@@ -10,6 +10,14 @@ export interface ProductTextFieldsForm {
   description: string;
   descriptionAr: string;
   sku: string;
+  /**
+   * Merchant-authored product card badge, bilingual. Same clearable contract
+   * as its siblings — emptying it on the edit form must send `null` or the
+   * merchant can never remove a badge they no longer want, which is the
+   * original clear-on-empty defect with a new field name.
+   */
+  badgeLabel: string;
+  badgeLabelAr: string;
 }
 
 export type ProductTextFieldsPayload = Record<
@@ -38,5 +46,13 @@ export function productTextFields(
     description: textFieldValue(form.description, intent),
     descriptionAr: textFieldValue(form.descriptionAr, intent),
     sku: textFieldValue(form.sku, intent),
+    // Trimmed at the call site — `textFieldValue` deliberately does not trim
+    // (its doc: "pass the value ALREADY trimmed when the caller trims"), and
+    // the pre-existing four fields are left byte-for-byte as they were. A
+    // badge is a chip, so `"  "` typed into it is a clear, not a two-space
+    // label: trimming here makes it send null instead of a whitespace string
+    // that would render an empty coloured pill on every card.
+    badgeLabel: textFieldValue(form.badgeLabel.trim(), intent),
+    badgeLabelAr: textFieldValue(form.badgeLabelAr.trim(), intent),
   };
 }

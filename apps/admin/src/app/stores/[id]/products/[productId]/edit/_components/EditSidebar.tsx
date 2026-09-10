@@ -1,6 +1,7 @@
 'use client';
 
-import { Button, Select } from '@force/ui';
+import { Button, Input, Select } from '@force/ui';
+import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { AICategorySuggestions } from '../../../../../../../components/AICategorySuggestions';
 
@@ -22,6 +23,16 @@ interface EditSidebarProps {
   onIsNewChange: (value: boolean) => void;
   isBestSeller: boolean;
   onIsBestSellerChange: (value: boolean) => void;
+  /**
+   * Merchant-authored product card badge, bilingual. Lives with the other
+   * card-facing flags because it IS one — the difference is that Featured /
+   * New / Best Seller are booleans the platform styles, and this one carries
+   * the merchant's own words.
+   */
+  badgeLabel: string;
+  onBadgeLabelChange: (value: string) => void;
+  badgeLabelAr: string;
+  onBadgeLabelArChange: (value: string) => void;
   saving: boolean;
   onCancel: () => void;
   /** Tenant scope for AI calls. */
@@ -44,6 +55,10 @@ export function EditSidebar({
   onIsNewChange,
   isBestSeller,
   onIsBestSellerChange,
+  badgeLabel,
+  onBadgeLabelChange,
+  badgeLabelAr,
+  onBadgeLabelArChange,
   saving,
   onCancel,
   storeId,
@@ -113,6 +128,29 @@ export function EditSidebar({
             />
             <span className="text-sm text-foreground">{tFields('bestSeller')}</span>
           </label>
+        </div>
+        {/* Custom card badge — free text, bilingual. Sits with the card flags
+            above because it renders in the same place on the card. Empty =
+            no badge at all (that is the feature's off switch: there is no
+            separate toggle by design). */}
+        <div className="mt-4 space-y-3 border-t border-border pt-4">
+          <Input
+            label={tFields('badgeLabel')}
+            value={badgeLabel}
+            onChange={e => onBadgeLabelChange(e.target.value)}
+            placeholder={tFields('badgeLabelPlaceholder')}
+            maxLength={PRODUCT_BADGE_LABEL_MAX_LENGTH}
+          />
+          <Input
+            label={tFields('badgeLabelAr')}
+            value={badgeLabelAr}
+            onChange={e => onBadgeLabelArChange(e.target.value)}
+            placeholder={tFields('badgeLabelArPlaceholder')}
+            maxLength={PRODUCT_BADGE_LABEL_MAX_LENGTH}
+            lang="ar"
+            dir="rtl"
+          />
+          <p className="text-xs text-muted-foreground">{tFields('badgeLabelHint')}</p>
         </div>
       </div>
 

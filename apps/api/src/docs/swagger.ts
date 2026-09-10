@@ -148,6 +148,13 @@ All errors follow this format:
             price: { type: 'integer', description: 'Price in fils (1 KWD = 1000 fils)' },
             compareAtPrice: { type: 'integer', nullable: true },
             sku: { type: 'string', nullable: true },
+            // Merchant-authored free-text card badge (EN + AR), same clearable
+            // contract as nameAr above: `null` clears, an omitted key leaves
+            // the stored value alone. Trimmed and capped at 32 characters by
+            // the update schema, so a documented `maxLength` here is the
+            // contract, not a hint.
+            badgeLabel: { type: 'string', nullable: true, maxLength: 32 },
+            badgeLabelAr: { type: 'string', nullable: true, maxLength: 32 },
             inventory: { type: 'integer' },
             status: { type: 'string', enum: ['active', 'draft', 'archived'] },
             images: { type: 'array', items: { $ref: '#/components/schemas/ProductImage' } },

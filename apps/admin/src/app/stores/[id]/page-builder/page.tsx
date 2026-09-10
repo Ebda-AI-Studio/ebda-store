@@ -2914,6 +2914,85 @@ export default function StoreLayoutPage() {
                       theme={storeInfo?.theme ?? FALLBACK_THEME}
                     />
                   </div>
+                  {/* Custom product badge group — corner + color for the
+                      merchant's own per-product label (Product.badgeLabel /
+                      badgeLabelAr, set on the product edit form). This block
+                      only STYLES the badge; whether it appears at all is
+                      per-product data, so there is deliberately no enable
+                      toggle here — an empty label already means off.
+                      Default (unset) = bottom-right corner, primary color:
+                      a different corner from the discount badge's bottom-left
+                      default so both show out of the box. When they DO share
+                      a corner, the custom badge wins and the discount badge is
+                      suppressed — see custom-badge.ts. Position is PHYSICAL
+                      (not RTL-mirrored), same as the discount badge. */}
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+                    <p className="text-sm font-semibold text-foreground">
+                      Custom product badge — الشارة المخصّصة
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Styling only. Type the badge text per product under Products → edit a product
+                      → Product Flags.
+                    </p>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">
+                        Badge position — موضع الشارة
+                      </label>
+                      <select
+                        value={layout.productCardDefaults?.customBadge?.position ?? ''}
+                        onChange={e =>
+                          setLayout(prev =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  productCardDefaults: {
+                                    ...(prev.productCardDefaults ?? {}),
+                                    customBadge: {
+                                      ...(prev.productCardDefaults?.customBadge ?? {}),
+                                      position:
+                                        (e.target.value as
+                                          | 'top-left'
+                                          | 'top-right'
+                                          | 'bottom-left'
+                                          | 'bottom-right') || undefined,
+                                    },
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Bottom right (default) — أسفل اليمين (افتراضي)</option>
+                        <option value="top-left">Top left — أعلى اليسار</option>
+                        <option value="top-right">Top right — أعلى اليمين</option>
+                        <option value="bottom-left">Bottom left — أسفل اليسار</option>
+                        <option value="bottom-right">Bottom right — أسفل اليمين</option>
+                      </select>
+                    </div>
+                    <ColorField
+                      label="Badge color"
+                      value={layout.productCardDefaults?.customBadge?.color}
+                      onChange={v =>
+                        setLayout(prev =>
+                          prev
+                            ? {
+                                ...prev,
+                                productCardDefaults: {
+                                  ...(prev.productCardDefaults ?? {}),
+                                  customBadge: {
+                                    ...(prev.productCardDefaults?.customBadge ?? {}),
+                                    color: v || undefined,
+                                  },
+                                },
+                              }
+                            : prev
+                        )
+                      }
+                      hint="Unset = platform primary color."
+                      theme={storeInfo?.theme ?? FALLBACK_THEME}
+                    />
+                  </div>
                 </div>
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

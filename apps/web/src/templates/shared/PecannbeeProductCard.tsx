@@ -32,6 +32,7 @@ import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor, getDiscountBadgePosition } from './discount-badge';
+import { getCustomBadgeColor, resolveCardBadges } from './custom-badge';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
@@ -192,6 +193,21 @@ function PecannbeeProductCardImpl({
     isRtl
   );
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
+  // Custom (merchant-authored) badge — the free text the merchant typed on
+  // the product itself. `resolveCardBadges` is the SINGLE owner of the mutex
+  // between this chip and the discount chip: it suppresses the custom badge
+  // when the product isn't orderable, and suppresses the DISCOUNT badge when
+  // both would land on the same physical corner. No label = both values fall
+  // back to today's behaviour exactly.
+  const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+    discountVisible: Boolean(onSale && discountBadgeText),
+    product,
+    isRtl,
+    orderable,
+    customPosition: defaults?.customBadge?.position,
+    discountPosition: defaults?.discountBadge?.position,
+  });
 
   // CTA shape + size classes (additive — '' when unset so pack styles win).
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
@@ -367,7 +383,7 @@ function PecannbeeProductCardImpl({
               both stock states. Corner + color are merchant-configurable
               via productCardDefaults.discountBadge (default bottom-left,
               physical — never mirrors with RTL). */}
-          {onSale && discountBadgeText && (
+          {onSale && discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(
                 'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
@@ -376,6 +392,21 @@ function PecannbeeProductCardImpl({
               style={{ backgroundColor: discountBadgeColor }}
             >
               {discountBadgeText}
+            </span>
+          )}
+          {/* Custom badge — merchant's own words (Product.badgeLabel/-Ar).
+              Same chip geometry as the sale chip above so the two read as one
+              system; only the corner + color differ. Renders only when the
+              merchant typed something. */}
+          {customBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                customBadgePositionCls
+              )}
+              style={{ backgroundColor: customBadgeColor }}
+            >
+              {customBadgeText}
             </span>
           )}
         </div>

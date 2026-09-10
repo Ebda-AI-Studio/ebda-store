@@ -16,6 +16,7 @@ import {
   getDiscountBadgeColor,
   getDiscountBadgePosition,
 } from '../../templates/shared/discount-badge';
+import { getCustomBadgeColor, resolveCardBadges } from '../../templates/shared/custom-badge';
 
 interface ProductListItemProps {
   product: Product;
@@ -85,6 +86,18 @@ export function ProductListItem({
     isRtl
   );
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
+  // Custom (merchant-authored) badge — same single-owner mutex as the grid
+  // cards. `orderable` here is the list view's richer inventory-based signal
+  // computed above, not `product.inStock`.
+  const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+    discountVisible: Boolean(discountBadgeText),
+    product,
+    isRtl,
+    orderable,
+    customPosition: defaults?.customBadge?.position,
+    discountPosition: defaults?.discountBadge?.position,
+  });
 
   // CTA shape + size extra classes.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
@@ -113,15 +126,32 @@ export function ProductListItem({
             BUG 2 fix: no inStock gate. Corner + color are merchant-
             configurable via productCardDefaults.discountBadge (default
             bottom-left, physical — never mirrors with RTL). */}
-        {(pricing.displayCompare || pricing.hasVariantDiscount) && discountBadgeText && (
+        {(pricing.displayCompare || pricing.hasVariantDiscount) &&
+          discountBadgeAllowed &&
+          discountBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-full px-2 py-0.5 text-xs font-bold uppercase text-white',
+                discountBadgePositionCls
+              )}
+              style={{ backgroundColor: discountBadgeColor }}
+            >
+              {discountBadgeText}
+            </span>
+          )}
+        {/* Custom badge — merchant's own words (Product.badgeLabel/-Ar).
+            Same chip geometry as the sale chip above; only corner + color
+            differ. The list thumbnail is small, so the chip inherits the
+            list view's tighter padding rather than the grid's. */}
+        {customBadgeText && (
           <span
             className={cn(
               'absolute z-10 rounded-full px-2 py-0.5 text-xs font-bold uppercase text-white',
-              discountBadgePositionCls
+              customBadgePositionCls
             )}
-            style={{ backgroundColor: discountBadgeColor }}
+            style={{ backgroundColor: customBadgeColor }}
           >
-            {discountBadgeText}
+            {customBadgeText}
           </span>
         )}
         {/* Task 3 B4: OOS badge on list view — sits inside the image container. */}

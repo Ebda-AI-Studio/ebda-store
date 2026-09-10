@@ -35,6 +35,7 @@ import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { SpecTable } from '../../../templates/shared/SpecTable';
 import { OosImageDim, OutOfStockRibbon } from '../../../templates/shared/ProductCardCta';
+import { getCustomBadgeColor, resolveCardBadges } from '../../../templates/shared/custom-badge';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
@@ -503,6 +504,29 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     outOfStock &&
     (selectedVariant ? selectedVariant.acceptsBackorder : product.acceptsBackorder) === true;
 
+  // Custom (merchant-authored) badge on the PDP. A badge that shows on the
+  // card and then vanishes on the product's own page is the same defect as
+  // not shipping it — the shopper clicks the "عرض" chip and lands on a page
+  // that never mentions it.
+  //
+  // `discountOccupiesCorner: false`: the PDP renders both badges as inline
+  // `<Badge>`s in a flex row, not as corner overlays, so they physically
+  // cannot collide and the corner arm of the mutex must not fire. The
+  // out-of-stock arm still applies, via the same backorder-aware `orderable`
+  // signal the cards use.
+  const { customBadgeText: pdpCustomBadgeText } = resolveCardBadges({
+    product,
+    isRtl: language === 'ar',
+    orderable: !outOfStock || canBackorder,
+    customPosition: resolvedLayout?.productCardDefaults?.customBadge?.position,
+    discountPosition: resolvedLayout?.productCardDefaults?.discountBadge?.position,
+    discountOccupiesCorner: false,
+  });
+  const pdpCustomBadgeColor = getCustomBadgeColor(
+    resolvedLayout?.productCardDefaults?.customBadge?.color,
+    store.theme
+  );
+
   return (
     <ShopChrome layout={resolvedLayout}>
       {/* Whole product detail page — gallery + info + variants +
@@ -662,6 +686,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             <div className="md:col-span-7">
               <div className="mb-4 flex items-center gap-2">
                 {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
+                {/* Custom badge — the merchant's own words, same chip the
+                    product cards show. Inline color so a merchant's
+                    productCardDefaults.customBadge.color carries onto the PDP
+                    instead of the badge silently reverting to the primary
+                    token here. */}
+                {pdpCustomBadgeText && (
+                  <Badge className="text-white" style={{ backgroundColor: pdpCustomBadgeColor }}>
+                    {pdpCustomBadgeText}
+                  </Badge>
+                )}
                 {/* Discount badge — BUG 1 fix: helper text (KWD or pct).
                     Waits for variant selection on variant products
                     (displayCompare is null until a variant is picked). */}

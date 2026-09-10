@@ -59,6 +59,46 @@ Invariants:
 - **The PDP carries the OOS system too** — `ProductDetailClient.tsx` mounts `OosImageDim` + `OutOfStockRibbon` on the main image from the same `productCardDefaults`, honoring backorder (`orderable = !outOfStock || canBackorder`).
 - **Backorder-aware CTA**: cards compute `orderable = product.inStock !== false || product.acceptsBackorder === true`; CTA pressable + OOS label hidden when orderable. `inStock` still used separately for NEW-badge suppression / BrandPill.
 
+## Custom product badge (2026-09-07)
+
+A **per-product, merchant-authored** chip rendered in the same visual language as the computed discount badge. Two nullable columns on `Product` (`badgeLabel` / `badgeLabelAr`, `VARCHAR(32)`, migration `20260907120000_product_custom_badge`) plus a `customBadge` block on `ProductCardDefaults` that carries only styling (`position` + `color`).
+
+The distinction that drives every decision below: `getDiscountBadgeText()` **derives** its text from the pricing maths and cannot say anything the numbers do not; this one is the merchant's own words ("عرض" / "Offer" on a School's Offer product), which nothing else in the platform could produce.
+
+**Where each half lives**
+
+| Half                              | Owner                                              | Surface                                                                                                            |
+| --------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| The text (per product, bilingual) | `Product.badgeLabel` / `badgeLabelAr`              | Admin → Products → edit → **Product Flags** card (`EditSidebar.tsx`), and the new-product form                     |
+| The look (per store)              | `productCardDefaults.customBadge.{position,color}` | Page Builder → "Product cards (everywhere)" → **Custom product badge**, sibling to the Discount / sale badge block |
+
+There is **no enable toggle by design** — an empty label already means off, which is why this satisfies "new visual features default OFF" structurally rather than with a flag. A store that has typed nothing renders byte-for-byte what it rendered before the feature existed (asserted, see below).
+
+**The badge mutex — `apps/web/src/templates/shared/custom-badge.ts`, `resolveCardBadges()`**
+
+Sister systems are a runtime mutex, not a merchant decision (same rule as the `SectionDivider` ↔ `backgroundPreset` precedent below). Three rules, one implementation, called by all nine surfaces:
+
+1. **No label → nothing changes.** `customBadgeText` is null, `discountBadgeAllowed` is true. The additive contract.
+2. **Not orderable → the custom badge is suppressed.** Out-of-stock is a hard state signal that must not compete with a promotion, and an "Offer" chip on something nobody can buy is a promise the store cannot keep. The **discount badge is deliberately NOT suppressed** here — it is factual pricing information and has rendered in both stock states since the 2026 "BUG 2" fix. This rule also collapses the three-way case (label + discount + OOS) to today's exact rendering, which is why there is no fourth rule for it.
+3. **Same physical corner → the custom badge wins, the discount badge yields.** The merchant _typed_ the custom label; the discount badge is _derived_. Explicit beats derived, same direction as the SectionDivider precedent. Different corners → both render. The comparison is on RESOLVED corners, so an unset position and its explicit twin count as the same corner.
+
+Two badges never stack on one corner, and the merchant is never asked to resolve the clash.
+
+**Invariants**
+
+- **Position is PHYSICAL, never RTL-mirrored** — identical rule and identical class mapping to `getDiscountBadgePosition` (`discount-badge.ts`). "bottom-right" is the physical bottom-right on an Arabic storefront too. The badge's _text_ follows the locale; its _placement_ does not.
+- **Defaults differ on purpose**: custom = `bottom-right`, discount = `bottom-left` (`CUSTOM_BADGE_DEFAULT_POSITION` / `DISCOUNT_BADGE_DEFAULT_POSITION`). A store that configures neither gets both badges, not a suppression. Bottom-right is also the only corner free of the platform's own overlays in both reading directions — the OOS ribbon, the NEW chip, the BrandPill and the wishlist heart all sit at the LOGICAL top-start.
+- **Colour** resolves `token:*` via `resolveColor` and falls back to `hsl(var(--primary))` (rule 15). Primary, not the discount badge's destructive red, so a promotion chip is never mistaken for a price cut.
+- **Locale fallback is two-way**: the current language's field wins, the other is the fallback. A merchant who fills only one box still gets a badge in both storefront languages. The label is merchant DATA — it is deliberately NOT in `LanguageContext`; only the admin's own field labels/hints are (`products.{new,edit}.fields.badgeLabel*` in `apps/admin/src/i18n/messages/{en,ar}.json`).
+- **`minimal` and the PDP pass `discountOccupiesCorner: false`.** minimal renders its discount as inline text under the price with no corner; the PDP renders both badges as inline `<Badge>`s in a flex row. Neither can collide, so rule 3 must not fire and steal their discount indicator. minimal's custom badge is still a corner overlay, styled in that pack's extra-quiet idiom (no shadow, micro-tracking) to match its NEW chip.
+- **Length is capped in three places** off one constant (`PRODUCT_BADGE_LABEL_MAX_LENGTH = 32`, `@force/shared`): the DB column (`VARCHAR(32)`), the Zod `badgeLabelSchema` (which **trims first**, so a padded max-length label is accepted and a whitespace-only value becomes `null`), and the admin inputs' `maxLength`. Over-length is **rejected**, never truncated — truncating ships a label the merchant never wrote.
+- **Clearable**: `null` clears, an omitted key leaves the stored value alone. The admin routes it through `productTextFields(form, 'update')` (`apps/admin/src/lib/form-text.ts` convention), which the `scripts/check-update-payload-clear.mjs` Lint gate enforces.
+- **Every data hop is an explicit allowlist and each one was widened**: `STOREFRONT_PRODUCT_SELECT`, the recommendation service's `productSelect` (FBT + "You might also like" render through the same canonical cards), `toTemplateProduct`, the wishlist route's two hand-written projections, and the three recommendation components' inline maps. A field missing from any of these reaches no card, with no error anywhere.
+
+**Coverage gate:** `tests/unit/product-custom-badge-render-paths.test.ts` asserts all eight card render paths + the PDP call `resolveCardBadges` and render the text, that no path re-implements the mutex, and that each data hop above still carries both columns. `apps/web/src/templates/shared/product-card-badge-render.test.tsx` renders the eight paths and asserts the additive contract byte-for-byte.
+
+**Known gap (deliberate, not shipped here):** the CSV product import (`PRODUCT_IMPORT_COLUMNS`) does not carry the badge — it also omits `excerpt`, `metaTitle` and `discountType`, so adding one field alone would be arbitrary. The **shared** (public) wishlist page renders its own bespoke markup rather than a card render path and therefore shows no badge; its projection also already drops `nameAr` and `discountType`, which is a pre-existing gap in a different system.
+
 ## PLP / PDP context (2026-06-24)
 
 - `ProductsClient.tsx` derives the active category into breadcrumb + H1 + contextual subtitle. PDP breadcrumb: `home / products / <category> / <product>`, category segment links to `/products?category=<slug>` (locale-aware, only with a primary category).
@@ -72,6 +112,7 @@ Per product: detect the richer of `description`/`descriptionAr` (`description-ri
 ## Layout / sizing invariants
 
 - **SectionDivider ↔ backgroundPreset mutex**: when `backgroundPreset !== 'none'`, `SectionDivider` returns null (color alternation IS the divider).
+- **Custom badge ↔ discount badge mutex**: when both resolve to the same physical corner, the merchant-typed custom badge renders and the derived discount badge returns null; out-of-stock suppresses the custom badge and leaves the discount badge alone. One implementation, `resolveCardBadges()` in `templates/shared/custom-badge.ts` — see "Custom product badge" above.
 - **Hairline accents**: `SectionHeading` flanks `kicker` + `subtitle` with `bg-foreground/30` hairlines automatically when set.
 - **Card-size:font-size locked table**: sizes come from `getProductCardTextSizes(cardSize)` in `@force/shared`; pack-styles carry flavor only (weight/tracking/color/family).
 - **Per-template branded baseline (Brand Engine Phase 2, 2026-06-05)**: empty `layoutSettings` inherits `resolveLayoutSettings(saved, store.template)` from `packages/shared/src/types/template-baselines.ts` (`BASE_BRANDED_LAYOUT` + `TEMPLATE_IDENTITIES` → `TEMPLATE_LAYOUT_BASELINES`). Colors `token:*` only. Saved values win; wadyaljuz unchanged (immutability gate: `verify-baseline-nodrift.mjs`).

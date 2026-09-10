@@ -26,6 +26,7 @@ import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
+import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
 
 /**
  * Classic Template - Product Card
@@ -131,6 +132,21 @@ function ClassicProductCard({
     isRtl
   );
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
+  // Custom (merchant-authored) badge — the free text the merchant typed on
+  // the product itself. `resolveCardBadges` is the SINGLE owner of the mutex
+  // between this chip and the discount chip: it suppresses the custom badge
+  // when the product isn't orderable, and suppresses the DISCOUNT badge when
+  // both would land on the same physical corner. No label = both values fall
+  // back to today's behaviour exactly.
+  const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+    discountVisible: Boolean(hasSale && discountBadgeText),
+    product,
+    isRtl,
+    orderable,
+    customPosition: defaults?.customBadge?.position,
+    discountPosition: defaults?.discountBadge?.position,
+  });
 
   return (
     <article
@@ -252,7 +268,7 @@ function ClassicProductCard({
               BUG 2 fix: no inStock gate. Sale badge corner + color are
               merchant-configurable via productCardDefaults.discountBadge
               (default bottom-left, physical — never mirrors with RTL). */}
-          {hasSale && discountBadgeText ? (
+          {hasSale && discountBadgeAllowed && discountBadgeText ? (
             <span
               className={cn(
                 'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold font-serif tracking-widest uppercase text-white shadow-[0_8px_20px_-8px_hsl(var(--destructive)/0.35)]',
@@ -276,6 +292,20 @@ function ClassicProductCard({
                 label={isRtl ? 'جديد' : 'New'}
               />
             )
+          )}
+          {/* Custom badge — merchant's own words (Product.badgeLabel/-Ar),
+              rendered in classic's serif badge idiom so it reads as native.
+              Only the corner + color differ from the sale chip above. */}
+          {customBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold font-serif tracking-widest uppercase text-white shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]',
+                customBadgePositionCls
+              )}
+              style={{ backgroundColor: customBadgeColor }}
+            >
+              {customBadgeText}
+            </span>
           )}
           {/* Platform-level OOS ribbon (red, prominent) — replaces the
               theme-local soldOut badge for visual consistency across

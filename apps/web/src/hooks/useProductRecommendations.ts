@@ -25,6 +25,9 @@ export interface RecommendedProduct {
   compareAtPrice?: number;
   discountType?: 'percentage' | 'fixed' | null;
   discountValue?: number | null;
+  /** Merchant-authored card badge (EN / AR). Absent = no badge. */
+  badgeLabel?: string | null;
+  badgeLabelAr?: string | null;
   images: Array<{ id: string; url: string; alt?: string }>;
   /** Variants of this product — empty/missing means a simple SKU. */
   variants?: Array<{ id: string; price: number }>;

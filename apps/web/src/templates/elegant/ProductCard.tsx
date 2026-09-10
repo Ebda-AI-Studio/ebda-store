@@ -26,6 +26,7 @@ import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
+import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
 
 /**
  * Elegant Template - Product Card
@@ -143,6 +144,21 @@ function ElegantProductCard({
     isRtl
   );
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
+  // Custom (merchant-authored) badge — the free text the merchant typed on
+  // the product itself. `resolveCardBadges` is the SINGLE owner of the mutex
+  // between this chip and the discount chip: it suppresses the custom badge
+  // when the product isn't orderable, and suppresses the DISCOUNT badge when
+  // both would land on the same physical corner. No label = both values fall
+  // back to today's behaviour exactly.
+  const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+    discountVisible: Boolean(hasSale && discountBadgeText),
+    product,
+    isRtl,
+    orderable,
+    customPosition: defaults?.customBadge?.position,
+    discountPosition: defaults?.discountBadge?.position,
+  });
 
   return (
     <article
@@ -310,7 +326,7 @@ function ElegantProductCard({
               to the merchant-configured corner (default bottom-left,
               physical — never mirrors with RTL). BUG 1 fix: helper text.
               BUG 2 fix: no inStock gate. */}
-          {hasSale && discountBadgeText && (
+          {hasSale && discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(
                 'absolute z-10 rounded-full px-2.5 py-1 text-[9px] font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
@@ -319,6 +335,20 @@ function ElegantProductCard({
               style={{ backgroundColor: discountBadgeColor }}
             >
               {discountBadgeText}
+            </span>
+          )}
+          {/* Custom badge — merchant's own words (Product.badgeLabel/-Ar),
+              rendered in this theme's own badge idiom so it reads as native.
+              Only the corner + color differ from the sale chip above. */}
+          {customBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-full px-2.5 py-1 text-[9px] font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                customBadgePositionCls
+              )}
+              style={{ backgroundColor: customBadgeColor }}
+            >
+              {customBadgeText}
             </span>
           )}
 

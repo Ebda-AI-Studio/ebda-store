@@ -21,6 +21,12 @@ export function toTemplateProduct(p: Product): TemplateProduct {
     // can render "Save KWD X.XXX" instead of "-Y%" for fixed-amount discounts.
     discountType: p.discountType ?? undefined,
     discountValue: p.discountValue ?? undefined,
+    // Merchant-authored card badge. This adapter is an explicit whitelist, so
+    // a field that is not named here is DROPPED — every card downstream would
+    // render no badge while the admin showed a saved label. Same class of bug
+    // as the `nameAr` and `discountType` lines above.
+    badgeLabel: p.badgeLabel ?? undefined,
+    badgeLabelAr: p.badgeLabelAr ?? undefined,
     images: (p.images || []).map(img => ({
       id: img.id || p.id,
       url: img.url,

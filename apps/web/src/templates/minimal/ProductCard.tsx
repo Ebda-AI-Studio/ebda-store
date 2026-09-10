@@ -30,6 +30,7 @@ import {
   isProductNew,
 } from '../shared/ProductCardCta';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
+import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
 import { cn } from '@force/ui';
 
 /**
@@ -134,6 +135,21 @@ function MinimalProductCard({
   // is a no-op for this theme. Unset color falls back to the platform
   // destructive/red default (matches the previous hardcoded text-red-600).
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
+  // Custom (merchant-authored) badge. Unlike the other four themes, minimal's
+  // DISCOUNT indicator is inline text under the price with no corner at all,
+  // so the two can never collide: `discountOccupiesCorner: false` keeps the
+  // corner arm of the mutex from firing and stealing the discount text. The
+  // OOS suppression arm still applies.
+  const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const { customBadgeText, customBadgePositionCls } = resolveCardBadges({
+    discountVisible: Boolean(discountBadgeText),
+    product,
+    isRtl,
+    orderable,
+    customPosition: defaults?.customBadge?.position,
+    discountPosition: defaults?.discountBadge?.position,
+    discountOccupiesCorner: false,
+  });
 
   return (
     <article
@@ -191,6 +207,26 @@ function MinimalProductCard({
               aria-label={isRtl ? 'منتج جديد' : 'New product'}
             >
               {isRtl ? 'جديد' : 'NEW'}
+            </span>
+          )}
+          {/* Custom badge — merchant's own words (Product.badgeLabel/-Ar).
+              Kept in minimal's extra-quiet badge idiom (no shadow, tight
+              padding, micro-tracking) to match the NEW chip above rather than
+              the loud chips the other packs use. It is a corner overlay even
+              though minimal's discount indicator is inline text: this chip is
+              merchant-authored promotional copy about the PRODUCT, not a
+              price annotation, and the merchant chose its corner. It appears
+              only when a label is typed, so the pack stays chrome-free by
+              default. */}
+          {customBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white',
+                customBadgePositionCls
+              )}
+              style={{ backgroundColor: customBadgeColor }}
+            >
+              {customBadgeText}
             </span>
           )}
           {onToggleCompare && (

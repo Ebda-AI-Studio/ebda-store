@@ -884,6 +884,29 @@ export interface ProductCardDefaults {
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
     color?: string; // token:* or hex; unset = theme destructive/red default
   };
+  /**
+   * Custom (merchant-authored) product badge corner + color — the sibling of
+   * `discountBadge` for the free-text `Product.badgeLabel` / `badgeLabelAr`
+   * chip. Deliberately the same shape and the same PHYSICAL-corner semantics:
+   * "bottom-right" is the physical bottom-right on LTR and RTL storefronts
+   * alike, so a merchant's chosen corner does not jump when a shopper
+   * switches language.
+   *
+   * Unset position defaults to 'bottom-right' at render time
+   * (apps/web/src/templates/shared/custom-badge.ts) — deliberately NOT the
+   * discount badge's 'bottom-left' default, so a store that configures
+   * neither gets the two badges in two different corners instead of a
+   * suppression. Unset color defaults to the platform primary token.
+   *
+   * NOTE: this block only styles the badge. Whether it renders at all is
+   * per-product data (`Product.badgeLabel`), not a layout setting — there is
+   * no "enable custom badges" toggle by design, because an empty label
+   * already means off.
+   */
+  customBadge?: {
+    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+    color?: string; // token:* or hex; unset = theme primary default
+  };
 }
 
 export interface StoreLayoutSettings {

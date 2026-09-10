@@ -604,6 +604,18 @@ const layoutSchemaInternal = z
           })
           .partial()
           .optional(),
+        // 2026-09: custom (merchant-authored) product badge corner + color —
+        // the styling sibling of discountBadge for Product.badgeLabel. Must be
+        // listed or Zod silently strips it on every PUT (no .passthrough()).
+        // Keep in sync with ProductCardDefaults in
+        // packages/shared/src/types/store-layout.ts.
+        customBadge: z
+          .object({
+            position: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']).optional(),
+            color: colorValue,
+          })
+          .partial()
+          .optional(),
       })
       .partial()
       .optional(),

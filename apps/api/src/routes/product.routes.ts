@@ -10,10 +10,36 @@ import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { invalidateCachedPrefix } from '../lib/public-cache';
 import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
+import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@force/shared';
 
 const router = Router({ mergeParams: true });
 
 // Validation schemas
+
+/**
+ * Merchant-authored product card badge label (EN or AR).
+ *
+ * Trims BEFORE measuring, then rejects anything still over the cap:
+ *   - `"  Offer  "`      → `"Offer"` (a padded label is a typo, not an error)
+ *   - `"   "`            → `null`    (whitespace-only IS clearing it)
+ *   - 33+ real chars     → 400       (a badge is a chip, not a paragraph —
+ *                                     truncating silently would ship a label
+ *                                     the merchant never wrote)
+ *   - `null`             → `null`    (clear the column)
+ *   - key omitted        → untouched (Prisma's convention, same as every
+ *                                     other nullable free-text column here)
+ *
+ * The cap is shared with the DB column (`VARCHAR(32)`) and the admin input's
+ * maxLength via PRODUCT_BADGE_LABEL_MAX_LENGTH so the three cannot drift.
+ */
+const badgeLabelSchema = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform(value => (typeof value === 'string' ? value.trim() || null : value))
+  .refine(value => value == null || value.length <= PRODUCT_BADGE_LABEL_MAX_LENGTH, {
+    message: `Badge label must be ${PRODUCT_BADGE_LABEL_MAX_LENGTH} characters or fewer.`,
+  });
+
 const createProductSchema = z.object({
   name: z.string().min(1).max(255),
   // Free-text columns the merchant can legitimately empty on the edit form.
@@ -59,6 +85,10 @@ const createProductSchema = z.object({
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().optional(),
   isBestSeller: z.boolean().optional(),
+  // Free-text card badge, bilingual. Sibling of the isNew/isBestSeller card
+  // flags — the difference is that this one carries the merchant's own words.
+  badgeLabel: badgeLabelSchema,
+  badgeLabelAr: badgeLabelSchema,
   // SEO meta — null clears, undefined leaves alone (Prisma convention).
   metaTitle: z.string().max(180).optional().nullable(),
   metaTitleAr: z.string().max(180).optional().nullable(),

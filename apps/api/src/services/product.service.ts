@@ -256,6 +256,14 @@ interface CreateProductData {
   isFeatured?: boolean;
   isNew?: boolean;
   isBestSeller?: boolean;
+  /**
+   * Merchant-authored free-text card badge, bilingual. `null` clears,
+   * `undefined` leaves the stored value alone — same convention as every
+   * other nullable free-text column above. Already trimmed and length-checked
+   * by `badgeLabelSchema` in product.routes.ts.
+   */
+  badgeLabel?: string | null;
+  badgeLabelAr?: string | null;
   categories?: string[];
   images?: { url: string; alt?: string }[];
   /** SEO meta — set per-product or via the AI sweep. `null` clears. */
@@ -453,6 +461,12 @@ export const STOREFRONT_PRODUCT_SELECT = {
   metaDescriptionAeo: true,
   metaDescriptionAeoAr: true,
   isNew: true,
+  // Merchant-authored card badge — the storefront renders it on every product
+  // card and on the PDP, so it MUST cross the public boundary. Omitting it
+  // here is the classic silent failure: the admin saves, the DB has the row,
+  // and the card shows nothing.
+  badgeLabel: true,
+  badgeLabelAr: true,
   updatedAt: true,
   createdAt: true,
 } as const satisfies Prisma.ProductSelect;
@@ -723,6 +737,8 @@ export class ProductService {
         featured: data.isFeatured ?? false,
         isNew: data.isNew ?? false,
         isBestSeller: data.isBestSeller ?? false,
+        badgeLabel: data.badgeLabel ?? null,
+        badgeLabelAr: data.badgeLabelAr ?? null,
         images: data.images
           ? {
               create: data.images.map((img, index) => ({
@@ -903,6 +919,10 @@ export class ProductService {
           ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
           ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
           ...(data.sku !== undefined ? { sku: data.sku } : {}),
+          // Card badge — null clears, an omitted key leaves it alone. Same
+          // convention as nameAr / description / excerpt above.
+          ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
+          ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
             ? { lowStockThreshold: data.lowStockThreshold }

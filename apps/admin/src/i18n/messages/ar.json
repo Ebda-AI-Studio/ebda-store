@@ -668,7 +668,12 @@
         "noCategory": "بدون فئة",
         "featured": "منتج مميّز",
         "newArrival": "وصل حديثًا",
-        "bestSeller": "الأكثر مبيعاً"
+        "bestSeller": "الأكثر مبيعاً",
+        "badgeLabel": "شارة البطاقة (بالإنجليزية)",
+        "badgeLabelPlaceholder": "مثلاً Offer",
+        "badgeLabelAr": "شارة البطاقة (بالعربية)",
+        "badgeLabelArPlaceholder": "مثلاً عرض",
+        "badgeLabelHint": "نص حر يظهر كشارة على بطاقة هذا المنتج وصفحته. اتركه فارغًا لإخفاء الشارة. 32 حرفًا كحد أقصى."
       },
       "statusOptions": {
         "draft": "مسودة",
@@ -807,6 +812,11 @@
         "descriptionPlaceholder": "صف منتجك...",
         "descriptionAr": "الوصف (بالعربية)",
         "descriptionArPlaceholder": "وصف المنتج...",
+        "badgeLabel": "شارة البطاقة (بالإنجليزية)",
+        "badgeLabelPlaceholder": "مثلاً Offer",
+        "badgeLabelAr": "شارة البطاقة (بالعربية)",
+        "badgeLabelArPlaceholder": "مثلاً عرض",
+        "badgeLabelHint": "نص حر يظهر كشارة على بطاقة هذا المنتج وصفحته. اتركه فارغًا لإخفاء الشارة. 32 حرفًا كحد أقصى.",
         "mediaHint": "اسحب وأفلت الصور هنا، أو انقر للاختيار",
         "mediaSizeHint": "الموصى به 1000×1000 (مربع). حتى 10 ميجابايت لكل ملف — نقوم بضغطها تلقائياً للمتجر.",
         "price": "السعر (د.ك)",

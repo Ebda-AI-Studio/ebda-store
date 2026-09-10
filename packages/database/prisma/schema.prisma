@@ -816,6 +816,17 @@ model Product {
   // Merchant-set display position within the Best Sellers carousel.
   // 0 = unordered (falls back to createdAt desc). Set via the reorder admin page.
   bestSellerPosition   Int           @default(0) @map("best_seller_position")
+  // Free-text promotional chip rendered on the product card (and PDP) in the
+  // same visual language as the computed discount badge — the merchant types
+  // it, the platform does not derive it. Bilingual pair, same convention as
+  // name/nameAr and description/descriptionAr. NULL (the default for every
+  // existing row) renders nothing at all: the feature is off until a merchant
+  // types a label. VarChar(32) caps it at the DB layer — a badge is a few
+  // words ("Offer" / "عرض"), never a sentence; the Zod layer trims and
+  // enforces the same 32-character cap so an over-long label is rejected at
+  // the edge instead of truncated silently.
+  badgeLabel           String?       @map("badge_label") @db.VarChar(32)
+  badgeLabelAr         String?       @map("badge_label_ar") @db.VarChar(32)
   viewCount            Int           @default(0) @map("view_count")
   // Short 1-2 sentence blurb, distinct from the full `description`. Written
   // by the bulk-ai-excerpt sweep (or manually) — surfaced anywhere a compact

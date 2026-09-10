@@ -31,6 +31,7 @@ import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
 import { getDiscountBadgeColor, getDiscountBadgePosition } from './discount-badge';
+import { getCustomBadgeColor, resolveCardBadges } from './custom-badge';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -135,6 +136,10 @@ export function ProductCarousel({
     isRtl
   );
   const discountBadgeColor = getDiscountBadgeColor(cardDefaults?.discountBadge?.color, store.theme);
+  // Custom (merchant-authored) badge styling — the per-product decision
+  // (`resolveCardBadges`) happens inside the map below, since it depends on
+  // that product's own label + stock state.
+  const customBadgeColor = getCustomBadgeColor(cardDefaults?.customBadge?.color, store.theme);
   // Build CTA extra classes for inline carousel CTA buttons.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
     .filter(Boolean)
@@ -339,6 +344,17 @@ export function ProductCarousel({
               // Task 13: backorder-aware orderable signal.
               const orderable = inStock || product.acceptsBackorder === true;
               const showNewBadge = inStock && isProductNew(product);
+              // Badge mutex — single owner, same call as every other card
+              // path. No label on this product = today's rendering exactly.
+              const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } =
+                resolveCardBadges({
+                  discountVisible: Boolean(onSale && discountBadgeText),
+                  product,
+                  isRtl: isRtl ?? false,
+                  orderable,
+                  customPosition: cardDefaults?.customBadge?.position,
+                  discountPosition: cardDefaults?.discountBadge?.position,
+                });
 
               return (
                 <li
@@ -473,7 +489,7 @@ export function ProductCarousel({
                             productCardDefaults.discountBadge (default
                             bottom-left, physical — never mirrors with RTL;
                             clears the top OOS ribbon by design). */}
-                        {onSale && discountBadgeText && (
+                        {onSale && discountBadgeAllowed && discountBadgeText && (
                           <span
                             className={cn(
                               'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
@@ -482,6 +498,20 @@ export function ProductCarousel({
                             style={{ backgroundColor: discountBadgeColor }}
                           >
                             {discountBadgeText}
+                          </span>
+                        )}
+                        {/* Custom badge — merchant's own words
+                            (Product.badgeLabel/-Ar). Same chip geometry as
+                            the sale chip above; only corner + color differ. */}
+                        {customBadgeText && (
+                          <span
+                            className={cn(
+                              'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]',
+                              customBadgePositionCls
+                            )}
+                            style={{ backgroundColor: customBadgeColor }}
+                          >
+                            {customBadgeText}
                           </span>
                         )}
                         {/* Bucket E3 (2026-05-17): quick-add (+) circle button

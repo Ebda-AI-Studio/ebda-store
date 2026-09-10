@@ -21,6 +21,8 @@ interface WishlistItem {
     compareAtPrice?: number;
     discountType?: 'percentage' | 'fixed' | null;
     discountValue?: number | null;
+    badgeLabel?: string | null;
+    badgeLabelAr?: string | null;
     images: string[];
     status: string;
   };
@@ -254,6 +256,8 @@ export default function WishlistClient() {
     compareAtPrice: item.product.compareAtPrice,
     discountType: item.product.discountType ?? undefined,
     discountValue: item.product.discountValue ?? undefined,
+    badgeLabel: item.product.badgeLabel ?? undefined,
+    badgeLabelAr: item.product.badgeLabelAr ?? undefined,
     images: item.product.images.map((url, i) => ({ id: `${item.id}-${i}`, url })),
     inStock: item.product.status === 'active',
   }));

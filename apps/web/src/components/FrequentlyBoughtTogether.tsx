@@ -190,6 +190,8 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
               compareAtPrice: p.compareAtPrice,
               discountType: p.discountType ?? undefined,
               discountValue: p.discountValue ?? undefined,
+              badgeLabel: p.badgeLabel ?? undefined,
+              badgeLabelAr: p.badgeLabelAr ?? undefined,
               images: p.images,
               inStock: true,
               variants: p.variants,

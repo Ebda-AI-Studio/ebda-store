@@ -9,6 +9,7 @@ import {
   applyDiscount,
   computeDiscountAmount,
   formatPrice,
+  PRODUCT_BADGE_LABEL_MAX_LENGTH,
 } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
@@ -63,6 +64,9 @@ export default function NewProductPage() {
     nameAr: '',
     description: '',
     descriptionAr: '',
+    /** Merchant-authored product card badge (EN / AR). Empty = no badge. */
+    badgeLabel: '',
+    badgeLabelAr: '',
     /** Regular (RRP) price as KWD string entered by the merchant. */
     price: '',
     costPrice: '',
@@ -256,6 +260,28 @@ export default function NewProductPage() {
                   lang="ar"
                   dir="rtl"
                 />
+                {/* Card badge — the merchant's own promotional chip, shown on
+                    every product-card render path and on the PDP. Bilingual
+                    like every other free-text field; empty = no badge. */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input
+                    label={t('fields.badgeLabel')}
+                    value={formData.badgeLabel}
+                    onChange={e => updateField('badgeLabel', e.target.value)}
+                    placeholder={t('fields.badgeLabelPlaceholder')}
+                    maxLength={PRODUCT_BADGE_LABEL_MAX_LENGTH}
+                  />
+                  <Input
+                    label={t('fields.badgeLabelAr')}
+                    value={formData.badgeLabelAr}
+                    onChange={e => updateField('badgeLabelAr', e.target.value)}
+                    placeholder={t('fields.badgeLabelArPlaceholder')}
+                    maxLength={PRODUCT_BADGE_LABEL_MAX_LENGTH}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{t('fields.badgeLabelHint')}</p>
               </div>
             </div>
 

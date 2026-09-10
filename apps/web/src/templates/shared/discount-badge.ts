@@ -10,6 +10,15 @@ import { resolveColor } from '@force/shared';
 export type DiscountBadgePosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 /**
+ * Corner used when the merchant has not chosen one. Exported (rather than
+ * left implicit in the `default:` arm below) because the custom-badge mutex
+ * in `custom-badge.ts` has to compare the two badges' RESOLVED corners — an
+ * unset discount position and an explicit 'bottom-left' are the same corner,
+ * and a comparison that missed that would let two chips stack on it.
+ */
+export const DISCOUNT_BADGE_DEFAULT_POSITION: DiscountBadgePosition = 'bottom-left';
+
+/**
  * Map the merchant's chosen discount-badge corner to Tailwind PHYSICAL
  * position classes (`left-*` / `right-*` / `top-*` / `bottom-*`) — NOT
  * logical `start-*` / `end-*`.

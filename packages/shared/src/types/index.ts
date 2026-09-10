@@ -228,6 +228,18 @@ export interface ProductOption {
   values: string[];
 }
 
+/**
+ * Hard cap on a merchant-authored product card badge label, in characters,
+ * applied AFTER trimming.
+ *
+ * One number, three enforcement points — DB (`products.badge_label
+ * VARCHAR(32)`), API Zod (`product.routes.ts`), admin input `maxLength` —
+ * because a cap that lives only in the form is a suggestion. A badge is a
+ * chip on a product card ("Offer", "عرض"), never a sentence: an unbounded
+ * label breaks the layout on all eight card render paths at once.
+ */
+export const PRODUCT_BADGE_LABEL_MAX_LENGTH = 32;
+
 export interface Product {
   id: string;
   storeId?: string;
@@ -251,6 +263,19 @@ export interface Product {
   status: ProductStatus;
   isFeatured?: boolean;
   isNew?: boolean;
+  /**
+   * Merchant-authored free-text card badge (EN). `null`/absent renders
+   * nothing — the badge does not exist until a merchant types a label.
+   * Capped at PRODUCT_BADGE_LABEL_MAX_LENGTH after trimming.
+   */
+  badgeLabel?: string | null;
+  /**
+   * Arabic counterpart of `badgeLabel`, same convention as `nameAr` /
+   * `descriptionAr`. Either side alone is enough: the storefront prefers the
+   * current locale's value and falls back to the other, so a merchant who
+   * fills only one language still gets a badge in both.
+   */
+  badgeLabelAr?: string | null;
   hasVariants?: boolean;
   weight?: number;
   images: ProductImage[];

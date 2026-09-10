@@ -111,6 +111,10 @@ interface Product {
   /** Discount value: basis points (bps) for percentage; fils for fixed. null when unset. */
   discountValue?: number | null;
   sku?: string;
+  /** Merchant-authored free-text card badge (EN). null/absent = no badge. */
+  badgeLabel?: string | null;
+  /** Arabic counterpart; either side alone is enough (each falls back to the other). */
+  badgeLabelAr?: string | null;
   inventory?: number;
   /** Server-computed: inventory <= 0 && allowBackorder. Keeps Add-to-Cart
    *  enabled for out-of-stock backorderable products (the cart/order API

@@ -22,6 +22,12 @@ const productSelect = {
   slug: true,
   price: true,
   compareAtPrice: true,
+  // Merchant-authored card badge. The FBT grid and the "You might also like"
+  // strip render through PecannbeeProductCard / ProductCarousel — the same
+  // canonical card components as the PLP — so a badge omitted here shows up
+  // as "the badge works everywhere except the recommendation strips".
+  badgeLabel: true,
+  badgeLabelAr: true,
   images: {
     take: 2, // primary + hover-reveal second image on recommendation cards
     orderBy: { position: 'asc' as const },

@@ -668,7 +668,12 @@
         "noCategory": "No category",
         "featured": "Featured Product",
         "newArrival": "New Arrival",
-        "bestSeller": "Best Seller"
+        "bestSeller": "Best Seller",
+        "badgeLabel": "Card badge (English)",
+        "badgeLabelPlaceholder": "e.g. Offer",
+        "badgeLabelAr": "Card badge (Arabic)",
+        "badgeLabelArPlaceholder": "\u0645\u062b\u0644\u0627\u064b \u0639\u0631\u0636",
+        "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters."
       },
       "statusOptions": {
         "draft": "Draft",
@@ -807,6 +812,11 @@
         "descriptionPlaceholder": "Describe your product...",
         "descriptionAr": "Description (Arabic)",
         "descriptionArPlaceholder": "وصف المنتج...",
+        "badgeLabel": "Card badge (English)",
+        "badgeLabelPlaceholder": "e.g. Offer",
+        "badgeLabelAr": "Card badge (Arabic)",
+        "badgeLabelArPlaceholder": "مثلاً عرض",
+        "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
         "price": "Price (KWD)",

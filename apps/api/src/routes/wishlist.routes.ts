@@ -119,6 +119,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         compareAtPrice: item.product.compareAtPrice
           ? item.product.compareAtPrice / 1000
           : undefined,
+        // Merchant-authored card badge — the wishlist grid renders through
+        // T.ProductGrid → the theme ProductCards, so this projection must
+        // carry it or the badge silently disappears on this one surface.
+        badgeLabel: item.product.badgeLabel,
+        badgeLabelAr: item.product.badgeLabelAr,
         images: item.product.images.map(img => img.url),
         status: item.product.status,
       },
@@ -235,6 +240,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
             compareAtPrice: item.product.compareAtPrice
               ? item.product.compareAtPrice / 1000
               : undefined,
+            badgeLabel: item.product.badgeLabel,
+            badgeLabelAr: item.product.badgeLabelAr,
             images: item.product.images.map(img => img.url),
             status: item.product.status,
           },

@@ -50,6 +50,9 @@ interface Product {
   isFeatured: boolean;
   isNew: boolean;
   isBestSeller: boolean;
+  /** Merchant-authored product card badge (EN / AR). null = no badge. */
+  badgeLabel?: string | null;
+  badgeLabelAr?: string | null;
   categories: { categoryId: string; category: { id: string; name: string } }[];
   images: { id: string; url: string; alt?: string; position: number }[];
   store: { id: string; name: string; slug: string };
@@ -128,6 +131,8 @@ export default function EditProductPage() {
     isFeatured: false,
     isNew: false,
     isBestSeller: false,
+    badgeLabel: '',
+    badgeLabelAr: '',
     category: '',
     metaTitle: '',
     metaTitleAr: '',
@@ -240,6 +245,8 @@ export default function EditProductPage() {
           isFeatured: p.isFeatured || false,
           isNew: p.isNew || false,
           isBestSeller: p.isBestSeller || false,
+          badgeLabel: p.badgeLabel || '',
+          badgeLabelAr: p.badgeLabelAr || '',
           category: p.categories?.[0]?.categoryId || p.categories?.[0]?.category?.id || '',
           metaTitle: (p as Product & { metaTitle?: string }).metaTitle || '',
           metaTitleAr: (p as Product & { metaTitleAr?: string }).metaTitleAr || '',
@@ -1071,6 +1078,10 @@ export default function EditProductPage() {
             onIsNewChange={value => updateField('isNew', value)}
             isBestSeller={formData.isBestSeller}
             onIsBestSellerChange={value => updateField('isBestSeller', value)}
+            badgeLabel={formData.badgeLabel}
+            onBadgeLabelChange={value => updateField('badgeLabel', value)}
+            badgeLabelAr={formData.badgeLabelAr}
+            onBadgeLabelArChange={value => updateField('badgeLabelAr', value)}
             saving={saving}
             // Cancel returns to the LIST (returnTo), not the product view page —
             // the merchant is bailing out of editing back to where they were.

@@ -43,6 +43,14 @@ export interface TemplateProduct {
   reviewCount?: number;
   isNew?: boolean;
   isFeatured?: boolean;
+  /**
+   * Merchant-authored free-text card badge (EN / AR). Absent or empty means
+   * no badge at all — the platform never derives this text, unlike the
+   * discount badge. Rendered by every card via
+   * `resolveCardBadges` in templates/shared/custom-badge.ts.
+   */
+  badgeLabel?: string | null;
+  badgeLabelAr?: string | null;
   inStock?: boolean;
   /**
    * Server-computed: inventory <= 0 AND allowBackorder. When true the product

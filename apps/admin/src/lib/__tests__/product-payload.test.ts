@@ -13,10 +13,25 @@
 import { describe, it, expect } from 'vitest';
 import { productTextFields, type ProductTextFieldsForm } from '../product-payload';
 
-const FIELDS = ['nameAr', 'description', 'descriptionAr', 'sku'] as const;
+const FIELDS = [
+  'nameAr',
+  'description',
+  'descriptionAr',
+  'sku',
+  'badgeLabel',
+  'badgeLabelAr',
+] as const;
 
 function form(overrides: Partial<ProductTextFieldsForm> = {}): ProductTextFieldsForm {
-  return { nameAr: '', description: '', descriptionAr: '', sku: '', ...overrides };
+  return {
+    nameAr: '',
+    description: '',
+    descriptionAr: '',
+    sku: '',
+    badgeLabel: '',
+    badgeLabelAr: '',
+    ...overrides,
+  };
 }
 
 describe('productTextFields — edit form (update)', () => {
@@ -35,6 +50,8 @@ describe('productTextFields — edit form (update)', () => {
       description: null,
       descriptionAr: null,
       sku: null,
+      badgeLabel: null,
+      badgeLabelAr: null,
     });
   });
 
@@ -45,6 +62,8 @@ describe('productTextFields — edit form (update)', () => {
         description: 'A long English description.',
         descriptionAr: 'وصف عربي',
         sku: 'PB-001',
+        badgeLabel: 'Offer',
+        badgeLabelAr: 'عرض',
       }),
       'update'
     );
@@ -53,6 +72,8 @@ describe('productTextFields — edit form (update)', () => {
       description: 'A long English description.',
       descriptionAr: 'وصف عربي',
       sku: 'PB-001',
+      badgeLabel: 'Offer',
+      badgeLabelAr: 'عرض',
     });
   });
 
@@ -68,7 +89,7 @@ describe('productTextFields — edit form (update)', () => {
 
   it('never emits `name` — it is required and must not become nullable', () => {
     expect(Object.keys(productTextFields(form(), 'update')).sort()).toEqual(
-      ['description', 'descriptionAr', 'nameAr', 'sku'].sort()
+      ['badgeLabel', 'badgeLabelAr', 'description', 'descriptionAr', 'nameAr', 'sku'].sort()
     );
   });
 });
@@ -86,5 +107,53 @@ describe('productTextFields — new-product form (create)', () => {
     const payload = productTextFields(form({ description: 'Hello', sku: 'PB-002' }), 'create');
     expect(payload.description).toBe('Hello');
     expect(payload.sku).toBe('PB-002');
+  });
+});
+
+/**
+ * The badge label is the newest member of the clearable set, and the one a
+ * merchant is most likely to REMOVE — a seasonal "عرض" that has to come off
+ * the card when the promotion ends. If an emptied badge sent `undefined` the
+ * chip would stay on the storefront forever with no way to take it down,
+ * which is the original clear-on-empty defect with a fresh field name.
+ */
+describe('productTextFields — the card badge', () => {
+  it('sends null for an emptied English badge so the chip comes off the card', () => {
+    expect(productTextFields(form({ badgeLabel: '' }), 'update').badgeLabel).toBeNull();
+  });
+
+  it('sends null for an emptied Arabic badge', () => {
+    expect(productTextFields(form({ badgeLabelAr: '' }), 'update').badgeLabelAr).toBeNull();
+  });
+
+  it('treats a whitespace-only badge as a clear, not a two-space label', () => {
+    // Unlike its siblings this field is trimmed at the call site: a coloured
+    // pill containing nothing but spaces is never what the merchant meant.
+    const payload = productTextFields(form({ badgeLabel: '   ', badgeLabelAr: '\t ' }), 'update');
+    expect(payload.badgeLabel).toBeNull();
+    expect(payload.badgeLabelAr).toBeNull();
+  });
+
+  it('trims a padded badge rather than rejecting or storing the padding', () => {
+    const payload = productTextFields(form({ badgeLabel: '  Offer  ' }), 'update');
+    expect(payload.badgeLabel).toBe('Offer');
+  });
+
+  it('clears the English badge while keeping the Arabic one', () => {
+    const payload = productTextFields(form({ badgeLabel: '', badgeLabelAr: 'عرض' }), 'update');
+    expect(payload.badgeLabel).toBeNull();
+    expect(payload.badgeLabelAr).toBe('عرض');
+  });
+
+  it('omits both on the create form — there is nothing to clear on a new product', () => {
+    const payload = productTextFields(form(), 'create');
+    expect(payload.badgeLabel).toBeUndefined();
+    expect(payload.badgeLabelAr).toBeUndefined();
+    expect(JSON.parse(JSON.stringify(payload))).toEqual({});
+  });
+
+  it('sends a badge typed on the create form', () => {
+    const payload = productTextFields(form({ badgeLabel: ' Offer ' }), 'create');
+    expect(payload.badgeLabel).toBe('Offer');
   });
 });
