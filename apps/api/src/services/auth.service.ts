@@ -66,6 +66,27 @@ function authScope(email: string, storeId: string | null) {
   return storeId === null ? { email, storeId: null as null } : { email, storeId };
 }
 
+/**
+ * How long after a rotation the same refresh token may be presented again
+ * without being treated as a stolen-token replay.
+ *
+ * Sized to the thing it forgives: two browser contexts whose access tokens
+ * expire together and refresh within milliseconds of each other, plus the
+ * round-trip and any retry. Seconds, not minutes — the window is a hole in
+ * reuse detection, and an attacker who has the token can use it inside the
+ * window, so it stays as small as the race allows.
+ */
+const ROTATION_RACE_GRACE_MS = 30_000;
+
+/**
+ * How far the grace check will follow `replacedById` looking for a live tip.
+ *
+ * A client racing itself rotates a handful of times inside the grace window,
+ * never dozens, so the cap costs nothing legitimate. It exists so a cyclic or
+ * corrupt back-link cannot spin a request forever.
+ */
+const ROTATION_RACE_MAX_CHAIN_HOPS = 10;
+
 export class AuthService {
   private static readonly SALT_ROUNDS = 12;
 
@@ -558,6 +579,52 @@ export class AuthService {
     };
   }
 
+  /**
+   * Follow `replacedById` from a rotated row to the tip of its family and
+   * report whether that tip is still live.
+   *
+   * Recency alone cannot tell a rotation race from a defeated revocation.
+   * Every mass revocation in this service is an `updateMany({ where: {
+   * revokedAt: null } })` — by design it does not touch rows that are already
+   * revoked. A row rotated at t0 therefore keeps `revokedReason: 'rotated'`
+   * and its original `revokedAt` forever, so at t0+6s it is indistinguishable
+   * from a race even if `revokeAllSessions`, logout-all, a password change or
+   * reuse detection fired at t0+5s. Honouring it there would mint a fresh
+   * access token carrying the just-bumped `tv` plus a 365-day refresh row,
+   * turning a 30-second window into a permanent parallel session that survives
+   * the very "sign out all devices" it was answering.
+   *
+   * The successor chain is what actually records those events: a revocation
+   * lands on whichever row is live. So if the tip is gone — revoked for any
+   * reason other than a further rotation, dead-ended, or pruned away — the
+   * family is dead and this presentation is a replay, not a race.
+   */
+  private static async successorChainIsLive(replacedById: string): Promise<boolean> {
+    let cursor = replacedById;
+
+    for (let hop = 0; hop < ROTATION_RACE_MAX_CHAIN_HOPS; hop++) {
+      const successor = await prisma.refreshToken.findUnique({
+        where: { id: cursor },
+        select: { revokedAt: true, revokedReason: true, replacedById: true },
+      });
+
+      // Never written, or aged out by cleanupRefreshTokens(): nothing proves
+      // the family is alive, so don't assume it.
+      if (!successor) return false;
+      // A live tip — the successor is still refreshing. This is the race.
+      if (!successor.revokedAt) return true;
+      // Revoked by anything other than a further rotation: the family was
+      // deliberately killed after this row rotated.
+      if (successor.revokedReason !== 'rotated') return false;
+      // Rotated but with no back-link: chain ends without a live row.
+      if (!successor.replacedById) return false;
+
+      cursor = successor.replacedById;
+    }
+
+    return false;
+  }
+
   static async refreshTokens(refreshToken: string): Promise<AuthTokens> {
     // Hash the token to look it up
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
@@ -578,20 +645,58 @@ export class AuthService {
     // a 401 on their next refresh and re-login, which is preferable to
     // letting an attacker keep refreshing in parallel.
     if (storedToken.revokedAt) {
+      // A ROTATION RACE is not a replay. Two tabs (or admin + orders) whose
+      // access tokens expire in the same instant both POST /auth/refresh with
+      // the same cookie. One wins and rotates; the other arrives moments later
+      // holding a token this service has just marked `rotated`. Treating that
+      // as a compromised family logs the user out of everything they have open.
+      //
+      // Measured in production 2026-09-10: 46 sessions for ONE user revoked in
+      // a single second, and the triggering token had been rotated 1.8s
+      // earlier. Across all history `reuse_detected` (58) had overtaken
+      // `rotated` (48) as the reason sessions die. It clusters after a deploy,
+      // when every open tab re-authenticates at once.
+      //
+      // So a narrow, precisely-conditioned exemption: the row must have been
+      // rotated (never revoked by logout, expiry, deletion or a previous reuse
+      // event), must carry the back-link proving a successor exists, must be
+      // within seconds of that rotation, AND the family it belongs to must
+      // still be alive. Anything else still burns the family down.
+      const rotationRace =
+        storedToken.revokedReason === 'rotated' &&
+        storedToken.replacedById !== null &&
+        Date.now() - storedToken.revokedAt.getTime() <= ROTATION_RACE_GRACE_MS &&
+        (await this.successorChainIsLive(storedToken.replacedById));
+
+      if (!rotationRace) {
+        logger.warn(
+          {
+            userId: storedToken.userId,
+            tokenId: storedToken.id,
+            revokedAt: storedToken.revokedAt,
+            revokedReason: storedToken.revokedReason,
+          },
+          'Refresh-token reuse detected — revoking all tokens for user'
+        );
+        await prisma.refreshToken.updateMany({
+          where: { userId: storedToken.userId, revokedAt: null },
+          data: { revokedAt: new Date(), revokedReason: 'reuse_detected' },
+        });
+        throw new AppError(401, 'TOKEN_REUSED', 'Token reuse detected — please sign in again');
+      }
+
+      // Logged at warn, not info: the exemption is a deliberate hole in a
+      // security control, so a sustained rate of it must be visible rather
+      // than inferred. A spike here is either a client refreshing in a loop or
+      // an attacker racing a real rotation — both worth looking at.
       logger.warn(
         {
           userId: storedToken.userId,
           tokenId: storedToken.id,
-          revokedAt: storedToken.revokedAt,
-          revokedReason: storedToken.revokedReason,
+          rotatedMsAgo: Date.now() - storedToken.revokedAt.getTime(),
         },
-        'Refresh-token reuse detected — revoking all tokens for user'
+        'Refresh-token rotation race — issuing a fresh token instead of revoking the family'
       );
-      await prisma.refreshToken.updateMany({
-        where: { userId: storedToken.userId, revokedAt: null },
-        data: { revokedAt: new Date(), revokedReason: 'reuse_detected' },
-      });
-      throw new AppError(401, 'TOKEN_REUSED', 'Token reuse detected — please sign in again');
     }
 
     if (storedToken.expiresAt < new Date()) {
@@ -633,14 +738,20 @@ export class AuthService {
       select: { id: true },
     });
 
-    await prisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: {
-        revokedAt: new Date(),
-        revokedReason: 'rotated',
-        replacedById: newRow?.id ?? null,
-      },
-    });
+    // Only the row that is still live gets marked rotated. On the race path
+    // the row is ALREADY revoked, and rewriting `revokedAt` to now would slide
+    // the grace window forward on every replay — turning a 30-second exemption
+    // into an indefinite one for anyone holding that token.
+    if (!storedToken.revokedAt) {
+      await prisma.refreshToken.update({
+        where: { id: storedToken.id },
+        data: {
+          revokedAt: new Date(),
+          revokedReason: 'rotated',
+          replacedById: newRow?.id ?? null,
+        },
+      });
+    }
 
     return newTokens;
   }

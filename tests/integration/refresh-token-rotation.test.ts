@@ -83,27 +83,58 @@ describe('refresh-token rotation', () => {
     expect(newRow?.revokedAt).toBeNull();
   });
 
-  it('reuse of an already-rotated token revokes the whole family', async () => {
+  it('an IMMEDIATE replay is a rotation race and is forgiven', async () => {
+    // Two tabs whose access tokens expire together both refresh with the same
+    // cookie. The loser arrives milliseconds after the winner rotated the row.
+    // Punishing that logged the user out of every session they had open —
+    // measured in production 2026-09-10 as 46 revocations in one second.
     const u = await createVerifiedUser();
     const session = (await AuthService.login(u.email, u.password)) as { refreshToken: string };
 
-    // First rotation succeeds and produces a new token.
     const rotated = await AuthService.refreshTokens(session.refreshToken);
     expect(rotated.refreshToken).toBeDefined();
 
-    // Replaying the ORIGINAL (now-rotated) token is treated as theft.
+    // Sub-second replay of the ORIGINAL, well inside ROTATION_RACE_GRACE_MS.
+    const raced = await AuthService.refreshTokens(session.refreshToken);
+    expect(raced.refreshToken).toBeDefined();
+    expect(raced.accessToken).toBeDefined();
+
+    // The family survives, and the legitimate successor still works.
+    const live = await prisma.refreshToken.count({
+      where: { userId: u.id, revokedAt: null },
+    });
+    expect(live).toBeGreaterThan(0);
+    await expect(AuthService.refreshTokens(rotated.refreshToken)).resolves.toBeDefined();
+  });
+
+  it('a replay OUTSIDE the grace window still revokes the whole family', async () => {
+    const u = await createVerifiedUser();
+    const session = (await AuthService.login(u.email, u.password)) as { refreshToken: string };
+
+    const rotated = await AuthService.refreshTokens(session.refreshToken);
+    expect(rotated.refreshToken).toBeDefined();
+
+    // Back-date the rotation so the replay lands outside the grace window.
+    // Age is the discriminator between "my other tab" and "someone holding a
+    // token they should not have", so this is the case the control exists for.
+    const originalHash = crypto.createHash('sha256').update(session.refreshToken).digest('hex');
+    await prisma.refreshToken.update({
+      where: { token: originalHash },
+      data: { revokedAt: new Date(Date.now() - 10 * 60 * 1000) },
+    });
+
     await expect(AuthService.refreshTokens(session.refreshToken)).rejects.toMatchObject({
       code: 'TOKEN_REUSED',
     });
 
-    // Every refresh token for the user is now revoked — including the
-    // rotated-out token's legitimate successor.
+    // Every token for the user is revoked — including the rotated-out token's
+    // legitimate successor. That collateral damage is the POINT: a stolen
+    // token must not keep working just because the thief refreshed it once.
     const live = await prisma.refreshToken.count({
       where: { userId: u.id, revokedAt: null },
     });
     expect(live).toBe(0);
 
-    // ...so the (previously valid) successor token can no longer refresh.
     await expect(AuthService.refreshTokens(rotated.refreshToken)).rejects.toMatchObject({
       code: 'TOKEN_REUSED',
     });
