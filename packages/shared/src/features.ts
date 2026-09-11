@@ -56,6 +56,12 @@ export const FEATURE_KEYS_ARRAY = [
   // DISABLES that requirement for that store — it is the per-store, no-deploy
   // rollback lever, never the switch that turns the protection on.
   'agent_checkout_open_writes',
+  // MERCHANT-ADMIN MCP surface (2026-09-11). Full store CRUD over MCP, so a
+  // merchant can operate their store from Claude Code instead of the admin
+  // dashboard. NOT part of any plan baseline: it resolves OFF for every store
+  // until a super-admin turns it on, and the endpoint 404s while off — the
+  // correct default for a surface that can change anything in a store.
+  'merchant_mcp',
   // Accounting sub-features (2026-05-27)
   'accounting.basic',
   'accounting.expenses',
@@ -550,6 +556,23 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'بيانات اعتماد المتجر عبر ترويسة X-Agent-Key، أما أدوات القراءة فلا تتطلب ذلك. ' +
       'تفعيل هذا الخيار يسمح لأي وكيل غير موثّق بالكتابة في هذا المتجر مجدداً — فعّله فقط ' +
       'لإصلاح تكامل قائم ريثما تُصدر بيانات الاعتماد.',
+    category: 'marketing',
+    tier: 'addon',
+  },
+  merchant_mcp: {
+    key: 'merchant_mcp',
+    name: 'Merchant MCP (store control for agents)',
+    nameAr: 'MCP للتاجر — إدارة المتجر عبر الوكلاء',
+    description:
+      'Exposes a separate, credential-gated MCP server so the merchant can run their own ' +
+      'store from Claude Code or any MCP client instead of the admin dashboard — read ' +
+      'analytics, inspect and edit the catalogue, and manage orders. Distinct from AI Agent ' +
+      'Checkout, which is the anonymous buyer-facing surface: this one never answers without ' +
+      'a merchant key, and its tool list is invisible to anyone who does not hold one.',
+    descriptionAr:
+      'يوفّر خادم MCP منفصلاً ومحمياً ببيانات اعتماد ليتمكّن التاجر من إدارة متجره من Claude Code ' +
+      'أو أي عميل MCP بدلاً من لوحة التحكم — قراءة التحليلات وتصفّح المنتجات وتعديلها وإدارة الطلبات. ' +
+      'يختلف عن الشراء عبر الوكلاء الموجّه للمشترين: هذا لا يستجيب أبداً بدون مفتاح التاجر.',
     category: 'marketing',
     tier: 'addon',
   },

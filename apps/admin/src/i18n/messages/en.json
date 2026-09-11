@@ -1537,6 +1537,10 @@
       "agentKey": {
         "title": "AI agent key",
         "description": "Issue, rotate or revoke the key an AI agent needs to order from this store"
+      },
+      "merchantKeys": {
+        "title": "Merchant MCP keys",
+        "description": "Issue keys so you can run this store from Claude Code or any MCP client"
       }
     },
     "metaCatalogCard": {
@@ -4375,7 +4379,8 @@
         "language": "Language",
         "staff": "Staff & roles",
         "announcement": "Announcement bar",
-        "agentKey": "AI agent key"
+        "agentKey": "AI agent key",
+        "merchantKeys": "Merchant MCP keys"
       }
     },
     "notificationBell": {
@@ -6201,6 +6206,77 @@
       "issueFailedTitle": "Could not issue the key",
       "issueFailedBody": "Nothing was changed. Try again.",
       "revokeFailedTitle": "Could not revoke the key"
+    }
+  },
+  "merchantKeys": {
+    "page": {
+      "title": "Merchant MCP keys",
+      "subtitle": "Credentials that let you run this store from Claude Code or any MCP client, instead of the dashboard.",
+      "backToSettings": "Back to settings"
+    },
+    "intro": {
+      "heading": "How these keys work",
+      "body": "Each key is a device: one for your laptop, one for a script, one per teammate. Revoking a lost laptop's key leaves the others working. A key acts as the person who created it, so every change it makes is recorded against them.",
+      "headerLabel": "Request header",
+      "activeCount": "{count} active"
+    },
+    "empty": {
+      "body": "No keys yet. Issue one to connect an MCP client to this store."
+    },
+    "actions": {
+      "mint": "Issue key",
+      "revoke": "Revoke"
+    },
+    "table": {
+      "name": "Name",
+      "key": "Key",
+      "scopes": "Permissions",
+      "user": "Acts as",
+      "lastUsed": "Last used",
+      "status": "Status",
+      "active": "Active",
+      "revoked": "Revoked",
+      "expired": "Expired",
+      "never": "Never",
+      "noScopes": "None"
+    },
+    "create": {
+      "title": "Issue a merchant key",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. my laptop",
+      "scopesLabel": "Permissions",
+      "scopesHelp": "Start with read only. Add write or delete only if this key needs to change your store.",
+      "scope": {
+        "read": "See store settings, products, orders and analytics.",
+        "write": "Create and edit products, and update order status.",
+        "destructive": "Delete products and run bulk changes."
+      },
+      "expiryLabel": "Expires after (days)",
+      "expiryPlaceholder": "Leave blank for no expiry"
+    },
+    "reveal": {
+      "title": "Copy your key now",
+      "warning": "This is the only time this key will be shown. Nobody — including us — can read it back. If you lose it, revoke it and issue a new one.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "done": "Done",
+      "configSummary": "Show MCP client configuration"
+    },
+    "revoke": {
+      "title": "Revoke this key",
+      "body": "“{name}” will stop working immediately. Anything using it will lose access to this store. Your other keys are unaffected.",
+      "confirm": "Revoke key"
+    },
+    "common": {
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "loadFailedTitle": "Could not load keys",
+      "mintFailedTitle": "Could not issue key",
+      "mintFailedBody": "Please try again.",
+      "minted": "Key issued",
+      "revokeFailedTitle": "Could not revoke key",
+      "revoked": "Key revoked"
     }
   }
 }

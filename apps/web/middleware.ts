@@ -439,8 +439,13 @@ export const config = {
      * - _next/image (image optimization files)
      * - manifest.webmanifest / sw.js
      * - public folder
-     * - .well-known/ (RFC 9116 security.txt etc. — must serve the static file
-     *   on every host, incl. custom domains, without tenant rewrites)
+     * - .well-known/security.txt (RFC 9116 — must serve the STATIC file on
+     *   every host, incl. custom domains, without tenant rewrites). Narrowed
+     *   from the whole `.well-known/` directory on 2026-09-11: the ACP and UCP
+     *   discovery documents live there too and are PER-STORE, so they need the
+     *   same `x-store-slug` / `x-store-domain` headers `/llms.txt` gets. With
+     *   the directory excluded they saw no store context at all and every
+     *   custom-domain merchant would have served the platform's answer.
      * - api routes (handled separately, EXCEPT /api/store-favicon which the
      *   favicon.ico rewrite below targets — matcher excludes `api/` broadly,
      *   but the rewrite target itself never re-enters this matcher since
@@ -456,6 +461,6 @@ export const config = {
      * NextResponse.next() with no rewrite, and Next serves the static
      * /public/favicon.ico exactly as before.
      */
-    '/((?!_next/static|_next/image|manifest\\.webmanifest|sw\\.js|api/|public/|\\.well-known/).*)',
+    '/((?!_next/static|_next/image|manifest\\.webmanifest|sw\\.js|api/|public/|\\.well-known/security\\.txt).*)',
   ],
 };

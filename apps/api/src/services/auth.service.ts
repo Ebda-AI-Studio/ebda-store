@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx, withRlsBypass } from '@force/database';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -926,6 +926,25 @@ export class AuthService {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
     });
+
+    // …and every merchant MCP key this user holds. "Sign out all devices" has
+    // to mean ALL devices: a merchant key is a long-lived credential acting as
+    // this user, so leaving it live would make the strongest lever the platform
+    // has a partial one. `verifyMerchantKey` also refuses a suspended or
+    // soft-deleted user on every call, so this is the second of two
+    // independent checks rather than the only one.
+    // `withRlsBypass`: this is CROSS-TENANT by nature — it revokes this user's
+    // keys in every store they hold one for. `revokeAllSessions` is called
+    // from request handlers that may already be inside a tenant context
+    // (auth.routes logout-all, mfa.routes), and under the table's RLS policy
+    // that would silently revoke only the current store's keys while reporting
+    // success. A partial "sign out all devices" is worse than a failed one.
+    await withRlsBypass(tx =>
+      tx.merchantApiKey.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+    );
   }
 
   static async requestPasswordReset(email: string, storeId: string | null = null): Promise<void> {

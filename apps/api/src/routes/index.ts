@@ -47,6 +47,7 @@ import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
 import wbsIntegrationRoutes from './wbs-integration.routes';
 import agentCredentialRoutes from './agent-credential.routes';
+import merchantKeyRoutes from './merchant-key.routes';
 import waTemplatesRoutes from './wa-templates.routes';
 import paymentLinksRoutes from './payment-links.routes';
 import financeRoutes from './finance.routes';
@@ -62,6 +63,7 @@ import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
+import mcpAdminRoutes from './mcp-admin.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -74,6 +76,13 @@ router.use('/public', publicStoreLayoutRoutes);
 // Resolves the store by slug + checks the `agent_checkout` feature gate
 // itself (see mcp.routes.ts); no auth middleware or tenantContext here —
 // it is a public, feature-gated, per-slug surface for MCP clients.
+// MERCHANT-ADMIN MCP endpoint — POST /api/v1/mcp/admin/:storeSlug.
+// MUST be mounted BEFORE '/mcp', or `mcpRoutes`'s `/:storeSlug` would match
+// the literal segment "admin" and route every merchant request into the
+// anonymous BUYER server — which would 404 on an unknown slug and look like
+// a config problem rather than the security hole it is. Express matches in
+// registration order; this line's position is load-bearing.
+router.use('/mcp/admin', mcpAdminRoutes);
 router.use('/mcp', mcpRoutes);
 router.use('/auth', authRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
@@ -285,6 +294,7 @@ router.use('/stores', tenantContext, wbsIntegrationRoutes);
 // line above (Express only fills params declared in the MOUNT path); tenant
 // scoping comes from `requireStoreAccess` inside the router.
 router.use('/stores', tenantContext, agentCredentialRoutes);
+router.use('/stores', tenantContext, merchantKeyRoutes);
 
 // Phase 7: WhatsApp templates admin (generate / sync / status)
 router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);

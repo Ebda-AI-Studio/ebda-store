@@ -1,0 +1,124 @@
+import { headers } from 'next/headers';
+import { API_URL } from '../../../lib/api';
+import { resolveAgentStore, storefrontBaseUrl } from '../../../lib/agent-store-resolver';
+
+/**
+ * `/.well-known/acp.json` — Agentic Commerce Protocol discovery.
+ *
+ * ACP (OpenAI / Stripe / Meta) and UCP (Google / Shopify) both start the same
+ * way: an agent that lands on a storefront looks for a well-known document
+ * that says "yes, you can transact here, and this is how". Until now the ONLY
+ * place this store's MCP endpoint was discoverable was inside `/llms.txt`,
+ * which an agent has to think to read; a well-known path is the one an agent
+ * checks by convention.
+ *
+ * This is a DISCOVERY document, not a new transaction surface. Every capability
+ * it names already exists and is already enforced — it points at the MCP
+ * endpoint (`apps/api`), the product feed, and the credential contract. Nothing
+ * here grants anything.
+ *
+ * ## Served per store, on three hosts
+ *
+ *   wadyaljuz.com/.well-known/acp.json          → that merchant
+ *   store.force-ai.co/<slug>/.well-known/…      → that merchant
+ *   store.force-ai.co/.well-known/…             → 404 (the platform is not a shop)
+ *
+ * `resolveAgentStore()` owns that logic, shared with `/llms.txt` so the two
+ * cannot disagree about which store a request belongs to.
+ *
+ * ## Fail closed
+ *
+ * A store without `agent_checkout` gets a 404, byte-identical to an unknown
+ * store's — the same posture `mcp.routes.ts` takes, and for the same reason: a
+ * discovery document that says "this store exists but will not sell to you" is
+ * a capability leak with no upside for the agent.
+ */
+
+export const dynamic = 'force-dynamic';
+
+const notFound = () =>
+  new Response(JSON.stringify({ error: 'not_found' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+export async function GET() {
+  const store = await resolveAgentStore();
+  if (!store) return notFound();
+
+  // Fail closed. Same 404 as an unknown store — do not diverge these.
+  if (!store.enabledFeatures?.includes('agent_checkout')) return notFound();
+
+  const h = await headers();
+  const base = storefrontBaseUrl(store, h.get('host'));
+
+  // Writes need the store's agent key UNLESS the per-store escape hatch is on.
+  // This mirrors `llms.txt`'s `mcpWriteLine` exactly: an agent that reads one
+  // document and acts on the other must not get a different answer.
+  const writesOpen = store.enabledFeatures?.includes('agent_checkout_open_writes') === true;
+
+  const body = {
+    // ACP is still a moving target; the version an agent sees is the one this
+    // document was written against, not a guess at the newest.
+    acp_version: '2026-01',
+    merchant: {
+      name: store.name,
+      name_localized: store.nameAr ? { ar: store.nameAr } : undefined,
+      description: store.description ?? undefined,
+      url: base,
+      contact: {
+        email: store.email ?? undefined,
+        phone: store.phone ?? undefined,
+      },
+    },
+    // The currency a price in any of these surfaces is quoted in. Integer minor
+    // units throughout — KWD prices are in fils (1 KWD = 1000 fils), so an
+    // agent that assumes 2 decimal places will be wrong by 10x on this platform.
+    currency: store.currency ?? 'KWD',
+    capabilities: {
+      catalog: true,
+      cart: true,
+      checkout: true,
+      // Not advertised because it is not built: returns and refunds exist in
+      // the dashboard but have no agent-facing tool. Saying `true` here would
+      // be the discovery document promising something no tool can do.
+      returns: false,
+    },
+    endpoints: {
+      // The real transaction surface. Served by apps/api, so it is rooted at
+      // the API origin, not at the storefront base.
+      mcp: `${API_URL}/mcp/${store.slug}`,
+      mcp_transport: 'streamable-http',
+      product_feed: `${base}/feeds/products.json`,
+      llms_txt: `${base}/llms.txt`,
+    },
+    authentication: {
+      // Reads are anonymous by design — that is the whole strategic surface.
+      read: 'none',
+      write: writesOpen ? 'none' : 'api_key',
+      ...(writesOpen
+        ? {}
+        : {
+            write_header: 'x-agent-key',
+            write_instructions:
+              'Ask the merchant (see merchant.contact) to issue an agent key. Without it the read tools still work and the write tools return an error explaining this.',
+          }),
+    },
+    tools: {
+      read: ['search_products', 'get_product', 'get_store_info', 'view_cart', 'get_order_status'],
+      write: ['add_to_cart', 'place_order'],
+    },
+  };
+
+  return new Response(JSON.stringify(body, null, 2), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      // Short TTL: the two things that change here — the feature gate and the
+      // escape hatch — are permission state, and a stale answer tells an agent
+      // it may write when it may not (or the reverse). Five minutes bounds the
+      // window without making this a per-request DB read.
+      'Cache-Control': 'public, max-age=300, s-maxage=300',
+    },
+  });
+}

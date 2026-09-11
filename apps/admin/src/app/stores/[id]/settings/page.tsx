@@ -494,6 +494,30 @@ export default function StoreSettingsPage() {
       ),
     },
     {
+      /*
+       * Merchant MCP keys — the MERCHANT-ADMIN surface, not the buyer one.
+       * Separate card from `agentKey` above because they are different
+       * credentials for different callers: that one lets a shopping agent buy,
+       * this one lets the merchant run the store. Gated on `merchant_mcp`,
+       * which is in no plan baseline, so the card only appears once a
+       * super-admin has enabled it.
+       */
+      key: 'merchantKeys',
+      href: `/stores/${storeId}/merchant-keys`,
+      color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+      featureKey: 'merchant_mcp',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 9l3 3-3 3m5 0h3M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z"
+          />
+        </svg>
+      ),
+    },
+    {
       key: 'staff',
       href: `/stores/${storeId}/staff`,
       color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',

@@ -62,6 +62,7 @@ model User {
   // Relations
   authStore                Store?                  @relation("StoreCustomers", fields: [storeId], references: [id], onDelete: Cascade)
   stores                   Store[]
+  merchantApiKeys          MerchantApiKey[]
   orders                   Order[]
   carts                    Cart[]
   addresses                Address[]
@@ -405,6 +406,7 @@ model Store {
   tags                     Tag[]
   auditLogs                AuditLog[]
   features                 StoreFeature[]
+  merchantApiKeys          MerchantApiKey[]
   notificationConfigs      NotificationConfig[]
   notificationEventConfigs NotificationEventConfig[]
   pushSubscriptions        PushSubscription[]
@@ -459,13 +461,13 @@ model Store {
   slugRedirects            SlugRedirect[]
   answerEngineChecks       AnswerEngineCheck[]
   gscDailyMetrics          GscDailyMetric[]
+  usageSnapshots           StoreUsageSnapshot[]
 
   @@index([ownerId])
   @@index([status])
   @@index([plan])
   @@index([createdAt])
   @@map("stores")
-  usageSnapshots StoreUsageSnapshot[]
 }
 
 // ==========================================
@@ -653,7 +655,7 @@ model Customer {
   /// Optional segment this customer belongs to. Drives group-scoped pricing
   /// and promotion/coupon targeting. SetNull on group delete — removing a
   /// group must never delete customers.
-  groupId          String?   @map("group_id")
+  groupId String? @map("group_id")
 
   store     Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
   addresses CustomerAddress[]
@@ -698,10 +700,10 @@ model CustomerGroup {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customers Customer[]
-  coupons     Coupon[]
-  promotions  Promotion[]
+  store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customers  Customer[]
+  coupons    Coupon[]
+  promotions Promotion[]
 
   @@unique([storeId, name])
   @@index([storeId, isActive])
@@ -1192,8 +1194,8 @@ model CartItem {
 
 enum BundlePricingType {
   fixed_price // value = the bundle's price in fils (e.g. 12000)
-  percentage  // value = basis points off the component sum (12.5% -> 1250)
-  fixed       // value = fils off the component sum
+  percentage // value = basis points off the component sum (12.5% -> 1250)
+  fixed // value = fils off the component sum
 }
 
 model Bundle {
@@ -1344,7 +1346,7 @@ model Order {
   /// "the fanout never ran" from "it ran and correctly did nothing". This
   /// claim can. NULL past the staleness window is what
   /// refund-reversal-stuck-sweep recovers.
-  refundReversedAt DateTime? @map("refund_reversed_at")
+  refundReversedAt       DateTime? @map("refund_reversed_at")
 
   // Enterprise: payment-gateway abandonment capture. Set by the Inngest
   // payment-abandonment-sweep cron when the order has a Payment row with a
@@ -1355,7 +1357,7 @@ model Order {
   // payment_abandonment). See migration 20260622130000.
   paymentGatewayAbandonedAt DateTime? @map("payment_gateway_abandoned_at")
 
-  source        String?   @default("web") // provenance: 'web' | 'agent' — audit only
+  source String? @default("web") // provenance: 'web' | 'agent' — audit only
 
   // Relations
   store               Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
@@ -2435,34 +2437,34 @@ model Coupon {
 /// customer. Shares the targeting field set with Coupon; the difference is
 /// coupons need a code, promotions apply automatically. Types reuse CouponType.
 model Promotion {
-  id               String     @id @default(uuid())
-  storeId          String     @map("store_id")
-  name             String
-  nameAr           String?    @map("name_ar")
-  description      String?
-  descriptionAr    String?    @map("description_ar")
-  type             CouponType @default(percentage)
-  value            Int // percentage (0-100) or fixed amount in fils
-  maxDiscount      Int?       @map("max_discount")
-  priority         Int        @default(0) // higher wins when several are eligible
-  isActive         Boolean    @default(true) @map("is_active")
-  startsAt         DateTime?  @map("starts_at")
-  expiresAt        DateTime?  @map("expires_at")
+  id            String     @id @default(uuid())
+  storeId       String     @map("store_id")
+  name          String
+  nameAr        String?    @map("name_ar")
+  description   String?
+  descriptionAr String?    @map("description_ar")
+  type          CouponType @default(percentage)
+  value         Int // percentage (0-100) or fixed amount in fils
+  maxDiscount   Int?       @map("max_discount")
+  priority      Int        @default(0) // higher wins when several are eligible
+  isActive      Boolean    @default(true) @map("is_active")
+  startsAt      DateTime?  @map("starts_at")
+  expiresAt     DateTime?  @map("expires_at")
 
   // Targeting (shared shape with Coupon)
-  customerGroupId  String?    @map("customer_group_id")
-  firstOrderOnly   Boolean    @default(false) @map("first_order_only")
-  minOrderAmount   Int?       @map("min_order_amount")
-  minQuantity      Int?       @map("min_quantity")
-  scopeProductIds  String[]   @map("scope_product_ids")
-  scopeCategoryIds String[]   @map("scope_category_ids")
+  customerGroupId  String?  @map("customer_group_id")
+  firstOrderOnly   Boolean  @default(false) @map("first_order_only")
+  minOrderAmount   Int?     @map("min_order_amount")
+  minQuantity      Int?     @map("min_quantity")
+  scopeProductIds  String[] @map("scope_product_ids")
+  scopeCategoryIds String[] @map("scope_category_ids")
 
-  createdAt        DateTime   @default(now()) @map("created_at")
-  updatedAt        DateTime   @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customerGroup  CustomerGroup? @relation(fields: [customerGroupId], references: [id], onDelete: SetNull)
-  orders         Order[]        @relation("OrderAppliedPromotion")
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customerGroup CustomerGroup? @relation(fields: [customerGroupId], references: [id], onDelete: SetNull)
+  orders        Order[]        @relation("OrderAppliedPromotion")
 
   @@index([storeId, isActive])
   @@index([storeId, customerGroupId])
@@ -2768,43 +2770,43 @@ enum BulkImportStatus {
 // AI buttons apply: never overwrite a filled field, never call the
 // model for an entity that's already complete.
 model BulkAiJob {
-  id             String          @id @default(uuid())
-  storeId        String          @map("store_id")
-  userId         String?         @map("user_id")
-  kind           BulkAiJobKind
-  status         BulkAiJobStatus @default(queued)
+  id              String          @id @default(uuid())
+  storeId         String          @map("store_id")
+  userId          String?         @map("user_id")
+  kind            BulkAiJobKind
+  status          BulkAiJobStatus @default(queued)
   // Direction is meaningful only for translate jobs. `to_ar` = fill
   // empty Arabic from English source. `to_en` = the reverse.
-  direction      String?         @db.Text
-  total          Int             @default(0)
-  processed      Int             @default(0)
-  filled         Int             @default(0)
-  skipped        Int             @default(0)
-  failed         Int             @default(0)
+  direction       String?         @db.Text
+  total           Int             @default(0)
+  processed       Int             @default(0)
+  filled          Int             @default(0)
+  skipped         Int             @default(0)
+  failed          Int             @default(0)
   // Capped list of recent failures for surfacing to the merchant —
   // [{entityId, entityName, error}, ...]. Hard-cap to 50 so the row
   // doesn't grow unbounded on a totally-failing run.
-  errors         Json?
+  errors          Json?
   // Capped list of products this job actually FILLED — [{id, name}, ...]. Lets
   // the merchant see exactly which products got AI-written content so they can
   // validate the output (the `filled` integer alone isn't actionable). Capped
   // (200) like `errors` so a huge sweep can't bloat the row.
-  filledProducts Json?           @map("filled_products")
-  errorMessage   String?         @map("error_message") // Top-level failure reason if status=failed
+  filledProducts  Json?           @map("filled_products")
+  errorMessage    String?         @map("error_message") // Top-level failure reason if status=failed
   // Durable copy of the event's `force` flag — persisted by the Inngest
   // function itself (mark-running / load-items step) so it survives the
   // per-batch `errors` column overwrites and stays readable by the
   // queue-depth-watch reaper when it needs to re-enqueue a stuck job.
-  force          Boolean         @default(false)
+  force           Boolean         @default(false)
   // How many times queue-depth-watch has auto-resumed (re-enqueued) this
   // job after finding it stuck `running`. Capped by MAX_AUTO_RESUMES so a
   // job that keeps crashing at the same batch can't loop forever — once
   // the cap is hit the reaper falls back to marking it failed + alerting.
-  autoResumeCount Int            @default(0) @map("auto_resume_count")
-  startedAt      DateTime?       @map("started_at")
-  completedAt    DateTime?       @map("completed_at")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  autoResumeCount Int             @default(0) @map("auto_resume_count")
+  startedAt       DateTime?       @map("started_at")
+  completedAt     DateTime?       @map("completed_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -3614,7 +3616,7 @@ model StoreUsageSnapshot {
   id          String   @id @default(uuid())
   storeId     String   @map("store_id")
   /// First day of the month this snapshot covers, UTC (a closed month).
-  periodStart DateTime @db.Date @map("period_start")
+  periodStart DateTime @map("period_start") @db.Date
   capturedAt  DateTime @default(now()) @map("captured_at")
 
   // ── Catalog (drives storage + admin effort) ───────────────────────────
@@ -3960,4 +3962,54 @@ model AnswerEngineProviderConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("answer_engine_provider_configs")
+}
+
+/// Per-store, per-device credential for the MERCHANT-ADMIN MCP surface
+/// (`POST /api/v1/mcp/admin/:storeSlug`). Distinct from `Store.agentApiKey`,
+/// which is the BUYER surface's single per-store key.
+///
+/// Three deliberate differences from `Store.agentApiKey`:
+///
+///  1. **Hashed, never encrypted.** The buyer key is displayed back to the
+///     merchant, so it must be reversible. An admin key is shown exactly once,
+///     at creation, so a one-way SHA-256 is correct — and it keeps the secret
+///     off every read path, which is what Ruling M5 (credential ciphertext
+///     riding out on wide reads) is about.
+///  2. **Many per store, each attributable to a user.** Revoking one laptop
+///     must not revoke the others, and every audit row names a human.
+///  3. **Three scope tiers.** A key minted for reporting cannot delete a
+///     product.
+model MerchantApiKey {
+  id      String @id @default(uuid())
+  storeId String @map("store_id")
+  /// The human this key acts as. Every tool call is authorised as this user
+  /// and every audit row carries them — a key is a device, not an identity.
+  userId  String @map("user_id")
+  /// Merchant-visible label ("pecanbee laptop"). Not a secret.
+  name    String
+
+  /// SHA-256 hex digest of the plaintext key. The plaintext is returned once,
+  /// in the mint response, and never stored or logged.
+  keyHash String @unique @map("key_hash")
+  /// First 8 chars of the plaintext, stored so the admin UI can show
+  /// `fwbm_3a9f…` next to each key. Not sufficient to authenticate.
+  prefix  String
+
+  /// One or more of: merchant:read, merchant:write, merchant:destructive.
+  /// Checked per tool. An empty array authorises nothing.
+  scopes String[]
+
+  lastUsedAt DateTime? @map("last_used_at")
+  expiresAt  DateTime? @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, revokedAt])
+  // FK-only index so the User delete RI check does not sequential-scan.
+  @@index([userId])
+  @@map("merchant_api_keys")
 }

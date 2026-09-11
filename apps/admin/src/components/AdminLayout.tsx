@@ -289,6 +289,7 @@ export function AdminLayout({
     staff: tcp('pages.staff'),
     announcement: tcp('pages.announcement'),
     agentKey: tcp('pages.agentKey'),
+    merchantKeys: tcp('pages.merchantKeys'),
   };
   const paletteItems: PaletteItem[] =
     mode === 'store_admin' && navStoreId

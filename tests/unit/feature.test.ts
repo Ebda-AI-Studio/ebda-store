@@ -48,8 +48,11 @@ describe('Feature Registry', () => {
     // 2026-09-06: 41 keys (added `bundles` — Product Bundles, in NO plan baseline).
     // 2026-09-09: 42 keys (added `agent_checkout_open_writes` — the MCP
     //   agent-write escape hatch, in NO plan baseline; Ruling M2).
-    it('has exactly 42 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(42);
+    // 2026-09-11: 43 keys (added `merchant_mcp` — the merchant-admin MCP
+    //   surface, in NO plan baseline so the whole surface is dark until a
+    //   super-admin enables it per store).
+    it('has exactly 43 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(43);
     });
   });
 

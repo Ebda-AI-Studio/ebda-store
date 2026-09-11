@@ -460,6 +460,36 @@
       "find": "router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, next) => {",
       "replace": "router.post('/enroll/begin', authenticate, async (req, res, next) => {",
       "test": "tests/unit/reject-impersonated.test.ts"
+    },
+    {
+      "id": "merchant-mcp-cross-store-key",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a merchant's own valid key drives ANOTHER store — every check but the tenant comparison passes",
+      "source": "apps/api/src/mcp/merchant-auth.ts",
+      "find": "    key.storeId === store.id &&",
+      "replace": "    true &&",
+      "test": "tests/unit/merchant-mcp-auth.test.ts"
+    },
+    {
+      "id": "merchant-mcp-scope-check",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "a key with no scopes (or a reporting-only key) performs any admin operation",
+      "source": "apps/api/src/mcp/merchant-auth.ts",
+      "find": "  if (!a || !Array.isArray(a.scopes) || !a.scopes.includes(required)) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/merchant-mcp-auth.test.ts"
+    },
+    {
+      "id": "merchant-mcp-user-still-active",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "a suspended or soft-deleted admin keeps a fully working merchant key after losing every dashboard session",
+      "source": "apps/api/src/mcp/merchant-auth.ts",
+      "find": "    (key.expiresAt === null || key.expiresAt > now) &&\n    userActive;",
+      "replace": "    (key.expiresAt === null || key.expiresAt > now);",
+      "test": "tests/unit/merchant-mcp-auth.test.ts"
     }
   ]
 }

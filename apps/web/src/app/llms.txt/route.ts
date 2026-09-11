@@ -298,8 +298,19 @@ export function buildPerStoreBody(
   const mcpWriteLine = mcpWritesOpen
     ? `- Write tools (no credential required on this store): add_to_cart, place_order`
     : `- Write tools (credential required): add_to_cart, place_order\n- Write authentication: send the store's agent key in the \`x-agent-key\` request header. Ask the store (see Contact above) to issue one. Without it the read tools still work and the write tools return an error explaining this.`;
+  // The two well-known discovery documents (added 2026-09-11) carry the SAME
+  // endpoint and the same credential contract in ACP (OpenAI/Stripe/Meta) and
+  // UCP (Google/Shopify) shape. Listed here because an agent that finds this
+  // file should not have to guess that they exist — and one that starts from a
+  // well-known path is pointed back here by both of them.
+  //
+  // Gated on the same `agent_checkout` flag those routes gate on, so the three
+  // surfaces appear and disappear together. If you change the credential line
+  // above, change it in apps/web/src/app/.well-known/{acp.json,ucp}/route.ts
+  // too — tests/unit/well-known-agent-discovery.test.ts asserts they agree.
+  const discoveryLines = `\n- Discovery (ACP): ${base}/.well-known/acp.json\n- Discovery (UCP): ${base}/.well-known/ucp`;
   const mcpSection = store.enabledFeatures?.includes('agent_checkout')
-    ? `\n\n## Agentic checkout (MCP)\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Read tools (no credential): search_products, get_product, get_store_info, view_cart, get_order_status\n${mcpWriteLine}`
+    ? `\n\n## Agentic checkout (MCP)\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Read tools (no credential): search_products, get_product, get_store_info, view_cart, get_order_status\n${mcpWriteLine}${discoveryLines}`
     : '';
 
   return `# ${storeTitle}

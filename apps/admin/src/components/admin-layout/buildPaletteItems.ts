@@ -94,6 +94,7 @@ export interface SettingsPaletteLabels {
   staff: string;
   announcement: string;
   agentKey: string;
+  merchantKeys: string;
 }
 
 /**
@@ -152,6 +153,7 @@ export function buildStorePaletteItems(
       [settings.language, `/stores/${storeId}/language`],
       [settings.staff, `/stores/${storeId}/staff`],
       [settings.agentKey, `/stores/${storeId}/agent-key`],
+      [settings.merchantKeys, `/stores/${storeId}/merchant-keys`],
     ];
     for (const [name, href] of pages)
       items.push({ name, href, group: settingsGroup, keywords: keywordsForHref(href) });

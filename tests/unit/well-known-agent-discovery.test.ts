@@ -1,0 +1,207 @@
+/**
+ * `/.well-known/acp.json` and `/.well-known/ucp` — agent discovery documents.
+ *
+ * These are the path an agent checks BY CONVENTION, where `/llms.txt` is the
+ * one it has to think to read. They grant nothing: every capability they name
+ * is already built and already enforced elsewhere. What they must get right is
+ * narrower, and all three are tested here:
+ *
+ *  1. **Fail closed, indistinguishably.** A store without `agent_checkout`,
+ *     an inactive store and a platform-level request all 404 with the same
+ *     body. A document that says "this store exists but will not sell to you"
+ *     is a capability leak with no upside for the agent.
+ *  2. **They agree with llms.txt about the credential.** An agent that reads
+ *     one and acts on the other must not get a different answer about whether
+ *     writes need `x-agent-key` — including when the per-store escape hatch is
+ *     on, where the credential line would otherwise be a lie.
+ *  3. **Custom-domain merchants get their OWN URLs.** A platform-rooted link
+ *     served on `wadyaljuz.com` sends the agent to a redirect at best. This is
+ *     the bug `/llms.txt` actually shipped with once.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const headerBag = {
+  slug: null as string | null,
+  domain: null as string | null,
+  host: 'store.force-ai.co',
+};
+
+vi.mock('next/headers', () => ({
+  headers: () =>
+    Promise.resolve({
+      get: (k: string) => {
+        if (k === 'x-store-slug') return headerBag.slug;
+        if (k === 'x-store-domain') return headerBag.domain;
+        if (k === 'host') return headerBag.host;
+        return null;
+      },
+    }),
+}));
+
+const fetchMock = vi.fn();
+vi.stubGlobal('fetch', fetchMock);
+
+import { GET as acpGet } from '@web/app/.well-known/acp.json/route';
+import { GET as ucpGet } from '@web/app/.well-known/ucp/route';
+
+interface StoreOpts {
+  slug?: string;
+  domain?: string | null;
+  status?: string;
+  features?: string[];
+  currency?: string;
+}
+
+function mockStore(o: StoreOpts = {}) {
+  const store = {
+    id: 'store-1',
+    name: 'Pecan Bee',
+    slug: o.slug ?? 'pecanbee',
+    description: 'Cakes',
+    email: 'hi@pecanbee.test',
+    phone: '+96500000000',
+    domain: o.domain ?? null,
+    currency: o.currency ?? 'KWD',
+    status: o.status ?? 'active',
+  };
+  fetchMock.mockResolvedValue({
+    ok: true,
+    json: () =>
+      Promise.resolve({ data: { store, enabledFeatures: o.features ?? ['agent_checkout'] } }),
+  });
+  return store;
+}
+
+const body = async (res: Response) => JSON.parse(await res.text());
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  headerBag.slug = 'pecanbee';
+  headerBag.domain = null;
+  headerBag.host = 'store.force-ai.co';
+});
+
+describe('acp.json', () => {
+  it('serves the merchant, its MCP endpoint and its tool split', async () => {
+    mockStore();
+    const res = await acpGet();
+    expect(res.status).toBe(200);
+    const b = await body(res);
+    expect(b.merchant.name).toBe('Pecan Bee');
+    expect(b.endpoints.mcp).toMatch(/\/mcp\/pecanbee$/);
+    expect(b.endpoints.mcp_transport).toBe('streamable-http');
+    expect(b.tools.write).toEqual(['add_to_cart', 'place_order']);
+  });
+
+  it('states the credential contract for writes, and none for reads', async () => {
+    mockStore();
+    const b = await body(await acpGet());
+    expect(b.authentication.read).toBe('none');
+    expect(b.authentication.write).toBe('api_key');
+    expect(b.authentication.write_header).toBe('x-agent-key');
+  });
+
+  it('says writes are open when the per-store escape hatch is on', async () => {
+    // Otherwise the credential line is a lie for that store — the same reason
+    // llms.txt branches on this feature.
+    mockStore({ features: ['agent_checkout', 'agent_checkout_open_writes'] });
+    const b = await body(await acpGet());
+    expect(b.authentication.write).toBe('none');
+    expect(b.authentication.write_header).toBeUndefined();
+  });
+
+  it('404s a store without agent_checkout — fail closed', async () => {
+    mockStore({ features: [] });
+    expect((await acpGet()).status).toBe(404);
+  });
+
+  it('404s an inactive store — a suspended shop cannot transact', async () => {
+    mockStore({ status: 'suspended' });
+    expect((await acpGet()).status).toBe(404);
+  });
+
+  it('404s a platform-level request — the platform is not a shop', async () => {
+    headerBag.slug = null;
+    expect((await acpGet()).status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('gives all three refusals a byte-identical body', async () => {
+    const bodies: string[] = [];
+    mockStore({ features: [] });
+    bodies.push(await (await acpGet()).text());
+    mockStore({ status: 'suspended' });
+    bodies.push(await (await acpGet()).text());
+    headerBag.slug = null;
+    bodies.push(await (await acpGet()).text());
+    expect(new Set(bodies).size).toBe(1);
+  });
+
+  it('roots URLs at the merchant OWN domain when they have one', async () => {
+    headerBag.slug = null;
+    headerBag.domain = 'wadyaljuz.com';
+    headerBag.host = 'wadyaljuz.com';
+    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    const b = await body(await acpGet());
+    expect(b.merchant.url).toBe('https://wadyaljuz.com');
+    expect(b.endpoints.product_feed).toBe('https://wadyaljuz.com/feeds/products.json');
+    expect(b.endpoints.llms_txt).toBe('https://wadyaljuz.com/llms.txt');
+  });
+
+  it('roots URLs under the platform path for a store with no domain', async () => {
+    mockStore({ slug: 'pecanbee', domain: null });
+    const b = await body(await acpGet());
+    expect(b.merchant.url).toBe('https://store.force-ai.co/pecanbee');
+  });
+
+  it('does not advertise returns — there is no agent-facing tool for them', async () => {
+    mockStore();
+    const b = await body(await acpGet());
+    expect(b.capabilities.returns).toBe(false);
+  });
+
+  it('is cached briefly — the gate and the hatch are permission state', async () => {
+    mockStore();
+    const res = await acpGet();
+    expect(res.headers.get('cache-control')).toMatch(/max-age=300/);
+  });
+});
+
+describe('ucp', () => {
+  it('points at the SAME endpoint and the same credential as acp.json', async () => {
+    mockStore();
+    const acp = await body(await acpGet());
+    mockStore();
+    const ucp = await body(await ucpGet());
+    expect(ucp.transports[0].url).toBe(acp.endpoints.mcp);
+    expect(ucp.transports[0].auth.write).toBe('api_key');
+    expect(ucp.transports[0].auth.header).toBe(acp.authentication.write_header);
+  });
+
+  it('declares KWD as 1000 minor units — the 10x trap', async () => {
+    mockStore({ currency: 'KWD' });
+    const b = await body(await ucpGet());
+    expect(b.pricing.amounts).toBe('integer-minor-units');
+    expect(b.pricing.minor_units_per_major).toBe(1000);
+  });
+
+  it('declares 100 minor units for a two-decimal currency', async () => {
+    mockStore({ currency: 'USD' });
+    const b = await body(await ucpGet());
+    expect(b.pricing.minor_units_per_major).toBe(100);
+  });
+
+  it('404s when agent_checkout is off, same as its sibling', async () => {
+    mockStore({ features: [] });
+    expect((await ucpGet()).status).toBe(404);
+  });
+
+  it('cross-links to acp.json on the right host', async () => {
+    headerBag.slug = null;
+    headerBag.domain = 'wadyaljuz.com';
+    headerBag.host = 'wadyaljuz.com';
+    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    const b = await body(await ucpGet());
+    expect(b.documents.acp).toBe('https://wadyaljuz.com/.well-known/acp.json');
+  });
+});
