@@ -2,6 +2,7 @@
 // iCarry Carrier Implementation
 // ==========================================
 
+import { assertPublicHttpUrl, safeFetch } from '../../lib/safe-fetch';
 import logger from '../../lib/logger';
 import {
   CarrierShipmentRequest,
@@ -14,7 +15,7 @@ import {
 } from './types';
 
 // Placeholder base URL — real API URL will be configured per environment
-const ICARRY_BASE_URL = 'https://api.icarry.com/v1';
+export const ICARRY_BASE_URL = 'https://api.icarry.com/v1';
 
 export interface ICarryCredentials {
   apiKey: string;
@@ -50,8 +51,42 @@ function buildHeaders(apiKey: string): Record<string, string> {
   };
 }
 
-function resolveBaseUrl(credentials: ICarryCredentials): string {
-  return credentials.baseUrl?.replace(/\/$/, '') || ICARRY_BASE_URL;
+/**
+ * Resolve the API base URL for a carrier config.
+ *
+ * `credentials` comes from `shipping-carrier.routes.ts`, whose schema is
+ * `z.record(z.string(), z.string())` — so `baseUrl` is merchant-supplied free
+ * text that ends up inside a server-side `fetch()`. Returned verbatim, that is
+ * an SSRF primitive against the API host's own network and the cloud metadata
+ * endpoint at 169.254.169.254, with `testConnection` echoing the status and
+ * `body.message` back to the merchant as an oracle.
+ *
+ * Every merchant-supplied override therefore goes through
+ * `assertPublicHttpUrl`, which requires http(s) and blocks a URL whose host —
+ * or ANY address that host resolves to — is loopback, private, CGNAT,
+ * link-local or unspecified. It throws `SSRF_BLOCKED: <reason>`; callers
+ * surface that the same way they already surface a carrier network error.
+ *
+ * This assert is the fail-fast half only, and on its own it is bypassable: a
+ * `baseUrl` on a host that resolves publicly passes here and then answers
+ * `302 Location: http://169.254.169.254/…`, which a bare `fetch()` follows
+ * (it defaults to `redirect: 'follow'`). So every request below goes out
+ * through `safeFetch`, which re-validates each redirect hop — validating here
+ * and fetching there is what actually closes the oracle. Never call bare
+ * `fetch()` on this base URL; `tests/unit/carrier-ssrf.test.ts` enforces that
+ * for every carrier declaring a merchant-supplied `baseUrl`.
+ *
+ * The no-override path returns our own compile-time constant without a DNS
+ * round-trip: validating a value we control would add latency to every
+ * shipment call and make the carrier depend on DNS to use its default.
+ */
+export async function resolveBaseUrl(credentials: ICarryCredentials): Promise<string> {
+  const override = credentials.baseUrl?.trim();
+  if (!override) return ICARRY_BASE_URL;
+
+  const trimmed = override.replace(/\/$/, '');
+  await assertPublicHttpUrl(trimmed);
+  return trimmed;
 }
 
 export class ICarryCarrier implements ShippingCarrierProvider {
@@ -62,7 +97,7 @@ export class ICarryCarrier implements ShippingCarrierProvider {
     credentials: ICarryCredentials,
     data: CarrierShipmentRequest
   ): Promise<CarrierShipmentResponse> {
-    const base = resolveBaseUrl(credentials);
+    const base = await resolveBaseUrl(credentials);
     const url = `${base}/orders`;
 
     const payload = {
@@ -117,7 +152,7 @@ export class ICarryCarrier implements ShippingCarrierProvider {
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await safeFetch(url, {
         method: 'POST',
         headers: buildHeaders(credentials.apiKey),
         body: JSON.stringify(payload),
@@ -152,12 +187,12 @@ export class ICarryCarrier implements ShippingCarrierProvider {
     credentials: ICarryCredentials,
     trackingNumber: string
   ): Promise<CarrierTrackingResponse> {
-    const base = resolveBaseUrl(credentials);
+    const base = await resolveBaseUrl(credentials);
     const url = `${base}/orders/${encodeURIComponent(trackingNumber)}/tracking`;
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await safeFetch(url, {
         method: 'GET',
         headers: buildHeaders(credentials.apiKey),
       });
@@ -199,12 +234,12 @@ export class ICarryCarrier implements ShippingCarrierProvider {
     credentials: ICarryCredentials,
     carrierShipmentId: string
   ): Promise<boolean> {
-    const base = resolveBaseUrl(credentials);
+    const base = await resolveBaseUrl(credentials);
     const url = `${base}/orders/${encodeURIComponent(carrierShipmentId)}/cancel`;
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await safeFetch(url, {
         method: 'PUT',
         headers: buildHeaders(credentials.apiKey),
       });
@@ -254,11 +289,17 @@ export class ICarryCarrier implements ShippingCarrierProvider {
   async testConnection(
     credentials: ICarryCredentials
   ): Promise<{ success: boolean; error?: string }> {
-    const base = resolveBaseUrl(credentials);
-    const url = `${base}/merchants/me`;
-
+    // Resolved INSIDE the try: testConnection's contract is
+    // `{ success: false, error }`, never a throw — an SSRF_BLOCKED base URL
+    // is a connection test that failed, and the merchant should be told why.
+    // This is the reachable oracle (status + body.message go back to the
+    // merchant), so it is the call site that most needs `safeFetch`: without
+    // per-hop re-validation a 302 turns the "why" into a metadata readout.
     try {
-      const res = await fetch(url, {
+      const base = await resolveBaseUrl(credentials);
+      const url = `${base}/merchants/me`;
+
+      const res = await safeFetch(url, {
         method: 'GET',
         headers: buildHeaders(credentials.apiKey),
       });
@@ -272,6 +313,15 @@ export class ICarryCarrier implements ShippingCarrierProvider {
     } catch (err) {
       const message = (err as Error).message;
       logger.error({ err, carrier: 'icarry' }, 'iCarry testConnection error');
+      // The merchant needs the VERDICT, not the reason. `assertPublicHttpUrl`
+      // distinguishes "does not resolve" from "resolves to a private address",
+      // which turns this endpoint into a boolean oracle over the API host's
+      // resolver — a store_admin could map which internal names exist. Far
+      // weaker than the pre-guard oracle, but free to close: the detailed
+      // reason stays in the log line above, where operators can read it.
+      if (message.startsWith('SSRF_BLOCKED')) {
+        return { success: false, error: 'Base URL must be a public http(s) address.' };
+      }
       return { success: false, error: message };
     }
   }

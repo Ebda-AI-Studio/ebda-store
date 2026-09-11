@@ -8,6 +8,10 @@
  * `resolveBestPromotion` run for real (only Prisma is mocked), same style as
  * tests/unit/promotion-resolver.test.ts, so the test exercises the real
  * targeting math end-to-end through the HTTP layer.
+ *
+ * Companion: `tests/integration/promotions-preview.test.ts` covers what a mock
+ * cannot — cross-tenant product scoping and the resolver's active/expiry/type
+ * filters against a real Postgres. Neither file is a duplicate of the other.
  */
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';

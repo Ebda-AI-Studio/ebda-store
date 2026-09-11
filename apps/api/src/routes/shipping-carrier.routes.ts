@@ -12,10 +12,34 @@ const router = Router();
 // Validation schemas
 // ==========================================
 
+/**
+ * `credentials` is an open string map because each carrier declares its own
+ * key set. One key is special: `baseUrl` reaches a server-side `fetch()` in
+ * the carrier client, so unchecked it is an SSRF primitive (see
+ * `carriers/icarry.carrier.ts` and `tests/unit/carrier-ssrf.test.ts`).
+ *
+ * The carrier client is the authority — it resolves the host and blocks
+ * private/loopback/link-local targets at call time, which is the only check
+ * that survives a DNS record changing after the write. This refinement is the
+ * cheap edge half: it rejects an obviously-wrong value while the merchant is
+ * still looking at the form, instead of silently storing it and failing later.
+ */
 const carrierConfigSchema = z.object({
   enabled: z.boolean(),
   isDefault: z.boolean().optional(),
-  credentials: z.record(z.string(), z.string()),
+  credentials: z.record(z.string(), z.string()).refine(
+    creds => {
+      const baseUrl = creds.baseUrl?.trim();
+      if (!baseUrl) return true;
+      try {
+        const u = new URL(baseUrl);
+        return u.protocol === 'https:' || u.protocol === 'http:';
+      } catch {
+        return false;
+      }
+    },
+    { message: 'credentials.baseUrl must be an http(s) URL', path: ['baseUrl'] }
+  ),
   settings: z.record(z.string(), z.unknown()).optional(),
 });
 

@@ -1,5 +1,5 @@
 {
-  "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` \u2014 the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
+  "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` — the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
   "defences": [
     {
       "id": "tenant-deadstock-clearance-coupon",
@@ -45,7 +45,7 @@
       "id": "authz-permission-gate",
       "domain": "authn / session",
       "tier": "unit",
-      "why": "staff can issue refunds \u2014 the orders:refund RBAC gate",
+      "why": "staff can issue refunds — the orders:refund RBAC gate",
       "source": "apps/api/src/middleware/rbac.ts",
       "find": "    if (!hasPermission(userRole, permission)) {",
       "replace": "    if (false) {",
@@ -195,7 +195,7 @@
       "id": "agent-credential-actually-compared",
       "domain": "agent identity",
       "tier": "unit",
-      "why": "any presented string authorises a write \u2014 a wrong key, and another store's key, both pass",
+      "why": "any presented string authorises a write — a wrong key, and another store's key, both pass",
       "source": "apps/api/src/mcp/agent-auth.ts",
       "find": "        } else if (expected && secretsMatch(expected, presented)) {",
       "replace": "        } else if (expected || presented) {",
@@ -305,7 +305,7 @@
       "id": "agent-key-openwrites-status-fails-closed",
       "domain": "authn/session",
       "tier": "unit",
-      "why": "the escape-hatch state shown to the merchant must never read as OPEN because the feature lookup failed \u2014 a fail-open reading of a security control",
+      "why": "the escape-hatch state shown to the merchant must never read as OPEN because the feature lookup failed — a fail-open reading of a security control",
       "source": "apps/api/src/routes/agent-credential.routes.ts",
       "find": "        .catch(() => false);",
       "replace": "        .catch(() => true);",
@@ -420,6 +420,46 @@
       "find": "        if (decryptFailed) {\n          context.credential = 'error';\n        } else if",
       "replace": "        if (false) {\n          context.credential = 'error';\n        } else if",
       "test": "tests/unit/mcp-agent-write-auth.test.ts"
+    },
+    {
+      "id": "ssrf-carrier-merchant-base-url",
+      "domain": "SSRF",
+      "tier": "unit",
+      "why": "merchant-supplied carrier baseUrl reaches fetch() unvalidated — cloud metadata at 169.254.169.254 from the API host",
+      "source": "apps/api/src/services/carriers/icarry.carrier.ts",
+      "find": "  await assertPublicHttpUrl(trimmed);\n  return trimmed;",
+      "replace": "  return trimmed;",
+      "test": "tests/unit/carrier-ssrf.test.ts"
+    },
+    {
+      "id": "impersonation-account-soft-delete",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "an impersonation session deactivates the impersonated person's account via DELETE /auth/me",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "  '/me',\n  authenticate,\n  rejectImpersonated,",
+      "replace": "  '/me',\n  authenticate,",
+      "test": "tests/unit/reject-impersonated.test.ts"
+    },
+    {
+      "id": "ssrf-carrier-redirect-revalidation",
+      "domain": "SSRF",
+      "tier": "unit",
+      "why": "an attacker-controlled PUBLIC host 302s to 169.254.169.254 — the pre-flight check passes and undici follows the redirect",
+      "source": "apps/api/src/lib/safe-fetch.ts",
+      "find": "    const res = await fetch(current, { ...currentInit, redirect: 'manual' });",
+      "replace": "    const res = await fetch(current, { ...currentInit });",
+      "test": "tests/unit/carrier-ssrf.test.ts"
+    },
+    {
+      "id": "impersonation-mfa-enroll",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "an impersonation session binds a new TOTP secret to a victim with no MFA and locks the owner out permanently",
+      "source": "apps/api/src/routes/mfa.routes.ts",
+      "find": "router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, next) => {",
+      "replace": "router.post('/enroll/begin', authenticate, async (req, res, next) => {",
+      "test": "tests/unit/reject-impersonated.test.ts"
     }
   ]
 }

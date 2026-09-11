@@ -614,34 +614,42 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
 });
 
 // DELETE /auth/me - Soft-delete (deactivate) the authenticated user's account
-router.delete('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.userId;
+// `rejectImpersonated`: deactivating the account is irreversible from the
+// user's side, so it belongs with /me/erase, /change-password and /logout-all.
+// It was the one destructive route the original guard rollout missed.
+router.delete(
+  '/me',
+  authenticate,
+  rejectImpersonated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
 
-    // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
-    await prisma.user.update({
-      where: { id: userId },
-      data: { deletedAt: new Date() },
-    });
+      // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
+      await prisma.user.update({
+        where: { id: userId },
+        data: { deletedAt: new Date() },
+      });
 
-    // Audit log
-    await auditLog({
-      action: 'user.account.deleted',
-      userId,
-      resourceType: 'user',
-      resourceId: userId,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+      // Audit log
+      await auditLog({
+        action: 'user.account.deleted',
+        userId,
+        resourceType: 'user',
+        resourceId: userId,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
-    res.json({
-      success: true,
-      data: { message: 'Account deleted successfully' },
-    });
-  } catch (error) {
-    next(error);
+      res.json({
+        success: true,
+        data: { message: 'Account deleted successfully' },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /auth/me/erase — irreversible PII anonymization (GDPR Art. 17 +
 // Kuwait Law 13/2023 Art. 17). Unlike DELETE /auth/me (soft-delete that

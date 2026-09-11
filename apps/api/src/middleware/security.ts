@@ -884,7 +884,16 @@ export const promotionPreviewLimiter = rateLimit({
   // Redis became a single point of failure for the whole write surface while
   // the cache layer deliberately fails open. Unlimited-but-up beats down.
   passOnStoreError: true,
-  skip: skipForLoadTest,
+  // `skipForLoadTestOrTests`, matching `publicTenantLimiter` below — which
+  // wraps this SAME route. With the plain `skipForLoadTest`, an integration
+  // suite mounting the real router spent the live 20/min budget from one IP
+  // against a Redis store shared across vitest workers and persisting between
+  // files. It passed with headroom, but the margin was invisible: four more
+  // cases, a second suite on this endpoint, or a same-minute re-run tips it
+  // over, and the failure surfaces as `Cannot read properties of undefined
+  // (reading 'promotion')` rather than as a 429 — the misleading-artefact
+  // failure mode the retry-safety rule exists to prevent.
+  skip: skipForLoadTestOrTests,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
 

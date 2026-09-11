@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { authenticate } from '../middleware/auth';
+import { authenticate, rejectImpersonated } from '../middleware/auth';
 import { authLimiter } from '../middleware/security';
 import { prisma } from '@force/database';
 import { encryption } from '../services/encryption.service';
@@ -40,7 +40,19 @@ const verifyBodySchema = z.object({
  * TOTP code in req.body.code before a new secret is generated. This prevents a
  * hijacked session from silently re-enrolling a new authenticator device.
  */
-router.post('/enroll/begin', authenticate, async (req, res, next) => {
+// `rejectImpersonated`: binding a second factor to someone else's account is
+// the WORST of the destructive actions, not a lesser one. For a victim with no
+// MFA, the re-auth branch below never runs, so an impersonation session could
+// write a fresh `mfaSecret` onto their user row, verify it with a code read off
+// the impersonator's own authenticator, and lock the legitimate owner out
+// permanently — they never possessed the secret. Unlike the soft-delete on
+// DELETE /auth/me, no admin can undo it.
+//
+// This router is mounted separately at `/auth/mfa` (routes/index.ts), which is
+// exactly why it was missed: the first rollout of this guard walked only
+// auth.routes.ts. The mount registry in tests/unit/reject-impersonated.test.ts
+// is now router-qualified so it can see routes outside that file.
+router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, next) => {
   try {
     // `code` is optional here (only required to re-enroll when MFA is already
     // enabled). Validate its shape only when supplied so first-time enrollment
@@ -86,37 +98,43 @@ router.post('/enroll/begin', authenticate, async (req, res, next) => {
  * Complete enrollment: verifies a TOTP code against the pending secret, enables
  * MFA, and returns one-time backup codes that the user must save.
  */
-router.post('/enroll/verify', authenticate, authLimiter, async (req, res, next) => {
-  try {
-    const parsed = codeSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+router.post(
+  '/enroll/verify',
+  authenticate,
+  rejectImpersonated,
+  authLimiter,
+  async (req, res, next) => {
+    try {
+      const parsed = codeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+      }
+      const { code } = parsed.data;
+      const u = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { mfaSecret: true },
+      });
+      if (!u?.mfaSecret) {
+        throw new AppError(400, 'MFA_NOT_STARTED', 'Begin enrollment first');
+      }
+      if (!MfaService.verifyCode(encryption.decrypt(u.mfaSecret), code)) {
+        throw new AppError(400, 'MFA_BAD_CODE', 'Invalid code');
+      }
+      const { plain, hashed } = await MfaService.generateBackupCodes();
+      await prisma.user.update({
+        where: { id: req.user!.userId },
+        data: {
+          mfaEnabled: true,
+          mfaEnrolledAt: new Date(),
+          mfaBackupCodes: hashed,
+        },
+      });
+      res.json({ success: true, data: { backupCodes: plain } });
+    } catch (error) {
+      next(error);
     }
-    const { code } = parsed.data;
-    const u = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: { mfaSecret: true },
-    });
-    if (!u?.mfaSecret) {
-      throw new AppError(400, 'MFA_NOT_STARTED', 'Begin enrollment first');
-    }
-    if (!MfaService.verifyCode(encryption.decrypt(u.mfaSecret), code)) {
-      throw new AppError(400, 'MFA_BAD_CODE', 'Invalid code');
-    }
-    const { plain, hashed } = await MfaService.generateBackupCodes();
-    await prisma.user.update({
-      where: { id: req.user!.userId },
-      data: {
-        mfaEnabled: true,
-        mfaEnrolledAt: new Date(),
-        mfaBackupCodes: hashed,
-      },
-    });
-    res.json({ success: true, data: { backupCodes: plain } });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * POST /auth/mfa/verify
@@ -240,7 +258,11 @@ router.post('/verify', authLimiter, async (req, res, next) => {
  * Also revokes all active sessions (bumps tokenVersion) so old tokens are
  * immediately invalidated.
  */
-router.post('/disable', authenticate, authLimiter, async (req, res, next) => {
+// Not exploitable by an impersonator today — it verifies a current TOTP code,
+// which they do not have. Guarded anyway: the whole point of a registry is that
+// every account-level MFA change is in it, so a future refactor that relaxes the
+// code check does not silently reopen the class.
+router.post('/disable', authenticate, rejectImpersonated, authLimiter, async (req, res, next) => {
   try {
     const parsed = codeSchema.safeParse(req.body);
     if (!parsed.success) {

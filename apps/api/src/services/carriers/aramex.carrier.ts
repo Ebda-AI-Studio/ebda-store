@@ -2,6 +2,7 @@
 // Aramex Carrier Implementation
 // ==========================================
 
+import { safeFetch } from '../../lib/safe-fetch';
 import logger from '../../lib/logger';
 import {
   CarrierShipmentRequest,
@@ -85,7 +86,14 @@ function apiUrl(path: string): string {
 }
 
 async function postJson(url: string, body: unknown): Promise<any> {
-  const res = await fetch(url, {
+  // `safeFetch`, not bare `fetch`, even though `url` is built from the
+  // module-level `ARAMEX_BASE_URL` and is not merchant-controlled today.
+  // Two reasons: the registry gate in tests/unit/carrier-ssrf.test.ts asserts
+  // NO bare fetch anywhere under services/carriers/ (an exception is a hole
+  // the next author inherits), and the day this base becomes config- or
+  // credential-driven — as iCarry's already is — the guard is already in
+  // place rather than being the thing someone forgot.
+  const res = await safeFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

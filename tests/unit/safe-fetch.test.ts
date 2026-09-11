@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // dns.lookup is mocked so host-based cases are deterministic (no real network).
 vi.mock('dns', () => {
@@ -7,7 +7,7 @@ vi.mock('dns', () => {
 });
 
 import { promises as dns } from 'dns';
-import { assertPublicHttpUrl } from '../../apps/api/src/lib/safe-fetch';
+import { assertPublicHttpUrl, safeFetch } from '../../apps/api/src/lib/safe-fetch';
 
 const mockLookup = dns.lookup as unknown as ReturnType<typeof vi.fn>;
 
@@ -70,5 +70,107 @@ describe('assertPublicHttpUrl (SSRF guard)', () => {
     await expect(assertPublicHttpUrl('https://nope.example.com/x.png')).rejects.toThrow(
       /SSRF_BLOCKED/
     );
+  });
+});
+
+/**
+ * The assert above only ever sees the FIRST URL. `fetch` defaults to
+ * `redirect: 'follow'`, so validating a URL and then handing it to a bare
+ * fetch() leaves the whole bypass open: a host that resolves public answers
+ * 302 and undici walks to the metadata endpoint for you. safeFetch is the
+ * transport that closes it, so every URL below is PUBLIC and only the hop is
+ * on trial.
+ */
+describe('safeFetch (redirects)', () => {
+  const fetchSpy = vi.fn();
+
+  beforeEach(() => {
+    mockLookup.mockReset();
+    mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    fetchSpy.mockReset();
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  function redirect(location: string, status = 302) {
+    return {
+      status,
+      headers: { get: (n: string) => (n.toLowerCase() === 'location' ? location : null) },
+    };
+  }
+  const ok = { status: 200, headers: { get: () => null } };
+
+  it('never issues the request to a redirect target in a blocked range', async () => {
+    fetchSpy.mockResolvedValue(redirect('http://169.254.169.254/latest/meta-data/'));
+
+    await expect(safeFetch('https://cdn.example.com/x.png')).rejects.toThrow(/SSRF_BLOCKED/);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-validates every hop, not just the first', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(redirect('https://hop2.example.com/a'))
+      .mockResolvedValueOnce(redirect('http://10.0.0.7/a'));
+
+    await expect(safeFetch('https://cdn.example.com/x.png')).rejects.toThrow(/SSRF_BLOCKED/);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes a public redirect chain through', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(redirect('https://cdn2.example.com/x.png'))
+      .mockResolvedValue(ok);
+
+    const res = await safeFetch('https://cdn.example.com/x.png');
+
+    expect(res.status).toBe(200);
+    expect(String(fetchSpy.mock.calls[1][0])).toBe('https://cdn2.example.com/x.png');
+  });
+
+  it('gives up rather than looping forever', async () => {
+    fetchSpy.mockResolvedValue(redirect('https://cdn.example.com/loop'));
+
+    await expect(safeFetch('https://cdn.example.com/x.png')).rejects.toThrow(/too many redirects/);
+  });
+
+  it('returns the 3xx itself when there is no Location to follow', async () => {
+    fetchSpy.mockResolvedValue({ status: 302, headers: { get: () => null } });
+
+    const res = await safeFetch('https://cdn.example.com/x.png');
+
+    expect(res.status).toBe(302);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops credentials when the redirect crosses origins', async () => {
+    fetchSpy.mockResolvedValueOnce(redirect('https://other.example.com/x')).mockResolvedValue(ok);
+
+    await safeFetch('https://cdn.example.com/x.png', {
+      headers: { Authorization: 'Bearer secret', 'X-Trace': 'keep-me' },
+    });
+
+    const hop = new Headers(fetchSpy.mock.calls[1][1].headers);
+    expect(hop.get('authorization')).toBeNull();
+    expect(hop.get('x-trace')).toBe('keep-me'); // only credentials are dropped
+  });
+
+  it('downgrades POST to GET on a 302, as redirect: follow would', async () => {
+    fetchSpy.mockResolvedValueOnce(redirect('https://cdn.example.com/x')).mockResolvedValue(ok);
+
+    await safeFetch('https://cdn.example.com/x.png', { method: 'POST', body: '{"a":1}' });
+
+    expect(fetchSpy.mock.calls[1][1].method).toBe('GET');
+    expect(fetchSpy.mock.calls[1][1].body).toBeUndefined();
+  });
+
+  it('preserves the method and body on a 307', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(redirect('https://cdn.example.com/x', 307))
+      .mockResolvedValue(ok);
+
+    await safeFetch('https://cdn.example.com/x.png', { method: 'POST', body: '{"a":1}' });
+
+    expect(fetchSpy.mock.calls[1][1].method).toBe('POST');
+    expect(fetchSpy.mock.calls[1][1].body).toBe('{"a":1}');
   });
 });

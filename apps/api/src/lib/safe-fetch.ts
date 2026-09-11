@@ -1,12 +1,19 @@
 /**
  * SSRF-safe fetch for MERCHANT-SUPPLIED URLs (product image URLs, store logo
- * URLs). A merchant can set these to anything, so a naive `fetch(url)` on the
- * server lets them probe internal services / cloud metadata (169.254.169.254)
- * and have the response described back to them via Gemini. This guard:
+ * URLs, carrier API base URLs). A merchant can set these to anything, so a
+ * naive `fetch(url)` on the server lets them probe internal services / cloud
+ * metadata (169.254.169.254) and have the response described back to them via
+ * Gemini or a carrier "test connection" result. This guard:
  *   1. requires an http(s) URL,
  *   2. resolves the host and blocks if ANY resolved address is loopback,
  *      private, link-local (cloud metadata), CGNAT, or unspecified,
  *   3. follows redirects MANUALLY, re-validating every hop.
+ *
+ * Step 3 is the half a pre-flight `assertPublicHttpUrl` cannot cover: `fetch`
+ * defaults to `redirect: 'follow'`, so a host that resolves publicly at check
+ * time can answer `302 Location: http://169.254.169.254/…` and undici walks
+ * there for us. Validating the first URL and then handing it to a bare
+ * `fetch()` leaves the oracle fully open — always call through `safeFetch`.
  *
  * Residual: classic DNS-rebinding (resolve public at check, private at connect)
  * is not fully closed — that needs a custom lookup-pinning agent, which breaks
@@ -110,22 +117,64 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
   return u;
 }
 
+// Headers that must not travel to a host the ORIGINAL target chose for us.
+// `redirect: 'follow'` strips these on a cross-origin hop; following redirects
+// by hand means we have to, or a merchant's carrier API key is handed to
+// whatever host their `baseUrl` redirects to.
+const CREDENTIAL_HEADERS = ['authorization', 'cookie', 'proxy-authorization'];
+
 /**
- * SSRF-safe image fetch. Validates the URL and every redirect target against
- * the private-range blocklist, following at most MAX_REDIRECTS manually.
+ * Re-shape the request for a redirect hop, mirroring what `fetch` does for us
+ * on the `redirect: 'follow'` path: credentials are dropped when the origin
+ * changes, and 301/302/303 downgrade the method to GET without a body (so a
+ * shipment payload is never re-POSTed to a redirect target).
  */
-export async function safeFetchImage(rawUrl: string, init?: RequestInit): Promise<Response> {
+function initForHop(init: RequestInit | undefined, status: number, sameOrigin: boolean) {
+  const next: RequestInit = { ...init };
+
+  if (!sameOrigin) {
+    const headers = new Headers(init?.headers ?? {});
+    for (const name of CREDENTIAL_HEADERS) headers.delete(name);
+    next.headers = headers;
+  }
+
+  if (status === 301 || status === 302 || status === 303) {
+    const method = (init?.method ?? 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+      next.method = 'GET';
+      delete next.body;
+    }
+  }
+
+  return next;
+}
+
+/**
+ * SSRF-safe fetch for a merchant-supplied URL. Validates the URL and every
+ * redirect target against the private-range blocklist, following at most
+ * MAX_REDIRECTS manually — a redirect to a blocked address throws
+ * `SSRF_BLOCKED` instead of being followed.
+ */
+export async function safeFetch(rawUrl: string, init?: RequestInit): Promise<Response> {
   let current = rawUrl;
+  let currentInit = init;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    await assertPublicHttpUrl(current);
-    const res = await fetch(current, { ...init, redirect: 'manual' });
+    const validated = await assertPublicHttpUrl(current);
+    const res = await fetch(current, { ...currentInit, redirect: 'manual' });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get('location');
       if (!loc) return res;
-      current = new URL(loc, current).toString(); // resolve relative redirects
+      const next = new URL(loc, current); // resolve relative redirects
+      currentInit = initForHop(currentInit, res.status, next.origin === validated.origin);
+      current = next.toString();
       continue;
     }
     return res;
   }
   throw new Error('SSRF_BLOCKED: too many redirects');
+}
+
+/** SSRF-safe image fetch. Thin alias kept for the image/logo call sites. */
+export function safeFetchImage(rawUrl: string, init?: RequestInit): Promise<Response> {
+  return safeFetch(rawUrl, init);
 }

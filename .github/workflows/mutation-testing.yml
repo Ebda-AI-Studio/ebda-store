@@ -35,10 +35,23 @@ on:
       - 'apps/api/src/services/store.service.ts'
       - 'apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts'
       - 'apps/api/src/routes/auth.routes.ts'
+      # `/auth/mfa/*` is a SEPARATE router. The impersonation guard's first
+      # rollout walked only auth.routes.ts and so never saw it — an audit found
+      # the hole, not the gate. Listing it here is what lets the gate see it.
+      - 'apps/api/src/routes/mfa.routes.ts'
+      # safe-fetch.ts holds the redirect re-validation loop: `assertPublicHttpUrl`
+      # alone proves only the URL you ASKED for is public.
+      - 'apps/api/src/lib/safe-fetch.ts'
       - 'apps/api/src/routes/public.routes.ts'
       - 'apps/api/src/services/auth.service.ts'
       - 'apps/api/src/services/accounting/**'
       - 'apps/api/src/services/payment-providers/**'
+      # Carrier clients: iCarry's resolveBaseUrl is the SSRF defence
+      # (assertPublicHttpUrl on a merchant-supplied baseUrl). Added because
+      # `mutation-gate-trigger-coverage` failed without it — the defence was
+      # registered and killed locally while the CI gate would never have run
+      # on a PR that changed it.
+      - 'apps/api/src/services/carriers/**'
       - 'apps/api/src/lib/inngest/functions/order-refunded.ts'
       - 'apps/web/src/lib/consent-cookie.ts'
       - 'apps/web/src/lib/store-resolver.ts'
