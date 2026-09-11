@@ -21,6 +21,15 @@ Every warning triaged below — fixed in this PR or accepted with reasoning. Com
 
 ## Accepted (documented, no action)
 
+> **Updated 2026-09-11.** "No action" used to mean "still fires every night".
+> `cmd_options` dropped `-I` ("do not return failure on warning") on that date,
+> so an unsuppressed WARN now FAILS the nightly job — which would have made
+> every one of the nine rows below a nightly red build and a Telegram alert.
+> All nine are therefore now suppressed in **`.zap/rules.tsv`**, which is the
+> live accepted-set: this table is the reasoning, that file is the mechanism.
+> Each carries a `review-by:` date, and `scripts/check-zap-review-dates.mjs`
+> fails the nightly job once one lapses.
+
 | ZAP id | Warning                                               | Reasoning                                                                                                                                                                                                                                                                                  |
 | ------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 10031  | User-controllable HTML attribute — potential XSS (×1) | PLAUSIBLE-only: React escapes attribute interpolation and every API edge is Zod-validated; the flagged case is a reflected query param in a React-rendered attribute. Standing browser-attack-surface audit (2026-06-21) covers this class. Re-check if a future scan upgrades it to FAIL. |

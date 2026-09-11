@@ -68,7 +68,8 @@
     "prepare": "husky || true",
     "commitlint": "commitlint --edit",
     "secrets": "secretlint --maskSecrets '**/*'",
-    "audit:strict": "npm audit --audit-level=low"
+    "audit:strict": "npm audit --audit-level=low",
+    "check:zap-review-dates": "node scripts/check-zap-review-dates.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",

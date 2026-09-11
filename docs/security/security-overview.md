@@ -14,13 +14,13 @@ Last verified: **2026-07-15**.
 
 ## Vulnerability management
 
-| Control                                                                  | Cadence                                                                            |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| Dependency audit (`npm audit`, hard gate on high-severity prod deps)     | Every PR + every push to `main` (`.github/workflows/ci.yml`)                       |
-| Secret scanning (gitleaks)                                               | Every PR + every push to `main` (`.github/workflows/gitleaks.yml`)                 |
-| Static analysis (semgrep)                                                | Every PR + every push to `main` (`.github/workflows/semgrep.yml`)                  |
-| Dynamic scanning (OWASP ZAP baseline DAST against production storefront) | Nightly (`.github/workflows/zap-baseline.yml`, target `https://store.force-ai.co`) |
-| Manual penetration-test pass (Burp checklist)                            | Quarterly — see run log in `docs/security/burp-manual-pentest-checklist.md`        |
+| Control                                                                  | Cadence                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dependency audit (`npm audit`, hard gate on high-severity prod deps)     | Every PR + every push to `main` (`.github/workflows/ci.yml`)                                                                                                                                                                                                                                                                    |
+| Secret scanning (gitleaks)                                               | Every PR + every push to `main` (`.github/workflows/gitleaks.yml`)                                                                                                                                                                                                                                                              |
+| Static analysis (semgrep)                                                | Every PR + every push to `main` (`.github/workflows/semgrep.yml`)                                                                                                                                                                                                                                                               |
+| Dynamic scanning (OWASP ZAP baseline DAST against production storefront) | Nightly (`.github/workflows/zap-baseline.yml`, target `https://store.force-ai.co`). **Alerts via a red job + Telegram + the report as a build artifact** — not a GitHub issue (changed 2026-09-11). Accepted alerts live in `.zap/rules.tsv` with `review-by:` dates, enforced nightly by `scripts/check-zap-review-dates.mjs`. |
+| Manual penetration-test pass (Burp checklist)                            | Quarterly — see run log in `docs/security/burp-manual-pentest-checklist.md`                                                                                                                                                                                                                                                     |
 
 Internal production audits run against 13+ dimensions (security surface,
 tenancy/RLS/auth, money integrity, reliability, scaling, observability/DR,

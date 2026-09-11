@@ -15,8 +15,10 @@ on:
         default: false
 
 permissions:
+  # `issues: write` dropped with `allow_issue_writing` — no reason to hand a
+  # write-scoped token to a third-party action running against a production URL
+  # on a nightly schedule.
   contents: read
-  issues: write
 
 jobs:
   zap:
@@ -28,11 +30,98 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Suppression expiry lives HERE, not in tests/unit. In the PR-blocking
+      # suite it would mean that on a review-by date every unrelated pull
+      # request — a hotfix included — fails CI on a ZAP suppression, with no
+      # way to tell "this PR broke something" from "a calendar date passed".
+      # Nightly, it alerts through the same Telegram path as a scan failure and
+      # blocks nobody. The deterministic half (every IGNORE HAS a date) stays
+      # PR-blocking in tests/unit/zap-rules-have-review-dates.test.ts.
+      #
+      # No `npm ci`: the script is dependency-free node, and installing the
+      # workspace here would add ~4 minutes to a job that scans a URL.
+      - name: Check ZAP suppressions have not expired
+        run: node scripts/check-zap-review-dates.mjs
+
       - name: ZAP Baseline Scan
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: ${{ github.event.inputs.target || vars.ZAP_TARGET }}
           rules_file_name: '.zap/rules.tsv'
-          cmd_options: '-a -I'
-          allow_issue_writing: true
+          # `-I` REMOVED (2026-09-11). It is zap-baseline.py's "do not return
+          # failure on warning", and baseline alerts are WARN-level by default
+          # — so with `-I` the scan exited 0 and `fail_action: true` never
+          # fired. The job stayed green even on a brand-new alert. Turning off
+          # issue writing while `-I` was still set would have replaced a noisy
+          # channel with NO channel, which is strictly worse than the 37
+          # duplicates it was meant to fix.
+          #
+          # `-a` (include the alpha passive rules) is kept.
+          cmd_options: '-a'
+          # `false` since 2026-09-11. The action re-opens a NEW issue titled
+          # "ZAP Scan Baseline Report" on runs where its dedupe search does not
+          # find the previous one — the GitHub search API it queries is
+          # eventually consistent, and a nightly schedule compounds every miss.
+          # Measured result: 37 open duplicates between 2026-07-15 and
+          # 2026-09-11, all of the same scan, which is how a REAL finding ends
+          # up somewhere nobody reads.
+          #
+          # The signal is not lost. `fail_action: true` still fails the job on a
+          # new alert, the HTML/JSON report is still uploaded as an artifact by
+          # the action itself, and this repo's CI standard already routes a
+          # failed job to Telegram. A red job with an attached report is a
+          # better alert than the 38th copy of an issue.
+          allow_issue_writing: false
           fail_action: true
+
+      # Explicit, rather than trusting the action to upload its own report.
+      # That behaviour lives in the same report-processing path as issue
+      # creation in this action family and is not documented as independent of
+      # it — so with issue writing off, "the report is still an artifact" was
+      # an assumption, not a guarantee. `if: always()` because the run we most
+      # want the report from is the failing one.
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zap-baseline-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          if-no-files-found: warn
+          retention-days: 30
+
+  notify-failure:
+    name: Notify on failure
+    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 2
+    needs: [zap]
+    if: always() && failure()
+    steps:
+      # The delivery channel that replaces the issue. Mirrors
+      # lighthouse-nightly.yml:69 — the claim that "this repo's CI standard
+      # already routes a failed job to Telegram" was true of OTHER workflows
+      # and not of this one, which is what made turning off issue writing a
+      # silent drop rather than a channel swap.
+      - name: Compose + send Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
+            echo "telegram secrets not configured — skipping alert"
+            exit 0
+          fi
+          MSG=$(printf '🔴 *ZAP baseline DAST FAILED* — %s\nA new alert appeared, or the scan errored. Report is attached to the run as an artifact.\n[view run](https://github.com/%s/actions/runs/%s)' \
+            "$REPO" "$REPO" "$RUN_ID")
+          curl -sS -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
+            -d parse_mode=Markdown \
+            -d disable_web_page_preview=true \
+            --data-urlencode text="$MSG" \
+            >/dev/null

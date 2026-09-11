@@ -1,3 +1,55 @@
 # ruleId	action	comment
-10096	IGNORE	Timestamp disclosure - noisy, not a real risk here
-10027	IGNORE	Information disclosure suspicious comments - false positives in minified JS
+
+# EVERY line below carries `review-by:<YYYY-MM-DD>`. That is not decoration:
+# tests/unit/zap-rules-have-review-dates.test.ts fails a PR if a suppression has
+# no date, and the NIGHTLY job fails once a date passes — so a suppression
+# cannot quietly outlive its reason, without a calendar date being able to
+# redden an unrelated hotfix. (The expiry check deliberately does NOT sit in the
+# PR-blocking unit suite; see that test's header.)
+#
+# ## Why this list is long, and why it has to be
+#
+# `cmd_options` no longer carries `-I` ("do not return failure on warning"), so
+# ANY unsuppressed WARN now fails the job. `docs/security/zap-triage-2026-07-15.md`
+# already accepted NINE rule ids with documented reasoning, and the reasons below
+# are quoted from it rather than re-derived. Without them the nightly job would
+# be red from its first post-merge run and every run after — turning the new
+# Telegram channel into exactly the alert fatigue this change set out to end.
+#
+# ## The cost of a global IGNORE
+#
+# rules.tsv has no URL scoping, so each line also hides the NOT-yet-accepted
+# variant of its own class. Two are worth naming:
+#
+#   10055 also covers the "CSP directives with no default-src fallback" finding
+#         that was FIXED in the 2026-07-15 PR. Suppressing the id hides a
+#         regression of that fix, so `tests/unit/csp-directive-floor.test.ts`
+#         pins base-uri/object-src/form-action directly on the three configs —
+#         that test, not the scan, is now what guards it.
+#   10202 hides any future form-post surface that genuinely lacks a token.
+#
+# ## Removal plan
+#
+# 10055 and 10038 come OFF this list when the CSP nonce work lands
+# (docs/security/csp-hardening-plan.md). Leaving them after that would hide a
+# regression rather than silence a known residual.
+
+# ── Suppressed before 2026-09-11 ────────────────────────────────────────────
+10096	IGNORE	Timestamp disclosure - noisy, not a real risk here; review-by:2027-03-31
+10027	IGNORE	Information disclosure suspicious comments - false positives in minified JS; review-by:2027-03-31
+
+# ── Accepted in docs/security/zap-triage-2026-07-15.md, reasons quoted ──────
+10031	IGNORE	User-controllable HTML attribute - PLAUSIBLE-only; React escapes attribute interpolation and every API edge is Zod-validated; review-by:2027-03-31
+10110	IGNORE	Dangerous JS functions - eval inside a bundled third-party SDK, the same dependency behind the CSP unsafe-eval debt; review-by:2026-12-31
+90003	IGNORE	SRI missing - marketing-pixel/OneSignal SDK loaders that self-update; pinning hashes breaks them on every vendor release. Bounded by the fixed script-src allowlist; review-by:2027-03-31
+90004	IGNORE	COEP missing - require-corp breaks cross-origin images/pixels storefront-wide; no SharedArrayBuffer use so no benefit; review-by:2027-03-31
+90005	IGNORE	Sec-Fetch-Dest missing - request-side header set by browsers not servers; ZAP noise on non-browser requests; review-by:2027-03-31
+10015	IGNORE	Re-examine Cache-Control - advisory on intentionally-cached public pages; caching policy is deliberate; review-by:2027-03-31
+10049	IGNORE	Non-storable content - advisory; responses marked non-cacheable are auth-adjacent, which is correct; review-by:2027-03-31
+10094	IGNORE	Base64 disclosure - Next.js inline RSC/flight payloads, not secrets; gitleaks + client-secret-scan gate real leakage; review-by:2027-03-31
+10112	IGNORE	Session-management response identified - informational fingerprint of the auth flow, not a defect; review-by:2027-03-31
+
+# ── Added 2026-09-11 ───────────────────────────────────────────────────────
+10055	IGNORE	CSP unsafe-inline/unsafe-eval - Next.js App Router requirement, needs nonce work. ALSO masks the default-src-fallback fix; csp-directive-floor.test.ts guards that; review-by:2026-12-31
+10038	IGNORE	CSP header not set - fires on the apex 307 redirect; every 200 carries a CSP (verified against production 2026-09-11); review-by:2026-12-31
+10202	IGNORE	Anti-CSRF tokens - double-submit cookie + X-CSRF-Token header, not a hidden form field; review-by:2027-03-31
