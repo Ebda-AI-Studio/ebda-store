@@ -26,6 +26,11 @@ import {
   fetchOpenFollowupTitles,
   followupIssueTitle,
   selectFollowupsToFile,
+  fingerprintMarker,
+  followupFingerprint,
+  locationCommentMarker,
+  findMarkedComment,
+  groupCommentsByIssue,
 } from './followup-filing.mjs';
 import { fetchAllPages } from './gh-paginate.mjs';
 import { nonRunExitCode, NON_RUN_REASONS } from './gate-policy.mjs';
@@ -355,23 +360,26 @@ if (GITHUB_STEP_SUMMARY) {
 async function fileFollowupIssues(followups) {
   // Dedup against EVERY open followup, not the first page of them.
   let openTitles = new Set();
+  let openFingerprints = new Map();
   let dedupComplete = false;
   try {
-    ({ titles: openTitles, complete: dedupComplete } = await fetchOpenFollowupTitles({
-      gh,
-      owner,
-      repo,
-    }));
+    ({
+      titles: openTitles,
+      fingerprints: openFingerprints,
+      complete: dedupComplete,
+    } = await fetchOpenFollowupTitles({ gh, owner, repo }));
   } catch (e) {
     console.error('Could not fetch open issues for dedup:', e.message);
   }
 
-  const { toFile, alreadyTracked, overCap, untracked, dedupIncomplete } = selectFollowupsToFile({
-    followups,
-    openTitles,
-    cap: MAX_ISSUES_PER_RUN,
-    dedupComplete,
-  });
+  const { toFile, alreadyTracked, overCap, untracked, toComment, dedupIncomplete } =
+    selectFollowupsToFile({
+      followups,
+      openTitles,
+      openFingerprints,
+      cap: MAX_ISSUES_PER_RUN,
+      dedupComplete,
+    });
 
   if (dedupIncomplete) {
     console.log(
@@ -382,11 +390,16 @@ async function fileFollowupIssues(followups) {
   } else {
     console.log(
       `scoped-audit: ${followups.length} followups — filing ${toFile.length}, ` +
-        `${alreadyTracked.length} already tracked, ${untracked.length} recorded on the PR ` +
+        `${alreadyTracked.length} already tracked, ${toComment.length} commented onto an ` +
+        `existing issue at the same location, ${untracked.length} recorded on the PR ` +
         `only, ${overCap.length} over the per-run cap of ${MAX_ISSUES_PER_RUN} ` +
         `(all of them are in the PR comment)`
     );
   }
+
+  // fingerprint -> issue number for issues created in THIS run, so a second
+  // finding at the same location comments onto the one just filed.
+  const filedThisRun = new Map();
 
   for (const f of toFile) {
     const issueTitle = followupIssueTitle(f);
@@ -409,17 +422,95 @@ async function fileFollowupIssues(followups) {
       '',
       '---',
       `_Filed automatically by the scoped-audit CI gate._`,
+      // Hidden location fingerprint. This is what the NEXT run dedupes on, so
+      // a reworded title resolves here instead of opening a second issue.
+      // Must stay in the body — GitHub does not render it, and there is
+      // nowhere else the list endpoint would return it from.
+      fingerprintMarker(f),
     ].join('\n');
 
     try {
-      await gh('POST', `/repos/${owner}/${repo}/issues`, {
+      // gh() resolves to the Response, never to the parsed body — reading
+      // `.number` off it yielded undefined on every filing, so filedThisRun was
+      // always empty and the same-run branch below could never resolve.
+      const resp = await gh('POST', `/repos/${owner}/${repo}/issues`, {
         title: issueTitle,
         body: issueBody,
         labels: ['audit-followup', f.severity.toLowerCase()],
       });
-      console.log(`scoped-audit: filed issue: ${issueTitle}`);
+      const created = resp.ok ? await resp.json().catch(() => null) : null;
+      if (created?.number) filedThisRun.set(followupFingerprint(f), created.number);
+      if (resp.ok) console.log(`scoped-audit: filed issue: ${issueTitle}`);
+      else console.error(`scoped-audit: issue filing rejected for "${issueTitle}"`);
     } catch (e) {
       console.error(`Issue filing failed for "${issueTitle}" (non-fatal):`, e.message);
+    }
+  }
+
+  // A finding at a location already tracked goes on the EXISTING issue rather
+  // than into a new one. Never dropped: if it really is a second, different
+  // defect at that line, a human reads both in one place — which is strictly
+  // better than the duplicate issue this replaces, and strictly better than
+  // the silent suppression a pure location key would have caused.
+  //
+  // UPSERT, not post. This path is reached exactly when a defect persists and
+  // the model rewords it, and the gate runs on every push — so posting
+  // unconditionally would leave one new comment per push per issue, forever:
+  // #116's 929 duplicate issues turned into the same unbounded growth one level
+  // down. Each comment carries a hidden (location, PR) marker and this edits it
+  // in place, the same shape as upsertMarkerComment above. Findings sharing a
+  // location travel in ONE comment, so keying on the location loses none of them.
+  const { groups, unresolved } = groupCommentsByIssue(toComment, fp => filedThisRun.get(fp));
+  if (unresolved.length) {
+    console.log(
+      `scoped-audit: ${unresolved.length} same-location finding(s) had no issue to comment ` +
+        `on (filed over the cap); the PR comment still carries them in full`
+    );
+  }
+
+  for (const group of groups) {
+    const marker = locationCommentMarker({ fingerprint: group.fingerprint, pr: PR_NUMBER });
+    const body = [
+      `**Also reported at this location** by the scoped-audit gate:`,
+      '',
+      ...group.findings.flatMap(f => [
+        `**${f.severity}** — ${f.title || 'untitled'}`,
+        '',
+        f.detail || '(no detail)',
+        '',
+      ]),
+      `_PR: ${PR_URL} — latest audit commit: ${HEAD_SHA ? HEAD_SHA.slice(0, 8) : 'unknown'}_`,
+      marker,
+    ].join('\n');
+
+    try {
+      const { items, complete } = await fetchAllPages({
+        gh,
+        path: `/repos/${owner}/${repo}/issues/${group.issueNumber}/comments`,
+      });
+      // A null marker on a partial read is not evidence of absence, and acting
+      // on it posts the duplicate. Unlike the PR comment — which is the only
+      // place some findings are reported, so it posts through uncertainty —
+      // this comment is a convenience on top of a finding the PR comment
+      // already carries in full. So it fails closed, same as the issue dedup.
+      if (!complete) {
+        console.log(
+          `::warning::scoped-audit could not read #${group.issueNumber}'s comments; skipping ` +
+            `its location comment rather than risking a duplicate. It is in the PR comment.`
+        );
+        continue;
+      }
+
+      const prior = findMarkedComment(items, marker);
+      if (prior) {
+        await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body });
+        console.log(`scoped-audit: updated its existing location comment on #${group.issueNumber}`);
+      } else {
+        await gh('POST', `/repos/${owner}/${repo}/issues/${group.issueNumber}/comments`, { body });
+        console.log(`scoped-audit: commented on #${group.issueNumber} instead of filing a duplicate`);
+      }
+    } catch (e) {
+      console.error(`Comment on #${group.issueNumber} failed (non-fatal):`, e.message);
     }
   }
 }
