@@ -330,8 +330,26 @@ export class OrderService {
     // inventory-decrement guard below, costPrice is snapshotted onto each
     // OrderItem for profit reporting. Neither is ever serialized in the
     // order response.
+    //
+    // Scoped to the store AND to live rows. Two separate defects otherwise:
+    //
+    //   `storeId` — an unscoped findMany on the order-creation path makes a
+    //   cross-tenant read load-bearing for checkout availability. UUID ids make
+    //   a collision impractical rather than impossible, but every other tenant
+    //   read in this service is scoped and this one was not.
+    //
+    //   `deletedAt` — the miss-detection below exists to catch a product that
+    //   vanished between cart load and order creation, and it only caught a
+    //   HARD delete. Soft delete is the path merchants actually use (the admin
+    //   "delete product" button sets `deletedAt`), so a soft-deleted product
+    //   still resolved here, passed the guard, and was ordered — with an
+    //   inventory decrement against a row the storefront no longer sells.
     const productInternals = await prisma.product.findMany({
-      where: { id: { in: cart.items.map(i => i.productId) } },
+      where: {
+        id: { in: cart.items.map(i => i.productId) },
+        storeId,
+        deletedAt: null,
+      },
       select: {
         id: true,
         trackInventory: true,
@@ -358,10 +376,16 @@ export class OrderService {
       .map(i => i.productId)
       .filter(id => !productInternalsById.has(id));
     if (missingProductIds.length > 0) {
+      // Ids travel in `details`, NOT interpolated into the message. The message
+      // is user-facing copy and must come from LanguageContext on the client;
+      // a raw UUID list is neither translatable nor useful to a shopper. The
+      // ids ARE useful to the cart page, which uses them to mark the offending
+      // lines — so they are structured data, not prose.
       throw new AppError(
         409,
         'PRODUCT_NO_LONGER_AVAILABLE',
-        `A product in your cart is no longer available (${missingProductIds.join(', ')}). Remove it and try again.`
+        'A product in your cart is no longer available. Remove it and try again.',
+        { productIds: missingProductIds }
       );
     }
 
@@ -1838,8 +1862,12 @@ export class OrderService {
     // submits only productId + quantity; we look up the canonical
     // price here so a tampered or stale price never persists.
     const productIds = Array.from(new Set(data.items.map(it => it.productId)));
+    // `deletedAt: null`: without it an admin manual order hydrates prices from,
+    // and decrements stock against, a product the merchant already deleted —
+    // `ProductService.delete` leaves `status: 'active'`, so the filter above
+    // does not exclude it.
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, storeId, status: 'active' },
+      where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
       include: {
         variants: true,
       },

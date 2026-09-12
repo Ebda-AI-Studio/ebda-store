@@ -157,7 +157,7 @@
       "tier": "unit",
       "why": "the guest-checkout bypass widened to exempt cookie-BEARING requests too, re-opening the lured-admin impersonation that removing isAllowlistedMerchantOrigin closed (2026-09-03 incident: 17 unpaid orders came from the opposite mistake, so both directions must stay pinned)",
       "source": "apps/api/src/middleware/security.ts",
-      "find": "  if (!req.cookies?.token && !req.cookies?.refresh_token) {\n    return next();\n  }",
+      "find": "  if (req.cookies && !req.cookies.token && !req.cookies.refresh_token) {\n    return next();\n  }",
       "replace": "  if (true) {\n    return next();\n  }",
       "test": "tests/unit/csrf-merchant-origin.test.ts"
     },
@@ -490,6 +490,16 @@
       "find": "    (key.expiresAt === null || key.expiresAt > now) &&\n    userActive;",
       "replace": "    (key.expiresAt === null || key.expiresAt > now);",
       "test": "tests/unit/merchant-mcp-auth.test.ts"
+    },
+    {
+      "id": "csrf-cookieless-bypass-fails-closed",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "an unparsed req.cookies exempts EVERY state-changing request from CSRF, silently",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  if (req.cookies && !req.cookies.token && !req.cookies.refresh_token) {",
+      "replace": "  if (!req.cookies?.token && !req.cookies?.refresh_token) {",
+      "test": "tests/unit/csrf-merchant-origin.test.ts"
     }
   ]
 }

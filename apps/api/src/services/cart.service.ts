@@ -244,9 +244,13 @@ export class CartService {
     // Perform the line write. Extracted so it can run either on the ambient
     // tenant transaction or in its own — see the branch below.
     const writeLine = async (tx: Prisma.TransactionClient) => {
-      // Verify product exists and is active
+      // Verify product exists, is active, and is NOT soft-deleted.
+      // `status: 'active'` alone is not enough: `ProductService.delete` sets
+      // `deletedAt` and nothing else (product.service.ts:999-1002), so a
+      // deleted product keeps `status: 'active'`. This is the PRIMARY
+      // add-to-cart path — the bulk `addItems` sibling below had the same hole.
       const product = await tx.product.findFirst({
-        where: { id: productId, storeId, status: 'active' },
+        where: { id: productId, storeId, status: 'active', deletedAt: null },
       });
 
       if (!product) {
@@ -530,8 +534,14 @@ export class CartService {
     );
 
     const productIds = items.map(i => i.productId);
+    // `deletedAt: null` alongside `status: 'active'`, because soft delete does
+    // NOT change status: `ProductService.delete` sets `deletedAt` and nothing
+    // else (product.service.ts:999-1002), so a deleted product is still
+    // `status: 'active'` and was resolvable here. A customer could add a
+    // product the merchant had deleted to their cart and only discover it at
+    // order creation — the same defect the audit reported one step later.
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, storeId, status: 'active' },
+      where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
       select: { id: true, inventory: true, trackInventory: true, allowBackorder: true },
     });
     const productById = new Map(products.map(p => [p.id, p]));

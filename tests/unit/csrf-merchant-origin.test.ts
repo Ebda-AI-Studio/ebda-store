@@ -242,3 +242,49 @@ describe('csrfProtection — merchant origins are no longer exempt', () => {
     expect(next).toHaveBeenCalledOnce();
   });
 });
+
+/**
+ * The cookieless short-circuit must not fire on an UNPARSED request.
+ *
+ * `if (!req.cookies?.token && !req.cookies?.refresh_token) return next();`
+ * evaluates TRUE when `req.cookies` is undefined — not empty, never parsed —
+ * so every state-changing request skipped CSRF, silently. The only thing
+ * preventing it was `cookieParser` being mounted ahead of `csrfProtection`.
+ *
+ * These EXECUTE the middleware rather than asserting on its source text: a
+ * source-grep proves the characters are present, not that the branch behaves.
+ */
+describe('csrfProtection — the cookieless short-circuit fails CLOSED', () => {
+  it('does NOT wave through a request whose cookies were never parsed', () => {
+    const res = makeRes();
+    const next = vi.fn();
+    // `cookies` deliberately absent — this is a request that reached
+    // csrfProtection before (or without) cookieParser.
+    const req = {
+      path: '/api/v1/stores/abc/reviews',
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: MERCHANT_ORIGIN },
+    } as unknown as Request;
+
+    csrfProtection(req, res, next as unknown as NextFunction);
+
+    // The precise assertion is "not silently exempted". Whether it 403s or
+    // falls to the token verifier is the implementation's business; skipping
+    // the gate entirely is the defect.
+    expect(next).not.toHaveBeenCalledWith();
+  });
+
+  it('still exempts a genuinely cookieless request — guest checkout must work', () => {
+    // The narrow case the short-circuit exists for: cookies PARSED, and empty.
+    // Breaking this would break guest checkout on merchant custom domains.
+    const res = makeRes();
+    const next = vi.fn();
+    csrfProtection(
+      makeReq('/api/v1/stores/abc/payments/create', { origin: MERCHANT_ORIGIN, cookies: {} }),
+      res,
+      next as unknown as NextFunction
+    );
+    expect(next).toHaveBeenCalled();
+    expect(res.statusCode).toBe(0);
+  });
+});

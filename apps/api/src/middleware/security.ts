@@ -514,7 +514,19 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // has been cleared while `refresh_token` survives still represents a session
   // a cross-origin page could try to ride, and treating that as "no credential"
   // would be the narrower claim than the one this branch actually makes.
-  if (!req.cookies?.token && !req.cookies?.refresh_token) {
+  //
+  // `req.cookies &&` FIRST, deliberately. Without it the optional chaining
+  // makes this fail OPEN: when `req.cookies` is undefined — not empty, but
+  // never parsed — `!undefined?.token` is true for both, so EVERY
+  // state-changing request in the API skips CSRF silently, with no error and
+  // no log. That is only prevented today by `cookieParser` being mounted at
+  // index.ts:421 ahead of `csrfProtection` at :431. Move either one, or mount
+  // this on a router that runs earlier, and the whole gate disappears.
+  //
+  // With the guard, an unparsed request falls THROUGH to the token verifier
+  // instead of being exempted — the safe direction for a request we cannot
+  // read the credentials of.
+  if (req.cookies && !req.cookies.token && !req.cookies.refresh_token) {
     return next();
   }
 

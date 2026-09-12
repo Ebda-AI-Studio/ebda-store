@@ -12,7 +12,13 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
+import { CheckoutErrorAlert } from './CheckoutErrorAlert';
 import { checkoutBundleErrorCopy } from '../../lib/checkout-bundle-errors';
+import {
+  PRODUCT_NO_LONGER_AVAILABLE,
+  productUnavailableCopy,
+  unavailableProductIds,
+} from '../../lib/product-cart-errors';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
 import {
   isValidEmail,
@@ -1247,6 +1253,33 @@ export default function CheckoutClient() {
             'سلة التسوق فارغة. يرجى إضافة منتجات قبل إتمام الشراء.'
           );
           break;
+        // A cart line whose product the merchant has since deleted. Before
+        // this case the customer fell to the generic "please try again",
+        // which can NEVER succeed — the product is gone, so every retry
+        // refuses identically. Send them back to the cart, which is the only
+        // place the line can be removed.
+        //
+        // The server sends the offending ids in `details.productIds`, not in
+        // the message: a raw UUID is neither translatable nor meaningful to a
+        // shopper. They are read here so the count picks singular vs plural
+        // copy, and so the cart page can mark the lines.
+        case PRODUCT_NO_LONGER_AVAILABLE: {
+          const goneIds = unavailableProductIds({
+            code,
+            details: details as { productIds?: unknown } | null | undefined,
+          });
+          // `goneIds.length` picks singular vs plural copy. The ids themselves
+          // are NOT rendered — a raw UUID means nothing to a shopper. Marking
+          // the specific cart lines needs a per-item `unavailable` flag on the
+          // cart read and a state in CartClient; that is tracked separately and
+          // is not required for the customer to recover, because the copy sends
+          // them to the cart where the line is visible.
+          friendly = productUnavailableCopy(t, goneIds.length);
+          // Safe now: <CheckoutErrorAlert> renders above BOTH steps, so this
+          // message survives the unmount of PaymentStep. Before that it did not.
+          setStep(1);
+          break;
+        }
         case 'COUPON_LIMIT_REACHED':
           friendly = t(
             'The coupon you applied has reached its usage limit. Please remove it and try again.',
@@ -1421,6 +1454,10 @@ export default function CheckoutClient() {
             {/* Form */}
             <div className="order-1 lg:order-none lg:col-span-8">
               <form id="checkout-shipping-form" onSubmit={handleSubmit}>
+                <CheckoutErrorAlert
+                  message={checkoutError}
+                  onClear={() => setCheckoutError(null)}
+                />
                 {step === 1 && (
                   <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <h2
@@ -1823,8 +1860,6 @@ export default function CheckoutClient() {
 
                 {step === 2 && (
                   <PaymentStep
-                    checkoutError={checkoutError}
-                    onClearError={() => setCheckoutError(null)}
                     formData={formData}
                     onEditShipping={() => setStep(1)}
                     paymentProviders={paymentProviders}
