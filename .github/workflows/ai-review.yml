@@ -156,26 +156,22 @@ jobs:
             exit 1
           fi
 
-          # A GitHub App token cannot create or update anything under
-          # .github/workflows/ without the `workflows` permission, and
-          # AI_FIX_PAT does not carry it. Before this split, ONE workflow-file
-          # edit made the whole push fail:
+          # Pushing anything under .github/workflows/ needs the token's
+          # `workflows` permission. AI_FIX_PAT did not have it, and ONE
+          # workflow-file edit failed the whole push, losing every other fix in
+          # the same commit — measured on PR #1720 (2026-09-11), which reported
+          # only "Process completed with exit code 1".
           #
-          #   ! [remote rejected] HEAD -> <branch> (refusing to allow a GitHub
-          #     App to create or update workflow `.github/workflows/x.yml`
-          #     without `workflows` permission)
-          #
-          # and every OTHER fix in the same commit was lost with it. Measured
-          # on PR #1720 (2026-09-11): a correct fix was written, rejected, and
-          # the job reported only "Process completed with exit code 1".
-          #
-          # So: commit and push everything that CAN go, and report what cannot
-          # rather than failing opaquely.
+          # This does NOT pre-emptively drop workflow files. It ATTEMPTS the
+          # real push and only falls back if GitHub actually refuses, because
+          # the permission is a property of the token — invisible from in here,
+          # and changeable without touching this file. Reverting on the
+          # assumption that it is missing would permanently stop the auto-fix
+          # repairing a workflow the day the scope is granted.
           WF_CHANGED="$(git status --porcelain -- '.github/workflows/**' | awk '{print $2}')"
           if [ -n "$WF_CHANGED" ]; then
-            echo "::warning::Auto-fix edited workflow file(s) it cannot push (AI_FIX_PAT lacks the 'workflows' scope):"
-            echo "$WF_CHANGED" | sed 's/^/::warning::  /'
-            echo "$WF_CHANGED" | xargs -r git checkout --
+            echo "Auto-fix edited workflow file(s); will attempt to push them:"
+            echo "$WF_CHANGED" | sed 's/^/  /'
           fi
 
           # `git add -u` + an explicit new-file list, never `git add -A`:
@@ -198,13 +194,41 @@ jobs:
           fi
 
           git commit -m "fix: address AI-review critical findings [ai-fix]"
-          if git push "https://x-access-token:${AI_FIX_PAT}@github.com/${GH_REPO}.git" "HEAD:${PR_HEAD_REF}"; then
+
+          REMOTE="https://x-access-token:${AI_FIX_PAT}@github.com/${GH_REPO}.git"
+          if git push "$REMOTE" "HEAD:${PR_HEAD_REF}" 2>/tmp/push-err; then
+            cat /tmp/push-err
             echo "Auto-fix pushed; a fresh review run will validate it."
-            if [ -n "$WF_CHANGED" ]; then
-              echo "::warning::The workflow-file portion of the fix was NOT pushed and still needs a human."
-              exit 1
-            fi
-          else
-            echo "::error::Auto-fix push rejected. If this names the 'workflows' permission, add the workflows scope to AI_FIX_PAT."
+            exit 0
+          fi
+
+          cat /tmp/push-err
+          # Only ONE rejection is recoverable here: the workflows permission.
+          # Anything else (protected branch, auth failure, non-fast-forward) is
+          # a real failure and must stay red rather than be retried into a
+          # partial push that hides it.
+          if ! grep -q "without \`workflows\` permission" /tmp/push-err; then
+            echo "::error::Auto-fix push rejected for a reason other than the workflows permission — see above."
             exit 1
           fi
+
+          echo "::warning::AI_FIX_PAT cannot push .github/workflows/** (missing the 'workflows' permission)."
+          echo "::warning::Retrying WITHOUT the workflow changes so the rest of the fix is not lost."
+          if [ -z "$WF_CHANGED" ]; then
+            echo "::error::Push was refused for workflow permissions but no workflow file changed — nothing to drop."
+            exit 1
+          fi
+
+          # Undo the commit, restore the workflow files, re-commit the rest.
+          git reset --soft HEAD~1
+          echo "$WF_CHANGED" | xargs -r git restore --staged --worktree --
+          if git diff --cached --quiet; then
+            echo "::error::The fix touched ONLY workflow files, which cannot be pushed. Leaving the PR red for a human."
+            echo "::error::Grant the 'workflows' permission to AI_FIX_PAT to let the bot fix these itself."
+            exit 1
+          fi
+          git commit -m "fix: address AI-review critical findings [ai-fix]"
+          git push "$REMOTE" "HEAD:${PR_HEAD_REF}"
+          echo "::warning::Pushed the non-workflow portion. These files still need a human:"
+          echo "$WF_CHANGED" | sed 's/^/::warning::  /'
+          exit 1
