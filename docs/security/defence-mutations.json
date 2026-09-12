@@ -500,6 +500,46 @@
       "find": "  if (req.cookies && !req.cookies.token && !req.cookies.refresh_token) {",
       "replace": "  if (!req.cookies?.token && !req.cookies?.refresh_token) {",
       "test": "tests/unit/csrf-merchant-origin.test.ts"
+    },
+    {
+      "id": "session-rotation-grace-budget",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "a rotated token's grace uses stop being spent — one stolen token replays in a loop, minting a session every pass",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "        (await this.claimGraceUse(storedToken.id, storedToken.revokedReason));",
+      "replace": "        true;",
+      "test": "tests/unit/refresh-token-rotation-race.test.ts"
+    },
+    {
+      "id": "session-rotation-backlink-cas",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the rotation write stops being conditional on the row still being live — a second concurrent rotation overwrites replacedById and the chain walk follows a dead branch",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "        where: { id: storedToken.id, revokedAt: null },",
+      "replace": "        where: { id: storedToken.id },",
+      "test": "tests/unit/refresh-token-rotation-race.test.ts"
+    },
+    {
+      "id": "session-revocation-midflight",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "a sign-out-everywhere landing between the liveness check and the row write is outlived by the token that write created",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    if (!currentVersion || currentVersion.tokenVersion !== storedToken.user.tokenVersion) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/refresh-token-rotation-race.test.ts"
+    },
+    {
+      "id": "session-rotation-grace-no-clock-renew",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "being forgiven for a replay renews the refresh row's clock — a thirty-second window pays out a fresh twelve-month session",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "      storedToken.revokedAt ? storedToken.expiresAt : undefined",
+      "replace": "      undefined",
+      "test": "tests/unit/refresh-token-rotation-race.test.ts"
     }
   ]
 }

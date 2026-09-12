@@ -20,17 +20,94 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockPrisma, mockLogger } = vi.hoisted(() => ({
-  mockPrisma: {
+/**
+ * The store is real, not stubbed.
+ *
+ * The grace cap and the conditional rotation write are compare-and-set
+ * operations: their whole value is what happens when a row has already moved
+ * under them. A `updateMany` mocked to a fixed `{ count: n }` cannot tell a
+ * claim that landed from one that was beaten to it, so it would report these
+ * tests green against code that never checked. The rows live in a map and the
+ * writes filter it, so a CAS that matches nothing returns 0 here for the same
+ * reason it would in Postgres.
+ */
+const { mockPrisma, mockLogger, store, byToken, reset } = vi.hoisted(() => {
+  const store = new Map<string, any>();
+  const byToken = new Map<string, any>();
+  let seq = 0;
+
+  const matches = (r: any, where: any = {}) =>
+    Object.entries(where).every(([k, v]: [string, any]) => {
+      if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
+        if ('not' in v) return v.not === null ? r[k] !== null : r[k] !== v.not;
+        if ('lt' in v) return r[k] !== null && r[k] < v.lt;
+        if ('gte' in v) return r[k] !== null && r[k] >= v.gte;
+        return false;
+      }
+      return r[k] === v;
+    });
+
+  const mockPrisma = {
     refreshToken: {
-      findUnique: vi.fn(),
-      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-      update: vi.fn().mockResolvedValue({}),
-      create: vi.fn().mockResolvedValue({}),
+      // Reads return COPIES. Prisma hands every caller its own object, and
+      // two concurrent rotations sharing one reference is the difference
+      // between a test that exercises a compare-and-set and a test where the
+      // second caller silently observes the first caller's write in memory
+      // and skips the write entirely.
+      findUnique: vi.fn(async (args: any) => {
+        const r =
+          args?.where?.id !== undefined
+            ? store.get(args.where.id)
+            : (byToken.get(args?.where?.token) ?? byToken.get('__presented__'));
+        return r ? { ...r } : null;
+      }),
+      findMany: vi.fn(async (args: any) =>
+        [...store.values()].filter(r => matches(r, args?.where)).map(r => ({ ...r }))
+      ),
+      updateMany: vi.fn(async (args: any) => {
+        const hits = [...store.values()].filter(r => matches(r, args?.where));
+        hits.forEach(r => Object.assign(r, args.data));
+        return { count: hits.length };
+      }),
+      update: vi.fn(async (args: any) => {
+        const r = store.get(args.where.id);
+        if (r) Object.assign(r, args.data);
+        return r ?? {};
+      }),
+      create: vi.fn(async (args: any) => {
+        const r = {
+          id: `minted-${++seq}`,
+          revokedAt: null,
+          revokedReason: null,
+          replacedById: null,
+          createdAt: new Date(),
+          ...args.data,
+        };
+        store.set(r.id, r);
+        byToken.set(r.token, r);
+        return r;
+      }),
     },
-  },
-  mockLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
+    user: {
+      findUnique: vi.fn(async () => ({ tokenVersion: 0 })),
+    },
+  };
+
+  const reset = () => {
+    store.clear();
+    byToken.clear();
+    seq = 0;
+    mockPrisma.user.findUnique.mockImplementation(async () => ({ tokenVersion: 0 }));
+  };
+
+  return {
+    mockPrisma,
+    mockLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+    store,
+    byToken,
+    reset,
+  };
+});
 
 vi.mock('@force/database', () => ({ prisma: mockPrisma, Prisma: {} }));
 vi.mock('@api/lib/logger', () => ({ default: mockLogger }));
@@ -56,6 +133,7 @@ function row(over: Record<string, unknown> = {}) {
     userId: USER.id,
     user: USER,
     expiresAt: new Date(Date.now() + 86_400_000),
+    createdAt: new Date(Date.now() - 86_400_000),
     revokedAt: null,
     revokedReason: null,
     replacedById: null,
@@ -73,28 +151,44 @@ const secondsAgo = (n: number) => new Date(Date.now() - n * 1000);
  * empty chain means "the successor is not there", which is itself a denial, so
  * every forgiven test has to name a live tip explicitly.
  */
-function present(stored: unknown, successors: Record<string, unknown> = {}) {
-  mockPrisma.refreshToken.findUnique.mockImplementation(async (args: any) => {
-    if (args?.where?.id !== undefined) return successors[args.where.id] ?? null;
-    return stored;
-  });
+function present(stored: any, successors: Record<string, any> = {}) {
+  if (stored) {
+    store.set(stored.id, stored);
+    byToken.set('__presented__', stored);
+  }
+  Object.values(successors).forEach((r: any) => store.set(r.id, r));
 }
 
-/** The live tip of a family: rotated into, not yet rotated out of. */
-const LIVE_SUCCESSOR = { 'tok-new': row({ id: 'tok-new', revokedAt: null, revokedReason: null }) };
+/** Did this presentation burn the family down? */
+const familyRevoked = () =>
+  mockPrisma.refreshToken.updateMany.mock.calls.some(
+    (c: any[]) => c[0]?.data?.revokedReason === 'reuse_detected'
+  );
+
+/** The row as it stands in the database after the call under test. */
+const stored = (id = 'tok-old') => store.get(id);
+
+/**
+ * The live tip of a family: rotated into, not yet rotated out of.
+ *
+ * A factory, not a constant. The store is real and the service's writes mutate
+ * the rows in it, so a shared literal would carry one test's revocation into
+ * the next and quietly decide its outcome.
+ */
+const liveSuccessor = () => ({
+  'tok-new': row({ id: 'tok-new', revokedAt: null, revokedReason: null }),
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
-  mockPrisma.refreshToken.update.mockResolvedValue({});
-  mockPrisma.refreshToken.create.mockResolvedValue({});
+  reset();
 });
 
 describe('the race is forgiven', () => {
   it('issues fresh tokens instead of revoking the family', async () => {
     present(
       row({ revokedAt: secondsAgo(2), revokedReason: 'rotated', replacedById: 'tok-new' }),
-      LIVE_SUCCESSOR
+      liveSuccessor()
     );
 
     const tokens = await AuthService.refreshTokens('any-token');
@@ -102,7 +196,7 @@ describe('the race is forgiven', () => {
     expect(tokens.accessToken).toBeTruthy();
     expect(tokens.refreshToken).toBeTruthy();
     // The whole point: no mass revocation.
-    expect(mockPrisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(familyRevoked()).toBe(false);
   });
 
   it('does not slide the grace window forward on repeated replays', async () => {
@@ -110,21 +204,20 @@ describe('the race is forgiven', () => {
     // permanent for whoever holds that token.
     present(
       row({ revokedAt: secondsAgo(2), revokedReason: 'rotated', replacedById: 'tok-new' }),
-      LIVE_SUCCESSOR
+      liveSuccessor()
     );
+
+    const revokedAtBefore = stored().revokedAt;
 
     await AuthService.refreshTokens('any-token');
 
-    const rewroteOldRow = mockPrisma.refreshToken.update.mock.calls.some(
-      c => c[0]?.where?.id === 'tok-old'
-    );
-    expect(rewroteOldRow).toBe(false);
+    expect(stored().revokedAt).toEqual(revokedAtBefore);
   });
 
   it('is loud about it — a hole in a control must be observable', async () => {
     present(
       row({ revokedAt: secondsAgo(1), revokedReason: 'rotated', replacedById: 'tok-new' }),
-      LIVE_SUCCESSOR
+      liveSuccessor()
     );
 
     await AuthService.refreshTokens('any-token');
@@ -151,7 +244,7 @@ describe('the race is forgiven', () => {
 
     await AuthService.refreshTokens('any-token');
 
-    expect(mockPrisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(familyRevoked()).toBe(false);
   });
 });
 
@@ -159,7 +252,7 @@ describe('everything else is still a replay', () => {
   it('revokes the family once the window has passed', async () => {
     present(
       row({ revokedAt: secondsAgo(120), revokedReason: 'rotated', replacedById: 'tok-new' }),
-      LIVE_SUCCESSOR
+      liveSuccessor()
     );
 
     await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
@@ -179,7 +272,7 @@ describe('everything else is still a replay', () => {
       // and the test would pass without ever exercising the reason check it
       // exists to pin.
       row({ revokedAt: secondsAgo(1), revokedReason: 'logout', replacedById: 'tok-new' }),
-      LIVE_SUCCESSOR
+      liveSuccessor()
     );
 
     await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
@@ -189,7 +282,7 @@ describe('everything else is still a replay', () => {
   it('revokes the family for a previous reuse event, however recent', async () => {
     present(
       row({ revokedAt: secondsAgo(1), revokedReason: 'reuse_detected', replacedById: 'tok-new' }),
-      LIVE_SUCCESSOR
+      liveSuccessor()
     );
 
     await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
@@ -283,5 +376,182 @@ describe('a revoked family stays revoked', () => {
     });
 
     await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
+  });
+});
+
+/**
+ * The window bounds the OPPORTUNITY to replay. On its own it bounds nothing
+ * about the CONSEQUENCE: the same rotated row could be presented in a loop for
+ * the whole thirty seconds, and every pass minted a separate full-length
+ * session with no record on the row that it had ever been forgiven.
+ */
+describe('the grace is a bounded budget, not an open window', () => {
+  const raced = () =>
+    row({ revokedAt: secondsAgo(1), revokedReason: 'rotated', replacedById: 'tok-new' });
+
+  it('forgives one row a fixed number of times, then treats it as a replay', async () => {
+    present(raced(), liveSuccessor());
+
+    // Five is the budget. Each pass re-presents the SAME row, exactly as a
+    // replay loop would.
+    for (let i = 1; i <= 5; i++) {
+      await expect(AuthService.refreshTokens('any-token')).resolves.toBeTruthy();
+      expect(familyRevoked()).toBe(false);
+    }
+
+    await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
+    expect(familyRevoked()).toBe(true);
+  });
+
+  it('records each forgiveness on the row it forgave', async () => {
+    present(raced(), liveSuccessor());
+
+    await AuthService.refreshTokens('any-token');
+    expect(stored().revokedReason).toBe('rotated_grace_1');
+
+    await AuthService.refreshTokens('any-token');
+    expect(stored().revokedReason).toBe('rotated_grace_2');
+  });
+
+  it('still recognises a partly-spent row as a rotation, mid-chain', async () => {
+    // A row forgiven once is still a row that ended by rotating. If the chain
+    // walk read `rotated_grace_1` as "revoked by something else" it would call
+    // a live family dead and log the user out — the exact regression the
+    // exemption exists to prevent.
+    present(row({ revokedAt: secondsAgo(3), revokedReason: 'rotated', replacedById: 'tok-a' }), {
+      'tok-a': row({
+        id: 'tok-a',
+        revokedAt: secondsAgo(2),
+        revokedReason: 'rotated_grace_1',
+        replacedById: 'tok-b',
+      }),
+      'tok-b': row({ id: 'tok-b', revokedAt: null, revokedReason: null }),
+    });
+
+    await expect(AuthService.refreshTokens('any-token')).resolves.toBeTruthy();
+    expect(familyRevoked()).toBe(false);
+  });
+
+  it('fails closed on a grace count it did not write', async () => {
+    // An unparseable counter is corruption. Reading it as zero would reopen
+    // the hole; reading it as spent closes it.
+    present(
+      row({
+        revokedAt: secondsAgo(1),
+        revokedReason: 'rotated_grace_zzz',
+        replacedById: 'tok-new',
+      }),
+      liveSuccessor()
+    );
+
+    await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
+  });
+});
+
+/**
+ * A rotation renews the clock. Being forgiven for a replay is not a rotation.
+ */
+describe('being forgiven does not renew the clock', () => {
+  const TEN_DAYS = new Date(Date.now() + 10 * 86_400_000);
+
+  it('hands back what was left of the presented token, not a fresh year', async () => {
+    present(
+      row({
+        expiresAt: TEN_DAYS,
+        revokedAt: secondsAgo(1),
+        revokedReason: 'rotated',
+        replacedById: 'tok-new',
+      }),
+      liveSuccessor()
+    );
+
+    await AuthService.refreshTokens('any-token');
+
+    const minted = mockPrisma.refreshToken.create.mock.calls[0][0].data;
+    expect(minted.expiresAt).toEqual(TEN_DAYS);
+  });
+
+  it('still renews the clock on an ordinary rotation', async () => {
+    // The bound applies to the forgiven hop only. A live token rotating
+    // normally is a session in good standing and keeps its full lifetime.
+    present(row({ expiresAt: TEN_DAYS }));
+
+    await AuthService.refreshTokens('any-token');
+
+    const minted = mockPrisma.refreshToken.create.mock.calls[0][0].data;
+    expect(minted.expiresAt.getTime()).toBeGreaterThan(Date.now() + 300 * 86_400_000);
+  });
+});
+
+/**
+ * Two requests rotating the SAME live row both read it as live. The second
+ * must not overwrite the first's back-link: `replacedById` is how the chain
+ * walk finds a live tip, and a link repointed at the loser's branch sends the
+ * walk down a chain whose tip nobody is using.
+ */
+describe('the back-link is written once', () => {
+  it('keeps the first rotation’s successor when two rotations race', async () => {
+    present(row());
+
+    await Promise.all([
+      AuthService.refreshTokens('any-token'),
+      AuthService.refreshTokens('any-token'),
+    ]);
+
+    expect(mockPrisma.refreshToken.create).toHaveBeenCalledTimes(2);
+    const firstMinted = await mockPrisma.refreshToken.create.mock.results[0].value;
+    expect(stored().replacedById).toBe(firstMinted.id);
+    expect(stored().revokedReason).toBe('rotated');
+  });
+});
+
+/**
+ * The liveness check and the row that answers it are not one atomic step.
+ */
+describe('a revocation landing mid-refresh wins', () => {
+  it('discards the token it just minted and refuses the refresh', async () => {
+    present(row());
+    // Sign-out-everywhere, a password change and a password reset all bump
+    // tokenVersion before revoking rows. Landing between our read and our
+    // write, it would otherwise miss the row we are about to create.
+    mockPrisma.user.findUnique.mockResolvedValue({ tokenVersion: USER.tokenVersion + 1 });
+
+    await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/revoked/i);
+
+    const minted = await mockPrisma.refreshToken.create.mock.results[0].value;
+    expect(store.get(minted.id).revokedAt).not.toBeNull();
+    expect(store.get(minted.id).revokedReason).toBe('revoke_all');
+  });
+});
+
+/**
+ * The chain walk runs on the thundering-herd path — every open tab refreshing
+ * at once after a deploy. One query for the slice, not one per hop.
+ */
+describe('the chain walk costs one query', () => {
+  it('does not issue a round-trip per hop', async () => {
+    present(row({ revokedAt: secondsAgo(3), revokedReason: 'rotated', replacedById: 'tok-a' }), {
+      'tok-a': row({
+        id: 'tok-a',
+        revokedAt: secondsAgo(2),
+        revokedReason: 'rotated',
+        replacedById: 'tok-b',
+      }),
+      'tok-b': row({
+        id: 'tok-b',
+        revokedAt: secondsAgo(1),
+        revokedReason: 'rotated',
+        replacedById: 'tok-c',
+      }),
+      'tok-c': row({ id: 'tok-c', revokedAt: null, revokedReason: null }),
+    });
+
+    await AuthService.refreshTokens('any-token');
+
+    expect(mockPrisma.refreshToken.findMany).toHaveBeenCalledTimes(1);
+    const byIdLookups = mockPrisma.refreshToken.findUnique.mock.calls.filter(
+      (c: any[]) => c[0]?.where?.id !== undefined
+    );
+    expect(byIdLookups).toHaveLength(0);
   });
 });

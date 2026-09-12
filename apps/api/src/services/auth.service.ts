@@ -87,6 +87,33 @@ const ROTATION_RACE_GRACE_MS = 30_000;
  */
 const ROTATION_RACE_MAX_CHAIN_HOPS = 10;
 
+/**
+ * How many times ONE rotated row may be forgiven before reuse detection fires.
+ *
+ * Without a cap the window bounds the opportunity but not the consequence: a
+ * stolen token could be replayed in a loop for the whole 30 seconds, minting a
+ * separate full-length session on every pass. The cap covers the legitimate
+ * shape of the race — the tabs that were already in flight when the winner
+ * rotated, which is a handful, never dozens — and turns an unbounded
+ * amplifier into a bounded one.
+ */
+const ROTATION_RACE_MAX_GRACE_USES = 5;
+
+/** `revokedReason` written by a rotation that has not been raced yet. */
+const REASON_ROTATED = 'rotated';
+
+/**
+ * Prefix for a rotated row whose grace uses are partly spent
+ * (`rotated_grace_1` … `rotated_grace_5`).
+ *
+ * The count lives in `revokedReason` rather than a column of its own because
+ * every reader of that field is in this file, so the encoding cannot leak, and
+ * because a bounded counter is not worth a schema migration on the table every
+ * authenticated request touches. A dedicated `familyId` column is the right
+ * home for the lineage work this cap only bounds — see the P2 backlog plan.
+ */
+const REASON_GRACE_PREFIX = 'rotated_grace_';
+
 export class AuthService {
   private static readonly SALT_ROUNDS = 12;
 
@@ -599,14 +626,36 @@ export class AuthService {
    * reason other than a further rotation, dead-ended, or pruned away — the
    * family is dead and this presentation is a replay, not a race.
    */
-  private static async successorChainIsLive(replacedById: string): Promise<boolean> {
-    let cursor = replacedById;
+  private static async successorChainIsLive(
+    replacedById: string,
+    userId: string
+  ): Promise<boolean> {
+    // One query, not one per hop. The walk is a linked list, so the ids are
+    // only discoverable in sequence — but every row in a live chain was
+    // created inside the grace window that led here, which makes the whole
+    // chain part of this user's newest rows. Reading that slice once and
+    // walking it in memory replaces up to ROTATION_RACE_MAX_CHAIN_HOPS
+    // round-trips on the exact path a post-deploy thundering herd hits.
+    // `take` is two orders of magnitude above any real chain; it exists so a
+    // pathological row count cannot turn this into an unbounded read.
+    const rows = await prisma.refreshToken.findMany({
+      where: { userId },
+      select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    const byId = new Map(rows.map(r => [r.id, r]));
+
+    let cursor: string | null = replacedById;
+    const seen = new Set<string>();
 
     for (let hop = 0; hop < ROTATION_RACE_MAX_CHAIN_HOPS; hop++) {
-      const successor = await prisma.refreshToken.findUnique({
-        where: { id: cursor },
-        select: { revokedAt: true, revokedReason: true, replacedById: true },
-      });
+      // A back-link that loops would otherwise spin until the hop cap; a cycle
+      // is corruption, and corruption is not evidence of a live family.
+      if (cursor === null || seen.has(cursor)) return false;
+      seen.add(cursor);
+
+      const successor = byId.get(cursor);
 
       // Never written, or aged out by cleanupRefreshTokens(): nothing proves
       // the family is alive, so don't assume it.
@@ -615,11 +664,76 @@ export class AuthService {
       if (!successor.revokedAt) return true;
       // Revoked by anything other than a further rotation: the family was
       // deliberately killed after this row rotated.
-      if (successor.revokedReason !== 'rotated') return false;
-      // Rotated but with no back-link: chain ends without a live row.
-      if (!successor.replacedById) return false;
+      if (!this.endedByRotation(successor.revokedReason)) return false;
 
       cursor = successor.replacedById;
+    }
+
+    return false;
+  }
+
+  /**
+   * Was this row ended by a rotation, rather than by a revocation?
+   *
+   * Accepts both the untouched `rotated` and the `rotated_grace_N` forms a
+   * raced row carries once some of its grace uses are spent. Spending a grace
+   * use records that the row was replayed; it does not change WHY the row
+   * stopped being live, so a partly-spent row is still a rotation to every
+   * reader that asks that question.
+   */
+  private static endedByRotation(revokedReason: string | null): boolean {
+    return (
+      revokedReason === REASON_ROTATED || (revokedReason?.startsWith(REASON_GRACE_PREFIX) ?? false)
+    );
+  }
+
+  /**
+   * How many of a rotated row's grace uses are already spent.
+   *
+   * An unparseable `rotated_grace_*` value reads as exhausted rather than as
+   * zero: this number gates a hole in a security control, so an encoding we
+   * did not write closes the hole instead of opening it.
+   */
+  private static graceUsesSpent(revokedReason: string | null): number {
+    if (!revokedReason?.startsWith(REASON_GRACE_PREFIX)) return 0;
+    const spent = Number.parseInt(revokedReason.slice(REASON_GRACE_PREFIX.length), 10);
+    return Number.isInteger(spent) && spent > 0 ? spent : ROTATION_RACE_MAX_GRACE_USES;
+  }
+
+  /**
+   * Claim one of a rotated row's bounded grace uses, or report that they are
+   * gone.
+   *
+   * The claim is a compare-and-set on `revokedReason`, so two replays landing
+   * in the same millisecond cannot both spend the same use — exactly the case
+   * a read-then-write counter would miss, and exactly the case an attacker
+   * replaying in parallel would exploit. Losing the CAS is not a denial: it
+   * means a concurrent replay moved the count, which is the legitimate
+   * multi-tab race, so re-read and try for the next use instead. The loop is
+   * bounded by the cap itself, so it terminates whoever wins.
+   */
+  private static async claimGraceUse(
+    tokenId: string,
+    revokedReason: string | null
+  ): Promise<boolean> {
+    let reason = revokedReason;
+
+    for (let attempt = 0; attempt <= ROTATION_RACE_MAX_GRACE_USES; attempt++) {
+      const spent = this.graceUsesSpent(reason);
+      if (spent >= ROTATION_RACE_MAX_GRACE_USES) return false;
+
+      const claimed = await prisma.refreshToken.updateMany({
+        where: { id: tokenId, revokedReason: reason },
+        data: { revokedReason: `${REASON_GRACE_PREFIX}${spent + 1}` },
+      });
+      if (claimed.count > 0) return true;
+
+      const fresh = await prisma.refreshToken.findUnique({
+        where: { id: tokenId },
+        select: { revokedReason: true },
+      });
+      if (!fresh) return false;
+      reason = fresh.revokedReason;
     }
 
     return false;
@@ -662,11 +776,23 @@ export class AuthService {
       // event), must carry the back-link proving a successor exists, must be
       // within seconds of that rotation, AND the family it belongs to must
       // still be alive. Anything else still burns the family down.
+      //
+      // The window bounds the OPPORTUNITY to replay; the use cap bounds the
+      // CONSEQUENCE of replaying. Without the cap a single stolen token could
+      // be presented in a loop for thirty seconds and mint a separate session
+      // every pass, so a 30-second hole paid out indefinitely.
       const rotationRace =
-        storedToken.revokedReason === 'rotated' &&
+        this.endedByRotation(storedToken.revokedReason) &&
         storedToken.replacedById !== null &&
         Date.now() - storedToken.revokedAt.getTime() <= ROTATION_RACE_GRACE_MS &&
-        (await this.successorChainIsLive(storedToken.replacedById));
+        (await this.successorChainIsLive(storedToken.replacedById, storedToken.userId)) &&
+        // Claimed last, and only once everything else has said yes: it is the
+        // single step here that writes, and a row's grace uses are not spent
+        // by a presentation that was going to be refused anyway. The budget is
+        // checked inside the claim rather than again out here — a second copy
+        // of the test would be a line no mutation can reach, which reads as
+        // covered while proving nothing.
+        (await this.claimGraceUse(storedToken.id, storedToken.revokedReason));
 
       if (!rotationRace) {
         logger.warn(
@@ -694,6 +820,8 @@ export class AuthService {
           userId: storedToken.userId,
           tokenId: storedToken.id,
           rotatedMsAgo: Date.now() - storedToken.revokedAt.getTime(),
+          graceUsesSpent: this.graceUsesSpent(storedToken.revokedReason) + 1,
+          graceUsesAllowed: ROTATION_RACE_MAX_GRACE_USES,
         },
         'Refresh-token rotation race — issuing a fresh token instead of revoking the family'
       );
@@ -724,13 +852,21 @@ export class AuthService {
     // the current tv and are not spuriously rejected by the tv check in
     // authenticate() when the user's tokenVersion has been bumped since
     // the original access token was issued.
-    const newTokens = await this.generateTokens({
-      userId: storedToken.user.id,
-      email: storedToken.user.email,
-      role: storedToken.user.role,
-      storeId: storedToken.user.storeId,
-      tv: storedToken.user.tokenVersion,
-    });
+    const newTokens = await this.generateTokens(
+      {
+        userId: storedToken.user.id,
+        email: storedToken.user.email,
+        role: storedToken.user.role,
+        storeId: storedToken.user.storeId,
+        tv: storedToken.user.tokenVersion,
+      },
+      // A rotation renews the clock; being forgiven for a replay does not.
+      // On the race path the caller is holding a token it already had, so it
+      // gets back what was left of that token's life rather than a fresh
+      // year — replaying a nine-month-old stolen token cannot manufacture a
+      // new twelve-month session out of a thirty-second window.
+      storedToken.revokedAt ? storedToken.expiresAt : undefined
+    );
 
     const newHash = crypto.createHash('sha256').update(newTokens.refreshToken).digest('hex');
     const newRow = await prisma.refreshToken.findUnique({
@@ -742,15 +878,48 @@ export class AuthService {
     // the row is ALREADY revoked, and rewriting `revokedAt` to now would slide
     // the grace window forward on every replay — turning a 30-second exemption
     // into an indefinite one for anyone holding that token.
+    //
+    // The write is conditional on the row STILL being live, not on the read
+    // from the top of this function. Two requests rotating the same live row
+    // both passed that read; an unconditional `update` would let the second
+    // overwrite `replacedById`, orphaning the first successor and leaving the
+    // chain walk following a branch whose tip is dead. Compare-and-set means
+    // the first rotation wins and the second is a no-op — the second caller
+    // still keeps the tokens it minted, which is the race resolving, not an
+    // error.
     if (!storedToken.revokedAt) {
-      await prisma.refreshToken.update({
-        where: { id: storedToken.id },
+      await prisma.refreshToken.updateMany({
+        where: { id: storedToken.id, revokedAt: null },
         data: {
           revokedAt: new Date(),
-          revokedReason: 'rotated',
+          revokedReason: REASON_ROTATED,
           replacedById: newRow?.id ?? null,
         },
       });
+    }
+
+    // The liveness check above and the row just written are not one atomic
+    // step. A `revokeAllSessions` — sign-out-everywhere, a password change, a
+    // password reset — landing between them revokes the rows it can see and
+    // never sees this one, so the session it was answering would outlive it.
+    // Every one of those paths increments `tokenVersion` first, so re-reading
+    // it after the write is a cheap primary-key check that closes the window:
+    // if it moved, the revocation happened under us and this token dies with
+    // the rest.
+    const currentVersion = await prisma.user.findUnique({
+      where: { id: storedToken.userId },
+      select: { tokenVersion: true },
+    });
+    if (!currentVersion || currentVersion.tokenVersion !== storedToken.user.tokenVersion) {
+      await prisma.refreshToken.updateMany({
+        where: { token: newHash, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
+      });
+      logger.warn(
+        { userId: storedToken.userId, tokenId: storedToken.id },
+        'Sessions revoked while a refresh was in flight — discarding the new token'
+      );
+      throw new AppError(401, 'TOKEN_REVOKED', 'Session was revoked — please sign in again');
     }
 
     return newTokens;
@@ -1255,7 +1424,17 @@ export class AuthService {
     };
   }
 
-  private static async generateTokens(payload: TokenPayload): Promise<AuthTokens> {
+  /**
+   * @param refreshRowExpiresAt When given, the stored refresh row expires then
+   *   instead of a year from now. The JWT's own `exp` is untouched — the row
+   *   is the shorter of the two and is what `refreshTokens()` checks, so an
+   *   inherited expiry shortens the session without minting a token whose
+   *   claims disagree with the database.
+   */
+  private static async generateTokens(
+    payload: TokenPayload,
+    refreshRowExpiresAt?: Date
+  ): Promise<AuthTokens> {
     // Generate access token — stamped with a unique jti (for per-token
     // revocation via the JTI denylist) and a tv (token version, for
     // bulk revocation on logout-all / password change).
@@ -1295,8 +1474,13 @@ export class AuthService {
     // mirrors the JWT lifetime above. Cleanup of expired rows happens
     // via the periodic refresh-token cleanup job.
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 365);
+    const defaultExpiresAt = new Date();
+    defaultExpiresAt.setDate(defaultExpiresAt.getDate() + 365);
+    // Never longer than the default: an inherited expiry may only shorten.
+    const expiresAt =
+      refreshRowExpiresAt && refreshRowExpiresAt < defaultExpiresAt
+        ? refreshRowExpiresAt
+        : defaultExpiresAt;
 
     await prisma.refreshToken.create({
       data: {

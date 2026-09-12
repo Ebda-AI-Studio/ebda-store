@@ -154,3 +154,66 @@ Cost if wrong: `store_usage_snapshots` stays outside the RLS cutover's coverage
 until someone sweeps it, and the cutover's own inventory
 (`docs/plans/2026-07-02-rls-cutover.md`) is the thing that has to catch it. It
 is recorded here so it does not read as fixed.
+
+**Ruling P2-B1-1 — the rotation-race grace budget is counted in
+`revokedReason`, not in a column of its own.**
+
+Bounding how many times one rotated row may be forgiven needs a counter. The
+obvious home is a `graceUses Int @default(0)` column on `refresh_tokens`; the
+counter instead lives in the existing `revokedReason` string, as
+`rotated_grace_1` … `rotated_grace_5`, read and written through
+`endedByRotation()` / `graceUsesSpent()` / `claimGraceUse()`.
+
+The reason is blast radius, not taste. `refresh_tokens` is touched by every
+authenticated request on the platform, and this work landed under a standing
+constraint that no order or payment path may break. A sweep of `revokedReason`
+across `apps/`, `scripts/`, `tests/` and `prisma/` found every reader inside
+`auth.service.ts` and its two test files — nothing outside this module can
+observe the encoding, so it cannot leak into an API response, a report, or a
+client. A migration on that table buys legibility and costs a deploy step on
+the hottest table in the schema, in a batch whose findings are all P2.
+
+All four defences here are registered in `docs/security/defence-mutations.json`
+(`session-rotation-grace-budget`, `session-rotation-backlink-cas`,
+`session-revocation-midflight`, `session-rotation-grace-no-clock-renew`) and
+each was confirmed KILLED — removing it reddens a named test.
+
+Cost if wrong: a future reader of `revokedReason` outside this module (an
+analytics query, an admin session list, a support tool) sees five spellings of
+"rotated" where it expected one, and filters on `= 'rotated'` under-count. The
+mitigation is that `endedByRotation()` is the only correct way to ask that
+question and is exported nowhere else — a new reader has to go through it or
+write the comparison itself, which is the moment to promote this to a column.
+
+**Ruling P2-B1-2 — token-family lineage (#1671) and the absolute lifetime
+half of #1691 are deferred; they need a schema column and this batch has none.**
+
+Six findings were opened against the rotation-race grace path. Four are fixed
+and mutation-proven here: the use budget (#1684), the conditional back-link
+write (#1687), the single-query chain walk (#1688), and the mid-flight
+revocation check (#1683). #1691 is fixed in the half that is reachable without
+a migration — a forgiven hop no longer renews the refresh row's clock, so
+replaying a nine-month-old token yields what was left of it rather than a fresh
+year.
+
+What is NOT fixed: the forgiven token is still a new family root with no link
+back to the family it came from, because `replacedById` already points at the
+first successor and a row cannot carry two. Real lineage needs a `familyId`
+column carried across every rotation, which also turns reuse detection from
+user-wide into family-wide. That is a schema change with its own migration,
+its own backfill of live rows, and its own rollback, and it does not belong in
+a batch of P2s.
+
+The containment argument for deferring: every revocation path in this service
+(`logout`, `password_changed`, `password_reset`, `revoke_all`,
+`reuse_detected`) is a `updateMany({ where: { userId, revokedAt: null } })`.
+They are user-scoped, not family-scoped, so an orphaned chain is killed by all
+of them. The lineage gap therefore costs forensics and precision, not
+containment.
+
+Cost if wrong: a client that legitimately rotates more than five times inside
+one 30-second window is logged out of everything — the budget is a cap on a
+security hole, and if the real multi-tab shape is wider than five the fix is a
+larger `ROTATION_RACE_MAX_GRACE_USES`, visible in the
+`Refresh-token rotation race` warn line which now carries `graceUsesSpent` and
+`graceUsesAllowed` on every forgiveness.
