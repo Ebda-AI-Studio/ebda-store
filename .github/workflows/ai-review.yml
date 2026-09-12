@@ -155,7 +155,56 @@ jobs:
             echo "Auto-fix produced no changes — leaving the PR red for human review."
             exit 1
           fi
-          git add -A
+
+          # A GitHub App token cannot create or update anything under
+          # .github/workflows/ without the `workflows` permission, and
+          # AI_FIX_PAT does not carry it. Before this split, ONE workflow-file
+          # edit made the whole push fail:
+          #
+          #   ! [remote rejected] HEAD -> <branch> (refusing to allow a GitHub
+          #     App to create or update workflow `.github/workflows/x.yml`
+          #     without `workflows` permission)
+          #
+          # and every OTHER fix in the same commit was lost with it. Measured
+          # on PR #1720 (2026-09-11): a correct fix was written, rejected, and
+          # the job reported only "Process completed with exit code 1".
+          #
+          # So: commit and push everything that CAN go, and report what cannot
+          # rather than failing opaquely.
+          WF_CHANGED="$(git status --porcelain -- '.github/workflows/**' | awk '{print $2}')"
+          if [ -n "$WF_CHANGED" ]; then
+            echo "::warning::Auto-fix edited workflow file(s) it cannot push (AI_FIX_PAT lacks the 'workflows' scope):"
+            echo "$WF_CHANGED" | sed 's/^/::warning::  /'
+            echo "$WF_CHANGED" | xargs -r git checkout --
+          fi
+
+          # `git add -u` + an explicit new-file list, never `git add -A`:
+          # a blanket add sweeps untracked files the fix never intended —
+          # nested repos, local scratch, anything a tool dropped in the
+          # workspace. Tracked modifications are what the fix actually made;
+          # genuinely new files are added by name, and listed in the log so
+          # the commit's contents are reviewable from the job output.
+          git add -u
+          NEW_FILES="$(git ls-files --others --exclude-standard -- apps packages tests docs scripts .zap)"
+          if [ -n "$NEW_FILES" ]; then
+            echo "Auto-fix created new file(s):"
+            echo "$NEW_FILES" | sed 's/^/  /'
+            echo "$NEW_FILES" | xargs -r git add --
+          fi
+
+          if git diff --cached --quiet; then
+            echo "Auto-fix touched only files it cannot push. Leaving the PR red for human review."
+            exit 1
+          fi
+
           git commit -m "fix: address AI-review critical findings [ai-fix]"
-          git push "https://x-access-token:${AI_FIX_PAT}@github.com/${GH_REPO}.git" "HEAD:${PR_HEAD_REF}"
-          echo "Auto-fix pushed; a fresh review run will validate it."
+          if git push "https://x-access-token:${AI_FIX_PAT}@github.com/${GH_REPO}.git" "HEAD:${PR_HEAD_REF}"; then
+            echo "Auto-fix pushed; a fresh review run will validate it."
+            if [ -n "$WF_CHANGED" ]; then
+              echo "::warning::The workflow-file portion of the fix was NOT pushed and still needs a human."
+              exit 1
+            fi
+          else
+            echo "::error::Auto-fix push rejected. If this names the 'workflows' permission, add the workflows scope to AI_FIX_PAT."
+            exit 1
+          fi
