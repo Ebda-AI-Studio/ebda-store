@@ -74,6 +74,10 @@ on:
       - 'apps/admin/src/**'
       - 'apps/web/src/**'
       - 'apps/orders/src/**'
+      # The admin client's refresh path is now a defended source too: it
+      # holds the 429-vs-401 distinction whose absence wiped the only copy
+      # of an iOS PWA's refresh token.
+      - 'apps/admin/src/lib/**'
       - '.github/workflows/mutation-testing.yml'
   workflow_dispatch:
     inputs:

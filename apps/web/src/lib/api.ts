@@ -361,6 +361,23 @@ interface CreateOrderData {
  */
 const COOKIE_ROTATED = 'cookie-rotated';
 
+/**
+ * A refresh the server THROTTLED, as opposed to one it rejected.
+ *
+ * 429 and 401 are opposite facts about a session — "slow down" versus "you
+ * are signed out" — and `if (!res.ok) return null` collapsed them into the
+ * second. On the storefront the cost is a customer shown as signed out while
+ * their session is fine; in the admin app the same collapse deleted the
+ * stored refresh token. Surfacing the distinction lets a caller wait instead
+ * of tearing down.
+ */
+export class RefreshThrottledError extends Error {
+  constructor() {
+    super('Refresh was rate-limited');
+    this.name = 'RefreshThrottledError';
+  }
+}
+
 class ApiClient {
   private baseUrl: string;
   private storeId: string | null = null;
@@ -417,6 +434,7 @@ class ApiClient {
           headers: { 'Content-Type': 'application/json', 'X-Session-ID': this.getSessionId() },
           body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
         });
+        if (res.status === 429) throw new RefreshThrottledError();
         if (!res.ok) return null;
         const json = await res.json();
         if (json.success && json.data) {
@@ -446,7 +464,11 @@ class ApiClient {
           return json.data.accessToken ?? (json.data.refreshed ? COOKIE_ROTATED : null);
         }
         return null;
-      } catch {
+      } catch (error) {
+        // A throttle is not a network error — it must reach the request path,
+        // or the blanket `return null` here re-collapses 429 into the caller's
+        // original 401 and AuthContext renders a signed-in customer as a guest.
+        if (error instanceof RefreshThrottledError) throw error;
         return null;
       }
     })().finally(() => {
@@ -516,7 +538,19 @@ class ApiClient {
 
       // On 401 (or a CSRF 403), attempt a single token refresh and retry
       if (shouldRefreshRetry && !endpoint.startsWith('/auth/')) {
-        const newToken = await this.refreshAccessToken();
+        // A throttle must not read as a rejection. The storefront has
+        // nothing to retry with here, so it returns the original response —
+        // but it does NOT let the failure reach AuthContext as "signed out".
+        let newToken: string | null = null;
+        try {
+          newToken = await this.refreshAccessToken();
+        } catch (error) {
+          if (!(error instanceof RefreshThrottledError)) throw error;
+          return {
+            success: false,
+            error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again.' },
+          } as ApiResponse<T>;
+        }
         if (newToken) {
           // Rebuild headers to pick up any new CSRF token set during refresh
           const retryHeaders = this.buildHeaders(options);
@@ -816,17 +850,11 @@ class ApiClient {
     }>(`/public/${storeId}/blog/${slug}`);
   }
 
-  // Store-scoped products (for admin)
-  async getStoreProducts(storeId: string, params?: Record<string, string>) {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return this.request<{ products: Product[]; meta: PaginationMeta }>(
-      `/stores/${storeId}/products${query}`
-    );
-  }
-
-  async getStoreProduct(storeId: string, productId: string) {
-    return this.request<{ product: Product }>(`/stores/${storeId}/products/${productId}`);
-  }
+  // `getStoreProducts` / `getStoreProduct` lived here, unreferenced. They were
+  // the cited justification for leaving `/stores/:id/products` off the origin
+  // gate's deny side — an enumeration that read method DEFINITIONS as call
+  // sites. Nothing in apps/web ever called either, and their own comment said
+  // "for admin". Removed so the next enumeration cannot cite them again.
 
   // Cart (public endpoints - uses default store)
   async getCart() {

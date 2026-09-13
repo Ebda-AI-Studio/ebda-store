@@ -237,9 +237,9 @@ const STOREFRONT_ALLOWED_STORE_PATHS: RegExp[] = [
   // coupons and promotions for every merchant on a custom domain — checkout
   // unusable — while working perfectly on store.force-ai.co, which is a
   // platform origin and returns early long before this list is consulted.
-  /^\/api\/v1\/stores\/public\//,
-  // Blog post bodies — app/blog/[slug]/BlogPostBody.tsx.
-  /^\/api\/v1\/stores\/[^/]+\/blog\/[^/]+\/?$/,
+  // Anchored against a `.` segment so `/stores/public/../<id>/customers`
+  // cannot satisfy a bare prefix. A store id never begins with a dot.
+  /^\/api\/v1\/stores\/public\/[^./][^/]*(\/|$)/,
   // Customer order tracking — lib/api.ts getOrderTimeline. NOT the order list,
   // detail or invoice, which are merchant-admin and stay denied.
   /^\/api\/v1\/stores\/[^/]+\/orders\/[^/]+\/timeline\/?$/,
@@ -251,6 +251,24 @@ const STOREFRONT_ALLOWED_STORE_PATHS: RegExp[] = [
   /^\/api\/v1\/stores\/[^/]+\/reviews\/can-review\/[^/]+\/?$/,
   //
   // DELIBERATELY NOT LISTED, though an earlier version had them:
+  //
+  //   /stores/:id/blog/:postId
+  //                         This was listed on the strength of
+  //                         app/blog/[slug]/BlogPostBody.tsx fetchPost. That
+  //                         call is SERVER-side (`next: { revalidate: 60 }`,
+  //                         no credentials), so it sends no Origin and never
+  //                         reaches this gate — and the route it names is
+  //                         `authenticate + authorize(store_admin,
+  //                         super_admin, staff) + requireStoreAccess`, the
+  //                         ADMIN single-post read that returns drafts. The
+  //                         entry therefore bought a merchant origin a
+  //                         credentialed cross-origin read of another
+  //                         tenant's unpublished posts and bought the
+  //                         storefront nothing. Verified against production
+  //                         2026-09-13: that path returns 401 unauthenticated
+  //                         while `/public/:storeId/blog/:slug` returns a
+  //                         clean 404 — fetchPost was calling the wrong
+  //                         endpoint and is repointed in the same change.
   //
   //   /stores/:id           store.routes.ts gates GET /:id with authenticate +
   //                         requireMfaEnrolled + authorize(store_admin,
@@ -288,6 +306,15 @@ const STOREFRONT_ALLOWED_STORE_PATHS: RegExp[] = [
  * Decoding here can only ever make MORE paths match the deny list (it fails
  * closed) and keeps the gate correct if a proxy or a future router version
  * decodes before matching.
+ *
+ * That "fails closed" argument holds ONLY while the normalized path feeds a
+ * deny-list. It stopped being true the moment an ALLOW-list was checked
+ * against the same string: there, decoding makes more paths match a
+ * PERMISSION, which fails OPEN — `/api/v1/stores/%70ublic/...` decodes into
+ * the storefront prefix and returns next() before the deny pattern is ever
+ * reached. `restrictPlatformOnlyOrigins` therefore requires the RAW path and
+ * the normalized path to AGREE before it allows anything; see the ordering
+ * comment there. Do not reintroduce a lone `gatePath` test on the allow-list.
  */
 function normalizePlatformGatePath(rawPath: string): string {
   let path = rawPath;
@@ -349,12 +376,24 @@ export function restrictPlatformOnlyOrigins(req: Request, res: Response, next: N
     return next();
   }
 
-  const gatePath = normalizePlatformGatePath(req.path);
+  const rawPath = req.path;
+  const gatePath = normalizePlatformGatePath(rawPath);
 
   // Allow-list FIRST: the storefront's own calls under /stores are permitted,
   // everything else under that prefix is not. Order matters — the deny pattern
   // covers the whole prefix, so checking it first would 403 the storefront.
-  if (STOREFRONT_ALLOWED_STORE_PATHS.some(pattern => pattern.test(gatePath))) {
+  //
+  // Both forms have to agree. Testing the allow-list against the NORMALIZED
+  // path alone inverts the normalizer's own safety argument: decoding may add
+  // denials, never permissions, and `/stores/%70ublic/...` decodes straight
+  // into the storefront prefix. Requiring the raw path to match too means an
+  // encoded variant is refused by the raw test, and a raw path that only
+  // LOOKS storefront-shaped until it is decoded is refused by the normalized
+  // one. A real storefront call is unencoded and satisfies both.
+  const storefrontShaped = (candidate: string) =>
+    STOREFRONT_ALLOWED_STORE_PATHS.some(pattern => pattern.test(candidate));
+
+  if (storefrontShaped(rawPath) && storefrontShaped(gatePath)) {
     return next();
   }
 
@@ -658,6 +697,132 @@ export const authLimiter = rateLimit({
     const email = req.body?.email || 'unknown';
     return `${ipKeyGenerator(req.ip ?? '')}-${email}`;
   },
+});
+
+/**
+ * Upper bound on a string we are willing to run an HMAC over in the refresh
+ * key generator. Refresh JWTs are ~300-500 bytes; 4096 is generous headroom.
+ */
+const MAX_REFRESH_TOKEN_CHARS = 4096;
+
+/**
+ * Rate-limit bucket for `POST /auth/refresh`.
+ *
+ * Exported so it can be unit-tested directly. The limiters are disabled in
+ * tests (`skipForLoadTestOrTests` is `isTestEnv || …`), so a bug in the key is
+ * structurally invisible to any suite that drives the route — the only way to
+ * cover it is to execute the key function itself.
+ *
+ * `/auth/refresh` used to ride `authLimiter`, whose key is
+ * `<ip>-<req.body.email>`. A refresh body is `{}` or `{refreshToken}` and
+ * never carries an email, so every refresh from an IP collapsed into ONE
+ * bucket, `<ip>-unknown`, shared with `/mfa/verify` and the password-reset
+ * confirm routes — which are emailless for the same reason. Measured in
+ * production on 2026-09-10: 46 sessions for one user refreshing in a single
+ * second after a deploy. Fifteen succeeded; the rest got 429, and both
+ * clients treat a non-ok refresh as a dead session, so the user was logged
+ * out of every tab — the exact symptom the rotation-race work exists to
+ * remove, arriving through a different door.
+ *
+ * The key is the presented token's subject, scoped by IP. What the subject
+ * buys is that one user's open tabs share a budget instead of every user
+ * behind a NAT sharing one.
+ *
+ * THE SUBJECT IS TAKEN FROM A *VERIFIED* TOKEN ONLY. `jwt.decode` would read
+ * `sub` out of an unsigned blob the caller composed, and for a rate limiter
+ * that is fatal even though a bucket is not a capability: the attacker would
+ * be choosing the partition, so a loop posting `jwt.sign({}, 'x', {subject:
+ * randomUUID()})` mints a fresh 120-per-15-min bucket per request and is never
+ * throttled — while `AuthService.refreshTokens` sha256s and hits Neon before
+ * any signature check, making each one an unauthenticated DB round trip.
+ * Verification is a single HMAC (microseconds) and cannot be forged, so
+ * bucket cardinality is bounded by real issued sessions. Anything that does
+ * not verify — garbage, wrong secret, expired, oversized — shares the strict
+ * `anon` bucket per IP, which is what a brute-force attempt looks like anyway.
+ */
+export function refreshLimiterKey(req: Request): string {
+  const presented =
+    (typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : undefined) ??
+    (typeof req.cookies?.refresh_token === 'string' ? req.cookies.refresh_token : undefined);
+
+  let subject = 'anon';
+  // Length ceiling before any crypto: bodies are accepted up to 10mb, and
+  // HMAC-ing a 10mb "token" once per request is itself the amplifier. A real
+  // refresh JWT is a few hundred bytes.
+  if (presented && presented.length <= MAX_REFRESH_TOKEN_CHARS) {
+    try {
+      const verified = jwt.verify(presented, config.jwtSecret, {
+        algorithms: ['HS256'],
+        issuer: 'force-api',
+        audience: 'force-app',
+      });
+      if (verified && typeof verified === 'object' && typeof verified.sub === 'string') {
+        subject = verified.sub;
+      }
+    } catch {
+      // Unverifiable token -> shared anonymous bucket. Deliberately silent:
+      // this runs before the route, and the route produces the 401.
+    }
+  }
+
+  return `${ipKeyGenerator(req.ip ?? '')}-refresh-${subject}`;
+}
+
+/**
+ * `/auth/refresh` only. Sized to real multi-tab behaviour rather than to
+ * credential stuffing: a merchant with the admin PWA, the orders PWA and a
+ * handful of browser tabs refreshes tens of times an hour in normal use, and
+ * every one of those is a request the user did not make and cannot see fail.
+ * Credential stuffing is what `authLimiter` is for, and /refresh is no longer
+ * in its bucket.
+ */
+export const refreshLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'refresh'),
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many refresh attempts, please try again later.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Same availability-over-strictness posture as the other limiters: a Redis
+  // blip must not 500 the path every open tab uses to stay signed in.
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: refreshLimiterKey,
+});
+
+/**
+ * Per-IP backstop for `POST /auth/refresh`, stacked in FRONT of
+ * `refreshLimiter`.
+ *
+ * `refreshLimiter` partitions by subject, so its ceiling is
+ * 120 × (distinct subjects seen from this IP). Verifying the token bounds that
+ * cardinality to genuinely issued sessions, but it does not make it a constant
+ * — and `skipGlobalRateLimit` bypass 3 removed the IP-wide mutation cap this
+ * route used to also ride. Without something IP-wide, the only ceiling left is
+ * attacker-influenced. This is that ceiling.
+ *
+ * 600/15min is deliberately far above real use (an access token lives 30
+ * minutes, so a tab refreshes ~1-2× per window) and still well above the
+ * 200/15min global mutation cap /refresh sat under before the bypass, so no
+ * office NAT that worked yesterday starts 429-ing today.
+ */
+export const refreshIpLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'refresh-ip'),
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many refresh attempts, please try again later.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Same availability-over-strictness posture as the other limiters.
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => `${ipKeyGenerator(req.ip ?? '')}-refresh-ip`,
 });
 
 // Limiter for API writes (orders, payments)

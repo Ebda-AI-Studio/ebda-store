@@ -30,7 +30,15 @@ export async function fetchPost(storeId: string, slug: string): Promise<BlogDeta
   if (!storeId || storeId === 'demo') return null;
   // NOTE: network errors intentionally propagate (no try/catch) — a transient
   // fetch failure must 500, not be swallowed into a false 404.
-  const res = await fetch(`${API_URL}/stores/${storeId}/blog/${encodeURIComponent(slug)}`, {
+  // `/public/:storeId/blog/:slug` — the PUBLISHED-by-slug read. The previous
+  // target, `/stores/:storeId/blog/:postId`, is the ADMIN single-post route
+  // (authenticate + authorize + requireStoreAccess) and takes a post id, not a
+  // slug. This fetch is server-side and sends no cookie, so it got a 401 —
+  // neither 404 nor ok, so the throw below fired and the post page 500'd.
+  // Confirmed against production 2026-09-13: the admin path 401s
+  // unauthenticated while the public path returns a clean 404. No blog post
+  // has ever existed in production (0 rows), so no reader met it.
+  const res = await fetch(`${API_URL}/public/${storeId}/blog/${encodeURIComponent(slug)}`, {
     next: { revalidate: 60 },
   });
   if (res.status === 404) return null; // definitive miss → caller resolves redirect / 404s

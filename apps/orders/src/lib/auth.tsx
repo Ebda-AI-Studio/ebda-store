@@ -2,7 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getApiUrl, refreshAccessToken } from './api';
+import {
+  getApiUrl,
+  refreshSession,
+  refreshSessionWaitingOutThrottle,
+  clearStoredSession,
+} from './api';
 
 /**
  * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where
@@ -75,18 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined' && isIosWebkit() && !localStorage.getItem('refreshToken')) {
       return false;
     }
-    try {
-      const newAccessToken = await refreshAccessToken();
-      if (newAccessToken) {
-        // On iOS, token rotation writes accessToken + refreshToken +
-        // csrfToken to localStorage inside refreshAccessToken(). On other
-        // browsers the server rotates the httpOnly cookie in the response.
-        return true;
-      }
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-    }
-    return false;
+    // The context's own contract stays boolean — only 'refreshed' is a
+    // success. checkAuth needs the third outcome and calls refreshSession()
+    // directly.
+    return (await refreshSession()) === 'refreshed';
   }, []);
 
   const checkAuth = useCallback(async () => {
@@ -105,8 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
         setUser(data.data.user);
       } else if (response.status === 401) {
-        const refreshed = await refreshToken();
-        if (refreshed) {
+        const outcome = await refreshSessionWaitingOutThrottle();
+        if (outcome === 'refreshed') {
           // Re-verify with the new access token so we can set the user object.
           const newAccessToken =
             typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -120,13 +117,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const retryData = await retryResponse.json();
             setUser(retryData.data.user);
           } else {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
+            clearStoredSession();
           }
-        } else {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+        } else if (outcome === 'rejected') {
+          clearStoredSession();
         }
+        // Still 'throttled' after the retries above: leave the credential
+        // alone. Discarding the stored refresh token in answer to a 429 is
+        // unrecoverable on this app in particular — it is an installed iOS
+        // PWA that asks for persistent storage precisely to keep that one
+        // copy alive.
       }
     } catch (error) {
       console.error('Auth check failed:', error);

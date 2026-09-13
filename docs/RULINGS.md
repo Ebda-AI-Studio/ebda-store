@@ -340,3 +340,235 @@ That is bounded by `take: 500` and by how rare a multi-rotation chain inside a
 30-second window is. If it ever shows up in slow-query logs the fix is the
 `(userId, createdAt)` composite, which reopens the migration trade-off and
 should be decided once rather than twice.
+
+**Ruling P2-B2-1 — #1240's security half does not reproduce; only its dead
+code did.**
+
+#1240 said `/stores/:id/products` was left off `PLATFORM_ONLY_ORIGIN_PATHS` on
+the strength of two `lib/api.ts` methods that nothing calls, and asked for
+`products` to be added to the enumerated deny segments. The enumeration it was
+filed against no longer exists: that list was inverted in the same PR series
+into a deny-prefix (`/^\/api\/v1\/stores(\/|$)/`) plus nine allowed storefront
+shapes. `products` is not one of the nine, so it is already denied — and so is
+`/reviews/admin`, the other half of the finding. Verified by executing the
+middleware, not by reading it: `tests/unit/platform-only-origins.test.ts`
+drives `restrictPlatformOnlyOrigins` and its re-derivation case re-enumerates
+every storefront call in `apps/web` against the allow-list.
+
+The dead code was real. `getStoreProducts` and `getStoreProduct` had zero
+callers in `apps/web/src` — the finding's own check, re-run and confirmed —
+and are removed, so the next enumeration cannot cite a method definition as a
+call site again.
+
+Cost if wrong: if some caller reaches those two endpoints from a browser on a
+merchant custom domain, it now gets a 403 instead of data. That is the
+fail-closed direction, it is loud, and the re-derivation test scans for exactly
+that case — a storefront call the allow-list does not permit fails the suite
+rather than the storefront.
+
+**Ruling P2-B2-2 — one line of the refresh-throttle fix is proven by reading,
+not by mutation, and it is named here so it does not read as covered.**
+
+The chain is: `refreshAccessToken` throws `RefreshThrottledError` on 429 →
+`refreshSession()` turns that into the outcome `'throttled'` → `checkAuth`
+calls `clearStoredSession()` only for `'rejected'`. The first two links are
+executed and mutation-proven (`tests/unit/refresh-throttle-not-logout.test.ts`;
+removing the 429 detection, re-swallowing the throw, or renaming `'throttled'`
+to `'rejected'` each reddens a named test). The third —
+`else if (outcome === 'rejected') clearStoredSession()` inside the
+`AuthProvider` component — is not, because rendering it needs a DOM and this
+repo has no jsdom: it is not a dependency, no test uses it, and adding the
+per-file environment pragma makes vitest try to resolve it mid-run and hang
+(hit while writing this suite).
+
+The mitigation is that the decision was moved OUT of the component precisely so
+the untested part is one readable line rather than a branch. `refreshSession()`
+and `clearStoredSession()` are exported and directly tested, including that a
+throttle never produces the outcome that calls the destructive one.
+
+Cost if wrong: if that line is later edited to clear on any non-`'refreshed'`
+outcome, the iOS PWA is back to deleting its only copy of the refresh token in
+answer to a 429, and no test fails. What would settle it: adding jsdom +
+Testing Library and rendering `AuthProvider` against a 429, which is a test
+-infrastructure change and does not belong in a P2 batch.
+
+**Ruling P2-B2-3 — `/mfa/verify` and the password-reset confirm routes keep
+sharing authLimiter's `<ip>-unknown` bucket.**
+
+> AMENDED 2026-09-13 after the scoped audit. The first version of this ruling
+> enumerated one bucket and concluded the knock-on was gone. It missed a
+> second: the GLOBAL limiter in `apps/api/src/index.ts` is mounted app-level,
+> counts every mutation at 200 per 15 minutes with the DEFAULT (per-IP) key,
+> and `POST /auth/refresh` is a mutation. So refresh was still inside an
+> IP-wide counter shared with every order creation, cart write and admin save
+> — the same "every user behind a NAT shares one bucket" failure the dedicated
+> limiter exists to end, one layer up, and binding FIRST because 200 is below
+> the per-user 120 times the number of users on that IP. Refresh now skips
+> the global limiter (`skipGlobalRateLimit`, its own module so a test can
+> execute it) and `refreshLimiter` is the sole gate on that route. The
+> enumeration below is the authLimiter half only, and is otherwise unchanged.
+
+#1690 notes that every emailless auth route collapses into the same key.
+`/auth/refresh` is the one this batch splits out, because it is the one the
+production incident was measured on (46 sessions for one user in a single
+second after a deploy) and the only one a client calls unprompted, tens of
+times an hour, with a teardown on failure. Moving refresh out also removes the
+knock-on the finding describes — a user exhausting the bucket with open tabs
+and then being unable to finish MFA — because the tabs are no longer in that
+bucket.
+
+The remaining routes stay together deliberately: they are user-initiated, low
+volume, and a shared per-IP ceiling is the right posture for a
+credential-guessing surface.
+
+Cost if wrong: several people behind one NAT doing MFA or password resets at
+the same moment can still rate-limit each other at 15 per 15 minutes. That is
+visible as a 429 with a `Retry-After` on a screen the user is actively looking
+at, not a silent session teardown, and the fix is the same split if it is ever
+measured.
+
+**Ruling P2-B2-4 — `Retry-After` is not surfaced to the clients, and the field
+that claimed to carry it is deleted rather than made to work.**
+
+`RefreshThrottledError` originally carried `retryAfterSeconds`, parsed from the
+429's `Retry-After` header, and a test asserted it came back as 12. That
+assertion could never hold in production. The API and all three frontends are
+on different hosts, so every refresh is a cross-origin fetch, and `Retry-After`
+is not a CORS-safelisted response header — `apps/api/src/index.ts` exposes only
+`X-Request-Id` and `X-CSRF-Token`, so the browser returns null for it whatever
+the server sent. The test passed because it stubbed `headers.get` itself: green
+against a value the real client path cannot produce.
+
+The header is NOT being added to `exposedHeaders`. Two reasons. It would be an
+export nothing consumes, and the value itself is the wrong shape for the job:
+`express-rate-limit` reports seconds until the WINDOW resets, so on a 15-minute
+window a throttled client would be told to wait up to 900 seconds — useless for
+an interactive retry and actively worse than a short fixed backoff. The retry
+that replaced it (`THROTTLE_RETRY_DELAYS_MS`, 1.5s then 4s) is bounded, fixed,
+and tested on fake timers.
+
+Cost if wrong: if a future caller genuinely needs the server's own backoff
+hint, it has to add `Retry-After` to `exposedHeaders` AND verify it by
+executing a real cross-origin 429 rather than a stubbed `Response` — the
+stubbed version is what hid this. Recorded here so the field's absence reads as
+a decision rather than an oversight.
+
+**Ruling P2-B2-5 — the refresh-throttle fix belongs on all THREE frontends, and
+the first version shipped it on two.**
+
+`apps/orders` was left byte-identical to the bug: the same
+`if (!res.ok) return null`, the same blanket catch, the same
+`localStorage.removeItem('accessToken'/'refreshToken')` pair in its
+`checkAuth`. It is a deployed frontend (orders.force-ai.co) and an installed
+iOS PWA that requests persistent storage precisely to keep that one copy of the
+credential alive. And because `refreshLimiter` is keyed per USER, the orders
+PWA, the admin PWA and every browser tab for one merchant share a single
+budget — so the app most likely to meet a throttle was the one still answering
+it destructively.
+
+The cause was not judgement, it was reach: `apps/orders` had no `@orders`
+vitest alias, so no test could import it, so it had no tests, so a client-side
+auth fix could land on two of three surfaces and look complete. The alias is
+added, the orders copy is covered by the same suite as admin and web, and both
+orders defences are registered in `docs/security/defence-mutations.json`.
+
+`apps/web` deliberately does NOT get the retry loop, and that is not a
+third miss. Its `AuthContext.refreshUser` calls `/auth/me`, and the storefront
+client skips the refresh-retry path entirely for `/auth/` endpoints — so the
+loop would have no caller there. It also never clears stored credentials except
+on an explicit logout, and its `setUser(null)` is UI state that the next check
+recovers. Web gets the 429 detection (so a throttled write reports
+`RATE_LIMITED` rather than a bare 401) and nothing more, because nothing more
+is reachable. A branch with no call site is the same defect inverted.
+
+Cost if wrong: a fourth frontend, or a later divergence in one of the three,
+re-opens the same hole. The mutation entries are the guard — `apps/orders/src`
+and `apps/admin/src/lib` are both in `mutation-testing.yml`'s `paths`, so a PR
+touching either runs the gate.
+
+**Ruling P2-B2-6 — "a bucket is not a capability" was the wrong argument, and
+it was mine.**
+
+`refreshLimiterKey` originally read the presented token's `sub` with
+`jwt.decode`, unverified. I registered that in the `jwt.decode` lens with the
+justification that a forged `sub` only moves the caller to a different counter,
+because a bucket is not a capability. The premise is true and the conclusion
+does not follow: for a rate limiter, the attacker choosing the PARTITION is the
+whole attack. A loop posting `jwt.sign({}, 'anything', { subject: randomUUID() })`
+mints a fresh 120-per-15-minute bucket on every request and is never throttled.
+
+It was worse in combination with the change one file over. `skipGlobalRateLimit`
+bypass 3 exempts `/auth/refresh` from the global 200/15min per-IP mutation cap,
+on the correct reasoning that the route now has its own bucket. Together those
+two edits left the route with NO constant per-IP ceiling at all — and
+`AuthService.refreshTokens` sha256s the presented token and queries Neon before
+any signature is checked, so each unthrottled request is an unauthenticated
+database round trip. I introduced that; the scoped audit did not catch it; the
+AI reviewer did.
+
+The fix, which is the reviewer's and is better than what I wrote: verify the
+token instead of decoding it, so bucket cardinality is bounded by genuinely
+issued sessions; refuse to run the HMAC at all over anything longer than
+`MAX_REFRESH_TOKEN_CHARS`, because JSON bodies are accepted up to 10mb and
+hashing one per request is itself the amplifier; and stack an IP-wide
+`refreshIpLimiter` in front at 600/15min — deliberately far above real use
+(an access token lives 30 minutes, so a tab refreshes once or twice a window)
+and above the 200/15min this route used to ride, so no office NAT that worked
+yesterday starts 429-ing today.
+
+Both are registered as defence mutations (`refresh-bucket-subject-is-verified`,
+`refresh-bucket-size-ceiling`) and both KILLED. The size ceiling SURVIVED its
+first mutation — the assertion that mattered was not "an oversized token lands
+in the anon bucket", which passes with the guard removed, but "`jwt.verify` is
+never reached", which is what the guard actually does.
+
+Cost if wrong: `refreshIpLimiter`'s 600 is a judgement, not a measurement. If a
+genuinely large shared-IP deployment exceeds it, the symptom is a 429 on
+refresh — which the clients now treat as back-pressure rather than a sign-out,
+so it degrades instead of signing people out. That is the order those two fixes
+had to land in.
+
+**Ruling P2-B2-7 — the throttle retry is one attempt, and it is not a recovery
+from a real throttle. Saying so is the point.**
+
+`refreshSessionWaitingOutThrottle` shipped with a ladder of 1.5s then 4s. The
+audit is right that it cannot do what its own doc comment claimed. Both buckets
+it waits on are FIXED 15-minute windows backed by a rate-limit-redis counter,
+so once a caller is over the cap, every request for the remainder of the window
+429s. A 5.5-second ladder ends on exactly the login screen it would have
+reached with no ladder at all — 5.5 seconds later and two requests deeper into
+the IP-wide cap. It was a spinner described as a recovery.
+
+Three options were available and two were rejected:
+
+Shortening the refresh windows so a ladder CAN cross a boundary (e.g. 8/minute
+instead of 120/15min — the same average rate) is the obvious server-side fix
+and it is wrong here. The whole reason this bucket is burst-tolerant is the
+measured incident: 46 sessions for one user refreshing in a single second after
+a deploy. 8 per minute refuses exactly that, so it would reintroduce the
+failure the work exists to remove, in exchange for a faster recovery from a
+throttle that would then happen far more often.
+
+Exposing `Retry-After` so the client could wait the real duration is refused by
+Ruling P2-B2-4, and would in any case be a wait of up to 900 seconds — not
+something to hold a mounting app on.
+
+So the ladder is cut to ONE 1.5s retry, which buys the case it can actually
+win: a request landing on the wrong side of a window boundary, or losing a
+moment of Redis contention. The comment now says that rather than claiming
+more.
+
+The recovery from a genuine throttle is that the CREDENTIAL SURVIVES —
+`clearStoredSession` is never called on this outcome — so a reload once the
+window turns over signs the user back in with no password. Making that
+automatic, by re-checking on focus or `visibilitychange` rather than only on
+mount, is the durable fix.
+
+Cost if wrong: a user who genuinely exhausts 120 refreshes in 15 minutes sees a
+login screen and has to reload rather than being signed back in on their own.
+That is a strictly better outcome than the behaviour this PR set out to fix,
+where the same event DELETED the only copy of their refresh token on the iOS
+PWA, and it is not on the order or payment path. The event-driven re-check is
+deferred because it is a behavioural change to the auth provider in two apps,
+with no jsdom in this repo to render it against — the same constraint recorded
+in Ruling P2-B2-2.

@@ -5,7 +5,13 @@ import { prisma } from '@force/database';
 import { config } from '../config';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import { AuthService, GENERIC_RESEND_VERIFICATION_RESULT } from '../services/auth.service';
-import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security';
+import {
+  authLimiter,
+  refreshLimiter,
+  refreshIpLimiter,
+  auditLog,
+  generateCsrfToken,
+} from '../middleware/security';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
 import { AppError } from '../middleware/error-handler';
@@ -420,8 +426,14 @@ function mayIssueCsrfToken(
   }
 }
 
+// `refreshIpLimiter` runs FIRST and is IP-wide. `refreshLimiter` is partitioned
+// by the presented token's (verified) subject, so on its own it has no constant
+// per-IP ceiling — and `skipGlobalRateLimit` exempts this route from the global
+// mutation cap, so nothing else supplies one.
+const refreshGuards = [refreshIpLimiter, refreshLimiter];
+
 // POST /auth/refresh
-router.post('/refresh', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', refreshGuards, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Accept the refresh token from the JSON body (Bearer/localStorage
     // clients — the iOS admin PWA) OR the HTTP-only refresh cookie

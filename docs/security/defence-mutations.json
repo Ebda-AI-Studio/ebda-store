@@ -600,6 +600,106 @@
       "find": "    const first = await prisma.refreshToken.findUnique({\n      where: { id: replacedById },\n      select: { revokedAt: true, revokedReason: true, replacedById: true },\n    });",
       "replace": "    const first = (\n      await prisma.refreshToken.findMany({\n        where: { userId },\n        select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },\n        orderBy: { createdAt: 'desc' },\n        take: 500,\n      })\n    ).find(r => r.id === replacedById);",
       "test": "tests/unit/refresh-token-rotation-race.test.ts"
+    },
+    {
+      "id": "origin-allowlist-reads-the-raw-path",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the storefront allow-list is matched against the DECODED path only — `/stores/%70ublic/...` decodes into a permission and returns next() before the deny pattern is ever reached",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  if (storefrontShaped(rawPath) && storefrontShaped(gatePath)) {",
+      "replace": "  if (storefrontShaped(gatePath)) {",
+      "test": "tests/unit/platform-only-origins.test.ts"
+    },
+    {
+      "id": "origin-public-prefix-rejects-traversal",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the /stores/public/ allow pattern loses its anchor, so `/stores/public/../<id>/customers` satisfies it and a merchant origin reads another tenant's customer PII",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  /^\\/api\\/v1\\/stores\\/public\\/[^./][^/]*(\\/|$)/,",
+      "replace": "  /^\\/api\\/v1\\/stores\\/public\\//,",
+      "test": "tests/unit/platform-only-origins.test.ts"
+    },
+    {
+      "id": "refresh-bucket-not-shared-unknown",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "/auth/refresh falls back into authLimiter's `<ip>-<email||unknown>` bucket — every refresh from an IP collapses into one counter shared with /mfa/verify, and a post-deploy herd 429s itself out of every session",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  return `${ipKeyGenerator(req.ip ?? '')}-refresh-${subject}`;",
+      "replace": "  return `${ipKeyGenerator(req.ip ?? '')}-${req.body?.email || 'unknown'}`;",
+      "test": "tests/unit/refresh-limiter-bucket.test.ts"
+    },
+    {
+      "id": "origin-blog-admin-read-stays-denied",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the ADMIN single-post blog read (drafts included) is put back on the storefront allow-list, handing a merchant origin a credentialed cross-origin read of another tenant's unpublished posts",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  /^\\/api\\/v1\\/stores\\/[^/]+\\/orders\\/[^/]+\\/timeline\\/?$/,",
+      "replace": "  /^\\/api\\/v1\\/stores\\/[^/]+\\/blog\\/[^/]+\\/?$/,\n  /^\\/api\\/v1\\/stores\\/[^/]+\\/orders\\/[^/]+\\/timeline\\/?$/,",
+      "test": "tests/unit/platform-only-origins.test.ts"
+    },
+    {
+      "id": "orders-throttle-not-logout",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the THIRD frontend collapses a 429 back into a sign-out and wipes the only copy of its refresh token — an installed iOS PWA where localStorage is the sole store",
+      "source": "apps/orders/src/lib/api.ts",
+      "find": "      if (res.status === 429) throw new RefreshThrottledError();",
+      "replace": "",
+      "test": "tests/unit/refresh-throttle-not-logout.test.ts"
+    },
+    {
+      "id": "orders-throttle-escapes-its-catch",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the orders client re-swallows the throttle in its blanket catch, so the credential clear fires anyway",
+      "source": "apps/orders/src/lib/api.ts",
+      "find": "      if (error instanceof RefreshThrottledError) throw error;",
+      "replace": "",
+      "test": "tests/unit/refresh-throttle-not-logout.test.ts"
+    },
+    {
+      "id": "refresh-skips-global-mutation-bucket",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "/auth/refresh falls back into the global 200/15min per-IP mutation counter it shares with every order and cart write, so a NAT'd office rate-limits its own sessions one layer above the per-user bucket",
+      "source": "apps/api/src/middleware/global-rate-limit-skip.ts",
+      "find": "  if (method === 'POST' && req.path === '/api/v1/auth/refresh') {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/global-rate-limit-skip.test.ts"
+    },
+    {
+      "id": "throttle-is-waited-out-not-reported",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "a throttled refresh stops being retried, so the provider stays unauthenticated and the redirect effect routes the user to /login while their session is fine",
+      "source": "apps/admin/src/lib/api.ts",
+      "find": "  for (const delay of THROTTLE_RETRY_DELAYS_MS) {",
+      "replace": "  for (const delay of []) {",
+      "test": "tests/unit/refresh-throttle-not-logout.test.ts"
+    },
+    {
+      "id": "refresh-bucket-subject-is-verified",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the refresh bucket keys on an UNVERIFIED `sub`, so the caller chooses its own partition — a loop signing a fresh random subject mints a new 120/15min bucket per request and is never throttled, while the route sha256s and hits Neon before any signature check",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "      const verified = jwt.verify(presented, config.jwtSecret, {\n        algorithms: ['HS256'],\n        issuer: 'force-api',\n        audience: 'force-app',\n      });",
+      "replace": "      const verified = jwt.decode(presented);",
+      "test": "tests/unit/refresh-limiter-bucket.test.ts"
+    },
+    {
+      "id": "refresh-bucket-size-ceiling",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the length ceiling before the HMAC is removed, so a 10mb body is verified once per request — the key generator becomes the amplifier the limiter exists to prevent",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  if (presented && presented.length <= MAX_REFRESH_TOKEN_CHARS) {",
+      "replace": "  if (presented) {",
+      "test": "tests/unit/refresh-limiter-bucket.test.ts"
     }
   ]
 }

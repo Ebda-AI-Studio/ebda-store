@@ -127,6 +127,12 @@ describe('JWT lens — the envelope is checked before the claims are believed', 
       'apps/api/src/middleware/auth.ts': 2,
       // Reads `userId` from a token this process just minted itself.
       'apps/api/src/routes/auth.routes.ts': 1,
+      // `apps/api/src/middleware/security.ts` was here: `refreshLimiterKey`
+      // decoded `sub` off the PRESENTED refresh token to pick a rate-limit
+      // bucket, on the argument that a bucket is not a capability. True for
+      // capability, wrong for rate limiting — an unverified `sub` lets the
+      // CALLER choose the partition, so N forged tokens buy N independent
+      // budgets. It verifies now, and unverifiable tokens share `anon`.
     });
   });
 });

@@ -111,6 +111,24 @@ let refreshInFlight: Promise<string | null> | null = null;
  */
 const COOKIE_ROTATED = 'cookie-rotated';
 
+/**
+ * A refresh the server THROTTLED, as opposed to one it rejected.
+ *
+ * 429 and 401 are opposite facts about a session — one says "slow down", the
+ * other says "you are signed out" — and `if (!res.ok) return null` collapsed
+ * them into the second. The consequence was not cosmetic: on a 429,
+ * `checkAuth` cleared `accessToken` AND `refreshToken` from localStorage,
+ * and on the iOS PWA that store holds the only copy of the refresh token.
+ * A transient throttle after a deploy therefore signed the user out
+ * permanently, with nothing to recover from.
+ */
+export class RefreshThrottledError extends Error {
+  constructor() {
+    super('Refresh was rate-limited');
+    this.name = 'RefreshThrottledError';
+  }
+}
+
 export function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
 
@@ -129,6 +147,7 @@ export function refreshAccessToken(): Promise<string | null> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
       });
+      if (res.status === 429) throw new RefreshThrottledError();
       if (!res.ok) return null;
       const json = await res.json();
       if (json?.success && json.data) {
@@ -149,7 +168,11 @@ export function refreshAccessToken(): Promise<string | null> {
         return json.data.accessToken ?? (json.data.refreshed ? COOKIE_ROTATED : null);
       }
       return null;
-    } catch {
+    } catch (error) {
+      // A throttle is not a network error — it must reach the caller, or the
+      // blanket `return null` here re-collapses 429 into "signed out" and the
+      // credential clear in auth.tsx fires anyway.
+      if (error instanceof RefreshThrottledError) throw error;
       return null;
     }
   })().finally(() => {
@@ -157,6 +180,84 @@ export function refreshAccessToken(): Promise<string | null> {
   });
 
   return refreshInFlight;
+}
+
+/**
+ * What a refresh attempt actually established about the session.
+ *
+ * Three outcomes, not two. `refreshAccessToken()` answers `string | null`,
+ * and callers read `null` as "signed out" — which is right for a 401 and
+ * wrong for a 429. Collapsing them is what let a rate-limited refresh trigger
+ * the credential wipe below.
+ */
+export type RefreshOutcome = 'refreshed' | 'rejected' | 'throttled';
+
+/** Run a refresh and name what it proved. */
+export async function refreshSession(): Promise<RefreshOutcome> {
+  try {
+    return (await refreshAccessToken()) !== null ? 'refreshed' : 'rejected';
+  } catch (error) {
+    if (error instanceof RefreshThrottledError) return 'throttled';
+    return 'rejected';
+  }
+}
+
+/**
+ * Drop the locally stored session.
+ *
+ * Called ONLY for a 'rejected' outcome. On the iOS PWA `refreshToken` in
+ * localStorage is the only copy there is — the httpOnly cookie is unreliable
+ * for installed PWAs — so this is not a cache eviction, it is the end of the
+ * session, and it must never be the answer to back-pressure.
+ */
+export function clearStoredSession(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+}
+
+/**
+ * How a throttled refresh is waited out before the caller gives up.
+ *
+ * Preserving the credential is only half an answer: on the mount path the
+ * provider stays unauthenticated, `isLoading` goes false, and the redirect
+ * effect routes to /login anyway — so the user still sees a password prompt
+ * while holding a perfectly good session. `checkAuth` runs ONCE, guarded by a
+ * ref, so "the next request retries" was not true there; nothing
+ * re-exercised the surviving token. These retries happen INSIDE checkAuth, so
+ * `isLoading` stays true throughout and the redirect never fires.
+ *
+ * ONE retry, and it is deliberately not a recovery from a real throttle.
+ *
+ * Both buckets it waits on are FIXED 15-minute windows backed by a
+ * rate-limit-redis counter, so once a caller is over the cap every request
+ * for the rest of the window 429s. No ladder short enough to sit inside
+ * `checkAuth` can cross that boundary; a longer one would just be a longer
+ * spinner that ends on the same login screen, two requests deeper into the
+ * IP-wide cap. What this single retry buys is the case it can actually win —
+ * a request that lands on the wrong side of a window boundary, or loses a
+ * moment of Redis contention.
+ *
+ * The real recovery from a genuine throttle is that the CREDENTIAL SURVIVES:
+ * `clearStoredSession` is never called on this outcome, so a reload once the
+ * window turns over signs the user back in without a password. Making that
+ * automatic — re-checking on focus or `visibilitychange` rather than only on
+ * mount — is the durable fix and is deliberately not in this PR; see Ruling
+ * P2-B2-7.
+ */
+export const THROTTLE_RETRY_DELAYS_MS = [1_500] as const;
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+/** Refresh, waiting out a throttle rather than reporting it as a sign-out. */
+export async function refreshSessionWaitingOutThrottle(): Promise<RefreshOutcome> {
+  let outcome = await refreshSession();
+  for (const delay of THROTTLE_RETRY_DELAYS_MS) {
+    if (outcome !== 'throttled') break;
+    await sleep(delay);
+    outcome = await refreshSession();
+  }
+  return outcome;
 }
 
 /**
@@ -221,7 +322,17 @@ export async function apiRequest<T = unknown>(
       !endpoint.startsWith('/auth/') &&
       typeof window !== 'undefined'
     ) {
-      const newToken = await refreshAccessToken();
+      // A throttled refresh is not a failed one, but there is nothing this
+      // call site can do with that distinction beyond NOT retrying: the
+      // original 401 is returned and the session is left intact. The one
+      // caller that must know is checkAuth, which would otherwise discard the
+      // stored credentials — see auth.tsx.
+      let newToken: string | null = null;
+      try {
+        newToken = await refreshAccessToken();
+      } catch (error) {
+        if (!(error instanceof RefreshThrottledError)) throw error;
+      }
       if (newToken) {
         response = await fetch(url, {
           ...options,
@@ -331,7 +442,12 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   // Same transparent refresh-on-401 as apiRequest — keeps file downloads /
   // invoice HTML working after the short-lived access token expires.
   if (response.status === 401 && !endpoint.startsWith('/auth/') && typeof window !== 'undefined') {
-    const newToken = await refreshAccessToken();
+    let newToken: string | null = null;
+    try {
+      newToken = await refreshAccessToken();
+    } catch (error) {
+      if (!(error instanceof RefreshThrottledError)) throw error;
+    }
     if (newToken) {
       response = await fetch(url, {
         ...options,

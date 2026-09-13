@@ -54,6 +54,10 @@ export function workspaceAliases(root: string): Record<string, string> {
     '@api': path.resolve(root, './apps/api/src'),
     '@web': path.resolve(root, './apps/web/src'),
     '@admin': path.resolve(root, './apps/admin/src'),
+    // orders is the third deployed frontend. It had no alias, which is a
+    // large part of why it had no tests — and why a client-side auth fix
+    // landed on two of three surfaces and looked complete.
+    '@orders': path.resolve(root, './apps/orders/src'),
     '@database': path.resolve(root, './packages/database'),
     '@shared': path.resolve(root, './packages/shared'),
   };

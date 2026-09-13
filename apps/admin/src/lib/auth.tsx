@@ -10,7 +10,12 @@ import {
   ReactNode,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getApiUrl, refreshAccessToken } from './api';
+import {
+  getApiUrl,
+  refreshSession,
+  refreshSessionWaitingOutThrottle,
+  clearStoredSession,
+} from './api';
 import { isIosWebkit, safeInternalPath } from '@force/shared';
 
 interface User {
@@ -68,13 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined' && isIosWebkit() && !localStorage.getItem('refreshToken')) {
       return false;
     }
-    try {
-      const newAccessToken = await refreshAccessToken();
-      return newAccessToken !== null;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      return false;
-    }
+    // The context's own contract stays boolean — only 'refreshed' is a
+    // success. checkAuth needs the third outcome and calls refreshSession()
+    // directly.
+    return (await refreshSession()) === 'refreshed';
   }, []);
 
   const checkAuth = useCallback(async () => {
@@ -101,8 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // refreshToken() delegates to the same single-flight in api.ts so
         // this path and any concurrent apiRequest 401-retries share ONE
         // rotation instead of racing and tripping reuse-detection.
-        const refreshed = await refreshToken();
-        if (refreshed) {
+        const outcome = await refreshSessionWaitingOutThrottle();
+        if (outcome === 'refreshed') {
           // Re-verify with the new access token to populate user state.
           const newAccessToken =
             typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -116,13 +118,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const retryData = await retryResponse.json();
             setUser(retryData.data.user);
           } else {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
+            clearStoredSession();
           }
-        } else {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+        } else if (outcome === 'rejected') {
+          clearStoredSession();
         }
+        // Still 'throttled' after the retries above: leave the credential
+        // alone. The server said "slow down", not "you are signed out", and
+        // discarding the stored refresh token on that answer is unrecoverable
+        // on the iOS PWA where it is the only copy. The user lands on /login,
+        // but the token survives, so a reload recovers without a password.
       }
     } catch (error) {
       console.error('Auth check failed:', error);

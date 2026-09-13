@@ -210,7 +210,6 @@ describe('restrictPlatformOnlyOrigins — the storefront must keep working', () 
     ['/api/v1/stores/public/store-1/shipping/area-rates', 'CheckoutClient — area rates'],
     ['/api/v1/stores/public/store-1/coupons/validate', 'CheckoutClient + CartClient'],
     ['/api/v1/stores/public/store-1/promotions/preview', 'CheckoutClient'],
-    ['/api/v1/stores/store-1/blog/my-post', 'BlogPostBody.tsx'],
     ['/api/v1/stores/store-1/orders/order-1/timeline', 'lib/api.ts — order tracking'],
     ['/api/v1/stores/store-1/returns', 'ReturnsClient.tsx'],
     ['/api/v1/stores/store-1/reviews', 'ReviewSection.tsx — submit'],
@@ -333,6 +332,10 @@ describe('restrictPlatformOnlyOrigins — the storefront must keep working', () 
         'lib/api.ts getStoreProducts/getStoreProduct — admin-only, zero callers',
       ],
       [/^\/stores\/x$/, 'lib/store-resolver.ts getStoreById — server-side, sends no Origin'],
+      [
+        /^\/stores\/x\/blog\/x$/,
+        'BlogPostBody.tsx fetchPost is a server-side fetch (no credentials, no Origin) and the route it named is the ADMIN single-post read; it now calls /public/:storeId/blog/:slug',
+      ],
     ];
     const unexpected = denied.filter(
       d => !KNOWN_NON_STOREFRONT.some(([re]) => re.test(d.split('  ')[0]))
@@ -341,6 +344,70 @@ describe('restrictPlatformOnlyOrigins — the storefront must keep working', () 
       unexpected,
       'these storefront calls are BLOCKED by the origin gate and would 403 on every merchant custom domain — add them to STOREFRONT_ALLOWED_STORE_PATHS, move them under /stores/public/, or list them in KNOWN_NON_STOREFRONT with a reason'
     ).toEqual([]);
+  });
+});
+
+/**
+ * The allow-list is read from the RAW path as well as the normalized one.
+ *
+ * `normalizePlatformGatePath` percent-decodes, and its own doc argued that was
+ * safe because decoding "can only ever make MORE paths match the deny list".
+ * That argument died when an allow-list started reading the same string:
+ * there, decoding makes more paths match a PERMISSION. These cases are the
+ * negative control for that — every one of them decodes into a shape the
+ * storefront allow-list accepts, and every one must still be refused.
+ */
+describe('restrictPlatformOnlyOrigins — an encoded path cannot buy a permission', () => {
+  it.each([
+    ['/api/v1/stores/%70ublic/store-1/shipping', 'percent-encoded p in `public`'],
+    ['/api/v1/stores/%2570ublic/store-1/shipping', 'double-encoded p in `public`'],
+    ['/api/v1/stores/pub%6cic/store-1/coupons', 'percent-encoded l in `public`'],
+    ['/api/v1/stores/public/%2e%2e/store-1/customers', 'encoded .. traversal out of /public/'],
+    ['/api/v1/stores/public/../store-1/customers', 'literal .. traversal out of /public/'],
+    ['/api/v1/stores/store-1/%72eviews', 'percent-encoded r in `reviews`'],
+  ])('denies %s (%s)', path => {
+    const req = makeReq(MERCHANT_ORIGIN, path);
+    const res = makeRes();
+    const next = vi.fn();
+
+    restrictPlatformOnlyOrigins(req, res, next);
+
+    expect(
+      next,
+      `${path} was ALLOWED — decoding must never grant a permission`
+    ).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+    expect(res.body?.error?.code).toBe('ORIGIN_NOT_PERMITTED');
+  });
+
+  it('denies the ADMIN blog read a storefront caller never made', () => {
+    // `/stores/:storeId/blog/:postId` is authenticate + authorize(store_admin,
+    // super_admin, staff) + requireStoreAccess — the single-post read that
+    // returns DRAFTS. It sat in the allow-list on the strength of
+    // BlogPostBody.tsx, a server-side fetch that sends no Origin and so never
+    // reaches this gate; it was also calling the wrong endpoint and getting a
+    // 401. Allowing it bought a merchant origin a credentialed cross-origin
+    // read of another tenant's unpublished posts.
+    const req = makeReq(MERCHANT_ORIGIN, '/api/v1/stores/store-1/blog/post-1');
+    const res = makeRes();
+    const next = vi.fn();
+
+    restrictPlatformOnlyOrigins(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('still allows the unencoded storefront call the encoded ones imitate', () => {
+    // The positive control. Without it a gate that denied everything would
+    // pass every case above while being useless.
+    const req = makeReq(MERCHANT_ORIGIN, '/api/v1/stores/public/store-1/shipping');
+    const res = makeRes();
+    const next = vi.fn();
+
+    restrictPlatformOnlyOrigins(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
   });
 });
 

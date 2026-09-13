@@ -187,6 +187,7 @@ app.use(
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
 import { corsDomainCache, CORS_CACHE_TTL_MS, isPlatformOrigin } from './lib/cors-cache';
 import { buildIdentity } from './lib/build-identity';
+import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 
 /**
  * A cross-origin request from an origin we don't recognise is a CLIENT
@@ -349,31 +350,7 @@ app.use(
     //        via the auth middleware's `authLimiter` 5-attempts-per-15min
     //      - polling endpoints don't trigger expensive work (Gemini calls
     //        happen inside Inngest, not in the GET handler)
-    skip: req => {
-      // Bypass 0: test environment. Integration test suites issue many
-      // POST/PUT/DELETE mutations in a short window; the global mutation cap
-      // would fire mid-suite and cascade all subsequent tests to 429. The
-      // per-endpoint authLimiter already skips for test env — the global
-      // limiter follows the same convention.
-      if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') return true;
-      // Bypass 1: load test
-      const expected = process.env.LOAD_TEST_BYPASS_TOKEN;
-      if (expected) {
-        const provided = req.header('x-load-test-token');
-        if (provided && provided === expected) return true;
-      }
-      // Bypass 2: safe-method reads. Legitimate clients (admin merchant
-      // sessions, storefront customers) issue many GETs per page load;
-      // 100+/15min is normal for normal use. Per-endpoint limiters
-      // (publicLimiter etc.) still cover targeted hotspots. Mutations
-      // (POST/PUT/PATCH/DELETE) below the bypass remain limited at 200/
-      // 15min — that's the abuse-blocking surface.
-      const method = req.method.toUpperCase();
-      if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
-        return true;
-      }
-      return false;
-    },
+    skip: skipGlobalRateLimit,
   })
 );
 

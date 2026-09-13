@@ -49,6 +49,8 @@ vi.mock('@force/database', () => ({
 
 vi.mock('@api/middleware/security', () => ({
   authLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  refreshLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  refreshIpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   auditLog: vi.fn(),
   generateCsrfToken: vi.fn(() => 'csrf'),
 }));
