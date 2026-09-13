@@ -179,6 +179,74 @@ describe('sitemap fan-out', () => {
       expect.objectContaining({ total: 55_001 })
     );
   });
+
+  /**
+   * The starvation case the 5000-store test above could never reach.
+   *
+   * It uses `productCounts: {}` — every store emits exactly its 11 static
+   * pages — so the clamp cuts a uniform list and every store looks equally
+   * treated. The real cliff needs PRODUCT-BEARING stores: each emits up to
+   * 11 + 300 URLs, so ~161 of them consume the whole 50,000 budget, and with a
+   * store-by-store build every store after that was emitted with ZERO URLs —
+   * not "their 11 static pages still get indexed", which is what the code
+   * comment and the GSC runbook both promised.
+   */
+  it('keeps every store’s static pages when product-bearing stores fill the budget', async () => {
+    hostRef.host = 'store.test';
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // 200 stores get the product fan-out (MAX_STORES_WITH_PRODUCTS), each with
+    // a full 300-product catalog: 200 x 311 = 62,200 URLs before the other
+    // stores are considered at all.
+    const stores = Array.from({ length: 400 }, (_, i) => ({
+      id: `store-${i}`,
+      slug: `slug-${i}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, i)).toISOString(),
+    }));
+    const productCounts: Record<string, number> = {};
+    for (const st of stores) productCounts[st.id] = 300;
+    installFetchMock({ tenant: null, stores, productCounts });
+
+    const entries = await sitemap();
+    expect(entries).toHaveLength(50_000);
+
+    // THE ASSERTION. Every store must still appear — its home page is the
+    // first of the 11 static pages, so its absence means the store contributed
+    // nothing at all.
+    const urls = new Set(entries.map(e => e.url));
+    const missing = stores.filter(st => !urls.has(`https://store.test/${st.slug}`));
+    expect(
+      missing.map(st => st.slug).slice(0, 5),
+      `${missing.length} of ${stores.length} stores vanished from the master sitemap entirely`
+    ).toEqual([]);
+  });
+
+  it('reports how many stores were fully dropped, not just a total', async () => {
+    // A total alone says truncation happened; it does not say anyone vanished.
+    // With static pages emitted first, a store is fully dropped only once even
+    // the cheap 11-per-store pass overflows — the point past which sharding is
+    // the real answer, and an operator has to be able to see it coming.
+    hostRef.host = 'store.test';
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stores = Array.from({ length: 5000 }, (_, i) => ({
+      id: `store-${i}`,
+      slug: `slug-${i}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, i)).toISOString(),
+    }));
+    installFetchMock({ tenant: null, stores, productCounts: {} });
+
+    await sitemap();
+
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('50k-URL protocol limit'),
+      expect.objectContaining({ storesFullyDropped: expect.any(Number) })
+    );
+    const payload = error.mock.calls.at(-1)?.[1] as { storesFullyDropped: number };
+    // 5000 stores x 11 = 55,000 static URLs + 1 apex; the budget fits 4545
+    // whole stores, so 455 get nothing.
+    expect(payload.storesFullyDropped).toBeGreaterThan(0);
+  });
 });
 
 /**

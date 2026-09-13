@@ -264,8 +264,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // it and the `apex` fallback below is declared too late to save it. Cap the
   // per-render fan-out and emit the remaining stores with their static pages
   // only (their 11 static pages still get indexed; their catalogs don't
-  // contribute product URLs to this render). Chunked rather than one
-  // Promise.all so we also stop opening 200 sockets at once against the API.
+  // contribute product URLs to this render) — a promise the 50k clamp used to
+  // break, because it cut the tail of a store-by-store list and starved every
+  // store past the budget of everything. Static pages are emitted in their own
+  // pass now, so this is true again. Chunked rather than one Promise.all so we
+  // also stop opening 200 sockets at once against the API.
   //
   // Subrequest budget (worst case): 50 store-list pages + 1 host resolve +
   // 200 stores x (3 product pages + 1 unpaginated bundle-list request) =
@@ -319,18 +322,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     productResults.push({ store, products: [], bundles: [] });
   }
 
-  const perTenant: MetadataRoute.Sitemap = [];
-  for (const { store, products, bundles } of productResults) {
+  // TWO passes, not one interleaved pass.
+  //
+  // The 50k clamp below cuts the TAIL, and `perTenant` used to be built
+  // store-by-store — all of one store's URLs, then all of the next's. A
+  // product-bearing store emits up to 11 static + 300 product + bundle URLs,
+  // so ~161 full-catalog stores consume the entire 50,000 budget on their own
+  // and every store after them is emitted with ZERO URLs. Not "their 11 static
+  // pages still get indexed", which is what the comment above and the GSC
+  // runbook both promised: newer tenants vanish from the master sitemap
+  // outright rather than degrading to static-page-only coverage.
+  //
+  // Static pages first for EVERY store — that pass is cheap and bounded at
+  // 11 x N, so it cannot starve anyone — then product and bundle URLs until
+  // the budget runs out. Now only catalog DEPTH degrades, which is the
+  // behaviour that was documented all along.
+  const staticPages: MetadataRoute.Sitemap = [];
+  const catalogPages: MetadataRoute.Sitemap = [];
+  for (const { store } of productResults) {
     for (const page of STORE_STATIC_PAGES) {
-      perTenant.push({
+      staticPages.push({
         url: `${siteUrl}/${store.slug}${page.path}`,
         lastModified: now,
         changeFrequency: page.freq,
         priority: page.priority,
       });
     }
+  }
+  for (const { store, products, bundles } of productResults) {
     for (const product of products) {
-      perTenant.push({
+      catalogPages.push({
         url: `${siteUrl}/${store.slug}/products/${product.slug}`,
         lastModified: product.updatedAt
           ? new Date(product.updatedAt)
@@ -344,7 +365,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Same gating as the tenant branch above: `/bundles` only listed when
     // this store actually has purchasable bundles.
     if (bundles.length > 0) {
-      perTenant.push({
+      catalogPages.push({
         url: `${siteUrl}/${store.slug}/bundles`,
         lastModified: now,
         changeFrequency: 'weekly',
@@ -352,7 +373,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
     for (const bundle of bundles) {
-      perTenant.push({
+      catalogPages.push({
         url: `${siteUrl}/${store.slug}/bundles/${bundle.slug}`,
         lastModified: now,
         changeFrequency: 'weekly',
@@ -360,6 +381,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
   }
+
+  const perTenant: MetadataRoute.Sitemap = [...staticPages, ...catalogPages];
 
   // Sitemap protocol hard limit: 50,000 URLs per file (sitemaps.org) —
   // past it Google reports an error and processes at most the first 50k.
@@ -375,10 +398,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const SITEMAP_URL_LIMIT = 50_000;
   const entries = [...apex, ...perTenant];
   if (entries.length > SITEMAP_URL_LIMIT) {
+    // Report how many stores got NOTHING, not just the total.
+    //
+    // A total alone tells an operator that truncation happened; it does not
+    // tell them anyone vanished. With static pages emitted first, a store is
+    // fully dropped only once even the cheap 11-per-store pass overflows —
+    // which is the point past which the sitemap genuinely cannot represent the
+    // platform and sharding is the real answer.
+    const staticBudget = Math.max(0, SITEMAP_URL_LIMIT - apex.length);
+    const storesFullyDropped = Math.max(
+      0,
+      productResults.length - Math.floor(staticBudget / STORE_STATIC_PAGES.length)
+    );
     console.error('sitemap: master sitemap exceeds the 50k-URL protocol limit — truncating', {
       total: entries.length,
       emitted: SITEMAP_URL_LIMIT,
       stores: stores.length,
+      storesFullyDropped,
+      catalogUrlsDropped: Math.min(catalogPages.length, entries.length - SITEMAP_URL_LIMIT),
     });
     return entries.slice(0, SITEMAP_URL_LIMIT);
   }

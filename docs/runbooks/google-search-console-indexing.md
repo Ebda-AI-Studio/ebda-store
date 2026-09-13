@@ -53,9 +53,25 @@ No changes to the sitemap/robots.txt/structured-data guidance above are needed f
 >   The drop logs `sitemap: product fan-out capped`.
 > - **The master sitemap hard-clamps at 50,000 URLs** (sitemaps.org protocol
 >   limit — Google rejects/truncates anything larger). Hitting the clamp logs
->   `sitemap: master sitemap exceeds the 50k-URL protocol limit`. Reaching it
->   takes ~4,500 stores; the fix at that scale is sharding — but NOT via
->   Next's `generateSitemaps()`, which remaps the route to `/sitemap/[id].xml`
+>   `sitemap: master sitemap exceeds the 50k-URL protocol limit`, with
+>   `storesFullyDropped` and `catalogUrlsDropped` in the payload.
+> - **What the clamp drops, and in what order.** Every store's 11 static pages
+>   are emitted FIRST, in one bounded pass; product and bundle URLs are
+>   appended after. So the clamp degrades catalog DEPTH — the last stores in
+>   the fan-out lose product URLs — and no store loses its static pages until
+>   even the 11-per-store pass overflows, which takes ~4,500 stores.
+>
+>   This was NOT true before 2026-09-13. The list was built store-by-store and
+>   the clamp cut the tail, so ~161 full-catalog stores (11 + 300 URLs each)
+>   consumed the entire budget and every store after them was emitted with
+>   ZERO URLs — vanishing from the master sitemap outright rather than
+>   degrading to static-page-only coverage. Measured on the pre-fix code:
+>   400 stores with full catalogs, **239 of them emitted nothing**. If you are
+>   reading a Worker log from before that date, `total` alone did not tell you
+>   any store had been dropped.
+>
+> - Past ~4,500 stores the fix is sharding — but NOT via Next's
+>   `generateSitemaps()`, which remaps the route to `/sitemap/[id].xml`
 >   and 404s the bare `/sitemap.xml` every merchant has already submitted.
 > - Merchant custom-domain sitemaps are unaffected by the store cap and the
 >   50k clamp (11 static pages + ≤1,000 products).
