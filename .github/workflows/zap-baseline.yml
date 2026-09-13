@@ -31,19 +31,6 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      # Suppression expiry lives HERE, not in tests/unit. In the PR-blocking
-      # suite it would mean that on a review-by date every unrelated pull
-      # request — a hotfix included — fails CI on a ZAP suppression, with no
-      # way to tell "this PR broke something" from "a calendar date passed".
-      # Nightly, it alerts through the same Telegram path as a scan failure and
-      # blocks nobody. The deterministic half (every IGNORE HAS a date) stays
-      # PR-blocking in tests/unit/zap-rules-have-review-dates.test.ts.
-      #
-      # No `npm ci`: the script is dependency-free node, and installing the
-      # workspace here would add ~4 minutes to a job that scans a URL.
-      - name: Check ZAP suppressions have not expired
-        run: node scripts/check-zap-review-dates.mjs
-
       - name: ZAP Baseline Scan
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
@@ -81,6 +68,42 @@ jobs:
       # it — so with issue writing off, "the report is still an artifact" was
       # an assumption, not a guarantee. `if: always()` because the run we most
       # want the report from is the failing one.
+      # Suppression expiry runs AFTER the scan, and this ordering is the whole
+      # point.
+      #
+      # It used to run FIRST, and on 2026-09-12 it stopped the DAST entirely
+      # for two consecutive nights — not because a date had lapsed, but because
+      # the step invoked `node` and this job never installs it. `node: command
+      # not found`, exit 127, and the scan never started. A security gate was
+      # silently off and the only signal was a red workflow that read like a
+      # scan finding. That is audit-followup #1754/#1749 exactly: an expiry
+      # check placed before the scan makes ANY failure in it — a lapsed date, a
+      # missing runtime, a typo — suppress the thing it is supposed to
+      # annotate.
+      #
+      # `if: always()` so a failing scan does not skip the expiry report, and a
+      # failing expiry report does not hide the scan's own verdict. Both gate
+      # the job; neither gates the other.
+      #
+      # `setup-node` because the runner does not carry one. No `npm ci`: the
+      # script is dependency-free, and installing the workspace here would add
+      # ~4 minutes to a job that scans a URL.
+      #
+      # It lives here rather than in tests/unit because in the PR-blocking
+      # suite a review-by date would fail every unrelated pull request — a
+      # hotfix included — with no way to tell "this PR broke something" from "a
+      # calendar date passed". The deterministic half (every IGNORE HAS a date)
+      # stays PR-blocking in tests/unit/zap-rules-have-review-dates.test.ts.
+      - name: Set up Node for the suppression-expiry check
+        if: always()
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
+      - name: Check ZAP suppressions have not expired
+        if: always()
+        run: node scripts/check-zap-review-dates.mjs
+
       - name: Upload ZAP report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
