@@ -636,3 +636,56 @@ Cost if wrong: the gate is scoped to `OrderService.create`, bounded at the next
 its own body — is invisible to it. `DELIBERATELY_GENERIC` is empty today, and
 an entry added there without a real reason would silence the gate for that code
 permanently.
+**Ruling P2-B8-1 — the other nine files answering with a bare-string error are
+registered, not swept.**
+
+`admin.routes.ts` is cleaned up: its six responses now use the platform
+envelope, which is what made the webhook force-replay escape hatch work again
+after four reports of it being dead (#553, #557, #582, #617).
+
+The other route files that answer `{ error: '<code>' }` are NOT changed, and
+the difference matters:
+
+`wa-bridge.routes.ts` answers an EXTERNAL consumer. The WhatsApp bridge's
+parser is not in this repository, so changing the shape breaks a client this
+repo cannot deploy alongside. That is recorded as deliberate.
+
+Nine more — `alert-webhooks`, `backorders`, `expenses`, `finance`, `insights`,
+`purchase-orders`, `smart-layer`, `stock-adjustments`, `suppliers` — share a
+DIFFERENT convention: a flat lower-case discriminant (`{ error: 'not_found' }`,
+`{ error: 'validation_failed', details }`) that their own admin pages read as a
+string rather than through `data.error.code`. That is self-consistent, so it is
+not the defect this batch is about. It IS a second error envelope on one
+platform, and nobody has decided whether the two should converge — so it goes
+on the unreviewed list rather than being swept. Changing a shape a page already
+reads correctly would be the mirror failure: a gate breaking working code.
+
+The gate's first version made exactly that mistake twice. It reported
+`bundle.routes.ts`, whose only match is inside a COMMENT documenting its
+deliberate flat body — a file already doing the right thing and explaining why.
+It now strips comments before matching.
+
+Cost if wrong: two envelopes remain on the platform, and a new client written
+against the object shape will read `undefined` from any of those nine routes.
+The registry is what makes that a decision someone takes rather than a surprise
+someone debugs — but it does not force the convergence, and until it happens
+the answer to "what shape does this API return?" is "it depends which router".
+
+**Ruling P2-B8-2 — four of this batch's findings are one defect, and the gate
+is the actual deliverable.**
+
+#553, #557, #582 and #617 are four separate audit reports of one mechanism:
+`error` as a string where the client reads `.code`. Each named one route. The
+feature they killed — a super-admin deliberately re-firing an already-processed
+payment webhook — was dead from the day it shipped, and it failed SAFE (it
+blocked re-processing rather than double-applying), which is why it survived
+four reports without anyone looking at the shape rather than the symptom.
+
+Fixing six lines would close four issues and leave the class exactly as
+findable as before, which is to say not at all. The registry is what changes
+that: a new route answering with a bare string now fails a test until someone
+writes down which convention it belongs to.
+
+Cost if wrong: the registry matches on source text, so a response built through
+a helper or spread from a variable is invisible to it. It catches the shape
+that has actually recurred four times, not every shape that could.

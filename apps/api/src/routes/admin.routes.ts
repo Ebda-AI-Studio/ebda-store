@@ -1724,7 +1724,10 @@ router.post(
     try {
       const parsed = impersonateSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: 'INVALID_INPUT', message: 'userId must be a valid UUID' });
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'userId must be a valid UUID' },
+        });
         return;
       }
       const { userId } = parsed.data;
@@ -1745,22 +1748,26 @@ router.post(
       });
 
       if (!target) {
-        res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'User not found' },
+        });
         return;
       }
 
       if (target.deletedAt !== null) {
-        res
-          .status(410)
-          .json({ error: 'USER_DELETED', message: 'Cannot impersonate a deleted user' });
+        res.status(410).json({
+          success: false,
+          error: { code: 'USER_DELETED', message: 'Cannot impersonate a deleted user' },
+        });
         return;
       }
 
       // Prevent impersonating another super_admin (principle of least privilege)
       if (target.role === 'super_admin') {
         res.status(403).json({
-          error: 'FORBIDDEN',
-          message: 'Cannot impersonate another super_admin',
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Cannot impersonate another super_admin' },
         });
         return;
       }
@@ -1901,7 +1908,10 @@ router.post(
         })
       );
       if (!row) {
-        res.status(404).json({ success: false, error: 'WEBHOOK_EVENT_NOT_FOUND' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'WEBHOOK_EVENT_NOT_FOUND', message: 'Webhook event not found' },
+        });
         return;
       }
       // Money-path guard: replaying an already-`processed` webhook re-fires the
@@ -1912,8 +1922,10 @@ router.post(
       if (row.status === 'processed' && !force) {
         res.status(409).json({
           success: false,
-          error: 'WEBHOOK_ALREADY_PROCESSED',
-          message: 'This webhook is already processed. Re-send force:true to replay it anyway.',
+          error: {
+            code: 'WEBHOOK_ALREADY_PROCESSED',
+            message: 'This webhook is already processed. Re-send force:true to replay it anyway.',
+          },
         });
         return;
       }
