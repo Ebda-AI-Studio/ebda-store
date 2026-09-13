@@ -59,6 +59,25 @@ export function checkoutBundleErrorCopy(
         );
   }
 
+  if (code === 'BUNDLE_PRICE_NOT_ALLOCATABLE') {
+    // The bundle's fixed price can no longer be split exactly across its
+    // components — a component's price moved after the bundle was priced. The
+    // server's own message ends "Please try again", which is the one thing
+    // that cannot work: the allocation will fail identically until the
+    // merchant re-prices the bundle. The recovering action is to remove it.
+    const match = /^"(.+)" can no longer be priced/.exec(rawMessage ?? '');
+    const name = match?.[1];
+    return name
+      ? t(
+          `"${name}" can no longer be priced correctly. Please remove it from your cart to continue.`,
+          `"${name}" لم يعد من الممكن تسعيرها بشكل صحيح. يرجى إزالتها من سلتك للمتابعة.`
+        )
+      : t(
+          'One of the bundles in your cart can no longer be priced correctly. Please remove it from your cart to continue.',
+          'إحدى الباقات في سلتك لم يعد من الممكن تسعيرها بشكل صحيح. يرجى إزالتها من سلتك للمتابعة.'
+        );
+  }
+
   if (code === 'INSUFFICIENT_INVENTORY') {
     // A plain product's INSUFFICIENT_INVENTORY message never contains
     // "component of" — only a bundle-component shortfall does (see the

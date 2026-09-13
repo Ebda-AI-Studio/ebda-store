@@ -94,3 +94,56 @@ describe('productUnavailableCopy', () => {
     expect(copy).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
   });
 });
+
+/**
+ * Naming the lines is the difference between "remove something" and "remove
+ * this". Without it a six-item cart is guess-and-check: remove a line, re-enter
+ * checkout, meet the same refusal, repeat.
+ */
+describe('productUnavailableCopy — naming the offending lines', () => {
+  it('names the item when the caller resolved it', () => {
+    const copy = productUnavailableCopy(t, 1, ['Blue Kaftan']);
+    expect(copy).toMatch(/Blue Kaftan/);
+    expect(copy).toMatch(/Remove:/);
+  });
+
+  it('lists several, separated', () => {
+    const copy = productUnavailableCopy(t, 2, ['Blue Kaftan', 'Gold Abaya']);
+    expect(copy).toMatch(/Blue Kaftan/);
+    expect(copy).toMatch(/Gold Abaya/);
+    expect(copy).toMatch(/Remove:/);
+  });
+
+  it('says "Including" — not "Remove" — when the list is PARTIAL', () => {
+    // The load-bearing case. Two lines are gone, one name resolved. Promising
+    // a complete list is worse than not listing: the customer removes the one
+    // named, retries, and meets the identical refusal.
+    const copy = productUnavailableCopy(t, 2, ['Blue Kaftan']);
+    expect(copy).toMatch(/Including:/);
+    expect(copy).not.toMatch(/Remove:/);
+  });
+
+  it('falls back to the plain sentence when nothing resolved', () => {
+    // The pre-existing behaviour, unchanged — an id that does not match a cart
+    // line must not produce a dangling "Remove:" with nothing after it.
+    const copy = productUnavailableCopy(t, 2, []);
+    expect(copy).not.toMatch(/Remove:|Including:/);
+    expect(copy).toMatch(/Some items/);
+  });
+
+  it('drops blank names rather than rendering an empty slot', () => {
+    const copy = productUnavailableCopy(t, 2, ['Blue Kaftan', '   ']);
+    expect(copy).toMatch(/Including:/);
+    expect(copy).not.toMatch(/,\s*$/);
+  });
+
+  it('keeps the Arabic sentence intact and appends the list after it', () => {
+    const copy = productUnavailableCopy(tAr, 1, ['عباية ذهبية']);
+    expect(copy).toMatch(/[؀-ۿ]/);
+    expect(copy).toMatch(/عباية ذهبية/);
+    // The name is appended, never spliced mid-clause — a product name is not
+    // translated, and interpolating one into Arabic copy reads as a
+    // mixed-direction fragment.
+    expect(copy.indexOf('عباية ذهبية')).toBeGreaterThan(copy.indexOf('يرجى'));
+  });
+});

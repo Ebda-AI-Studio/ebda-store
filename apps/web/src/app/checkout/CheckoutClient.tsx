@@ -1268,13 +1268,24 @@ export default function CheckoutClient() {
             code,
             details: details as { productIds?: unknown } | null | undefined,
           });
-          // `goneIds.length` picks singular vs plural copy. The ids themselves
-          // are NOT rendered — a raw UUID means nothing to a shopper. Marking
-          // the specific cart lines needs a per-item `unavailable` flag on the
-          // cart read and a state in CartClient; that is tracked separately and
-          // is not required for the customer to recover, because the copy sends
-          // them to the cart where the line is visible.
-          friendly = productUnavailableCopy(t, goneIds.length);
+          // Resolve the ids to NAMES off the cart we are already holding.
+          //
+          // The ids used to be parsed and dropped — only `length` survived, to
+          // pick singular vs plural. That left a customer with a six-item cart
+          // removing lines by guess-and-check and re-entering checkout after
+          // each one. The cart line for each id is right here, so the message
+          // can say which products rather than making the shopper find them.
+          //
+          // `nameAr` falls back to `name`: a merchant may not have translated
+          // every product, and an empty Arabic name would render as a gap in
+          // the list. `productUnavailableCopy` drops blanks and says "Including"
+          // rather than "Remove" when the list is partial, so a name we cannot
+          // resolve never turns the sentence into a false promise.
+          const goneNames = goneIds
+            .map(id => cart?.items.find(item => item.productId === id)?.product)
+            .filter((prod): prod is NonNullable<typeof prod> => Boolean(prod))
+            .map(prod => (language === 'ar' ? (prod.nameAr ?? prod.name) : prod.name));
+          friendly = productUnavailableCopy(t, goneIds.length, goneNames);
           // Safe now: <CheckoutErrorAlert> renders above BOTH steps, so this
           // message survives the unmount of PaymentStep. Before that it did not.
           setStep(1);
@@ -1284,6 +1295,24 @@ export default function CheckoutClient() {
           friendly = t(
             'The coupon you applied has reached its usage limit. Please remove it and try again.',
             'تم استخدام الكوبون الذي طبّقته بالكامل. يرجى إزالته والمحاولة مرة أخرى.'
+          );
+          break;
+        case 'COUPON_NOT_ELIGIBLE':
+          // `OrderService.create` refuses with this whenever the coupon does
+          // not apply to the cart as the SERVER prices it — which free-shipping
+          // coupons now reach routinely. It fell to `default` ("please try
+          // again"), and retrying refused identically: the coupon was still
+          // applied, still in sessionStorage, and re-applied on every reload.
+          // A deterministic dead-end dressed as a transient failure.
+          //
+          // So remove it here rather than only telling the customer to. The
+          // sessionStorage key is the load-bearing half — without dropping it,
+          // the promo re-applies on the next mount and the next submit fails
+          // the same way.
+          removeCoupon();
+          friendly = t(
+            'This coupon does not apply to the items in your cart, so it has been removed. Please try again.',
+            'هذا الكوبون لا ينطبق على المنتجات في سلتك، لذلك تمت إزالته. يرجى المحاولة مرة أخرى.'
           );
           break;
         case 'MIN_ORDER_NOT_MET':
@@ -1309,6 +1338,19 @@ export default function CheckoutClient() {
             'One of the items in your cart is out of stock. Please review your cart.',
             'أحد المنتجات في سلتك غير متوفر. يرجى مراجعة سلة التسوق.'
           );
+          break;
+        case 'AREA_NOT_DELIVERABLE':
+          // The store prices delivery per area and the selected one matches no
+          // rate, so the order is refused rather than shipped at 0. The
+          // storefront hides unpriced areas, so reaching this means the saved
+          // address predates the merchant's current rates — deterministic
+          // until the customer picks a different area, which is the shipping
+          // step, not this one.
+          friendly = t(
+            'This store does not deliver to the area you selected. Please choose a different area.',
+            'هذا المتجر لا يوصل إلى المنطقة التي اخترتها. يرجى اختيار منطقة أخرى.'
+          );
+          setStep(1);
           break;
         case 'TIMEOUT':
           friendly = t(

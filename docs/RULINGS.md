@@ -572,3 +572,67 @@ PWA, and it is not on the order or payment path. The event-driven re-check is
 deferred because it is a behavioural change to the auth provider in two apps,
 with no jsdom in this repo to render it against — the same constraint recorded
 in Ruling P2-B2-2.
+**Ruling P2-B5-1 — #1408 does not reproduce, and #1765 is answered by naming
+the products rather than by changing the cart contract.**
+
+#1408 asked for a `PRODUCT_NO_LONGER_AVAILABLE` case in the checkout switch.
+That case already exists, with the `setStep(1)` the finding asked for — it
+landed earlier in this same session, in the change that made the refusal
+routine. Verified by executing the coverage gate, not by reading the diff.
+
+#1765 asked for the offending product ids to be carried to `/cart` so the cart
+page can mark those lines. That is the same contract change Ruling P2-B3-2
+deferred: it needs a per-item `unavailable` flag on the cart read, which is a
+public-boundary change whose durable half also moves `itemsSubtotal`.
+
+The customer's actual problem — "I cannot tell which line to remove" — is
+answered without any of that. The ids arrive in `details.productIds`, and the
+cart the checkout is already holding has the matching lines, so the message
+names the products. A six-item cart stops being guess-and-check.
+
+Two things make that safe to say in copy. Names are APPENDED as a trailing
+clause rather than interpolated mid-sentence, because a product name is not
+translated and splicing one into Arabic copy reads as a mixed-direction
+fragment. And when only some ids resolve, the label is "Including:" rather than
+"Remove:" — claiming a complete list when it is partial is worse than not
+listing at all, because the customer removes what is named, retries, and meets
+the identical refusal.
+
+Cost if wrong: the cart page still renders a dead line like any other, so a
+customer who navigates there without reading the checkout message has no
+marker. That is the state before this change, and P2-B3-2 still owns it.
+
+**Ruling P2-B5-2 — the checkout error switch gets an enumeration gate, because
+it has now missed an API error code three times.**
+
+`PRODUCT_NO_LONGER_AVAILABLE` (#1408), `COUPON_NOT_ELIGIBLE` (#1369), and the
+opaque Prisma error the first of those replaced: three reports, one mechanism.
+The API gains a code, the switch does not, and the shopper is told to retry a
+refusal that is deterministic. Each fix mapped its own code and left the next
+one to be found by a customer.
+
+`tests/unit/checkout-error-code-coverage.test.ts` derives the codes
+`OrderService.create` can throw from the source and requires each to be either
+answered or named as deliberately generic. Writing it immediately found two
+more nobody had reported — `AREA_NOT_DELIVERABLE` and
+`BUNDLE_PRICE_NOT_ALLOCATABLE`, both deterministic, both landing on "please try
+again". `BUNDLE_PRICE_NOT_ALLOCATABLE` is the sharper one: the SERVER's own
+message ends "Please try again", so the shopper was told the same useless thing
+twice.
+
+The gate's first version also produced a FALSE POSITIVE — it reported
+`BUNDLE_NOT_PURCHASABLE` as unanswered because that code is handled by
+`checkoutBundleErrorCopy`, which runs before the switch and returns early. A
+gate that fails good work gets deleted rather than fixed, so it now reads both
+handlers.
+
+It asserts on source text and says so in its own header. It proves the case
+EXISTS, not that it renders; what the copy says is asserted in the two copy
+suites, and that the message survives the step change is asserted in
+`checkout-error-alert-renders.test.tsx`.
+
+Cost if wrong: the gate is scoped to `OrderService.create`, bounded at the next
+`static async`. A code thrown by a helper that method calls — rather than in
+its own body — is invisible to it. `DELIBERATELY_GENERIC` is empty today, and
+an entry added there without a real reason would silence the gate for that code
+permanently.
