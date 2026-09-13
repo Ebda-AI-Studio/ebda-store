@@ -505,10 +505,10 @@
       "id": "session-rotation-grace-budget",
       "domain": "authn / session",
       "tier": "unit",
-      "why": "a rotated token's grace uses stop being spent — one stolen token replays in a loop, minting a session every pass",
+      "why": "a rotated token's grace uses stop being spent — the claim is faked instead of written, so one stolen token replays in a loop for the whole window, minting a separate full-length session every pass",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "        (await this.claimGraceUse(storedToken.id, storedToken.revokedReason));",
-      "replace": "        true;",
+      "find": "        ? await this.claimGraceUse(storedToken.id, storedToken.revokedReason)",
+      "replace": "        ? { claimed: true, exhausted: false, spent: 1 }",
       "test": "tests/unit/refresh-token-rotation-race.test.ts"
     },
     {
@@ -570,6 +570,36 @@
       "find": "      await prisma.cart.update({\n        where: { id: guestCart.id },\n        data: { customerId },\n      });\n      return this.loadMergedCart(guestCart.id);",
       "replace": "      const created = await prisma.cart.create({\n        data: { storeId, sessionId: guestSessionId, customerId },\n      });\n      return this.loadMergedCart(created.id);",
       "test": "tests/unit/cart.test.ts"
+    },
+    {
+      "id": "password-reset-bumps-token-version",
+      "domain": "authn / session",
+      "tier": "integration",
+      "why": "a password reset stops bumping tokenVersion, so every access token already issued survives the reset for its full lifetime — the one action a compromised user performs, and the mid-flight guard becomes a no-op on that path",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    await AuthService.revokeAllSessions(storedToken.userId, 'password_reset');",
+      "replace": "    await prisma.refreshToken.updateMany({\n      where: { userId: storedToken.userId, revokedAt: null },\n      data: { revokedAt: new Date(), revokedReason: 'password_reset' },\n    });",
+      "test": "tests/integration/refresh-token-rotation.test.ts"
+    },
+    {
+      "id": "grace-exhaustion-is-legible",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "an exhausted grace budget is logged as an ordinary replay, so 'the cap is too low for how this merchant works' is indistinguishable from 'a stolen token was replayed' — and the cap being wrong is invisible exactly when it is burning someone's sessions",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "            graceExhausted: claim.exhausted,",
+      "replace": "            graceExhausted: false,",
+      "test": "tests/unit/refresh-token-rotation-race.test.ts"
+    },
+    {
+      "id": "chain-walk-hop1-is-a-point-lookup",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "hop 1 of the successor walk becomes a per-user scan plus sort (there is no (userId, createdAt) index) instead of a primary-key read — a pessimisation on the thundering-herd path, where the chain is almost always one hop",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    const first = await prisma.refreshToken.findUnique({\n      where: { id: replacedById },\n      select: { revokedAt: true, revokedReason: true, replacedById: true },\n    });",
+      "replace": "    const first = (\n      await prisma.refreshToken.findMany({\n        where: { userId },\n        select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },\n        orderBy: { createdAt: 'desc' },\n        take: 500,\n      })\n    ).find(r => r.id === replacedById);",
+      "test": "tests/unit/refresh-token-rotation-race.test.ts"
     }
   ]
 }

@@ -269,3 +269,74 @@ by how often a merchant soft-deletes a product that is sitting in live carts,
 and the checkout refusal does still name the product ids in `details`, so no
 order can be placed against a deleted product — this is a usability defect, not
 a correctness one.
+
+**Ruling P2-B1b-1 — the mid-flight guard shipped resting on a premise that was
+false on two of the three paths it named.**
+
+Ruling P2-B1-2 recorded the guard in `refreshTokens` as closing the window
+where a revocation lands between the liveness check and the row write. Its
+comment named three paths — sign-out-everywhere, password change, password
+reset — and asserted that "every one of those paths increments `tokenVersion`
+first". That was true of exactly one of them.
+
+`resetPassword` never called `revokeAllSessions` at all: it revoked rows with a
+bare `updateMany` and left `tokenVersion` untouched. So the guard, which
+arbitrates entirely on `tokenVersion`, was a no-op on that path. And
+independently of any race, every access token already issued survived a reset
+for the rest of its lifetime — a password CHANGE killed them immediately, a
+password RESET did not, and a reset is the one a compromised user performs
+precisely because they believe someone else is holding their credentials. That
+second consequence is the serious one, and it had nothing to do with the race.
+
+`changePassword` did call `revokeAllSessions`, but only after its own
+`updateMany` — revoke first, bump second, which is the ordering the guard
+cannot see. Both now route through `revokeAllSessions`, which bumps first and
+revokes second, so the ordering is guaranteed by construction rather than by
+convention.
+
+`revokeAllSessions` grew a `reason` parameter rather than flattening everything
+to `revoke_all`. `revokedReason` is the only forensic record of WHY a session
+died — `docs/audits/2026-05-28-auth-access-audit.md` reads `password_reset` off
+these rows to tell a redeemed reset from a sign-out — so correct ordering had
+to be bought without paying for it in audit trail.
+
+The `why` text on the `session-revocation-midflight` defence entry has been
+corrected: it described coverage the guard did not have.
+
+Cost if wrong: `changePassword`'s ordering fix is structural — one call in
+place of two in the wrong order — so its consequence (a millisecond-wide race)
+is not observable from outside and is NOT mutation-gated. What is gated is
+every consequence that can be observed: `tokenVersion` moves on both paths,
+live rows are revoked, and the reason survives. Recorded here so the ordering
+does not read as tested.
+
+**Ruling P2-B1b-2 — the chain-walk "optimisation" was a pessimisation, and the
+test I wrote for it locked the pessimisation in.**
+
+Finding #1688 asked for the successor walk to stop costing one round-trip per
+hop. I replaced every hop with a single
+`findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 500 })`.
+`RefreshToken` has `@@index([userId])` and no `(userId, createdAt)` composite,
+so Postgres fetches every row for that user and sorts before applying `take` —
+and `cleanupRefreshTokens` keeps revoked rows for 30 days and live rows until
+they expire, so an active merchant accumulates on the order of a thousand.
+Meanwhile the chain is almost always ONE hop, which the original code did as a
+single primary-key read. I traded an index-unique lookup for a full per-user
+scan plus sort, per replaying request, at the moment concurrency is highest —
+on the thundering-herd path the change was justified by.
+
+The test made it worse: it asserted `findMany` was called exactly once AND that
+no by-id lookups happened at all. That is a ban on the cheap read, not a bound
+on cost. It is now expressed as what was actually wanted — one point lookup for
+the common one-hop shape, and for a deep chain one lookup plus one slice read
+rather than a round-trip per hop.
+
+No index was added, so Ruling P2-B1-1's "no migration on the hottest table in
+the schema" still holds. Worst case is two queries instead of the original ten;
+the common case is one, as it was before either change.
+
+Cost if wrong: a chain deeper than one hop still pays the unindexed slice read.
+That is bounded by `take: 500` and by how rare a multi-rotation chain inside a
+30-second window is. If it ever shows up in slow-query logs the fix is the
+`(userId, createdAt)` composite, which reopens the migration trade-off and
+should be decided once rather than twice.

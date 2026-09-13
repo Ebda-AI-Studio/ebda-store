@@ -208,3 +208,111 @@ describe('refresh-token rotation', () => {
     });
   });
 });
+
+/**
+ * A password reset must end every session it finds, the way a password change
+ * already did.
+ *
+ * `resetPassword` used to revoke refresh rows with a bare `updateMany` and
+ * never touch `tokenVersion`. Two consequences, and the second is the one that
+ * matters:
+ *
+ *   1. The mid-flight guard in `refreshTokens` — which re-reads `tokenVersion`
+ *      after writing its new row, to learn whether a revocation landed
+ *      underneath it — was a NO-OP on this path. It arbitrates on a number a
+ *      reset never moved.
+ *   2. Independently of any race, every ACCESS token already issued survived
+ *      the reset for the rest of its life (30 minutes by default). A password
+ *      CHANGE killed them immediately. A password RESET did not — and a reset
+ *      is the one a compromised user performs precisely because they believe
+ *      someone else is holding their credentials.
+ *
+ * Both paths now go through `revokeAllSessions`, which bumps first and revokes
+ * second, and carries the reason so `revokedReason` stays the forensic record
+ * of WHY a session died.
+ */
+describe('password reset and change end every session', () => {
+  /** Mint a reset token the way requestPasswordReset does, and return the raw value. */
+  async function seedResetToken(userId: string): Promise<string> {
+    const raw = crypto.randomBytes(32).toString('hex');
+    await prisma.refreshToken.create({
+      data: {
+        token: `reset:${hash(raw)}`,
+        userId,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+    return raw;
+  }
+
+  it('a reset BUMPS tokenVersion, so outstanding access tokens die with it', async () => {
+    const u = await createVerifiedUser();
+    const before = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { tokenVersion: true },
+    });
+
+    await AuthService.resetPassword(await seedResetToken(u.id), 'BrandNew!2345');
+
+    const after = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { tokenVersion: true },
+    });
+    expect(after!.tokenVersion).toBeGreaterThan(before!.tokenVersion);
+  });
+
+  it('a reset revokes live sessions and keeps `password_reset` as the reason', async () => {
+    // The reason is the only forensic signal that distinguishes a redeemed
+    // reset from a sign-out-everywhere, so routing through revokeAllSessions
+    // must not flatten it to a generic `revoke_all`.
+    const u = await createVerifiedUser();
+    const session = await AuthService.login(u.email, u.password);
+    expect('refreshToken' in session).toBe(true);
+
+    await AuthService.resetPassword(await seedResetToken(u.id), 'BrandNew!2345');
+
+    const rows = await prisma.refreshToken.findMany({
+      where: { userId: u.id, token: { not: { startsWith: 'reset:' } } },
+      select: { revokedAt: true, revokedReason: true },
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every(r => r.revokedAt !== null)).toBe(true);
+    expect(rows.map(r => r.revokedReason)).toContain('password_reset');
+  });
+
+  it('the reset token itself is consumed, not left live', async () => {
+    const u = await createVerifiedUser();
+    const raw = await seedResetToken(u.id);
+
+    await AuthService.resetPassword(raw, 'BrandNew!2345');
+
+    const reused = prisma.refreshToken.findFirst({ where: { token: `reset:${hash(raw)}` } });
+    await expect(reused).resolves.toBeNull();
+  });
+
+  it('a password change still bumps tv and still records `password_changed`', async () => {
+    // The control: this path already worked, and the reordering must not have
+    // broken it or lost its reason.
+    const u = await createVerifiedUser();
+    await AuthService.login(u.email, u.password);
+    const before = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { tokenVersion: true },
+    });
+
+    await AuthService.changePassword(u.id, u.password, 'BrandNew!2345');
+
+    const after = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { tokenVersion: true },
+    });
+    expect(after!.tokenVersion).toBeGreaterThan(before!.tokenVersion);
+
+    const rows = await prisma.refreshToken.findMany({
+      where: { userId: u.id },
+      select: { revokedAt: true, revokedReason: true },
+    });
+    expect(rows.every(r => r.revokedAt !== null)).toBe(true);
+    expect(rows.map(r => r.revokedReason)).toContain('password_changed');
+  });
+});

@@ -99,6 +99,23 @@ const ROTATION_RACE_MAX_CHAIN_HOPS = 10;
  */
 const ROTATION_RACE_MAX_GRACE_USES = 5;
 
+/**
+ * The outcome of trying to claim a grace use.
+ *
+ * Three states, not two. "Refused because the budget is gone" and "refused
+ * because the row vanished" look identical to a boolean, and they are the
+ * difference between "the cap is set too low for how this merchant works" and
+ * "a token was pruned". The first is the only signal that tells an operator
+ * to raise the cap — and the log line that was supposed to carry it only ever
+ * ran on the SUCCESS path, so the case that matters never reached it.
+ */
+interface GraceClaim {
+  claimed: boolean;
+  /** The budget was spent. The presentation may have been entirely legitimate. */
+  exhausted: boolean;
+  spent: number;
+}
+
 /** `revokedReason` written by a rotation that has not been raced yet. */
 const REASON_ROTATED = 'rotated';
 
@@ -630,14 +647,40 @@ export class AuthService {
     replacedById: string,
     userId: string
   ): Promise<boolean> {
-    // One query, not one per hop. The walk is a linked list, so the ids are
-    // only discoverable in sequence — but every row in a live chain was
-    // created inside the grace window that led here, which makes the whole
-    // chain part of this user's newest rows. Reading that slice once and
-    // walking it in memory replaces up to ROTATION_RACE_MAX_CHAIN_HOPS
-    // round-trips on the exact path a post-deploy thundering herd hits.
-    // `take` is two orders of magnitude above any real chain; it exists so a
-    // pathological row count cannot turn this into an unbounded read.
+    // Hop 1 is a primary-key lookup, and hop 1 is almost always the whole
+    // walk: the presented row's successor IS the live tip unless the client
+    // rotated more than once inside the grace window.
+    //
+    // The previous version replaced every hop with ONE
+    // `findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 500 })`
+    // to cut round-trips on the thundering-herd path. That was a pessimisation
+    // dressed as an optimisation: `RefreshToken` has `@@index([userId])` but
+    // no `(userId, createdAt)` composite, so Postgres fetches every row for
+    // that user and sorts before applying `take` — and `cleanupRefreshTokens`
+    // keeps revoked rows for 30 days and live rows until they expire, so a
+    // merchant refreshing across admin, orders and the storefront accumulates
+    // on the order of a thousand. It traded one index-unique read for a full
+    // per-user scan plus sort, per replaying request, exactly when concurrency
+    // is highest.
+    //
+    // So: pay the cheap read for the common shape, and fall back to the bulk
+    // read only when a SECOND hop is actually needed. Worst case is two
+    // queries instead of the original ten; the common case is one, as it was
+    // before either change. No new index, so Ruling P2-B1-1's "no migration on
+    // the hottest table in the schema" still holds.
+    const first = await prisma.refreshToken.findUnique({
+      where: { id: replacedById },
+      select: { revokedAt: true, revokedReason: true, replacedById: true },
+    });
+    if (!first) return false;
+    if (!first.revokedAt) return true;
+    if (!this.endedByRotation(first.revokedReason)) return false;
+    if (!first.replacedById) return false;
+
+    // A chain deeper than one hop. Every row in it was created inside the
+    // grace window that led here, so it is part of this user's newest rows;
+    // read that slice once and finish in memory rather than paying a
+    // round-trip per remaining hop.
     const rows = await prisma.refreshToken.findMany({
       where: { userId },
       select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },
@@ -646,10 +689,10 @@ export class AuthService {
     });
     const byId = new Map(rows.map(r => [r.id, r]));
 
-    let cursor: string | null = replacedById;
-    const seen = new Set<string>();
+    let cursor: string | null = first.replacedById;
+    const seen = new Set<string>([replacedById]);
 
-    for (let hop = 0; hop < ROTATION_RACE_MAX_CHAIN_HOPS; hop++) {
+    for (let hop = 1; hop < ROTATION_RACE_MAX_CHAIN_HOPS; hop++) {
       // A back-link that loops would otherwise spin until the hop cap; a cycle
       // is corruption, and corruption is not evidence of a live family.
       if (cursor === null || seen.has(cursor)) return false;
@@ -715,28 +758,31 @@ export class AuthService {
   private static async claimGraceUse(
     tokenId: string,
     revokedReason: string | null
-  ): Promise<boolean> {
+  ): Promise<GraceClaim> {
     let reason = revokedReason;
 
     for (let attempt = 0; attempt <= ROTATION_RACE_MAX_GRACE_USES; attempt++) {
       const spent = this.graceUsesSpent(reason);
-      if (spent >= ROTATION_RACE_MAX_GRACE_USES) return false;
+      if (spent >= ROTATION_RACE_MAX_GRACE_USES) return { claimed: false, exhausted: true, spent };
 
       const claimed = await prisma.refreshToken.updateMany({
         where: { id: tokenId, revokedReason: reason },
         data: { revokedReason: `${REASON_GRACE_PREFIX}${spent + 1}` },
       });
-      if (claimed.count > 0) return true;
+      if (claimed.count > 0) return { claimed: true, exhausted: false, spent: spent + 1 };
 
       const fresh = await prisma.refreshToken.findUnique({
         where: { id: tokenId },
         select: { revokedReason: true },
       });
-      if (!fresh) return false;
+      // The row is gone — pruned, or deleted underneath us. That is not a
+      // budget problem, and reporting it as one would blame the cap for
+      // something the cap did not do.
+      if (!fresh) return { claimed: false, exhausted: false, spent };
       reason = fresh.revokedReason;
     }
 
-    return false;
+    return { claimed: false, exhausted: true, spent: ROTATION_RACE_MAX_GRACE_USES };
   }
 
   static async refreshTokens(refreshToken: string): Promise<AuthTokens> {
@@ -781,28 +827,45 @@ export class AuthService {
       // CONSEQUENCE of replaying. Without the cap a single stolen token could
       // be presented in a loop for thirty seconds and mint a separate session
       // every pass, so a 30-second hole paid out indefinitely.
-      const rotationRace =
+      const raceSignalsAgree =
         this.endedByRotation(storedToken.revokedReason) &&
         storedToken.replacedById !== null &&
         Date.now() - storedToken.revokedAt.getTime() <= ROTATION_RACE_GRACE_MS &&
-        (await this.successorChainIsLive(storedToken.replacedById, storedToken.userId)) &&
-        // Claimed last, and only once everything else has said yes: it is the
-        // single step here that writes, and a row's grace uses are not spent
-        // by a presentation that was going to be refused anyway. The budget is
-        // checked inside the claim rather than again out here — a second copy
-        // of the test would be a line no mutation can reach, which reads as
-        // covered while proving nothing.
-        (await this.claimGraceUse(storedToken.id, storedToken.revokedReason));
+        (await this.successorChainIsLive(storedToken.replacedById, storedToken.userId));
+
+      // Claimed last, and only once everything else has said yes: it is the
+      // single step here that writes, and a row's grace uses are not spent by
+      // a presentation that was going to be refused anyway. The budget is
+      // checked inside the claim rather than again out here — a second copy of
+      // the test would be a line no mutation can reach, which reads as covered
+      // while proving nothing.
+      const claim = raceSignalsAgree
+        ? await this.claimGraceUse(storedToken.id, storedToken.revokedReason)
+        : { claimed: false, exhausted: false, spent: 0 };
+      const rotationRace = claim.claimed;
 
       if (!rotationRace) {
+        // `graceExhausted` is the field that separates "a stolen token was
+        // replayed" from "a legitimate seventh tab exceeded a cap of five".
+        // Without it the two are byte-identical in the log, and the cap being
+        // wrong is invisible precisely when it is hurting someone: every tab
+        // of admin, orders and the storefront shares ONE refresh cookie, so
+        // six simultaneous tabs is ordinary for a busy merchant and the sixth
+        // replay burns the account out of all of them.
         logger.warn(
           {
             userId: storedToken.userId,
             tokenId: storedToken.id,
             revokedAt: storedToken.revokedAt,
             revokedReason: storedToken.revokedReason,
+            graceExhausted: claim.exhausted,
+            ...(claim.exhausted
+              ? { graceUsesSpent: claim.spent, graceUsesAllowed: ROTATION_RACE_MAX_GRACE_USES }
+              : {}),
           },
-          'Refresh-token reuse detected — revoking all tokens for user'
+          claim.exhausted
+            ? 'Refresh-token grace budget exhausted — revoking all tokens for user'
+            : 'Refresh-token reuse detected — revoking all tokens for user'
         );
         await prisma.refreshToken.updateMany({
           where: { userId: storedToken.userId, revokedAt: null },
@@ -820,7 +883,7 @@ export class AuthService {
           userId: storedToken.userId,
           tokenId: storedToken.id,
           rotatedMsAgo: Date.now() - storedToken.revokedAt.getTime(),
-          graceUsesSpent: this.graceUsesSpent(storedToken.revokedReason) + 1,
+          graceUsesSpent: claim.spent,
           graceUsesAllowed: ROTATION_RACE_MAX_GRACE_USES,
         },
         'Refresh-token rotation race — issuing a fresh token instead of revoking the family'
@@ -1056,18 +1119,23 @@ export class AuthService {
       data: { passwordHash },
     });
 
-    // Revoke (don't delete) so a replay of any of these tokens still
-    // hits the reuse-detection branch in refreshTokens(). Limit to
-    // session tokens — the special `reset:` rows used by password-reset
-    // are short-lived and live in the same table.
-    await prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null, NOT: { token: { startsWith: 'reset:' } } },
-      data: { revokedAt: new Date(), revokedReason: 'password_changed' },
-    });
-
-    // Bump tokenVersion so all outstanding access tokens (which carry the
-    // old tv claim) are rejected by the auth middleware on next use.
-    await AuthService.revokeAllSessions(userId);
+    // ONE call, and it runs BEFORE anything else observes the change.
+    //
+    // This used to revoke the rows first and bump `tokenVersion` second. That
+    // ordering is backwards for the mid-flight guard in `refreshTokens`,
+    // which re-reads `tokenVersion` after writing its new row to find out
+    // whether a revocation landed underneath it: a refresh could read tv=N,
+    // have this revoke commit (unable to see a row that does not exist yet),
+    // create its row, re-read tv — still N, because the bump had not run —
+    // and be handed a live session that outlives the password change. Bumping
+    // first is what makes that re-read able to observe anything.
+    //
+    // `revokeAllSessions` also supersedes the old `updateMany`: it revokes
+    // every live row for the user, warms the Redis tv cache, and revokes the
+    // merchant MCP keys. The old query's `NOT: { token: { startsWith:
+    // 'reset:' } }` filter was already ineffective, since the unconditional
+    // call on the next line revoked those rows anyway.
+    await AuthService.revokeAllSessions(userId, 'password_changed');
   }
 
   /**
@@ -1077,7 +1145,10 @@ export class AuthService {
    * Fail-open: if Redis is unavailable, the DB increment is still written
    * and the next authenticate call will re-populate the cache from DB.
    */
-  static async revokeAllSessions(userId: string): Promise<void> {
+  static async revokeAllSessions(
+    userId: string,
+    reason: 'revoke_all' | 'password_changed' | 'password_reset' = 'revoke_all'
+  ): Promise<void> {
     // Atomically increment tokenVersion and read the new value.
     const updated = await prisma.user.update({
       where: { id: userId },
@@ -1091,9 +1162,15 @@ export class AuthService {
 
     // Revoke all live refresh tokens — prevents session resumption via
     // token rotation even before the access token's tv is checked.
+    //
+    // The caller names the reason. `revokedReason` is the only forensic record
+    // of WHY a session died — docs/audits/2026-05-28-auth-access-audit.md
+    // reads `password_reset` off these rows to tell a redeemed reset from a
+    // sign-out — so folding a password change or reset into a generic
+    // `revoke_all` would buy correct ordering at the cost of the audit trail.
     await prisma.refreshToken.updateMany({
       where: { userId, revokedAt: null },
-      data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
+      data: { revokedAt: new Date(), revokedReason: reason },
     });
 
     // …and every merchant MCP key this user holds. "Sign out all devices" has
@@ -1200,16 +1277,19 @@ export class AuthService {
       where: { id: storedToken.id },
     });
 
-    // Revoke all session refresh tokens — same rationale as
+    // Revoke all sessions — same call, and the same ordering, as
     // changePassword. The reset-token row was already deleted above.
-    await prisma.refreshToken.updateMany({
-      where: {
-        userId: storedToken.userId,
-        revokedAt: null,
-        NOT: { token: { startsWith: 'reset:' } },
-      },
-      data: { revokedAt: new Date(), revokedReason: 'password_reset' },
-    });
+    //
+    // This used to be a bare `updateMany` that never touched `tokenVersion`,
+    // which had two consequences. The mid-flight guard in `refreshTokens` was
+    // a NO-OP on this path — it arbitrates on a tv that a reset never moved,
+    // so a refresh racing the reset kept its new session. And, independently
+    // of any race, every access token already issued survived the reset for
+    // the rest of its lifetime: a password CHANGE killed them immediately, a
+    // password RESET did not — and a reset is the one a compromised user
+    // performs precisely because they believe someone else is holding their
+    // credentials.
+    await AuthService.revokeAllSessions(storedToken.userId, 'password_reset');
   }
 
   /**

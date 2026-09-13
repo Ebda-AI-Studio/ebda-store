@@ -525,11 +525,43 @@ describe('a revocation landing mid-refresh wins', () => {
 });
 
 /**
- * The chain walk runs on the thundering-herd path — every open tab refreshing
- * at once after a deploy. One query for the slice, not one per hop.
+ * What the chain walk COSTS, on the shape it actually meets.
+ *
+ * The first version of this suite asserted `findMany` was called exactly once
+ * and no by-id lookups happened at all. That banned the cheap read and locked
+ * in the expensive one: `RefreshToken` has `@@index([userId])` but no
+ * `(userId, createdAt)` composite, so an ordered `take: 500` makes Postgres
+ * fetch every row for that user and sort. Meanwhile the chain is almost always
+ * ONE hop — the presented row's successor IS the live tip — which is a single
+ * primary-key lookup. The test was pinning a pessimisation.
+ *
+ * These assert a BOUND on total queries instead, which is the property that
+ * was ever wanted, and they name the common case separately from the rare one.
  */
-describe('the chain walk costs one query', () => {
-  it('does not issue a round-trip per hop', async () => {
+describe('the chain walk pays for the shape it meets', () => {
+  it('costs ONE point lookup when the successor is the live tip', () => {
+    // The common case, and the one the old assertion made worse.
+    return (async () => {
+      present(
+        row({ revokedAt: secondsAgo(2), revokedReason: 'rotated', replacedById: 'tok-new' }),
+        liveSuccessor()
+      );
+
+      await AuthService.refreshTokens('any-token');
+
+      const walkLookups = mockPrisma.refreshToken.findUnique.mock.calls.filter(
+        (c: any) => c[0]?.where?.id === 'tok-new'
+      );
+      expect(walkLookups).toHaveLength(1);
+      // No per-user scan at all on this path.
+      expect(mockPrisma.refreshToken.findMany).not.toHaveBeenCalled();
+    })();
+  });
+
+  it('does not issue a round-trip per hop on a deep chain', async () => {
+    // The rare case the bulk read exists for: three hops. The walk must not
+    // cost three round-trips, and it must not cost more than the one cheap
+    // lookup plus the one slice read.
     present(row({ revokedAt: secondsAgo(3), revokedReason: 'rotated', replacedById: 'tok-a' }), {
       'tok-a': row({
         id: 'tok-a',
@@ -549,9 +581,59 @@ describe('the chain walk costs one query', () => {
     await AuthService.refreshTokens('any-token');
 
     expect(mockPrisma.refreshToken.findMany).toHaveBeenCalledTimes(1);
-    const byIdLookups = mockPrisma.refreshToken.findUnique.mock.calls.filter(
-      (c: any[]) => c[0]?.where?.id !== undefined
+    const walkLookups = mockPrisma.refreshToken.findUnique.mock.calls.filter(
+      (c: any) => c[0]?.where?.id !== undefined
     );
-    expect(byIdLookups).toHaveLength(0);
+    // Hop 1 only. Hops 2 and 3 come out of the slice already read.
+    expect(walkLookups).toHaveLength(1);
+  });
+});
+
+/**
+ * Exhausting the budget is a different event from replaying a stolen token.
+ *
+ * Both end in the same place — every session for the user revoked — but only
+ * one of them means the cap is set too low for how this merchant works. Every
+ * tab of admin, orders and the storefront shares ONE refresh cookie, so six
+ * simultaneous tabs is ordinary and the sixth replay burns the account out of
+ * all of them. The log line that was supposed to make an undersized cap
+ * visible only ran on the SUCCESS path, so the case that matters never reached
+ * it.
+ */
+describe('an exhausted grace budget is legible in the log', () => {
+  const raced = () =>
+    row({ revokedAt: secondsAgo(1), revokedReason: 'rotated', replacedById: 'tok-new' });
+
+  it('says so, and says what the cap was', async () => {
+    present(raced(), liveSuccessor());
+    for (let i = 0; i < 5; i++) await AuthService.refreshTokens('any-token');
+
+    mockLogger.warn.mockClear();
+    await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        graceExhausted: true,
+        graceUsesSpent: 5,
+        graceUsesAllowed: 5,
+      }),
+      expect.stringContaining('grace budget exhausted')
+    );
+  });
+
+  it('does NOT claim exhaustion for a genuine replay', async () => {
+    // The negative control. A log that said `graceExhausted: true` on every
+    // revocation would satisfy the test above and tell an operator nothing.
+    present(
+      row({ revokedAt: secondsAgo(120), revokedReason: 'rotated', replacedById: 'tok-new' }),
+      liveSuccessor()
+    );
+
+    await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/reuse/i);
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ graceExhausted: false }),
+      expect.stringContaining('reuse detected')
+    );
   });
 });
