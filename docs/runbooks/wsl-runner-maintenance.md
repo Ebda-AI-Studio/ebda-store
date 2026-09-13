@@ -88,15 +88,53 @@ sudo systemctl restart 'actions.runner.*' 2>/dev/null \
 gh variable set USE_SELF_HOSTED --body false --repo ForceAI-KW/whatsapp-broadcaster
 ```
 
-All workflows use `runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}`,
-so `USE_SELF_HOSTED=false` sends every job to GitHub's cloud runners. Flip back
-once the runner is healthy:
+> **Do not flip this during an incident — it is not a recovery action today.**
+>
+> GitHub-hosted runners are **billing-blocked for this org**. Verified
+> 2026-09-13: the only two `ubuntu-latest` jobs are `cloud-rescue.yml` (marked
+> OBSOLETE) and `runner-health-check.yml`, whose last four runs — all
+> 2026-07-21 — failed, and whose own header records that on blocked billing it
+> "fails in ~3s every 15 min and alerts nobody". Setting `USE_SELF_HOSTED=false`
+> therefore does not move work to runners that can execute it; it moves work to
+> a pool that cannot, silently disabling ALL CI for this repo — including
+> `db-backup.yml`, which the same page documents as must-run.
+>
+> **When the guest is sick, fix the guest** (`umbra doctor`, the disk check
+> below, `ci-runner-guard.sh`). The toggle is the lever for the day cloud
+> billing is restored, not for today.
+
+Every job routes through the toggle, so the switch is ready and no job is
+un-movable. Two spellings are in use and both honour it — most jobs carry the
+`inputs.force_cloud` term as well, so a `workflow_dispatch` can force cloud for
+one run without changing the variable:
+
+```
+runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+```
+
+`tests/unit/workflow-runner-selector.test.ts` enforces this: a workflow whose
+`runs-on` is neither of those forms — and is not registered there with a reason
+— fails the suite. That gate exists because `gitleaks.yml`'s `notify-failure`
+was once hardcoded to `[self-hosted, linux, wsl2]`, which silently opted the
+secret-leak alert out of this switch. **GitHub does not fail a job whose labels
+match no online runner — it queues it for up to ~24h**, and `timeout-minutes`
+only starts counting once a runner is assigned. So during exactly the incident
+this section is written for, that alert would never have sent and the run would
+have shown as still in progress.
+
+If cloud billing is ever restored, flip back once the runner is healthy:
 
 ```bash
 gh variable set USE_SELF_HOSTED --body true --repo ForceAI-KW/whatsapp-broadcaster
 ```
 
-(`notify-failure` jobs always stay on `ubuntu-latest` so alerts fire even when the box is dead.)
+(`notify-failure` jobs do NOT stay on `ubuntu-latest` — that was true before
+the 2026-07-15 Umbra-only CI policy and is no longer. They ride the self-hosted
+runner like everything else and move to cloud with this switch. The
+runner-is-dead case is alerted by the local OS medic — the `:7717`
+runner-offline watch — not by CI, so verify that medic is alive before relying
+on CI to tell you the box has gone.)
 
 ---
 

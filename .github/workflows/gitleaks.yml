@@ -46,11 +46,32 @@ jobs:
     name: Notify on failure (main only)
     needs: [scan]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # Self-hosted, and deliberately NOT behind a toggle. This is the job that
-    # reports CI failing; with the org billing block a GitHub-hosted job dies in
-    # ~3s with no runner assigned, so failures here have been going unreported —
-    # and silence from an alerting job reads as green. It only uses curl.
-    runs-on: [self-hosted, linux, wsl2]
+    # Self-hosted by DEFAULT, but still behind the toggle — same form as the
+    # identical job in ci.yml:842, which carries the same rationale without
+    # giving up the kill switch.
+    #
+    # This was a hardcoded `[self-hosted, linux, wsl2]`, the only one in the
+    # repo. The reasoning was sound (with the org billing block a
+    # GitHub-hosted job dies in ~3s with no runner assigned, and silence from
+    # an alerting job reads as green) but it traded one silence for another:
+    # `vars.USE_SELF_HOSTED=false` is the documented escape hatch for a runner
+    # that is drained or offline, and a hardcoded label opts this job out of
+    # it. GitHub does not FAIL a job whose labels match no online runner — it
+    # QUEUES it, for up to ~24h, and `timeout-minutes` below only starts
+    # counting once a runner is assigned. So in the exact incident the runbook
+    # is written for, the secret-leak alert never sends and the run shows as
+    # still in progress.
+    #
+    # The billing block is expressed by `vars.USE_SELF_HOSTED` being 'true',
+    # not by hardcoding the label.
+    #
+    # To be explicit about what the toggle is and is not: GitHub-hosted runners
+    # are billing-blocked for this org, so setting it to 'false' does NOT move
+    # this job to runners that can execute it. Today the toggle's value is that
+    # no job is UN-MOVABLE and the escape hatch is ready if billing is
+    # restored. When the guest is sick, the fix is the guest — see
+    # docs/runbooks/wsl-runner-maintenance.md.
+    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     steps:
       - name: Telegram alert
