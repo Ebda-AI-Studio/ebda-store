@@ -45,6 +45,10 @@ on:
       - 'apps/api/src/routes/public.routes.ts'
       - 'apps/api/src/services/auth.service.ts'
       - 'apps/api/src/services/accounting/**'
+      # cart.service.ts holds the ambient-transaction branches. Their
+      # absence is a P2003 on the first cart write of a session, and a
+      # deterministic unique violation in the guest-cart merge.
+      - 'apps/api/src/services/cart.service.ts'
       - 'apps/api/src/services/payment-providers/**'
       # Carrier clients: iCarry's resolveBaseUrl is the SSRF defence
       # (assertPublicHttpUrl on a merchant-supplied baseUrl). Added because

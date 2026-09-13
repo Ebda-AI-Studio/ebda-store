@@ -483,21 +483,39 @@ describe('CartService', () => {
       expect(result).toEqual(mockUserCart);
     });
 
-    it('should create user cart if it does not exist', async () => {
+    // This test used to assert the opposite — that a SECOND cart was created
+    // with `{ storeId, sessionId: 'guest-session', customerId }` — and it
+    // passed, because the Prisma mock has no unique indexes. Against the real
+    // schema that create is a guaranteed failure, not a race:
+    // `carts_store_id_session_id_key` is a FULL unique index on
+    // `(store_id, session_id)`, and the guest row with that exact pair is
+    // still live at this point (it is not deleted until the end of the
+    // function). Inside the ambient tenant transaction it aborts the whole
+    // request. The old assertion was pinning a defect.
+    it('promotes the guest cart in place instead of creating a second one', async () => {
       vi.mocked(prisma.cart.findFirst)
         .mockResolvedValueOnce(mockGuestCart as any)
         .mockResolvedValueOnce(null);
-      vi.mocked(prisma.cart.create).mockResolvedValue(mockUserCart as any);
 
       await CartService.mergeGuestCart(mockStoreId, 'guest-session', mockCustomerId);
 
-      expect(prisma.cart.create).toHaveBeenCalledWith({
-        data: {
-          storeId: mockStoreId,
-          sessionId: 'guest-session',
-          customerId: mockCustomerId,
-        },
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: mockGuestCart.id },
+        data: { customerId: mockCustomerId },
       });
+      expect(prisma.cart.create).not.toHaveBeenCalled();
+    });
+
+    it('does not delete the cart it just promoted', async () => {
+      // The old path deleted the guest cart after merging into the new one.
+      // On the promote branch that row IS the answer.
+      vi.mocked(prisma.cart.findFirst)
+        .mockResolvedValueOnce(mockGuestCart as any)
+        .mockResolvedValueOnce(null);
+
+      await CartService.mergeGuestCart(mockStoreId, 'guest-session', mockCustomerId);
+
+      expect(prisma.cart.delete).not.toHaveBeenCalled();
     });
   });
 });

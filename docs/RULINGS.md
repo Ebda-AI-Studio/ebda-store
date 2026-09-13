@@ -217,3 +217,55 @@ security hole, and if the real multi-tab shape is wider than five the fix is a
 larger `ROTATION_RACE_MAX_GRACE_USES`, visible in the
 `Refresh-token rotation race` warn line which now carries `graceUsesSpent` and
 `graceUsesAllowed` on every forgiveness.
+
+**Ruling P2-B3-1 — `lastActivityAt` stays on the synchronous cart path; only
+the retry budget is fixed here.**
+
+Finding #1584 has two halves. The first — `retryOnWriteConflict`'s exponential
+backoff sleeping INSIDE the request's interactive transaction — is fixed:
+ambient-path writes now use `AMBIENT_TX_RETRY` (`retries: 1, baseDelayMs: 5`)
+instead of the default four retries from a 20ms base. On the standalone path
+those sleeps happen between transactions and cost only latency; on the ambient
+path they hold a Neon pooler connection and every row lock the request has
+taken, for up to about a third of a second, on the losing side of a hot-cart
+race. One immediate re-run is the correct budget because the only recoverable
+case there is a same-cart P2002 whose winner has by definition already
+committed — backoff buys nothing against an opponent that has finished.
+
+The second half is the finding's own "longer term" suggestion: move
+`lastActivityAt` off the synchronous path, so cart mutations stop serializing
+on the `carts` row for a full request. That is NOT done here, deliberately.
+It is a whole-service sweep — the same write appears at seven call sites in
+`cart.service.ts` — it changes when abandonment telemetry becomes visible, and
+`apps/admin/.../abandoned-carts` depends on that freshness. Doing it inside a
+PR about transaction scoping would put an unrelated behavioural change on the
+money path, which the P2 plan's own Global Constraints forbid.
+
+Cost if wrong: concurrent mutations of one hot cart keep queueing behind the
+`carts` row lock for the duration of a request. That is the behaviour as it
+stands today — this PR does not worsen it, and the tightened retry budget
+strictly reduces how long the losing side holds its own locks. It is recorded
+here so the remaining half does not read as fixed.
+
+**Ruling P2-B3-2 — #1766 (soft-deleted cart lines) is split into its own PR
+because its durable half moves an amount expression.**
+
+The finding is real and verified: `STOREFRONT_PRODUCT_SELECT` carries no
+`deletedAt`, so a soft-deleted line renders exactly like a live one on `/cart`,
+and it is still counted into `itemsSubtotal` and `itemCount`. Since
+`PRODUCT_NO_LONGER_AVAILABLE` became a routine checkout refusal, a customer
+with a five-item basket can be bounced to checkout step 1, return to a cart
+where all five lines look normal, and have to guess — up to five times.
+
+It is not in this PR for one reason: the durable fix changes `itemsSubtotal`.
+The P2 plan's Global Constraints say that "changing an amount/rounding/currency
+expression requires its own PR with nothing else in it", and this PR is
+transaction scoping on the same file. Shipping only the additive half — a
+`deletedAt`/`unavailable` flag with no renderer — would be a field with no call
+site, which is the defect this session already removed once in batch 2.
+
+Cost if wrong: the conversion-loss loop stays until that PR lands. It is bounded
+by how often a merchant soft-deletes a product that is sitting in live carts,
+and the checkout refusal does still name the product ids in `details`, so no
+order can be placed against a deleted product — this is a usability defect, not
+a correctness one.

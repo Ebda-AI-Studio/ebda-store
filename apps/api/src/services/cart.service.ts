@@ -68,6 +68,27 @@ async function tryResolveCartBundle(
   }
 }
 
+/**
+ * Retry budget for a write running on the AMBIENT request transaction.
+ *
+ * `retryOnWriteConflict` defaults to 4 retries with exponential backoff from a
+ * 20ms base — roughly 20+40+80+160ms plus jitter. On the standalone path those
+ * sleeps happen BETWEEN transactions and cost nothing but latency. On the
+ * ambient path they happen INSIDE the request's interactive transaction, which
+ * holds its Neon pooler connection and every row lock it has taken for the
+ * whole duration — including the `carts` row, which is locked until the
+ * response is flushed. Concurrent mutations of one hot cart already queue
+ * behind each other for a full request; adding a third of a second of sleep to
+ * the losing side pushes toward P2028 (`runInTenantContext` allows only
+ * maxWait: 10000) rather than the 500s the retry was added to prevent.
+ *
+ * One immediate re-run is the right budget here because the only recoverable
+ * case on this path is a same-cart P2002 whose winner has BY DEFINITION
+ * already committed its row: the re-read sees it and merges the quantity.
+ * Backoff buys nothing against an opponent that has already finished.
+ */
+const AMBIENT_TX_RETRY = { retries: 1, baseDelayMs: 5 } as const;
+
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
     // Shared include fragment to avoid repetition. `product` uses the
@@ -351,7 +372,7 @@ export class CartService {
       // describes.
       await retryOnWriteConflict(
         () => withSavepoint(() => writeLine(prisma as unknown as Prisma.TransactionClient)),
-        { label: 'cart.addItem(ambient-tx)', extraRetryCodes: ['P2002'] }
+        { label: 'cart.addItem(ambient-tx)', extraRetryCodes: ['P2002'], ...AMBIENT_TX_RETRY }
       );
     } else {
       // No tenant context (crons, scripts, tests) — own transaction as before.
@@ -465,7 +486,7 @@ export class CartService {
     const result = hasTenantContext()
       ? await retryOnWriteConflict(
           () => withSavepoint(() => writeBundleLine(prisma as unknown as Prisma.TransactionClient)),
-          { label: 'cart.addBundle(ambient-tx)', extraRetryCodes: ['P2002'] }
+          { label: 'cart.addBundle(ambient-tx)', extraRetryCodes: ['P2002'], ...AMBIENT_TX_RETRY }
         )
       : await retryOnWriteConflict(
           () =>
@@ -559,76 +580,112 @@ export class CartService {
     const lineKey = (productId: string, variantId?: string | null) =>
       `${productId}::${variantId ?? ''}`;
 
-    await retryOnWriteConflict(
-      () =>
-        prisma.$transaction(
-          async tx => {
-            const existingItems = await tx.cartItem.findMany({
-              where: { cartId: cart.id, productId: { in: productIds } },
-            });
-            const existingByLine = new Map(
-              existingItems.map(i => [lineKey(i.productId, i.variantId), i])
-            );
+    // Extracted so BOTH paths run the same body — the ambient one inline on the
+    // request transaction, the standalone one inside its own. Leaving this
+    // inline is what let `addItems` keep the defect `addItem` and `addBundle`
+    // were both fixed for.
+    const writeItems = async (tx: Prisma.TransactionClient) => {
+      const existingItems = await tx.cartItem.findMany({
+        where: { cartId: cart.id, productId: { in: productIds } },
+      });
+      const existingByLine = new Map(
+        existingItems.map(i => [lineKey(i.productId, i.variantId), i])
+      );
 
-            for (const item of items) {
-              const product = productById.get(item.productId);
-              if (!product) continue;
-              // A chosen-but-invalid variant is skipped, not silently dropped to
-              // the base product (which would be the wrong cart line).
-              if (item.variantId && !variantById.has(item.variantId)) continue;
-              const variant = item.variantId ? variantById.get(item.variantId)! : null;
+      for (const item of items) {
+        const product = productById.get(item.productId);
+        if (!product) continue;
+        // A chosen-but-invalid variant is skipped, not silently dropped to
+        // the base product (which would be the wrong cart line).
+        if (item.variantId && !variantById.has(item.variantId)) continue;
+        const variant = item.variantId ? variantById.get(item.variantId)! : null;
 
-              const existing = existingByLine.get(lineKey(item.productId, item.variantId));
-              const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
+        const existing = existingByLine.get(lineKey(item.productId, item.variantId));
+        const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
 
-              const availableInventory = variant ? variant.inventory : product.inventory;
-              const effectiveAllowBackorder =
-                backorderFeatureEnabled &&
-                (variant ? variant.allowBackorder : product.allowBackorder);
+        const availableInventory = variant ? variant.inventory : product.inventory;
+        const effectiveAllowBackorder =
+          backorderFeatureEnabled && (variant ? variant.allowBackorder : product.allowBackorder);
 
-              if (
-                product.trackInventory &&
-                availableInventory < targetQuantity &&
-                !effectiveAllowBackorder
-              ) {
-                throw new AppError(
-                  400,
-                  'INSUFFICIENT_INVENTORY',
-                  `Not enough inventory for product ${item.productId}`
-                );
-              }
+        if (
+          product.trackInventory &&
+          availableInventory < targetQuantity &&
+          !effectiveAllowBackorder
+        ) {
+          throw new AppError(
+            400,
+            'INSUFFICIENT_INVENTORY',
+            `Not enough inventory for product ${item.productId}`
+          );
+        }
 
-              if (existing) {
-                // Atomic increment, not the absolute `targetQuantity` — same
-                // lost-update reason as addItem's merge (a bulk sync racing a
-                // manual add is the concrete case here).
-                await tx.cartItem.update({
-                  where: { id: existing.id },
-                  data: { quantity: { increment: item.quantity } },
-                });
-              } else {
-                // Same-cart unique race → P2002, retried at the tx level (see
-                // addItem + the extraRetryCodes below).
-                await tx.cartItem.create({
-                  data: {
-                    cartId: cart.id,
-                    productId: item.productId,
-                    variantId: item.variantId ?? null,
-                    quantity: item.quantity,
-                  },
-                });
-              }
-            }
-          },
-          {
+        if (existing) {
+          // Atomic increment, not the absolute `targetQuantity` — same
+          // lost-update reason as addItem's merge (a bulk sync racing a
+          // manual add is the concrete case here).
+          await tx.cartItem.update({
+            where: { id: existing.id },
+            data: { quantity: { increment: item.quantity } },
+          });
+        } else {
+          // Same-cart unique race → P2002, retried at the tx level (see
+          // addItem + the extraRetryCodes below).
+          await tx.cartItem.create({
+            data: {
+              cartId: cart.id,
+              productId: item.productId,
+              variantId: item.variantId ?? null,
+              quantity: item.quantity,
+            },
+          });
+        }
+      }
+    };
+
+    if (hasTenantContext()) {
+      // Already inside the request-scoped tenant transaction opened by
+      // `tenantContext` middleware, exactly as in `addItem`. `getOrCreate`
+      // above writes the new `carts` row through the tenant proxy, and that
+      // outer transaction does not commit until the response finishes.
+      // `$transaction` is deliberately NOT proxied (packages/database
+      // `isProxiedProp` rejects every `$`-prefixed name but the raw helpers),
+      // so a nested one runs on a DIFFERENT connection that cannot see that
+      // cart — and `tx.cartItem.create` then violated the
+      // `cart_items.cart_id` FK with P2003. P2003 is in neither
+      // `RETRYABLE_CODES` nor the `extraRetryCodes` below, so all attempts
+      // failed and it surfaced as a 500; `tenantContext` rolls back on a 5xx,
+      // discarding the cart row too, so a client retry reproduced it
+      // identically instead of self-healing.
+      //
+      // Reachable at `POST /stores/:storeId/cart/sync`, mounted under
+      // `tenantContext` with no `authenticate`. The first-party storefront
+      // calls the sibling `/public/cart/sync`, which is mounted OUTSIDE
+      // tenantContext and therefore always took the safe branch — which is
+      // why this survived three separate reports without a production 500.
+      //
+      // `withSavepoint` is load-bearing here for a second reason beyond
+      // addItem's: this body writes a LOOP of lines, so a P2002 on the fifth
+      // item cannot be undone by rolling back a transaction we do not own.
+      // Without the savepoint the retry would re-apply `{ increment }` to the
+      // four lines that already succeeded and silently double them.
+      await retryOnWriteConflict(
+        () => withSavepoint(() => writeItems(prisma as unknown as Prisma.TransactionClient)),
+        { label: 'cart.addItems(ambient-tx)', extraRetryCodes: ['P2002'], ...AMBIENT_TX_RETRY }
+      );
+    } else {
+      // No tenant context (the public storefront route, crons, scripts,
+      // tests) — own transaction as before.
+      await retryOnWriteConflict(
+        () =>
+          prisma.$transaction(writeItems, {
             isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
             // Money-safe tx defaults (mirrors withMoneyTx) — see addItem above.
             maxWait: 10000,
             timeout: 30000,
-          }
-        ),
-      { label: 'cart.addItems', extraRetryCodes: ['P2002'] }
-    );
+          }),
+        { label: 'cart.addItems', extraRetryCodes: ['P2002'] }
+      );
+    }
 
     await prisma.cart.update({
       where: { id: cart.id, storeId },
@@ -766,12 +823,36 @@ export class CartService {
       return userCart;
     }
 
-    // Create user cart if doesn't exist
-    const targetCart =
-      userCart ||
-      (await prisma.cart.create({
-        data: { storeId, sessionId: guestSessionId, customerId },
-      }));
+    // No cart of their own yet: PROMOTE the guest cart rather than create a
+    // second one.
+    //
+    // `carts` carries a FULL unique index on `(store_id, session_id)` —
+    // `carts_store_id_session_id_key`, not partial and not conditioned on
+    // `customer_id`. The early return above guarantees `guestCart` exists with
+    // this exact `(storeId, guestSessionId)`, and it is not deleted until the
+    // end of this function. So creating a row with the same pair was not a
+    // lost race: it was a 100% collision on every call down this branch, and
+    // inside the ambient tenant transaction it aborts the whole request — so
+    // the two merge loops below and the guest-cart delete were unreachable
+    // here too.
+    //
+    // Promotion is also simply the right operation. The merge loops have
+    // nothing to merge when there is no user cart, and the delete would be
+    // deleting the row we want to keep.
+    //
+    // Why this was never seen: `mergeGuestCart` has no HTTP route, and the
+    // only real-DB test always pre-creates a `userCart`, so this branch had
+    // never executed against the real index. The unit tests mock Prisma,
+    // where a unique index does not exist.
+    if (!userCart) {
+      await prisma.cart.update({
+        where: { id: guestCart.id },
+        data: { customerId },
+      });
+      return this.loadMergedCart(guestCart.id);
+    }
+
+    const targetCart = userCart;
 
     // Merge items — match on BOTH productId and variantId so a red-large variant
     // and a red-small variant (same product, different variants) stay as separate
@@ -829,8 +910,19 @@ export class CartService {
     // Delete guest cart (cascades to its own CartItem/CartBundle rows).
     await prisma.cart.delete({ where: { id: guestCart.id } });
 
+    return this.loadMergedCart(targetCart.id);
+  }
+
+  /**
+   * Re-read a merged cart with the storefront-safe shape.
+   *
+   * Extracted so the promote-in-place branch and the merge branch cannot
+   * return two different shapes — a duplicated include is exactly how that
+   * drifts.
+   */
+  private static loadMergedCart(cartId: string) {
     return prisma.cart.findUnique({
-      where: { id: targetCart.id },
+      where: { id: cartId },
       include: {
         items: {
           include: {

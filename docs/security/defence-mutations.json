@@ -540,6 +540,36 @@
       "find": "      storedToken.revokedAt ? storedToken.expiresAt : undefined",
       "replace": "      undefined",
       "test": "tests/unit/refresh-token-rotation-race.test.ts"
+    },
+    {
+      "id": "cart-additems-stays-on-ambient-tx",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "addItems opens a nested $transaction on a different connection from the ambient tenant tx, so cart_items.cart_id points at a cart the nested tx cannot see — P2003, a 500 on the first /cart/sync of a session, and tenantContext then rolls the cart back so the retry reproduces it",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "    if (hasTenantContext()) {\n      // Already inside the request-scoped tenant transaction opened by\n      // `tenantContext` middleware, exactly as in `addItem`.",
+      "replace": "    if (false) {\n      // Already inside the request-scoped tenant transaction opened by\n      // `tenantContext` middleware, exactly as in `addItem`.",
+      "test": "tests/unit/cart-ambient-tx.test.ts"
+    },
+    {
+      "id": "cart-additems-savepoint-scopes-the-abort",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the bulk-sync loop loses its savepoint, so a same-line P2002 aborts a transaction the service does not own and every later statement throws 25P02 — the guard written to absorb the race surfaces it instead",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "        () => withSavepoint(() => writeItems(prisma as unknown as Prisma.TransactionClient)),",
+      "replace": "        () => writeItems(prisma as unknown as Prisma.TransactionClient),",
+      "test": "tests/unit/cart-ambient-tx.test.ts"
+    },
+    {
+      "id": "cart-merge-promotes-instead-of-colliding",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "mergeGuestCart creates a second cart carrying the guest's own sessionId while the guest row is still live — a deterministic violation of the FULL unique index carts_store_id_session_id_key, which inside the ambient transaction aborts the whole request",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "      await prisma.cart.update({\n        where: { id: guestCart.id },\n        data: { customerId },\n      });\n      return this.loadMergedCart(guestCart.id);",
+      "replace": "      const created = await prisma.cart.create({\n        data: { storeId, sessionId: guestSessionId, customerId },\n      });\n      return this.loadMergedCart(created.id);",
+      "test": "tests/unit/cart.test.ts"
     }
   ]
 }

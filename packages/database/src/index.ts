@@ -212,6 +212,20 @@ function isProxiedProp(prop: string | symbol): boolean {
  * session. Call sites that write-then-read within one request must use this to
  * stay on the ambient transaction.
  *
+ * The call sites that do, as of 2026-09-13 — keep this list current, because
+ * the next omission looks exactly like the last three:
+ *   - `CartService.addItem`    (cart_items unique + FK)
+ *   - `CartService.addBundle`  (cart_bundles unique + FK)
+ *   - `CartService.addItems`   (bulk /cart/sync — same shape, and it kept the
+ *                               defect through THREE separate audit reports
+ *                               because the first-party storefront calls the
+ *                               sibling public route, which is mounted outside
+ *                               `tenantContext` and so always took the safe
+ *                               branch)
+ *
+ * The shape to look for: a service that calls `getOrCreate`-then-`$transaction`
+ * and is reachable from a router mounted under `tenantContext`.
+ *
  * Prisma does not support nested interactive transactions in any case.
  */
 export function hasTenantContext(): boolean {
