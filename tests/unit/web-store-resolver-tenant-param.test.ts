@@ -38,7 +38,26 @@ describe('getStoreByTenantParam', () => {
               }),
             } as Response;
           }
-          return { ok: false, json: async () => ({}) } as Response;
+          // A DEFINITIVE miss must carry the API's real status. `/store/resolve`
+          // answers an unknown domain with a genuine
+          // `404 {success:false, error:{code:'STORE_NOT_FOUND'}}`, and since
+          // 2026-09-16 the resolver keys on that: only a 404 (or a well-formed
+          // store-less body) is "no such store", while any OTHER non-OK
+          // response — a 429 from storeResolveLimiter, a 5xx — is transient and
+          // must NOT become a 404. A statusless `{ok:false}` stub no longer
+          // describes anything the API can actually return.
+          // See docs/plans/2026-09-16-store-resolve-transient-not-404.md.
+          return {
+            ok: false,
+            status: 404,
+            json: async () => ({
+              success: false,
+              error: {
+                code: 'STORE_NOT_FOUND',
+                message: 'No store found for the specified domain',
+              },
+            }),
+          } as Response;
         }
         if (url.includes('/public/stores/palora')) {
           return {
@@ -49,7 +68,16 @@ describe('getStoreByTenantParam', () => {
             }),
           } as Response;
         }
-        return { ok: false, json: async () => ({}) } as Response;
+        // Unknown slug → the same definitive 404 the API really returns
+        // (`/stores/:slugOrId` throws `AppError(404,'NOT_FOUND')`).
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Store not found' },
+          }),
+        } as Response;
       })
     );
   });

@@ -25,7 +25,12 @@
  */
 
 import { ImageResponse } from 'next/og';
-import { getStore, resolveStoreBySlug, type ResolvedStore } from '../../lib/store-resolver';
+import {
+  getStore,
+  resolveStoreBySlug,
+  StoreTemporarilyUnavailableError,
+  type ResolvedStore,
+} from '../../lib/store-resolver';
 
 // node runtime (NOT edge): on Vercel/Node we rasterize SVG store logos to PNG
 // (via a runtime-gated dynamic `sharp` import) so the card can <img> them —
@@ -124,11 +129,28 @@ async function resolveLogoUrl(store: ResolvedStore): Promise<string | null> {
   return null;
 }
 
+/**
+ * `resolveStoreBySlug` now THROWS on a transient resolve failure (429/5xx/
+ * network) so storefront pages can show retry copy instead of a false 404.
+ * This route's contract is the opposite — "so the route never throws" below —
+ * because a social card must degrade to the branded default rather than take
+ * the request down. So the transient is swallowed here and the caller falls
+ * back to the header-resolved / platform-default store.
+ */
+async function resolveCardStoreBySlug(slug: string): Promise<ResolvedStore | null> {
+  try {
+    return await resolveStoreBySlug(slug);
+  } catch (error) {
+    if (error instanceof StoreTemporarilyUnavailableError) return null;
+    throw error;
+  }
+}
+
 export async function GET(request: Request): Promise<Response> {
   const slug = new URL(request.url).searchParams.get('slug');
   // Slug wins (path-based stores); fall back to header-resolved store (custom
   // domains) or the platform default so the route never throws.
-  const store = (slug ? await resolveStoreBySlug(slug) : null) ?? (await getStore());
+  const store = (slug ? await resolveCardStoreBySlug(slug) : null) ?? (await getStore());
 
   const primaryHsl = (store.theme as unknown as Record<string, unknown>)?.primaryColor as
     | string

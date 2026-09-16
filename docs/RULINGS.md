@@ -8,6 +8,48 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-16
+
+Context: `docs/plans/2026-09-16-store-resolve-transient-not-404.md` — a transient
+store-resolve failure (429/5xx/network) was rendered to shoppers as a branded
+404 "store not found". Implements **F2** of the 2026-09-15 investigation, whose
+Ruling S1 deferred the decision rather than rejecting it; Ahmad approved this
+fix, and only this one, on 2026-09-16.
+
+**Ruling SR-1 — `getStoreById()` keeps its `null`-on-any-failure contract.**
+Its siblings `fetchStoreByDomain`/`fetchStoreBySlug` now split 404 (miss) from
+everything else (transient); `getStoreById` does not. All 5 of its references
+are the definition, its import in a test, and 3 test assertions — it has zero
+production callers and sits on no shopper's 404 path, and its existing
+`503 → null` assertion in `store-resolve-logging.test.ts` is a deliberate
+regression gate. Cost if wrong: a future admin surface that adopts it inherits
+the transient-as-miss bug — mitigated by a doc comment at its definition
+telling the next caller to split it first.
+
+**Ruling SR-2 — the retry page ships as HTTP 500, not 503 + `Retry-After`.**
+Next 16.2.11 permits only 404/403/401 as deliberate statuses from a page render
+(`http-access-fallback.js`: `HTTPAccessErrorStatus = {NOT_FOUND:404,
+FORBIDDEN:403, UNAUTHORIZED:401}`; `forbidden()`/`unauthorized()` additionally
+require `experimental.authInterrupts`). Only Route Handlers can set an arbitrary
+status, and none is on this path. Rewriting 500→503 in the OpenNext Worker entry
+was rejected because `scripts/cf-setup-local.sh` GENERATES that entry at build
+time, so the edit would be silently discarded on the next deploy. The defect
+being fixed is "404 tells the shopper the shop is gone and tells Google to
+deindex it"; 500 already fixes both, and Google retains a URL across 5xx.
+Cost if wrong: uptime/DAST tooling keeps counting these as server faults rather
+than backpressure — the F1 complaint, inherited rather than introduced.
+
+**Ruling SR-3 — the same defect class in `agent-store-resolver.ts` and
+`sitemap.ts` is reported, not fixed.** Both still do `if (!res.ok) return null`
+(or `break`), so during a 429 burst `/llms.txt` and `/.well-known/*` serve the
+PLATFORM document instead of the merchant's, and the sitemap silently truncates.
+Both are bot-facing, not shopper-facing, and today's approved scope is this fix
+only. `ProductDetailBody.tsx:139` (F1) is excluded for the same reason.
+Cost if wrong: crawlers see a platform document or a short sitemap during a
+burst — an SEO cost with no customer impact, and one small PR to close later.
+
+---
+
 ## 2026-09-11
 
 **Ruling SSRF-1 — the ESLint SSRF selector stays scoped to `routes/**`; the

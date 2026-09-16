@@ -10,6 +10,12 @@ import {
 } from '@force/shared';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
+import { StoreTemporarilyUnavailableError } from './store-unavailable';
+
+// Re-exported so server callers have one import site for the resolver and the
+// failure it can raise. The declaration itself lives in a client-safe module
+// because `app/error.tsx` reads the digest — see store-unavailable.ts.
+export { StoreTemporarilyUnavailableError, STORE_UNAVAILABLE_DIGEST } from './store-unavailable';
 
 /**
  * Lifecycle status of a resolved store. Mirrors the `StoreStatus` enum on
@@ -255,9 +261,23 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       },
     });
 
-    if (!response.ok) {
+    // A 404 is the API's definitive answer that no store owns this domain
+    // (`/store/resolve` → `{success:false, error:{code:'STORE_NOT_FOUND'}}`).
+    // That, and only that, is a real miss the caller may turn into a 404.
+    if (response.status === 404) {
       console.error(`Failed to fetch store for domain ${logSafe(domain)}: ${response.status}`);
       return null;
+    }
+
+    // Anything else non-OK — 429 from `storeResolveLimiter` (30/min per IP),
+    // a 5xx, a gateway error — means we could not ASK, not that the answer is
+    // no. Returning null here is what told a shopper their shop does not
+    // exist, and told Google to drop the URL, every time the API was busy.
+    if (!response.ok) {
+      console.error(`Failed to fetch store for domain ${logSafe(domain)}: ${response.status}`);
+      throw new StoreTemporarilyUnavailableError(
+        `domain ${logSafe(domain)} → HTTP ${response.status}`
+      );
     }
 
     const data = await response.json();
@@ -363,8 +383,14 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
           : null,
     };
   } catch (error) {
+    // Already classified above — rethrow rather than re-wrap or downgrade.
+    if (error instanceof StoreTemporarilyUnavailableError) throw error;
+    // A dropped connection, a timeout, or a body that would not parse. None of
+    // these are evidence about whether the store exists.
     console.error(`Error fetching store for domain ${logSafe(domain)}:`, error);
-    return null;
+    throw new StoreTemporarilyUnavailableError(
+      `domain ${logSafe(domain)} → ${error instanceof Error ? error.name : 'unknown error'}`
+    );
   }
 }
 
@@ -402,9 +428,16 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    if (!response.ok) {
+    // Definitive miss: `/stores/:slugOrId` answers an unknown slug with
+    // `AppError(404,'NOT_FOUND')`. See fetchStoreByDomain for the full rationale.
+    if (response.status === 404) {
       console.error(`Failed to fetch store for slug ${logSafe(slug)}: ${response.status}`);
       return null;
+    }
+
+    if (!response.ok) {
+      console.error(`Failed to fetch store for slug ${logSafe(slug)}: ${response.status}`);
+      throw new StoreTemporarilyUnavailableError(`slug ${logSafe(slug)} → HTTP ${response.status}`);
     }
 
     const data = await response.json();
@@ -506,8 +539,11 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
           : null,
     };
   } catch (error) {
+    if (error instanceof StoreTemporarilyUnavailableError) throw error;
     console.error(`Error fetching store for slug ${logSafe(slug)}:`, error);
-    return null;
+    throw new StoreTemporarilyUnavailableError(
+      `slug ${logSafe(slug)} → ${error instanceof Error ? error.name : 'unknown error'}`
+    );
   }
 }
 
@@ -553,7 +589,7 @@ export async function getStore(): Promise<ResolvedStore> {
   // 1. Custom domain resolution
   const domain = await getStoreDomain();
   if (domain) {
-    const store = await resolveStoreByDomain(domain);
+    const store = await lenientResolve(() => resolveStoreByDomain(domain));
     if (store) return store;
     return DEFAULT_STORE;
   }
@@ -561,13 +597,37 @@ export async function getStore(): Promise<ResolvedStore> {
   // 2. Slug-based resolution (platform domains)
   const slug = await getStoreSlug();
   if (slug) {
-    const store = await resolveStoreBySlug(slug);
+    const store = await lenientResolve(() => resolveStoreBySlug(slug));
     if (store) return store;
     return DEFAULT_STORE;
   }
 
   // 3. Default demo store
   return DEFAULT_STORE;
+}
+
+/**
+ * Collapse a transient resolve failure back to `null` for the LENIENT callers.
+ *
+ * `getStore()` renders the chrome that both the 404 page and the retry page
+ * live inside (`app/layout.tsx` + its `generateMetadata`, `app/not-found.tsx`,
+ * `app/manifest.ts`, the favicon and OG routes). If a 429 threw out of there,
+ * the shopper would lose the branded layout entirely and fall through to
+ * `global-error.tsx` — a worse outcome than the demo chrome, and it would take
+ * the 404 page down with it.
+ *
+ * Only `StoreTemporarilyUnavailableError` is swallowed; a genuine bug still
+ * propagates.
+ */
+async function lenientResolve(
+  resolve: () => Promise<ResolvedStore | null>
+): Promise<ResolvedStore | null> {
+  try {
+    return await resolve();
+  } catch (error) {
+    if (error instanceof StoreTemporarilyUnavailableError) return null;
+    throw error;
+  }
 }
 
 /**
@@ -586,6 +646,12 @@ export async function getStore(): Promise<ResolvedStore> {
  * not-found page renders inside that layout and needs the
  * `DEFAULT_STORE` chrome (Force-branded header/footer) to render
  * without crashing.
+ *
+ * Only a DEFINITIVE miss 404s. A transient resolve failure (429/5xx/network)
+ * raises `StoreTemporarilyUnavailableError` from the fetch layer and is
+ * deliberately NOT caught here: it propagates to `app/error.tsx`, which shows
+ * retry copy instead of telling the shopper the shop does not exist. See
+ * `docs/plans/2026-09-16-store-resolve-transient-not-404.md`.
  */
 export async function getStoreOrNotFound(): Promise<ResolvedStore> {
   const domain = await getStoreDomain();
@@ -636,7 +702,9 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  * Triggers Next's `notFound()` when the tenant doesn't resolve to an active
  * store — mirrors `getStoreOrNotFound()`'s behavior for unknown
  * domains/slugs so an unknown tenant lands on the branded 404 instead of
- * silently rendering the demo store.
+ * silently rendering the demo store. It mirrors the transient behaviour too:
+ * a 429/5xx/network failure raises `StoreTemporarilyUnavailableError` rather
+ * than 404ing a store that exists.
  */
 export async function getStoreByTenantParam(rawTenant: string): Promise<ResolvedStore> {
   // Decoded HERE, once, for every tenant-store route: middleware percent-
@@ -659,6 +727,13 @@ export async function getStoreByTenantParam(rawTenant: string): Promise<Resolved
 
 /**
  * Get store by ID (for admin panel)
+ *
+ * NOTE — this one deliberately keeps the old "null on any failure" contract,
+ * unlike its `domain`/`slug` siblings above (Ruling SR-1 in
+ * `docs/plans/2026-09-16-store-resolve-transient-not-404.md`): it has no
+ * production callers today and sits on no shopper's 404 path. If you wire it
+ * to a customer-facing surface, give it the same 404-vs-transient split first,
+ * or that surface inherits the bug this plan fixed.
  */
 export async function getStoreById(storeId: string): Promise<ResolvedStore | null> {
   try {
