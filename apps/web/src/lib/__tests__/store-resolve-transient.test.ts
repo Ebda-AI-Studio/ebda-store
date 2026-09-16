@@ -212,6 +212,12 @@ describe('the lenient resolver still never throws into the layout', () => {
     // the favicon route all call this. If it threw, the retry page would lose
     // the layout it renders inside and fall through to global-error.tsx.
     await expect(getStore()).resolves.toMatchObject({ id: 'demo' });
+
+    // ...and it must MARK the fallback as transient. `layout.tsx` keys on the
+    // `id === 'demo'` sentinel to emit `title: 'Page not found — Force AI'`, so
+    // without this flag the retry BODY renders inside a document whose TITLE
+    // says the store does not exist — the same claim, relocated to the head.
+    await expect(getStore()).resolves.toMatchObject({ transientResolveFailure: true });
   });
 });
 

@@ -69,6 +69,22 @@ export async function generateMetadata(): Promise<Metadata> {
   const requestHost = (await headers()).get('host')?.toLowerCase() ?? '';
   const isOnCustomDomain = !!(store.domain && requestHost === store.domain.toLowerCase());
 
+  // A store WAS named but the API could not be reached (429/5xx/network), so
+  // the resolver handed back the flagged fallback. The page below this layout
+  // is rendering the "we're a little busy" retry body — so the title must NOT
+  // say the page does not exist. That claim in the <title> survives into the
+  // tab, the tab-switcher, a bookmark and every link preview, which is the
+  // same lie this work removes from the body, just relocated to the head.
+  // Store-neutral on purpose: during a transient we do not know the merchant's
+  // name, and guessing one is worse than saying nothing.
+  if (store.transientResolveFailure) {
+    return {
+      title: 'Temporarily unavailable — please try again',
+      description: 'This store is busy right now. Please try again in a moment.',
+      robots: { index: false, follow: false },
+    };
+  }
+
   // Bare platform host (no custom domain, no slug) resolves to DEFAULT_STORE,
   // whose name is "Force" — which produced the merchant-shaped title
   // "Force - Online Shopping in Kuwait" for a store that does not exist. The

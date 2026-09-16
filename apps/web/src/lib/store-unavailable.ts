@@ -21,6 +21,20 @@
 export const STORE_UNAVAILABLE_DIGEST = 'STORE_TEMPORARILY_UNAVAILABLE';
 
 /**
+ * Does this caught error mean "the store could not be reached", rather than
+ * "something broke"?
+ *
+ * Client error boundaries receive a plain `{message, digest}` object, never the
+ * original class, so the digest is the only thing they can key on. Extracted as
+ * a pure function so the decision is unit-testable without a DOM harness (this
+ * repo has none) — `RouteErrorFallback` is a hook-using client component and
+ * cannot be invoked directly from a test.
+ */
+export function isStoreTemporarilyUnavailable(error?: { digest?: string } | null): boolean {
+  return error?.digest === STORE_UNAVAILABLE_DIGEST;
+}
+
+/**
  * Thrown when the store could not be resolved for a reason that is NOT
  * "this store does not exist": a 429 from `storeResolveLimiter`, a 5xx, a
  * dropped connection, or a body that would not parse.

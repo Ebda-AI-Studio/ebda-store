@@ -48,6 +48,128 @@ only. `ProductDetailBody.tsx:139` (F1) is excluded for the same reason.
 Cost if wrong: crawlers see a platform document or a short sitemap during a
 burst — an SEO cost with no customer impact, and one small PR to close later.
 
+**Ruling SR-4 — the retry page carries NO `noindex`; the HTTP 500 is the
+indexing guard.** A draft rendered `<meta name="robots" content="noindex,nofollow">`
+inside the fallback body and the plan presented it as delivered protection. It
+was inert, and measured rather than assumed: `<meta>` hoisting into `<head>` is
+a React 19 feature, `require('react/package.json').version` is **18.3.1**, and
+the root `package.json` `overrides` hard-pins `"react":"18.3.1"` — so the tag
+rendered in `<body>`, where Google ignores robots directives. Removed rather
+than left as protection-shaped dead weight. A server-component throw returns
+500, which crawlers treat as temporary and which does not deindex, unlike the
+404 this work removes. Cost if wrong: during a long 429 burst a crawler could
+index a retry page it fetched at 500 — contradicting its own status — and the
+fix is a `head`-level tag or a React 19 upgrade, not a body tag.
+NOTE: `components/StoreMaintenance.tsx:63` has the IDENTICAL inert in-body
+`robots` meta for the suspended-store page. Pre-existing and outside this
+fix's approved scope — reported, not changed.
+
+**Ruling SR-5 — 8 of the 11 store-resolving pages keep the chrome-less root
+boundary.** Only `/products`, `/products/[slug]` and `/bundles/[slug]` have a
+segment boundary that wraps the fallback in `ShopChrome`; the homepage,
+`/categories`, `/bundles`, `/blog/[slug]`, `/about`, `/contact`, `/faq`,
+`/how-to-guides` and `/locations` fall through to the root boundary and render
+without header/nav/footer. The retry COPY — the deliverable of this work — is
+correct on all 11; only the chrome differs, and that gap predates this change.
+Adding 8 boundaries is a presentation change outside today's approved scope.
+Cost if wrong: a shopper who hits a transient on the homepage sees a bare
+centered retry card instead of the branded storefront chrome, which reads as
+more broken than it is.
+
+**Ruling SR-7 — the transient fallback is flagged, so the retry page is no
+longer TITLED "Page not found".** Review found that during the exact scenario
+this work serves, the layout's lenient `getStore()` returns `DEFAULT_STORE`
+(`id:'demo'`) and `generateMetadata` hits that sentinel, emitting
+`title: 'Page not found — Force AI'` around the new retry body — the removed
+claim, relocated from the body to the `<title>`, where it reaches the tab,
+bookmarks and link previews. `lenientResolve` now reports WHICH `null` it
+produced, `getStore()` returns a `transientResolveFailure`-flagged fallback,
+and the layout emits store-neutral "Temporarily unavailable" metadata with
+`robots: noindex` for it. Two residuals are accepted, not fixed: the retry page
+still paints with `DEFAULT_THEME` and the "Force" name, because during a
+transient the merchant's brand is genuinely unknown and inventing one is worse;
+and SR-4's "no noindex" refers to the BODY — the layout's metadata does emit a
+head-level `robots: noindex` on this path, which is the correct place for it.
+Cost if wrong: a crawler that fetched the retry page at 500 sees a neutral
+title instead of the merchant's, which is the intended trade.
+
+**CORRECTION to SR-7 (same day, next review pass).** An earlier version of this
+ruling rebutted a reported dead `/demo` "Go Home" link by concluding "the link
+is `/`" — technically right and materially wrong, because `/` is not the
+merchant's home on the platform host. Measured: `curl -sI
+https://store.force-ai.co/` returns `307 → https://force-ai.co`. So on a
+path-based store the retry page's only non-retry control walked a merchant's
+shopper onto the Force platform pitch — the HARD multi-tenant rule in
+`app/not-found.tsx`. The link is now suppressed on the transient branch
+entirely: during a transient there is no known home to offer, and "Try Again"
+is the correct action. Custom-domain stores were never affected. This is the
+second time a narrow rebuttal hid a wider defect — rebut the MECHANISM, not the
+sentence.
+
+**Scope correction to SR-7 — which routes the new title actually reaches.** In
+Next's metadata merge a page's own export wins over the layout's, and nearly
+every store-resolving route defines a title: `products/page.tsx` exports static
+`title: 'Products'`, `products/[slug]` and `bundles/[slug]` return
+`{title:'Product'}`/`{title:'Bundle'}` from their own demo-sentinel branch, and
+categories/about/contact/locations/bundles/faq/how-to-guides all export static
+metadata. So the layout's "Temporarily unavailable" title is visible chiefly on
+the HOMEPAGE — which is also the only route where the old "Page not found —
+Force AI" title was ever visible, so the bug and the fix have the same reach.
+The `robots: noindex` half DOES inherit on every route. Extending the title to
+the PLP/PDP means touching each page's own metadata export and is deliberately
+not done here.
+
+**Ruling SR-8 — "Try Again" now refreshes the route; two related findings are
+declined with reasons.** Review found the retry button called the BARE `reset`.
+Confirmed in Next's own `client/components/error-boundary.js`: the boundary
+defines `reset = () => setState({error:null})` AND
+`retry = () => startTransition(() => { context?.refresh(); reset(); })`, and
+passes `reset` to the component — so bare `reset` re-renders the same failed
+server payload. Because the transient branch suppresses "Go Home", that button
+is the page's ONLY control, and a retry that cannot recover makes the page a
+dead end during exactly the outage it exists to survive. Now mirrors Next's
+`retry`. A headless-Chromium render of a forced transient confirms the page
+itself is sound — retry body present, "Try Again" present, "Go Home" absent,
+zero uncaught page errors, so the added `useRouter` hook is safe inside a
+boundary. The CLICK is still not verified: proving recovery needs a browser
+that flips the API back to healthy mid-session. The wiring is gated by a source
+assertion in the meantime.
+
+Declined, with reasons:
+
+- **`global-error.tsx` keeps bare `reset`.** It renders only when the ROOT
+  LAYOUT itself failed, which is the one case where the App Router context a
+  `useRouter()` refresh depends on may not be mounted — Next's own boundary
+  guards that call with `?.` for the same reason. Adding a hook that can throw
+  to the last-resort surface trades a certain catastrophic failure for an
+  uncertain recovery. Cost if wrong: a shopper on a root-layout failure must
+  reload the tab manually, which is today's behaviour.
+- **"Go Home" stays suppressed on custom domains too**, not just the platform
+  host where the `307 → force-ai.co` leak was measured. During a transient the
+  API is unreachable for every route, so the merchant's home page would render
+  the same retry body — the link would lead from one retry page to another
+  while implying escape. "Try Again" is the honest single action on both host
+  types. Cost if wrong: a custom-domain shopper loses a home link they could
+  have used had the outage been route-specific rather than API-wide.
+- **`StoreMaintenance.tsx:63`'s inert in-body robots meta is still only
+  REPORTED** (SR-4). It is a real SEO hole — the suspended-store page returns
+  HTTP 200, so unlike the retry page it has no status-code guard behind it —
+  but it predates this work, belongs to the suspended-store path, and today's
+  approved scope is this fix. Cost if wrong: a suspended merchant's maintenance
+  page stays indexable until a one-line follow-up lands.
+
+**Ruling SR-6 — the `role="status"` live region is withdrawn, not restated.**
+It was added to announce the boundary swap after a client-side navigation. A
+live region inserted TOGETHER with its content is generally not announced by
+NVDA/JAWS/VoiceOver, and wrapping the `<h2>` in one can make the heading read
+as flat live-region text — so the comment claimed a benefit that probably does
+not exist while carrying a real cost. The pattern that works is moving focus to
+the container, which requires a real screen-reader verification this session
+could not run. `aria-hidden` on the state-carrying icon is kept (that one is
+unambiguous). Cost if wrong: a screen-reader user gets no announcement when the
+retry page replaces a page after client-side navigation — the same behaviour as
+before this work, not a regression.
+
 ---
 
 ## 2026-09-11

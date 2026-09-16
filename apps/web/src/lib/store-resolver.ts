@@ -155,6 +155,21 @@ export interface ResolvedStore {
     steps: Array<{ name: string; text: string; image?: string }>;
     stepsAr?: Array<{ name: string; text: string; image?: string }> | null;
   }>;
+
+  /**
+   * Set ONLY on the `DEFAULT_STORE` fallback returned by the lenient
+   * {@link getStore}, and only when the real store could not be resolved for a
+   * TRANSIENT reason (429/5xx/network) rather than because the request carried
+   * no store identifier.
+   *
+   * It exists because those two cases are opposite facts that `id === 'demo'`
+   * cannot tell apart, and `app/layout.tsx::generateMetadata` keys on that
+   * sentinel to emit `title: 'Page not found — Force AI'`. Without this flag a
+   * rate-limited merchant's storefront renders the "we're a little busy" body
+   * inside a document whose `<title>` says the page does not exist — the exact
+   * claim this work removes, relocated from the body to the head.
+   */
+  transientResolveFailure?: boolean;
 }
 
 /**
@@ -589,25 +604,39 @@ export async function getStore(): Promise<ResolvedStore> {
   // 1. Custom domain resolution
   const domain = await getStoreDomain();
   if (domain) {
-    const store = await lenientResolve(() => resolveStoreByDomain(domain));
+    const { store, transient } = await lenientResolve(() => resolveStoreByDomain(domain));
     if (store) return store;
-    return DEFAULT_STORE;
+    return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
   }
 
   // 2. Slug-based resolution (platform domains)
   const slug = await getStoreSlug();
   if (slug) {
-    const store = await lenientResolve(() => resolveStoreBySlug(slug));
+    const { store, transient } = await lenientResolve(() => resolveStoreBySlug(slug));
     if (store) return store;
-    return DEFAULT_STORE;
+    return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
   }
 
-  // 3. Default demo store
+  // 3. No identifier in the request at all — the genuine platform sentinel.
   return DEFAULT_STORE;
 }
 
 /**
- * Collapse a transient resolve failure back to `null` for the LENIENT callers.
+ * The fallback for "a store WAS named but we could not reach the API".
+ *
+ * Identical chrome to `DEFAULT_STORE` — we do not know the merchant's brand
+ * during a transient, and inventing one would be worse — but flagged so
+ * `layout.tsx::generateMetadata` does not title the retry page
+ * "Page not found — Force AI".
+ */
+const TRANSIENTLY_UNRESOLVED_STORE: ResolvedStore = {
+  ...DEFAULT_STORE,
+  transientResolveFailure: true,
+};
+
+/**
+ * Collapse a transient resolve failure for the LENIENT callers — but SAY which
+ * of the two `null`s it was.
  *
  * `getStore()` renders the chrome that both the 404 page and the retry page
  * live inside (`app/layout.tsx` + its `generateMetadata`, `app/not-found.tsx`,
@@ -616,16 +645,21 @@ export async function getStore(): Promise<ResolvedStore> {
  * `global-error.tsx` — a worse outcome than the demo chrome, and it would take
  * the 404 page down with it.
  *
+ * `transient` distinguishes "this store does not exist" from "I could not ask",
+ * which the caller needs because the two produce opposite page titles.
+ *
  * Only `StoreTemporarilyUnavailableError` is swallowed; a genuine bug still
  * propagates.
  */
 async function lenientResolve(
   resolve: () => Promise<ResolvedStore | null>
-): Promise<ResolvedStore | null> {
+): Promise<{ store: ResolvedStore | null; transient: boolean }> {
   try {
-    return await resolve();
+    return { store: await resolve(), transient: false };
   } catch (error) {
-    if (error instanceof StoreTemporarilyUnavailableError) return null;
+    if (error instanceof StoreTemporarilyUnavailableError) {
+      return { store: null, transient: true };
+    }
     throw error;
   }
 }

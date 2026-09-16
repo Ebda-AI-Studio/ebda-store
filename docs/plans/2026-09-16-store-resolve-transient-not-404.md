@@ -146,6 +146,50 @@ Every caller of the touched helpers, and what the new throw does to it:
 | `app/tenant-store/[tenant]/[locale]/**` (layout + 9 pages, incl. its `generateMetadata`)                                                                                    | `getStoreByTenantParam()`             | same                                                                             | **intended**; tree is dark-launched behind `STOREFRONT_TENANT_ROUTING` |
 | `getStoreById()`                                                                                                                                                            | —                                     | 5 references, **all** in `store-resolver.ts` + its test; zero production callers | **unchanged** (Ruling SR-1)                                            |
 
+### The error boundaries are part of the change surface
+
+**The first draft of this plan got this wrong, and the review caught it.** The table above
+enumerated the callers of the resolver but not the `error.tsx` boundaries sitting between those
+callers and `app/error.tsx`. Next dispatches a thrown error to the CLOSEST boundary above the
+throwing segment, and three segment-level boundaries already existed — all of which destructured
+`error: _error`, i.e. threw the error object away and rendered the generic body unconditionally:
+
+| Boundary                        | Its page calls         | Was                 |
+| ------------------------------- | ---------------------- | ------------------- |
+| `app/products/error.tsx`        | `getStoreOrNotFound()` | discarded the error |
+| `app/products/[slug]/error.tsx` | `getStoreOrNotFound()` | discarded the error |
+| `app/bundles/[slug]/error.tsx`  | `getStoreOrNotFound()` | discarded the error |
+| `app/cart/error.tsx`            | — (not today)          | discarded the error |
+| `app/checkout/error.tsx`        | — (not today)          | discarded the error |
+
+So on the PLP and the PDP — the two pages a shopper is most likely to reach from Google or a
+WhatsApp link — the 404→500 half of the fix landed but the **shopper-facing half did not**: they
+got "Something went wrong" instead of the retry copy.
+
+The retry/generic branch therefore lives in the SHARED `components/RouteErrorFallback.tsx`, which
+every boundary already renders, and `app/error.tsx` now delegates to it too rather than keeping a
+second copy of the copy. Every boundary forwards `error`. This is CLAUDE.md platform rule 1 (a
+change lands on every render path, not one) applied to error boundaries.
+
+`global-error.tsx` is deliberately excluded: it replaces the whole document when the root layout
+itself failed, so no provider is mounted and it cannot use the hook-based shared body.
+
+**What this does NOT cover, stated plainly.** Only 3 of the 11 pages that call
+`getStoreOrNotFound()` have a segment boundary that preserves chrome (`/products`,
+`/products/[slug]`, `/bundles/[slug]`). The other 8 — including the storefront **homepage**, plus
+`/categories`, `/bundles`, `/blog/[slug]`, `/about`, `/contact`, `/faq`, `/how-to-guides`,
+`/locations` — fall through to the root boundary, which renders the shared body WITHOUT
+header/nav/footer. The retry **copy** is now correct on all 11; the **chrome** is not. That gap is
+pre-existing (the root boundary always rendered bare) and is accepted here rather than fixed, so
+this section does not claim total coverage — Ruling SR-5.
+
+**There is no `noindex` on the retry page.** An earlier draft rendered
+`<meta name="robots" content="noindex,nofollow">` inside the fallback body and presented it as part
+of the shipped fix. It was inert: `<meta>` hoisting into `<head>` is a React 19 feature and this
+repo hard-pins react/react-dom to **18.3.1** in the root `overrides`, so the tag stayed in `<body>`
+where Google ignores it. It has been removed; the indexing guard is the **HTTP 500** itself.
+Ruling SR-4.
+
 ### `generateMetadata` safety
 
 - `layout.tsx::generateMetadata` calls the **lenient** `getStore()` → cannot throw. ✔
@@ -196,9 +240,125 @@ New: `apps/web/src/lib/__tests__/store-resolve-transient.test.ts`
 
 Plus the untouched `store-resolve-logging.test.ts` (7 tests) as the miss-path regression gate.
 
-**Mutation checks (≥2):** revert `if (response.status === 404) return null` → the definitive-miss
-tests must redden; revert the transient `throw` back to `return null` → the transient tests must
-redden. Restore byte-identical both times.
+New: `tests/unit/web-error-boundaries-forward-error.test.ts` — the enumeration gate over the
+boundaries, added after review found the nested-boundary miss:
+
+11. Every `error.tsx` under `apps/web/src/app` is found (a positive control, so the gate cannot
+    pass vacuously over an empty glob).
+12. **No boundary discards its error as `_error`.**
+13. **Every boundary that renders `RouteErrorFallback` passes `error={error}` to it.**
+14. The digest predicate `isStoreTemporarilyUnavailable()` is true for the marker, false for an
+    ordinary error, a lookalike digest, `undefined` and `null`.
+
+Tests 11–13 assert on SOURCE TEXT — they prove each boundary FORWARDS the error, not that the page
+renders. **This repo has no DOM harness** (no Testing Library, no jsdom — see the note in
+`BundlesPageBody.test.tsx`), so the review's suggested render test is not available without adding
+a dependency; the rendering decision is instead covered behaviourally by test 14 against the pure
+predicate the component calls.
+
+**Mutation checks — 7 run, 7 killed.** Source restored byte-identical (sha256 compared) after each:
+
+| #   | Mutation                                               | Reddens                                                                                            |
+| --- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| A   | delete `if (response.status === 404) return null`      | the definitive-miss tests                                                                          |
+| B   | revert the transient `throw` to `return null`          | the 429 test and the digest test                                                                   |
+| C   | put `error: _error` back in one boundary               | both enumeration-gate assertions, naming the file                                                  |
+| D   | drop `error={error}` from one boundary                 | **`tsc`** — `TS2741: Property 'error' is missing … but required in type 'RouteErrorFallbackProps'` |
+| E   | drop `transientResolveFailure: true` from the fallback | the lenient-resolver test                                                                          |
+| F   | delete the layout's transient metadata branch          | the branch-order assertion                                                                         |
+| G   | add a boundary that hand-rolls its own body            | the shared-body assertion, naming the file                                                         |
+
+D is the important one: it proves the gate is the TYPE SYSTEM, not the regex. F guards branch ORDER —
+the demo sentinel also matches the transient fallback, so if the two `if`s are ever swapped the retry
+page silently goes back to being titled "Page not found — Force AI".
+
+**What the mutations do NOT prove:** that Next forwards a custom `digest` through the RSC payload in
+a production build, and that `generateMetadata` emits the new title — neither is executable as a unit
+test here (no DOM harness, no way to render `generateMetadata` in a test). Both are instead verified
+outside the unit suite: the metadata half by a production render (§6.1), the digest half by a
+headless-browser render (§6.3). §6.1 also records why the FIRST version of that verification claimed
+the digest half on the strength of a grep that was matching its own `<meta>` description.
+
+### 6.1 Rendered verification (the linchpin, executed not reasoned)
+
+The entire user-visible deliverable hangs on two assumptions: that a digest set by the thrower
+survives to the client error boundary, and that the layout's transient metadata branch is reached. If
+either is false, every test here still passes, `tsc` still passes, and shoppers still see "Something
+went wrong" — the PR would ship zero user-visible change and nothing would detect it. So it is
+executed against a real production build rather than argued from Next's source.
+
+**Executed 2026-09-16.** `NEXT_PUBLIC_API_URL=http://127.0.0.1:9/api/v1` (port 9 = discard, so every
+resolve fetch is refused → the network-error branch of the transient mapping), `next build` then
+`next start`, then `GET /pecannbee`:
+
+| Assumption under test                                  | Observed                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------ |
+| The transient path fires at all (not a 404)            | **HTTP 500**                                                       |
+| A thrower-set `digest` survives to the CLIENT boundary | **VERIFIED IN A BROWSER — §6.3**                                   |
+| `generateMetadata` reaches the transient branch        | **`<title>Temporarily unavailable — please try again</title>`**    |
+| The SEO guard is real and head-level                   | **`<meta name="robots" content="noindex, nofollow">` in `<head>`** |
+| No multi-tenant leak                                   | **`Go Home`: 0 matches**                                           |
+| The old claim is gone                                  | **`Page not found`: 0 · `isn't available`: 0**                     |
+
+**CORRECTION — a first version of this section claimed the digest handoff was proven. It was not,
+and the correction matters more than the original claim.** The evidence offered was a `grep` hit on
+"busy right now", which comes from the `<meta name="description">` this very change adds — not from
+the error body. Next does not server-render a production error UI: `<button>`, `Try Again` and
+`Go Home` are absent from the HTML (0 matches each), and the document is byte-identical (22,432
+bytes) before and after the Go-Home suppression, a change that would be visible had the body been in
+the response at all. The error body renders on the CLIENT after hydration, so no curl-based check can
+observe it. A grep matching a string the page legitimately contains for another reason is a check
+answering the wrong question — the same class this plan documents elsewhere.
+
+So `curl` proves the STATUS CODE and the whole METADATA branch, and can prove nothing about the body.
+The body needed a browser — §6.3.
+
+### 6.3 Client-render verification (headless Chromium)
+
+Same forced-transient build, driven with Playwright's installed `chrome-headless-shell` (no new
+dependency, no browser download), `GET /pecannbee`, 4s after load:
+
+| Assertion                                                     | Observed                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| HTTP status                                                   | **500**                                                                                                                                          |
+| Retry body actually renders — **the digest handoff**          | **true** — "We're a little busy right now / This store is getting more requests than usual, so it could not load. Please try again in a moment." |
+| "Try Again" control present                                   | **true**                                                                                                                                         |
+| "Go Home" present                                             | **false** — the multi-tenant leak is gone                                                                                                        |
+| Generic "Something went wrong"                                | **false**                                                                                                                                        |
+| "Page not found" / "isn't available"                          | **false**                                                                                                                                        |
+| Uncaught page errors (the new `useRouter` hook in a boundary) | **none**                                                                                                                                         |
+
+**That closes the linchpin.** A thrower-set `digest` does survive Next's production RSC pipeline to
+the client error boundary, so the branch this whole change hangs on is real and not an inference.
+It also retires the `<button>`-absent puzzle from §6.1: the control was always there, just rendered
+on the client.
+
+Still NOT verified: the click itself (whether `router.refresh()` + `reset()` recovers once the API is
+healthy again), and the OpenNext/workerd bundle — see the residual below.
+
+**Residual, stated precisely:** this ran on `next start` (Node), NOT on the OpenNext/workerd Worker
+that serves production. Under Next 16 on Node the status code, the metadata branch AND the
+client-rendered retry body are all now measured (§6.1 + §6.3). ONE hop remains carried by inference:
+that the OpenNext/workerd bundle preserves the same digest forwarding. Re-running the §6.3 probe
+against a preview Worker closes it, and is the single highest-value follow-up to this work.
+
+### 6.2 Two things the retry page must NOT do
+
+- **No "Go Home" during a transient.** `getStore()` fell back to the demo sentinel, so `useStoreUrl`
+  drops the `/<slug>` prefix and the link resolves to `/` — which on the platform host is
+  `307 → force-ai.co` (measured). That would walk a merchant's shopper onto the Force platform pitch,
+  violating the HARD multi-tenant rule in `app/not-found.tsx`. The link is suppressed on that branch.
+- **The title branch's real reach.** A page's own metadata export wins over the layout's, and nearly
+  every store-resolving route exports a title, so the "Temporarily unavailable" title is visible
+  chiefly on the HOMEPAGE — the same reach the old "Page not found — Force AI" bug had. The
+  `robots: noindex` half inherits everywhere. Ruling SR-7.
+- **"Try Again" must actually retry.** Next hands the boundary the BARE `reset`, which only clears
+  client error state and re-renders the SAME failed server payload — its own
+  `client/components/error-boundary.js` keeps a separate `retry` that wraps `context.refresh()` and
+  `reset()` in a transition. With "Go Home" suppressed, that button is the page's only control, so
+  bare `reset` would make the retry page a dead end during the very outage it serves. The handler now
+  mirrors Next's `retry`. **Not click-verified** — that needs a browser driving a live transient;
+  the wiring is held by a source assertion in the gate. Ruling SR-8.
 
 **Gates:** `npm run lint`, `npm run typecheck`, the full CI unit set
 (`npx vitest run tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders`),
