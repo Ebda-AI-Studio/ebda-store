@@ -19,7 +19,12 @@ jobs:
     runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 15
     steps:
-      - name: dump -> gzip -> encrypt -> upload to R2 (rclone, verified path)
+      # Needed for scripts/verify-dump.sh below. This job used to run with no
+      # checkout at all, which is why its only quality bar could be an inline
+      # byte count.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: dump -> gzip -> VERIFY -> encrypt -> upload to R2 (rclone, verified path)
         env:
           PGURL: ${{ secrets.DATABASE_URL_DIRECT }}
           KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
@@ -35,11 +40,40 @@ jobs:
           done
           TS=$(date -u +%Y%m%dT%H%M%SZ)
           OUT="${PROJECT}-backup-${TS}.sql.gz.enc"
-          # pg_dump 17 (matches Neon PG17) via docker; gzip; AES-256-CBC encrypt.
-          docker run --rm -e PGURL postgres:17 sh -c 'pg_dump "$PGURL"' \
-            | gzip | openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:KEY -out "$OUT"
+
+          WORK="$(mktemp -d)"
+          trap 'rm -rf "$WORK"' EXIT
+          GZ="${WORK}/${PROJECT}-backup-${TS}.sql.gz"
+
+          # pg_dump 17 (matches Neon PG17) via docker; gzip to a TEMP FILE rather
+          # than straight into openssl. The plaintext has to exist for one step so
+          # that it can be INSPECTED: once encrypted, nothing downstream — not this
+          # job, not a restore six weeks from now — can tell a complete dump from
+          # an empty one without the decryption key and a manual look.
+          docker run --rm -e PGURL postgres:17 sh -c 'pg_dump "$PGURL"' | gzip > "$GZ"
+
+          # Assert the dump is RESTORABLE before it is encrypted or uploaded:
+          # gzip integrity, a decompressed floor, the pg_dump header, at least one
+          # CREATE TABLE, and data rows >= tables.
+          #
+          # The last one is the assertion that matters and the reason a byte count
+          # is not enough. A schema-only dump is a few KB — it clears any sane size
+          # floor and restores an EMPTY DATABASE. That is not hypothetical: the
+          # Force Media CRM archived 30 consecutive schema-only dumps over five
+          # weeks, each one reported as a successful backup, and they were the DR
+          # that was supposed to survive the wipe that had already happened.
+          #
+          # On failure this exits non-zero, which fails the job, fires the
+          # "notify on failure" step below, and leaves NOTHING uploaded — a missing
+          # backup is loud, a worthless one is silent.
+          bash scripts/verify-dump.sh "$GZ"
+
+          openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:KEY -in "$GZ" -out "$OUT"
           SZ=$(stat -c%s "$OUT"); echo "encrypted dump: ${SZ} bytes"
-          [ "${SZ:-0}" -gt 200 ] || { echo "::error::dump empty/too small"; exit 1; }
+          # Belt-and-braces on the ENCRYPTED artifact: catches a truncated write or
+          # a failed encryption between the check above and the upload below. It is
+          # not, and never was, a check on the dump's contents.
+          [ "${SZ:-0}" -gt 200 ] || { echo "::error::encrypted artifact empty/too small"; exit 1; }
           # rclone S3 -> R2. NO_CHECK_BUCKET=true is REQUIRED for a bucket-scoped
           # R2 token (else CreateBucket probe 403s). Verified end-to-end 2026-07-01.
           command -v rclone >/dev/null || {

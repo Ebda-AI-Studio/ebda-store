@@ -91,7 +91,7 @@ deps) — dated reports live in `docs/audits/`.
 - Nightly encrypted off-machine database dump to a private R2 bucket
   (03:50 UTC, `.github/workflows/db-backup.yml`) — RPO ≤ 24h.
 - Neon point-in-time recovery: **7 days** of history (restore to any second).
-- Independent daily local dumps (9 rotations) as a third copy.
+- Independent daily local dumps (30 rotations) as a third copy.
 - Restore procedures documented and tested: `docs/ROLLBACK.md`.
 
 ## Privacy

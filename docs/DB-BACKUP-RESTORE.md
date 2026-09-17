@@ -85,16 +85,27 @@ Central script `~/.claude/scripts/backup-all-neon.sh` (launchd `com.forceai.neon
   (the entire DB — it's small). Files are `<UTC-timestamp>.sql.gz` (plaintext gzip) plus the
   `.sql.gz.enc` copies pushed off-site.
 - **Requires** `pg_dump` ≥ the Neon server major (PG17 → `brew install postgresql@17`;
-  pg_dump 14 silently produces empty dumps against a PG17 server) and the **DIRECT**
+  pg_dump 14 aborts against a PG17 server and the pipeline gzips the empty stream into a
+  valid 20-byte archive — measured 2026-09-17, six such files were found locally, see
+  `docs/plans/2026-09-17-db-backup-assert-dump.md`) and the **DIRECT**
   (non-pooler) URL, which the script pulls from Neon via `neonctl --role-name neondb_owner`
   (full-privilege, includes RLS tables) — independent of any repo `.env`.
 
 ## Layer 2 — off-machine encrypted (GitHub Actions → private R2)
 
 `.github/workflows/db-backup.yml` runs daily 03:50 UTC (+ `workflow_dispatch`): `pg_dump 17`
-→ gzip → AES-256-CBC (openssl, pbkdf2) → upload to `s3://databasebackup/<project>/`. Prunes
-objects >30 days (bucket also has a 30-day lifecycle rule). **Fails loudly** (Telegram) on
-empty output. Mac-independent — this is what survives the laptop dying.
+→ gzip → **verify** → AES-256-CBC (openssl, pbkdf2) → upload to `s3://databasebackup/<project>/`.
+Prunes objects >30 days (bucket also has a 30-day lifecycle rule). Mac-independent — this is
+what survives the laptop dying.
+
+**The dump is asserted before it is encrypted** (`scripts/verify-dump.sh`, added 2026-09-17):
+gzip integrity → decompressed floor (1KB) → `-- PostgreSQL database dump` header → at least one
+`CREATE TABLE` → **data rows ≥ tables**. The row assertion is the one with teeth: a schema-only
+dump is a few KB, clears any byte floor, and restores an empty database — which is exactly how
+the Force Media CRM archived 30 consecutive nightly "successes" over five weeks against a
+database that had already been wiped. Verification happens on the PLAINTEXT because an encrypted
+blob cannot be inspected later without the key. A failed assertion **fails the job, fires the
+Telegram alert, and uploads nothing** — a missing backup is loud, a worthless one is silent.
 
 ### Required repo secrets
 
@@ -184,5 +195,13 @@ To re-drill: run the Layer-0 restore block (steps 1–2, then `branches delete`)
 dump-restore block (steps 1–3, verify counts, then `branches delete`). Both must end with only
 `main` remaining: `neonctl branches list --project-id "$PID" --org-id "$ORG"`.
 
-**Verify a dump is valid before trusting it:** `zcat < <file>.sql.gz | head` should show SQL
-(`-- PostgreSQL database dump` … `CREATE TABLE`).
+**Verify a dump is valid before trusting it:** `bash scripts/verify-dump.sh <file>.sql.gz`.
+It exits 0 only for a dump that can actually restore — valid gzip, above the size floor, real
+pg_dump header, ≥1 table, and **more data rows than tables**. Eyeballing `zcat < <file>.sql.gz |
+head` shows the header but cannot tell a full dump from a schema-only one; that distinction is
+the whole point. Its own tests (valid / empty / truncated / schema-only) live in
+`scripts/verify-dump.test.sh` and run in CI via `tests/unit/db-backup-verify-dump.test.ts`.
+
+A `.sql.gz.SUSPECT` file in the backup directory is a dump that FAILED that check, parked for
+forensics by `scripts/backup-db.sh`. It is not a backup and is deliberately outside the
+`*.sql.gz` glob the restore steps above use.
