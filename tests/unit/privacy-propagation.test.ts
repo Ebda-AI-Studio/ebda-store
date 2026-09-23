@@ -82,6 +82,7 @@ describe('privacy-propagation.service', () => {
     mockConfig.posthogPersonalApiKey = '';
     mockConfig.posthogProjectId = '';
     mockConfig.posthogHost = 'https://eu.posthog.com';
+    mockConfig.posthogErasureRequired = false;
   });
 
   afterEach(() => {
@@ -157,7 +158,26 @@ describe('privacy-propagation.service', () => {
   });
 
   describe('deletePostHogPerson', () => {
-    it('FAILS LOUD when PostHog personal API key/project id are unset', async () => {
+    /**
+     * Unset credentials are a documented NO-OP, not a failure, because nothing
+     * calls `posthog.identify(userId)` so no person is keyed by our userId.
+     * It used to throw, which dead-lettered the propagation function and raised
+     * a P1 alert on EVERY erasure — up to 200 per monthly retention-cron run —
+     * for a person that provably cannot exist. The same function already
+     * returns normally when the credential IS set and the distinct_id matches
+     * nothing, so this branch was strictly noisier than a stricter one.
+     */
+    it('no-ops (does not throw) when PostHog credentials are unset and erasure is not declared required', async () => {
+      const fetchMock = vi.fn();
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      await expect(deletePostHogPerson('user-123')).resolves.toBeUndefined();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    /** The escape hatch: once identify() is wired, declare it and it fails loud again. */
+    it('FAILS LOUD when credentials are unset but POSTHOG_ERASURE_REQUIRED is true', async () => {
+      mockConfig.posthogErasureRequired = true;
       const fetchMock = vi.fn();
       global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -168,6 +188,7 @@ describe('privacy-propagation.service', () => {
     });
 
     it('the not-configured error names the provider', async () => {
+      mockConfig.posthogErasureRequired = true;
       await expect(deletePostHogPerson('user-123')).rejects.toMatchObject({
         provider: 'posthog',
       });

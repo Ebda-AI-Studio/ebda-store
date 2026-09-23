@@ -19,9 +19,11 @@
  *     a genuine no-op rather than a missing-credential failure.
  *   - PostHog: deletes the person, env-gated behind
  *     `POSTHOG_PERSONAL_API_KEY` (not configured anywhere in this repo
- *     today — see `deletePostHogPerson`). Missing credential now FAILS
- *     LOUD (`PropagationNotConfiguredError`, dead-lettered via
- *     `alerts-failure-watch`) rather than silently no-opping.
+ *     today — see `deletePostHogPerson`). A missing credential WARNS and
+ *     no-ops, because no person is keyed by our userId until
+ *     `posthog.identify()` is wired; it fails loud
+ *     (`PropagationNotConfiguredError`, dead-lettered via
+ *     `alerts-failure-watch`) only when `POSTHOG_ERASURE_REQUIRED=true`.
  *   - Meta / TikTok CAPI: no per-subject deletion API exists (see
  *     docs/privacy/data-map.md "Deletion & backups" for the full
  *     reasoning and the providers' own data-subject-request contacts) —
@@ -189,23 +191,61 @@ interface PostHogPersonSearchResult {
  *
  * To make this live: set `POSTHOG_PERSONAL_API_KEY` + `POSTHOG_PROJECT_ID`,
  * AND add `posthog.identify(user.id)` at login so `userId` really is the
- * PostHog `distinct_id` this function looks up. Until then, every erasure
- * throws `PropagationNotConfiguredError` here, which
- * `account-erased-propagation.ts` catches, logs, and dead-letters via
- * `alerts-failure-watch` — visible, not silent.
+ * PostHog `distinct_id` this function looks up — then set
+ * `POSTHOG_ERASURE_REQUIRED=true` so a missing credential fails loud again.
+ *
+ * Until identify() exists there is no person keyed by our `userId`, so an
+ * unconfigured PostHog is a documented WARN + no-op rather than a thrown
+ * `PropagationNotConfiguredError`. It used to throw, which dead-lettered
+ * `account-erased-propagation` and raised a P1 alert on EVERY erasure
+ * (up to 200 per monthly retention-cron run) for a person that provably
+ * cannot exist — noise that trains operators to mute the very channel a real
+ * OneSignal outage would use. See the branch below for the full reasoning.
  */
 export async function deletePostHogPerson(userId: string): Promise<void> {
   const { posthogPersonalApiKey: apiKey, posthogProjectId: projectId, posthogHost } = config;
 
   if (!apiKey || !projectId) {
-    logger.error(
-      '[privacy-propagation] POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID not set — ' +
-        'PostHog person deletion could NOT be attempted (fail-loud, not a silent no-op; see docs/privacy/data-map.md)'
+    // `PropagationNotConfiguredError` means, by its own contract above,
+    // "there IS a copy of this person's data here and we could not reach it".
+    // For PostHog that precondition does NOT hold: nothing in this repo calls
+    // `posthog.identify(userId)` (verified 2026-09-23 — every occurrence is a
+    // comment), so PostHog knows visitors only by an anonymous distinct_id the
+    // server never learns. There is no person keyed by our userId to delete.
+    //
+    // The proof is in this function's own body: when the credential IS set and
+    // the distinct_id matches nothing, it logs "nothing to delete" and returns
+    // normally. Unconfigured cannot hold MORE data than configured-and-
+    // unmatched, yet it was the only branch that threw.
+    //
+    // Cost of that asymmetry: `account-erased-propagation` (retries: 2)
+    // exhausted every attempt on EVERY erasure, so `alerts-failure-watch`
+    // raised a P1 per erase — and the monthly retention cron erases up to
+    // USER_ANONYMIZE_BATCH_CAP (200) subjects per run. A channel that cries
+    // wolf on every single erasure gets muted, and then a REAL OneSignal
+    // outage or PostHog 500 is invisible. Fail-loud that cannot distinguish
+    // itself from noise is not fail-loud.
+    //
+    // So: warn (durable, greppable) instead of throwing — UNLESS someone has
+    // declared that PostHog really does hold identified data, in which case
+    // the original fail-loud behaviour is exactly right.
+    if (config.posthogErasureRequired) {
+      logger.error(
+        '[privacy-propagation] POSTHOG_ERASURE_REQUIRED=true but ' +
+          'POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID are not set — PostHog person deletion could NOT be attempted'
+      );
+      throw new PropagationNotConfiguredError(
+        'posthog',
+        'POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID not set while POSTHOG_ERASURE_REQUIRED=true — PostHog person deletion not attempted'
+      );
+    }
+    logger.warn(
+      { userId },
+      '[privacy-propagation] PostHog person deletion SKIPPED — no POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID, ' +
+        'and posthog.identify(userId) is never called so no person is keyed by this userId. ' +
+        'Set POSTHOG_ERASURE_REQUIRED=true (with the credentials) to make this a hard failure once identify() is wired.'
     );
-    throw new PropagationNotConfiguredError(
-      'posthog',
-      'POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID not set — PostHog person deletion not attempted'
-    );
+    return;
   }
 
   const authHeader = { Authorization: `Bearer ${apiKey}` };

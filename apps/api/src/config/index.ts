@@ -171,12 +171,21 @@ export const config = {
   // bundle) — deleting a person requires a PERSONAL API key with
   // person-level write scope, which must never reach the browser. Unset
   // by default; when unset, `deletePostHogPerson` (privacy-propagation
-  // service) throws `PropagationNotConfiguredError` so the erasure's
-  // PostHog step fails loud (logged + dead-lettered) rather than faking
-  // success. See docs/privacy/data-map.md.
+  // service) logs a WARN and no-ops, because nothing calls
+  // `posthog.identify(userId)` so no person is keyed by our userId. Set
+  // `POSTHOG_ERASURE_REQUIRED=true` once identify() is wired to make the
+  // unconfigured case fail loud again. See docs/privacy/data-map.md.
   posthogPersonalApiKey: process.env.POSTHOG_PERSONAL_API_KEY || '',
   posthogProjectId: process.env.POSTHOG_PROJECT_ID || '',
   posthogHost: process.env.POSTHOG_HOST || 'https://eu.posthog.com',
+  // Declares that PostHog HOLDS erasable per-subject data, so a missing
+  // credential is a real compliance failure rather than a no-op. Off by
+  // default because nothing in this repo calls `posthog.identify(userId)`
+  // (verified 2026-09-23: every occurrence is a comment), so PostHog knows
+  // visitors only by an anonymous distinct_id the server never learns —
+  // there is no person keyed by our userId to delete. Set this to `true` the
+  // moment identify() is wired, and the unconfigured case fails loud again.
+  posthogErasureRequired: process.env.POSTHOG_ERASURE_REQUIRED === 'true',
 
   // Email
   smtpHost: process.env.SMTP_HOST || 'localhost',
