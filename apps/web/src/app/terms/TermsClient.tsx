@@ -5,6 +5,15 @@ import { useStore, useStoreContact } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatDate } from '../../lib/format-date';
 
+// This fallback copy's content last materially changed in commit 9364a5c3
+// ("fix: remediate builder reality audit findings ... legal", 2026-07-09,
+// PR #523 §Lens D) — the Kuwait governing-law/jurisdiction/as-is-warranty
+// section below. `formatDate(new Date(), ...)` rendered "today" on every
+// page load regardless, a false attestation that the terms are currently
+// under review (C1-2 in the 2026-09-22 AEO audit). Update this constant in
+// the SAME commit as any future edit to the copy below.
+const TERMS_FALLBACK_LAST_UPDATED = new Date('2026-07-09T00:00:00Z');
+
 /**
  * Legacy hardcoded Terms of Service. Used as fallback when the merchant
  * hasn't authored a `terms` row in the Pages CMS.
@@ -23,7 +32,7 @@ function TermsFallback() {
         </h1>
         <p className="mt-2 text-muted-foreground">
           {t('Last updated:', 'آخر تحديث:')}{' '}
-          {formatDate(new Date(), {
+          {formatDate(TERMS_FALLBACK_LAST_UPDATED, {
             timezone: store.timezone,
             language,
             style: 'long',

@@ -3,6 +3,7 @@ import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { decodeRouteParam } from '../../../lib/route-params';
 import { getPreviewDraftToken } from '../../../lib/preview-draft';
+import { resolveStorefrontLocale } from '../../../lib/seo/resolve-locale';
 import { buildProductMetadata, ProductDetailBody } from './ProductDetailBody';
 
 /**
@@ -51,7 +52,11 @@ export async function generateMetadata({
       return { title: 'Product Not Found' };
     }
 
-    return buildProductMetadata(product, store);
+    const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
+      ?.defaultLanguage as string | undefined;
+    const locale = await resolveStorefrontLocale(storeDefaultLanguage);
+
+    return buildProductMetadata(product, store, locale);
   } catch {
     // On any fetch error, return minimal metadata
     return { title: 'Product' };

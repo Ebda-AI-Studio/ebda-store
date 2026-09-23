@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 import { getStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import { pickMetaDescription } from '../lib/seo/meta-description';
+import { resolveStorefrontLocale } from '../lib/seo/resolve-locale';
 import { hslToHex } from '@force/shared';
 
 /**
@@ -76,6 +77,11 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const store = await getStore();
   const primaryColor = store.theme?.primaryColor || '#ff6e00';
   const fallbackThemeColor = hslToHex(primaryColor);
+  const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
+    ?.defaultLanguage as string | undefined;
+  const locale = await resolveStorefrontLocale(storeDefaultLanguage);
+  const localizedStoreDescriptionFallback =
+    locale === 'ar' ? `تسوق في ${store.name}` : `Shop at ${store.name}`;
 
   // When the admin has enabled PWA and saved app-name / icons / theme color
   // for the store, the API returns a manifest already shaped for that store.
@@ -87,7 +93,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     return {
       name: apiManifest.name || store.name,
       short_name: apiManifest.short_name || store.name,
-      description: apiManifest.description || `Shop at ${store.name}`,
+      description: apiManifest.description || localizedStoreDescriptionFallback,
       start_url: apiManifest.start_url || '/',
       display: apiManifest.display || 'standalone',
       orientation: apiManifest.orientation || 'any',
@@ -112,7 +118,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     name: store.name,
     short_name: store.name,
-    description: pickMetaDescription(store) || `Shop at ${store.name}`,
+    description: pickMetaDescription(store, locale) || localizedStoreDescriptionFallback,
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',

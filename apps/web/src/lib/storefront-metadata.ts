@@ -122,6 +122,20 @@ export function buildStorefrontMetadata(store: ResolvedStore, isOnCustomDomain: 
       template: `%s | ${localizedStoreName}`,
     },
     description,
+    // NO `alternates.canonical` here on purpose. This function backs the
+    // ROOT layout's `generateMetadata` (both the legacy header-based layout
+    // AND the tenant-store `[locale]` layout) — its return value is the
+    // FALLBACK metadata for every route under it, and Next.js fills in any
+    // top-level key (like `alternates`) a page doesn't set itself from the
+    // nearest ancestor that does. Setting a canonical here once pointed
+    // EVERY page with no canonical of its own (privacy, terms, about, faq,
+    // contact, cart, checkout, account/*, ...) at the STORE HOME instead of
+    // having none — verified live: `/privacy` picked up
+    // `<link rel="canonical" href="https://pecannbee.com.kw">`, telling
+    // crawlers the privacy policy is a duplicate of the homepage. The home
+    // canonical (A3, 2026-09-22 AEO audit) is set at the actual home ROUTE
+    // instead — `app/page.tsx` and `app/tenant-store/[tenant]/[locale]/page.tsx`
+    // each carry their own `generateMetadata` for exactly this reason.
     keywords: [
       'e-commerce',
       'online store',

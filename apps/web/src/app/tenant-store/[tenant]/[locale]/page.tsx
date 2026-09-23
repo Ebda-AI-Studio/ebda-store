@@ -1,9 +1,25 @@
+import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
+import { storeAbsoluteUrl } from '@/lib/structured-data';
 import { HomePageBody } from '@/app/HomePageBody';
 
 // NOTE: no `generateStaticParams` here — deliberate, see the layout's
 // `dynamicParams` comment and
 // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.4 (explicit ban).
+
+// See the identical comment in `app/page.tsx` — the parent `[locale]/layout.tsx`'s
+// `generateMetadata` deliberately does not set `alternates`, or it leaks the
+// home canonical onto every sibling route (about, contact, faq, ...) that
+// doesn't set its own.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tenant: string; locale: string }>;
+}): Promise<Metadata> {
+  const { tenant } = await params;
+  const store = await getStoreByTenantParam(tenant);
+  return { alternates: { canonical: storeAbsoluteUrl(store, '') } };
+}
 
 export default async function StoreHomePage({
   params,

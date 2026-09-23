@@ -7,6 +7,7 @@ import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect'
 import { fetchPublicShippingZones } from '../../../lib/shipping-public';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
+import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
 import {
   productJsonLd,
   breadcrumbJsonLd,
@@ -65,15 +66,24 @@ interface ProductData {
 
 export function buildProductMetadata(
   product: ProductData,
-  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'>
+  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'>,
+  locale: StorefrontLocale = 'en'
 ): Metadata {
   const { name: storeName, slug: storeSlug, domain: storeDomain } = store;
   const title = product.name;
   // AEO > SEO > plain description (truncated to 160 chars for meta tag).
-  const rawDescription = pickMetaDescription(product) || product.description;
+  // The plain-description fallback must match `locale` too — with only the
+  // locale threaded into `pickMetaDescription` fixed, a product with no AEO/SEO
+  // copy but a real `descriptionAr` would still fall through to the English
+  // `description` field on an Arabic-default store (A1 fix step 5).
+  const rawDescription =
+    pickMetaDescription(product, locale) ||
+    (locale === 'ar' ? product.descriptionAr : product.description);
   const description =
     rawDescription?.slice(0, 160) ||
-    `Buy ${product.name} at ${storeName}. Fast delivery in Kuwait.`;
+    (locale === 'ar'
+      ? `تسوق ${product.name} من ${storeName}. توصيل سريع في الكويت.`
+      : `Buy ${product.name} at ${storeName}. Fast delivery in Kuwait.`);
   const ogImage = product.images?.[0]?.url;
   const category = product.categories?.[0]?.category?.name;
   // Platform-path stores need the `/<slug>` prefix (see storeAbsoluteUrl doc
@@ -110,6 +120,18 @@ export function buildProductMetadata(
       type: 'website',
       url: canonicalUrl,
       ...(ogImages.length ? { images: ogImages } : {}),
+    },
+    // Without an explicit `twitter` block, Next.js does NOT derive one from
+    // the top-level `title`/`description` above — it deep-merges only with
+    // the ROOT layout's `twitter` object (which carries the STORE's home
+    // description), so every product/bundle page silently showed the
+    // store-wide description on Twitter/X and iMessage-style unfurls
+    // instead of its own. Explicit block here matches `openGraph` exactly.
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} | ${storeName}`,
+      description,
+      ...(ogImages.length ? { images: [ogImages[0].url] } : {}),
     },
     other: {
       ...(category ? { 'product:category': category } : {}),

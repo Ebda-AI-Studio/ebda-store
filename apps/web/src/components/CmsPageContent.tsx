@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
+import { formatDate } from '../lib/format-date';
 
 /**
  * Shape of a public StorePage row as returned by the API. The API
@@ -21,6 +22,9 @@ interface PublicStorePage {
   isPublished: boolean;
   contentHtml?: string | null;
   contentHtmlAr?: string | null;
+  /** ISO 8601. Absent only if a stale cached response predates this field —
+   *  guarded at the render site below. */
+  updatedAt?: string;
 }
 
 type FetchState =
@@ -174,6 +178,18 @@ export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentP
       )}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+        {/* Merchant-authored legal pages previously showed NO "Last updated"
+         *  date at all on this path (the fallback copy's always-today date
+         *  was the only place it ever rendered) — C1-2 in the 2026-09-22
+         *  AEO audit. Scoped to privacy/terms only, matching the fallback's
+         *  own scope; other CMS page types (about, faq, shipping, custom)
+         *  were never asked to carry this claim. */}
+        {(slug === 'privacy' || slug === 'terms') && page.updatedAt && (
+          <p className="mt-2 text-muted-foreground">
+            {t('Last updated:', 'آخر تحديث:')}{' '}
+            {formatDate(page.updatedAt, { timezone: store.timezone, language, style: 'long' })}
+          </p>
+        )}
       </div>
       <div className="mt-12 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
         <div

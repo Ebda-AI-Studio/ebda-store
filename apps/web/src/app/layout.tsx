@@ -192,8 +192,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const marketingConsentGranted = resolvedConsent?.marketing === true;
 
-  // Organization JSON-LD for search engines
-  const orgJsonLd = organizationJsonLd(store);
+  // Organization JSON-LD for search engines. `resolvedLanguage` (above) is
+  // the SAME cookie-then-store-default decision that picked `<html lang>` —
+  // reusing it here (rather than re-deriving) is what guarantees this
+  // JSON-LD's `description` can never disagree with the page it's on.
+  const orgJsonLd = organizationJsonLd(store, resolvedLanguage);
 
   // Build a <style> tag that overrides the default orange theme in globals.css
   // Inline styles on <html> don't beat `:root {}` in @layer base, so we inject a :root rule instead.

@@ -180,10 +180,21 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
             ? `https://${store.domain}`
             : `https://store.force-ai.co/${store.slug}`;
 
+          // `/products?category=<slug>` is the storefront's real
+          // category-browse URL — there is no `/categories/[slug]` route in
+          // apps/web. This prompt previously fed the model `/categories/<slug>`,
+          // which the model then echoed verbatim into the stored llms.txt text,
+          // producing links that 404 for every category on every store that
+          // ran this sweep (A4-2, 2026-09-22 AEO audit — verified live: 18/18
+          // category links across pecannbee.com.kw + wadyaljuz.com 404'd).
+          // `apps/web/src/app/llms.txt/route.ts`'s `fixCategoryLinks` also
+          // rewrites/drops any dead link at serve time as a second layer of
+          // defense, but the prompt should stop generating them in the first
+          // place.
           const catList = categories
             .map(
               c =>
-                `- ${c.name}${c.nameAr ? ` / ${c.nameAr}` : ''}: ${storeUrl}/categories/${c.slug}`
+                `- ${c.name}${c.nameAr ? ` / ${c.nameAr}` : ''}: ${storeUrl}/products?category=${c.slug}`
             )
             .join('\n');
 

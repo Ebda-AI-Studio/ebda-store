@@ -5,6 +5,15 @@ import { useStore, useStoreContact } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatDate } from '../../lib/format-date';
 
+// This fallback copy's content last materially changed in commit 9364a5c3
+// ("fix: remediate builder reality audit findings ... legal", 2026-07-09,
+// PR #523 §Lens D) — the PostHog/Sentry/OneSignal/Resend/data-retention
+// section below. `formatDate(new Date(), ...)` rendered "today" on every
+// page load regardless, a false attestation that the policy is currently
+// under review (C1-2 in the 2026-09-22 AEO audit). Update this constant in
+// the SAME commit as any future edit to the copy below.
+const PRIVACY_FALLBACK_LAST_UPDATED = new Date('2026-07-09T00:00:00Z');
+
 /**
  * Legacy hardcoded Privacy Policy. Used as a fallback when the merchant
  * hasn't authored a `privacy` row in the Pages CMS — preserves the
@@ -24,7 +33,7 @@ function PrivacyFallback() {
         </h1>
         <p className="mt-2 text-muted-foreground">
           {t('Last updated:', 'آخر تحديث:')}{' '}
-          {formatDate(new Date(), {
+          {formatDate(PRIVACY_FALLBACK_LAST_UPDATED, {
             timezone: store.timezone,
             language,
             style: 'long',

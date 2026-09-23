@@ -1,4 +1,6 @@
 import type { ResolvedStore } from './store-resolver';
+import { pickMetaDescription } from './seo/meta-description';
+import type { StorefrontLocale } from './seo/resolve-locale';
 
 interface ProductForJsonLd {
   name: string;
@@ -248,32 +250,54 @@ export function bundleJsonLd(bundle: BundleForJsonLd, store: ResolvedStore) {
 
 /**
  * Schema.org Organization structured data for the store.
- * When `store.aboutJson` is present (populated by the GEO brand-facts sweep),
- * its fields are merged into the node to enrich LLM-search visibility.
- * aboutJson fields never overwrite the core fields (name, url, logo, etc.) —
- * they only add supplemental properties like `description`, `areaServed`,
- * `knowsLanguage`, `contactPoint`, etc.
+ * When `store.aboutJson` is present (populated by the GEO brand-facts sweep,
+ * `apps/api/src/lib/inngest/functions/bulk-ai-geo.ts`), its known keys
+ * (`location`, `region`, `currency`, `languages`, `keyCategories`,
+ * `contactMethods`) are NOT schema.org properties, so they are folded into
+ * `additionalProperty` as `PropertyValue` entries rather than spread onto
+ * the node directly (A2 in the 2026-09-22 AEO audit — spreading them raw
+ * produced invalid/non-standard keys on a schema.org node). `description`
+ * and `areaServed` ARE real schema.org Organization properties and are
+ * derived from real store data below; the aboutJson `location`/`region`
+ * only feed `areaServed` — every other about* field only ever feeds
+ * `additionalProperty`.
+ *
+ * `locale` selects which of the store's own description fields to emit —
+ * pass the SAME locale the page's `<html lang>` resolved to (see
+ * `lib/seo/resolve-locale.ts`), or Organization's `description` disagrees
+ * with the rest of the page, exactly the A1 bug class.
  */
-export function organizationJsonLd(store: ResolvedStore) {
+export function organizationJsonLd(store: ResolvedStore, locale: StorefrontLocale = 'en') {
   const siteUrl = storeAbsoluteUrl(store, '');
+  const description = pickMetaDescription(store, locale);
 
-  // Merge brand-facts from GEO sweep without overriding core fields.
-  const aboutOverrides: Record<string, unknown> =
-    store.aboutJson && typeof store.aboutJson === 'object' ? { ...store.aboutJson } : {};
-  // Remove keys that the canonical fields below own so we never double-set.
-  for (const key of [
-    '@context',
-    '@type',
-    'name',
-    'url',
-    'logo',
-    'email',
-    'telephone',
-    'address',
-    'sameAs',
-  ]) {
-    delete aboutOverrides[key];
-  }
+  const aboutJson: Record<string, unknown> =
+    store.aboutJson && typeof store.aboutJson === 'object' ? store.aboutJson : {};
+
+  // Real schema.org property. `areaServed` accepts Text — no need to guess
+  // a Place/Country/AdministrativeArea @type for AI-generated free text
+  // ("Kuwait", "GCC") that isn't guaranteed to be a formal place name.
+  // Absent when the merchant/sweep never populated either field — never
+  // invented (a default "Kuwait/GCC" would be a false claim for a
+  // GCC-adjacent merchant that hasn't actually confirmed its service area).
+  const areaServed =
+    typeof aboutJson.location === 'string' && aboutJson.location.trim()
+      ? aboutJson.location.trim()
+      : typeof aboutJson.region === 'string' && aboutJson.region.trim()
+        ? aboutJson.region.trim()
+        : undefined;
+
+  // Every OTHER aboutJson key (not location/region, already consumed above)
+  // becomes a PropertyValue instead of a raw spread — valid schema.org,
+  // still fully consumable by an LLM reading the JSON-LD, and no information
+  // lost versus the previous raw-spread shape.
+  const additionalProperty = Object.entries(aboutJson)
+    .filter(([key, value]) => key !== 'location' && key !== 'region' && value !== undefined)
+    .map(([key, value]) => ({
+      '@type': 'PropertyValue',
+      name: key,
+      value: Array.isArray(value) ? value.join(', ') : String(value),
+    }));
 
   return {
     '@context': 'https://schema.org',
@@ -281,6 +305,7 @@ export function organizationJsonLd(store: ResolvedStore) {
     name: store.name,
     url: siteUrl,
     ...(store.logo ? { logo: store.logo } : {}),
+    ...(description ? { description } : {}),
     ...(store.email ? { email: store.email } : {}),
     ...(store.phone ? { telephone: store.phone } : {}),
     ...(store.address
@@ -291,13 +316,13 @@ export function organizationJsonLd(store: ResolvedStore) {
           },
         }
       : {}),
+    ...(areaServed ? { areaServed } : {}),
     ...(store.socialLinks
       ? {
           sameAs: Object.values(store.socialLinks).filter(Boolean),
         }
       : {}),
-    // GEO brand-facts enrichment (supplemental only — core fields above win).
-    ...aboutOverrides,
+    ...(additionalProperty.length ? { additionalProperty } : {}),
   };
 }
 

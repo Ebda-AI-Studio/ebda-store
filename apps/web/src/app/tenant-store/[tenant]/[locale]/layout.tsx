@@ -4,6 +4,7 @@ import { buildStorefrontMetadata } from '@/lib/storefront-metadata';
 import { buildThemeStyleTag } from '@/lib/theme-css';
 import { emitZoneCss } from '@/lib/emit-zone-css';
 import { organizationJsonLd } from '@/lib/structured-data';
+import { localeFromRouteParam } from '@/lib/seo/resolve-locale';
 import { JsonLd } from '@/components/JsonLd';
 import { ConsentGatedMarketingPixels } from './ConsentGatedMarketingPixels';
 
@@ -75,8 +76,9 @@ export default async function StoreLayout({
   children: React.ReactNode;
   params: Promise<StoreLayoutParams>;
 }) {
-  const { tenant } = await params;
+  const { tenant, locale: localeParam } = await params;
   const store = await getStoreByTenantParam(tenant);
+  const locale = localeFromRouteParam(localeParam);
 
   // Theme CSS injection — shared builder with the legacy layout (see
   // lib/theme-css.ts) so both trees paint an identical theme.
@@ -90,7 +92,7 @@ export default async function StoreLayout({
     : '';
   const combinedStyleTag = [themeStyleTag, typographyCss].filter(Boolean).join('\n');
 
-  const orgJsonLd = organizationJsonLd(store);
+  const orgJsonLd = organizationJsonLd(store, locale);
 
   return (
     <>

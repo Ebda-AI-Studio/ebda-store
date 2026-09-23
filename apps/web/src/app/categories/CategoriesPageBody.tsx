@@ -100,7 +100,11 @@ export async function CategoriesPageBody({
       ? itemList(
           categories.slice(0, 50).map((c: Category) => ({
             name: c.name,
-            url: storeAbsoluteUrl(store, `/categories/${c.slug}`),
+            // `/categories/<slug>` is not a real route anywhere in this app
+            // (see `fixCategoryLinks` in `app/llms.txt/route.ts` for the
+            // full writeup — same A4-2 defect class) — the storefront's
+            // actual category-browse URL is `/products?category=<slug>`.
+            url: storeAbsoluteUrl(store, `/products?category=${c.slug}`),
             image: c.image ?? null,
             price: null,
           })),

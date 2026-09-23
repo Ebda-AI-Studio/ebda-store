@@ -183,6 +183,11 @@ export type PublicPageResult =
         isPublished: boolean;
         contentHtml: string;
         contentHtmlAr: string;
+        // ISO 8601. Lets the storefront show a real "Last updated" date for a
+        // merchant-authored CMS page instead of either always showing
+        // today's date or (as it did previously) showing no date at all on
+        // this path — see C1-2 in the 2026-09-22 AEO audit.
+        updatedAt: string;
       };
     };
 
@@ -236,6 +241,7 @@ export class PagesService {
         isPublished: page.isPublished,
         contentHtml: renderBlocksToHtml(page.contentBlocks),
         contentHtmlAr: renderBlocksToHtml(page.contentBlocksAr),
+        updatedAt: page.updatedAt.toISOString(),
       },
     };
   }

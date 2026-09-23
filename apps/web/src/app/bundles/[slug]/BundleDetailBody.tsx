@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL, type PublicBundleDetail } from '../../../lib/api';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
+import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
 import { bundleJsonLd, breadcrumbJsonLd, storeAbsoluteUrl } from '../../../lib/structured-data';
 import { JsonLd } from '../../../components/JsonLd';
 import BundleDetailClient from './BundleDetailClient';
@@ -56,13 +57,25 @@ export async function fetchInitialBundle(
 
 export function buildBundleMetadata(
   bundle: PublicBundleDetail,
-  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'>
+  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'>,
+  locale: StorefrontLocale = 'en'
 ): Metadata {
   const { name: storeName, slug: storeSlug, domain: storeDomain } = store;
   const title = bundle.name;
-  const rawDescription = pickMetaDescription(bundle) || bundle.description || undefined;
+  // Bundles carry no metaDescription*/Aeo* columns (schema.prisma Bundle
+  // model), so `pickMetaDescription` always falls through to
+  // description/descriptionAr — the locale param is what selects between
+  // them. Same locale-aware fallback as products (A1 fix step 5): don't
+  // fall back to the English `description` on an Arabic-default store.
+  const rawDescription =
+    pickMetaDescription(bundle, locale) ||
+    (locale === 'ar' ? bundle.descriptionAr : bundle.description) ||
+    undefined;
   const description =
-    rawDescription?.slice(0, 160) || `Buy ${bundle.name} at ${storeName}. Fast delivery in Kuwait.`;
+    rawDescription?.slice(0, 160) ||
+    (locale === 'ar'
+      ? `تسوق ${bundle.name} من ${storeName}. توصيل سريع في الكويت.`
+      : `Buy ${bundle.name} at ${storeName}. Fast delivery in Kuwait.`);
   const canonicalUrl = storeAbsoluteUrl(
     { slug: storeSlug, domain: storeDomain },
     `/bundles/${bundle.slug}`
@@ -91,6 +104,16 @@ export function buildBundleMetadata(
       type: 'website',
       url: canonicalUrl,
       ...(ogImages.length ? { images: ogImages } : {}),
+    },
+    // See the identical comment in ProductDetailBody.buildProductMetadata —
+    // without an explicit `twitter` block Next.js does not derive one from
+    // the top-level description, it deep-merges the ROOT layout's `twitter`
+    // (the store's home description) instead.
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} | ${storeName}`,
+      description,
+      ...(ogImages.length ? { images: [ogImages[0].url] } : {}),
     },
     other: {
       'product:price:amount': String(bundle.price / 1000),

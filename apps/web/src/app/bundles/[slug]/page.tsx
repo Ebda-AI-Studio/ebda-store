@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { decodeRouteParam } from '../../../lib/route-params';
+import { resolveStorefrontLocale } from '../../../lib/seo/resolve-locale';
 import { BundleDetailBody, buildBundleMetadata, fetchInitialBundle } from './BundleDetailBody';
 
 /**
@@ -27,7 +28,10 @@ export async function generateMetadata({
     if (!bundle) {
       return { title: 'Bundle Not Found' };
     }
-    return buildBundleMetadata(bundle, store);
+    const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
+      ?.defaultLanguage as string | undefined;
+    const locale = await resolveStorefrontLocale(storeDefaultLanguage);
+    return buildBundleMetadata(bundle, store, locale);
   } catch {
     return { title: 'Bundle' };
   }
