@@ -78,7 +78,11 @@ describe('passwordResetTemplate', () => {
     email: 'a@example.com',
     name: 'Ahmad',
     resetUrl: 'https://store.test/reset?token=abc',
-    expiresIn: '1 hour',
+    // S5-2 (2026-09-22 security audit): TTL is now 15 minutes (was 1 hour),
+    // and the template takes a minute COUNT, not a pre-formatted English
+    // phrase, so the ar body below can render its own Arabic copy instead
+    // of embedding "1 hour" verbatim.
+    expiresInMinutes: 15,
   };
 
   it('en subject', () => {
@@ -92,14 +96,18 @@ describe('passwordResetTemplate', () => {
   it('en body contains reset URL and expiry', () => {
     const html = passwordResetTemplate.en(data, STORE);
     expect(html).toContain(data.resetUrl);
-    expect(html).toContain('1 hour');
+    expect(html).toContain('15 minutes');
   });
 
-  it('ar body contains Arabic text and reset URL', () => {
+  it('ar body contains Arabic text, the reset URL, and an Arabic expiry — no leaked English', () => {
     const html = passwordResetTemplate.ar(data, STORE);
     expect(html).toContain('إعادة تعيين');
     expect(html).toContain(data.resetUrl);
-    expect(html).toContain('1 hour');
+    expect(html).toContain('15 دقيقة');
+    // The bug this test now guards: the old template embedded the EN
+    // template's own literal English phrase verbatim into Arabic copy.
+    expect(html).not.toContain('minutes');
+    expect(html).not.toContain('hour');
   });
 
   it('XSS in name escaped (en)', () => {

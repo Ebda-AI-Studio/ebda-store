@@ -700,6 +700,55 @@ export const authLimiter = rateLimit({
 });
 
 /**
+ * Exported so it can be unit-tested directly (same reasoning as
+ * `refreshLimiterKey` above): `skipForLoadTestOrTests` disables every
+ * limiter under vitest, so a suite that only drove the route could never
+ * observe a 429 and would pass against a bucket that does not exist.
+ *
+ * Normalises the email (trim + lowercase) so `A@x.com` and `a@x.com ` share
+ * a budget, and has NO IP component — the whole point is to bound this
+ * account regardless of how many source IPs a flood comes from.
+ */
+export function resetEmailLimiterKey(req: Request): string {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  return `reset-email-${email || 'unknown'}`;
+}
+
+/**
+ * S5-3 (2026-09-22 security audit), `/forgot-password` only.
+ *
+ * `authLimiter` bounds this route too (15/15min per IP+email), but that
+ * budget is sized for credential-stuffing request VOLUME, not for reset-
+ * EMAIL flooding — 15 reset emails to one inbox in 15 minutes is still
+ * within it. This is a second, tighter, account-scoped budget stacked in
+ * front of `authLimiter`, keyed on the normalised email alone (no IP
+ * component) so rotating source IPs cannot reopen it.
+ *
+ * Not applied to `/reset-password` (the confirm step): that request body is
+ * `{ token, password }` — it carries no email to key on, and `authLimiter`
+ * already bounds it (IP + the literal string "unknown", since
+ * `req.body?.email` is absent) at 15/15min/IP.
+ */
+export const resetEmailLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'reset-email'),
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMITED',
+      message: 'Too many password reset requests for this account, please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Same availability-over-strictness posture as the other auth limiters.
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: resetEmailLimiterKey,
+});
+
+/**
  * Upper bound on a string we are willing to run an HMAC over in the refresh
  * key generator. Refresh JWTs are ~300-500 bytes; 4096 is generous headroom.
  */

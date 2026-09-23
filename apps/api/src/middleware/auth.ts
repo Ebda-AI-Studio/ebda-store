@@ -56,7 +56,8 @@ function extractToken(req: Request): string | undefined {
 }
 
 /**
- * Resolve the user's current token version.
+ * Resolve the user's current token version, plus (on a cache miss only) their
+ * account status.
  *
  * Redis first, Postgres on a miss. There is deliberately NO in-process cache
  * behind that.
@@ -79,15 +80,32 @@ function extractToken(req: Request): string | undefined {
  * revocation can still reach: a shorter-lived negative cache keyed on the
  * outage rather than on the user, or a circuit breaker in the Redis client.
  * Not a silent local copy of a security-critical value.
+ *
+ * STATUS (S3-1, 2026-09-22 security audit): the primary enforcement for a
+ * suspended/inactive account is `revokeAllSessions`, called from
+ * `PUT /admin/users/:id` whenever `status` leaves `active` — that bumps
+ * `tokenVersion`, which every request already checks below, cache hit or
+ * miss. Reading `status` here too is defense-in-depth for the case that call
+ * is skipped or fails: whenever the tv cache is COLD and this middleware has
+ * to hit Postgres anyway, it reads `status` off the same row for free and
+ * rejects a non-active user even if nothing ever bumped their tv. It cannot
+ * detect a suspension while the tv cache stays warm (that gap is what
+ * `revokeAllSessions` closes), so it is a second layer, not a replacement for
+ * the admin-route call.
  */
-async function resolveTokenVersion(userId: string): Promise<number> {
+async function resolveTokenVersionAndStatus(
+  userId: string
+): Promise<{ tokenVersion: number; blocked: boolean }> {
   const cachedTv = await redis.getUserTokenVersion(userId);
-  if (cachedTv !== null) return cachedTv;
+  if (cachedTv !== null) return { tokenVersion: cachedTv, blocked: false };
 
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } });
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tokenVersion: true, status: true },
+  });
   const currentTv = u?.tokenVersion ?? 0;
   await redis.setUserTokenVersion(userId, currentTv);
-  return currentTv;
+  return { tokenVersion: currentTv, blocked: u ? u.status !== 'active' : false };
 }
 
 export async function authenticate(
@@ -134,8 +152,12 @@ export async function authenticate(
 
     // --- Revocation check 2: per-user token-version (bulk revocation) ---
     // Read tv from Redis cache; fall back to DB + repopulate cache on miss.
-    const currentTv = await resolveTokenVersion(payload.userId);
+    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(payload.userId);
     if ((payload.tv ?? 0) < currentTv) {
+      return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
+    }
+    // S3-1: defense-in-depth status check — see resolveTokenVersionAndStatus.
+    if (blocked) {
       return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
     }
 
@@ -198,8 +220,12 @@ export async function optionalAuthenticate(
     const decoded = jwt.decode(token) as { jti?: string } | null;
     if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) return next();
 
-    const currentTv = await resolveTokenVersion(payload.userId);
+    const { tokenVersion: currentTv, blocked } = await resolveTokenVersionAndStatus(payload.userId);
     if ((payload.tv ?? 0) < currentTv) return next();
+    // S3-1: same defense-in-depth status check as `authenticate` — a
+    // suspended user must fall through to "continue as guest", never
+    // establish an identity.
+    if (blocked) return next();
 
     req.user = payload;
   } catch {

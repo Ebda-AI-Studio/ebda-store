@@ -507,6 +507,20 @@ setupSwagger(app);
 // API Routes
 app.use('/api/v1', routes);
 
+// JSON 404 catch-all (2026-09-22 security audit, info finding). Mounted
+// AFTER every router above, so it only runs when nothing matched — an
+// unknown route previously fell through to Express's own default handler,
+// which returns HTML ("Cannot GET /x") and fingerprints the framework. This
+// is a plain (req, res) middleware, not an error handler, so it never
+// shadows a route that matched and threw — those still reach
+// SentryService.errorHandler() / errorHandler below via next(err).
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: { code: 'NOT_FOUND', message: `Cannot ${req.method} ${req.originalUrl}` },
+  });
+});
+
 // Sentry error handler (must be before errorHandler)
 app.use(SentryService.errorHandler());
 

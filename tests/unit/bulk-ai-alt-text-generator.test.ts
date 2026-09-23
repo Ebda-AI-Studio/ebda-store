@@ -7,6 +7,19 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// The generator fetches through safeFetchImage, whose SSRF guard resolves the
+// host with dns.lookup BEFORE any fetch. Stubbing global.fetch alone therefore
+// left this "unit" test making a REAL DNS query for example.com: it passed only
+// where that resolved, and on the CI guest (DNS down) every success case failed
+// as `AI_IMAGE_FETCH_FAILED` thrown from the guard, not from the stub. Mocking
+// dns — the same shape carrier-ssrf.test.ts uses — makes the guard deterministic
+// and keeps its blocklist ON the path under test instead of bypassing it.
+const lookup = vi.fn();
+vi.mock('dns', () => ({
+  promises: { lookup: (...a: unknown[]) => lookup(...a) },
+  default: { promises: { lookup: (...a: unknown[]) => lookup(...a) } },
+}));
+
 const mockGenerateContent = vi.fn();
 vi.mock('@google/generative-ai', () => ({
   GoogleGenerativeAI: class {
@@ -31,6 +44,8 @@ const originalFetch = global.fetch;
 
 beforeEach(() => {
   mockGenerateContent.mockReset();
+  lookup.mockReset();
+  lookup.mockResolvedValue([{ address: '93.184.216.34' }]); // public, passes the guard
 });
 
 afterEach(() => {
@@ -120,5 +135,41 @@ describe('generateProductAltText', () => {
         'gemini-flash-lite-latest'
       )
     ).rejects.toThrow('AI returned an empty alt-text response');
+  });
+
+  /**
+   * Negative control for the SSRF guard on the AI image path.
+   *
+   * imageUrl is MERCHANT-supplied, so a product image pointing at cloud
+   * metadata would otherwise be fetched by the API host and described back to
+   * the merchant by Gemini. Every other case here stubs a 200, so swapping
+   * safeFetchImage for a bare fetch() leaves them all green — this is the only
+   * test that reddens, which is what makes the defence killable and what the
+   * `ssrf-ai-image-url` entry in docs/security/defence-mutations.json records.
+   *
+   * fetch must not merely fail — it must never be CALLED. Asserting on the
+   * thrown message alone would also pass if the request left the process and
+   * the link-local address simply refused the connection.
+   */
+  it('refuses a merchant image URL that resolves to cloud metadata', async () => {
+    lookup.mockResolvedValue([{ address: '169.254.169.254' }]);
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/jpeg' }),
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+    global.fetch = fetchSpy;
+    mockGenerateContent.mockResolvedValue(respond('metadata leaked'));
+
+    await expect(
+      generateProductAltText(
+        { imageUrl: 'http://metadata.example/latest/meta-data/', product: { name: 'Product' } },
+        'fake-key',
+        'gemini-flash-lite-latest'
+      )
+    ).rejects.toThrow('AI_IMAGE_FETCH_FAILED');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

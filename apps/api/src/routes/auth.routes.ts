@@ -9,6 +9,7 @@ import {
   authLimiter,
   refreshLimiter,
   refreshIpLimiter,
+  resetEmailLimiter,
   auditLog,
   generateCsrfToken,
 } from '../middleware/security';
@@ -794,6 +795,9 @@ router.post(
 router.post(
   '/forgot-password',
   authLimiter,
+  // S5-3: a dedicated, tighter, email-scoped budget stacked in front of
+  // authLimiter — see resetEmailLimiter's docstring in middleware/security.ts.
+  resetEmailLimiter,
   async (req: Request, res: Response, _next: NextFunction) => {
     try {
       const { email, storeId } = req.body ?? {};
@@ -889,36 +893,45 @@ router.post(
 );
 
 // POST /auth/verify-email
-router.post('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { token } = req.body;
+// S5-4 (2026-09-22 security audit): every other unauthenticated auth lookup
+// route on this router (login, register, forgot-password, reset-password,
+// resend-verification) sits behind authLimiter; this one didn't. The token
+// is 256-bit and hashed, so brute force is infeasible — this closes a
+// consistency gap, not a practical attack.
+router.post(
+  '/verify-email',
+  authLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = req.body;
 
-    if (!token) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Verification token is required' },
+      if (!token) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Verification token is required' },
+        });
+        return;
+      }
+
+      const result = await AuthService.verifyEmail(token);
+
+      // Audit log
+      await auditLog({
+        action: 'user.email.verified',
+        resourceType: 'user',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
       });
-      return;
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const result = await AuthService.verifyEmail(token);
-
-    // Audit log
-    await auditLog({
-      action: 'user.email.verified',
-      resourceType: 'user',
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
-
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /auth/resend-verification
 router.post(

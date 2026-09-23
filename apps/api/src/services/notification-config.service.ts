@@ -154,14 +154,33 @@ class NotificationConfigService {
       // `maskCredentials`. Lazily load the stored config only when needed.
       if (typeof value === 'string' && value.includes('****')) {
         if (stored === null) {
-          const current = await this.getConfig(storeId, channel);
-          stored = (current?.credentials as Record<string, unknown>) ?? {};
+          // Straight from Prisma, NEVER through getConfig's 300s Redis cache.
+          // This is the merge base for a secret we are about to overwrite, so
+          // it must be current truth: a cached base is stale by up to the TTL
+          // (silently reverting a credential just changed on another replica),
+          // and a cache entry that fails to decrypt reads as "no credentials"
+          // and erases the secret outright. Same defect fixed the same way in
+          // shipping-carrier.service.ts.
+          const current = await prisma.notificationConfig.findUnique({
+            where: { storeId_channel: { storeId, channel } },
+            select: { credentials: true },
+          });
+          stored = {};
+          if (current?.credentials) {
+            stored = JSON.parse(encryption.decrypt(current.credentials)) as Record<string, unknown>;
+          }
         }
         const storedVal = stored[key];
-        // Keep the real stored secret; if none exists, drop the field rather
-        // than persisting mask text as a credential.
+        // Keep the real stored secret. If we cannot resolve one, REFUSE the
+        // save: dropping the field persists a truncated credential set over a
+        // working one — silent, permanent data loss the merchant never sees.
+        // Failing the write is recoverable; erasing their provider secret is not.
         if (typeof storedVal === 'string' && storedVal.length > 0) {
           out[key] = storedVal;
+        } else {
+          throw new Error(
+            `NOTIFICATION_CREDENTIALS_UNRESOLVED: re-enter the ${channel} credentials — the saved value for "${key}" could not be read, and saving now would erase it.`
+          );
         }
       } else {
         out[key] = value;

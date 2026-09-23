@@ -42,6 +42,10 @@ on:
       # safe-fetch.ts holds the redirect re-validation loop: `assertPublicHttpUrl`
       # alone proves only the URL you ASKED for is public.
       - 'apps/api/src/lib/safe-fetch.ts'
+      # ssrf-ai-image-url: the merchant-supplied product imageUrl call site.
+      # safe-fetch.ts above covers the guard itself; this covers the path that
+      # has to keep calling it.
+      - 'apps/api/src/lib/ai/product-alt-text-generator.ts'
       - 'apps/api/src/routes/public.routes.ts'
       - 'apps/api/src/services/auth.service.ts'
       - 'apps/api/src/services/accounting/**'
@@ -56,6 +60,11 @@ on:
       # registered and killed locally while the CI gate would never have run
       # on a PR that changed it.
       - 'apps/api/src/services/carriers/**'
+      # The masked-resubmit credential merges. Both services drop a masked
+      # field they cannot resolve unless the guard holds, which erases a
+      # merchant's carrier / notification provider secret on a normal save.
+      - 'apps/api/src/services/shipping-carrier.service.ts'
+      - 'apps/api/src/services/notification-config.service.ts'
       - 'apps/api/src/lib/inngest/functions/order-refunded.ts'
       - 'apps/web/src/lib/consent-cookie.ts'
       - 'apps/web/src/lib/store-resolver.ts'

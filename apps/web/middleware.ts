@@ -342,6 +342,11 @@ function handlePlatformDomain(
         path: '/',
         httpOnly: true,
         sameSite: 'lax',
+        // S3-3 (2026-09-22 security audit): explicit Secure in production.
+        // Gated on NODE_ENV (not unconditional) so local dev over plain
+        // http keeps working — same pattern as AUTH_COOKIE_OPTIONS in
+        // apps/api/src/routes/auth.routes.ts.
+        secure: process.env.NODE_ENV === 'production',
         maxAge: 60 * 60 * 24 * 30,
       });
     }

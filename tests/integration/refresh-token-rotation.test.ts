@@ -315,4 +315,67 @@ describe('password reset and change end every session', () => {
     expect(rows.every(r => r.revokedAt !== null)).toBe(true);
     expect(rows.map(r => r.revokedReason)).toContain('password_changed');
   });
+
+  // S5-1 (2026-09-22 security audit): `resetPassword`'s token lookup did not
+  // check `revokedAt`, so a reset link `revokeAllSessions` had already
+  // revoked (via a password change, or via redeeming a SIBLING reset link)
+  // could still be redeemed — the exact guarantee `revokeAllSessions` exists
+  // to provide. The fix mirrors the refresh path: the lookup now excludes
+  // revoked rows.
+  it('a reset token revoked by revokeAllSessions can no longer be redeemed', async () => {
+    const u = await createVerifiedUser();
+    const raw = await seedResetToken(u.id);
+
+    // Simulate an intervening sign-out-everywhere (or a password change) —
+    // revokeAllSessions revokes every live row, reset rows included.
+    await AuthService.revokeAllSessions(u.id);
+
+    await expect(AuthService.resetPassword(raw, 'BrandNew!2345')).rejects.toMatchObject({
+      code: 'TOKEN_INVALID',
+    });
+
+    // The password must be unchanged — the old hash still verifies.
+    const after = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { passwordHash: true },
+    });
+    await expect(bcrypt.compare(u.password, after!.passwordHash!)).resolves.toBe(true);
+  });
+
+  it('redeeming one of two outstanding reset links invalidates the other', async () => {
+    const u = await createVerifiedUser();
+    const rawA = await seedResetToken(u.id);
+    const rawB = await seedResetToken(u.id);
+
+    // Redeem the first link — this calls revokeAllSessions('password_reset'),
+    // which must also revoke sibling reset rows, not just refresh rows.
+    await AuthService.resetPassword(rawA, 'BrandNew!2345');
+
+    // The second, still-unused link must now be dead too.
+    await expect(AuthService.resetPassword(rawB, 'AnotherNew!6789')).rejects.toMatchObject({
+      code: 'TOKEN_INVALID',
+    });
+  });
+
+  // S5-2 (2026-09-22 security audit): the reset link TTL was 1 hour; target
+  // is 15 minutes. `requestPasswordReset` with storeId: null (the admin
+  // path) skips the branded email entirely — "no store context, skip
+  // branded email" — so this exercises the real production code path
+  // without needing to stub EmailService/Resend.
+  it('a reset token expires ~15 minutes from creation, not 1 hour', async () => {
+    const u = await createVerifiedUser();
+    const before = Date.now();
+    await AuthService.requestPasswordReset(u.email, null);
+
+    const row = await prisma.refreshToken.findFirst({
+      where: { userId: u.id, token: { startsWith: 'reset:' } },
+      select: { expiresAt: true },
+    });
+    expect(row).not.toBeNull();
+    const ttlMs = row!.expiresAt.getTime() - before;
+    // Generous bounds around 15 minutes to absorb test execution time,
+    // while unambiguously excluding the old 1-hour TTL.
+    expect(ttlMs).toBeGreaterThan(14 * 60 * 1000);
+    expect(ttlMs).toBeLessThan(16 * 60 * 1000);
+  });
 });

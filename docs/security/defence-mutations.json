@@ -700,6 +700,66 @@
       "find": "  if (presented && presented.length <= MAX_REFRESH_TOKEN_CHARS) {",
       "replace": "  if (presented) {",
       "test": "tests/unit/refresh-limiter-bucket.test.ts"
+    },
+    {
+      "id": "ssrf-ai-image-url",
+      "domain": "SSRF",
+      "tier": "unit",
+      "why": "merchant-supplied product imageUrl reaches fetch() unvalidated — the API host fetches cloud metadata at 169.254.169.254 and Gemini describes it back to the merchant as alt text",
+      "source": "apps/api/src/lib/ai/product-alt-text-generator.ts",
+      "find": "    imgFetch = await safeFetchImage(imageUrl);",
+      "replace": "    imgFetch = await fetch(imageUrl);",
+      "test": "tests/unit/bulk-ai-alt-text-generator.test.ts"
+    },
+    {
+      "id": "carrier-merge-base-not-cached",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "the masked-resubmit merge base is read through a 300s Redis cache — a stale or wrong-shaped entry reads as \"no credentials\" and the merchant's carrier secret is dropped and overwritten",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "          const current = await prisma.shippingCarrierConfig.findUnique({\n            where: { storeId_carrier: { storeId, carrier } },\n            select: { credentials: true },\n          });\n          stored = current?.credentials ? this.decryptCredentials(current.credentials) : {};",
+      "replace": "          const current = await this.getCarrierConfig(storeId, carrier);\n          stored = ((current?.credentials as Record<string, string>) ?? {}) as Record<string, string>;",
+      "test": "tests/unit/carrier-credentials-merge.test.ts"
+    },
+    {
+      "id": "carrier-masked-field-refuses-drop",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "an unresolvable masked field is silently dropped instead of refusing the save, persisting a truncated credential set over a working Aramex/iCarry secret",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "        } else {\n          throw new AppError(\n            400,\n            'CARRIER_CREDENTIALS_UNRESOLVED',\n            `Re-enter the ${carrier} credentials: the saved value for \"${key}\" could not be read, and saving now would erase it.`\n          );\n        }",
+      "replace": "        }",
+      "test": "tests/unit/carrier-credentials-merge.test.ts"
+    },
+    {
+      "id": "carrier-credentials-shape-fails-loudly",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "an already-decrypted (pre-v2 cache) credentials value falls into the catch and returns {}, indistinguishable from an unconfigured carrier — carrier auth fails on live orders and the erasing merge is fed",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "    if (typeof encryptedCredentials !== 'string') {\n      throw new Error(\n        '[ShippingCarrierService] credentials are not an encrypted string — refusing to read them as empty'\n      );\n    }\n",
+      "replace": "",
+      "test": "tests/unit/carrier-credentials-merge.test.ts"
+    },
+    {
+      "id": "notification-merge-base-not-cached",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "same defect class as carrier-merge-base-not-cached, against provider secrets (e.g. Unifonic appSid): the merge base comes from a 300s cache",
+      "source": "apps/api/src/services/notification-config.service.ts",
+      "find": "          const current = await prisma.notificationConfig.findUnique({\n            where: { storeId_channel: { storeId, channel } },\n            select: { credentials: true },\n          });\n          stored = {};\n          if (current?.credentials) {\n            stored = JSON.parse(encryption.decrypt(current.credentials)) as Record<string, unknown>;\n          }\n",
+      "replace": "          const current = await this.getConfig(storeId, channel);\n          stored = (current?.credentials as Record<string, unknown>) ?? {};",
+      "test": "tests/unit/notification-credentials-merge.test.ts"
+    },
+    {
+      "id": "notification-masked-field-refuses-drop",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "an unresolvable masked field is silently dropped instead of refusing the save, erasing a notification provider secret",
+      "source": "apps/api/src/services/notification-config.service.ts",
+      "find": "        } else {\n          throw new Error(\n            `NOTIFICATION_CREDENTIALS_UNRESOLVED: re-enter the ${channel} credentials — the saved value for \"${key}\" could not be read, and saving now would erase it.`\n          );\n        }",
+      "replace": "        }",
+      "test": "tests/unit/notification-credentials-merge.test.ts"
     }
   ]
 }

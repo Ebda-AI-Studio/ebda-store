@@ -627,7 +627,7 @@ export class EmailService {
       email: string;
       name: string;
       resetUrl: string;
-      expiresIn: string;
+      expiresInMinutes: number;
     },
     language?: 'en' | 'ar'
   ): Promise<void> {

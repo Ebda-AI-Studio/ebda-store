@@ -124,6 +124,11 @@ const USER = {
   storeId: 'store-1',
   tokenVersion: 0,
   deletedAt: null,
+  // S3-1, 2026-09-22 security audit: refreshTokens() now rejects a
+  // non-active account — this fixture's user must be active, or every rotation
+  // test below (none of which is about account status) fails on a check
+  // unrelated to what it's testing.
+  status: 'active',
 };
 
 /** A refresh-token row as the service reads it. */

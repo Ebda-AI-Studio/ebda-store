@@ -158,7 +158,18 @@ const nextConfig = {
                 // the page-builder live-preview iframe is CSP-blocked on CF
                 // (the storefront refuses to be framed). Kept alongside the
                 // legacy app.forcemediakw.com (Vercel admin) during cutover.
-                'https://admin.force-ai.co https://app.forcemediakw.com http://localhost:3001 http://localhost:3000'
+                //
+                // S1-1 (2026-09-22 security audit): localhost:3000/3001 is
+                // dev-server scope and does not belong in a PRODUCTION
+                // header — STOREFRONT_FRAME_ANCESTORS is unset in every prod
+                // config (verified: no wrangler.toml/.env.production.example
+                // entry), so this fallback IS the live prod value. Only
+                // include the dev origins when NOT building for production;
+                // the prod value is unchanged otherwise (still 'self'
+                // https://admin.force-ai.co https://app.forcemediakw.com).
+                (process.env.NODE_ENV === 'production'
+                  ? 'https://admin.force-ai.co https://app.forcemediakw.com'
+                  : 'https://admin.force-ai.co https://app.forcemediakw.com http://localhost:3001 http://localhost:3000')
               }`,
             ].join('; '),
           },

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
+import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
 import { bustStoreCaches } from '../services/store.service';
@@ -649,6 +650,29 @@ router.put(
       }
       if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
         fromTo.email = { from: existing.email, to: data.email.toLowerCase() };
+      }
+
+      // S3-1 / S3-2 (2026-09-22 security audit): a status or role change
+      // must not leave the user's EXISTING sessions live under the old
+      // grant. Without this, a suspended user's open session (and any token
+      // it still holds) kept working — the status column was recorded but
+      // never enforced — and a demoted role kept authorizing at the old
+      // level in every already-issued access token for up to its full
+      // 30-minute life. `revokeAllSessions` bumps tokenVersion (which every
+      // request checks) and revokes every refresh token, so both cases are
+      // now bounded by "next request", not "token expiry".
+      //
+      // Status: only a transition AWAY FROM 'active' revokes — reactivating
+      // a suspended user (inactive/suspended -> active) is not itself a
+      // reason to kill sessions, and there are none live to kill in the
+      // ordinary case anyway.
+      const statusLeftActive =
+        fromTo.status !== undefined &&
+        fromTo.status.from === 'active' &&
+        fromTo.status.to !== 'active';
+      const roleChanged = fromTo.role !== undefined;
+      if (statusLeftActive || roleChanged) {
+        await AuthService.revokeAllSessions(id);
       }
 
       await auditLog({

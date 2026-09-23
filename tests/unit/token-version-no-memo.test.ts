@@ -26,7 +26,12 @@ import type { Request, Response, NextFunction } from 'express';
 const getUserTokenVersion = vi.fn(() => Promise.resolve<number | null>(null));
 /** The authoritative value. Bumped mid-test to simulate a logout-all. */
 let dbTokenVersion = 0;
-const findUnique = vi.fn(() => Promise.resolve({ tokenVersion: dbTokenVersion }));
+// `status` is included because the real `users` row always has one (NOT
+// NULL, default 'active' — schema.prisma) — this mock simulates that row,
+// and omitting the field is not a real state the DB path ever sees. S3-1,
+// 2026-09-22 security audit: `authenticate`'s DB-fallback path now also
+// reads `status` on the same query these tests already mock.
+const findUnique = vi.fn(() => Promise.resolve({ tokenVersion: dbTokenVersion, status: 'active' }));
 
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: {

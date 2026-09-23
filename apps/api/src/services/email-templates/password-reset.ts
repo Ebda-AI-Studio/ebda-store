@@ -4,7 +4,15 @@ export interface PasswordResetData {
   email: string;
   name: string;
   resetUrl: string;
-  expiresIn: string;
+  // A count of minutes, not a pre-formatted string (S5-2, 2026-09-22
+  // security audit). The old `expiresIn: string` field let the caller bake
+  // in an English phrase ("1 hour") that the `ar` template below then
+  // embedded VERBATIM into Arabic copy — every Arabic password-reset email
+  // read "...ينتهي خلال 1 hour", English text inside Arabic. Each language
+  // now formats its own copy from the same number, so a TTL change (or a
+  // language change) can never again desync the copy from the behaviour or
+  // from itself.
+  expiresInMinutes: number;
 }
 
 export const passwordResetTemplate = {
@@ -20,7 +28,7 @@ export const passwordResetTemplate = {
     <p style="text-align: center; margin: 24px 0;">
       <a href="${escapeHtml(d.resetUrl)}" class="button">Reset Password</a>
     </p>
-    <p>This link expires in ${escapeHtml(d.expiresIn)}.</p>
+    <p>This link expires in ${d.expiresInMinutes} minutes.</p>
     <p>If you didn't request this, you can safely ignore this email.</p>
   `,
 
@@ -31,7 +39,7 @@ export const passwordResetTemplate = {
     <p style="text-align: center; margin: 24px 0;">
       <a href="${escapeHtml(d.resetUrl)}" class="button">إعادة تعيين كلمة المرور</a>
     </p>
-    <p>الرابط ينتهي خلال ${escapeHtml(d.expiresIn)}.</p>
+    <p>الرابط ينتهي خلال ${d.expiresInMinutes} دقيقة.</p>
     <p>إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة بأمان.</p>
   `,
 };

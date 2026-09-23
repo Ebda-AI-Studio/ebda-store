@@ -24,7 +24,16 @@ const CARRIER_REGISTRY: Record<CarrierCode, ShippingCarrierProvider> = {
 
 // Cache TTL for carrier configs (5 minutes)
 const CARRIER_CONFIG_CACHE_TTL = 300;
-const CARRIER_CONFIG_CACHE_PREFIX = 'shipping:carrier-configs:';
+// `:v2:` is load-bearing, not cosmetic. Before 2026-09-23 this key cached the
+// DECRYPTED rows, so `credentials` was a plain object; it now caches the
+// still-encrypted Prisma rows. Redis outlives the deploy, so reusing the old
+// key would feed a pre-fix object to decryptCredentials for the full 300s TTL
+// (longer under a rolling restart, where old instances keep writing the old
+// shape). That returned {} — indistinguishable from "no credentials" — and
+// preserveMaskedCredentials would then drop the merchant's masked fields and
+// persist the truncated set, permanently erasing an Aramex/iCarry secret.
+// Bump this suffix on ANY change to the cached value's shape.
+const CARRIER_CONFIG_CACHE_PREFIX = 'shipping:carrier-configs:v2:';
 
 // Redis lock for tracking cron
 const TRACKING_CRON_LOCK = 'shipping:tracking-cron';
@@ -51,40 +60,45 @@ class ShippingCarrierService {
   // ==========================================
 
   /**
-   * Get all carrier configs for a store (Redis-cached, credentials decrypted)
+   * Get all carrier configs for a store (Redis-cached, credentials decrypted).
+   *
+   * S2-1 (2026-09-22 security audit): the Redis cache stores the row AS
+   * FETCHED FROM PRISMA — `credentials` still AES-256-GCM-encrypted, same as
+   * at rest in Postgres. Decryption happens AFTER every read (cache hit or
+   * miss), never before the write to Redis. Before this fix the cache stored
+   * the DECRYPTED blob for the full 300s TTL — Aramex/iCarry API keys sat in
+   * Redis in plaintext, the same tier that was publicly reachable without
+   * auth until 2026-09-04.
    */
   async getCarrierConfigs(storeId: string) {
     const cacheKey = `${CARRIER_CONFIG_CACHE_PREFIX}${storeId}`;
 
-    // Try cache first
-    const cached = await redis.get<any[]>(cacheKey, true);
-    if (cached !== null) {
-      return cached;
+    // Try cache first — encrypted, same shape Prisma returns.
+    let configs = await redis.get<any[]>(cacheKey, true);
+
+    if (configs === null) {
+      // Fetch from DB
+      configs = await prisma.shippingCarrierConfig.findMany({
+        where: { storeId },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      // Cache the still-ENCRYPTED rows (best-effort).
+      try {
+        await redis.set(cacheKey, configs, CARRIER_CONFIG_CACHE_TTL);
+      } catch (err) {
+        logger.warn(
+          { err, storeId },
+          '[ShippingCarrierService] Cache write failed for carrier configs'
+        );
+      }
     }
 
-    // Fetch from DB
-    const configs = await prisma.shippingCarrierConfig.findMany({
-      where: { storeId },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // Decrypt credentials before returning
-    const decrypted = configs.map(cfg => ({
+    // Decrypt after every read — this result is never itself cached.
+    return configs.map(cfg => ({
       ...cfg,
       credentials: cfg.credentials ? this.decryptCredentials(cfg.credentials) : {},
     }));
-
-    // Cache (best-effort)
-    try {
-      await redis.set(cacheKey, decrypted, CARRIER_CONFIG_CACHE_TTL);
-    } catch (err) {
-      logger.warn(
-        { err, storeId },
-        '[ShippingCarrierService] Cache write failed for carrier configs'
-      );
-    }
-
-    return decrypted;
   }
 
   /**
@@ -152,17 +166,33 @@ class ShippingCarrierService {
     for (const [key, value] of Object.entries(incoming)) {
       if (typeof value === 'string' && value.includes('*')) {
         if (stored === null) {
-          const current = await this.getCarrierConfig(storeId, carrier);
-          stored = ((current?.credentials as Record<string, string>) ?? {}) as Record<
-            string,
-            string
-          >;
+          // Straight from Prisma, NEVER through getCarrierConfig's 300s cache.
+          // This read is the merge base for a secret we are about to
+          // overwrite, so it has to be the current truth: a cached base is
+          // stale by up to the TTL, which silently reverts a credential the
+          // merchant changed moments ago on another replica — and a cache
+          // holding an unexpected shape reads as "no credentials" and erases
+          // the secret outright.
+          const current = await prisma.shippingCarrierConfig.findUnique({
+            where: { storeId_carrier: { storeId, carrier } },
+            select: { credentials: true },
+          });
+          stored = current?.credentials ? this.decryptCredentials(current.credentials) : {};
         }
         const storedVal = stored[key];
-        // Keep the real stored secret; if none exists, drop the field rather
-        // than persisting mask text as a credential.
+        // Keep the real stored secret. If we cannot resolve one, REFUSE the
+        // save: dropping the field here persists a truncated credential set
+        // over a working one, which is silent, permanent data loss the
+        // merchant never sees. Failing the write is recoverable; erasing
+        // their carrier password is not.
         if (typeof storedVal === 'string' && storedVal.length > 0) {
           out[key] = storedVal;
+        } else {
+          throw new AppError(
+            400,
+            'CARRIER_CREDENTIALS_UNRESOLVED',
+            `Re-enter the ${carrier} credentials: the saved value for "${key}" could not be read, and saving now would erase it.`
+          );
         }
       } else {
         out[key] = value;
@@ -865,8 +895,19 @@ class ShippingCarrierService {
   }
 
   private decryptCredentials(encryptedCredentials: string): Record<string, string> {
+    if (!encryptedCredentials) return {};
+    // Outside the try ON PURPOSE. A non-string here means the caller handed us
+    // an ALREADY-DECRYPTED object — the pre-v2 cache shape. Letting that fall
+    // into the catch below returns {}, which every caller reads as "this
+    // merchant has no credentials configured": carrier auth fails on live
+    // orders, and the masked-resubmit merge erases the real secret. A wrong
+    // shape is a bug, not a missing credential, so it fails loudly.
+    if (typeof encryptedCredentials !== 'string') {
+      throw new Error(
+        '[ShippingCarrierService] credentials are not an encrypted string — refusing to read them as empty'
+      );
+    }
     try {
-      if (!encryptedCredentials) return {};
       const decrypted = encryption.decrypt(encryptedCredentials);
       return JSON.parse(decrypted);
     } catch (err) {

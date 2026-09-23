@@ -541,6 +541,18 @@ export class AuthService {
     // Successful login - reset lockout
     await accountLockout.recordSuccessfulLogin(lockoutKey, ip);
 
+    // Reject non-active accounts. Checked AFTER the password is confirmed
+    // correct (not before) — checking status before/instead of the password
+    // would let a wrong-password guess distinguish "no such account",
+    // "wrong password" and "suspended account" by response shape, reopening
+    // the account-enumeration oracle the dummy-bcrypt-compare above exists to
+    // close. S3-1, 2026-09-22 security audit: a super_admin who suspends a
+    // compromised or departing account previously found the account could
+    // still log in with its password — `status` was recorded but never read.
+    if (user.status !== 'active') {
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+    }
+
     // If MFA is enabled and a TOTP secret is configured, return a short-lived
     // challenge token instead of a full session. The client must verify the
     // TOTP code via /auth/mfa/verify to exchange it for a real session.
@@ -907,6 +919,20 @@ export class AuthService {
       throw new AppError(401, 'ACCOUNT_DELETED', 'Account has been deleted');
     }
 
+    // Reject refresh for a non-active account. S3-1, 2026-09-22 security
+    // audit: this is the second of the two places a NEW valid session can be
+    // minted (the other is login()) — without this check, an already-open
+    // session on a suspended user kept refreshing forever, independent of
+    // whether the admin PUT handler also revoked the row (belt and braces
+    // with the revokeAllSessions call added to that handler).
+    if (storedToken.user.status !== 'active') {
+      await prisma.refreshToken.update({
+        where: { id: storedToken.id },
+        data: { revokedAt: new Date(), revokedReason: 'account_suspended' },
+      });
+      throw new AppError(401, 'ACCOUNT_SUSPENDED', 'Account is not active');
+    }
+
     // Generate new tokens FIRST so we have the new id available for the
     // back-link. Then mark the old token as rotated. Order matters: if
     // generateTokens fails after we've already revoked the old token,
@@ -1173,6 +1199,17 @@ export class AuthService {
       data: { revokedAt: new Date(), revokedReason: reason },
     });
 
+    // Belt and braces on top of the revoke above (S5-1, 2026-09-22 security
+    // audit): password-reset rows are stored as `reset:<hash>` RefreshToken
+    // rows and are already covered by the unconditional `updateMany` above
+    // (it has no `token` filter), so this is a second, explicit guarantee —
+    // not a fix for a gap the updateMany leaves open — that no outstanding
+    // reset link survives a revocation. Deleting rather than revoking mirrors
+    // resetPassword's own single-use cleanup (it deletes the row it redeems).
+    await prisma.refreshToken.deleteMany({
+      where: { userId, token: { startsWith: 'reset:' } },
+    });
+
     // …and every merchant MCP key this user holds. "Sign out all devices" has
     // to mean ALL devices: a merchant key is a long-lived credential acting as
     // this user, so leaving it live would make the strongest lever the platform
@@ -1216,7 +1253,11 @@ export class AuthService {
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    // 15 minutes (S5-2, 2026-09-22 security audit — was 1 hour). A reset
+    // link outstanding for an hour is an hour-long window for a forwarded
+    // or intercepted email to take over the account.
+    const RESET_TOKEN_TTL_MINUTES = 15;
+    const resetExpires = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
 
     // Store reset token as a special refresh token
     await prisma.refreshToken.create({
@@ -1236,7 +1277,7 @@ export class AuthService {
           email: user.email,
           name: `${user.firstName} ${user.lastName}`.trim() || user.email,
           resetUrl,
-          expiresIn: '1 hour',
+          expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
         },
         (user.language as 'en' | 'ar' | undefined) ?? undefined
       );
@@ -1250,11 +1291,17 @@ export class AuthService {
     // Hash the provided token
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    // Find the reset token
+    // Find the reset token. `revokedAt: null` mirrors the check the refresh
+    // path already makes (see the reuse-detection block in refreshTokens
+    // above): without it, a reset link that `revokeAllSessions` already
+    // revoked (by an intervening password change, or by redeeming a sibling
+    // reset link) was still redeemable — the token lookup never looked at
+    // whether the row had been revoked at all. S5-1, 2026-09-22 security audit.
     const storedToken = await prisma.refreshToken.findFirst({
       where: {
         token: `reset:${tokenHash}`,
         expiresAt: { gt: new Date() },
+        revokedAt: null,
       },
       include: { user: true },
     });
