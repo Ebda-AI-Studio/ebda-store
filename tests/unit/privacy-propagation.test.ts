@@ -3,15 +3,21 @@
  *
  * What we test:
  *   deleteOneSignalPlayers
- *     - no-op when playerIds is empty (no fetch call, no config lookup needed)
- *     - warns + no-ops when the OneSignal admin app isn't configured
+ *     - no-op when playerIds is empty (no fetch call, no config lookup needed
+ *       — genuinely nothing to delete, not a missing-credential failure)
+ *     - FAILS LOUD (PropagationNotConfiguredError) when the OneSignal admin
+ *       app isn't configured AND there ARE playerIds to delete (2026-09-22:
+ *       this used to warn + silently return, which reported success on an
+ *       erasure that never propagated)
  *     - calls DELETE for every playerId with the right URL + admin auth header
  *     - treats 404 as success (already gone)
  *     - a failed deletion doesn't stop the others AND rejects the whole call
  *       (so the caller — the Inngest step — can catch/log it without ever
  *       throwing back into AuthService.eraseAccount)
  *   deletePostHogPerson
- *     - warns + no-ops when POSTHOG_PERSONAL_API_KEY / POSTHOG_PROJECT_ID unset
+ *     - FAILS LOUD (PropagationNotConfiguredError) when
+ *       POSTHOG_PERSONAL_API_KEY / POSTHOG_PROJECT_ID are unset (same
+ *       2026-09-22 fix — was warn + silent no-op)
  *     - no-ops when the lookup returns no matching person
  *     - deletes the person when the lookup finds one
  *     - rejects (doesn't swallow) on a lookup or delete HTTP failure
@@ -53,6 +59,8 @@ vi.mock('@api/config', () => ({
 import {
   deleteOneSignalPlayers,
   deletePostHogPerson,
+  PropagationNotConfiguredError,
+  summarizePropagationFailures,
 } from '@api/services/privacy-propagation.service';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -90,13 +98,22 @@ describe('privacy-propagation.service', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('warns and no-ops when the OneSignal admin app is not configured', async () => {
+    it('FAILS LOUD when the OneSignal admin app is not configured and there is something to delete', async () => {
       const fetchMock = vi.fn();
       global.fetch = fetchMock as unknown as typeof fetch;
 
-      await deleteOneSignalPlayers(['player-1']);
-
+      await expect(deleteOneSignalPlayers(['player-1'])).rejects.toBeInstanceOf(
+        PropagationNotConfiguredError
+      );
+      // Never attempted an HTTP call it can't make — and never silently
+      // reports success either.
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('the not-configured error names the provider', async () => {
+      await expect(deleteOneSignalPlayers(['player-1'])).rejects.toMatchObject({
+        provider: 'onesignal',
+      });
     });
 
     it('calls DELETE for every playerId with the admin app id + key', async () => {
@@ -140,13 +157,20 @@ describe('privacy-propagation.service', () => {
   });
 
   describe('deletePostHogPerson', () => {
-    it('warns and no-ops when PostHog personal API key/project id are unset', async () => {
+    it('FAILS LOUD when PostHog personal API key/project id are unset', async () => {
       const fetchMock = vi.fn();
       global.fetch = fetchMock as unknown as typeof fetch;
 
-      await deletePostHogPerson('user-123');
-
+      await expect(deletePostHogPerson('user-123')).rejects.toBeInstanceOf(
+        PropagationNotConfiguredError
+      );
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('the not-configured error names the provider', async () => {
+      await expect(deletePostHogPerson('user-123')).rejects.toMatchObject({
+        provider: 'posthog',
+      });
     });
 
     it('no-ops when the person lookup returns no results', async () => {
@@ -203,6 +227,27 @@ describe('privacy-propagation.service', () => {
       global.fetch = fetchMock as unknown as typeof fetch;
 
       await expect(deletePostHogPerson('user-123')).rejects.toThrow();
+    });
+  });
+
+  describe('summarizePropagationFailures', () => {
+    it('names the provider + "not-configured" for a PropagationNotConfiguredError', () => {
+      const summary = summarizePropagationFailures([
+        new PropagationNotConfiguredError('posthog', 'nope'),
+      ]);
+      expect(summary).toBe('posthog: not-configured');
+    });
+
+    it('distinguishes a real outage from a not-configured credential', () => {
+      const summary = summarizePropagationFailures([
+        new PropagationNotConfiguredError('posthog', 'nope'),
+        new Error('OneSignal player delete failed (500): boom'),
+      ]);
+      expect(summary).toBe('posthog: not-configured; OneSignal player delete failed (500): boom');
+    });
+
+    it('falls back to "unknown error" for a non-Error reason', () => {
+      expect(summarizePropagationFailures(['a bare string'])).toBe('unknown error');
     });
   });
 });

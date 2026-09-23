@@ -1334,7 +1334,28 @@
       "statusFailed": "Failed",
       "statusRefunded": "Refunded",
       "refundedOn": "on",
-      "refundedReason": "reason:"
+      "refundedReason": "reason:",
+      "privacy": {
+        "sectionTitle": "Privacy & data",
+        "sectionSubtitle": "Merchant-initiated data-subject request handling",
+        "exportTitle": "Export this customer's data",
+        "exportDescription": "Download a JSON bundle of everything tied to this account (profile, orders, addresses, wishlist).",
+        "exportButton": "Export",
+        "exportFailed": "Failed to export customer data",
+        "eraseTitle": "Erase this customer",
+        "eraseDescription": "Permanently anonymize this customer's name, email, phone, and addresses. Order records are kept (with PII removed) for tax-compliance retention. This cannot be undone.",
+        "eraseButton": "Erase customer",
+        "eraseFailed": "Failed to erase customer",
+        "erasedToastTitle": "Customer erased",
+        "erasedToastDescription": "This customer's data has been anonymized.",
+        "eraseModalTitle": "Erase customer data",
+        "eraseModalBody": "This permanently anonymizes the customer's name, email, phone, and addresses. Order records are kept (with personal data removed) for tax-compliance retention.",
+        "eraseModalWarning": "This action cannot be undone.",
+        "typeToConfirmLabel": "Type \"{value}\" to confirm",
+        "cancelButton": "Cancel",
+        "confirmEraseButton": "Erase customer",
+        "erasing": "Erasing…"
+      }
     }
   },
   "analytics": {

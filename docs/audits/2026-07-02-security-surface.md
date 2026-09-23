@@ -1,5 +1,7 @@
 # Security Audit — Force Website Builder (Application Security / STRIDE + OWASP)
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 ---
 
 agent: security-auditor

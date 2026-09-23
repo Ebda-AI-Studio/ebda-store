@@ -83,8 +83,10 @@ deps) — dated reports live in `docs/audits/`.
 - Primary database: Neon Postgres, **AWS eu-central-1 (Frankfurt, Germany)**.
 - Object storage: Cloudflare R2.
 - CDN/edge: Cloudflare global network (sees encrypted traffic only).
-- Kuwait Law 13/2023 (PDPL) does not require in-country residency for SaaS
-  but does require erasure capability — provided (see Privacy below).
+- Data residency requirements per GCC country are tracked in
+  `docs/legal/gcc-data-protection.md`; for Kuwait, the applicable
+  reference is the Electronic Transactions Law No. 20/2014. Erasure
+  capability is provided platform-wide regardless (see Privacy below).
 
 ## Backups & disaster recovery
 

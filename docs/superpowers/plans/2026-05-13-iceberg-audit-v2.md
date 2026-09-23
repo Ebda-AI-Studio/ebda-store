@@ -1,5 +1,7 @@
 # Iceberg Audit follow-up plan v2 — item-by-item triage
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 **Supersedes** `2026-05-13-iceberg-audit-followup.md` (v1). v1 kept the session structure; v2 adds the real-life impact + choice list per gap so Ahmad can triage with full context.
 
 For each gap below: **Status** → **Real-life impact** (what breaks if we don't fix it) → **Options** (cheap → thorough) → **Recommended choice**. After all items, the sequenced execution plan groups them into shippable sessions.

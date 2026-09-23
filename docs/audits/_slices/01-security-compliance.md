@@ -1,5 +1,7 @@
 ## 1. Security & Compliance Audit
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 ### Executive summary
 
 - Auth layer is well-hardened: bcrypt cost-12, dual Bearer/cookie path, refresh-token rotation with reuse detection, and a correct `customerUserId()` role guard preventing merchant cookies from tainting customer-scope data.

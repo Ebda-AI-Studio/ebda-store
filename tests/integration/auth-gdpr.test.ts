@@ -1,5 +1,6 @@
 /**
- * GDPR Art. 17 + 20 + Kuwait Law 13/2023 Art. 17 + 20 endpoints:
+ * GDPR Art. 17 + 20 and applicable GCC data-protection law (see
+ * docs/legal/gcc-data-protection.md) endpoints:
  *   POST /auth/me/erase  — irreversible PII anonymization
  *   GET  /auth/me/export — right to data portability
  *

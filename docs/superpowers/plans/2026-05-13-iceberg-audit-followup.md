@@ -1,5 +1,7 @@
 # Iceberg Audit follow-up plan — FWB
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 **Audit ran**: 2026-05-13
 **Scope**: 38 production-reality terms from the "Vibe Coding vs Production Reality" iceberg framework
 **Audit doc location**: see commit history around `3ff1354` + the in-session sub-agent report

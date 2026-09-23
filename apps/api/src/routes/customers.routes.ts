@@ -2,11 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
 import { neutralizeRowObject, neutralizeRowArray } from '../lib/exports/xlsx';
 import { prisma, Prisma } from '@force/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
-import { writeLimiter } from '../middleware/security';
+import { writeLimiter, auditLog } from '../middleware/security';
 import { getCached, customersCacheKey, invalidateCustomersCache } from '../lib/public-cache';
+import { AuthService } from '../services/auth.service';
 
 const router = Router({ mergeParams: true });
 
@@ -1108,6 +1109,129 @@ router.get(
         success: true,
         data: { customer: { ...customer, groupId, group }, orders, truncated },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Owner/admin-only — merchants act as data controllers and must be able to
+// fulfil a shopper's erasure/export request themselves, not only the shopper.
+// `staff` is deliberately excluded (destructive + full-PII-export action).
+const privacyMiddleware = [
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  rejectImpersonated,
+  writeLimiter,
+];
+
+const CUSTOMER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves `:customerId` to a User row that (a) exists, (b) is a `customer`
+ * role account (never an admin/staff row — `eraseAccount`/`exportAccount`
+ * refuse those anyway, but we want a clean 404 before calling them), and
+ * (c) belongs to THIS store. Every one of those three failure modes
+ * returns the SAME generic 404 — a merchant must never be able to
+ * distinguish "no such id", "that id is staff", and "that id belongs to
+ * another store" from the response, which would let them enumerate ids
+ * across tenants by probing this endpoint. This is the single most
+ * important property of both routes below: a merchant can only ever act
+ * on a shopper that belongs to its own store.
+ */
+export async function resolveStoreCustomerOrThrow(storeId: string, customerId: string) {
+  if (!CUSTOMER_ID_RE.test(customerId)) {
+    throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: customerId },
+    select: { id: true, storeId: true, role: true },
+  });
+  if (!user || user.role !== 'customer' || user.storeId !== storeId) {
+    throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+  }
+  return user;
+}
+
+/**
+ * POST /stores/:storeId/customers/:customerId/erase
+ *
+ * Merchant-initiated right-to-erasure. Merchants are the data controller
+ * for their own shoppers and must be able to fulfil a data-subject erasure
+ * request even when the shopper doesn't use the storefront self-service
+ * flow themselves (`POST /auth/me/erase`). Reuses `AuthService.eraseAccount`
+ * — the SAME anonymization used by the shopper self-service path and the
+ * `soft-deleted-user-anonymize` retention cron — so there is exactly one
+ * implementation of "what erasure means" in this codebase (see
+ * docs/RETENTION.md). Idempotent (eraseAccount already is).
+ */
+router.post(
+  '/customers/:customerId/erase',
+  ...privacyMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, customerId } = req.params;
+      await resolveStoreCustomerOrThrow(storeId, customerId);
+
+      await AuthService.eraseAccount(customerId);
+
+      await auditLog({
+        action: 'customer.account.erased_by_merchant',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'user',
+        resourceId: customerId,
+        details: { actorRole: req.user!.role },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      invalidateCustomersCache(storeId);
+
+      res.json({ success: true, data: { message: 'Customer data erased' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /stores/:storeId/customers/:customerId/export
+ *
+ * Merchant-initiated data export — the same JSON bundle shape as the
+ * shopper self-service `GET /auth/me/export`, reusing
+ * `AuthService.exportAccount` for the same "one implementation" reason as
+ * erase above.
+ */
+router.get(
+  '/customers/:customerId/export',
+  ...privacyMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, customerId } = req.params;
+      await resolveStoreCustomerOrThrow(storeId, customerId);
+
+      const bundle = await AuthService.exportAccount(customerId);
+
+      await auditLog({
+        action: 'customer.data.exported_by_merchant',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'user',
+        resourceId: customerId,
+        details: { actorRole: req.user!.role },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      const today = new Date().toISOString().slice(0, 10);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="customer-${customerId}-${today}.json"`
+      );
+      res.send(JSON.stringify(bundle, null, 2));
     } catch (error) {
       next(error);
     }

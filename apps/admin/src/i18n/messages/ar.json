@@ -1334,7 +1334,28 @@
       "statusFailed": "فاشل",
       "statusRefunded": "مُسترد",
       "refundedOn": "في",
-      "refundedReason": "السبب:"
+      "refundedReason": "السبب:",
+      "privacy": {
+        "sectionTitle": "الخصوصية والبيانات",
+        "sectionSubtitle": "معالجة طلبات صاحب البيانات بمبادرة من المتجر",
+        "exportTitle": "تصدير بيانات هذا العميل",
+        "exportDescription": "نزّل ملف JSON يحتوي على كل ما يرتبط بهذا الحساب (الملف الشخصي، الطلبات، العناوين، المفضلة).",
+        "exportButton": "تصدير",
+        "exportFailed": "فشل تصدير بيانات العميل",
+        "eraseTitle": "حذف هذا العميل",
+        "eraseDescription": "إخفاء اسم هذا العميل وبريده الإلكتروني وهاتفه وعناوينه بشكل دائم. تُحفظ سجلات الطلبات (دون بيانات شخصية) لأغراض الامتثال الضريبي. لا يمكن التراجع عن هذا الإجراء.",
+        "eraseButton": "حذف العميل",
+        "eraseFailed": "فشل حذف العميل",
+        "erasedToastTitle": "تم حذف العميل",
+        "erasedToastDescription": "تم إخفاء بيانات هذا العميل.",
+        "eraseModalTitle": "حذف بيانات العميل",
+        "eraseModalBody": "سيؤدي هذا إلى إخفاء اسم العميل وبريده الإلكتروني وهاتفه وعناوينه بشكل دائم. تُحفظ سجلات الطلبات (دون بيانات شخصية) لأغراض الامتثال الضريبي.",
+        "eraseModalWarning": "لا يمكن التراجع عن هذا الإجراء.",
+        "typeToConfirmLabel": "اكتب \"{value}\" للتأكيد",
+        "cancelButton": "إلغاء",
+        "confirmEraseButton": "حذف العميل",
+        "erasing": "جارٍ الحذف…"
+      }
     }
   },
   "analytics": {

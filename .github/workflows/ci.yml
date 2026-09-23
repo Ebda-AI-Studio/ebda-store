@@ -833,6 +833,46 @@ jobs:
           path: ./
           extra_args: --only-verified
 
+      # trufflehog's action scans inside a Docker container running AS ROOT and
+      # leaves `trufflehog-<pid>-<rand>/` (mode 700, root:root) in the workspace
+      # when the scan is interrupted — an OOM kill, a cancelled run, a guest
+      # restart. The runner user cannot remove it: deleting that tree means
+      # recursing INTO a directory it is not permitted to read, and this runner
+      # has no sudo (see the jq step above).
+      #
+      # The consequence is far worse than a stray directory. The NEXT job to
+      # land on that runner dies in `actions/checkout` — which clears the
+      # workspace before anything else — with
+      #   EACCES: permission denied, scandir '.../trufflehog-20-...'
+      # so it fails before a single real step runs, and it is STICKY: every
+      # later job on that runner fails identically until someone with root
+      # deletes it. On 2026-09-23 one leftover took out six runs at once and
+      # survived a full re-run of all of them; the failures looked like six
+      # unrelated red checks, not one directory.
+      #
+      # Clean it the way it was created — a root container bind-mounting the
+      # workspace — since sudo is unavailable. `if: always()` because the
+      # interrupted-scan case is exactly the one that strands the directory.
+      - name: Remove root-owned trufflehog scratch (survives an interrupted scan)
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            echo "no trufflehog scratch left behind"
+            exit 0
+          fi
+          echo "removing root-owned scratch: ${leftovers[*]}"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*'
+          remaining=(trufflehog-*)
+          if [ ${#remaining[@]} -ne 0 ]; then
+            echo "::error::trufflehog scratch survived cleanup (${remaining[*]}) — the next checkout on this runner will fail with EACCES"
+            exit 1
+          fi
+          echo "workspace is clean"
+
   notify-failure:
     # Umbra-only CI policy (2026-07-15): GitHub-hosted runners are billing-
     # blocked permanently, so the old fail-open-on-cloud design can never fire.

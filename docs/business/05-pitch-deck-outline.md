@@ -60,9 +60,10 @@ KNET logo visible.
    still 5 years behind
 2. **AI commodity unlocks** — the AI free tier lets us ship assistance features (translation, SEO,
    categorization, WhatsApp bot intelligence) at near-zero marginal cost to the merchant
-3. **Kuwait Law 13/2023** — new data residency + erasure requirements that internationally-hosted
-   platforms handle poorly. A locally-operated managed platform delivers compliance as part of the
-   service.
+3. **GCC data-protection requirements** (see `docs/legal/gcc-data-protection.md`; Kuwait's own
+   reference point is the Electronic Transactions Law No. 20/2014) — data residency + erasure
+   requirements that internationally-hosted platforms handle poorly. A locally-operated managed
+   platform delivers compliance as part of the service.
 
 Visual: 3 timeline arrows converging into a single "now" point.
 

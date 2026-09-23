@@ -1,5 +1,7 @@
 # Mutate-in-Place vs Append-Only History Audit
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 **Date:** 2026-05-28
 **Scope:** `packages/database/prisma/schema.prisma` + all `apps/api/src` routes and services
 **Status:** READ-ONLY — no code changes

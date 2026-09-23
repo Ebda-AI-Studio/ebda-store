@@ -10,7 +10,8 @@ import { useConsent } from '../contexts/ConsentContext';
  *
  * Gated on the marketing consent cookie because PostHog captures
  * page views + click data + visitor identifiers, which falls under
- * the GDPR / Kuwait Law 13/2023 "analytics cookies" category and
+ * the GDPR / applicable GCC data-protection law (see
+ * docs/legal/gcc-data-protection.md) "analytics cookies" category and
  * requires opt-in. Same gate as the Meta / GA / TikTok pixels.
  *
  * Init flow:
@@ -47,7 +48,8 @@ export function PostHogProvider({ children }: Props) {
     posthog.init(apiKey, {
       api_host: apiHost,
       // Don't capture IP — the EU/GCC PoV: IPs are PII under GDPR
-      // and Kuwait Law 13/2023. Visitor identity comes from PostHog's
+      // and applicable GCC data-protection law (see
+      // docs/legal/gcc-data-protection.md). Visitor identity comes from PostHog's
       // distinct_id cookie (anonymous by default until we call
       // posthog.identify(userId) at login).
       ip: false,

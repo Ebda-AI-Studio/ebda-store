@@ -90,8 +90,9 @@ describe('restrictPlatformOnlyOrigins', () => {
       // These read as "destructive, lock them down", but the storefront account
       // page calls /auth/me/erase and storefronts run on merchant custom
       // domains. Gating them here 403'd every customer erasing their own
-      // account on a real merchant domain, breaking the GDPR Art. 17 / Kuwait
-      // Law 13 path. They stay protected by authenticate + CSRF token +
+      // account on a real merchant domain, breaking the GDPR Art. 17 /
+      // applicable GCC data-protection law path. They stay protected by
+      // authenticate + CSRF token +
       // rejectImpersonated, which is the right boundary for self-service.
       const res = makeRes();
       const localNext = vi.fn();

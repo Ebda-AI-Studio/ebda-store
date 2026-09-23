@@ -65,7 +65,6 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {};
  */
 const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'affiliate.service.ts',
-  'auth.service.ts',
   'barcode-scan.service.ts',
   'blog.service.ts',
   'bulk.service.ts',
@@ -113,7 +112,7 @@ describe('nested-transaction registry', () => {
   it('keeps the unreviewed list from growing', () => {
     // The list is a debt ledger. It may shrink; it may not grow. A new entry
     // means someone met the question and wrote "later" instead of answering.
-    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.size).toBeLessThanOrEqual(13);
+    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.size).toBeLessThanOrEqual(12);
   });
 
   it('does not list a file that has since been fixed', () => {

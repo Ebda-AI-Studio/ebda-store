@@ -2,13 +2,14 @@ import type { InngestFunction } from 'inngest';
 import {
   deleteOneSignalPlayers,
   deletePostHogPerson,
+  summarizePropagationFailures,
 } from '../../../services/privacy-propagation.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 
 /**
- * Third-party Right-to-Erasure propagation (GDPR Art. 17 / Kuwait Law
- * 13/2023 Art. 17).
+ * Third-party Right-to-Erasure propagation (GDPR Art. 17 and applicable
+ * GCC data-protection law — see docs/legal/gcc-data-protection.md).
  *
  * `AuthService.eraseAccount` anonymizes Neon in a single transaction and
  * that MUST succeed on its own — this consumer runs entirely AFTER that
@@ -54,9 +55,14 @@ export const accountErasedPropagation: InngestFunction.Any = inngest.createFunct
         // Never log PII — userId is an opaque identifier, no email/name here.
         logger.error({ err: r.reason, userId }, 'account/erased propagation step failed')
       );
+      // Name WHICH provider(s) failed, and whether it's the expected
+      // "not configured yet" case vs a genuine outage, directly in the
+      // message that becomes the alert body — see
+      // `summarizePropagationFailures`'s doc comment for why.
+      const summary = summarizePropagationFailures(rejected.map(r => r.reason));
       throw new AggregateError(
         rejected.map(r => r.reason),
-        `account-erased-propagation: ${rejected.length}/${results.length} step(s) failed`
+        `account-erased-propagation: ${rejected.length}/${results.length} step(s) failed (${summary})`
       );
     }
   }

@@ -296,11 +296,12 @@ We typically ship requested features within 1–4 weeks if they fit the platform
 - **Storage (Cloudflare R2):** global CDN — content served from the closest edge to your customer
 - **API (Railway):** US East (planned migration to ME region as Railway adds it)
 
-**Data sovereignty for Kuwait:** Kuwait Law 13/2023 (PDPL) doesn't require data residency for SaaS
-providers but does require erasure capability — which we provide (`/auth/me/erase` endpoint,
-irreversible PII anonymization).
+**Data sovereignty for Kuwait:** see `docs/legal/gcc-data-protection.md` for the verified legal
+basis (Kuwait's own reference point is the Electronic Transactions Law No. 20/2014). We provide
+erasure capability platform-wide regardless of country (`/auth/me/erase` endpoint, irreversible
+PII anonymization).
 
-### Are you GDPR / Kuwait Law 13/2023 compliant?
+### Are you GDPR / GCC data-protection compliant?
 
 Yes:
 

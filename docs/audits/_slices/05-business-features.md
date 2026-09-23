@@ -1,5 +1,7 @@
 ## 5. Business Features & Competitive Positioning
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 ### Executive Summary
 
 - **FWB is a proprietary multi-tenant e-commerce platform built by Force AI (Kuwait)**, targeting Kuwait/GCC SMB merchants who need bilingual Arabic-first storefronts with local payment rails (KNET/Tap/MyFatoorah) and built-in AI — a market gap that Shopify, Salla, and Wix leave open.

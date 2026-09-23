@@ -174,7 +174,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   // Cookie consent — read server-side so MarketingPixelsProvider is only
   // RENDERED into the HTML when the user has consented to marketing.
-  // GDPR Art. 6(a) + ePrivacy + Kuwait Law 13/2023 require prior consent
+  // GDPR Art. 6(a) + ePrivacy + applicable GCC data-protection law
+  // (see docs/legal/gcc-data-protection.md) require prior consent
   // BEFORE non-essential tracking scripts execute. Client-side gating
   // alone leaks the script on first paint; SSR gating prevents that.
   const consentCookieRaw = cookieStore.get('force-cookie-consent')?.value;
@@ -557,7 +558,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     {/* Marketing pixels render ONLY when the visitor has
                     consented (read from the `force-cookie-consent` cookie
                     server-side). No consent → scripts never reach the
-                    browser. GDPR/ePrivacy/Kuwait Law 13/2023 compliance. */}
+                    browser. GDPR/ePrivacy/applicable GCC data-protection
+                    law compliance (see docs/legal/gcc-data-protection.md). */}
                     {marketingConsentGranted &&
                       store.marketingPixels &&
                       Object.keys(store.marketingPixels).length > 0 && (

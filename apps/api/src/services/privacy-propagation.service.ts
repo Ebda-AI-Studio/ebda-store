@@ -1,5 +1,6 @@
 /**
- * Right-to-erasure (GDPR Art. 17 / Kuwait Law 13/2023 Art. 17) propagation
+ * Right-to-erasure (GDPR Art. 17 and applicable GCC data-protection law —
+ * see docs/legal/gcc-data-protection.md) propagation
  * to third parties that hold a copy of the user's personal data outside
  * Neon Postgres.
  *
@@ -14,21 +15,76 @@
  * Coverage:
  *   - OneSignal: best-effort delete of any known player/subscription for
  *     the user. See the caveat on `deleteOneSignalPlayers` — in practice
- *     this is empty for real customer erasures today (see below).
+ *     this is empty for real customer erasures today (see below), so it's
+ *     a genuine no-op rather than a missing-credential failure.
  *   - PostHog: deletes the person, env-gated behind
  *     `POSTHOG_PERSONAL_API_KEY` (not configured anywhere in this repo
- *     today — see `deletePostHogPerson`).
- *   - Meta / TikTok / Snap CAPI: intentionally NOT handled here. CAPI
- *     receives pseudonymized (SHA-256 hashed email/phone) conversion
- *     EVENTS, not a queryable per-user profile FWB can delete via API —
- *     see docs/privacy/data-map.md "Deletion & backups" for the full
- *     reasoning and the providers' own data-subject-request contacts.
+ *     today — see `deletePostHogPerson`). Missing credential now FAILS
+ *     LOUD (`PropagationNotConfiguredError`, dead-lettered via
+ *     `alerts-failure-watch`) rather than silently no-opping.
+ *   - Meta / TikTok CAPI: no per-subject deletion API exists (see
+ *     docs/privacy/data-map.md "Deletion & backups" for the full
+ *     reasoning and the providers' own data-subject-request contacts) —
+ *     instead, `order-capi-conversion.ts` SUPPRESSES the event entirely
+ *     for any order whose customer has since been erased (detected via
+ *     the `{ anonymized: true }` shipping-address marker `eraseAccount`
+ *     writes), so an erased subject never generates a fresh CAPI event.
+ *     Snap/Twitter/Pinterest never received server-side CAPI events to
+ *     begin with (client-side pixels only — see data-map.md §3).
  */
 
 import logger from '../lib/logger';
 import { config } from '../config';
 
 const ONESIGNAL_PLAYERS_ENDPOINT = 'https://onesignal.com/api/v1/players';
+
+/**
+ * Thrown when a third-party erasure-propagation target has personal data
+ * to delete but the credential needed to reach it isn't configured.
+ *
+ * This is NOT the same as "nothing to delete" (e.g. `deleteOneSignalPlayers`
+ * with an empty `playerIds` array, which is a genuine no-op and returns
+ * normally) — it's "there IS a copy of this person's data at this
+ * provider, and we could not attempt to remove it." Per the repo's
+ * fail-loud-not-silent-no-op rule, this must surface as a FAILED
+ * propagation step (caught by `Promise.allSettled` in
+ * `account-erased-propagation.ts`, which re-throws so
+ * `alerts-failure-watch` dead-letters it) rather than a quiet success that
+ * leaves the third-party copy in place indefinitely.
+ */
+export class PropagationNotConfiguredError extends Error {
+  constructor(
+    public readonly provider: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'PropagationNotConfiguredError';
+  }
+}
+
+/**
+ * Turn a list of rejected propagation-step reasons into a short,
+ * human-readable summary naming which provider failed and why — used as
+ * the Inngest `AggregateError` message, which becomes the Telegram alert
+ * body in `alerts-failure-watch.ts`. `sendAlert` already throttles repeats
+ * of the same (level, title) to one per 5 minutes, but that title is
+ * generic per Inngest function ("inngest function failed: X"); without a
+ * distinguishing body, an operator reading the throttled alert can't tell
+ * "PostHog is expectedly unconfigured" from "OneSignal is actually down" —
+ * which would turn the fail-loud fix into noise that gets muted just as
+ * silently as the no-op it replaced.
+ */
+export function summarizePropagationFailures(reasons: unknown[]): string {
+  return reasons
+    .map(reason => {
+      if (reason instanceof PropagationNotConfiguredError) {
+        return `${reason.provider}: not-configured`;
+      }
+      if (reason instanceof Error) return reason.message;
+      return 'unknown error';
+    })
+    .join('; ');
+}
 
 /**
  * Delete each known OneSignal player/subscription for an erased user.
@@ -53,14 +109,20 @@ const ONESIGNAL_PLAYERS_ENDPOINT = 'https://onesignal.com/api/v1/players';
  * the only server-side record that ever existed for a customer.
  */
 export async function deleteOneSignalPlayers(playerIds: string[]): Promise<void> {
+  // Genuine no-op: there is nothing to delete, so there is nothing to fail
+  // at. Distinct from the missing-credential case below.
   if (playerIds.length === 0) return;
 
   if (!config.onesignalAdminAppId || !config.onesignalAdminRestApiKey) {
-    logger.warn(
+    logger.error(
       { count: playerIds.length },
-      '[privacy-propagation] OneSignal admin app not configured — skipping player deletion'
+      '[privacy-propagation] OneSignal admin app not configured — ' +
+        `${playerIds.length} player(s) could NOT be deleted (fail-loud, not a silent no-op)`
     );
-    return;
+    throw new PropagationNotConfiguredError(
+      'onesignal',
+      `OneSignal admin app not configured — ${playerIds.length} player(s) left undeleted`
+    );
   }
 
   const appId = config.onesignalAdminAppId;
@@ -106,7 +168,11 @@ interface PostHogPersonSearchResult {
 /**
  * Delete the user's PostHog person record.
  *
- * NOT LIVE TODAY — env-gated, warns and no-ops rather than faking success:
+ * NOT LIVE TODAY — env-gated, and now FAILS LOUD rather than silently
+ * no-opping when the credential is missing (2026-09-22 — a silent
+ * `return` here meant a PostHog person copy of an "erased" customer's
+ * data survived indefinitely while every log line said the erasure
+ * succeeded):
  *
  *   1. FWB's storefront PostHog init (`PostHogProvider.tsx`) only ever
  *      holds the PUBLIC project key (`NEXT_PUBLIC_POSTHOG_KEY`) client-side.
@@ -123,16 +189,23 @@ interface PostHogPersonSearchResult {
  *
  * To make this live: set `POSTHOG_PERSONAL_API_KEY` + `POSTHOG_PROJECT_ID`,
  * AND add `posthog.identify(user.id)` at login so `userId` really is the
- * PostHog `distinct_id` this function looks up.
+ * PostHog `distinct_id` this function looks up. Until then, every erasure
+ * throws `PropagationNotConfiguredError` here, which
+ * `account-erased-propagation.ts` catches, logs, and dead-letters via
+ * `alerts-failure-watch` — visible, not silent.
  */
 export async function deletePostHogPerson(userId: string): Promise<void> {
   const { posthogPersonalApiKey: apiKey, posthogProjectId: projectId, posthogHost } = config;
 
   if (!apiKey || !projectId) {
-    logger.warn(
-      '[privacy-propagation] POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID not set — skipping PostHog person deletion (see docs/privacy/data-map.md)'
+    logger.error(
+      '[privacy-propagation] POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID not set — ' +
+        'PostHog person deletion could NOT be attempted (fail-loud, not a silent no-op; see docs/privacy/data-map.md)'
     );
-    return;
+    throw new PropagationNotConfiguredError(
+      'posthog',
+      'POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID not set — PostHog person deletion not attempted'
+    );
   }
 
   const authHeader = { Authorization: `Bearer ${apiKey}` };

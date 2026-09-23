@@ -1,5 +1,7 @@
 # FWB Iceberg Audit — 2026-05-15
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 **Scope**: 38 production-readiness terms, force-website-builder monorepo
 **Baseline**: 2026-05-13 — 16 ✅ / 13 ⚠️ / 8 ❌ / 1 ⏭️
 **This audit**: **22 ✅ / 9 ⚠️ / 6 ❌ / 1 ⏭️**

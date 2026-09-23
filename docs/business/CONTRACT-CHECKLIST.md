@@ -21,7 +21,7 @@
 ## Terms that were verified accurate (don't change without a reason)
 
 - [ ] **SLA**: 99.5% monthly uptime, 24h normal / 4h critical support response, credit = 1 service-day per excess downtime hour (cap 30 days/year). Defensible against current infra (Neon + Railway + Cloudflare Workers + Redis + Inngest).
-- [ ] **Data protection**: Kuwait Law 13/2023 Data-Processor split; erasure (`/auth/me/erase`) + export (`/auth/me/export`) endpoints exist; ≥30-day backups. (See `docs/RETENTION.md`.)
+- [ ] **Data protection**: Kuwait Electronic Transactions Law No. 20/2014 Data-Processor split (GCC-wide basis: `docs/legal/gcc-data-protection.md`); erasure (`/auth/me/erase`) + export (`/auth/me/export`) endpoints exist; ≥30-day backups. (See `docs/RETENTION.md`.)
 - [ ] **Third-party cost carve-outs**: payment-gateway commissions, shipping-carrier fees, domain registration are the client's cost, not Force AI's.
 - [ ] **Payment**: bank transfer / KNET / cheque payable to شركة فورس AI.
 

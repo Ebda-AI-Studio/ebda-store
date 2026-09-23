@@ -1,5 +1,7 @@
 # FWB Accounting + Stock + Insights — Design
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 **Date:** 2026-05-19
 **Status:** Approved by Ahmad 2026-05-19 (hybrid GL, single-warehouse, admin/backend only, weighted-average costing, all 4 AI features, opt-in backorders, Insights/BI tier added).
 **Ships in:** four phased commit batches (Foundations → Stock → Smart Layer → Insights).

@@ -167,7 +167,8 @@ to a dump when it isn't. Coordinate with the team before a production cutover.
 
 ## Erasure boundary — how long deleted PII survives in these backups
 
-A `POST /auth/me/erase` request (GDPR Art. 17 / Kuwait Law 13/2023 Art. 17)
+A `POST /auth/me/erase` request (GDPR Art. 17 and applicable GCC
+data-protection law — see `docs/legal/gcc-data-protection.md`)
 only mutates the LIVE database — it can't retroactively edit a backup that
 was already taken. Full breakdown of the resulting persistence window
 (PITR 7 days + dump retention 30 days below) and what that means for a

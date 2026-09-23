@@ -6,8 +6,9 @@ import { inngest } from '../client';
 import { auditLog } from '../../../middleware/security';
 
 /**
- * Data retention crons (iceberg item #15 / Kuwait Law 13/2023 Art. 17:
- * "no longer than business need" + GDPR Art. 5(1)(e) storage limitation).
+ * Data retention crons (iceberg item #15 / applicable GCC data-protection
+ * law's "no longer than business need" principle + GDPR Art. 5(1)(e)
+ * storage limitation — see docs/legal/gcc-data-protection.md).
  *
  * Two passes:
  *
@@ -33,7 +34,8 @@ const SOFT_DELETED_USER_RETENTION_DAYS = 365;
 // After that the order row is no longer required for tax compliance
 // and its PII snapshots (already nullified at customer-erase time,
 // but not for orders whose customer never asked to be erased) need
-// to be scrubbed under Kuwait Law 13/2023 storage limitation.
+// to be scrubbed under applicable GCC data-protection law's storage
+// limitation principle (see docs/legal/gcc-data-protection.md).
 const ORDER_ANONYMIZE_RETENTION_DAYS = 365 * 5; // 1825 days
 
 // Caps per run so a one-time historical backlog doesn't open
@@ -164,8 +166,9 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
  *
  * Kuwait MOF requires invoice retention ≥5 years for tax compliance.
  * After that window the order ROW can still survive (financial record)
- * but its PII snapshots must go (Kuwait Law 13/2023 + GDPR Art. 5(1)(e)
- * storage limitation).
+ * but its PII snapshots must go (applicable GCC data-protection law +
+ * GDPR Art. 5(1)(e) storage limitation — see
+ * docs/legal/gcc-data-protection.md).
  *
  * The eraseAccount path already scrubs orders' shipping/billing JSON
  * to `{ anonymized: true }` and nulls customerId AT CUSTOMER-ERASE TIME.

@@ -50,6 +50,7 @@ import {
   hashEmail,
   hashPhone,
   sendPurchaseConversion,
+  isErasedCustomerOrder,
   type PurchaseOrderData,
 } from '@api/services/pixels-capi.service';
 
@@ -434,5 +435,36 @@ describe('sendPurchaseConversion — fail-open', () => {
     mockFetch.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
     await expect(sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL)).resolves.toBeUndefined();
+  });
+});
+
+describe('isErasedCustomerOrder — right-to-erasure CAPI suppression', () => {
+  it('is true for the exact marker AuthService.eraseAccount writes', () => {
+    expect(isErasedCustomerOrder({ anonymized: true })).toBe(true);
+  });
+
+  it('is false for a normal shipping address', () => {
+    expect(
+      isErasedCustomerOrder({
+        firstName: 'Ahmad',
+        email: 'shopper@example.com',
+        city: 'Kuwait City',
+      })
+    ).toBe(false);
+  });
+
+  it('is false for null / undefined shippingAddress', () => {
+    expect(isErasedCustomerOrder(null)).toBe(false);
+    expect(isErasedCustomerOrder(undefined)).toBe(false);
+  });
+
+  it('is false when "anonymized" is present but not === true (truthy-but-not-boolean trap)', () => {
+    expect(isErasedCustomerOrder({ anonymized: 'true' })).toBe(false);
+    expect(isErasedCustomerOrder({ anonymized: 1 })).toBe(false);
+  });
+
+  it('is false for a non-object shippingAddress', () => {
+    expect(isErasedCustomerOrder('anonymized')).toBe(false);
+    expect(isErasedCustomerOrder(42)).toBe(false);
   });
 });

@@ -82,6 +82,27 @@ export interface PurchaseOrderData {
   shippingAddress?: Record<string, unknown> | null;
 }
 
+/**
+ * True when an order's shipping-address JSON carries the `{ anonymized:
+ * true }` marker `AuthService.eraseAccount` writes when it scrubs an
+ * order's PII on customer erasure.
+ *
+ * Right-to-erasure suppression: Meta/TikTok CAPI has no per-subject
+ * deletion API (it's a one-way event stream, not a queryable profile — see
+ * docs/privacy/data-map.md), so the only available control is to never
+ * send another event for an already-erased subject's order. Callers
+ * (`order-capi-conversion.ts`) use this to skip the whole
+ * `sendPurchaseConversion` call for such an order, even on a delayed or
+ * retried delivery of the triggering event.
+ */
+export function isErasedCustomerOrder(shippingAddress: unknown): boolean {
+  return (
+    typeof shippingAddress === 'object' &&
+    shippingAddress !== null &&
+    (shippingAddress as Record<string, unknown>).anonymized === true
+  );
+}
+
 // ─── Meta CAPI ───────────────────────────────────────────────────────────────
 
 const META_API_VERSION = process.env.META_GRAPH_API_VERSION ?? 'v21.0';

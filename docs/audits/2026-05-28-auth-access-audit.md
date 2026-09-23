@@ -1,5 +1,7 @@
 # Auth / Access / Privacy Audit — 2026-05-28
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 **Scope:** Authentication events, session lifecycle, role mutations, credential rotations, webhook secrets, GDPR/Kuwait Law erasure, data export, tenant isolation, cookie consent, push subscriptions, PII access, bot mode.  
 **Excludes:** Business state machines (payments, orders, returns, shipments, reviews, affiliates, loyalty) — those are covered in the companion `2026-05-28-mutate-in-place-audit.md`.  
 **Method:** Grep coverage map of `auditLog({ action: '...' })` writes per surface, cross-referenced against the surfaces themselves.

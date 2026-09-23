@@ -164,14 +164,16 @@ export const config = {
   onesignalOrdersAppId: process.env.ONESIGNAL_ORDERS_APP_ID || '',
   onesignalOrdersRestApiKey: process.env.ONESIGNAL_ORDERS_REST_API_KEY || '',
 
-  // PostHog — server-side Right-to-Erasure propagation only (Kuwait Law
-  // 13/2023 Art. 17 / GDPR Art. 17). Distinct from the storefront's
+  // PostHog — server-side Right-to-Erasure propagation only (GDPR Art. 17
+  // and applicable GCC data-protection law — see
+  // docs/legal/gcc-data-protection.md). Distinct from the storefront's
   // NEXT_PUBLIC_POSTHOG_KEY (public project key, baked into the browser
   // bundle) — deleting a person requires a PERSONAL API key with
   // person-level write scope, which must never reach the browser. Unset
   // by default; when unset, `deletePostHogPerson` (privacy-propagation
-  // service) warns once and no-ops rather than faking success. See
-  // docs/privacy/data-map.md.
+  // service) throws `PropagationNotConfiguredError` so the erasure's
+  // PostHog step fails loud (logged + dead-lettered) rather than faking
+  // success. See docs/privacy/data-map.md.
   posthogPersonalApiKey: process.env.POSTHOG_PERSONAL_API_KEY || '',
   posthogProjectId: process.env.POSTHOG_PROJECT_ID || '',
   posthogHost: process.env.POSTHOG_HOST || 'https://eu.posthog.com',

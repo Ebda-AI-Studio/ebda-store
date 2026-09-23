@@ -137,8 +137,8 @@
       "tier": "unit",
       "why": "erased account's OneSignal player ids never reach the propagation consumer, so the third party keeps the PII",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "      .send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })",
-      "replace": "      .send({ name: 'account/erased', data: { userId, oneSignalPlayerIds: [] } })",
+      "find": "      inngest.send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })",
+      "replace": "      inngest.send({ name: 'account/erased', data: { userId, oneSignalPlayerIds: [] } })",
       "test": "tests/unit/auth-erase-propagation.test.ts"
     },
     {
@@ -760,6 +760,26 @@
       "find": "        } else {\n          throw new Error(\n            `NOTIFICATION_CREDENTIALS_UNRESOLVED: re-enter the ${channel} credentials — the saved value for \"${key}\" could not be read, and saving now would erase it.`\n          );\n        }",
       "replace": "        }",
       "test": "tests/unit/notification-credentials-merge.test.ts"
+    },
+    {
+      "id": "erasure-addresses-escapes-user-rls",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "addresses carries a USER-scoped RLS policy and the merchant-initiated erase runs under the MERCHANT's current_user_id, so without the bypass the delete matches zero rows and the shopper's name/phone/street survive an erased account with no error",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;\n      await tx.address.deleteMany({ where: { userId } });\n      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'false'`;",
+      "replace": "      await tx.address.deleteMany({ where: { userId } });",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "erasure-crm-identity-must-be-unambiguous",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "the merchant-CRM scrub matches a customers row with no FK to users; the (storeId,email) unique is case-SENSITIVE and the read is case-INsensitive, so two case-variant rows both match and erasing A hard-deletes B's customer_addresses and overwrites B's identity fields — the phone branch cannot collide because @@unique([storeId,phone]) forecloses it, so the EMAIL branch is the reachable one",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "          if (byEmail.length === 1) {\n            crmIdSet.add(byEmail[0].id);\n          } else if (byEmail.length > 1) {",
+      "replace": "          if (byEmail.length >= 1) {\n            for (const c of byEmail) crmIdSet.add(c.id);\n          } else if (byEmail.length > 1) {",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
     }
   ]
 }

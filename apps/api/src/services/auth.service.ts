@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { prisma, Prisma, withMoneyTx, withRlsBypass } from '@force/database';
+import { prisma, Prisma, hasTenantContext, withMoneyTx, withRlsBypass } from '@force/database';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -9,6 +9,7 @@ import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
 import { redis } from './redis.service';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { inngest } from '../lib/inngest/client';
 
 interface TokenPayload {
@@ -1340,7 +1341,8 @@ export class AuthService {
   }
 
   /**
-   * Irreversible PII anonymization (GDPR Art. 17 + Kuwait Law 13/2023).
+   * Irreversible PII anonymization (GDPR Art. 17 and applicable GCC
+   * data-protection law — see docs/legal/gcc-data-protection.md).
    *
    * Wipes every personally-identifying field on the user and removes child
    * rows that have no audit/financial basis (addresses, push subs, cart,
@@ -1349,6 +1351,10 @@ export class AuthService {
    * (orders preserve totals/line-items/order-number for Kuwait MOF's ≥5y
    * invoice-retention requirement; shipping/billing address JSON snapshots
    * are scrubbed since they store the same PII as the addresses table).
+   * The merchant-CRM copy of the same shopper (`customers` +
+   * `customer_addresses`, matched by phone/email because it has no FK to
+   * `users`) is scrubbed/deleted too — otherwise an "erased" shopper stays
+   * fully readable in the customers list, group queries and the bot.
    *
    * Idempotent: re-running on an already-erased account is a no-op (the
    * second call's `update` succeeds with the same data, the `deleteMany`s
@@ -1361,7 +1367,17 @@ export class AuthService {
   static async eraseAccount(userId: string): Promise<void> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, storeId: true, role: true, avatar: true },
+      select: {
+        id: true,
+        storeId: true,
+        role: true,
+        avatar: true,
+        // Needed to reach the `customers` CRM row, which is keyed by
+        // phone/email rather than by a FK to `users` — see the scrub
+        // inside `anonymize` below.
+        email: true,
+        phone: true,
+      },
     });
     if (!user) {
       throw new AppError(404, 'NOT_FOUND', 'User not found');
@@ -1377,6 +1393,18 @@ export class AuthService {
     const anonymizedEmail = `erased-${user.id}@anonymized.local`;
     const anonymizedAddressJson = { anonymized: true } as const;
 
+    // The `customers` table is a SECOND copy of the same shopper's PII
+    // (email, firstName, lastName, phone, notes + a `customer_addresses`
+    // child table) that the merchant CRM, customer groups and the WhatsApp
+    // bot read from. It has NO foreign key to `users` — it is keyed by
+    // phone/email — so none of the `userId`/`customerId` deletes below can
+    // reach it. It is resolved at the scrub site below, and BOTH identifiers
+    // require a single-row match — deliberately NOT the
+    // `OR: [{phone}, {email}]` the rest of the codebase uses for LOOKUP
+    // (customers.routes.ts group lookup). A read that returns an extra row
+    // merely shows the merchant too much; this WRITE would destroy that extra
+    // person's record, so the same heuristic is not safe here.
+
     // Capture third-party identifiers BEFORE the transaction deletes the
     // local rows that carry them — the account/erased propagation consumer
     // (fired after commit, below) needs these to reach OneSignal's API.
@@ -1388,7 +1416,7 @@ export class AuthService {
       })
     ).map(s => s.playerId);
 
-    await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+    const anonymize = async (tx: Prisma.TransactionClient) => {
       // Orders: preserve for tax records (Kuwait MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
@@ -1415,7 +1443,28 @@ export class AuthService {
       // Pure-PII child rows — no business reason to retain. The FK
       // column names vary across models (some use `userId`, some
       // `customerId`) — match each model's actual schema.
+      // `addresses` is the ONE erasure target with a USER-scoped RLS policy:
+      // `rls_addresses_user` (20260702170000_rls_close_denyall_tables) admits a
+      // row only when `user_id = current_user_id()`. On the merchant-initiated
+      // path `app.current_user_id` is the MERCHANT's id — `tenantContext` sets
+      // it from `req.user?.userId` — not the shopper's, so under force_app this
+      // deleteMany matches ZERO rows and returns `{count: 0}` with NO error.
+      // The shopper's name, phone, block/street and postal code would survive
+      // an "erased" account while the audit row records a completed erasure.
+      // Inert today only because prod still connects as neondb_owner
+      // (BYPASSRLS); it goes live the day the force_app cutover flips.
+      //
+      // SET LOCAL on the AMBIENT transaction — deliberately NOT `withRlsBypass`,
+      // which is `basePrisma.$transaction`: a SECOND connection that commits
+      // independently of this request. That is precisely the hazard eraseAccount
+      // was just moved off, and using it here would make the address delete
+      // non-atomic with the rest of the erasure. SET LOCAL reverts at COMMIT,
+      // and is switched back immediately below so every remaining delete still
+      // runs under normal RLS rather than silently widening the whole erase.
+      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
       await tx.address.deleteMany({ where: { userId } });
+      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'false'`;
+
       await tx.abandonedCart.deleteMany({ where: { customerId: userId } });
       await tx.cart.deleteMany({ where: { customerId: userId } });
       await tx.wishlist.deleteMany({ where: { userId } });
@@ -1425,6 +1474,118 @@ export class AuthService {
       await tx.verificationToken.deleteMany({ where: { userId } });
       await tx.loyaltyTransaction.deleteMany({ where: { customerId: userId } });
       await tx.loyaltyPoints.deleteMany({ where: { customerId: userId } });
+
+      // Merchant-CRM copy of the same identity (`customers` +
+      // `customer_addresses`). Without this the shopper's name, email,
+      // phone, notes and street addresses stay fully readable after an
+      // "erase" — in customer-group queries, the customers list and the
+      // WhatsApp bot — while the audit row claims the account was erased.
+      // Store-scoped, so a shared phone/email across tenants only ever
+      // erases THIS store's copy.
+      if (user.storeId && (user.email || user.phone)) {
+        // Resolve the CRM row by the STRONGEST available identifier, and refuse
+        // to act on an ambiguous one.
+        //
+        // The previous `OR: [{phone}, {email}]` was destructive in one
+        // direction: two shoppers in the same store sharing a phone — a
+        // household mobile, a landline given at checkout, the same contact
+        // number typed onto two rows, all ordinary in KW/GCC — meant erasing
+        // shopper A hard-deleted shopper B's `customer_addresses` and
+        // overwrote B's name/email/phone/notes with "Erased User". That is
+        // irreversible destruction of a SECOND data subject's record from a
+        // request that only authorised erasure of the first.
+        //
+        // NEITHER identifier is trusted without a count check, and the
+        // EMAIL branch is the one that can actually collide.
+        //
+        // The earlier version trusted email on the grounds that `customers`
+        // carries `@@unique([storeId, email])`. That index is a plain,
+        // case-SENSITIVE Postgres unique, and nothing lowercases email on
+        // write, so `Ahmad@gmail.com` and `ahmad@gmail.com` are two legal,
+        // distinct rows in one store — and this read uses `mode:
+        // 'insensitive'`, so it returns BOTH. Scrubbing both destroys a second
+        // data subject exactly as the shared-phone case would.
+        //
+        // The phone branch, meanwhile, is guarded against something
+        // `@@unique([storeId, phone])` already forecloses: `byPhone.length > 1`
+        // cannot happen. Its guard is kept as a cheap invariant assertion (the
+        // index could be relaxed later), but it is NOT the one that protects
+        // anyone today — that is the email guard below.
+        //
+        // Both branches therefore require an unambiguous, single-row match. An
+        // ambiguous match scrubs NOTHING and says so: a compliance gap someone
+        // can act on beats destroying the wrong person's record.
+        const crmIdSet = new Set<string>();
+
+        if (user.email) {
+          const byEmail = await tx.customer.findMany({
+            where: { storeId: user.storeId, email: { equals: user.email, mode: 'insensitive' } },
+            select: { id: true },
+          });
+          if (byEmail.length === 1) {
+            crmIdSet.add(byEmail[0].id);
+          } else if (byEmail.length > 1) {
+            logger.warn(
+              { userId, storeId: user.storeId, matches: byEmail.length },
+              '[auth.eraseAccount] CRM email match is ambiguous (case-variant rows) — scrubbing no email-matched row rather than erasing another data subject'
+            );
+          }
+        }
+
+        if (user.phone) {
+          const byPhone = await tx.customer.findMany({
+            where: { storeId: user.storeId, phone: user.phone },
+            select: { id: true },
+          });
+          if (byPhone.length === 1) {
+            crmIdSet.add(byPhone[0].id);
+          } else if (byPhone.length > 1) {
+            logger.warn(
+              { userId, storeId: user.storeId, matches: byPhone.length },
+              '[auth.eraseAccount] CRM phone match is ambiguous — scrubbing no phone-matched row rather than erasing another data subject'
+            );
+          }
+        }
+
+        const crmRows = [...crmIdSet].map(id => ({ id }));
+        if (crmRows.length === 0) {
+          // Previously silent. A differently-normalised phone (+965… vs 965…)
+          // and a changed email match nothing, so the shopper stays readable in
+          // the customers list, group queries and the bot while the audit row
+          // records a completed erasure.
+          logger.warn(
+            { userId, storeId: user.storeId },
+            '[auth.eraseAccount] no CRM customer row matched — the merchant copy may survive this erasure'
+          );
+        }
+        if (crmRows.length > 0) {
+          const crmIds = crmRows.map(c => c.id);
+          // Addresses hold nothing but PII — hard delete, same as
+          // `addresses` above.
+          await tx.customerAddress.deleteMany({ where: { customerId: { in: crmIds } } });
+          // The row itself is scrubbed rather than deleted: totalOrders /
+          // totalSpent / groupId are merchant analytics over orders that
+          // are themselves retained for Kuwait MOF, and carry no PII once
+          // the identity fields are gone. Each row gets its OWN anonymized
+          // email (keyed on the customer id, not the user id) so the
+          // composite-unique (storeId, email) cannot collide when a
+          // phone-matched and an email-matched row are both erased.
+          for (const id of crmIds) {
+            await tx.customer.update({
+              where: { id },
+              data: {
+                email: `erased-${id}@anonymized.local`,
+                firstName: 'Erased',
+                lastName: 'User',
+                phone: null,
+                notes: null,
+                preferredLocale: null,
+                lastLocaleChoice: null,
+              },
+            });
+          }
+        }
+      }
 
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
@@ -1445,7 +1606,32 @@ export class AuthService {
           deletedAt: new Date(),
         },
       });
-    });
+    };
+
+    if (hasTenantContext()) {
+      // Store-scoped request (POST /stores/:storeId/customers/:customerId/erase)
+      // — the whole request ALREADY runs in one tenant transaction, and
+      // `withMoneyTx` is `prisma.$transaction`, which the tenant proxy
+      // deliberately does NOT forward (see `hasTenantContext`'s doc comment in
+      // packages/database/src/index.ts). Calling it here would open a SECOND
+      // connection with neither `app.current_store_id` nor `app.current_user_id`
+      // SET LOCAL, so every anonymizing write below would run RLS-contextless —
+      // the tenant backstop silently off for an irreversible PII-destroying
+      // write — and, worse, it would COMMIT INDEPENDENTLY of the request. If
+      // anything later in that request aborted the outer transaction (a poisoned
+      // statement → 25P02, or a failed COMMIT that `middleware/request-transaction.ts`
+      // turns into a 500), the shopper's PII would already be irreversibly gone
+      // while the `customer.account.erased_by_merchant` audit row rolled back and
+      // the merchant was told the operation failed: an unlogged, unrecoverable
+      // deletion. Staying on the ambient transaction makes erasure and its audit
+      // row atomic and keeps both GUCs in force. Same shape as `CartService.addItem`.
+      await anonymize(prisma as unknown as Prisma.TransactionClient);
+    } else {
+      // No tenant context — self-service `POST /auth/me/erase`, the
+      // `soft-deleted-user-anonymize` retention cron, scripts. Own money-safe
+      // transaction, exactly as before.
+      await withMoneyTx(prisma, anonymize);
+    }
 
     // The avatar URL was just nulled out of the DB — clean up R2 after
     // the transaction commits. Best-effort, same pattern as other cleanup
@@ -1456,21 +1642,29 @@ export class AuthService {
       );
     }
 
-    // Third-party deletion propagation (GDPR Art. 17 / Kuwait Law 13/2023
-    // Art. 17): OneSignal + PostHog. Fire-and-forget, same discipline as the
-    // R2 cleanup above — the primary anonymization already committed, so a
-    // dead Inngest connection must never surface as a failed erase. See
-    // lib/inngest/functions/account-erased-propagation.ts +
+    // Third-party deletion propagation (GDPR Art. 17 and applicable GCC
+    // data-protection law — see docs/legal/gcc-data-protection.md):
+    // OneSignal + PostHog. Fire-and-forget, same discipline as the
+    // R2 cleanup above — a dead Inngest connection must never surface as a
+    // failed erase. See lib/inngest/functions/account-erased-propagation.ts +
     // services/privacy-propagation.service.ts.
-    inngest
-      .send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })
-      .catch(err =>
-        logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
-      );
+    //
+    // Deferred, because on the ambient-transaction branch above the
+    // anonymization has NOT committed yet: sending inline would ask OneSignal
+    // and PostHog to irreversibly delete the person for an erasure the request
+    // may still roll back. `deferAfterTenantCommit` fires it after COMMIT and
+    // DROPS it if the transaction failed. Outside a request (self-service,
+    // retention cron) it runs inline, unchanged.
+    void deferAfterTenantCommit('auth.eraseAccount.propagate', () =>
+      inngest.send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })
+    ).catch(err =>
+      logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
+    );
   }
 
   /**
-   * Right to data portability (GDPR Art. 20 + Kuwait Law 13/2023).
+   * Right to data portability (GDPR Art. 20 and applicable GCC
+   * data-protection law — see docs/legal/gcc-data-protection.md).
    *
    * Returns every row across the schema that ties back to this user as a
    * single JSON bundle. Intentionally returns the raw shape — the
@@ -1514,7 +1708,14 @@ export class AuthService {
       pushSubscriptions,
       onesignalSubscriptions,
     ] = await Promise.all([
-      prisma.address.findMany({ where: { userId } }),
+      // Same user-scoped RLS policy as the erase path above: on the
+      // merchant-initiated export `current_user_id()` is the MERCHANT, so a
+      // plain read returns an EMPTY addresses section and ships an incomplete
+      // Art. 20 portability bundle that looks complete. `withRlsBypass` is the
+      // right tool HERE — unlike the erase, this is read-only, so a second
+      // connection carries no atomicity or independent-commit hazard — and it
+      // is the repo's deliberate, greppable cross-user read.
+      withRlsBypass(tx => tx.address.findMany({ where: { userId } })),
       prisma.order.findMany({
         where: { customerId: userId },
         include: { items: true, payments: true },

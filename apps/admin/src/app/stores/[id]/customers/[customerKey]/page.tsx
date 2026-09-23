@@ -3,9 +3,11 @@
 import { Fragment, useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
-import { apiGet, apiPut } from '../../../../../lib/api';
+import { apiGet, apiPut, apiPost, apiFetch } from '../../../../../lib/api';
+import { useAuth } from '../../../../../lib/auth';
+import { EraseCustomerModal } from './_components/EraseCustomerModal';
 
 interface CustomerGroupOption {
   id: string;
@@ -113,7 +115,17 @@ export default function CustomerDetailPage() {
   const [groups, setGroups] = useState<CustomerGroupOption[]>([]);
   const [savingGroup, setSavingGroup] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [isErasing, setIsErasing] = useState(false);
+  const [showEraseModal, setShowEraseModal] = useState(false);
   const t = useT('customers.detail');
+  const tPrivacy = useT('customers.detail.privacy');
+  const { user } = useAuth();
+  const { success: toastSuccess, error: toastError } = useToast();
+  // Owner/admin roles only — matches the API's `authorize('store_admin',
+  // 'super_admin')` on both routes. Hiding the card for staff/other roles
+  // is UX only; the API is the real gate.
+  const canManagePrivacy = user?.role === 'store_admin' || user?.role === 'super_admin';
 
   const fetchDetail = useCallback(async () => {
     if (!storeId || !customerKey) return;
@@ -195,6 +207,67 @@ export default function CustomerDetailPage() {
     },
     [customer, groups, storeId, t]
   );
+
+  /**
+   * Merchant-initiated export — same blob-download pattern as the
+   * customers-list `.xlsx` export (`page.tsx` one level up), but the
+   * response here is JSON (`AuthService.exportAccount`, same shape as the
+   * shopper's own `/auth/me/export`).
+   */
+  const handleExportData = useCallback(async () => {
+    if (!storeId || !customer || isExportingData) return;
+    setIsExportingData(true);
+    try {
+      const res = await apiFetch(`/api/v1/stores/${storeId}/customers/${customer.id}/export`);
+      if (!res.ok) {
+        toastError(tPrivacy('exportFailed'));
+        return;
+      }
+      const blob = await res.blob();
+      const filename = (() => {
+        const cd = res.headers.get('content-disposition') ?? '';
+        const match = cd.match(/filename="?([^"]+)"?/i);
+        return match?.[1] ?? `customer-${customer.id}.json`;
+      })();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toastError(tPrivacy('exportFailed'));
+    } finally {
+      setIsExportingData(false);
+    }
+  }, [storeId, customer, isExportingData, tPrivacy, toastError]);
+
+  const handleEraseConfirm = useCallback(async () => {
+    if (!storeId || !customer) return;
+    setIsErasing(true);
+    try {
+      const { error: apiError } = await apiPost(
+        `/api/v1/stores/${storeId}/customers/${customer.id}/erase`,
+        {}
+      );
+      if (apiError) {
+        toastError(tPrivacy('eraseFailed'), apiError.message ?? '');
+        setIsErasing(false);
+        return;
+      }
+      toastSuccess(tPrivacy('erasedToastTitle'), tPrivacy('erasedToastDescription'));
+      setShowEraseModal(false);
+      // The customer's identifying fields are gone — re-fetch so the page
+      // reflects the anonymized row rather than showing stale PII.
+      await fetchDetail();
+    } catch (err) {
+      toastError(tPrivacy('eraseFailed'), err instanceof Error ? err.message : '');
+    } finally {
+      setIsErasing(false);
+    }
+  }, [storeId, customer, tPrivacy, toastError, toastSuccess, fetchDetail]);
 
   const displayName =
     customer && (customer.firstName || customer.lastName)
@@ -531,9 +604,62 @@ export default function CustomerDetailPage() {
                   </table>
                 </div>
               </div>
+
+              {/* Privacy & data — merchant-initiated erasure/export.
+                  Registered customers only: a guest has no User row for
+                  AuthService.eraseAccount/exportAccount to act on (their
+                  PII lives only in order shipping-address snapshots).
+                  Role-gated client-side to match the API's authorize()
+                  (store_admin/super_admin only — never staff). */}
+              {!customer.isGuest && canManagePrivacy && (
+                <div className="rounded-xl border border-destructive/30 bg-card shadow-sm">
+                  <div className="border-b border-destructive/30 bg-destructive/10 p-4">
+                    <h2 className="font-semibold text-destructive">{tPrivacy('sectionTitle')}</h2>
+                    <p className="text-sm text-destructive">{tPrivacy('sectionSubtitle')}</p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">{tPrivacy('exportTitle')}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {tPrivacy('exportDescription')}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={handleExportData}
+                        isLoading={isExportingData}
+                      >
+                        {tPrivacy('exportButton')}
+                      </Button>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-border pt-4">
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">{tPrivacy('eraseTitle')}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {tPrivacy('eraseDescription')}
+                        </p>
+                      </div>
+                      <Button variant="destructive" onClick={() => setShowEraseModal(true)}>
+                        {tPrivacy('eraseButton')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
+      )}
+
+      {customer && (
+        <EraseCustomerModal
+          isOpen={showEraseModal}
+          confirmValue={customer.email || customer.phone || customer.id}
+          isErasing={isErasing}
+          onClose={() => setShowEraseModal(false)}
+          onConfirm={handleEraseConfirm}
+        />
       )}
     </AdminLayout>
   );

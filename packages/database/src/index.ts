@@ -222,9 +222,24 @@ function isProxiedProp(prop: string | symbol): boolean {
  *                               sibling public route, which is mounted outside
  *                               `tenantContext` and so always took the safe
  *                               branch)
+ *   - `AuthService.eraseAccount` (2026-09-23 — a DIFFERENT shape from the cart
+ *                               three: no write-then-read, so it would not have
+ *                               failed loudly. The `withMoneyTx` simply committed
+ *                               the irreversible PII anonymization on a second,
+ *                               GUC-less connection, independently of the request
+ *                               transaction — so an abort after it destroyed the
+ *                               data while rolling back its own audit row. Latent
+ *                               until the merchant-initiated
+ *                               `POST /stores/:storeId/customers/:customerId/erase`
+ *                               route made it reachable under `tenantContext`;
+ *                               `/auth/me/erase` and the retention cron are both
+ *                               context-less.)
  *
  * The shape to look for: a service that calls `getOrCreate`-then-`$transaction`
- * and is reachable from a router mounted under `tenantContext`.
+ * and is reachable from a router mounted under `tenantContext`. Note the
+ * eraseAccount case widens that: ANY `$transaction` reachable under
+ * `tenantContext` is already wrong on RLS scoping and commit atomicity, even
+ * when it never reads back what it wrote and so never throws.
  *
  * Prisma does not support nested interactive transactions in any case.
  */

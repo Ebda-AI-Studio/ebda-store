@@ -1,5 +1,7 @@
 # Force AI Suite — Security Hardening + AI PR Reviewer Implementation Plan
 
+> **Correction (2026-09-22):** "Kuwait Law 13/2023" cited below does not exist. See docs/legal/gcc-data-protection.md for the verified GCC legal basis.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Bring every security/quality status to "full" (no partial, none missing) across all three production apps — FWB, WBS, CRM — and add a Claude-powered PR reviewer that posts inline comments and blocks merge on critical findings.

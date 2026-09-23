@@ -19,13 +19,21 @@
  *   `sendPurchaseConversion` catches and logs all CAPI errors internally.
  *   This function therefore never throws from the conversion call — Inngest
  *   will only retry if the store or order load fails.
+ *
+ * Erasure suppression:
+ *   An order whose customer has since been erased (`eraseAccount` marks
+ *   `shippingAddress` `{ anonymized: true }`) never gets a CAPI event sent,
+ *   even on a delayed/retried delivery of this event — see the check below.
  */
 
 import type { InngestFunction } from 'inngest';
 import { prisma, runInTenantContext } from '@force/database';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
-import { sendPurchaseConversion } from '../../../services/pixels-capi.service';
+import {
+  sendPurchaseConversion,
+  isErasedCustomerOrder,
+} from '../../../services/pixels-capi.service';
 import { config } from '../../../config';
 import logger from '../../logger';
 
@@ -117,6 +125,25 @@ export const orderCapiConversion: InngestFunction.Any = inngest.createFunction(
     if (!order) {
       logger.warn({ storeId, orderId }, '[order-capi] order not found — skipping');
       return { skipped: 'order-not-found' };
+    }
+
+    // Right-to-erasure suppression: `AuthService.eraseAccount` nulls
+    // `order.customerId` AND rewrites `shippingAddress`/`billingAddress` to
+    // `{ anonymized: true }` inside its transaction. There is no per-subject
+    // deletion API for Meta/TikTok CAPI (it's a one-way event stream, not a
+    // queryable profile — see docs/privacy/data-map.md), so the only
+    // available control is to never send another event tied to an erased
+    // subject's order in the first place — a delayed/retried Inngest
+    // delivery of this same `order/created` event after the customer erased
+    // their account must not (re)send a conversion event for them. The
+    // anonymized marker is the signal: an order that's been through
+    // `eraseAccount` always carries it, a normal order never does.
+    if (isErasedCustomerOrder(order.shippingAddress)) {
+      logger.info(
+        { storeId, orderId },
+        '[order-capi] order belongs to an erased customer — suppressing CAPI event'
+      );
+      return { skipped: 'erased-customer-suppressed' };
     }
 
     // Send to all configured CAPI providers. sendPurchaseConversion is

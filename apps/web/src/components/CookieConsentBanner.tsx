@@ -15,7 +15,8 @@ import { useStoreUrl } from '../contexts/StoreContext';
  *   - Customize      → opens the CookiePreferencesModal for granular control
  *
  * Regulatory context: required by GDPR Art. 6(a), ePrivacy Directive,
- * and Kuwait Personal Data Protection Law (Law 13/2023). The "Reject"
+ * and applicable GCC data-protection law (see
+ * docs/legal/gcc-data-protection.md). The "Reject"
  * option must be as prominent and easy to click as "Accept" — that's
  * why both are primary-style buttons, not "Accept" prominent + "Reject"
  * buried in a sub-menu (a pattern regulators have specifically flagged

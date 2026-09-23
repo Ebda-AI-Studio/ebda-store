@@ -664,8 +664,9 @@ router.delete(
   }
 );
 
-// POST /auth/me/erase — irreversible PII anonymization (GDPR Art. 17 +
-// Kuwait Law 13/2023 Art. 17). Unlike DELETE /auth/me (soft-delete that
+// POST /auth/me/erase — irreversible PII anonymization (GDPR Art. 17 and
+// applicable GCC data-protection law — see docs/legal/gcc-data-protection.md).
+// Unlike DELETE /auth/me (soft-delete that
 // leaves PII intact), this nulls/scrubs every identifying field across
 // the schema in a single transaction and preserves anonymized order
 // records for Kuwait MOF ≥5y tax retention. No request body — possession
@@ -706,8 +707,9 @@ router.post(
   }
 );
 
-// GET /auth/me/export — right to data portability (GDPR Art. 20 + Kuwait
-// Law 13/2023 Art. 20). Returns a JSON bundle of every row tied to this
+// GET /auth/me/export — right to data portability (GDPR Art. 20 and
+// applicable GCC data-protection law — see docs/legal/gcc-data-protection.md).
+// Returns a JSON bundle of every row tied to this
 // user. Marked as an attachment so browsers download it as a file.
 router.get('/me/export', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {

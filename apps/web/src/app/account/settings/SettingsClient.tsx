@@ -201,7 +201,8 @@ export default function SettingsClient() {
     setMessage(null);
 
     try {
-      // Kuwait Law 13/2023 + GDPR Art. 17 compliant erasure: POST /auth/me/erase
+      // GDPR Art. 17 and applicable GCC data-protection law (see
+      // docs/legal/gcc-data-protection.md) compliant erasure: POST /auth/me/erase
       // irreversibly anonymizes PII while preserving anonymized order records
       // for Kuwait MOF tax retention. The old DELETE /auth/me was a soft-delete
       // (deletedAt timestamp) that left PII intact — NOT compliant.
@@ -418,7 +419,7 @@ export default function SettingsClient() {
         </form>
       </div>
 
-      {/* Privacy & data \u2014 GDPR Art. 20 / Kuwait Law 13/2023 portability right */}
+      {/* Privacy & data \u2014 GDPR Art. 20 / applicable GCC data-protection law portability right (see docs/legal/gcc-data-protection.md) */}
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border bg-muted/40 p-4">
           <h2 className="font-semibold text-foreground">
@@ -445,8 +446,8 @@ export default function SettingsClient() {
               </p>
               <p className="text-sm text-muted-foreground">
                 {t(
-                  'Get a JSON file with your profile, orders, addresses, and wishlist \u2014 exercise of your right to data portability under Kuwait Law 13/2023.',
-                  '\u0627\u062d\u0635\u0644 \u0639\u0644\u0649 \u0645\u0644\u0641 JSON \u064a\u062d\u062a\u0648\u064a \u0639\u0644\u0649 \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a \u0648\u0637\u0644\u0628\u0627\u062a\u0643 \u0648\u0639\u0646\u0627\u0648\u064a\u0646\u0643 \u0648\u0645\u0641\u0636\u0644\u0627\u062a\u0643 \u2014 \u0645\u0645\u0627\u0631\u0633\u0629 \u062d\u0642\u0643 \u0641\u064a \u0646\u0642\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0648\u0641\u0642\u0627\u064b \u0644\u0644\u0642\u0627\u0646\u0648\u0646 \u0627\u0644\u0643\u0648\u064a\u062a\u064a 13/2023.'
+                  'Get a JSON file with your profile, orders, addresses, and wishlist \u2014 exercise your right to data portability under applicable data-protection law.',
+                  '\u0627\u062d\u0635\u0644 \u0639\u0644\u0649 \u0645\u0644\u0641 JSON \u064a\u062d\u062a\u0648\u064a \u0639\u0644\u0649 \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a \u0648\u0637\u0644\u0628\u0627\u062a\u0643 \u0648\u0639\u0646\u0627\u0648\u064a\u0646\u0643 \u0648\u0645\u0641\u0636\u0644\u0627\u062a\u0643 \u2014 \u0645\u0645\u0627\u0631\u0633\u0629\u064b \u0644\u062d\u0642\u0643 \u0641\u064a \u0646\u0642\u0644 \u0628\u064a\u0627\u0646\u0627\u062a\u0643 \u0648\u0641\u0642\u0627\u064b \u0644\u0642\u0648\u0627\u0646\u064a\u0646 \u062d\u0645\u0627\u064a\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0639\u0645\u0648\u0644 \u0628\u0647\u0627.'
                 )}
               </p>
             </div>
@@ -503,8 +504,8 @@ export default function SettingsClient() {
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {t(
-                'Your name, email, phone, and addresses will be permanently anonymized. Your past order records will remain (with personal data removed) for tax-compliance retention per Kuwait Law 13/2023. You will be signed out immediately. This cannot be undone.',
-                '\u0633\u064a\u062a\u0645 \u0625\u062e\u0641\u0627\u0621 \u0627\u0633\u0645\u0643 \u0648\u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0648\u0647\u0627\u062a\u0641\u0643 \u0648\u0639\u0646\u0627\u0648\u064a\u0646\u0643 \u0628\u0634\u0643\u0644 \u062f\u0627\u0626\u0645. \u0633\u062a\u0628\u0642\u0649 \u0633\u062c\u0644\u0627\u062a \u0637\u0644\u0628\u0627\u062a\u0643 \u0627\u0644\u0633\u0627\u0628\u0642\u0629 (\u0628\u062f\u0648\u0646 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0634\u062e\u0635\u064a\u0629) \u0644\u0623\u063a\u0631\u0627\u0636 \u0627\u0644\u0627\u0645\u062a\u062b\u0627\u0644 \u0627\u0644\u0636\u0631\u064a\u0628\u064a \u0648\u0641\u0642\u0627\u064b \u0644\u0644\u0642\u0627\u0646\u0648\u0646 \u0627\u0644\u0643\u0648\u064a\u062a\u064a 13/2023. \u0633\u064a\u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u062e\u0631\u0648\u062c\u0643 \u0641\u0648\u0631\u0627\u064b. \u0644\u0627 \u064a\u0645\u0643\u0646 \u0627\u0644\u062a\u0631\u0627\u062c\u0639 \u0639\u0646 \u0647\u0630\u0627 \u0627\u0644\u0625\u062c\u0631\u0627\u0621.'
+                'Your name, email, phone, and addresses will be permanently anonymized. Your past order records will remain (with personal data removed) for tax-compliance retention under applicable law. You will be signed out immediately. This cannot be undone.',
+                '\u0633\u064a\u062a\u0645 \u0625\u062e\u0641\u0627\u0621 \u0627\u0633\u0645\u0643 \u0648\u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0648\u0647\u0627\u062a\u0641\u0643 \u0648\u0639\u0646\u0627\u0648\u064a\u0646\u0643 \u0628\u0634\u0643\u0644 \u062f\u0627\u0626\u0645. \u0633\u062a\u0628\u0642\u0649 \u0633\u062c\u0644\u0627\u062a \u0637\u0644\u0628\u0627\u062a\u0643 \u0627\u0644\u0633\u0627\u0628\u0642\u0629 (\u062f\u0648\u0646 \u0628\u064a\u0627\u0646\u0627\u062a \u0634\u062e\u0635\u064a\u0629) \u0644\u0623\u063a\u0631\u0627\u0636 \u0627\u0644\u0627\u0645\u062a\u062b\u0627\u0644 \u0627\u0644\u0636\u0631\u064a\u0628\u064a \u0648\u0641\u0642\u0627\u064b \u0644\u0644\u0642\u0648\u0627\u0646\u064a\u0646 \u0627\u0644\u0645\u0639\u0645\u0648\u0644 \u0628\u0647\u0627. \u0633\u064a\u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u062e\u0631\u0648\u062c\u0643 \u0641\u0648\u0631\u0627\u064b. \u0644\u0627 \u064a\u0645\u0643\u0646 \u0627\u0644\u062a\u0631\u0627\u062c\u0639 \u0639\u0646 \u0647\u0630\u0627 \u0627\u0644\u0625\u062c\u0631\u0627\u0621.'
               )}
             </p>
             <div className="mt-6 flex items-center justify-end gap-3">

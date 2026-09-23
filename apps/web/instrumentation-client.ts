@@ -18,7 +18,8 @@
  * No-op when NEXT_PUBLIC_SENTRY_DSN_WEB is missing so local dev + preview
  * deploys without the env var still build and run cleanly.
  *
- * GDPR / Kuwait Law 13/2023: Sentry runs as "legitimate interest" for bug
+ * GDPR / applicable GCC data-protection law (see
+ * docs/legal/gcc-data-protection.md): Sentry runs as "legitimate interest" for bug
  * fixing. Default config sends NO PII (no IP, no body, no cookies). This is
  * distinct from PostHog which IS marketing analytics and needs explicit consent.
  */

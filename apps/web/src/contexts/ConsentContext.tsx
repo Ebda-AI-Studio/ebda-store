@@ -12,7 +12,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
  * via next/headers `cookies()`) can decide whether to RENDER the pixel
  * scripts at all. Without consent, the scripts never reach the
  * browser — server-side gating is the only way to comply fully with
- * GDPR ePrivacy + Kuwait Law 13/2023.
+ * GDPR ePrivacy and applicable GCC data-protection law (see
+ * docs/legal/gcc-data-protection.md).
  */
 
 export type ConsentState = {

@@ -76,7 +76,7 @@ plan-gated line against `docs/business/plan-feature-matrix.md`:
   التفاعلي الرسمي من Meta (WhatsApp Native Catalog)") in both the Store and WhatsApp templates —
   the old "send an image per category" flow does not appear anywhere. ✅
 - SLA terms (99.5% uptime, 24h/4h response, service-day credit capped at 30 days/year), Kuwait
-  Law 13/2023 data-processor language, and payment terms (bank transfer/certified cheque, no
+  Electronic Transactions Law No. 20/2014 data-processor language, and payment terms (bank transfer/certified cheque, no
   monthly subscription) all read exactly as `CONTRACT-CHECKLIST.md` describes as
   "verified accurate" — matches, no drift, **left untouched per instructions.**
 
@@ -111,7 +111,7 @@ None of these are required by this session's changes. Optional, in priority orde
 
 **Not touched, and should not be touched without a reason** (per task instructions and
 `CONTRACT-CHECKLIST.md`'s "verified accurate" list): pricing figures (1500/1000 KWD defaults), SLA
-terms, Kuwait Law 13/2023 clauses, payment terms, renewal/termination language.
+terms, Kuwait Electronic Transactions Law No. 20/2014 clauses, payment terms, renewal/termination language.
 
 ---
 
