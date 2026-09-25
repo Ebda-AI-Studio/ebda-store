@@ -46,7 +46,10 @@
     "backToStore": "العودة إلى المتجر",
     "backToSettings": "العودة إلى الإعدادات",
     "saveChanges": "حفظ التغييرات",
-    "loadingEllipsis": "جارٍ التحميل..."
+    "loadingEllipsis": "جارٍ التحميل...",
+    "skipToMainContent": "تخطَّ إلى المحتوى الرئيسي",
+    "actions": "الإجراءات",
+    "deactivate": "إلغاء التفعيل"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -628,7 +631,8 @@
         "inventory": "المخزون",
         "status": "الحالة",
         "organization": "التنظيم",
-        "flags": "خيارات المنتج"
+        "flags": "خيارات المنتج",
+        "seo": "SEO"
       },
       "fields": {
         "name": "اسم المنتج",
@@ -685,7 +689,7 @@
         "cancel": "إلغاء"
       },
       "faqs": {
-        "title": "الأسئلة الشائعة / FAQs",
+        "title": "الأسئلة الشائعة",
         "description": "تظهر هذه الأسئلة في صفحة المنتج وتُحقن كنتائج منسقة في جوجل.",
         "empty": "لا توجد أسئلة بعد. أضف واحداً أدناه أو أنشئها بالذكاء الاصطناعي.",
         "question": "السؤال (EN)",
@@ -706,6 +710,26 @@
         "reviewNote": "مسودة الذكاء الاصطناعي — راجع قبل الحفظ",
         "saveAll": "حفظ جميع المسودات",
         "discardAll": "تجاهل المسودات"
+      },
+      "seoSection": {
+        "hint": "كيف يظهر هذا المنتج في جوجل وعند المشاركة.",
+        "aiFillEmpty": "تعبئة الفراغات بالذكاء الاصطناعي",
+        "aiRegenerateAll": "إعادة توليد الكل",
+        "generating": "جارٍ التوليد…",
+        "metaTitleLabel": "عنوان الميتا ({count}/70)",
+        "metaTitleArLabel": "عنوان الميتا بالعربية ({count}/70)",
+        "metaDescriptionLabel": "وصف الميتا ({count}/180)",
+        "metaDescriptionArLabel": "وصف الميتا بالعربية ({count}/180)",
+        "aeoExplanation": "<b>AEO</b> — نص محرك الإجابة الحواري لمحركات البحث بالذكاء الاصطناعي (Perplexity وملخصات Google AI). يتم تعبئته بواسطة \"تعبئة الفراغات بالذكاء الاصطناعي\" أو \"إعادة توليد الكل\" أعلاه (أو عملية تحديث AEO الشاملة للكتالوج)؛ يمكنك التعديل هنا.",
+        "aeoMetaDescriptionEnLabel": "وصف ميتا AEO بالإنجليزية ({count}/180)",
+        "aeoMetaDescriptionArLabel": "وصف ميتا AEO بالعربية ({count}/180)",
+        "generateSuccessMessage": "قام الذكاء الاصطناعي بتعبئة السيو و AEO وصياغة الأسئلة الشائعة (راجع قسم الأسئلة أدناه). راجع ثم اضغط حفظ التغييرات.",
+        "generatePartialFailureMessage": "فشل توليد الذكاء الاصطناعي جزئياً — {failures}. تم تطبيق الباقي؛ راجع ثم اضغط حفظ التغييرات.",
+        "failureSeo": "السيو ({message})",
+        "failureAeo": "AEO ({message})",
+        "failureFaqs": "الأسئلة الشائعة (فشل)",
+        "genericFailed": "فشل",
+        "networkError": "خطأ في الشبكة أثناء الاتصال بالذكاء الاصطناعي"
       }
     },
     "recommendations": {
@@ -744,7 +768,34 @@
         "savedDescription": "تم حفظ التوصيات بنجاح."
       },
       "counts": "{count} / {max}",
-      "removeAria": "إزالة {name}"
+      "removeAria": "إزالة {name}",
+      "aiSuggestions": {
+        "heading": "اقتراحات الذكاء الاصطناعي",
+        "refresh": "تحديث",
+        "loading": "جارٍ التحميل...",
+        "errorLoadFailed": "تعذّر تحميل اقتراحات الذكاء الاصطناعي",
+        "addedToCrossSell": "تمت إضافة \"{name}\" إلى البيع المتقاطع",
+        "promotedAll": "تمت ترقية {count} من اقتراحات الذكاء الاصطناعي إلى البيع المتقاطع اليدوي",
+        "promotedCapped": "تمت ترقية {capped} (تم بلوغ الحد الأقصى {max} — تم تخطي {skipped})",
+        "demoteConfirm": "إزالة {count} منتج (منتجات) تمت ترقيتها بالذكاء الاصطناعي من قائمة البيع المتقاطع اليدوي؟ ستعود واجهة المتجر لاستخدام اقتراحات الذكاء الاصطناعي (المستوى الثاني من الأولوية) في العرض التالي.",
+        "demotedToast": "تم خفض {count} من اقتراحات الذكاء الاصطناعي إلى العرض الاحتياطي",
+        "promoteAllButton": "ترقية الكل",
+        "demoteAllButton": "خفض الكل",
+        "promoteAllTitleEmpty": "لا يوجد ما تتم ترقيته — جميع الاقتراحات موجودة بالفعل في قائمة البيع المتقاطع",
+        "promoteAllTitleMax": "قائمة البيع المتقاطع بلغت الحد الأقصى ({max}). أزل عنصرًا أولًا.",
+        "promoteAllTitleReady": "ترقية {count} اقتراح (اقتراحات)",
+        "demoteAllTitleEmpty": "لا يوجد ما تتم خفضه — لا يوجد أي من اقتراحات الذكاء الاصطناعي في قائمة البيع المتقاطع اليدوي",
+        "demoteAllTitleReady": "خفض {count} من اقتراحات الذكاء الاصطناعي إلى العرض الاحتياطي",
+        "description": "اقتراحات من آخر مسح <b>توصيات الذكاء الاصطناعي</b>. تظهر هذه تلقائيًا في قسم \"قد يعجبك أيضًا\" على واجهة المتجر عند عدم تحديد بيع متقاطع يدوي. اضغط <b>ترقية</b> لإضافة اقتراح واحد، أو استخدم <b>ترقية الكل</b> / <b>خفض الكل</b> أعلاه لقلب القائمة بالكامل. الاقتراحات المُرقّاة لها أولوية على اقتراحات الذكاء الاصطناعي الافتراضية في واجهة المتجر.",
+        "emptyState": "لا توجد اقتراحات ذكاء اصطناعي بعد لهذا المنتج. شغّل مسح <b>توصيات الذكاء الاصطناعي</b> من <a>أدوات الذكاء الاصطناعي</a>.",
+        "alreadyAdded": "تمت الإضافة بالفعل",
+        "promoteButton": "ترقية",
+        "confirmModal": {
+          "title": "ترقية جميع التوصيات؟",
+          "body": "سيضيف هذا <b>{count}</b> {count, plural, one {اقتراح ذكاء اصطناعي} other {اقتراحات ذكاء اصطناعي}} إلى قائمة البيع المتقاطع اليدوي.",
+          "confirmButton": "ترقية {count}"
+        }
+      }
     },
     "variants": {
       "loading": "جارٍ التحميل...",
@@ -895,6 +946,14 @@
       "sku": "رمز: {sku}",
       "inactive": "غير نشط",
       "retry": "إعادة المحاولة"
+    },
+    "aiFieldBadge": {
+      "aiGeneratedTitle": "تم إنشاؤه بواسطة الذكاء الاصطناعي — التعديل ينقل الملكية إليك",
+      "aiLabel": "ذكاء اصطناعي",
+      "failedTitle": "تعذّر التحويل إلى الذكاء الاصطناعي — حاول مجددًا",
+      "handBackTitle": "أعِد هذا الحقل إلى الذكاء الاصطناعي",
+      "retryLabel": "⚠ إعادة المحاولة",
+      "switchToAiLabel": "✨ التحويل إلى الذكاء الاصطناعي"
     }
   },
   "orders": {
@@ -997,7 +1056,8 @@
         "markPaid": "تعذّر التعليم كمدفوع",
         "bulkMarkPaid": "تعذّر التعليم الجماعي كمدفوع",
         "retry": "إعادة المحاولة"
-      }
+      },
+      "agentBadge": "وكيل ذكي"
     },
     "status": {
       "pending": "قيد الانتظار",
@@ -1009,6 +1069,76 @@
       "refunded": "مُسترد",
       "paid": "مدفوع",
       "unpaid": "غير مدفوع"
+    },
+    "new": {
+      "title": "طلب جديد (طلب هاتفي)",
+      "subtitle": "أنشئ طلبًا نيابة عن عميل، ثم أصدر رابط دفع",
+      "customerSection": {
+        "heading": "العميل",
+        "existingTab": "عميل موجود",
+        "guestTab": "جديد / زائر",
+        "searchPlaceholder": "ابحث بالاسم أو البريد الإلكتروني أو الهاتف…",
+        "guestBadge": "زائر",
+        "linkedToCustomer": "مرتبط بعميل موجود {id}…",
+        "firstNameLabel": "الاسم الأول *",
+        "lastNameLabel": "اسم العائلة",
+        "emailLabel": "البريد الإلكتروني",
+        "phoneLabel": "الهاتف *"
+      },
+      "shippingSection": {
+        "heading": "عنوان الشحن",
+        "addressLabel": "العنوان",
+        "governorateLabel": "المحافظة",
+        "areaLabel": "المنطقة",
+        "selectGovernoratePlaceholder": "— اختر المحافظة —",
+        "selectAreaPlaceholder": "— اختر المنطقة —",
+        "selectGovernorateFirstPlaceholder": "— اختر المحافظة أولاً —",
+        "countryLabel": "الدولة",
+        "calculatedFeeTitle": "رسوم الشحن المحسوبة",
+        "calculating": "جارٍ الحساب…",
+        "freeDelivery": "توصيل مجاني",
+        "viaAreaRate": "سعر المنطقة",
+        "viaZone": "المنطقة الشحنية",
+        "viaSource": "(عبر {source})",
+        "noRateConfigured": "لا يوجد سعر شحن مُعدّ لهذه المنطقة — حدّد رسومًا أدناه، وإلا سيُحفظ الطلب برسوم شحن 0 د.ك.",
+        "overrideLabel": "تجاوز رسوم الشحن (د.ك) — اتركه فارغًا لاستخدام الرسوم المحسوبة",
+        "overridePlaceholder": "مثال: 1.500",
+        "overrideActive": "التجاوز اليدوي مفعّل: سيُستخدم {price} ({fils} فلس) بدلاً من الرسوم المحسوبة."
+      },
+      "productsSection": {
+        "heading": "المنتجات",
+        "searchPlaceholder": "ابحث عن المنتجات بالاسم أو رمز SKU…",
+        "loadingVariants": "جارٍ تحميل المتغيرات…",
+        "chooseVariantPrompt": "{name} — اختر متغيرًا:",
+        "outOfStock": "(نفدت الكمية)",
+        "noProductsYet": "لا توجد منتجات بعد. ابحث أعلاه لإضافة أول عنصر.",
+        "removeItemAria": "إزالة العنصر",
+        "subtotalLabel": "الإجمالي الفرعي:",
+        "shippingLabel": "الشحن:",
+        "freeShort": "مجاني",
+        "overrideSuffix": "(تجاوز يدوي)",
+        "previewHintReady": "رسوم الشحن المعروضة معاينة فقط — تُحتسب الضريبة عند الحفظ.",
+        "previewHintPending": "اختر المحافظة والمنطقة أعلاه لمعاينة رسوم الشحن."
+      },
+      "notesSection": {
+        "couponLabel": "كود الكوبون (اختياري)",
+        "notesLabel": "ملاحظات (اختياري)"
+      },
+      "footer": {
+        "itemCount": "{count, plural, zero {# عنصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصرًا} other {# عنصر}}",
+        "creating": "جارٍ الإنشاء…",
+        "placeOrder": "إتمام الطلب",
+        "unpaidHint": "أُنشئ الطلب بحالة غير مدفوع. أصدر رابط دفع عبر MyFatoorah من صفحة تفاصيل الطلب بعد الحفظ."
+      },
+      "errors": {
+        "noItems": "أضف منتجًا واحدًا على الأقل قبل إتمام الطلب",
+        "missingRequired": "الاسم الأول والهاتف مطلوبان",
+        "createFailed": "تعذّر إنشاء الطلب",
+        "unknownError": "خطأ غير معروف"
+      },
+      "toast": {
+        "created": "تم إنشاء الطلب {orderNumber}"
+      }
     },
     "detail": {
       "back": "رجوع",
@@ -1059,7 +1189,8 @@
         "printInvoice": "طباعة الفاتورة",
         "markPaid": "وضع كمدفوع",
         "addNote": "إضافة ملاحظة",
-        "refund": "استرداد"
+        "refund": "استرداد",
+        "toolbarLabel": "إجراءات الطلب"
       },
       "loading": "جاري تحميل الطلب…",
       "errors": {
@@ -1079,6 +1210,38 @@
         "building": "بناية",
         "floor": "طابق",
         "apt": "شقة"
+      },
+      "refundViaProvider": {
+        "button": "استرداد عبر مزوّد الدفع",
+        "buttonTooltip": "استرداد المبلغ للعميل عبر مزوّد الدفع الأصلي",
+        "modalTitle": "استرداد الطلب {orderNumber}؟",
+        "modalBodyIntro": "سيتم إرسال طلب استرداد بقيمة <b>{amount} {currency}</b> إلى مزوّد الدفع. عادةً ما تنعكس عملية الاسترداد على بطاقة العميل خلال 1-3 أيام عمل (يراجع فريق MyFatoorah المالي طلبات الاسترداد قبل تنفيذها).",
+        "modalBodySideEffects": "سيتم إعادة المخزون، وخصم استخدام الكوبون، وعكس نقاط الولاء، وإشعار العميل عبر البريد الإلكتروني. لا يمكن التراجع عن هذا الإجراء.",
+        "reasonLabel": "السبب (اختياري، يظهر للعميل)",
+        "reasonPlaceholder": "نفاد المخزون، طلب العميل، خصم مكرر…",
+        "refundNowButton": "استرداد الآن",
+        "refundingButton": "جارٍ الاسترداد…",
+        "toastFailedTitle": "فشل الاسترداد",
+        "toastSuccessBody": "تم طلب استرداد بقيمة {amount} {currency} عبر {provider} — ستنعكس العملية على بطاقة العميل خلال 1-3 أيام عمل"
+      },
+      "refreshPayment": {
+        "button": "تحديث حالة الدفع",
+        "checkingButton": "جارٍ التحقق…",
+        "buttonTooltip": "إعادة التحقق من حالة الدفع مع المزوّد (استخدمه إذا لم يصل الويب هوك)",
+        "toastFailedTitle": "فشل التحديث",
+        "toastUpdated": "تم تحديث حالة الدفع إلى {status}",
+        "toastNoChange": "حالة المزوّد: {status} (لا تغيير)"
+      },
+      "refreshRefundStatus": {
+        "button": "تحديث حالة الاسترداد",
+        "checkingButton": "جارٍ التحقق من الاسترداد…",
+        "buttonTooltip": "إعادة التحقق من حالة الاسترداد مع المزوّد (استخدمه إذا لم يصل ويب هوك الاسترداد)",
+        "toastFailedTitle": "فشل تحديث حالة الاسترداد",
+        "statusCompleted": "مكتمل — تم إضافة المبلغ إلى بطاقة العميل",
+        "statusCanceled": "أُلغي من قبل المزوّد",
+        "statusPending": "لا يزال قيد مراجعة الفريق المالي",
+        "toastStatusChanged": "حالة الاسترداد: {label}",
+        "toastNoChange": "الاسترداد لا يزال {status} (لا تغيير)"
       }
     },
     "layout": {
@@ -1093,7 +1256,12 @@
       "loadError": "فشل تحميل التخطيط",
       "preview": {
         "mobile": "جوال",
-        "desktop": "سطح المكتب"
+        "desktop": "سطح المكتب",
+        "liveTitle": "معاينة مباشرة",
+        "iframeTitle": "معاينة واجهة المتجر (جوال)",
+        "openInNewTab": "فتح في تبويب جديد ↗",
+        "unavailable": "المعاينة غير متاحة — لا يوجد معرّف أو نطاق مهيّأ للمتجر.",
+        "saveHint": "اضغط <b>حفظ التغييرات</b> للتحديث — تُعاد تحميل المعاينة بعد كل حفظ."
       },
       "sections": {
         "hero": {
@@ -1206,11 +1374,387 @@
           "heroAspect": "نسبة البانر",
           "productImageAspect": "صورة المنتج",
           "categoryImageAspect": "صورة الفئة"
-        }
+        },
+        "brandStory": "قصة العلامة",
+        "blogCarousel": "شريط المدونة",
+        "trustStrip": "شريط الثقة",
+        "announcementBar": "شريط الإعلانات",
+        "header": "الرأس",
+        "footer": "التذييل",
+        "brandStoryDescription": "قسم صورة + قصة مأخوذ من صورة ووصف المتجر الرئيسي.",
+        "blogCarouselDescription": "أحدث مقالات المدونة في الصفحة الرئيسية. مسارات /blog يتم التحكم بها بشكل منفصل عبر Store.blogEnabled.",
+        "trustStripDescription": "3 شارات ثقة (توصيل مجاني، إرجاع، دعم) — نصوص المنصة ثنائية اللغة.",
+        "announcementDescription": "رسالة على مستوى الموقع فوق الرأس. المحتوى الظاهر يُحرَّر من صفحة إدارة شريط الإعلانات؛ هنا تتحكم بالمظهر والفواصل.",
+        "headerDescription": "مظهر الرأس — الخلفية، الثبات عند التمرير، الفواصل، التباعد، الطباعة.",
+        "footerDescription": "كل ما يخص التذييل: الخلفية، الفواصل، التباعد، الطباعة — بالإضافة إلى أعمدة روابط التذييل الثلاثة والاشتراك بالنشرة البريدية. (الشريط العلوي له بطاقة خاصة به بجانب الرأس.)"
       },
       "common": {
         "enabled": "مفعل",
-        "disabled": "معطل"
+        "disabled": "معطل",
+        "themeDefault": "افتراضي القالب",
+        "small": "صغير",
+        "medium": "متوسط",
+        "large": "كبير",
+        "extraLarge": "كبير جداً",
+        "auto": "تلقائي",
+        "normal": "عادي",
+        "compact": "مضغوط",
+        "spacious": "واسع",
+        "rounded": "مدوّر",
+        "pill": "كبسولة",
+        "square": "مربع",
+        "soft": "ناعم",
+        "none": "بدون",
+        "tight": "ضيق",
+        "loose": "واسع",
+        "xloose": "واسع جداً",
+        "sectionBgColorLabel": "لون خلفية القسم",
+        "sectionBgColorHint": "يتجاوز خلفية القالب الافتراضية لهذا القسم فقط.",
+        "cancel": "إلغاء"
+      },
+      "productCard": {
+        "cardSize": "حجم البطاقة",
+        "imageAspect": "نسبة الصورة",
+        "cardShape": "شكل البطاقة",
+        "cardSpacing": "تباعد البطاقات",
+        "frameStyle": "نمط الإطار",
+        "borderThickness": "سمك الحد",
+        "frameSize": "حجم الإطار",
+        "sizeTiniest": "أصغر حجم (90/110 بكسل)",
+        "sizeXs": "صغير جداً (120/140 بكسل)",
+        "sizeSmDefault": "صغير (150/180 بكسل) — افتراضي",
+        "sizeMd": "متوسط (200/240 بكسل)",
+        "sizeLg": "كبير (240/300 بكسل)",
+        "sizeXl": "كبير جداً (280/360 بكسل)",
+        "aspectThemeDefaultRatio": "افتراضي القالب (3:4 — 600×800)",
+        "aspectSquare": "مربع 1:1 (800×800)",
+        "aspectPortraitRatio": "عمودي 3:4 (600×800)",
+        "aspectLandscapeRatio": "أفقي 4:3 (800×600)",
+        "aspectWideRatio": "عريض 3:2 (900×600)",
+        "aspectUltrawideRatio": "عريض جداً 16:9 (960×540)",
+        "shapeCircle": "دائري (مستدير، 1:1)",
+        "shapeRoundedSquare": "مربع مدوّر (ناعم، 1:1)",
+        "shapeSharpSquare": "مربع حاد (1:1)",
+        "shapeSoftRectangle": "مستطيل ناعم (4:5)",
+        "shapePortraitPlain": "عمودي (3:4)",
+        "shapeLandscapePlain": "أفقي (4:3)",
+        "shapePillRatio": "كبسولة (أفقي، 2:1)",
+        "spacingTight": "ضيق (6-8 بكسل)",
+        "spacingNormalDefault": "عادي (12-16 بكسل) — افتراضي",
+        "spacingLoose": "واسع (20-24 بكسل)",
+        "spacingXloose": "واسع جداً (32-40 بكسل)",
+        "frameSoftDefault": "ناعم (حواف مدوّرة وظل خفيف) — افتراضي",
+        "frameOutline": "حد خارجي (إطار 2 بكسل، بدون ظل)",
+        "frameShadow": "ظل (ظل أكبر، بدون إطار)",
+        "framePaper": "ورقي (تحريري، حشو أكبر)",
+        "borderThinDefault": "رفيع (1 بكسل) — افتراضي",
+        "borderNormal": "عادي (2 بكسل)",
+        "borderThick": "سميك (4 بكسل)",
+        "borderXthick": "سميك جداً (8 بكسل)",
+        "frameSizeCompact": "مضغوط (حشو 8 بكسل)",
+        "frameSizeNormalDefault": "عادي (حشو 12 بكسل) — افتراضي",
+        "frameSizeComfortable": "مريح (حشو 16 بكسل)",
+        "frameSizeSpacious": "واسع (حشو 24 بكسل)",
+        "showCategoryLabels": "إظهار تسميات الفئات",
+        "showLabels": "إظهار التسميات",
+        "hoverEffects": "تأثيرات التمرير",
+        "showFrame": "إظهار إطار حول كل بطاقة",
+        "frameColorLabel": "لون إطار البطاقة (هذا القسم)",
+        "frameColorHint": "يتجاوز لون حد القالب لهذه البطاقات.",
+        "shapeOverrideHint": "يتجاوز نسبة العرض للارتفاع والحواف المدوّرة بإعداد واحد جاهز.",
+        "aspectAutoSquare": "تلقائي (مربع)",
+        "aspectSquarePlain": "مربع (1:1)",
+        "aspectWidePlain": "عريض (3:2)",
+        "aspectUltrawidePlain": "عريض جداً (16:9)",
+        "everywhereTitle": "بطاقات المنتجات (في كل مكان)",
+        "everywhereDescription": "تنسيق بطاقات المنتج — الحجم، الإطار، النسبة، وخطوط الاسم/السعر/الزر — أينما ظهرت (القائمة، الفئة، البحث، الكاروسيل). هذه البطاقة نفسها وليست صفحة؛ خلفيات وعناوين الصفحات في بطاقات الصفحة أعلاه.",
+        "brandBadgeTitle": "شارة العلامة على البطاقات",
+        "brandBadgeHint": "كبسولة صغيرة باسم المتجر في الزاوية العلوية لكل بطاقة منتج.",
+        "quickAddTitle": "إضافة سريعة (+) على بطاقات الكاروسيل",
+        "quickAddHint": "دائرة إضافة للسلة بلمسة واحدة على بطاقات كاروسيل الصفحة الرئيسية. عند التفعيل، يُخفى زر الإضافة للسلة السفلي تلقائياً في نفس البطاقة.",
+        "normalizeImagesTitle": "توحيد صور المنتجات",
+        "normalizeImagesHint": "إجبار كل صور البطاقات على ملء إطارها بشكل موحّد (object-fit: cover). يمنح شكلاً متسقاً للشبكة عندما تختلف أبعاد صور المنتجات. الصور لا تُعدَّل أبداً — عطّل الخيار للتراجع.",
+        "cardImageShapeTitle": "شكل صورة البطاقة",
+        "imageAspectRatioLabel": "نسبة أبعاد الصورة",
+        "imageShapeSquare": "مربع (1:1)",
+        "imageShapePortrait45": "عمودي (4:5)",
+        "imageShapeTallPortrait": "عمودي طويل (3:4)",
+        "imageShapeLandscape169": "أفقي (16:9)",
+        "imageShapeAutoNoConstraint": "تلقائي (بدون قيد)",
+        "cornerRadiusLabel": "استدارة الحواف",
+        "radiusNone": "بدون (حاد)",
+        "radiusFull": "كامل (دائري)",
+        "showName": "إظهار اسم المنتج",
+        "showPrice": "إظهار سعر المنتج",
+        "productNameCaseLabel": "حالة أحرف اسم المنتج",
+        "textUppercase": "أحرف كبيرة",
+        "ctaTitle": "زر الإجراء (CTA)",
+        "ctaModeLabel": "وضع زر البطاقة",
+        "ctaModeAuto": "تلقائي (عرض + إضافة للسلة)",
+        "ctaModeViewOnly": "عرض فقط",
+        "ctaShapeLabel": "شكل زر الإجراء",
+        "ctaSizeLabel": "حجم زر الإجراء",
+        "customCtaLabel": "نص مخصص لزر الإجراء",
+        "ctaLabelEn": "نص زر الإجراء (إنجليزي)",
+        "ctaLabelAr": "نص زر الإجراء (عربي)",
+        "ctaBgColorLabel": "لون خلفية زر الإجراء",
+        "ctaTextColorLabel": "لون نص زر الإجراء",
+        "oosTitle": "تسمية نفاد المخزون",
+        "showOosLabel": "إظهار تسمية نفاد المخزون",
+        "oosLabelEn": "تسمية نفاد المخزون (إنجليزي)",
+        "oosLabelAr": "تسمية نفاد المخزون (عربي)",
+        "labelShapeLabel": "شكل التسمية",
+        "labelPlacementLabel": "موضع التسمية",
+        "oosBgColorLabel": "لون خلفية تسمية نفاد المخزون",
+        "oosTextColorLabel": "لون نص تسمية نفاد المخزون",
+        "dimColorLabel": "تعتيم اللون عند نفاد المخزون",
+        "dimColorHint": "طبقة تعتيم تُطبَّق على صورة البطاقة عند نفاد المخزون.",
+        "badgeColorLabel": "لون الشارة",
+        "discountBadgeColorHint": "غير محدد = اللون الأحمر الافتراضي للمنصة.",
+        "customBadgeColorHint": "غير محدد = اللون الأساسي للمنصة.",
+        "discountBadgeTitle": "شارة الخصم / التخفيض",
+        "badgePositionLabel": "موضع الشارة",
+        "positionBottomLeftDefault": "أسفل اليسار (افتراضي)",
+        "positionBottomRightDefault": "أسفل اليمين (افتراضي)",
+        "positionTopLeft": "أعلى اليسار",
+        "positionTopRight": "أعلى اليمين",
+        "positionBottomLeft": "أسفل اليسار",
+        "positionBottomRight": "أسفل اليمين",
+        "customBadgeTitle": "شارة المنتج المخصّصة",
+        "customBadgeStylingHint": "التنسيق فقط. اكتب نص الشارة لكل منتج من المنتجات ← تعديل منتج ← علامات المنتج.",
+        "sectionTitle": "بطاقات المنتجات",
+        "placementTopStart": "أعلى البداية",
+        "placementTopEnd": "أعلى النهاية",
+        "placementBottomStart": "أسفل البداية",
+        "placementBottomEnd": "أسفل النهاية"
+      },
+      "categories": {
+        "frameColorHint": "يتجاوز لون حد القالب لبطاقات هذه الفئة."
+      },
+      "toolbar": {
+        "smartPalette": "لوحة الألوان الذكية",
+        "pendingBrandColorsHint": "تغييرات ألوان العلامة من لوحة الألوان الذكية معلّقة. اضغط حفظ لتثبيتها.",
+        "unsavedBrandColors": "ألوان علامة غير محفوظة",
+        "stopPreviewHint": "إيقاف معاينة التغييرات غير المحفوظة — إظهار النسخة المحفوظة بدلاً منها.",
+        "previewUnsavedChanges": "المعاينة تعرض تغييرات غير محفوظة (اضغط لإعادة التعيين)",
+        "expandAll": "توسيع الكل",
+        "collapseAll": "طيّ الكل"
+      },
+      "pageCards": {
+        "productsListTitle": "صفحة قائمة المنتجات",
+        "productDetailTitle": "صفحة تفاصيل المنتج",
+        "categoriesTitle": "صفحة الفئات",
+        "locationsTitle": "صفحة الفروع",
+        "checkoutTitle": "صفحة الدفع",
+        "cartTitle": "صفحة السلة",
+        "productsListDescription": "صفحة قائمة /products — الخلفية + طباعة العنوان/العنوان الفرعي. (تنسيق البطاقات في 'بطاقات المنتجات' أدناه.)",
+        "productDetailDescription": "صفحة المنتج الواحد — الخلفية، شكل الصورة الرئيسية، وطباعة اسم/سعر/عنوان المنتج.",
+        "categoriesDescription": "صفحة قائمة /categories — الخلفية + طباعة العنوان / العنوان الفرعي / تسمية الفئة.",
+        "locationsDescription": "صفحة الفروع /locations — الخلفية + طباعة العنوان / العنوان الفرعي.",
+        "checkoutDescription": "صفحة الدفع — الخلفية + طباعة العنوان / التسمية / المبلغ.",
+        "cartDescription": "لون الخلفية والطباعة لكامل السلة: العناوين (عنوان القسم)، التسميات — عدد العناصر / المجموع الفرعي / الشحن (العنوان الفرعي للقسم)، أسماء العناصر (اسم المنتج)، كل سعر (سعر المنتج)، والأزرار/الروابط — إزالة / متابعة / تطبيق / الدفع (زر الإجراء).",
+        "backgroundLabel": "خلفية الصفحة",
+        "textColorsTitle": "ألوان النص",
+        "breadcrumbColorLabel": "لون شريط التنقل (الرئيسية / المنتجات)",
+        "breadcrumbColorHint": "لون مسار التنقل الرئيسية ← المنتجات. الافتراضي: لون القالب الخافت.",
+        "headingColorLabel": "لون عنوان الصفحة (كل المنتجات)",
+        "headingColorHint": "لون عنوان 'كل المنتجات'. الافتراضي: لون القالب الأمامي.",
+        "subtitleColorLabel": "لون العنوان الفرعي (تصفح مجموعتنا)",
+        "subtitleColorHint": "لون العنوان الفرعي تحت العنوان الرئيسي. الافتراضي: لون القالب الخافت.",
+        "mainImageAspectLabel": "نسبة الصورة الرئيسية",
+        "orderSummaryLabelsTitle": "تسميات ملخص الطلب",
+        "labelColorLabel": "لون التسمية (المجموع الفرعي، الشحن…)",
+        "labelColorHint": "لون تسميات صفوف المجموع الفرعي والشحن والضريبة. الافتراضي: لون القالب الأمامي.",
+        "totalColorLabel": "لون الإجمالي",
+        "totalColorHint": "لون تسمية الإجمالي والمبلغ. الافتراضي: لون القالب الأمامي.",
+        "boldSummaryLabels": "تسميات ملخص عريضة",
+        "boldSummaryLabelsHint": "يجعل تسميات المجموع الفرعي / الشحن / الإجمالي عريضة. مفعّل افتراضياً."
+      },
+      "header": {
+        "topUtilityBarTitle": "الشريط العلوي",
+        "topUtilityBarDescription": "شريط روابط رفيع أعلى الرأس الرئيسي (باقتي Elegant و Classic) — تتبع الطلب، اللغة، التواصل، إلخ. عطّله لإخفائه بالكامل.",
+        "storefrontNavTitle": "تنقّل واجهة المتجر",
+        "storefrontNavDescription": "روابط قائمة الرأس — أضف، احذف، وأعد ترتيب العناصر. استخدم مسارات نسبية (/products) لصفحات المتجر أو روابط كاملة للروابط الخارجية."
+      },
+      "footer": {
+        "footerLinksTitle": "روابط التذييل",
+        "bottomBarTitle": "الشريط السفلي (جوال)",
+        "bottomBarDescription": "لوّن شريط التبويبات السفلي للجوال. اترك الحقول فارغة للإبقاء على لون القالب الافتراضي.",
+        "barBackgroundLabel": "خلفية الشريط",
+        "barBackgroundHint": "يتجاوز خلفية الشريط الافتراضية (لون القالب البديل للقسم) عند التحديد.",
+        "activeIconLabelColorLabel": "لون الأيقونة والتسمية النشطة",
+        "activeIconLabelColorHint": "لون أيقونة وتسمية وتظليل التبويب النشط. الافتراضي: لون القالب الأمامي.",
+        "inactiveIconLabelColorLabel": "لون الأيقونة والتسمية غير النشطة",
+        "inactiveIconLabelColorHint": "لون التبويبات غير النشطة. الافتراضي: لون القالب الأمامي بشفافية 60%."
+      },
+      "typography": {
+        "textContrastLabel": "تباين النص",
+        "contrastAuto": "تلقائي (حسب الخلفية)",
+        "contrastLight": "سطح فاتح · نص داكن",
+        "contrastDark": "سطح داكن · نص فاتح",
+        "spacingDensityLabel": "كثافة التباعد",
+        "textSizeLabel": "حجم النص",
+        "sectionOverrideTitle": "طباعة القسم (تجاوز الافتراضي)",
+        "sectionOverrideHint": "تجاوز الطباعة الافتراضية لكل نوع نص في هذا القسم فقط. اترك كل الحقول فارغة للوراثة من إعدادات طباعة الرأس والتذييل الافتراضية أسفل هذه الصفحة."
+      },
+      "roleLabels": {
+        "heading": "عنوان القسم",
+        "kicker": "الشارة العلوية للقسم (فوق العنوان)",
+        "subtitle": "العنوان الفرعي للقسم",
+        "seeAll": "رابط \"عرض الكل\"",
+        "productName": "اسم المنتج",
+        "productPrice": "سعر المنتج",
+        "productCta": "زر إجراء المنتج",
+        "categoryLabel": "تسمية بطاقة الفئة"
+      },
+      "zoneLabels": {
+        "beforeHeader": "شريط الإعلانات (الشريط الترويجي العلوي)",
+        "header": "رأس الصفحة (الشعار + التنقل)",
+        "storeName": "اسم المتجر (في الرأس)",
+        "sectionKicker": "الشارة العلوية للقسم (فوق العنوان)",
+        "sectionTitle": "عنوان القسم",
+        "sectionSubtitle": "العنوان الفرعي للقسم",
+        "sectionSeeAll": "رابط \"عرض الكل\" للقسم",
+        "categories": "تسميات بطاقة الفئة",
+        "products": "المنتجات (أساسي)",
+        "productName": "اسم المنتج (البطاقة)",
+        "productPrice": "سعر المنتج (البطاقة)",
+        "cta": "الأزرار وأزرار الإجراء",
+        "filters": "الشريط الجانبي للتصفية",
+        "footer": "التذييل",
+        "afterFooter": "أسفل التذييل"
+      },
+      "sectionLabels": {
+        "hero": "القسم الرئيسي",
+        "categories": "الفئات",
+        "newArrivals": "وصل حديثاً",
+        "bestSellers": "الأكثر مبيعاً",
+        "brandStory": "قصة العلامة",
+        "blogCarousel": "شريط المدونة",
+        "trustStrip": "شريط الثقة",
+        "testimonials": "آراء العملاء"
+      },
+      "kickerSubtitle": {
+        "optionalHint": "الشارة العلوية والعنوان الفرعي اختياريان. اتركهما فارغين لتخطيهما.",
+        "kickerLabelEn": "الشارة العلوية (إنجليزي)",
+        "kickerLabelAr": "الشارة العلوية (عربي)",
+        "subtitleLabelEn": "العنوان الفرعي (إنجليزي)",
+        "subtitleLabelAr": "العنوان الفرعي (عربي)"
+      },
+      "fonts": {
+        "title": "الخطوط",
+        "description": "الخطوط المتاحة للاستخدام في أي قسم طباعة أدناه. أضف خطوط Google باسم العائلة (مثال: Cairo) — يُبنى الرابط تلقائياً. أو ارفع ملف خط مخصص (.woff2/.woff/.ttf/.otf، حد أقصى 5 ميغابايت).",
+        "google": "Google",
+        "custom": "مخصص",
+        "remove": "إزالة",
+        "familyNameLabel": "اسم عائلة الخط",
+        "googleUrlLabel": "رابط خطوط Google (اختياري — يُبنى تلقائياً من اسم العائلة)",
+        "addFont": "إضافة خط",
+        "familyNameDisplayLabel": "اسم عائلة الخط (تسمية العرض)",
+        "fileLabel": "ملف الخط (.woff2 / .woff / .ttf / .otf — حد أقصى 5 ميغابايت)",
+        "uploading": "جارٍ الرفع…",
+        "uploadFont": "رفع الخط",
+        "addGoogleFont": "+ إضافة خط من Google",
+        "uploadCustomFont": "↥ رفع خط مخصص"
+      },
+      "sectionOrder": {
+        "title": "ترتيب الأقسام",
+        "dragHint": "اسحب لإعادة ترتيب أقسام الصفحة الرئيسية. يُحفظ الترتيب الجديد عبر زر الحفظ الرئيسي.",
+        "v1Notice": "إصدار الإدارة v1 — حفظ السحب مفعّل الآن. سيتم تطبيق هذا الترتيب في واجهة المتجر في الإصدار v2؛ حالياً تحتفظ واجهة المتجر بترتيبها الثابت بغض النظر عن القيمة المحفوظة هنا."
+      },
+      "manualPicker": {
+        "maxProductsAlert": "الحد الأقصى 50 منتجاً لكل كاروسيل",
+        "skuPrefix": "SKU: {sku}",
+        "moveUp": "نقل لأعلى",
+        "moveDown": "نقل لأسفل",
+        "remove": "إزالة",
+        "searchPlaceholder": "ابحث عن منتجات لإضافتها ({current}/{max})…",
+        "searching": "جارٍ البحث…",
+        "noMatches": "لا توجد نتائج.",
+        "keyboardHint": "↑↓ للتنقل · Enter للإضافة · Esc للإغلاق"
+      },
+      "extraCarousel": {
+        "defaultTitle": "كاروسيل إضافي {n}",
+        "sourceDescription": "المصدر: {source}. دعم إعادة الترتيب بالسحب قادم في الإصدار v2.",
+        "titleEn": "العنوان (إنجليزي)",
+        "titleAr": "العنوان (عربي)",
+        "subtitleEn": "العنوان الفرعي (إنجليزي)",
+        "subtitleAr": "العنوان الفرعي (عربي)",
+        "productSourceLabel": "مصدر المنتجات",
+        "sourceNewest": "الأحدث (كوصل حديثاً)",
+        "sourceBestSellers": "الأكثر مبيعاً",
+        "sourceFeatured": "مميز",
+        "sourceCategory": "فئة",
+        "sourceManual": "قائمة منتجات يدوية",
+        "categorySlugLabel": "معرّف الفئة (Slug)",
+        "categoryFetchLimitLabel": "عدد المنتجات المطلوب جلبها من هذه الفئة (الافتراضي 50)",
+        "categoryFetchLimitHint": "ارفع القيمة (حتى 200) للفئات الكبيرة — يزيد تكلفة تحميل الصفحة. أبقها 50 إلا إذا كانت الفئة تحتوي أكثر من 50 منتجاً وتحتاج واجهة المتجر لإظهارها جميعاً.",
+        "manualProductsLabel": "منتجات يدوية",
+        "maxProductsLabel": "أقصى عدد منتجات",
+        "backgroundColorLabel": "لون الخلفية",
+        "positionOfTotal": "الموضع {position} من {total}",
+        "moveUp": "↑ نقل لأعلى",
+        "moveDown": "↓ نقل لأسفل",
+        "deleteConfirm": "هل تريد حذف هذا الكاروسيل{suffix}؟",
+        "deleteButton": "حذف الكاروسيل"
+      },
+      "extraSection": {
+        "backgroundColorLabel": "لون الخلفية",
+        "layoutLabel": "التخطيط",
+        "layoutHorizontal": "أفقي (3 عناصر)",
+        "layoutVertical": "عمودي (متراكب)",
+        "sizeLabel": "الحجم",
+        "iconColorLabel": "لون الأيقونة",
+        "iconBgColorLabel": "لون خلفية الأيقونة",
+        "textColorLabel": "لون النص",
+        "maxPostsLabel": "أقصى عدد مقالات",
+        "typographyLabel": "الطباعة"
+      },
+      "paddingBlock": {
+        "title": "التباعد والظهور",
+        "paddingTopLabel": "الحشو العلوي",
+        "paddingBottomLabel": "الحشو السفلي",
+        "maxWidthLabel": "أقصى عرض",
+        "hideOnMobile": "إخفاء على الجوال",
+        "hideOnDesktop": "إخفاء على سطح المكتب",
+        "optNone": "بدون",
+        "optTight": "ضيق",
+        "optNormal": "عادي",
+        "optLoose": "واسع",
+        "optXloose": "واسع جداً",
+        "maxWidthContained": "محدود (max-w-7xl)",
+        "maxWidthFull": "من الحافة إلى الحافة"
+      },
+      "dividers": {
+        "title": "فواصل القسم",
+        "hint": "فواصل رفيعة حول كل جزء من هذا القسم. اختر الأماكن التي تظهر فيها الفواصل؛ التنسيق أدناه ينطبق على كل الأماكن المفعّلة لتبقى متسقة بصرياً.",
+        "above": "أعلى هذا القسم",
+        "aroundKicker": "حول نص الشارة العلوية",
+        "aroundTitle": "حول العنوان",
+        "aroundSubtitle": "حول العنوان الفرعي",
+        "belowHeading": "أسفل العنوان (قبل المحتوى)",
+        "style": "النمط",
+        "optSolid": "متصل",
+        "optDashed": "متقطع",
+        "optDotted": "منقّط",
+        "optDouble": "مزدوج",
+        "thickness": "السمك",
+        "width": "العرض",
+        "optShort": "قصير",
+        "optContained": "محدود",
+        "optEdgeToEdge": "من الحافة إلى الحافة",
+        "color": "اللون",
+        "colorAuto": "تلقائي (لون حد القالب)",
+        "colorForeground": "أمامي (تباين عالٍ)",
+        "colorAccent": "لون العلامة الثانوي (أساسي)",
+        "colorCustom": "مخصص — لون من القالب أو hex",
+        "spacing": "التباعد"
+      },
+      "aiSectionFill": {
+        "failedTitle": "فشل التوليد بالذكاء الاصطناعي",
+        "successTitle": "ملأ الذكاء الاصطناعي حقول الشارة العلوية والعنوان الفرعي الفارغة",
+        "generating": "جارٍ التوليد…",
+        "generateWithAi": "توليد بالذكاء الاصطناعي"
       }
     },
     "devices": {
@@ -1241,6 +1785,36 @@
       "toast": {
         "emailSent": "تم إرسال الفاتورة للعميل"
       }
+    },
+    "paymentLinkButton": {
+      "linkCopied": "تم نسخ الرابط إلى الحافظة",
+      "clipboardError": "تعذّر الوصول إلى الحافظة — انسخ الرابط يدويًا",
+      "issueFailed": "تعذّر إصدار رابط الدفع",
+      "emailSent": "تم إرسال البريد الإلكتروني إلى {email}",
+      "customerFallback": "العميل",
+      "copyAria": "نسخ رابط الدفع",
+      "openAria": "فتح رابط الدفع",
+      "issueNewLink": "إصدار رابط جديد",
+      "buttonLabel": "رابط الدفع",
+      "modalTitle": "إصدار رابط دفع",
+      "modalSubtitle": "الطلب {orderNumber} — إنشاء رابط MyFatoorah لتحصيل الدفع.",
+      "option": {
+        "copyLink": {
+          "title": "نسخ الرابط",
+          "description": "أنشئ الرابط — انسخه وشاركه عبر واتساب أو البريد الإلكتروني أو أي وسيلة تفضّلها."
+        },
+        "email": {
+          "title": "إرسال عبر البريد الإلكتروني",
+          "description": "يرسل MyFatoorah رابط الدفع مباشرة إلى البريد الإلكتروني المسجّل للعميل."
+        }
+      },
+      "issuing": "جارٍ إصدار رابط الدفع…",
+      "successEmailSent": "✓ تم إرسال البريد الإلكتروني إلى {email}",
+      "successGenerated": "✓ تم إنشاء رابط الدفع",
+      "paymentUrlLabel": "رابط الدفع",
+      "copyButton": "نسخ",
+      "paidAutoUpdateNote": "يمكن للعميل الدفع في أي وقت من هذا الرابط. بمجرد الدفع، تتحدّث حالة دفع الطلب تلقائيًا عبر webhook.",
+      "doneButton": "تم"
     }
   },
   "customers": {
@@ -1289,7 +1863,10 @@
         "lost": "مفقود",
         "activeBuyer": "مشترٍ نشط",
         "new": "جديد"
-      }
+      },
+      "colLastPayment": "آخر دفعة",
+      "colAddress": "العنوان",
+      "statusCancelled": "ملغى"
     },
     "detail": {
       "loading": "جاري التحميل…",
@@ -1710,6 +2287,43 @@
       "arabicNumerals": {
         "title": "الأرقام العربية (٠١٢٣)",
         "hint": "إظهار الأرقام الهندية الشرقية في نسخة المتجر العربية. الوضع الافتراضي (إيقاف) يعرض الأرقام الغربية (0-9) في كل مكان."
+      },
+      "socialIconColors": {
+        "title": "ألوان أيقونات التواصل الاجتماعي",
+        "hint": "تتبع أيقونات التواصل الاجتماعي افتراضيًا لون نص التذييل (أحادي اللون). فعّل الألوان الأصلية للعلامات التجارية لإظهار كل منصة بلونها المسجّل (وردي إنستغرام، أخضر واتساب، إلخ).",
+        "footerLabel": "استخدام ألوان العلامات التجارية الأصلية في أيقونات التواصل الاجتماعي بالتذييل",
+        "widgetLabel": "استخدام ألوان العلامات التجارية الأصلية في أزرار القطعة العائمة (يتجاوز ألوان الأزرار المخصصة)"
+      },
+      "webPush": {
+        "title": "إشعارات الويب للمتجر",
+        "hint": "معطّل افتراضيًا. عند التفعيل، يمكن للعملاء الاشتراك في إشعارات الويب (يتطلب ميزة إشعارات الدفع ضمن باقتك).",
+        "enableLabel": "تفعيل الاشتراك في إشعارات الويب للمتجر"
+      },
+      "personaChrome": {
+        "title": "إتمام هوية القالب",
+        "hint": "معطّل افتراضيًا في المتاجر الحالية؛ يُفعَّل تلقائيًا في المتاجر الجديدة. يضيف عناصر تصميم خاصة بكل قالب باستخدام ألوانك الحالية: عنوان محاط بخطوط رفيعة ورابط \"عرض الكل\" الخفيف في قالب Elegant، بطاقات أقسام دائرية في قالب Classic، هيدر بحدود وتذييل معكوس في قالب Bold. لا يغيّر حجم البطاقات أو نص اسم/سعر المنتج أو الخطوط أو الألوان.",
+        "enableLabel": "تفعيل إتمام هوية القالب"
+      },
+      "cardFrameDedup": {
+        "title": "إزالة الإطار المزدوج للبطاقات",
+        "hint": "معطّل افتراضيًا في المتاجر الحالية؛ يُفعَّل تلقائيًا في المتاجر الجديدة. عند تفعيل \"إظهار إطار البطاقة\" في عروض الصفحة الرئيسية، تُزيل هذه الميزة الحد الداخلي الزائد بحيث تظهر كل بطاقة بإطار واحد بدلاً من إطارين متداخلين.",
+        "enableLabel": "تفعيل إطار واحد للبطاقات"
+      },
+      "rtlPolish": {
+        "title": "تحسين اتجاه السهم للعربية (Elegant)",
+        "hint": "معطّل افتراضيًا في المتاجر الحالية؛ يُفعَّل تلقائيًا في المتاجر الجديدة. يصحّح اتجاه سهم زر الحالة الفارغة في قالب Elegant ليتوافق مع اتجاه القراءة بالعربية (← بدلاً من → دائمًا).",
+        "enableLabel": "تفعيل تحسين اتجاه السهم"
+      },
+      "uppercaseStyle": {
+        "title": "نمط الأحرف الكبيرة (التنقل، العناوين، التسميات)",
+        "hint": "عند التفعيل، تظهر روابط التنقل وعناوين أعمدة التذييل وعناوين الأقسام وتسميات الأقسام ونص الهيدر وأسماء أصحاب الشهادات بأحرف كبيرة. معطّل افتراضيًا (الحالة الطبيعية). أسماء المنتجات لها إعداد خاص بها في منشئ الصفحات.",
+        "enableLabel": "تفعيل نمط الأحرف الكبيرة في الواجهة"
+      },
+      "footerLogo": {
+        "title": "شعار التذييل (اختياري)",
+        "hint": "ارفع شعارًا مختلفًا للتذييل عندما تكون خلفية التذييل داكنة ولا يظهر الشعار الرئيسي بوضوح. اتركه فارغًا لاستخدام الشعار الرئيسي.",
+        "invertLabel": "أو اعكس لون الشعار الرئيسي إلى الأبيض (فلتر CSS — مفيد لخلفيات التذييل الداكنة عندما لا يستحق الأمر رفع شعار منفصل). يُتجاهل عند رفع شعار تذييل أعلاه.",
+        "hideMobileLabel": "إخفاء شعار التذييل على الجوال (يبقى شعار سطح المكتب ظاهرًا). مفيد عندما يكون شعار الهيدر على الجوال كبيرًا بالفعل ويكون التذييل أوضح كنص فقط."
       },
       "logoSize": {
         "title": "حجم الشعار",
@@ -2236,7 +2850,10 @@
     "page": {
       "title": "مناطق التوصيل والرسوم",
       "subtitle": "حدّد رسوم التوصيل لكل منطقة في الكويت",
-      "intro": "منطقة الشحن هي مجموعة من المناطق التي تتقاضى عنها رسوم توصيل موحّدة. أنشئ منطقة لكل إقليم تشحن إليه ليتمكن صفحة الدفع من تسعير الشحن بدقّة."
+      "intro": "منطقة الشحن هي مجموعة من المناطق التي تتقاضى عنها رسوم توصيل موحّدة. أنشئ منطقة لكل إقليم تشحن إليه ليتمكن صفحة الدفع من تسعير الشحن بدقّة.",
+      "carriersBannerTitle": "شركات الشحن مفعّلة",
+      "carriersBannerHint": "اضبط بيانات iCarry وAramex، واختبر الاتصال، وتابع الشحنات.",
+      "carriersBannerLink": "إدارة شركات الشحن ←"
     },
     "toolbar": {
       "addZone": "إضافة منطقة"
@@ -2765,7 +3382,8 @@
         "approve": "اعتماد",
         "reject": "رفض",
         "suspend": "تعليق",
-        "payout": "دفعة"
+        "payout": "دفعة",
+        "viewEvents": "عرض الأحداث"
       },
       "empty": {
         "title": "لا يوجد مسوّقون بعد",
@@ -2859,6 +3477,32 @@
       },
       "inviteError": {
         "message": "تعذّر إضافة المسوّق. ربما يكون البريد الإلكتروني مسجّلاً بالفعل."
+      }
+    },
+    "auditTrail": {
+      "title": "سجل التدقيق",
+      "titleFallback": "سجل تدقيق المسوّق",
+      "titleWithName": "{name} — سجل التدقيق",
+      "backToAffiliates": "العودة للمسوقين",
+      "referralsAndPayouts": "الإحالات والدفعات",
+      "description": "سجل تغييرات الحالة الملحق فقط من جدول <code>affiliate_events</code>",
+      "noEvents": "لا توجد أحداث تدقيق حتى الآن",
+      "noEventsHint": "تظهر هنا تغييرات الحالة (موافقة / رفض / تعليق) فور حدوثها.",
+      "loadError": "تعذّر تحميل سجل التدقيق",
+      "eventsCount": "{count, plural, one {# حدث} two {# حدثان} few {# أحداث} many {# حدثًا} other {# حدث}}",
+      "reasonLabel": "السبب: {reason}",
+      "commissionLabel": "العمولة:",
+      "payoutLabelText": "الدفعة:",
+      "eventTypes": {
+        "created": "تم إنشاء المسوّق",
+        "approve": "تمت الموافقة على الطلب",
+        "reject": "تم رفض الطلب",
+        "suspend": "تم تعليق الحساب",
+        "reactivate": "تم إعادة تفعيل الحساب",
+        "commission_recorded": "تم تسجيل العمولة",
+        "payout_initiated": "بدأت عملية الدفع",
+        "payout_completed": "اكتملت عملية الدفع",
+        "payout_failed": "فشلت عملية الدفع"
       }
     }
   },
@@ -3697,7 +4341,12 @@
         "expire": "منتهي الصلاحية",
         "adjust": "تعديل",
         "tier_changed": "تغيير المستوى"
-      }
+      },
+      "filterTypeAriaLabel": "تصفية حسب نوع المعاملة",
+      "dateFromAriaLabel": "من تاريخ",
+      "dateToAriaLabel": "إلى تاريخ",
+      "customerIdPlaceholder": "رقم العميل...",
+      "customerIdAriaLabel": "تصفية حسب رقم العميل"
     }
   },
   "paymentSettings": {
@@ -3878,6 +4527,57 @@
     "row": {
       "enabledBy": "فُعّل بواسطة",
       "enabledOn": "في"
+    },
+    "matrix": {
+      "storePlanHeading": "خطة المتجر",
+      "storePlanSubtitle": "الخطة الحالية تحدد الميزات الأساسية.",
+      "changePlanOption": "تغيير الخطة…",
+      "planChangeNote": "تغيير الخطة يحافظ على كل الإعدادات المخصصة الحالية. تتحدث الميزات الأساسية فورًا.",
+      "featureCount": "{count, plural, zero {# ميزة} one {ميزة واحدة} two {ميزتان} few {# ميزات} many {# ميزة} other {# ميزة}}",
+      "loadStoreFailed": "تعذّر تحميل بيانات المتجر.",
+      "badges": {
+        "includedIn": "مُضمّن في {plan}",
+        "grantedByOverride": "مُمنوح عبر تجاوز",
+        "revokedByOverride": "مسحوب عبر تجاوز",
+        "notIn": "غير مُضمّن في {plan}"
+      },
+      "dangerZone": {
+        "heading": "منطقة الخطر",
+        "reactivateTitle": "إعادة تفعيل المتجر",
+        "suspendTitle": "تعليق المتجر",
+        "reactivateDescription": "السماح للعملاء بالوصول إلى المتجر والشراء منه.",
+        "suspendDescription": "منع وصول العملاء إلى هذا المتجر دون حذف بياناته.",
+        "resetTitle": "إعادة التعيين إلى إعدادات الخطة",
+        "resetDescription": "مسح كل تجاوزات الميزات لهذا المتجر. سيستخدم المتجر إعدادات خطته الأساسية فقط.",
+        "resetButton": "إعادة تعيين التجاوزات",
+        "auditLogsLink": "عرض سجلات التدقيق ←"
+      },
+      "modals": {
+        "changePlanTitle": "تغيير الخطة",
+        "changePlanBody": "سيتم تغيير الخطة إلى <b>{plan}</b>. ستُحفظ تجاوزات الميزات. المتابعة؟",
+        "suspendBody": "تعليق {name}؟ لن يتمكن العملاء من الوصول إلى المتجر أو الشراء منه.",
+        "reactivateBody": "إعادة تفعيل {name}؟ سيستعيد العملاء الوصول فورًا.",
+        "confirmReactivate": "إعادة التفعيل",
+        "confirmSuspend": "تعليق",
+        "resetBody": "سيؤدي هذا إلى مسح كل تجاوزات الميزات لهذا المتجر. سيعود المتجر إلى إعدادات خطته <b>{plan}</b> الأساسية. لا يمكن التراجع عن هذا الإجراء.",
+        "resetAllButton": "إعادة تعيين كل التجاوزات"
+      },
+      "toasts": {
+        "loadFeaturesFailed": "تعذّر تحميل الميزات",
+        "featureUpdateFailed": "تعذّر تحديث الميزة",
+        "planUpdated": "تم تحديث الخطة",
+        "planUpdatedDescription": "تم تغيير خطة المتجر إلى {plan}.",
+        "planChangeFailed": "تعذّر تغيير الخطة",
+        "storeSuspended": "تم تعليق المتجر",
+        "storeReactivated": "تمت إعادة تفعيل المتجر",
+        "storeStatusDescription": "{name} أصبح الآن {status}.",
+        "statusActive": "نشطًا",
+        "statusSuspended": "معلّقًا",
+        "statusChangeFailed": "تعذّر تغيير الحالة",
+        "overridesCleared": "تم مسح التجاوزات",
+        "overridesClearedDescription": "أصبح المتجر يستخدم إعدادات الخطة الافتراضية.",
+        "resetFailed": "تعذّر إعادة التعيين"
+      }
     }
   },
   "template": {
@@ -4097,7 +4797,23 @@
       "toastDeletedBody": "تمت إزالة \"{name}\".",
       "errorTitle": "خطأ",
       "deleteFailed": "تعذّر حذف الفئة",
-      "searchPlaceholder": "ابحث عن فئة…"
+      "searchPlaceholder": "ابحث عن فئة…",
+      "bestSellersCoverTitle": "غلاف الأكثر مبيعًا",
+      "bestSellersCoverHint": "يظهر على بطاقة الأكثر مبيعًا في المتجر جنبًا إلى جنب مع فئاتك الحقيقية. تظهر البطاقة فقط عند وجود منتج واحد على الأقل مصنّف كأكثر مبيعًا.",
+      "uploadCoverLabel": "رفع الغلاف",
+      "showBestSellersCardTitle": "إظهار بطاقة الأكثر مبيعًا",
+      "showBestSellersCardHint": "أوقف الخيار لإزالة بطاقة الأكثر مبيعًا من شريط الفئات في الصفحة الرئيسية وصفحة الفئات. يبقى كاروسيل الأكثر مبيعًا وصفحته كما هما.",
+      "countUnitTitle": "تسمية عدد المنتجات",
+      "countUnitHint": "الكلمة التي تظهر بعد عدد المنتجات في بطاقات الفئات، مثلاً \"4 قطعة\". اتركها فارغة لاستخدام الافتراضي (\"قطعة\").",
+      "countUnitEnglishLabel": "التسمية بالإنجليزية",
+      "countUnitArabicLabel": "التسمية بالعربية",
+      "saveLabelButton": "حفظ التسمية",
+      "previewLabel": "معاينة:",
+      "countUnitSaved": "تم حفظ تسمية عدد الفئات",
+      "bestSellersTileShown": "تم إظهار بطاقة الأكثر مبيعًا",
+      "bestSellersTileHidden": "تم إخفاء بطاقة الأكثر مبيعًا",
+      "bestSellersCoverUpdated": "تم تحديث غلاف الأكثر مبيعًا",
+      "bestSellersCoverRemoved": "تمت إزالة غلاف الأكثر مبيعًا"
     },
     "form": {
       "editTitle": "تعديل الفئة",
@@ -4132,7 +4848,23 @@
       "updateFailed": "تعذّر تحديث الفئة",
       "createFailed": "تعذّر إنشاء الفئة",
       "slugInUse": "هذا المعرّف مستخدم بالفعل",
-      "connectionError": "تعذّر الاتصال بالخادم"
+      "connectionError": "تعذّر الاتصال بالخادم",
+      "seoSaveFirst": "احفظ الفئة أولاً، ثم ولّد بيانات السيو.",
+      "seoGenerationFailed": "تعذّر توليد المحتوى بالذكاء الاصطناعي",
+      "seoFilled": "قام الذكاء الاصطناعي بتعبئة حقول السيو. اضغط حفظ لاعتمادها.",
+      "seoNetworkError": "خطأ في الشبكة أثناء الاتصال بالذكاء الاصطناعي",
+      "seoHeading": "السيو",
+      "seoSubheading": "كيف تظهر هذه الفئة في نتائج جوجل.",
+      "seoGenerating": "جارٍ التوليد…",
+      "seoFillEmpty": "تعبئة الفارغ بالذكاء الاصطناعي",
+      "seoRegenerateAll": "إعادة توليد الكل",
+      "metaTitleLabel": "عنوان السيو ({count}/60)",
+      "metaTitleArLabel": "عنوان السيو بالعربية ({count}/60)",
+      "metaDescriptionLabel": "وصف السيو ({count}/160)",
+      "metaDescriptionArLabel": "وصف السيو بالعربية ({count}/160)",
+      "aeoIntro": "<b>AEO</b> — محتوى حواري لمحركات الإجابة بالذكاء الاصطناعي. تتم تعبئته تلقائيًا عبر عملية AEO؛ يمكنك تعديله هنا.",
+      "aeoMetaEnLabel": "نص AEO إنجليزي ({count}/160)",
+      "aeoMetaArLabel": "نص AEO عربي ({count}/160)"
     },
     "table": {
       "label": "الفئات",
@@ -4293,7 +5025,10 @@
       "mfaBackupSubtitle": "أدخل أحد رموز الاحتياط المحفوظة",
       "mfaTotpLink": "استخدم تطبيق المصادقة بدلاً من ذلك",
       "mfaInvalid": "رمز غير صحيح أو منتهي الصلاحية. يرجى المحاولة مرة أخرى.",
-      "rememberMe": "تذكّر بريدي الإلكتروني"
+      "rememberMe": "تذكّر بريدي الإلكتروني",
+      "serverError": "أرسل الخادم استجابة غير صالحة. يرجى المحاولة مرة أخرى.",
+      "accessDenied": "تم رفض الوصول. الصلاحية مطلوبة لمدير أو موظف.",
+      "mfaVerifyFailed": "فشل التحقق"
     }
   },
   "users": {
@@ -4386,8 +5121,22 @@
         "customer": "عميل",
         "store_admin": "مدير متجر",
         "super_admin": "مدير عام"
-      }
-    }
+      },
+      "passwordMismatch": "كلمتا المرور غير متطابقتين",
+      "deleteFailed": "فشل الحذف",
+      "deleteNetworkError": "خطأ في الشبكة",
+      "userDeleted": "تم حذف المستخدم",
+      "newPasswordSectionTitle": "تعيين كلمة مرور جديدة",
+      "newPasswordSectionHint": "اتركه فارغًا للاحتفاظ بكلمة المرور الحالية. 8 أحرف على الأقل.",
+      "newPasswordPlaceholder": "كلمة المرور الجديدة",
+      "confirmPasswordPlaceholder": "تأكيد كلمة المرور",
+      "dangerZoneTitle": "منطقة الخطر",
+      "dangerZoneDescription": "حذف حساب هذا المستخدم نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
+      "deleteUserButton": "حذف المستخدم",
+      "deleteConfirmTitle": "حذف المستخدم؟",
+      "deleteConfirmBody": "سيؤدي هذا إلى حذف <b>{name}</b> ({email}) نهائيًا. لا يمكن التراجع عن هذا الإجراء."
+    },
+    "roleLabel": "الدور"
   },
   "components": {
     "commandPalette": {
@@ -4539,7 +5288,10 @@
         "enableNotifications": "تفعيل إشعارات الطلبات",
         "notificationsEnabled": "الإشعارات مفعّلة",
         "focusModeHint": "يُقيّد التطبيق على شاشة الطلبات فقط على هذا الجهاز"
-      }
+      },
+      "staffBadge": "موظف",
+      "staffBadgeHint": "صلاحية محدودة",
+      "hubSectionsAriaLabel": "أقسام المركز"
     },
     "errorState": {
       "defaultTitle": "حدث خطأ ما",
@@ -4640,7 +5392,78 @@
         "quotaExceeded": "تم الوصول إلى حصة الذكاء الاصطناعي. حاول مرة أخرى غداً.",
         "extractionFailed": "فشل استخراج الذكاء الاصطناعي.",
         "extractionFailedRetry": "فشل استخراج الذكاء الاصطناعي. يرجى المحاولة مرة أخرى."
+      },
+      "closeOverrideEditor": "إغلاق محرر التخصيص",
+      "sectionLabels": {
+        "hero": "البطل",
+        "categories": "الفئات",
+        "newArrivals": "وصل حديثاً",
+        "bestSellers": "الأكثر مبيعاً",
+        "testimonials": "آراء العملاء"
       }
+    },
+    "paymentEventsTimeline": {
+      "toggleLabel": "عرض أحداث الدفع",
+      "superAdminBadge": "(المشرف العام)",
+      "loadingEvents": "جارٍ تحميل الأحداث…",
+      "couldNotLoadEvents": "تعذّر تحميل الأحداث",
+      "noEventsYet": "لم يتم تسجيل أحداث بعد",
+      "viewRawPayload": "عرض البيانات الأولية",
+      "rawPayloadModalTitle": "بيانات المزوّد الأولية",
+      "payloadLoadFailed": "تعذّر تحميل البيانات",
+      "unknownError": "خطأ غير معروف",
+      "eventTypes": {
+        "created": "تم إنشاء الدفعة",
+        "status_change": "تغيير الحالة",
+        "webhook_received": "تم استلام الويب هوك",
+        "admin_action": "إجراء المشرف",
+        "reconciliation": "تسوية",
+        "refund_initiated": "تم بدء الاسترداد",
+        "refund_completed": "اكتمل الاسترداد",
+        "refund_failed": "فشل الاسترداد",
+        "retry": "محاولة إعادة",
+        "expired": "انتهت صلاحية الدفعة",
+        "cancelled": "تم إلغاء الدفعة",
+        "completed": "اكتملت الدفعة",
+        "failed": "فشلت الدفعة"
+      }
+    },
+    "colorField": {
+      "tokens": {
+        "primary": "العلامة: اللون الأساسي",
+        "secondary": "العلامة: اللون الثانوي",
+        "accent": "العلامة: اللون المميّز",
+        "card": "السطح: خلفية البطاقة",
+        "muted": "السطح: لون خافت",
+        "foreground": "النص: اللون الافتراضي",
+        "border": "لون الحدود"
+      },
+      "customHex": "لون مخصص…",
+      "themeDefault": "— افتراضي القالب —",
+      "inheritedLabel": "العلامة: {token} ({hex})",
+      "colorPickerAriaLabel": "منتقي اللون",
+      "hexValueAriaLabel": "قيمة اللون السداسية",
+      "clear": "مسح"
+    },
+    "bottomSheet": {
+      "close": "إغلاق"
+    },
+    "sectionPreview": {
+      "kickerDefault": "اكتشف",
+      "subtitleDefault": "مختارات منسّقة",
+      "productNamePlaceholder": "منتج",
+      "addToCartLabel": "أضف",
+      "headingSuffix": "عنوان {label}"
+    },
+    "colorContrastPreview": {
+      "backgroundLabel": "الخلفية: {label}",
+      "roles": {
+        "heading": "العنوان",
+        "subtitle": "العنوان الفرعي",
+        "bodyCta": "النص / زر الإجراء"
+      },
+      "autoFixedLabel": "تصحيح تلقائي:",
+      "pickedTextWarning": "النص المختار {ratio} : 1 — تحتاج AA إلى {min} : 1"
     }
   },
   "finance": {
@@ -4806,7 +5629,23 @@
           "timeout": "OCR يستغرق وقتاً أطول من المتوقع. تحقق من قائمة المصروفات بعد قليل.",
           "unsupported": "يُدعم فقط JPG وPNG وWebP.",
           "manualHint": "أو أدخل البيانات يدوياً أدناه"
-        }
+        },
+        "supplierLabel": "المورد",
+        "expenseCategoryLabel": "فئة المصروف",
+        "paidFromAccountLabel": "الدفع من حساب",
+        "currencyLabel": "العملة",
+        "fxRateLabel": "سعر الصرف (1 {currency} = ؟ د.ك)",
+        "fxRateHint": "أدخل سعر الصرف من البنك أو تاريخ الإيصال.",
+        "fxRatePlaceholder": "مثال: 0.30700",
+        "errorExpenseDateRequired": "تاريخ المصروف مطلوب",
+        "errorExpenseCategoryRequired": "فئة المصروف مطلوبة",
+        "errorPaidFromRequired": "حساب الدفع مطلوب",
+        "errorAmountRequired": "يجب أن يكون المبلغ أكبر من 0",
+        "errorFxRateRequired": "سعر الصرف مطلوب لمصروفات {currency} ويجب أن يكون رقمًا موجبًا",
+        "uploadFailedGeneric": "فشل الرفع ({status})",
+        "uploadFailedRetry": "فشل الرفع. يرجى المحاولة مرة أخرى.",
+        "totalInKwdConverted": "الإجمالي بالدينار الكويتي (محوّل بسعر {rate}):",
+        "minorUnitsSuffix": "(وحدات {currency} الصغرى)"
       }
     },
     "reports": {
@@ -4904,7 +5743,10 @@
         "importButton": "استيراد",
         "parseErrors": "تحذيرات التحليل",
         "success": "تم استيراد {count} معاملة.",
-        "error": "فشل الاستيراد."
+        "error": "فشل الاستيراد.",
+        "fileTypesHint": "CSV أو Excel (.xlsx) أو OFX (بحد أقصى 5 ميغابايت)",
+        "skippedLabel": "تم التجاوز",
+        "viewReconciliation": "عرض المطابقة"
       },
       "tx": {
         "date": "التاريخ",
@@ -4990,7 +5832,8 @@
       "openBackorders": "طلبات الانتظار المفتوحة",
       "reorderSuggestions": "اقتراحات إعادة الطلب",
       "deadStockCount": "أصناف البضاعة الراكدة",
-      "viewAll": "عرض الكل"
+      "viewAll": "عرض الكل",
+      "couldntLoad": "تعذّر التحميل"
     },
     "inventory": {
       "title": "الجرد",
@@ -5122,11 +5965,14 @@
       "description": "الموردون الذين تضع معهم أوامر الشراء.",
       "newButton": "+ مورد جديد",
       "name": "الاسم",
+      "nameArLabel": "الاسم (عربي)",
       "contact": "جهة الاتصال",
+      "contactPlaceholder": "الشخص المسؤول عن التواصل",
       "phone": "الهاتف",
       "email": "البريد الإلكتروني",
       "paymentTerms": "شروط الدفع",
       "active": "نشط",
+      "nameRequired": "الاسم مطلوب.",
       "terms": {
         "net0": "الدفع عند الاستلام",
         "net15": "صافي 15 يوماً",
@@ -5140,7 +5986,9 @@
         "notes": "ملاحظات (إنجليزي)",
         "notesAr": "ملاحظات (عربي)",
         "submit": "إنشاء المورد",
-        "paymentTermsTip": "شروط الدفع = المدة المتفق عليها لسداد الفاتورة بعد استلام البضاعة. صافي 30 = خلال 30 يومًا من تاريخ الفاتورة. صافي 0 = الدفع فورًا. مخصص = عدد الأيام الذي تحدده."
+        "paymentTermsTip": "شروط الدفع = المدة المتفق عليها لسداد الفاتورة بعد استلام البضاعة. صافي 30 = خلال 30 يومًا من تاريخ الفاتورة. صافي 0 = الدفع فورًا. مخصص = عدد الأيام الذي تحدده.",
+        "leadTimeDays": "مدة التوريد (أيام)",
+        "leadTimeDaysTip": "عدد الأيام من وضع الطلب لدى هذا المورد حتى وصول البضاعة. يستخدمها محرك إعادة الطلب عند عدم وجود قاعدة خاصة بالمنتج تتجاوزها."
       },
       "searchPlaceholder": "ابحث عن مورد…"
     },
@@ -5319,7 +6167,8 @@
       "topSkus": "أفضل 5 منتجات (آخر 7 أيام)",
       "yesterdayFunnel": "معدل تحويل الأمس",
       "aiCallout": "AI:",
-      "noDataYet": "ستظهر التحليلات بعد أول تحديث ليلي الساعة 02:00 بتوقيت الكويت."
+      "noDataYet": "ستظهر التحليلات بعد أول تحديث ليلي الساعة 02:00 بتوقيت الكويت.",
+      "asOf": "حتى"
     },
     "cohorts": {
       "title": "شرائح العملاء الزمنية",
@@ -5358,7 +6207,14 @@
       },
       "count": "عملاء",
       "revenue": "الإيرادات",
-      "recommendedAction": "الإجراء الموصى به"
+      "recommendedAction": "الإجراء الموصى به",
+      "totalSegmentedCustomers": "إجمالي العملاء المصنّفين",
+      "totalMonetaryValue": "إجمالي القيمة المالية",
+      "noSegmentData": "لا توجد بيانات شرائح بعد. تُحدَّث التحليلات بعد أول تشغيل ليلي الساعة 02:00 بتوقيت الكويت.",
+      "aiLabel": "الذكاء الاصطناعي:",
+      "shareOfCustomers": "{pct}% من العملاء",
+      "shareOfTotal": "{pct}% من الإجمالي",
+      "loadFailed": "تعذّر تحميل بيانات الشرائح"
     },
     "products": {
       "title": "سرعة بيع المنتجات",
@@ -5568,7 +6424,8 @@
       "categoryAssign": "تعيين الفئات",
       "imageAlt": "نص بديل للصور",
       "excerpt": "ملخصات المنتجات",
-      "productTags": "وسوم المنتجات"
+      "productTags": "وسوم المنتجات",
+      "descriptionRevert": "التراجع عن موازنة الأوصاف"
     },
     "activeJob": {
       "sweepSuffix": "مسح",
@@ -5609,6 +6466,102 @@
       "completed": "مكتمل",
       "failed": "فاشل",
       "cancelled": "ملغى"
+    },
+    "sweepResults": {
+      "header": "نتائج المسح",
+      "refreshing": "جارٍ التحديث…",
+      "refresh": "تحديث",
+      "lastFetched": "آخر جلب: {time}",
+      "panels": {
+        "translate": {
+          "title": "معدل ملء الترجمة"
+        },
+        "seo": {
+          "title": "معدل ملء بيانات السيو"
+        },
+        "faq": {
+          "title": "الأسئلة الشائعة"
+        },
+        "howto": {
+          "title": "أدلة الإرشادات"
+        },
+        "metaAeo": {
+          "title": "وصف AEO التحادثي"
+        },
+        "categorize": {
+          "title": "تعيين الفئات"
+        },
+        "imageAlt": {
+          "title": "نص بديل للصور"
+        },
+        "excerpt": {
+          "title": "ملخصات المنتجات"
+        },
+        "tags": {
+          "title": "وسوم المنتجات"
+        }
+      },
+      "fillRateLabels": {
+        "productsAr": "منتجات بالعربي",
+        "categoriesAr": "فئات بالعربي",
+        "store": "المتجر",
+        "products": "المنتجات",
+        "categories": "الفئات",
+        "productsCategorized": "منتجات مصنّفة",
+        "imagesWithAlt": "صور بنص بديل",
+        "productsWithExcerpt": "منتجات بملخص",
+        "productsTagged": "منتجات موسومة"
+      },
+      "totalTags": "إجمالي الوسوم",
+      "recentlyTranslated": "المترجمة مؤخراً (آخر 30 يوماً)",
+      "openCatalogProducts": "فتح الكتالوج ← المنتجات",
+      "latestSeoFills": "آخر تعبئة سيو",
+      "titleLabel": "العنوان:",
+      "descLabel": "الوصف:",
+      "copied": "تم النسخ!",
+      "copy": "نسخ",
+      "openSeoPage": "فتح صفحة السيو",
+      "faqUnit": "{count, plural, one {سؤال} other {أسئلة}}",
+      "lastUpdated": "آخر تحديث: {time}",
+      "noFaqsYet": "لا توجد أسئلة بعد. شغّل مسح الأسئلة الشائعة أعلاه.",
+      "aiBadge": "ذكاء اصطناعي",
+      "editedBadge": "معدّل",
+      "viewFaqsOnSeoPage": "عرض الأسئلة في صفحة السيو",
+      "guideUnit": "{count, plural, one {دليل} other {أدلة}}",
+      "noHowtosYet": "لا توجد أدلة بعد. شغّل مسح الأدلة أعلاه.",
+      "stepCount": "{count, plural, one {# خطوة} other {# خطوات}}",
+      "viewHowtosOnSeoPage": "عرض الأدلة في صفحة السيو",
+      "storeAeoDescriptionLabel": "وصف AEO للمتجر:",
+      "recentlyRewritten": "أُعيدت صياغته مؤخراً",
+      "recentlyCategorized": "المصنّفة مؤخراً",
+      "recentlyFilled": "المملوءة مؤخراً",
+      "loading": "جارٍ التحميل…"
+    },
+    "geoResults": {
+      "title": "نتائج مسح GEO",
+      "refresh": "تحديث",
+      "loading": "جارٍ تحميل نتائج GEO…",
+      "errorFailed": "تعذّر تحميل نتائج GEO",
+      "empty": "فارغ",
+      "view": "عرض",
+      "notGenerated": "لم يتم إنشاؤه بعد. اضغط <b>إنشاء</b> أعلاه لتشغيل المسح.",
+      "copy": "نسخ",
+      "copyJson": "نسخ JSON",
+      "copiedToast": "تم نسخ {label}",
+      "llmsTxt": {
+        "label": "LLMs.txt",
+        "charsSuffix": "حرفًا"
+      },
+      "brandFacts": {
+        "label": "حقائق العلامة التجارية",
+        "keysSuffix": "مفتاحًا",
+        "jsonLabel": "بيانات JSON لحقائق العلامة التجارية"
+      },
+      "citationCopy": {
+        "label": "نسخة الاستشهاد",
+        "filledOfTotal": "تم تعبئة {filled} من أصل {total} منتج",
+        "hint": "القيم الخاصة بكل منتج مرئية في صفحة تعديل المنتج ضمن <b>نسخة الاستشهاد</b>."
+      }
     }
   },
   "account": {
@@ -5648,7 +6601,11 @@
       "errorVerify": "رمز غير صحيح. يرجى التحقق من تطبيق المصادقة والمحاولة مرة أخرى.",
       "errorDisable": "رمز غير صحيح. يرجى المحاولة مرة أخرى.",
       "successEnabled": "تم تفعيل المصادقة الثنائية لحسابك.",
-      "successDisabled": "تم تعطيل المصادقة الثنائية."
+      "successDisabled": "تم تعطيل المصادقة الثنائية.",
+      "continueButton": "متابعة",
+      "statusOn": "مفعّل",
+      "statusOff": "غير مفعّل",
+      "qrCodeAlt": "رمز QR للمصادقة الثنائية"
     }
   },
   "answerEngine": {
@@ -5772,7 +6729,8 @@
       "toastWaOffTitle": "تم إيقاف الطلب عبر واتساب",
       "toastWaOnBody": "يمكن للعملاء الآن الطلب مباشرة عبر رسائل واتساب.",
       "toastWaOffBody": "تم إيقاف الطلب عبر رسائل واتساب.",
-      "toastWaSaveFailedBody": "تعذّر تحديث إعداد الطلب عبر واتساب"
+      "toastWaSaveFailedBody": "تعذّر تحديث إعداد الطلب عبر واتساب",
+      "apiKeyPlaceholder": "الصق المفتاح من لوحة تحكم WBS ← العملاء ← Force AI Store Bridge"
     },
     "templates": {
       "generating": "جاري الإنشاء…",
@@ -5831,7 +6789,8 @@
       "toastResetTitle": "تمت إعادة تعيين {count} قالب مرفوض",
       "toastNoRejectedTitle": "لا توجد قوالب مرفوضة",
       "toastResetBody": "تمت إعادة القوالب إلى مسودة بأحدث نص أساسي. اضغط على مزامنة لإعادة الإرسال.",
-      "toastNoRejectedBody": "لا توجد قوالب مرفوضة لإعادة تعيينها."
+      "toastNoRejectedBody": "لا توجد قوالب مرفوضة لإعادة تعيينها.",
+      "resetRejectedHint": "يحدّث القوالب المرفوضة من أحدث نص معتمد، ثم اضغط مزامنة لإعادة إرسالها"
     },
     "orderUpdates": {
       "notConnected": "مو متصل للحين.",
@@ -5905,7 +6864,10 @@
       "toastUnknownError": "خطأ غير معروف",
       "toastSentTitle": "تم إرسال رابط الدفع",
       "toastSentBody": "سيستلم {phone} رابط دفع MyFatoorah عبر واتساب.",
-      "toastSendFailedTitle": "فشل الإرسال"
+      "toastSendFailedTitle": "فشل الإرسال",
+      "removeItemAriaLabel": "إزالة المنتج",
+      "orderNumberLabel": "الطلب رقم {orderNumber}",
+      "invoiceIdLabel": "الفاتورة {invoiceId}"
     },
     "botAnalytics": {
       "notConnected": "WBS غير متصل بهذا المتجر. يرجى إعداد الربط في تبويب الاتصال أولاً.",
@@ -5997,6 +6959,68 @@
       "confirmNew": "سيؤدي هذا إلى استدعاء واجهة Meta Graph API لإنشاء كتالوج تجاري جديد تماماً ضمن مدير أعمال Force AI الرئيسي وتعيينه لهذا المتجر. هل تريد المتابعة؟",
       "catalogIdPlaceholder": "مثال: 123456789012345",
       "businessIdPlaceholder": "مثال: 987654321098765"
+    },
+    "botCopy": {
+      "editorTitle": "محرر نصوص البوت",
+      "editorDescription": "خصّص النصوص التي يستخدمها بوت الطلب عبر واتساب عند التواصل مع العملاء. اترك الحقل فارغاً لاستخدام النص الافتراضي (يظهر كنص مؤقت).",
+      "customizedCount": "{count} من {total} رسالة مخصصة",
+      "saveChanges": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ…",
+      "variablesLegendLabel": "المتغيرات",
+      "variablesLegendText": "— استخدم صيغة <code>variableName</code> في النص.",
+      "variablesLegendSupported": "مدعومة لكل رسالة (راجع التسمية بجانب كل صف).",
+      "customizedBadge": "مخصص",
+      "resetToDefault": "إعادة للافتراضي",
+      "enColumnLabel": "الإنجليزية",
+      "arColumnLabel": "العربية",
+      "saveFailedTitle": "فشل الحفظ",
+      "saveFailedBody": "تعذّر حفظ إعدادات نصوص البوت",
+      "saveFailedGeneric": "حدث خطأ غير متوقع",
+      "savedTitle": "تم حفظ نصوص البوت",
+      "savedBody": "تعديلاتك على نصوص البوت أصبحت مفعّلة الآن.",
+      "groups": {
+        "Greeting": "الترحيب",
+        "Products": "المنتجات",
+        "Cart": "السلة",
+        "Checkout": "الدفع",
+        "Search": "البحث",
+        "Prompts": "التوجيهات"
+      },
+      "keys": {
+        "catalog_preparing": "التحضير",
+        "welcome_header": "الترحيب",
+        "welcome_body": "نص الترحيب",
+        "welcome_button_text": "زر الفئات",
+        "welcome_footer": "تذييل الترحيب",
+        "categories_section_title": "عنوان الفئات",
+        "no_products": "لا توجد منتجات",
+        "products_body": "قائمة المنتجات",
+        "products_button_text": "زر المنتجات",
+        "products_section_title": "عنوان المنتجات",
+        "products_more_footer": "المزيد من المنتجات",
+        "out_of_stock": "نفذ المخزون",
+        "product_out_of_stock": "رسالة نفاد المخزون",
+        "add_to_cart_body": "رسالة الإضافة للسلة",
+        "qty_1": "زر الكمية ١",
+        "qty_2": "زر الكمية ٢",
+        "qty_more": "زر الكمية أكثر",
+        "qty_prompt": "طلب الكمية",
+        "qty_range": "خطأ نطاق الكمية",
+        "cart_updated": "تحديث السلة",
+        "btn_add_more": "زر إضافة المزيد",
+        "btn_checkout": "زر إتمام الطلب",
+        "btn_cancel": "زر الإلغاء",
+        "cart_cleared": "رسالة مسح السلة",
+        "checkout_unavailable": "الدفع غير متاح",
+        "checkout_error": "خطأ في الدفع",
+        "checkout_ready": "رابط الدفع جاهز",
+        "checkout_resend": "إعادة إرسال الرابط",
+        "search_found_n": "نتائج البحث",
+        "search_no_results": "لا نتائج",
+        "search_section_title": "عنوان البحث",
+        "tap_a_product": "اختر منتجا",
+        "tap_a_flow_button": "اختر زرا"
+      }
     }
   },
   "staff": {
@@ -6306,6 +7330,184 @@
       "minted": "تم إصدار المفتاح",
       "revokeFailedTitle": "تعذّر إلغاء المفتاح",
       "revoked": "تم إلغاء المفتاح"
+    }
+  },
+  "floatingWidget": {
+    "kind": {
+      "whatsapp": "واتساب",
+      "instagram": "إنستغرام",
+      "phone": "هاتف",
+      "email": "البريد",
+      "music": "موسيقى",
+      "custom": "رابط مخصص",
+      "tiktok": "تيك توك",
+      "snapchat": "سناب شات",
+      "youtube": "يوتيوب",
+      "facebook": "فيسبوك",
+      "x": "إكس",
+      "telegram": "تيليغرام"
+    },
+    "position": {
+      "br": "أسفل اليمين",
+      "bl": "أسفل اليسار",
+      "tr": "أعلى اليمين",
+      "tl": "أعلى اليسار"
+    },
+    "expand": {
+      "up": "لأعلى",
+      "down": "لأسفل",
+      "left": "لليسار",
+      "right": "لليمين"
+    },
+    "pageTitle": "الودجة العائمة",
+    "common": {
+      "loading": "جارٍ التحميل…"
+    },
+    "premiumSubtitle": "إضافة مميزة",
+    "featureNotEnabledTitle": "الميزة غير مفعّلة",
+    "featureNotEnabledBody": "الودجة العائمة إضافة مميزة. يجب أن يفعّلها مسؤول عام لهذا المتجر قبل أن تتمكن من إعدادها. تواصل مع Force AI لطلب الوصول.",
+    "mainSubtitle": "مجموعة أزرار ثابتة يراها عملاؤك في كل صفحة",
+    "showWidgetLabel": "إظهار الودجة في واجهة المتجر",
+    "showWidgetHint": "عند التعطيل، لن تظهر الودجة حتى لو كانت الميزة مفعّلة.",
+    "positionLabel": "الموضع",
+    "expandDirectionLabel": "اتجاه الفتح",
+    "startExpandedLabel": "بدء الفتح تلقائياً عند تحميل كل صفحة",
+    "hideOnMobile": "إخفاء على الجوال",
+    "hideOnDesktop": "إخفاء على سطح المكتب",
+    "toggleButtonTitle": "زر التبديل",
+    "toggleButtonHint": "الدائرة الظاهرة دائماً. الضغط عليها يفتح باقي الأزرار.",
+    "backgroundColorLabel": "لون الخلفية",
+    "tooltipEnLabel": "التلميح (إنجليزي)",
+    "tooltipArLabel": "التلميح (عربي)",
+    "customIconUrlLabel": "رابط أيقونة مخصصة (اختياري)",
+    "buttonsTitle": "الأزرار",
+    "buttonsHint": "إجراءات تظهر عند فتح الزر. أعد ترتيبها باستخدام الأسهم.",
+    "addButton": "+ إضافة زر",
+    "noButtonsHint": "لا توجد أزرار بعد — أضف واحداً أعلاه (واتساب، إنستغرام، موسيقى، إلخ).",
+    "moveUp": "نقل لأعلى",
+    "moveDown": "نقل لأسفل",
+    "removeButtonAria": "إزالة الزر",
+    "kindLabel": "النوع",
+    "tooltipEnPlaceholder": "التلميح (إنجليزي)",
+    "tooltipArPlaceholder": "التسمية",
+    "whatsappPhoneLabel": "الهاتف (دولي، بدون + أو مسافات)",
+    "usingStoreWhatsapp": "باستخدام واتساب المتجر: {value}",
+    "whatsappMessageLabel": "رسالة معبأة مسبقاً (اختياري)",
+    "instagramHandleLabel": "معرّف إنستغرام (بدون @)",
+    "usingStoreInstagram": "باستخدام إنستغرام المتجر: {value}",
+    "phoneNumberLabel": "رقم الهاتف",
+    "usingStorePhone": "باستخدام هاتف المتجر: {value}",
+    "tiktokHandleLabel": "معرّف تيك توك (بدون @)",
+    "usingStoreTiktok": "باستخدام تيك توك المتجر: {value}",
+    "snapchatHandleLabel": "اسم مستخدم سناب شات",
+    "usingStoreSnapchat": "باستخدام سناب شات المتجر: {value}",
+    "youtubeUrlLabel": "رابط قناة يوتيوب",
+    "usingStoreYoutube": "باستخدام يوتيوب المتجر: {value}",
+    "facebookUrlLabel": "رابط صفحة فيسبوك",
+    "usingStoreFacebook": "باستخدام فيسبوك المتجر: {value}",
+    "xHandleLabel": "معرّف إكس (بدون @)",
+    "usingStoreX": "باستخدام إكس المتجر: {value}",
+    "telegramHandleLabel": "معرّف تيليغرام (بدون @)",
+    "usingStoreTelegram": "باستخدام تيليغرام المتجر: {value}",
+    "emailAddressLabel": "البريد الإلكتروني",
+    "emailSubjectLabel": "الموضوع الافتراضي (اختياري)",
+    "audioUrlLabel": "رابط الصوت (mp3 / ogg / m4a)",
+    "loopAudioLabel": "تكرار الصوت (موسيقى خلفية)",
+    "targetUrlLabel": "الرابط المستهدف",
+    "iconUrlLabel": "رابط الأيقونة (اختياري)",
+    "buttonBackgroundColorLabel": "لون الخلفية (اختياري)",
+    "iconColorLabel": "لون الأيقونة (اختياري)",
+    "saveFailedFallback": "فشل الحفظ",
+    "savedToast": "تم حفظ الودجة العائمة",
+    "saveHint": "تُطبَّق التغييرات على واجهة المتجر الفعلية بعد الحفظ.",
+    "saving": "جارٍ الحفظ…",
+    "saveChanges": "حفظ التغييرات"
+  },
+  "zoneEditor": {
+    "resetToDefault": "إعادة التعيين إلى الافتراضي",
+    "inherit": "موروث",
+    "inheritWithValue": "موروث ({value})",
+    "fontFamilyLabel": "نوع الخط",
+    "fontSizeLabel": "حجم الخط",
+    "fontSizeExample": "مثال: 16px أو 1rem",
+    "fontSizeHint": "الرقم المجرد يتحول تلقائيًا إلى px (16 ← 16px). المسموح: 12 / 14 / 16 / 18 / 22px.",
+    "arbitrarySizeNotAllowed": "أحجام Tailwind العشوائية (text-[…]) غير مسموح بها.\nاستخدم قيمة px (مثل 12px / 14px / 16px / 18px / 22px) أو\nرمزًا مسمّى: text-xs / text-sm / text-base / text-lg / text-xl / text-2xl.",
+    "fontWeightLabel": "وزن الخط",
+    "fontWeightExample": "مثال: 400، 600، 700",
+    "fontWeightHint": "400 عادي · 600 نصف عريض · 700 عريض",
+    "letterSpacingLabel": "تباعد الأحرف",
+    "letterSpacingExample": "مثال: 0.05em أو 1px",
+    "lineHeightLabel": "ارتفاع السطر",
+    "lineHeightExample": "مثال: 1.6 أو 24px",
+    "textTransformLabel": "تحويل النص",
+    "textTransformOptions": {
+      "inherit": "موروث (بدون)",
+      "uppercase": "أحرف كبيرة",
+      "lowercase": "أحرف صغيرة",
+      "capitalize": "بداية كل كلمة بحرف كبير",
+      "explicitNone": "بدون (صريح)"
+    },
+    "textDecorationLabel": "زخرفة النص",
+    "textDecorationOptions": {
+      "inherit": "استخدام الافتراضي (موروث)",
+      "none": "بدون زخرفة (إيقاف قسري)",
+      "underline": "تسطير",
+      "overline": "خط علوي",
+      "strikethrough": "يتوسطه خط"
+    },
+    "textAlignmentLabel": "محاذاة النص",
+    "textAlign": {
+      "auto": {
+        "label": "تلقائي",
+        "title": "موروث (استخدام افتراضي المستهلك)"
+      },
+      "start": {
+        "label": "البداية",
+        "title": "يسار في LTR، يمين في RTL"
+      },
+      "center": {
+        "label": "الوسط",
+        "title": "توسيط دائمًا"
+      },
+      "end": {
+        "label": "النهاية",
+        "title": "يمين في LTR، يسار في RTL"
+      }
+    },
+    "textAlignAriaLabel": "{label} — {title}",
+    "textColorLabel": "لون النص",
+    "colorInheriting": "موروث: {value}",
+    "colorHint": "اتركه فارغًا للوراثة من السمة الحالية."
+  },
+  "answerEngineProviders": {
+    "pageTitle": "محركات الإجابة",
+    "pageSubtitle": "فعّل فحوصات Perplexity وOpenAI بإدخال مفتاح API. يعمل Gemini على مفتاح المنصة افتراضياً.",
+    "loadFailedBody": "تعذّر تحميل إعدادات محركات الإجابة.",
+    "retry": "إعادة المحاولة",
+    "geminiTitle": "Gemini",
+    "geminiHint": "نشط دائماً على مفتاح المنصة الخاص — لا حاجة لإعداد لكل مزوّد.",
+    "geminiActiveBadge": "نشط (مفتاح المنصة)",
+    "statusActive": "نشط",
+    "statusOff": "متوقف",
+    "apiKeyLabel": "مفتاح API",
+    "apiKeyMaskedHint": "(مخفي — اتركه كما هو للاحتفاظ به)",
+    "apiKeyPlaceholderMasked": "sk_****",
+    "apiKeyPlaceholderEmpty": "أدخل مفتاح API",
+    "enabledLabel": "مفعّل",
+    "saveButton": "حفظ",
+    "savingButton": "جارٍ الحفظ…",
+    "saveFailed": "فشل الحفظ: {message}",
+    "saved": "تم الحفظ",
+    "genericError": "خطأ",
+    "engines": {
+      "perplexity": {
+        "label": "بيربلكسيتي (Sonar)",
+        "hint": "إجابات مستندة إلى الويب عبر Perplexity Sonar API."
+      },
+      "openai": {
+        "label": "أوبن إيه آي (Responses API + بحث الويب)",
+        "hint": "إجابات مستندة إلى الويب عبر OpenAI Responses API."
+      }
     }
   }
 }

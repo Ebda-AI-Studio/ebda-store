@@ -288,7 +288,7 @@ export default function StoreCustomersPage() {
     },
     {
       // Last Payment column — hidden on mobile to keep cards lean; shown at desktop lg+
-      header: 'Last Payment',
+      header: t('colLastPayment'),
       hideOnMobile: true,
       cell: customer => (
         <div className="text-sm text-foreground">
@@ -308,14 +308,14 @@ export default function StoreCustomersPage() {
           )}
           {customer.lastOrderStatus === 'cancelled' && (
             <span className="ms-2 inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
-              cancelled
+              {t('statusCancelled')}
             </span>
           )}
         </div>
       ),
     },
     {
-      header: 'Address',
+      header: t('colAddress'),
       hideOnMobile: true,
       cell: customer =>
         customer.address ? (

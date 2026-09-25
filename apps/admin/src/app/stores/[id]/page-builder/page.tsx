@@ -377,15 +377,15 @@ export default function StoreLayoutPage() {
             onClick={() => setPaletteOpen(true)}
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
-            Smart palette
+            {t('toolbar.smartPalette')}
           </button>
           {Object.keys(pendingThemeUpdates).length > 0 && (
             <span
               className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700"
-              title="Brand color changes from Smart Palette are pending. Click Save to commit."
+              title={t('toolbar.pendingBrandColorsHint')}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              Unsaved brand colors
+              {t('toolbar.unsavedBrandColors')}
             </span>
           )}
           {/* Real-time preview — POSTs current local layout to Redis with a
@@ -452,10 +452,10 @@ export default function StoreLayoutPage() {
                 setPreviewRefreshTick(t => t + 1);
               }}
               className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-100"
-              title="Stop previewing unsaved changes — show the saved version instead."
+              title={t('toolbar.stopPreviewHint')}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-              Preview is showing unsaved changes (click to reset)
+              {t('toolbar.previewUnsavedChanges')}
             </button>
           )}
           <button
@@ -488,7 +488,7 @@ export default function StoreLayoutPage() {
                   onClick={() => document.querySelectorAll('details').forEach(d => (d.open = true))}
                   className="text-muted-foreground hover:text-foreground underline"
                 >
-                  Expand all
+                  {t('toolbar.expandAll')}
                 </button>
                 <span className="text-muted-foreground">·</span>
                 <button
@@ -498,7 +498,7 @@ export default function StoreLayoutPage() {
                   }
                   className="text-muted-foreground hover:text-foreground underline"
                 >
-                  Collapse all
+                  {t('toolbar.collapseAll')}
                 </button>
               </div>
 
@@ -604,10 +604,10 @@ export default function StoreLayoutPage() {
                   onChange={next => updateSection('hero', s => ({ ...s, slides: next }))}
                 />
                 <ColorField
-                  label="Section background color"
+                  label={t('common.sectionBgColorLabel')}
                   value={layout.hero.bgColor}
                   onChange={v => updateSection('hero', s => ({ ...s, bgColor: v }))}
-                  hint="Overrides the theme background preset for this section only."
+                  hint={t('common.sectionBgColorHint')}
                   theme={storeInfo?.theme}
                   inheritFromToken="card"
                 />
@@ -643,10 +643,10 @@ export default function StoreLayoutPage() {
                 />
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Live preview
+                    {t('preview.liveTitle')}
                   </p>
                   <SectionPreview
-                    label="Hero"
+                    label={t('sectionLabels.hero')}
                     bgColor={layout.hero.bgColor}
                     cardFrameColor={undefined}
                     cardFrameWidth={undefined}
@@ -809,7 +809,7 @@ export default function StoreLayoutPage() {
                     string arrays). */}
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Card size</span>
+                    <span className="text-muted-foreground">{t('productCard.cardSize')}</span>
                     <select
                       value={layout.categories.cardSize ?? 'sm'}
                       onChange={e =>
@@ -820,16 +820,16 @@ export default function StoreLayoutPage() {
                       }
                       className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     >
-                      <option value="xxs">Tiniest (90/110px)</option>
-                      <option value="xs">Extra small (120/140px)</option>
-                      <option value="sm">Small (150/180px) — default</option>
-                      <option value="md">Medium (200/240px)</option>
-                      <option value="lg">Large (240/300px)</option>
-                      <option value="xl">Extra large (280/360px)</option>
+                      <option value="xxs">{t('productCard.sizeTiniest')}</option>
+                      <option value="xs">{t('productCard.sizeXs')}</option>
+                      <option value="sm">{t('productCard.sizeSmDefault')}</option>
+                      <option value="md">{t('productCard.sizeMd')}</option>
+                      <option value="lg">{t('productCard.sizeLg')}</option>
+                      <option value="xl">{t('productCard.sizeXl')}</option>
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Image aspect</span>
+                    <span className="text-muted-foreground">{t('productCard.imageAspect')}</span>
                     <select
                       value={layout.categories.cardAspect ?? 'theme'}
                       onChange={e =>
@@ -846,16 +846,16 @@ export default function StoreLayoutPage() {
                       }
                       className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     >
-                      <option value="theme">Theme default (3:4 — 600×800)</option>
-                      <option value="square">Square 1:1 (800×800)</option>
-                      <option value="portrait">Portrait 3:4 (600×800)</option>
-                      <option value="landscape">Landscape 4:3 (800×600)</option>
-                      <option value="wide">Wide 3:2 (900×600)</option>
-                      <option value="ultrawide">Ultra-wide 16:9 (960×540)</option>
+                      <option value="theme">{t('productCard.aspectThemeDefaultRatio')}</option>
+                      <option value="square">{t('productCard.aspectSquare')}</option>
+                      <option value="portrait">{t('productCard.aspectPortraitRatio')}</option>
+                      <option value="landscape">{t('productCard.aspectLandscapeRatio')}</option>
+                      <option value="wide">{t('productCard.aspectWideRatio')}</option>
+                      <option value="ultrawide">{t('productCard.aspectUltrawideRatio')}</option>
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Card shape</span>
+                    <span className="text-muted-foreground">{t('productCard.cardShape')}</span>
                     <select
                       value={layout.categories.cardShape ?? 'theme'}
                       onChange={e =>
@@ -874,21 +874,21 @@ export default function StoreLayoutPage() {
                       }
                       className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     >
-                      <option value="theme">Theme default</option>
-                      <option value="circle">Circle (round, 1:1)</option>
-                      <option value="rounded-square">Rounded square (soft, 1:1)</option>
-                      <option value="square">Sharp square (1:1)</option>
-                      <option value="soft">Soft rectangle (4:5)</option>
-                      <option value="portrait">Portrait (3:4)</option>
-                      <option value="landscape">Landscape (4:3)</option>
-                      <option value="pill">Pill (horizontal, 2:1)</option>
+                      <option value="theme">{t('common.themeDefault')}</option>
+                      <option value="circle">{t('productCard.shapeCircle')}</option>
+                      <option value="rounded-square">{t('productCard.shapeRoundedSquare')}</option>
+                      <option value="square">{t('productCard.shapeSharpSquare')}</option>
+                      <option value="soft">{t('productCard.shapeSoftRectangle')}</option>
+                      <option value="portrait">{t('productCard.shapePortraitPlain')}</option>
+                      <option value="landscape">{t('productCard.shapeLandscapePlain')}</option>
+                      <option value="pill">{t('productCard.shapePillRatio')}</option>
                     </select>
                     <span className="text-[11px] text-muted-foreground/80">
-                      Overrides the aspect ratio + rounded corners with one preset.
+                      {t('productCard.shapeOverrideHint')}
                     </span>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Card spacing</span>
+                    <span className="text-muted-foreground">{t('productCard.cardSpacing')}</span>
                     <select
                       value={layout.categories.cardGap ?? 'normal'}
                       onChange={e =>
@@ -899,30 +899,30 @@ export default function StoreLayoutPage() {
                       }
                       className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     >
-                      <option value="tight">Tight (6-8px)</option>
-                      <option value="normal">Normal (12-16px) — default</option>
-                      <option value="loose">Loose (20-24px)</option>
-                      <option value="xloose">Extra loose (32-40px)</option>
+                      <option value="tight">{t('productCard.spacingTight')}</option>
+                      <option value="normal">{t('productCard.spacingNormalDefault')}</option>
+                      <option value="loose">{t('productCard.spacingLoose')}</option>
+                      <option value="xloose">{t('productCard.spacingXloose')}</option>
                     </select>
                   </label>
                   <RowToggle
-                    label="Show category labels"
+                    label={t('productCard.showCategoryLabels')}
                     checked={layout.categories.showLabel !== false}
                     onChange={v => updateSection('categories', s => ({ ...s, showLabel: v }))}
                   />
                   <RowToggle
-                    label="Hover effects"
+                    label={t('productCard.hoverEffects')}
                     checked={layout.categories.showHover !== false}
                     onChange={v => updateSection('categories', s => ({ ...s, showHover: v }))}
                   />
                   <RowToggle
-                    label="Show frame around each card"
+                    label={t('productCard.showFrame')}
                     checked={!!layout.categories.showCardFrame}
                     onChange={v => updateSection('categories', s => ({ ...s, showCardFrame: v }))}
                   />
                   {layout.categories.showCardFrame && (
                     <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-muted-foreground">Frame style</span>
+                      <span className="text-muted-foreground">{t('productCard.frameStyle')}</span>
                       <select
                         value={layout.categories.cardFrameStyle ?? 'soft'}
                         onChange={e =>
@@ -937,16 +937,18 @@ export default function StoreLayoutPage() {
                         }
                         className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        <option value="soft">Soft (rounded + light shadow) — default</option>
-                        <option value="outline">Outline (2px border, no shadow)</option>
-                        <option value="shadow">Shadow (larger drop shadow, no border)</option>
-                        <option value="paper">Paper (editorial, larger padding)</option>
+                        <option value="soft">{t('productCard.frameSoftDefault')}</option>
+                        <option value="outline">{t('productCard.frameOutline')}</option>
+                        <option value="shadow">{t('productCard.frameShadow')}</option>
+                        <option value="paper">{t('productCard.framePaper')}</option>
                       </select>
                     </label>
                   )}
                   {layout.categories.showCardFrame && (
                     <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-muted-foreground">Border thickness</span>
+                      <span className="text-muted-foreground">
+                        {t('productCard.borderThickness')}
+                      </span>
                       <select
                         value={layout.categories.cardFrameWidth ?? 'thin'}
                         onChange={e =>
@@ -957,16 +959,16 @@ export default function StoreLayoutPage() {
                         }
                         className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        <option value="thin">Thin (1px) — default</option>
-                        <option value="normal">Normal (2px)</option>
-                        <option value="thick">Thick (4px)</option>
-                        <option value="xthick">Extra thick (8px)</option>
+                        <option value="thin">{t('productCard.borderThinDefault')}</option>
+                        <option value="normal">{t('productCard.borderNormal')}</option>
+                        <option value="thick">{t('productCard.borderThick')}</option>
+                        <option value="xthick">{t('productCard.borderXthick')}</option>
                       </select>
                     </label>
                   )}
                   {layout.categories.showCardFrame && (
                     <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-muted-foreground">Frame size</span>
+                      <span className="text-muted-foreground">{t('productCard.frameSize')}</span>
                       <select
                         value={layout.categories.cardFrameSize ?? 'normal'}
                         onChange={e =>
@@ -977,29 +979,29 @@ export default function StoreLayoutPage() {
                         }
                         className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       >
-                        <option value="compact">Compact (8px padding)</option>
-                        <option value="normal">Normal (12px padding) — default</option>
-                        <option value="comfortable">Comfortable (16px padding)</option>
-                        <option value="spacious">Spacious (24px padding)</option>
+                        <option value="compact">{t('productCard.frameSizeCompact')}</option>
+                        <option value="normal">{t('productCard.frameSizeNormalDefault')}</option>
+                        <option value="comfortable">{t('productCard.frameSizeComfortable')}</option>
+                        <option value="spacious">{t('productCard.frameSizeSpacious')}</option>
                       </select>
                     </label>
                   )}
                 </div>
                 {layout.categories.showCardFrame && (
                   <ColorField
-                    label="Card frame color (this section)"
+                    label={t('productCard.frameColorLabel')}
                     value={layout.categories.cardFrameColor}
                     onChange={v => updateSection('categories', s => ({ ...s, cardFrameColor: v }))}
-                    hint="Overrides the theme border color for these category cards."
+                    hint={t('categories.frameColorHint')}
                     theme={storeInfo?.theme}
                     inheritFromToken="border"
                   />
                 )}
                 <ColorField
-                  label="Section background color"
+                  label={t('common.sectionBgColorLabel')}
                   value={layout.categories.bgColor}
                   onChange={v => updateSection('categories', s => ({ ...s, bgColor: v }))}
-                  hint="Overrides the theme background preset for this section only."
+                  hint={t('common.sectionBgColorHint')}
                   theme={storeInfo?.theme}
                   inheritFromToken="card"
                 />
@@ -1034,10 +1036,10 @@ export default function StoreLayoutPage() {
                 />
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Live preview
+                    {t('preview.liveTitle')}
                   </p>
                   <SectionPreview
-                    label="Categories"
+                    label={t('sectionLabels.categories')}
                     bgColor={layout.categories.bgColor}
                     cardFrameColor={layout.categories.cardFrameColor}
                     cardFrameWidth={layout.categories.cardFrameWidth}
@@ -1093,10 +1095,10 @@ export default function StoreLayoutPage() {
                   theme={storeInfo?.theme}
                 />
                 <ColorField
-                  label="Section background color"
+                  label={t('common.sectionBgColorLabel')}
                   value={layout.newArrivals.bgColor}
                   onChange={v => updateSection('newArrivals', s => ({ ...s, bgColor: v }))}
-                  hint="Overrides the theme background preset for this section only."
+                  hint={t('common.sectionBgColorHint')}
                   theme={storeInfo?.theme}
                   inheritFromToken="card"
                 />
@@ -1147,10 +1149,10 @@ export default function StoreLayoutPage() {
                 />
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Live preview
+                    {t('preview.liveTitle')}
                   </p>
                   <SectionPreview
-                    label="New arrivals"
+                    label={t('sectionLabels.newArrivals')}
                     bgColor={layout.newArrivals.bgColor}
                     cardFrameColor={layout.newArrivals.cardFrameColor}
                     cardFrameWidth={layout.newArrivals.cardFrameWidth}
@@ -1206,10 +1208,10 @@ export default function StoreLayoutPage() {
                   theme={storeInfo?.theme}
                 />
                 <ColorField
-                  label="Section background color"
+                  label={t('common.sectionBgColorLabel')}
                   value={layout.bestSellers.bgColor}
                   onChange={v => updateSection('bestSellers', s => ({ ...s, bgColor: v }))}
-                  hint="Overrides the theme background preset for this section only."
+                  hint={t('common.sectionBgColorHint')}
                   theme={storeInfo?.theme}
                   inheritFromToken="card"
                 />
@@ -1260,10 +1262,10 @@ export default function StoreLayoutPage() {
                 />
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Live preview
+                    {t('preview.liveTitle')}
                   </p>
                   <SectionPreview
-                    label="Best sellers"
+                    label={t('sectionLabels.bestSellers')}
                     bgColor={layout.bestSellers.bgColor}
                     cardFrameColor={layout.bestSellers.cardFrameColor}
                     cardFrameWidth={layout.bestSellers.cardFrameWidth}
@@ -1322,13 +1324,13 @@ export default function StoreLayoutPage() {
                 const roles = ['heading', 'subtitle'] as const;
                 return (
                   <SectionCard
-                    title="Products list page"
-                    description="The /products listing page — background + heading/subtitle typography. (Card styling is in 'Product cards' below.)"
+                    title={t('pageCards.productsListTitle')}
+                    description={t('pageCards.productsListDescription')}
                     defaultExpanded={false}
                     alwaysOn
                   >
                     <ColorField
-                      label="Page background"
+                      label={t('pageCards.backgroundLabel')}
                       value={pg.bgColor}
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
@@ -1348,10 +1350,10 @@ export default function StoreLayoutPage() {
                         Stored on StoreTheme JSON (no migration). */}
                     <div className="mt-4 space-y-1 border-t border-border/40 pt-4">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Text colors
+                        {t('pageCards.textColorsTitle')}
                       </p>
                       <ColorField
-                        label="Breadcrumb color (Home / Products)"
+                        label={t('pageCards.breadcrumbColorLabel')}
                         value={
                           (pendingThemeUpdates.plpBreadcrumbColor as string | undefined) ??
                           storeInfo?.theme?.plpBreadcrumbColor
@@ -1359,12 +1361,12 @@ export default function StoreLayoutPage() {
                         onChange={v =>
                           setPendingThemeUpdates(prev => ({ ...prev, plpBreadcrumbColor: v }))
                         }
-                        hint="Color of the Home → Products breadcrumb trail. Default: theme muted."
+                        hint={t('pageCards.breadcrumbColorHint')}
                         theme={storeInfo?.theme ?? FALLBACK_THEME}
                         inheritFromToken="muted"
                       />
                       <ColorField
-                        label="Page heading color (All Products)"
+                        label={t('pageCards.headingColorLabel')}
                         value={
                           (pendingThemeUpdates.plpHeadingColor as string | undefined) ??
                           storeInfo?.theme?.plpHeadingColor
@@ -1372,12 +1374,12 @@ export default function StoreLayoutPage() {
                         onChange={v =>
                           setPendingThemeUpdates(prev => ({ ...prev, plpHeadingColor: v }))
                         }
-                        hint="Color of the 'All Products' h1. Default: theme foreground."
+                        hint={t('pageCards.headingColorHint')}
                         theme={storeInfo?.theme ?? FALLBACK_THEME}
                         inheritFromToken="foreground"
                       />
                       <ColorField
-                        label="Subtitle color (Browse our collection)"
+                        label={t('pageCards.subtitleColorLabel')}
                         value={
                           (pendingThemeUpdates.plpSubheadingColor as string | undefined) ??
                           storeInfo?.theme?.plpSubheadingColor
@@ -1385,7 +1387,7 @@ export default function StoreLayoutPage() {
                         onChange={v =>
                           setPendingThemeUpdates(prev => ({ ...prev, plpSubheadingColor: v }))
                         }
-                        hint="Color of the subtitle under the h1. Default: theme muted."
+                        hint={t('pageCards.subtitleColorHint')}
                         theme={storeInfo?.theme ?? FALLBACK_THEME}
                         inheritFromToken="muted"
                       />
@@ -1400,13 +1402,13 @@ export default function StoreLayoutPage() {
                 const roles = ['heading', 'productName', 'productPrice'] as const;
                 return (
                   <SectionCard
-                    title="Product detail page"
-                    description="The single-product page — background, main image shape, and product name / price / heading typography."
+                    title={t('pageCards.productDetailTitle')}
+                    description={t('pageCards.productDetailDescription')}
                     defaultExpanded={false}
                     alwaysOn
                   >
                     <ColorField
-                      label="Page background"
+                      label={t('pageCards.backgroundLabel')}
                       value={pg.bgColor}
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
@@ -1416,7 +1418,7 @@ export default function StoreLayoutPage() {
                     <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-muted-foreground">
-                        Main image aspect
+                        {t('pageCards.mainImageAspectLabel')}
                       </span>
                       <select
                         value={layout.productDetailPage?.imageAspect ?? 'auto'}
@@ -1441,12 +1443,12 @@ export default function StoreLayoutPage() {
                         }
                         className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                       >
-                        <option value="auto">Auto (square)</option>
-                        <option value="square">Square (1:1)</option>
-                        <option value="portrait">Portrait (3:4)</option>
-                        <option value="landscape">Landscape (4:3)</option>
-                        <option value="wide">Wide (3:2)</option>
-                        <option value="ultrawide">Ultra-wide (16:9)</option>
+                        <option value="auto">{t('productCard.aspectAutoSquare')}</option>
+                        <option value="square">{t('productCard.aspectSquarePlain')}</option>
+                        <option value="portrait">{t('productCard.shapePortraitPlain')}</option>
+                        <option value="landscape">{t('productCard.shapeLandscapePlain')}</option>
+                        <option value="wide">{t('productCard.aspectWidePlain')}</option>
+                        <option value="ultrawide">{t('productCard.aspectUltrawidePlain')}</option>
                       </select>
                     </label>
                     <SectionTypographyBlock
@@ -1467,13 +1469,13 @@ export default function StoreLayoutPage() {
                 const roles = ['heading', 'subtitle', 'categoryLabel'] as const;
                 return (
                   <SectionCard
-                    title="Categories page"
-                    description="The /categories listing page — background + heading / subtitle / category-label typography."
+                    title={t('pageCards.categoriesTitle')}
+                    description={t('pageCards.categoriesDescription')}
                     defaultExpanded={false}
                     alwaysOn
                   >
                     <ColorField
-                      label="Page background"
+                      label={t('pageCards.backgroundLabel')}
                       value={pg.bgColor}
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
@@ -1499,13 +1501,13 @@ export default function StoreLayoutPage() {
                 const roles = ['heading', 'subtitle'] as const;
                 return (
                   <SectionCard
-                    title="Locations page"
-                    description="The /locations branches page — background + heading / subtitle typography."
+                    title={t('pageCards.locationsTitle')}
+                    description={t('pageCards.locationsDescription')}
                     defaultExpanded={false}
                     alwaysOn
                   >
                     <ColorField
-                      label="Page background"
+                      label={t('pageCards.backgroundLabel')}
                       value={pg.bgColor}
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
@@ -1531,13 +1533,13 @@ export default function StoreLayoutPage() {
                 const roles = ['heading', 'subtitle', 'productPrice'] as const;
                 return (
                   <SectionCard
-                    title="Checkout page"
-                    description="The checkout / payment page — background + heading / label / amount typography."
+                    title={t('pageCards.checkoutTitle')}
+                    description={t('pageCards.checkoutDescription')}
                     defaultExpanded={false}
                     alwaysOn
                   >
                     <ColorField
-                      label="Page background"
+                      label={t('pageCards.backgroundLabel')}
                       value={pg.bgColor}
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
@@ -1560,13 +1562,13 @@ export default function StoreLayoutPage() {
               {/* Cart page — standalone background + typography control. Saved
                   via the main page-builder save button (no separate save / page). */}
               <SectionCard
-                title="Cart page"
-                description="Background colour + typography for the whole cart: headings (Section heading), labels — items count / subtotal / shipping (Section subtitle), item names (Product name), every price (Product price), and buttons/links — remove / continue / apply / checkout (Product CTA)."
+                title={t('pageCards.cartTitle')}
+                description={t('pageCards.cartDescription')}
                 defaultExpanded={false}
                 alwaysOn
               >
                 <ColorField
-                  label="Page background"
+                  label={t('pageCards.backgroundLabel')}
                   value={layout.cartPage?.bgColor}
                   onChange={v =>
                     setLayout(prev =>
@@ -1657,10 +1659,10 @@ export default function StoreLayoutPage() {
                     current look so existing stores see no visual change. */}
                 <div className="mt-4 space-y-1 border-t border-border/40 pt-4">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Order summary labels
+                    {t('pageCards.orderSummaryLabelsTitle')}
                   </p>
                   <ColorField
-                    label="Label color (Subtotal, Shipping…)"
+                    label={t('pageCards.labelColorLabel')}
                     value={
                       (pendingThemeUpdates.summaryLabelColor as string | undefined) ??
                       storeInfo?.theme?.summaryLabelColor
@@ -1668,12 +1670,12 @@ export default function StoreLayoutPage() {
                     onChange={v =>
                       setPendingThemeUpdates(prev => ({ ...prev, summaryLabelColor: v }))
                     }
-                    hint="Color of the Subtotal, Shipping, Tax row labels. Default: theme foreground."
+                    hint={t('pageCards.labelColorHint')}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                     inheritFromToken="foreground"
                   />
                   <ColorField
-                    label="Total color"
+                    label={t('pageCards.totalColorLabel')}
                     value={
                       (pendingThemeUpdates.summaryTotalColor as string | undefined) ??
                       storeInfo?.theme?.summaryTotalColor
@@ -1681,17 +1683,17 @@ export default function StoreLayoutPage() {
                     onChange={v =>
                       setPendingThemeUpdates(prev => ({ ...prev, summaryTotalColor: v }))
                     }
-                    hint="Color of the Total label and amount. Default: theme foreground."
+                    hint={t('pageCards.totalColorHint')}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                     inheritFromToken="foreground"
                   />
                   <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-foreground">
-                        Bold summary labels
+                        {t('pageCards.boldSummaryLabels')}
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Makes Subtotal / Shipping / Total labels bold. On by default.
+                        {t('pageCards.boldSummaryLabelsHint')}
                       </span>
                     </span>
                     <input
@@ -1747,10 +1749,10 @@ export default function StoreLayoutPage() {
                   onChangeTitleAr={v => updateSection('testimonials', s => ({ ...s, titleAr: v }))}
                 />
                 <ColorField
-                  label="Section background color"
+                  label={t('common.sectionBgColorLabel')}
                   value={layout.testimonials.bgColor}
                   onChange={v => updateSection('testimonials', s => ({ ...s, bgColor: v }))}
-                  hint="Overrides the theme background preset for this section only."
+                  hint={t('common.sectionBgColorHint')}
                   theme={storeInfo?.theme}
                   inheritFromToken="card"
                 />
@@ -1786,10 +1788,10 @@ export default function StoreLayoutPage() {
                 />
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Live preview
+                    {t('preview.liveTitle')}
                   </p>
                   <SectionPreview
-                    label="Testimonials"
+                    label={t('sectionLabels.testimonials')}
                     bgColor={layout.testimonials.bgColor}
                     cardFrameColor={undefined}
                     cardFrameWidth={undefined}
@@ -1817,8 +1819,8 @@ export default function StoreLayoutPage() {
                   store.heroImage + store.description{Ar}. */}
               <ExtraSectionCard
                 kind="brandStory"
-                label="Brand story"
-                description="Image + story block sourced from your store hero image + description."
+                label={t('sections.brandStory')}
+                description={t('sections.brandStoryDescription')}
                 settings={layout.brandStory}
                 legacyEnabled={storeInfo?.theme?.showBrandStory !== false}
                 onPatch={patch =>
@@ -1832,8 +1834,8 @@ export default function StoreLayoutPage() {
               {/* Home blog carousel */}
               <ExtraSectionCard
                 kind="blogCarousel"
-                label="Blog carousel"
-                description="Latest blog posts on the homepage. The /blog routes are gated separately by Store.blogEnabled."
+                label={t('sections.blogCarousel')}
+                description={t('sections.blogCarouselDescription')}
                 settings={layout.blogCarousel}
                 legacyEnabled={storeInfo?.blogEnabled === true}
                 onPatch={patch =>
@@ -1849,8 +1851,8 @@ export default function StoreLayoutPage() {
               {/* Trust strip — 3 trust-signal badges (delivery / returns / support) */}
               <ExtraSectionCard
                 kind="trustStrip"
-                label="Trust strip"
-                description="3 trust-signal badges (free delivery, returns, support) — bilingual platform copy."
+                label={t('sections.trustStrip')}
+                description={t('sections.trustStripDescription')}
                 settings={layout.trustStrip}
                 legacyEnabled={storeInfo?.theme?.showTrustStrip !== false}
                 onPatch={patch =>
@@ -1865,8 +1867,8 @@ export default function StoreLayoutPage() {
                   this card controls visibility + chrome (bg/dividers/padding). */}
               <ExtraSectionCard
                 kind="announcement"
-                label="Announcement bar"
-                description="Site-wide message above the header. Visible content edited via the Announcement Bar admin page; here you control chrome and dividers."
+                label={t('sections.announcementBar')}
+                description={t('sections.announcementDescription')}
                 settings={layout.announcement}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1885,8 +1887,8 @@ export default function StoreLayoutPage() {
                   place for header chrome AND header text styling. */}
               <ExtraSectionCard
                 kind="header"
-                label="Header"
-                description="Header chrome — background, sticky-on-scroll, dividers, spacing, typography."
+                label={t('sections.header')}
+                description={t('sections.headerDescription')}
                 settings={layout.header}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1917,8 +1919,8 @@ export default function StoreLayoutPage() {
                   appears, not buried in the footer. Saved by the main Save
                   button via its own registered saver. */}
               <SectionCard
-                title="Top utility bar"
-                description="Thin links strip above the main header (Elegant + Classic packs) — track order, language, contact, etc. Disable to hide it entirely."
+                title={t('header.topUtilityBarTitle')}
+                description={t('header.topUtilityBarDescription')}
                 defaultExpanded={false}
                 alwaysOn
               >
@@ -1935,8 +1937,8 @@ export default function StoreLayoutPage() {
                   every other section; saved by the main Save button via the
                   registered saver (no separate save button, no standalone page). */}
               <SectionCard
-                title="Storefront Navigation"
-                description="Header menu links — add, remove, and reorder items. Use relative paths (/products) for store pages or full URLs for external links."
+                title={t('header.storefrontNavTitle')}
+                description={t('header.storefrontNavDescription')}
                 defaultExpanded={false}
                 alwaysOn
               >
@@ -1963,8 +1965,8 @@ export default function StoreLayoutPage() {
                   header. Saved by the main Save button. */}
               <ExtraSectionCard
                 kind="footer"
-                label="Footer"
-                description="Everything footer: background, dividers, spacing, typography — plus the three footer link columns and the newsletter signup. (The top utility bar has its own card near the header.)"
+                label={t('sections.footer')}
+                description={t('sections.footerDescription')}
                 settings={layout.footer}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1991,7 +1993,7 @@ export default function StoreLayoutPage() {
               >
                 <div className="border-t border-border pt-4">
                   <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Footer links
+                    {t('footer.footerLinksTitle')}
                   </h4>
                   <FooterLinksEditor
                     storeId={storeId}
@@ -2008,8 +2010,8 @@ export default function StoreLayoutPage() {
                   stores see zero visual change. Page-builder 2026-06-17.
                   EN: "Bottom bar (mobile)" / AR: "شريط التنقل السفلي (جوال)" */}
               <SectionCard
-                title="Bottom bar (mobile) / شريط التنقل السفلي (جوال)"
-                description="Color the mobile tab bar at the bottom of the screen. Leave fields empty to keep the theme default."
+                title={t('footer.bottomBarTitle')}
+                description={t('footer.bottomBarDescription')}
                 defaultExpanded={false}
                 // alwaysOn — this is a content-only card (color knobs, no
                 // on/off toggle). Without it SectionCard gates `children` on
@@ -2022,7 +2024,7 @@ export default function StoreLayoutPage() {
               >
                 <div className="space-y-1">
                   <ColorField
-                    label="Bar background / خلفية الشريط"
+                    label={t('footer.barBackgroundLabel')}
                     value={layout.bottomBar?.bgColor}
                     onChange={v =>
                       setLayout(prev =>
@@ -2031,12 +2033,12 @@ export default function StoreLayoutPage() {
                           : prev
                       )
                     }
-                    hint="Overrides the default bar background (theme section-alt) when set."
+                    hint={t('footer.barBackgroundHint')}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                     inheritFromToken="card"
                   />
                   <ColorField
-                    label="Active icon & label color / لون الأيقونة والتسمية النشطة"
+                    label={t('footer.activeIconLabelColorLabel')}
                     value={layout.bottomBar?.activeColor}
                     onChange={v =>
                       setLayout(prev =>
@@ -2045,12 +2047,12 @@ export default function StoreLayoutPage() {
                           : prev
                       )
                     }
-                    hint="Color for the active tab's icon, label, and pill tint. Default: theme foreground."
+                    hint={t('footer.activeIconLabelColorHint')}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                     inheritFromToken="primary"
                   />
                   <ColorField
-                    label="Inactive icon & label color / لون الأيقونة والتسمية الغير نشطة"
+                    label={t('footer.inactiveIconLabelColorLabel')}
                     value={layout.bottomBar?.inactiveColor}
                     onChange={v =>
                       setLayout(prev =>
@@ -2059,7 +2061,7 @@ export default function StoreLayoutPage() {
                           : prev
                       )
                     }
-                    hint="Color for inactive tabs. Default: theme foreground at 60% opacity."
+                    hint={t('footer.inactiveIconLabelColorHint')}
                     theme={storeInfo?.theme ?? FALLBACK_THEME}
                     inheritFromToken="muted"
                   />
@@ -2136,8 +2138,8 @@ export default function StoreLayoutPage() {
                   homepage carousels. Per-section settings above override
                   these for homepage new-arrivals + best-sellers. */}
               <SectionCard
-                title="Product cards (everywhere)"
-                description="Styling for the product CARD tiles — size, frame, aspect, and name/price/button fonts — wherever they appear (listing, category, search, carousels). This is the card itself, not a page; page backgrounds & headings are in the page cards above."
+                title={t('productCard.everywhereTitle')}
+                description={t('productCard.everywhereDescription')}
                 alwaysOn
                 defaultExpanded={false}
               >
@@ -2217,10 +2219,10 @@ export default function StoreLayoutPage() {
                   <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-foreground">
-                        Brand badge on cards
+                        {t('productCard.brandBadgeTitle')}
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Small store-name pill in the top corner of every product card.
+                        {t('productCard.brandBadgeHint')}
                       </span>
                     </span>
                     <input
@@ -2241,11 +2243,10 @@ export default function StoreLayoutPage() {
                   <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-foreground">
-                        Quick-add (+) on carousel cards
+                        {t('productCard.quickAddTitle')}
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        One-tap add-to-cart circle on homepage carousel cards. When ON, the bottom
-                        Add to cart button auto-suppresses on the same card.
+                        {t('productCard.quickAddHint')}
                       </span>
                     </span>
                     <input
@@ -2270,12 +2271,10 @@ export default function StoreLayoutPage() {
                   <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-foreground">
-                        Normalize product images
+                        {t('productCard.normalizeImagesTitle')}
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Force all card images to fill their container uniformly (object-fit: cover).
-                        Creates a consistent grid look when product photos have mixed dimensions.
-                        Images are never modified — toggle off to revert.
+                        {t('productCard.normalizeImagesHint')}
                       </span>
                     </span>
                     <input
@@ -2295,11 +2294,13 @@ export default function StoreLayoutPage() {
                   </label>
                   {/* Items 8 + 9 — image aspect, radius, label visibility */}
                   <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-                    <p className="text-sm font-semibold text-foreground">Card image shape</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {t('productCard.cardImageShapeTitle')}
+                    </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">
-                          Image aspect ratio
+                          {t('productCard.imageAspectRatioLabel')}
                         </label>
                         <select
                           value={layout.productCardDefaults?.cardImageAspect ?? ''}
@@ -2321,17 +2322,19 @@ export default function StoreLayoutPage() {
                           }
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
-                          <option value="">Theme default</option>
-                          <option value="1:1">Square (1:1)</option>
-                          <option value="4:5">Portrait (4:5)</option>
-                          <option value="3:4">Tall portrait (3:4)</option>
-                          <option value="16:9">Landscape (16:9)</option>
-                          <option value="auto">Auto (no constraint)</option>
+                          <option value="">{t('common.themeDefault')}</option>
+                          <option value="1:1">{t('productCard.imageShapeSquare')}</option>
+                          <option value="4:5">{t('productCard.imageShapePortrait45')}</option>
+                          <option value="3:4">{t('productCard.imageShapeTallPortrait')}</option>
+                          <option value="16:9">{t('productCard.imageShapeLandscape169')}</option>
+                          <option value="auto">
+                            {t('productCard.imageShapeAutoNoConstraint')}
+                          </option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">
-                          Corner radius
+                          {t('productCard.cornerRadiusLabel')}
                         </label>
                         <select
                           value={layout.productCardDefaults?.cardImageRadius ?? ''}
@@ -2353,18 +2356,18 @@ export default function StoreLayoutPage() {
                           }
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
-                          <option value="">Theme default</option>
-                          <option value="none">None (sharp)</option>
-                          <option value="sm">Small</option>
-                          <option value="md">Medium</option>
-                          <option value="lg">Large</option>
-                          <option value="full">Full (circle)</option>
+                          <option value="">{t('common.themeDefault')}</option>
+                          <option value="none">{t('productCard.radiusNone')}</option>
+                          <option value="sm">{t('common.small')}</option>
+                          <option value="md">{t('common.medium')}</option>
+                          <option value="lg">{t('common.large')}</option>
+                          <option value="full">{t('productCard.radiusFull')}</option>
                         </select>
                       </div>
                     </div>
                     <div className="space-y-2 pt-1">
                       <label className="flex items-center justify-between gap-4 cursor-pointer">
-                        <span className="text-sm text-foreground">Show product name</span>
+                        <span className="text-sm text-foreground">{t('productCard.showName')}</span>
                         <input
                           type="checkbox"
                           checked={layout.productCardDefaults?.showCardName !== false}
@@ -2385,7 +2388,9 @@ export default function StoreLayoutPage() {
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 cursor-pointer">
-                        <span className="text-sm text-foreground">Show product price</span>
+                        <span className="text-sm text-foreground">
+                          {t('productCard.showPrice')}
+                        </span>
                         <input
                           type="checkbox"
                           checked={layout.productCardDefaults?.showCardPrice !== false}
@@ -2407,7 +2412,7 @@ export default function StoreLayoutPage() {
                       </label>
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">
-                          Product name case
+                          {t('productCard.productNameCaseLabel')}
                         </label>
                         <select
                           value={layout.productCardDefaults?.productNameCase ?? ''}
@@ -2427,21 +2432,23 @@ export default function StoreLayoutPage() {
                           }
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
-                          <option value="">Theme default</option>
-                          <option value="normal">Normal</option>
-                          <option value="uppercase">UPPERCASE</option>
+                          <option value="">{t('common.themeDefault')}</option>
+                          <option value="normal">{t('common.normal')}</option>
+                          <option value="uppercase">{t('productCard.textUppercase')}</option>
                         </select>
                       </div>
                     </div>
                   </div>
                   {/* Call-to-action button group */}
                   <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-                    <p className="text-sm font-semibold text-foreground">Call-to-action button</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {t('productCard.ctaTitle')}
+                    </p>
                     {/* Card button mode — controls whether no-variant in-stock products
                         show an inline Add-to-cart button (auto) or a View link (viewOnly). */}
                     <div>
                       <label className="block text-xs text-muted-foreground mb-1">
-                        Card button mode / وضع زر البطاقة
+                        {t('productCard.ctaModeLabel')}
                       </label>
                       <select
                         value={layout.productCardDefaults?.ctaMode ?? ''}
@@ -2460,14 +2467,14 @@ export default function StoreLayoutPage() {
                         }
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
-                        <option value="">Auto (View + Add to cart) — تلقائي</option>
-                        <option value="viewOnly">View only — عرض فقط</option>
+                        <option value="">{t('productCard.ctaModeAuto')}</option>
+                        <option value="viewOnly">{t('productCard.ctaModeViewOnly')}</option>
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">
-                          CTA shape
+                          {t('productCard.ctaShapeLabel')}
                         </label>
                         <select
                           value={layout.productCardDefaults?.ctaShape ?? ''}
@@ -2491,15 +2498,17 @@ export default function StoreLayoutPage() {
                           }
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
-                          <option value="">Theme default</option>
-                          <option value="rounded">Rounded</option>
-                          <option value="pill">Pill</option>
-                          <option value="square">Square</option>
-                          <option value="soft">Soft</option>
+                          <option value="">{t('common.themeDefault')}</option>
+                          <option value="rounded">{t('common.rounded')}</option>
+                          <option value="pill">{t('common.pill')}</option>
+                          <option value="square">{t('common.square')}</option>
+                          <option value="soft">{t('common.soft')}</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-muted-foreground mb-1">CTA size</label>
+                        <label className="block text-xs text-muted-foreground mb-1">
+                          {t('productCard.ctaSizeLabel')}
+                        </label>
                         <select
                           value={layout.productCardDefaults?.ctaSize ?? ''}
                           onChange={e =>
@@ -2517,16 +2526,18 @@ export default function StoreLayoutPage() {
                           }
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
-                          <option value="">Auto</option>
-                          <option value="sm">Small</option>
-                          <option value="md">Medium</option>
-                          <option value="lg">Large</option>
+                          <option value="">{t('common.auto')}</option>
+                          <option value="sm">{t('common.small')}</option>
+                          <option value="md">{t('common.medium')}</option>
+                          <option value="lg">{t('common.large')}</option>
                         </select>
                       </div>
                     </div>
                     <div className="space-y-2 pt-1">
                       <label className="flex items-center justify-between gap-4 cursor-pointer">
-                        <span className="text-sm text-foreground">Custom CTA label</span>
+                        <span className="text-sm text-foreground">
+                          {t('productCard.customCtaLabel')}
+                        </span>
                         <input
                           type="checkbox"
                           checked={layout.productCardDefaults?.ctaLabel === true}
@@ -2550,7 +2561,7 @@ export default function StoreLayoutPage() {
                         <div className="grid grid-cols-2 gap-3 ms-4 border-s-2 border-s-primary/30 ps-3">
                           <div>
                             <label className="block text-xs text-muted-foreground mb-1">
-                              CTA label (EN)
+                              {t('productCard.ctaLabelEn')}
                             </label>
                             <input
                               type="text"
@@ -2574,7 +2585,7 @@ export default function StoreLayoutPage() {
                           </div>
                           <div>
                             <label className="block text-xs text-muted-foreground mb-1">
-                              CTA label (AR)
+                              {t('productCard.ctaLabelAr')}
                             </label>
                             <input
                               type="text"
@@ -2601,7 +2612,7 @@ export default function StoreLayoutPage() {
                       )}
                     </div>
                     <ColorField
-                      label="CTA background color"
+                      label={t('productCard.ctaBgColorLabel')}
                       value={layout.productCardDefaults?.ctaColor}
                       onChange={v =>
                         setLayout(prev =>
@@ -2620,7 +2631,7 @@ export default function StoreLayoutPage() {
                       inheritFromToken="primary"
                     />
                     <ColorField
-                      label="CTA text color"
+                      label={t('productCard.ctaTextColorLabel')}
                       value={layout.productCardDefaults?.ctaTextColor}
                       onChange={v =>
                         setLayout(prev =>
@@ -2641,10 +2652,14 @@ export default function StoreLayoutPage() {
                   </div>
                   {/* Out-of-stock label group */}
                   <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-                    <p className="text-sm font-semibold text-foreground">Out-of-stock label</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {t('productCard.oosTitle')}
+                    </p>
                     <div className="space-y-2">
                       <label className="flex items-center justify-between gap-4 cursor-pointer">
-                        <span className="text-sm text-foreground">Show OOS label</span>
+                        <span className="text-sm text-foreground">
+                          {t('productCard.showOosLabel')}
+                        </span>
                         <input
                           type="checkbox"
                           checked={layout.productCardDefaults?.oosLabel === true}
@@ -2669,7 +2684,7 @@ export default function StoreLayoutPage() {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs text-muted-foreground mb-1">
-                                OOS label (EN)
+                                {t('productCard.oosLabelEn')}
                               </label>
                               <input
                                 type="text"
@@ -2693,7 +2708,7 @@ export default function StoreLayoutPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-muted-foreground mb-1">
-                                OOS label (AR)
+                                {t('productCard.oosLabelAr')}
                               </label>
                               <input
                                 type="text"
@@ -2720,7 +2735,7 @@ export default function StoreLayoutPage() {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs text-muted-foreground mb-1">
-                                Label shape
+                                {t('productCard.labelShapeLabel')}
                               </label>
                               <select
                                 value={layout.productCardDefaults?.oosLabelShape ?? ''}
@@ -2744,16 +2759,16 @@ export default function StoreLayoutPage() {
                                 }
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                               >
-                                <option value="">Theme default</option>
-                                <option value="rounded">Rounded</option>
-                                <option value="pill">Pill</option>
-                                <option value="square">Square</option>
-                                <option value="soft">Soft</option>
+                                <option value="">{t('common.themeDefault')}</option>
+                                <option value="rounded">{t('common.rounded')}</option>
+                                <option value="pill">{t('common.pill')}</option>
+                                <option value="square">{t('common.square')}</option>
+                                <option value="soft">{t('common.soft')}</option>
                               </select>
                             </div>
                             <div>
                               <label className="block text-xs text-muted-foreground mb-1">
-                                Label placement
+                                {t('productCard.labelPlacementLabel')}
                               </label>
                               <select
                                 value={layout.productCardDefaults?.oosLabelPlacement ?? ''}
@@ -2777,16 +2792,22 @@ export default function StoreLayoutPage() {
                                 }
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                               >
-                                <option value="">Theme default</option>
-                                <option value="top-start">Top start</option>
-                                <option value="top-end">Top end</option>
-                                <option value="bottom-start">Bottom start</option>
-                                <option value="bottom-end">Bottom end</option>
+                                <option value="">{t('common.themeDefault')}</option>
+                                <option value="top-start">
+                                  {t('productCard.placementTopStart')}
+                                </option>
+                                <option value="top-end">{t('productCard.placementTopEnd')}</option>
+                                <option value="bottom-start">
+                                  {t('productCard.placementBottomStart')}
+                                </option>
+                                <option value="bottom-end">
+                                  {t('productCard.placementBottomEnd')}
+                                </option>
                               </select>
                             </div>
                           </div>
                           <ColorField
-                            label="OOS label background color"
+                            label={t('productCard.oosBgColorLabel')}
                             value={layout.productCardDefaults?.oosLabelColor}
                             onChange={v =>
                               setLayout(prev =>
@@ -2805,7 +2826,7 @@ export default function StoreLayoutPage() {
                             inheritFromToken="muted"
                           />
                           <ColorField
-                            label="OOS label text color"
+                            label={t('productCard.oosTextColorLabel')}
                             value={layout.productCardDefaults?.oosLabelTextColor}
                             onChange={v =>
                               setLayout(prev =>
@@ -2824,7 +2845,7 @@ export default function StoreLayoutPage() {
                             inheritFromToken="foreground"
                           />
                           <ColorField
-                            label="Dim color when out of stock"
+                            label={t('productCard.dimColorLabel')}
                             value={layout.productCardDefaults?.oosDimColor}
                             onChange={v =>
                               setLayout(prev =>
@@ -2839,7 +2860,7 @@ export default function StoreLayoutPage() {
                                   : prev
                               )
                             }
-                            hint="Overlay tint applied to the card image when out of stock."
+                            hint={t('productCard.dimColorHint')}
                             theme={storeInfo?.theme ?? FALLBACK_THEME}
                           />
                         </div>
@@ -2853,11 +2874,11 @@ export default function StoreLayoutPage() {
                       left" always renders bottom-left, in Arabic stores too. */}
                   <div className="rounded-lg border border-border bg-card p-4 space-y-4">
                     <p className="text-sm font-semibold text-foreground">
-                      Discount / sale badge — شارة الخصم
+                      {t('productCard.discountBadgeTitle')}
                     </p>
                     <div>
                       <label className="block text-xs text-muted-foreground mb-1">
-                        Badge position — موضع الشارة
+                        {t('productCard.badgePositionLabel')}
                       </label>
                       <select
                         value={layout.productCardDefaults?.discountBadge?.position ?? ''}
@@ -2884,15 +2905,15 @@ export default function StoreLayoutPage() {
                         }
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
-                        <option value="">Bottom left (default) — أسفل اليسار (افتراضي)</option>
-                        <option value="top-left">Top left — أعلى اليسار</option>
-                        <option value="top-right">Top right — أعلى اليمين</option>
-                        <option value="bottom-left">Bottom left — أسفل اليسار</option>
-                        <option value="bottom-right">Bottom right — أسفل اليمين</option>
+                        <option value="">{t('productCard.positionBottomLeftDefault')}</option>
+                        <option value="top-left">{t('productCard.positionTopLeft')}</option>
+                        <option value="top-right">{t('productCard.positionTopRight')}</option>
+                        <option value="bottom-left">{t('productCard.positionBottomLeft')}</option>
+                        <option value="bottom-right">{t('productCard.positionBottomRight')}</option>
                       </select>
                     </div>
                     <ColorField
-                      label="Badge color"
+                      label={t('productCard.badgeColorLabel')}
                       value={layout.productCardDefaults?.discountBadge?.color}
                       onChange={v =>
                         setLayout(prev =>
@@ -2910,7 +2931,7 @@ export default function StoreLayoutPage() {
                             : prev
                         )
                       }
-                      hint="Unset = platform default red/destructive color."
+                      hint={t('productCard.discountBadgeColorHint')}
                       theme={storeInfo?.theme ?? FALLBACK_THEME}
                     />
                   </div>
@@ -2928,15 +2949,14 @@ export default function StoreLayoutPage() {
                       (not RTL-mirrored), same as the discount badge. */}
                   <div className="rounded-lg border border-border bg-card p-4 space-y-4">
                     <p className="text-sm font-semibold text-foreground">
-                      Custom product badge — الشارة المخصّصة
+                      {t('productCard.customBadgeTitle')}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Styling only. Type the badge text per product under Products → edit a product
-                      → Product Flags.
+                      {t('productCard.customBadgeStylingHint')}
                     </p>
                     <div>
                       <label className="block text-xs text-muted-foreground mb-1">
-                        Badge position — موضع الشارة
+                        {t('productCard.badgePositionLabel')}
                       </label>
                       <select
                         value={layout.productCardDefaults?.customBadge?.position ?? ''}
@@ -2963,15 +2983,15 @@ export default function StoreLayoutPage() {
                         }
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
-                        <option value="">Bottom right (default) — أسفل اليمين (افتراضي)</option>
-                        <option value="top-left">Top left — أعلى اليسار</option>
-                        <option value="top-right">Top right — أعلى اليمين</option>
-                        <option value="bottom-left">Bottom left — أسفل اليسار</option>
-                        <option value="bottom-right">Bottom right — أسفل اليمين</option>
+                        <option value="">{t('productCard.positionBottomRightDefault')}</option>
+                        <option value="top-left">{t('productCard.positionTopLeft')}</option>
+                        <option value="top-right">{t('productCard.positionTopRight')}</option>
+                        <option value="bottom-left">{t('productCard.positionBottomLeft')}</option>
+                        <option value="bottom-right">{t('productCard.positionBottomRight')}</option>
                       </select>
                     </div>
                     <ColorField
-                      label="Badge color"
+                      label={t('productCard.badgeColorLabel')}
                       value={layout.productCardDefaults?.customBadge?.color}
                       onChange={v =>
                         setLayout(prev =>
@@ -2989,17 +3009,17 @@ export default function StoreLayoutPage() {
                             : prev
                         )
                       }
-                      hint="Unset = platform primary color."
+                      hint={t('productCard.customBadgeColorHint')}
                       theme={storeInfo?.theme ?? FALLBACK_THEME}
                     />
                   </div>
                 </div>
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Live preview
+                    {t('preview.liveTitle')}
                   </p>
                   <SectionPreview
-                    label="Product cards"
+                    label={t('productCard.sectionTitle')}
                     bgColor={undefined}
                     cardFrameColor={layout.productCardDefaults?.cardFrameColor}
                     cardFrameWidth={layout.productCardDefaults?.cardFrameWidth}
@@ -3038,7 +3058,7 @@ export default function StoreLayoutPage() {
         <aside className="hidden lg:block">
           <div className="sticky top-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">Live preview</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('preview.liveTitle')}</h3>
               <div className="flex items-center gap-2">
                 {previewUrl && (
                   <a
@@ -3047,7 +3067,7 @@ export default function StoreLayoutPage() {
                     rel="noopener noreferrer"
                     className="text-[11px] font-semibold text-primary hover:underline"
                   >
-                    Open in new tab ↗
+                    {t('preview.openInNewTab')}
                   </a>
                 )}
               </div>
@@ -3069,7 +3089,7 @@ export default function StoreLayoutPage() {
                     <iframe
                       key={iframeKey}
                       src={src}
-                      title="Storefront preview (mobile)"
+                      title={t('preview.iframeTitle')}
                       className="block h-[calc(100vh-200px)] w-[390px] max-w-full bg-background"
                       loading="lazy"
                       sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -3079,11 +3099,11 @@ export default function StoreLayoutPage() {
               </div>
             ) : (
               <div className="rounded-2xl border border-border bg-card p-6 text-center text-xs text-muted-foreground">
-                Preview unavailable — the store has no slug or domain configured.
+                {t('preview.unavailable')}
               </div>
             )}
             <p className="text-[11px] text-muted-foreground">
-              Click <strong>Save changes</strong> to refresh — the iframe reloads after each save.
+              {t.rich('preview.saveHint', { b: chunks => <strong>{chunks}</strong> })}
             </p>
           </div>
         </aside>
@@ -3207,26 +3227,27 @@ function ProductCardControls({
   onChange: (patch: Partial<CardControlsValues>) => void;
   theme?: StoreTheme;
 }) {
+  const t = useT('orders.layout');
   return (
     <div className="mt-3 space-y-0">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Card size</span>
+          <span className="text-muted-foreground">{t('productCard.cardSize')}</span>
           <select
             value={values.cardSize ?? 'sm'}
             onChange={e => onChange({ cardSize: e.target.value as CardControlsValues['cardSize'] })}
             className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value="xxs">Tiniest (90/110px)</option>
-            <option value="xs">Extra small (120/140px)</option>
-            <option value="sm">Small (150/180px) — default</option>
-            <option value="md">Medium (200/240px)</option>
-            <option value="lg">Large (240/300px)</option>
-            <option value="xl">Extra large (280/360px)</option>
+            <option value="xxs">{t('productCard.sizeTiniest')}</option>
+            <option value="xs">{t('productCard.sizeXs')}</option>
+            <option value="sm">{t('productCard.sizeSmDefault')}</option>
+            <option value="md">{t('productCard.sizeMd')}</option>
+            <option value="lg">{t('productCard.sizeLg')}</option>
+            <option value="xl">{t('productCard.sizeXl')}</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Image aspect</span>
+          <span className="text-muted-foreground">{t('productCard.imageAspect')}</span>
           <select
             value={values.cardAspect ?? 'theme'}
             onChange={e =>
@@ -3234,16 +3255,16 @@ function ProductCardControls({
             }
             className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value="theme">Theme default (3:4 — 600×800)</option>
-            <option value="square">Square 1:1 (800×800)</option>
-            <option value="portrait">Portrait 3:4 (600×800)</option>
-            <option value="landscape">Landscape 4:3 (800×600)</option>
-            <option value="wide">Wide 3:2 (900×600)</option>
-            <option value="ultrawide">Ultra-wide 16:9 (960×540)</option>
+            <option value="theme">{t('productCard.aspectThemeDefaultRatio')}</option>
+            <option value="square">{t('productCard.aspectSquare')}</option>
+            <option value="portrait">{t('productCard.aspectPortraitRatio')}</option>
+            <option value="landscape">{t('productCard.aspectLandscapeRatio')}</option>
+            <option value="wide">{t('productCard.aspectWideRatio')}</option>
+            <option value="ultrawide">{t('productCard.aspectUltrawideRatio')}</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Card shape</span>
+          <span className="text-muted-foreground">{t('productCard.cardShape')}</span>
           <select
             value={values.cardShape ?? 'theme'}
             onChange={e =>
@@ -3251,50 +3272,50 @@ function ProductCardControls({
             }
             className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value="theme">Theme default</option>
-            <option value="circle">Circle (round, 1:1)</option>
-            <option value="rounded-square">Rounded square (soft, 1:1)</option>
-            <option value="square">Sharp square (1:1)</option>
-            <option value="soft">Soft rectangle (4:5)</option>
-            <option value="portrait">Portrait (3:4)</option>
-            <option value="landscape">Landscape (4:3)</option>
-            <option value="pill">Pill (horizontal, 2:1)</option>
+            <option value="theme">{t('common.themeDefault')}</option>
+            <option value="circle">{t('productCard.shapeCircle')}</option>
+            <option value="rounded-square">{t('productCard.shapeRoundedSquare')}</option>
+            <option value="square">{t('productCard.shapeSharpSquare')}</option>
+            <option value="soft">{t('productCard.shapeSoftRectangle')}</option>
+            <option value="portrait">{t('productCard.shapePortraitPlain')}</option>
+            <option value="landscape">{t('productCard.shapeLandscapePlain')}</option>
+            <option value="pill">{t('productCard.shapePillRatio')}</option>
           </select>
           <span className="text-[11px] text-muted-foreground/80">
-            Overrides the aspect ratio + rounded corners with one preset.
+            {t('productCard.shapeOverrideHint')}
           </span>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Card spacing</span>
+          <span className="text-muted-foreground">{t('productCard.cardSpacing')}</span>
           <select
             value={values.cardGap ?? 'normal'}
             onChange={e => onChange({ cardGap: e.target.value as CardControlsValues['cardGap'] })}
             className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value="tight">Tight (6-8px)</option>
-            <option value="normal">Normal (12-16px) — default</option>
-            <option value="loose">Loose (20-24px)</option>
-            <option value="xloose">Extra loose (32-40px)</option>
+            <option value="tight">{t('productCard.spacingTight')}</option>
+            <option value="normal">{t('productCard.spacingNormalDefault')}</option>
+            <option value="loose">{t('productCard.spacingLoose')}</option>
+            <option value="xloose">{t('productCard.spacingXloose')}</option>
           </select>
         </label>
         <RowToggle
-          label="Show labels"
+          label={t('productCard.showLabels')}
           checked={values.showLabel !== false}
           onChange={v => onChange({ showLabel: v })}
         />
         <RowToggle
-          label="Hover effects"
+          label={t('productCard.hoverEffects')}
           checked={values.showHover !== false}
           onChange={v => onChange({ showHover: v })}
         />
         <RowToggle
-          label="Show frame around each card"
+          label={t('productCard.showFrame')}
           checked={!!values.showCardFrame}
           onChange={v => onChange({ showCardFrame: v })}
         />
         {values.showCardFrame && (
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted-foreground">Frame style</span>
+            <span className="text-muted-foreground">{t('productCard.frameStyle')}</span>
             <select
               value={values.cardFrameStyle ?? 'soft'}
               onChange={e =>
@@ -3304,40 +3325,40 @@ function ProductCardControls({
               }
               className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="soft">Soft (rounded + light shadow) — default</option>
-              <option value="outline">Outline (2px border, no shadow)</option>
-              <option value="shadow">Shadow (larger drop shadow, no border)</option>
-              <option value="paper">Paper (editorial, larger padding)</option>
+              <option value="soft">{t('productCard.frameSoftDefault')}</option>
+              <option value="outline">{t('productCard.frameOutline')}</option>
+              <option value="shadow">{t('productCard.frameShadow')}</option>
+              <option value="paper">{t('productCard.framePaper')}</option>
             </select>
           </label>
         )}
         {values.showCardFrame && (
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted-foreground">Border thickness</span>
+            <span className="text-muted-foreground">{t('productCard.borderThickness')}</span>
             <select
               value={values.cardFrameWidth ?? 'thin'}
               onChange={e => onChange({ cardFrameWidth: e.target.value as CardFrameWidth })}
               className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="thin">Thin (1px) — default</option>
-              <option value="normal">Normal (2px)</option>
-              <option value="thick">Thick (4px)</option>
-              <option value="xthick">Extra thick (8px)</option>
+              <option value="thin">{t('productCard.borderThinDefault')}</option>
+              <option value="normal">{t('productCard.borderNormal')}</option>
+              <option value="thick">{t('productCard.borderThick')}</option>
+              <option value="xthick">{t('productCard.borderXthick')}</option>
             </select>
           </label>
         )}
         {values.showCardFrame && (
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted-foreground">Frame size</span>
+            <span className="text-muted-foreground">{t('productCard.frameSize')}</span>
             <select
               value={values.cardFrameSize ?? 'normal'}
               onChange={e => onChange({ cardFrameSize: e.target.value as CardFrameSize })}
               className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="compact">Compact (8px padding)</option>
-              <option value="normal">Normal (12px padding) — default</option>
-              <option value="comfortable">Comfortable (16px padding)</option>
-              <option value="spacious">Spacious (24px padding)</option>
+              <option value="compact">{t('productCard.frameSizeCompact')}</option>
+              <option value="normal">{t('productCard.frameSizeNormalDefault')}</option>
+              <option value="comfortable">{t('productCard.frameSizeComfortable')}</option>
+              <option value="spacious">{t('productCard.frameSizeSpacious')}</option>
             </select>
           </label>
         )}
@@ -3346,10 +3367,10 @@ function ProductCardControls({
           + clear button have room. Only shown when the frame toggle is on. */}
       {values.showCardFrame && (
         <ColorField
-          label="Card frame color (this section)"
+          label={t('productCard.frameColorLabel')}
           value={values.cardFrameColor}
           onChange={v => onChange({ cardFrameColor: v })}
-          hint="Overrides the theme border color for these cards."
+          hint={t('productCard.frameColorHint')}
           theme={theme}
           inheritFromToken="border"
         />
@@ -3370,17 +3391,20 @@ function SchemeSelect({
   value: 'auto' | 'light' | 'dark';
   onChange: (v: 'auto' | 'light' | 'dark') => void;
 }) {
+  const t = useT('orders.layout');
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">Text contrast</span>
+      <span className="text-xs font-medium text-muted-foreground">
+        {t('typography.textContrastLabel')}
+      </span>
       <select
         value={value}
         onChange={e => onChange(e.target.value as 'auto' | 'light' | 'dark')}
         className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
       >
-        <option value="auto">Auto (from background)</option>
-        <option value="light">Light surface · dark text</option>
-        <option value="dark">Dark surface · light text</option>
+        <option value="auto">{t('typography.contrastAuto')}</option>
+        <option value="light">{t('typography.contrastLight')}</option>
+        <option value="dark">{t('typography.contrastDark')}</option>
       </select>
     </label>
   );
@@ -3394,17 +3418,20 @@ function DensitySelect({
   value: 'compact' | 'normal' | 'spacious';
   onChange: (v: 'compact' | 'normal' | 'spacious') => void;
 }) {
+  const t = useT('orders.layout');
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">Spacing density</span>
+      <span className="text-xs font-medium text-muted-foreground">
+        {t('typography.spacingDensityLabel')}
+      </span>
       <select
         value={value}
         onChange={e => onChange(e.target.value as 'compact' | 'normal' | 'spacious')}
         className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
       >
-        <option value="compact">Compact</option>
-        <option value="normal">Normal</option>
-        <option value="spacious">Spacious</option>
+        <option value="compact">{t('common.compact')}</option>
+        <option value="normal">{t('common.normal')}</option>
+        <option value="spacious">{t('common.spacious')}</option>
       </select>
     </label>
   );
@@ -3418,18 +3445,21 @@ function TextScaleSelect({
   value: 'sm' | 'normal' | 'lg' | 'xl';
   onChange: (v: 'sm' | 'normal' | 'lg' | 'xl') => void;
 }) {
+  const t = useT('orders.layout');
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">Text size</span>
+      <span className="text-xs font-medium text-muted-foreground">
+        {t('typography.textSizeLabel')}
+      </span>
       <select
         value={value}
         onChange={e => onChange(e.target.value as 'sm' | 'normal' | 'lg' | 'xl')}
         className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
       >
-        <option value="sm">Small</option>
-        <option value="normal">Normal</option>
-        <option value="lg">Large</option>
-        <option value="xl">Extra large</option>
+        <option value="sm">{t('common.small')}</option>
+        <option value="normal">{t('common.normal')}</option>
+        <option value="lg">{t('common.large')}</option>
+        <option value="xl">{t('common.extraLarge')}</option>
       </select>
     </label>
   );
@@ -3478,23 +3508,8 @@ function SectionCard({
 
 // Human-readable labels for the global zone keys — mirrors the labeling
 // convention from the /typography page so merchants see consistent names.
-const GLOBAL_ZONE_LABELS: Record<string, string> = {
-  beforeHeader: 'Announcement bar (top promo strip)',
-  header: 'Page header (logo + nav)',
-  storeName: 'Store name (in header)',
-  sectionKicker: 'Section kicker (chip above title)',
-  sectionTitle: 'Section heading',
-  sectionSubtitle: 'Section subtitle',
-  sectionSeeAll: 'Section "View All" link',
-  categories: 'Category card labels',
-  products: 'Products (base)',
-  productName: 'Product name (card)',
-  productPrice: 'Product price (card)',
-  cta: 'Buttons + CTAs',
-  filters: 'Filter sidebar',
-  footer: 'Footer',
-  afterFooter: 'Below footer',
-};
+// Translated inline via t('zoneLabels.*') at the single call site below
+// (kept here only as the historical key-set reference in the comment).
 
 /**
  * All supported per-section typography roles — extended 2026-05-19 (Wave 3A)
@@ -3527,17 +3542,8 @@ const ROLE_INHERIT: Record<SectionTypographyRole, ColorToken> = {
   categoryLabel: 'foreground',
 };
 
-/** Human-readable label for each per-section typography role. */
-const ROLE_LABELS: Record<SectionTypographyRole, string> = {
-  heading: 'Section heading',
-  kicker: 'Section kicker (chip above title)',
-  subtitle: 'Section subtitle',
-  seeAll: '"View All" link',
-  productName: 'Product name',
-  productPrice: 'Product price',
-  productCta: 'Product CTA / button',
-  categoryLabel: 'Category card label',
-};
+// Human-readable label for each per-section typography role — translated
+// inline via t(`roleLabels.${role}`) at the single call site below.
 
 /**
  * Maps each per-section role to the corresponding global typography zone key.
@@ -3580,21 +3586,21 @@ function SectionTypographyBlock({
   onResetRole: (role: SectionTypographyRole) => void;
   theme: StoreTheme | undefined;
 }) {
+  const t = useT('orders.layout');
   return (
     <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Section typography (overrides default)
+        {t('typography.sectionOverrideTitle')}
       </h4>
       <p className="mb-3 text-[11px] text-muted-foreground/80">
-        Override the default typography for each text role in this section only. Leave all fields
-        empty to inherit from the Header + Footer typography defaults at the bottom of this page.
+        {t('typography.sectionOverrideHint')}
       </p>
       <div className="space-y-3">
         {roles.map(role => (
           <ZoneEditor
             key={role}
             zoneKey={`section.typography.${role}`}
-            zoneLabel={ROLE_LABELS[role]}
+            zoneLabel={t(`roleLabels.${role}`)}
             values={typography?.[role] ?? {}}
             placeholder={globalZones[role]}
             onChange={next => onChangeRole(role, next)}
@@ -3801,12 +3807,11 @@ function KickerSubtitleControls({
    *  picker when omitted. */
   theme?: import('@force/shared').StoreTheme;
 }) {
+  const t = useT('orders.layout');
   return (
     <>
       <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          Optional kicker + subtitle. Leave blank to skip.
-        </p>
+        <p className="text-xs text-muted-foreground">{t('kickerSubtitle.optionalHint')}</p>
         <AiSectionFillButton
           storeId={storeId}
           section={section}
@@ -3824,26 +3829,26 @@ function KickerSubtitleControls({
       </div>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TextField
-          label="Kicker label (EN)"
+          label={t('kickerSubtitle.kickerLabelEn')}
           placeholder="e.g. EXPLORE"
           value={values.kicker ?? ''}
           onChange={v => onPatch({ kicker: v })}
         />
         <TextField
-          label="Kicker label (AR)"
+          label={t('kickerSubtitle.kickerLabelAr')}
           placeholder="مثال: استكشف"
           value={values.kickerAr ?? ''}
           onChange={v => onPatch({ kickerAr: v })}
           dir="rtl"
         />
         <TextField
-          label="Subtitle (EN)"
+          label={t('kickerSubtitle.subtitleLabelEn')}
           placeholder="e.g. Browse our top picks"
           value={values.subtitle ?? ''}
           onChange={v => onPatch({ subtitle: v })}
         />
         <TextField
-          label="Subtitle (AR)"
+          label={t('kickerSubtitle.subtitleLabelAr')}
           placeholder="مثال: تصفح أفضل اختياراتنا"
           value={values.subtitleAr ?? ''}
           onChange={v => onPatch({ subtitleAr: v })}
@@ -3903,16 +3908,8 @@ const ALL_SECTION_KEYS: SectionKey[] = [
   'testimonials',
 ];
 
-const SECTION_LABELS: Record<SectionKey, string> = {
-  hero: 'Hero banner / slider',
-  categories: 'Categories',
-  newArrivals: 'New arrivals',
-  bestSellers: 'Best sellers',
-  brandStory: 'Brand story',
-  blogCarousel: 'Blog carousel',
-  trustStrip: 'Trust strip',
-  testimonials: 'Testimonials',
-};
+// Human-readable label for each section kind — translated inline via
+// t(`sectionLabels.${key}`) at the single call site below.
 
 // ---------------------------------------------------------------------------
 // Font library — Ahmad 2026-05-20.
@@ -3941,6 +3938,7 @@ function FontsCard({
   fonts: FontEntry[];
   onChange: (next: FontEntry[]) => void;
 }) {
+  const t = useT('orders.layout');
   const [showAdd, setShowAdd] = useState(false);
   const [family, setFamily] = useState('');
   const [url, setUrl] = useState('');
@@ -4018,12 +4016,8 @@ function FontsCard({
   return (
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="mb-3">
-        <h3 className="text-base font-semibold text-foreground">Fonts</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Fonts available to use in any Typography zone below. Add Google Fonts by family name (e.g.{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">Cairo</code>) — URL
-          auto-builds. Or upload a custom font file (.woff2/.woff/.ttf/.otf, max 5MB).
-        </p>
+        <h3 className="text-base font-semibold text-foreground">{t('fonts.title')}</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t('fonts.description')}</p>
       </div>
       {fonts.length > 0 && (
         <ul className="mb-3 space-y-1.5">
@@ -4039,7 +4033,7 @@ function FontsCard({
                     : 'bg-emerald-100 text-emerald-800'
                 }`}
               >
-                {f.type === 'google' ? 'Google' : 'Custom'}
+                {f.type === 'google' ? t('fonts.google') : t('fonts.custom')}
               </span>
               <span
                 className="flex-1 truncate text-sm font-medium text-foreground"
@@ -4052,7 +4046,7 @@ function FontsCard({
                 onClick={() => remove(i)}
                 className="rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/10"
               >
-                Remove
+                {t('fonts.remove')}
               </button>
             </li>
           ))}
@@ -4061,7 +4055,9 @@ function FontsCard({
       {showAdd ? (
         <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/20 p-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Font family name</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('fonts.familyNameLabel')}
+            </span>
             <input
               type="text"
               value={family}
@@ -4072,7 +4068,7 @@ function FontsCard({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">
-              Google Fonts URL (optional — auto-built from family)
+              {t('fonts.googleUrlLabel')}
             </span>
             <input
               type="text"
@@ -4092,7 +4088,7 @@ function FontsCard({
               }}
               className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -4100,7 +4096,7 @@ function FontsCard({
               onClick={addGoogle}
               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
             >
-              Add font
+              {t('fonts.addFont')}
             </button>
           </div>
         </div>
@@ -4108,7 +4104,7 @@ function FontsCard({
         <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/20 p-3">
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">
-              Font family name (display label)
+              {t('fonts.familyNameDisplayLabel')}
             </span>
             <input
               type="text"
@@ -4120,7 +4116,7 @@ function FontsCard({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">
-              Font file (.woff2 / .woff / .ttf / .otf — max 5MB)
+              {t('fonts.fileLabel')}
             </span>
             <input
               type="file"
@@ -4151,7 +4147,7 @@ function FontsCard({
               }}
               className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -4159,7 +4155,7 @@ function FontsCard({
               onClick={uploadCustom}
               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
             >
-              {isUploading ? 'Uploading…' : 'Upload font'}
+              {isUploading ? t('fonts.uploading') : t('fonts.uploadFont')}
             </button>
           </div>
         </div>
@@ -4170,14 +4166,14 @@ function FontsCard({
             onClick={() => setShowAdd(true)}
             className="rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
-            + Add Google Font
+            {t('fonts.addGoogleFont')}
           </button>
           <button
             type="button"
             onClick={() => setShowUpload(true)}
             className="rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
-            ↥ Upload custom font
+            {t('fonts.uploadCustomFont')}
           </button>
         </div>
       )}
@@ -4192,6 +4188,7 @@ function SectionOrderCard({
   order: SectionKey[] | undefined;
   onChange: (next: SectionKey[]) => void;
 }) {
+  const t = useT('orders.layout');
   // Resolve current order: merchant-saved value wins; missing keys append at
   // the end so new sections shipped later show up automatically. Unknown keys
   // (from older saves) get filtered out.
@@ -4219,20 +4216,22 @@ function SectionOrderCard({
   return (
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="mb-3">
-        <h3 className="text-base font-semibold text-foreground">Section order</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Drag to reorder homepage sections. The new order saves on the main Save button.
-        </p>
+        <h3 className="text-base font-semibold text-foreground">{t('sectionOrder.title')}</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t('sectionOrder.dragHint')}</p>
         <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
-          Admin v1 — drag persistence is live. Storefront enforcement of this order is coming in v2;
-          for now the storefront keeps its hardcoded sequence regardless of the value saved here.
+          {t('sectionOrder.v1Notice')}
         </p>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={resolved} strategy={verticalListSortingStrategy}>
           <ul className="space-y-2">
             {resolved.map((key, i) => (
-              <SortableSectionRow key={key} id={key} label={SECTION_LABELS[key]} index={i + 1} />
+              <SortableSectionRow
+                key={key}
+                id={key}
+                label={t(`sectionLabels.${key}`)}
+                index={i + 1}
+              />
             ))}
           </ul>
         </SortableContext>
@@ -4329,6 +4328,7 @@ function ManualProductPicker({
   value: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const t = useT('orders.layout');
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<ProductSummary[]>([]);
   // Seed from the module-level cache so already-known products render their
@@ -4418,7 +4418,7 @@ function ManualProductPicker({
   function add(id: string, summary?: ProductSummary) {
     if (value.includes(id)) return;
     if (value.length >= 50) {
-      alert('Maximum 50 products per carousel');
+      alert(t('manualPicker.maxProductsAlert'));
       return;
     }
     if (summary) {
@@ -4468,7 +4468,9 @@ function ManualProductPicker({
                     {detail?.name || id}
                   </p>
                   {detail?.sku && (
-                    <p className="truncate text-[10px] text-muted-foreground">SKU: {detail.sku}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">
+                      {t('manualPicker.skuPrefix', { sku: detail.sku })}
+                    </p>
                   )}
                 </div>
                 <button
@@ -4476,7 +4478,7 @@ function ManualProductPicker({
                   disabled={idx === 0}
                   onClick={() => move(idx, -1)}
                   className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  aria-label="Move up"
+                  aria-label={t('manualPicker.moveUp')}
                 >
                   ↑
                 </button>
@@ -4485,7 +4487,7 @@ function ManualProductPicker({
                   disabled={idx === value.length - 1}
                   onClick={() => move(idx, 1)}
                   className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  aria-label="Move down"
+                  aria-label={t('manualPicker.moveDown')}
                 >
                   ↓
                 </button>
@@ -4493,7 +4495,7 @@ function ManualProductPicker({
                   type="button"
                   onClick={() => remove(id)}
                   className="touch-target rounded text-destructive hover:bg-destructive/10"
-                  aria-label="Remove"
+                  aria-label={t('manualPicker.remove')}
                 >
                   ×
                 </button>
@@ -4532,16 +4534,20 @@ function ManualProductPicker({
               setOpen(false);
             }
           }}
-          placeholder={`Search products to add (${value.length}/50)…`}
+          placeholder={t('manualPicker.searchPlaceholder', { current: value.length, max: 50 })}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
         />
         {open && (search.trim() !== '' || searchResults.length > 0) && (
           <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
             {isSearching && (
-              <div className="px-3 py-2 text-xs text-muted-foreground">Searching…</div>
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                {t('manualPicker.searching')}
+              </div>
             )}
             {!isSearching && searchResults.length === 0 && search.trim() !== '' && (
-              <div className="px-3 py-2 text-xs text-muted-foreground">No matches.</div>
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                {t('manualPicker.noMatches')}
+              </div>
             )}
             {searchResults
               .filter(p => !value.includes(p.id))
@@ -4567,7 +4573,9 @@ function ManualProductPicker({
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-xs font-medium text-foreground">{p.name}</p>
                     {p.sku && (
-                      <p className="truncate text-[10px] text-muted-foreground">SKU: {p.sku}</p>
+                      <p className="truncate text-[10px] text-muted-foreground">
+                        {t('manualPicker.skuPrefix', { sku: p.sku })}
+                      </p>
                     )}
                   </div>
                 </button>
@@ -4576,7 +4584,7 @@ function ManualProductPicker({
         )}
         {(search.trim() !== '' || searchResults.length > 0) && (
           <p className="mt-1 text-[10px] text-muted-foreground/70">
-            ↑↓ to navigate · Enter to add · Esc to close
+            {t('manualPicker.keyboardHint')}
           </p>
         )}
       </div>
@@ -4611,6 +4619,7 @@ function ExtraCarouselCard({
   onMove: (delta: -1 | 1) => void;
   theme: import('@force/shared').StoreTheme;
 }) {
+  const t = useT('orders.layout');
   const enabled = extra.enabled !== false;
   const dividerValues = {
     dividers: extra.dividers,
@@ -4619,8 +4628,8 @@ function ExtraCarouselCard({
   };
   return (
     <SectionCard
-      title={extra.title || `Extra carousel ${index + 1}`}
-      description={`Source: ${extra.productSource}. Drag-reorder support coming in v2.`}
+      title={extra.title || t('extraCarousel.defaultTitle', { n: index + 1 })}
+      description={t('extraCarousel.sourceDescription', { source: extra.productSource })}
       enabled={enabled}
       onToggle={v => onPatch({ enabled: v })}
       defaultExpanded={false}
@@ -4628,7 +4637,9 @@ function ExtraCarouselCard({
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Title (EN)</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraCarousel.titleEn')}
+            </span>
             <input
               type="text"
               value={extra.title ?? ''}
@@ -4638,7 +4649,9 @@ function ExtraCarouselCard({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Title (AR)</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraCarousel.titleAr')}
+            </span>
             <input
               type="text"
               value={extra.titleAr ?? ''}
@@ -4649,7 +4662,9 @@ function ExtraCarouselCard({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Subtitle (EN)</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraCarousel.subtitleEn')}
+            </span>
             <input
               type="text"
               value={extra.subtitle ?? ''}
@@ -4658,7 +4673,9 @@ function ExtraCarouselCard({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Subtitle (AR)</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraCarousel.subtitleAr')}
+            </span>
             <input
               type="text"
               value={extra.subtitleAr ?? ''}
@@ -4668,7 +4685,9 @@ function ExtraCarouselCard({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Product source</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraCarousel.productSourceLabel')}
+            </span>
             <select
               value={extra.productSource}
               onChange={e =>
@@ -4678,17 +4697,19 @@ function ExtraCarouselCard({
               }
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
             >
-              <option value="newest">Newest (same as New Arrivals)</option>
-              <option value="best_seller">Best sellers</option>
-              <option value="featured">Featured</option>
-              <option value="category">Category</option>
-              <option value="manual">Manual product list</option>
+              <option value="newest">{t('extraCarousel.sourceNewest')}</option>
+              <option value="best_seller">{t('extraCarousel.sourceBestSellers')}</option>
+              <option value="featured">{t('extraCarousel.sourceFeatured')}</option>
+              <option value="category">{t('extraCarousel.sourceCategory')}</option>
+              <option value="manual">{t('extraCarousel.sourceManual')}</option>
             </select>
           </label>
           {extra.productSource === 'category' && (
             <>
               <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-xs font-medium text-muted-foreground">Category slug</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('extraCarousel.categorySlugLabel')}
+                </span>
                 <input
                   type="text"
                   value={extra.categorySlug ?? ''}
@@ -4699,7 +4720,7 @@ function ExtraCarouselCard({
               </label>
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Products to fetch from this category (default 50)
+                  {t('extraCarousel.categoryFetchLimitLabel')}
                 </span>
                 <input
                   type="number"
@@ -4716,16 +4737,16 @@ function ExtraCarouselCard({
                   className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-32"
                 />
                 <span className="mt-0.5 text-[11px] text-muted-foreground/80">
-                  Bump higher (max 200) for large categories — costs more per page load. Keep at 50
-                  unless your category has &gt;50 products AND the storefront needs visibility past
-                  the first 50.
+                  {t('extraCarousel.categoryFetchLimitHint')}
                 </span>
               </label>
             </>
           )}
           {extra.productSource === 'manual' && (
             <div className="sm:col-span-2 flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Manual products</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('extraCarousel.manualProductsLabel')}
+              </span>
               <ManualProductPicker
                 storeId={storeId}
                 value={extra.manualProductIds ?? []}
@@ -4734,7 +4755,9 @@ function ExtraCarouselCard({
             </div>
           )}
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Max products</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraCarousel.maxProductsLabel')}
+            </span>
             <input
               type="number"
               min={1}
@@ -4745,7 +4768,9 @@ function ExtraCarouselCard({
             />
           </label>
           <label className="flex flex-col gap-1 sm:col-span-2">
-            <span className="text-xs font-medium text-muted-foreground">Background color</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraCarousel.backgroundColorLabel')}
+            </span>
             <input
               type="text"
               value={extra.bgColor ?? ''}
@@ -4781,37 +4806,43 @@ function ExtraCarouselCard({
         <div className="border-t border-border pt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              Position {index + 1} of {total}
+              {t('extraCarousel.positionOfTotal', { position: index + 1, total })}
             </span>
             <button
               type="button"
               disabled={index === 0}
               onClick={() => onMove(-1)}
               className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
-              aria-label="Move up"
+              aria-label={t('extraCarousel.moveUp')}
             >
-              ↑ Move up
+              {t('extraCarousel.moveUp')}
             </button>
             <button
               type="button"
               disabled={index === total - 1}
               onClick={() => onMove(1)}
               className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
-              aria-label="Move down"
+              aria-label={t('extraCarousel.moveDown')}
             >
-              ↓ Move down
+              {t('extraCarousel.moveDown')}
             </button>
           </div>
           <button
             type="button"
             onClick={() => {
-              if (confirm(`Delete this carousel${extra.title ? ` ("${extra.title}")` : ''}?`)) {
+              if (
+                confirm(
+                  t('extraCarousel.deleteConfirm', {
+                    suffix: extra.title ? ` ("${extra.title}")` : '',
+                  })
+                )
+              ) {
                 onDelete();
               }
             }}
             className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
           >
-            Delete carousel
+            {t('extraCarousel.deleteButton')}
           </button>
         </div>
       </div>
@@ -4868,6 +4899,7 @@ function ExtraSectionCard({
    *  Footer links editor into the same Footer card (one card, one Save). */
   children?: React.ReactNode;
 }) {
+  const t = useT('orders.layout');
   const enabled = settings?.enabled ?? legacyEnabled;
   // KickerSubtitleValues shape used by SectionDividersBlock — these sections
   // don't have kicker/subtitle fields, but the divider block only reads
@@ -4887,7 +4919,7 @@ function ExtraSectionCard({
     >
       <div className="space-y-4">
         <ColorField
-          label="Background color"
+          label={t('extraSection.backgroundColorLabel')}
           value={settings?.bgColor}
           onChange={v => onPatch({ bgColor: v })}
           theme={theme}
@@ -4895,7 +4927,9 @@ function ExtraSectionCard({
         {kind === 'trustStrip' && (
           <>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Layout</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('extraSection.layoutLabel')}
+              </span>
               <select
                 value={
                   (settings as import('@force/shared').TrustStripSettings | undefined)?.layout ??
@@ -4904,12 +4938,14 @@ function ExtraSectionCard({
                 onChange={e => onPatch({ layout: e.target.value as 'horizontal' | 'vertical' })}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
-                <option value="horizontal">Horizontal (3-up)</option>
-                <option value="vertical">Vertical (stacked)</option>
+                <option value="horizontal">{t('extraSection.layoutHorizontal')}</option>
+                <option value="vertical">{t('extraSection.layoutVertical')}</option>
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Size</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('extraSection.sizeLabel')}
+              </span>
               <select
                 value={
                   (settings as import('@force/shared').TrustStripSettings | undefined)?.size ?? 'md'
@@ -4917,13 +4953,13 @@ function ExtraSectionCard({
                 onChange={e => onPatch({ size: e.target.value as 'sm' | 'md' | 'lg' })}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
-                <option value="sm">Small</option>
-                <option value="md">Medium</option>
-                <option value="lg">Large</option>
+                <option value="sm">{t('common.small')}</option>
+                <option value="md">{t('common.medium')}</option>
+                <option value="lg">{t('common.large')}</option>
               </select>
             </label>
             <ColorField
-              label="Icon color"
+              label={t('extraSection.iconColorLabel')}
               value={
                 (settings as import('@force/shared').TrustStripSettings | undefined)?.iconColor
               }
@@ -4931,7 +4967,7 @@ function ExtraSectionCard({
               theme={theme}
             />
             <ColorField
-              label="Icon background color"
+              label={t('extraSection.iconBgColorLabel')}
               value={
                 (settings as import('@force/shared').TrustStripSettings | undefined)?.iconBgColor
               }
@@ -4939,7 +4975,7 @@ function ExtraSectionCard({
               theme={theme}
             />
             <ColorField
-              label="Text color"
+              label={t('extraSection.textColorLabel')}
               value={
                 (settings as import('@force/shared').TrustStripSettings | undefined)?.textColor
               }
@@ -4950,7 +4986,9 @@ function ExtraSectionCard({
         )}
         {kind === 'blogCarousel' && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Max posts</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('extraSection.maxPostsLabel')}
+            </span>
             <input
               type="number"
               min={1}
@@ -4983,14 +5021,34 @@ function ExtraSectionCard({
         {typographyZones && typographyZones.length > 0 && globalZones && onZonePatch && (
           <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Typography
+              {t('extraSection.typographyLabel')}
             </p>
             <div className="space-y-3">
               {typographyZones.map(zoneKey => (
                 <ZoneEditor
                   key={zoneKey}
                   zoneKey={zoneKey}
-                  zoneLabel={GLOBAL_ZONE_LABELS[zoneKey] ?? zoneKey}
+                  zoneLabel={
+                    (
+                      {
+                        beforeHeader: t('zoneLabels.beforeHeader'),
+                        header: t('zoneLabels.header'),
+                        storeName: t('zoneLabels.storeName'),
+                        sectionKicker: t('zoneLabels.sectionKicker'),
+                        sectionTitle: t('zoneLabels.sectionTitle'),
+                        sectionSubtitle: t('zoneLabels.sectionSubtitle'),
+                        sectionSeeAll: t('zoneLabels.sectionSeeAll'),
+                        categories: t('zoneLabels.categories'),
+                        products: t('zoneLabels.products'),
+                        productName: t('zoneLabels.productName'),
+                        productPrice: t('zoneLabels.productPrice'),
+                        cta: t('zoneLabels.cta'),
+                        filters: t('zoneLabels.filters'),
+                        footer: t('zoneLabels.footer'),
+                        afterFooter: t('zoneLabels.afterFooter'),
+                      } as Record<string, string>
+                    )[zoneKey] ?? zoneKey
+                  }
                   values={globalZones[zoneKey] ?? {}}
                   onChange={next => onZonePatch(zoneKey, next)}
                   onReset={onZoneReset ? () => onZoneReset(zoneKey) : undefined}
@@ -5030,54 +5088,55 @@ function SectionPaddingMaxWidthBlock({
   values: import('@force/shared').SectionPaddingMaxWidthVisibility | undefined;
   onPatch: (patch: Partial<import('@force/shared').SectionPaddingMaxWidthVisibility>) => void;
 }) {
+  const t = useT('orders.layout');
   return (
     <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Spacing & visibility
+        {t('paddingBlock.title')}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <DividerStyleSelect
-          label="Padding top"
+          label={t('paddingBlock.paddingTopLabel')}
           value={values?.paddingTop ?? 'normal'}
           options={[
-            ['none', 'None'],
-            ['tight', 'Tight'],
-            ['normal', 'Normal'],
-            ['loose', 'Loose'],
-            ['xloose', 'X-loose'],
+            ['none', t('paddingBlock.optNone')],
+            ['tight', t('paddingBlock.optTight')],
+            ['normal', t('paddingBlock.optNormal')],
+            ['loose', t('paddingBlock.optLoose')],
+            ['xloose', t('paddingBlock.optXloose')],
           ]}
           onChange={v => onPatch({ paddingTop: v as 'normal' })}
         />
         <DividerStyleSelect
-          label="Padding bottom"
+          label={t('paddingBlock.paddingBottomLabel')}
           value={values?.paddingBottom ?? 'normal'}
           options={[
-            ['none', 'None'],
-            ['tight', 'Tight'],
-            ['normal', 'Normal'],
-            ['loose', 'Loose'],
-            ['xloose', 'X-loose'],
+            ['none', t('paddingBlock.optNone')],
+            ['tight', t('paddingBlock.optTight')],
+            ['normal', t('paddingBlock.optNormal')],
+            ['loose', t('paddingBlock.optLoose')],
+            ['xloose', t('paddingBlock.optXloose')],
           ]}
           onChange={v => onPatch({ paddingBottom: v as 'normal' })}
         />
         <DividerStyleSelect
-          label="Max width"
+          label={t('paddingBlock.maxWidthLabel')}
           value={values?.maxWidth ?? 'contained'}
           options={[
-            ['contained', 'Contained (max-w-7xl)'],
-            ['full', 'Edge-to-edge'],
+            ['contained', t('paddingBlock.maxWidthContained')],
+            ['full', t('paddingBlock.maxWidthFull')],
           ]}
           onChange={v => onPatch({ maxWidth: v as 'contained' })}
         />
       </div>
       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <RowToggle
-          label="Hide on mobile"
+          label={t('paddingBlock.hideOnMobile')}
           checked={values?.hideOnMobile === true}
           onChange={v => onPatch({ hideOnMobile: v })}
         />
         <RowToggle
-          label="Hide on desktop"
+          label={t('paddingBlock.hideOnDesktop')}
           checked={values?.hideOnDesktop === true}
           onChange={v => onPatch({ hideOnDesktop: v })}
         />
@@ -5109,6 +5168,7 @@ function SectionDividersBlock({
    *  work, just without contrast preview). */
   theme?: import('@force/shared').StoreTheme;
 }) {
+  const t = useT('orders.layout');
   const dividers = values.dividers ?? {};
 
   // Slot toggles. When turning ON, seed `enabled: true` while preserving any
@@ -5190,40 +5250,41 @@ function SectionDividersBlock({
   return (
     <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/20 p-3">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Section dividers
+        {t('dividers.title')}
       </p>
-      <p className="mb-3 text-[11px] text-muted-foreground/80">
-        Hairline dividers around each part of this section. Pick which slots show a divider; the
-        styling below applies to all enabled slots so they stay visually consistent.
-      </p>
+      <p className="mb-3 text-[11px] text-muted-foreground/80">{t('dividers.hint')}</p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {(!availableSlots || availableSlots.includes('above')) && (
           <RowToggle
-            label="Above this section"
+            label={t('dividers.above')}
             checked={aboveOn}
             onChange={v => setSlot('above', v)}
           />
         )}
         {(!availableSlots || availableSlots.includes('kicker')) && (
           <RowToggle
-            label="Around kicker text"
+            label={t('dividers.aroundKicker')}
             checked={kickerOn}
             onChange={v => setSlot('kicker', v)}
           />
         )}
         {(!availableSlots || availableSlots.includes('title')) && (
-          <RowToggle label="Around title" checked={titleOn} onChange={v => setSlot('title', v)} />
+          <RowToggle
+            label={t('dividers.aroundTitle')}
+            checked={titleOn}
+            onChange={v => setSlot('title', v)}
+          />
         )}
         {(!availableSlots || availableSlots.includes('subtitle')) && (
           <RowToggle
-            label="Around subtitle"
+            label={t('dividers.aroundSubtitle')}
             checked={subtitleOn}
             onChange={v => setSlot('subtitle', v)}
           />
         )}
         {(!availableSlots || availableSlots.includes('belowHeading')) && (
           <RowToggle
-            label="Below heading (before content)"
+            label={t('dividers.belowHeading')}
             checked={belowHeadingOn}
             onChange={v => setSlot('belowHeading', v)}
           />
@@ -5233,18 +5294,18 @@ function SectionDividersBlock({
       {anyOn && (
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-5">
           <DividerStyleSelect
-            label="Style"
+            label={t('dividers.style')}
             value={sharedStyle}
             options={[
-              ['solid', 'Solid'],
-              ['dashed', 'Dashed'],
-              ['dotted', 'Dotted'],
-              ['double', 'Double'],
+              ['solid', t('dividers.optSolid')],
+              ['dashed', t('dividers.optDashed')],
+              ['dotted', t('dividers.optDotted')],
+              ['double', t('dividers.optDouble')],
             ]}
             onChange={v => patchSharedStyle({ style: v as 'solid' })}
           />
           <DividerStyleSelect
-            label="Thickness"
+            label={t('dividers.thickness')}
             value={String(sharedThickness)}
             options={[
               ['1', '1px'],
@@ -5254,24 +5315,24 @@ function SectionDividersBlock({
             onChange={v => patchSharedStyle({ thickness: Number(v) as 1 | 2 | 3 })}
           />
           <DividerStyleSelect
-            label="Width"
+            label={t('dividers.width')}
             value={sharedWidth}
             options={[
-              ['short', 'Short'],
-              ['contained', 'Contained'],
-              ['full', 'Edge-to-edge'],
+              ['short', t('dividers.optShort')],
+              ['contained', t('dividers.optContained')],
+              ['full', t('dividers.optEdgeToEdge')],
             ]}
             onChange={v => patchSharedStyle({ width: v as 'short' })}
           />
           <div className="flex flex-col gap-1 sm:col-span-2">
             <DividerStyleSelect
-              label="Color"
+              label={t('dividers.color')}
               value={sharedColor}
               options={[
-                ['auto', 'Auto (theme border token)'],
-                ['foreground', 'Foreground (high contrast)'],
-                ['accent', 'Brand accent (primary)'],
-                ['custom', 'Custom — brand token or hex'],
+                ['auto', t('dividers.colorAuto')],
+                ['foreground', t('dividers.colorForeground')],
+                ['accent', t('dividers.colorAccent')],
+                ['custom', t('dividers.colorCustom')],
               ]}
               onChange={v => patchSharedStyle({ color: v as 'auto' })}
             />
@@ -5295,12 +5356,12 @@ function SectionDividersBlock({
             )}
           </div>
           <DividerStyleSelect
-            label="Spacing"
+            label={t('dividers.spacing')}
             value={sharedSpacing}
             options={[
-              ['tight', 'Tight'],
-              ['normal', 'Normal'],
-              ['loose', 'Loose'],
+              ['tight', t('paddingBlock.optTight')],
+              ['normal', t('paddingBlock.optNormal')],
+              ['loose', t('paddingBlock.optLoose')],
             ]}
             onChange={v => patchSharedStyle({ spacing: v as 'tight' })}
           />
@@ -5359,6 +5420,7 @@ function AiSectionFillButton({
   existingTitleAr?: string;
   onFilled: (r: { kicker: string; kickerAr: string; subtitle: string; subtitleAr: string }) => void;
 }) {
+  const t = useT('orders.layout');
   const [busy, setBusy] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
   const generate = async () => {
@@ -5372,13 +5434,13 @@ function AiSectionFillButton({
         existingTitleAr: existingTitleAr || undefined,
       });
       if (error || !data) {
-        toastError('AI generation failed', error?.message ?? '');
+        toastError(t('aiSectionFill.failedTitle'), error?.message ?? '');
         return;
       }
       onFilled(data.suggestion);
-      toastSuccess('AI filled empty kicker + subtitle fields');
+      toastSuccess(t('aiSectionFill.successTitle'));
     } catch (e) {
-      toastError('AI generation failed', e instanceof Error ? e.message : '');
+      toastError(t('aiSectionFill.failedTitle'), e instanceof Error ? e.message : '');
     } finally {
       setBusy(false);
     }
@@ -5404,7 +5466,7 @@ function AiSectionFillButton({
           d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
         />
       </svg>
-      {busy ? 'Generating…' : 'Generate with AI'}
+      {busy ? t('aiSectionFill.generating') : t('aiSectionFill.generateWithAi')}
     </button>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Modal } from '@force/ui';
 import { apiGet } from '@/lib/api';
+import { useT } from '@/i18n/useT';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,33 +30,17 @@ interface PaymentEventPayload extends PaymentEvent {
 }
 
 // ---------------------------------------------------------------------------
-// Bilingual event-type label map
-// EN is rendered ltr, AR is rendered rtl, both shown side-by-side.
+// Event-type label — locale-driven via i18n; falls back to a humanized
+// version of the raw event type for anything not in the translated set.
 // ---------------------------------------------------------------------------
 
-const EVENT_TYPE_LABELS: Record<string, { en: string; ar: string }> = {
-  created: { en: 'Payment created', ar: 'تم إنشاء الدفعة' },
-  status_change: { en: 'Status changed', ar: 'تغيير الحالة' },
-  webhook_received: { en: 'Webhook received', ar: 'تم استلام الويب هوك' },
-  admin_action: { en: 'Admin action', ar: 'إجراء المشرف' },
-  reconciliation: { en: 'Reconciliation', ar: 'تسوية' },
-  refund_initiated: { en: 'Refund initiated', ar: 'تم بدء الاسترداد' },
-  refund_completed: { en: 'Refund completed', ar: 'اكتمل الاسترداد' },
-  refund_failed: { en: 'Refund failed', ar: 'فشل الاسترداد' },
-  retry: { en: 'Retry attempt', ar: 'محاولة إعادة' },
-  expired: { en: 'Payment expired', ar: 'انتهت صلاحية الدفعة' },
-  cancelled: { en: 'Payment cancelled', ar: 'تم إلغاء الدفعة' },
-  completed: { en: 'Payment completed', ar: 'اكتملت الدفعة' },
-  failed: { en: 'Payment failed', ar: 'فشلت الدفعة' },
-};
-
-function getLabel(eventType: string): { en: string; ar: string } {
-  return (
-    EVENT_TYPE_LABELS[eventType] ?? {
-      en: eventType.replace(/_/g, ' '),
-      ar: eventType.replace(/_/g, ' '),
-    }
-  );
+function getLabel(
+  t: (key: string) => string,
+  hasKey: (key: string) => boolean,
+  eventType: string
+): string {
+  const key = `eventTypes.${eventType}`;
+  return hasKey(key) ? t(key) : eventType.replace(/_/g, ' ');
 }
 
 // `details` may be a string OR a JSON object (payment-confirm writes
@@ -231,6 +216,8 @@ interface PayloadModalProps {
 }
 
 function PayloadModal({ eventId, onClose }: PayloadModalProps) {
+  const t = useT('components.paymentEventsTimeline');
+  const tCommon = useT('common');
   const [payload, setPayload] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -240,18 +227,18 @@ function PayloadModal({ eventId, onClose }: PayloadModalProps) {
     apiGet<{ event: PaymentEventPayload }>(`/api/v1/payments/events/${eventId}/payload`)
       .then(({ data, error }) => {
         if (error || !data?.event) {
-          setErr(error?.message ?? 'Failed to load payload');
+          setErr(error?.message ?? t('payloadLoadFailed'));
         } else {
           setPayload(data.event.providerPayload);
         }
       })
-      .catch(e => setErr(e instanceof Error ? e.message : 'Unknown error'))
+      .catch(e => setErr(e instanceof Error ? e.message : t('unknownError')))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
   return (
-    <Modal isOpen onClose={onClose} title="Raw provider payload" size="lg">
+    <Modal isOpen onClose={onClose} title={t('rawPayloadModalTitle')} size="lg">
       {loading && (
         <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">
           <svg
@@ -268,7 +255,7 @@ function PayloadModal({ eventId, onClose }: PayloadModalProps) {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Loading…
+          {tCommon('loading')}
         </div>
       )}
       {err && !loading && <p className="py-6 text-center text-sm text-destructive">{err}</p>}
@@ -292,8 +279,13 @@ interface EventRowProps {
 }
 
 function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
+  const t = useT('components.paymentEventsTimeline');
   const [showPayload, setShowPayload] = useState(false);
-  const label = getLabel(event.eventType);
+  const label = getLabel(
+    key => t(key as Parameters<typeof t>[0]),
+    key => t.has(key as Parameters<typeof t.has>[0]),
+    event.eventType
+  );
   const iconVariant = getIconVariant(event.eventType);
   const detailsText = formatDetails(event.details);
 
@@ -307,12 +299,7 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
       <div className="min-w-0 flex-1 pb-5">
         {/* Labels row */}
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span dir="ltr" className="text-sm font-medium text-foreground">
-            {label.en}
-          </span>
-          <span dir="rtl" className="text-xs text-muted-foreground">
-            {label.ar}
-          </span>
+          <span className="text-sm font-medium text-foreground">{label}</span>
         </div>
 
         {/* Meta row — chips + time */}
@@ -356,7 +343,7 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              View raw payload
+              {t('viewRawPayload')}
             </button>
             {showPayload && (
               <PayloadModal eventId={event.id} onClose={() => setShowPayload(false)} />
@@ -378,6 +365,7 @@ interface PaymentEventsTimelineProps {
 }
 
 export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTimelineProps) {
+  const t = useT('components.paymentEventsTimeline');
   const [expanded, setExpanded] = useState(false);
   const [events, setEvents] = useState<PaymentEvent[]>([]);
   const [count, setCount] = useState<number | null>(null);
@@ -396,14 +384,14 @@ export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTime
         `/api/v1/payments/${paymentId}/events`
       );
       if (error || !data) {
-        setErr('Could not load events');
+        setErr('load-failed');
       } else {
         setEvents(data.events);
         setCount(data.total ?? data.events.length);
         setFetched(true);
       }
     } catch {
-      setErr('Could not load events');
+      setErr('load-failed');
     } finally {
       setLoading(false);
     }
@@ -444,9 +432,12 @@ export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTime
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
         <span>
-          View payment events{countLabel}
+          {t('toggleLabel')}
+          {countLabel}
           {isSuperAdmin && (
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">(super-admin)</span>
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+              {t('superAdminBadge')}
+            </span>
           )}
         </span>
       </button>
@@ -471,24 +462,19 @@ export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTime
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              Loading events…
+              {t('loadingEvents')}
             </div>
           )}
 
           {/* Error state — non-breaking; order detail still usable */}
           {err && !loading && (
-            <p className="py-2 text-xs text-destructive">
-              Could not load events / تعذّر تحميل الأحداث
-            </p>
+            <p className="py-2 text-xs text-destructive">{t('couldNotLoadEvents')}</p>
           )}
 
           {/* Empty state */}
           {!loading && !err && events.length === 0 && (
             <div className="py-3 text-center">
-              <p className="text-sm text-muted-foreground">No events recorded yet</p>
-              <p className="text-xs text-muted-foreground mt-0.5" dir="rtl">
-                لم يتم تسجيل أحداث بعد
-              </p>
+              <p className="text-sm text-muted-foreground">{t('noEventsYet')}</p>
             </div>
           )}
 

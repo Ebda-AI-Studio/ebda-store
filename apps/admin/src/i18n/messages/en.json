@@ -46,7 +46,10 @@
     "backToStore": "Back to Store",
     "backToSettings": "Back to Settings",
     "saveChanges": "Save Changes",
-    "loadingEllipsis": "Loading..."
+    "loadingEllipsis": "Loading...",
+    "skipToMainContent": "Skip to main content",
+    "actions": "Actions",
+    "deactivate": "Deactivate"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -628,7 +631,8 @@
         "inventory": "Inventory",
         "status": "Status",
         "organization": "Organization",
-        "flags": "Product Flags"
+        "flags": "Product Flags",
+        "seo": "SEO"
       },
       "fields": {
         "name": "Product Name",
@@ -685,7 +689,7 @@
         "cancel": "Cancel"
       },
       "faqs": {
-        "title": "FAQs / الأسئلة الشائعة",
+        "title": "FAQs",
         "description": "These FAQs appear on the product page and are injected as FAQ rich-results for Google.",
         "empty": "No FAQs yet. Add one below or generate with AI.",
         "question": "Question (EN)",
@@ -706,6 +710,26 @@
         "reviewNote": "AI draft — review before saving",
         "saveAll": "Save all AI drafts",
         "discardAll": "Discard AI drafts"
+      },
+      "seoSection": {
+        "hint": "How this product appears on Google and when shared.",
+        "aiFillEmpty": "AI fill empty",
+        "aiRegenerateAll": "Regenerate all",
+        "generating": "Generating…",
+        "metaTitleLabel": "Meta title ({count}/70)",
+        "metaTitleArLabel": "Meta title AR ({count}/70)",
+        "metaDescriptionLabel": "Meta description ({count}/180)",
+        "metaDescriptionArLabel": "Meta description AR ({count}/180)",
+        "aeoExplanation": "<b>AEO</b> — Conversational answer-engine copy for AI search (Perplexity, Google AI Overview). Filled by \"AI fill empty\" or \"Regenerate all\" above (or the catalogue-wide AEO sweep); you can edit here.",
+        "aeoMetaDescriptionEnLabel": "AEO meta description EN ({count}/180)",
+        "aeoMetaDescriptionArLabel": "AEO meta description AR ({count}/180)",
+        "generateSuccessMessage": "AI filled SEO + AEO and drafted FAQs (review the FAQ section below). Review then click Save changes.",
+        "generatePartialFailureMessage": "AI generation partially failed — {failures}. The rest were applied; review then click Save changes.",
+        "failureSeo": "SEO ({message})",
+        "failureAeo": "AEO ({message})",
+        "failureFaqs": "FAQs (failed)",
+        "genericFailed": "failed",
+        "networkError": "Network error contacting AI"
       }
     },
     "recommendations": {
@@ -744,7 +768,34 @@
         "savedDescription": "Recommendations saved successfully."
       },
       "counts": "{count} / {max}",
-      "removeAria": "Remove {name}"
+      "removeAria": "Remove {name}",
+      "aiSuggestions": {
+        "heading": "AI suggestions",
+        "refresh": "Refresh",
+        "loading": "Loading…",
+        "errorLoadFailed": "Failed to load AI suggestions",
+        "addedToCrossSell": "Added \"{name}\" to cross-sell",
+        "promotedAll": "Promoted {count} AI picks to manual cross-sell",
+        "promotedCapped": "Promoted {capped} (max {max} reached — {skipped} skipped)",
+        "demoteConfirm": "Remove {count} AI-promoted product(s) from the manual cross-sell list? The storefront will fall back to AI picks (priority tier 2) on the next render.",
+        "demotedToast": "Demoted {count} AI picks back to fallback rendering",
+        "promoteAllButton": "Promote all",
+        "demoteAllButton": "Demote all",
+        "promoteAllTitleEmpty": "Nothing to promote — all suggestions already in the cross-sell list",
+        "promoteAllTitleMax": "Cross-sell list at max ({max}). Remove an entry first.",
+        "promoteAllTitleReady": "Promote {count} suggestion(s)",
+        "demoteAllTitleEmpty": "Nothing to demote — none of the AI picks are in the manual cross-sell list",
+        "demoteAllTitleReady": "Demote {count} AI pick(s) back to fallback rendering",
+        "description": "Picks from the last <b>AI recommendations</b> sweep. These show automatically on the storefront \"You might also like\" section when no manual cross-sell is set. Click <b>Promote</b> to add a single pick, or use <b>Promote all</b> / <b>Demote all</b> at the top to flip the whole list. Promoted picks take priority over the AI defaults on the storefront.",
+        "emptyState": "No AI suggestions yet for this product. Run the <b>AI recommendations</b> sweep from <a>AI Tools</a>.",
+        "alreadyAdded": "Already added",
+        "promoteButton": "Promote",
+        "confirmModal": {
+          "title": "Promote all recommendations?",
+          "body": "This will add <b>{count}</b> {count, plural, one {AI-suggested product} other {AI-suggested products}} to the manual cross-sell list.",
+          "confirmButton": "Promote {count}"
+        }
+      }
     },
     "variants": {
       "loading": "Loading...",
@@ -895,6 +946,14 @@
       "sku": "SKU: {sku}",
       "inactive": "Inactive",
       "retry": "Retry"
+    },
+    "aiFieldBadge": {
+      "aiGeneratedTitle": "Generated by AI — edit to take ownership",
+      "aiLabel": "AI",
+      "failedTitle": "Could not switch to AI — try again",
+      "handBackTitle": "Hand this field back to the AI",
+      "retryLabel": "⚠ Retry",
+      "switchToAiLabel": "✨ Switch to AI"
     }
   },
   "orders": {
@@ -997,7 +1056,8 @@
         "markPaid": "Failed to mark as paid",
         "bulkMarkPaid": "Failed to bulk mark as paid",
         "retry": "Retry"
-      }
+      },
+      "agentBadge": "Agent"
     },
     "status": {
       "pending": "Pending",
@@ -1009,6 +1069,76 @@
       "refunded": "Refunded",
       "paid": "Paid",
       "unpaid": "Unpaid"
+    },
+    "new": {
+      "title": "New order (phone order)",
+      "subtitle": "Create an order on behalf of a customer, then issue a payment link",
+      "customerSection": {
+        "heading": "Customer",
+        "existingTab": "Existing customer",
+        "guestTab": "New / Guest",
+        "searchPlaceholder": "Search by name, email, or phone…",
+        "guestBadge": "guest",
+        "linkedToCustomer": "Linked to existing customer {id}…",
+        "firstNameLabel": "First name *",
+        "lastNameLabel": "Last name",
+        "emailLabel": "Email",
+        "phoneLabel": "Phone *"
+      },
+      "shippingSection": {
+        "heading": "Shipping address",
+        "addressLabel": "Address line",
+        "governorateLabel": "Governorate",
+        "areaLabel": "Area",
+        "selectGovernoratePlaceholder": "— Select governorate —",
+        "selectAreaPlaceholder": "— Select area —",
+        "selectGovernorateFirstPlaceholder": "— Select governorate first —",
+        "countryLabel": "Country",
+        "calculatedFeeTitle": "Calculated shipping fee",
+        "calculating": "Calculating…",
+        "freeDelivery": "Free delivery",
+        "viaAreaRate": "area rate",
+        "viaZone": "zone",
+        "viaSource": "(via {source})",
+        "noRateConfigured": "No rate configured for this area — set a fee below or the order will save with 0 KWD shipping.",
+        "overrideLabel": "Shipping fee override (KWD) — leave blank to use the calculated fee",
+        "overridePlaceholder": "e.g. 1.500",
+        "overrideActive": "Override active: {price} ({fils} fils) will be used instead of the calculated fee."
+      },
+      "productsSection": {
+        "heading": "Products",
+        "searchPlaceholder": "Search products by name or SKU…",
+        "loadingVariants": "Loading variants…",
+        "chooseVariantPrompt": "{name} — choose a variant:",
+        "outOfStock": "(out of stock)",
+        "noProductsYet": "No products yet. Search above to add the first item.",
+        "removeItemAria": "Remove item",
+        "subtotalLabel": "Subtotal:",
+        "shippingLabel": "Shipping:",
+        "freeShort": "Free",
+        "overrideSuffix": "(override)",
+        "previewHintReady": "Shipping fee shown is a preview — tax is calculated on save.",
+        "previewHintPending": "Select governorate + area above to preview the shipping fee."
+      },
+      "notesSection": {
+        "couponLabel": "Coupon code (optional)",
+        "notesLabel": "Notes (optional)"
+      },
+      "footer": {
+        "itemCount": "{count, plural, one {# item} other {# items}}",
+        "creating": "Creating…",
+        "placeOrder": "Place order",
+        "unpaidHint": "Order created in unpaid state. Issue a MyFatoorah payment link from the order detail page after save."
+      },
+      "errors": {
+        "noItems": "Add at least one product before placing the order",
+        "missingRequired": "First name and phone are required",
+        "createFailed": "Failed to create order",
+        "unknownError": "Unknown error"
+      },
+      "toast": {
+        "created": "Order {orderNumber} created"
+      }
     },
     "detail": {
       "back": "Back",
@@ -1059,7 +1189,8 @@
         "printInvoice": "Print Invoice",
         "markPaid": "Mark Paid",
         "addNote": "Add Note",
-        "refund": "Refund"
+        "refund": "Refund",
+        "toolbarLabel": "Order actions"
       },
       "loading": "Loading order…",
       "errors": {
@@ -1079,6 +1210,38 @@
         "building": "Building",
         "floor": "Floor",
         "apt": "Apt"
+      },
+      "refundViaProvider": {
+        "button": "Refund via provider",
+        "buttonTooltip": "Refund the customer via the original payment provider",
+        "modalTitle": "Refund order {orderNumber}?",
+        "modalBodyIntro": "A refund request of <b>{amount} {currency}</b> will be sent to the payment provider. The customer's card typically reflects the refund in 1-3 business days (MyFatoorah refunds are reviewed by their finance team before execution).",
+        "modalBodySideEffects": "Inventory will be restored, coupon usage decremented, loyalty points reversed, and the customer will be notified by email. This cannot be undone.",
+        "reasonLabel": "Reason (optional, shown to the customer)",
+        "reasonPlaceholder": "Out of stock, customer request, duplicate charge…",
+        "refundNowButton": "Refund now",
+        "refundingButton": "Refunding…",
+        "toastFailedTitle": "Refund failed",
+        "toastSuccessBody": "Refund of {amount} {currency} requested via {provider} — customer's card will reflect in 1-3 business days"
+      },
+      "refreshPayment": {
+        "button": "Refresh payment",
+        "checkingButton": "Checking…",
+        "buttonTooltip": "Re-check payment status with the provider (use when webhook didn't fire)",
+        "toastFailedTitle": "Refresh failed",
+        "toastUpdated": "Payment status updated to {status}",
+        "toastNoChange": "Provider status: {status} (no change)"
+      },
+      "refreshRefundStatus": {
+        "button": "Refresh refund status",
+        "checkingButton": "Checking refund…",
+        "buttonTooltip": "Re-check refund status with the provider (use when refund webhook didn't fire)",
+        "toastFailedTitle": "Refund status refresh failed",
+        "statusCompleted": "completed — customer card has been credited",
+        "statusCanceled": "canceled by provider",
+        "statusPending": "still pending finance team review",
+        "toastStatusChanged": "Refund status: {label}",
+        "toastNoChange": "Refund still {status} (no change)"
       }
     },
     "layout": {
@@ -1093,7 +1256,12 @@
       "loadError": "Failed to load layout",
       "preview": {
         "mobile": "Mobile",
-        "desktop": "Desktop"
+        "desktop": "Desktop",
+        "liveTitle": "Live preview",
+        "iframeTitle": "Storefront preview (mobile)",
+        "openInNewTab": "Open in new tab ↗",
+        "unavailable": "Preview unavailable — the store has no slug or domain configured.",
+        "saveHint": "Click <b>Save changes</b> to refresh — the iframe reloads after each save."
       },
       "sections": {
         "hero": {
@@ -1206,11 +1374,387 @@
           "heroAspect": "Hero aspect",
           "productImageAspect": "Product image",
           "categoryImageAspect": "Category image"
-        }
+        },
+        "brandStory": "Brand story",
+        "blogCarousel": "Blog carousel",
+        "trustStrip": "Trust strip",
+        "announcementBar": "Announcement bar",
+        "header": "Header",
+        "footer": "Footer",
+        "brandStoryDescription": "Image + story block sourced from your store hero image + description.",
+        "blogCarouselDescription": "Latest blog posts on the homepage. The /blog routes are gated separately by Store.blogEnabled.",
+        "trustStripDescription": "3 trust-signal badges (free delivery, returns, support) — bilingual platform copy.",
+        "announcementDescription": "Site-wide message above the header. Visible content edited via the Announcement Bar admin page; here you control chrome and dividers.",
+        "headerDescription": "Header chrome — background, sticky-on-scroll, dividers, spacing, typography.",
+        "footerDescription": "Everything footer: background, dividers, spacing, typography — plus the three footer link columns and the newsletter signup. (The top utility bar has its own card near the header.)"
       },
       "common": {
         "enabled": "Enabled",
-        "disabled": "Disabled"
+        "disabled": "Disabled",
+        "themeDefault": "Theme default",
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large",
+        "extraLarge": "Extra large",
+        "auto": "Auto",
+        "normal": "Normal",
+        "compact": "Compact",
+        "spacious": "Spacious",
+        "rounded": "Rounded",
+        "pill": "Pill",
+        "square": "Square",
+        "soft": "Soft",
+        "none": "None",
+        "tight": "Tight",
+        "loose": "Loose",
+        "xloose": "X-loose",
+        "sectionBgColorLabel": "Section background color",
+        "sectionBgColorHint": "Overrides the theme background preset for this section only.",
+        "cancel": "Cancel"
+      },
+      "productCard": {
+        "cardSize": "Card size",
+        "imageAspect": "Image aspect",
+        "cardShape": "Card shape",
+        "cardSpacing": "Card spacing",
+        "frameStyle": "Frame style",
+        "borderThickness": "Border thickness",
+        "frameSize": "Frame size",
+        "sizeTiniest": "Tiniest (90/110px)",
+        "sizeXs": "Extra small (120/140px)",
+        "sizeSmDefault": "Small (150/180px) — default",
+        "sizeMd": "Medium (200/240px)",
+        "sizeLg": "Large (240/300px)",
+        "sizeXl": "Extra large (280/360px)",
+        "aspectThemeDefaultRatio": "Theme default (3:4 — 600×800)",
+        "aspectSquare": "Square 1:1 (800×800)",
+        "aspectPortraitRatio": "Portrait 3:4 (600×800)",
+        "aspectLandscapeRatio": "Landscape 4:3 (800×600)",
+        "aspectWideRatio": "Wide 3:2 (900×600)",
+        "aspectUltrawideRatio": "Ultra-wide 16:9 (960×540)",
+        "shapeCircle": "Circle (round, 1:1)",
+        "shapeRoundedSquare": "Rounded square (soft, 1:1)",
+        "shapeSharpSquare": "Sharp square (1:1)",
+        "shapeSoftRectangle": "Soft rectangle (4:5)",
+        "shapePortraitPlain": "Portrait (3:4)",
+        "shapeLandscapePlain": "Landscape (4:3)",
+        "shapePillRatio": "Pill (horizontal, 2:1)",
+        "spacingTight": "Tight (6-8px)",
+        "spacingNormalDefault": "Normal (12-16px) — default",
+        "spacingLoose": "Loose (20-24px)",
+        "spacingXloose": "Extra loose (32-40px)",
+        "frameSoftDefault": "Soft (rounded + light shadow) — default",
+        "frameOutline": "Outline (2px border, no shadow)",
+        "frameShadow": "Shadow (larger drop shadow, no border)",
+        "framePaper": "Paper (editorial, larger padding)",
+        "borderThinDefault": "Thin (1px) — default",
+        "borderNormal": "Normal (2px)",
+        "borderThick": "Thick (4px)",
+        "borderXthick": "Extra thick (8px)",
+        "frameSizeCompact": "Compact (8px padding)",
+        "frameSizeNormalDefault": "Normal (12px padding) — default",
+        "frameSizeComfortable": "Comfortable (16px padding)",
+        "frameSizeSpacious": "Spacious (24px padding)",
+        "showCategoryLabels": "Show category labels",
+        "showLabels": "Show labels",
+        "hoverEffects": "Hover effects",
+        "showFrame": "Show frame around each card",
+        "frameColorLabel": "Card frame color (this section)",
+        "frameColorHint": "Overrides the theme border color for these cards.",
+        "shapeOverrideHint": "Overrides the aspect ratio + rounded corners with one preset.",
+        "aspectAutoSquare": "Auto (square)",
+        "aspectSquarePlain": "Square (1:1)",
+        "aspectWidePlain": "Wide (3:2)",
+        "aspectUltrawidePlain": "Ultra-wide (16:9)",
+        "everywhereTitle": "Product cards (everywhere)",
+        "everywhereDescription": "Styling for the product CARD tiles — size, frame, aspect, and name/price/button fonts — wherever they appear (listing, category, search, carousels). This is the card itself, not a page; page backgrounds & headings are in the page cards above.",
+        "brandBadgeTitle": "Brand badge on cards",
+        "brandBadgeHint": "Small store-name pill in the top corner of every product card.",
+        "quickAddTitle": "Quick-add (+) on carousel cards",
+        "quickAddHint": "One-tap add-to-cart circle on homepage carousel cards. When ON, the bottom Add to cart button auto-suppresses on the same card.",
+        "normalizeImagesTitle": "Normalize product images",
+        "normalizeImagesHint": "Force all card images to fill their container uniformly (object-fit: cover). Creates a consistent grid look when product photos have mixed dimensions. Images are never modified — toggle off to revert.",
+        "cardImageShapeTitle": "Card image shape",
+        "imageAspectRatioLabel": "Image aspect ratio",
+        "imageShapeSquare": "Square (1:1)",
+        "imageShapePortrait45": "Portrait (4:5)",
+        "imageShapeTallPortrait": "Tall portrait (3:4)",
+        "imageShapeLandscape169": "Landscape (16:9)",
+        "imageShapeAutoNoConstraint": "Auto (no constraint)",
+        "cornerRadiusLabel": "Corner radius",
+        "radiusNone": "None (sharp)",
+        "radiusFull": "Full (circle)",
+        "showName": "Show product name",
+        "showPrice": "Show product price",
+        "productNameCaseLabel": "Product name case",
+        "textUppercase": "UPPERCASE",
+        "ctaTitle": "Call-to-action button",
+        "ctaModeLabel": "Card button mode",
+        "ctaModeAuto": "Auto (View + Add to cart)",
+        "ctaModeViewOnly": "View only",
+        "ctaShapeLabel": "CTA shape",
+        "ctaSizeLabel": "CTA size",
+        "customCtaLabel": "Custom CTA label",
+        "ctaLabelEn": "CTA label (EN)",
+        "ctaLabelAr": "CTA label (AR)",
+        "ctaBgColorLabel": "CTA background color",
+        "ctaTextColorLabel": "CTA text color",
+        "oosTitle": "Out-of-stock label",
+        "showOosLabel": "Show OOS label",
+        "oosLabelEn": "OOS label (EN)",
+        "oosLabelAr": "OOS label (AR)",
+        "labelShapeLabel": "Label shape",
+        "labelPlacementLabel": "Label placement",
+        "oosBgColorLabel": "OOS label background color",
+        "oosTextColorLabel": "OOS label text color",
+        "dimColorLabel": "Dim color when out of stock",
+        "dimColorHint": "Overlay tint applied to the card image when out of stock.",
+        "badgeColorLabel": "Badge color",
+        "discountBadgeColorHint": "Unset = platform default red/destructive color.",
+        "customBadgeColorHint": "Unset = platform primary color.",
+        "discountBadgeTitle": "Discount / sale badge",
+        "badgePositionLabel": "Badge position",
+        "positionBottomLeftDefault": "Bottom left (default)",
+        "positionBottomRightDefault": "Bottom right (default)",
+        "positionTopLeft": "Top left",
+        "positionTopRight": "Top right",
+        "positionBottomLeft": "Bottom left",
+        "positionBottomRight": "Bottom right",
+        "customBadgeTitle": "Custom product badge",
+        "customBadgeStylingHint": "Styling only. Type the badge text per product under Products → edit a product → Product Flags.",
+        "sectionTitle": "Product cards",
+        "placementTopStart": "Top start",
+        "placementTopEnd": "Top end",
+        "placementBottomStart": "Bottom start",
+        "placementBottomEnd": "Bottom end"
+      },
+      "categories": {
+        "frameColorHint": "Overrides the theme border color for these category cards."
+      },
+      "toolbar": {
+        "smartPalette": "Smart palette",
+        "pendingBrandColorsHint": "Brand color changes from Smart Palette are pending. Click Save to commit.",
+        "unsavedBrandColors": "Unsaved brand colors",
+        "stopPreviewHint": "Stop previewing unsaved changes — show the saved version instead.",
+        "previewUnsavedChanges": "Preview is showing unsaved changes (click to reset)",
+        "expandAll": "Expand all",
+        "collapseAll": "Collapse all"
+      },
+      "pageCards": {
+        "productsListTitle": "Products list page",
+        "productDetailTitle": "Product detail page",
+        "categoriesTitle": "Categories page",
+        "locationsTitle": "Locations page",
+        "checkoutTitle": "Checkout page",
+        "cartTitle": "Cart page",
+        "productsListDescription": "The /products listing page — background + heading/subtitle typography. (Card styling is in 'Product cards' below.)",
+        "productDetailDescription": "The single-product page — background, main image shape, and product name / price / heading typography.",
+        "categoriesDescription": "The /categories listing page — background + heading / subtitle / category-label typography.",
+        "locationsDescription": "The /locations branches page — background + heading / subtitle typography.",
+        "checkoutDescription": "The checkout / payment page — background + heading / label / amount typography.",
+        "cartDescription": "Background colour + typography for the whole cart: headings (Section heading), labels — items count / subtotal / shipping (Section subtitle), item names (Product name), every price (Product price), and buttons/links — remove / continue / apply / checkout (Product CTA).",
+        "backgroundLabel": "Page background",
+        "textColorsTitle": "Text colors",
+        "breadcrumbColorLabel": "Breadcrumb color (Home / Products)",
+        "breadcrumbColorHint": "Color of the Home → Products breadcrumb trail. Default: theme muted.",
+        "headingColorLabel": "Page heading color (All Products)",
+        "headingColorHint": "Color of the 'All Products' h1. Default: theme foreground.",
+        "subtitleColorLabel": "Subtitle color (Browse our collection)",
+        "subtitleColorHint": "Color of the subtitle under the h1. Default: theme muted.",
+        "mainImageAspectLabel": "Main image aspect",
+        "orderSummaryLabelsTitle": "Order summary labels",
+        "labelColorLabel": "Label color (Subtotal, Shipping…)",
+        "labelColorHint": "Color of the Subtotal, Shipping, Tax row labels. Default: theme foreground.",
+        "totalColorLabel": "Total color",
+        "totalColorHint": "Color of the Total label and amount. Default: theme foreground.",
+        "boldSummaryLabels": "Bold summary labels",
+        "boldSummaryLabelsHint": "Makes Subtotal / Shipping / Total labels bold. On by default."
+      },
+      "header": {
+        "topUtilityBarTitle": "Top utility bar",
+        "topUtilityBarDescription": "Thin links strip above the main header (Elegant + Classic packs) — track order, language, contact, etc. Disable to hide it entirely.",
+        "storefrontNavTitle": "Storefront Navigation",
+        "storefrontNavDescription": "Header menu links — add, remove, and reorder items. Use relative paths (/products) for store pages or full URLs for external links."
+      },
+      "footer": {
+        "footerLinksTitle": "Footer links",
+        "bottomBarTitle": "Bottom bar (mobile)",
+        "bottomBarDescription": "Color the mobile tab bar at the bottom of the screen. Leave fields empty to keep the theme default.",
+        "barBackgroundLabel": "Bar background",
+        "barBackgroundHint": "Overrides the default bar background (theme section-alt) when set.",
+        "activeIconLabelColorLabel": "Active icon & label color",
+        "activeIconLabelColorHint": "Color for the active tab's icon, label, and pill tint. Default: theme foreground.",
+        "inactiveIconLabelColorLabel": "Inactive icon & label color",
+        "inactiveIconLabelColorHint": "Color for inactive tabs. Default: theme foreground at 60% opacity."
+      },
+      "typography": {
+        "textContrastLabel": "Text contrast",
+        "contrastAuto": "Auto (from background)",
+        "contrastLight": "Light surface · dark text",
+        "contrastDark": "Dark surface · light text",
+        "spacingDensityLabel": "Spacing density",
+        "textSizeLabel": "Text size",
+        "sectionOverrideTitle": "Section typography (overrides default)",
+        "sectionOverrideHint": "Override the default typography for each text role in this section only. Leave all fields empty to inherit from the Header + Footer typography defaults at the bottom of this page."
+      },
+      "roleLabels": {
+        "heading": "Section heading",
+        "kicker": "Section kicker (chip above title)",
+        "subtitle": "Section subtitle",
+        "seeAll": "\"View All\" link",
+        "productName": "Product name",
+        "productPrice": "Product price",
+        "productCta": "Product CTA / button",
+        "categoryLabel": "Category card label"
+      },
+      "zoneLabels": {
+        "beforeHeader": "Announcement bar (top promo strip)",
+        "header": "Page header (logo + nav)",
+        "storeName": "Store name (in header)",
+        "sectionKicker": "Section kicker (chip above title)",
+        "sectionTitle": "Section heading",
+        "sectionSubtitle": "Section subtitle",
+        "sectionSeeAll": "Section \"View All\" link",
+        "categories": "Category card labels",
+        "products": "Products (base)",
+        "productName": "Product name (card)",
+        "productPrice": "Product price (card)",
+        "cta": "Buttons + CTAs",
+        "filters": "Filter sidebar",
+        "footer": "Footer",
+        "afterFooter": "Below footer"
+      },
+      "sectionLabels": {
+        "hero": "Hero",
+        "categories": "Categories",
+        "newArrivals": "New arrivals",
+        "bestSellers": "Best sellers",
+        "brandStory": "Brand story",
+        "blogCarousel": "Blog carousel",
+        "trustStrip": "Trust strip",
+        "testimonials": "Testimonials"
+      },
+      "kickerSubtitle": {
+        "optionalHint": "Optional kicker + subtitle. Leave blank to skip.",
+        "kickerLabelEn": "Kicker label (EN)",
+        "kickerLabelAr": "Kicker label (AR)",
+        "subtitleLabelEn": "Subtitle (EN)",
+        "subtitleLabelAr": "Subtitle (AR)"
+      },
+      "fonts": {
+        "title": "Fonts",
+        "description": "Fonts available to use in any Typography zone below. Add Google Fonts by family name (e.g. Cairo) — URL auto-builds. Or upload a custom font file (.woff2/.woff/.ttf/.otf, max 5MB).",
+        "google": "Google",
+        "custom": "Custom",
+        "remove": "Remove",
+        "familyNameLabel": "Font family name",
+        "googleUrlLabel": "Google Fonts URL (optional — auto-built from family)",
+        "addFont": "Add font",
+        "familyNameDisplayLabel": "Font family name (display label)",
+        "fileLabel": "Font file (.woff2 / .woff / .ttf / .otf — max 5MB)",
+        "uploading": "Uploading…",
+        "uploadFont": "Upload font",
+        "addGoogleFont": "+ Add Google Font",
+        "uploadCustomFont": "↥ Upload custom font"
+      },
+      "sectionOrder": {
+        "title": "Section order",
+        "dragHint": "Drag to reorder homepage sections. The new order saves on the main Save button.",
+        "v1Notice": "Admin v1 — drag persistence is live. Storefront enforcement of this order is coming in v2; for now the storefront keeps its hardcoded sequence regardless of the value saved here."
+      },
+      "manualPicker": {
+        "maxProductsAlert": "Maximum 50 products per carousel",
+        "skuPrefix": "SKU: {sku}",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "searchPlaceholder": "Search products to add ({current}/{max})…",
+        "searching": "Searching…",
+        "noMatches": "No matches.",
+        "keyboardHint": "↑↓ to navigate · Enter to add · Esc to close"
+      },
+      "extraCarousel": {
+        "defaultTitle": "Extra carousel {n}",
+        "sourceDescription": "Source: {source}. Drag-reorder support coming in v2.",
+        "titleEn": "Title (EN)",
+        "titleAr": "Title (AR)",
+        "subtitleEn": "Subtitle (EN)",
+        "subtitleAr": "Subtitle (AR)",
+        "productSourceLabel": "Product source",
+        "sourceNewest": "Newest (same as New Arrivals)",
+        "sourceBestSellers": "Best sellers",
+        "sourceFeatured": "Featured",
+        "sourceCategory": "Category",
+        "sourceManual": "Manual product list",
+        "categorySlugLabel": "Category slug",
+        "categoryFetchLimitLabel": "Products to fetch from this category (default 50)",
+        "categoryFetchLimitHint": "Bump higher (max 200) for large categories — costs more per page load. Keep at 50 unless your category has >50 products AND the storefront needs visibility past the first 50.",
+        "manualProductsLabel": "Manual products",
+        "maxProductsLabel": "Max products",
+        "backgroundColorLabel": "Background color",
+        "positionOfTotal": "Position {position} of {total}",
+        "moveUp": "↑ Move up",
+        "moveDown": "↓ Move down",
+        "deleteConfirm": "Delete this carousel{suffix}?",
+        "deleteButton": "Delete carousel"
+      },
+      "extraSection": {
+        "backgroundColorLabel": "Background color",
+        "layoutLabel": "Layout",
+        "layoutHorizontal": "Horizontal (3-up)",
+        "layoutVertical": "Vertical (stacked)",
+        "sizeLabel": "Size",
+        "iconColorLabel": "Icon color",
+        "iconBgColorLabel": "Icon background color",
+        "textColorLabel": "Text color",
+        "maxPostsLabel": "Max posts",
+        "typographyLabel": "Typography"
+      },
+      "paddingBlock": {
+        "title": "Spacing & visibility",
+        "paddingTopLabel": "Padding top",
+        "paddingBottomLabel": "Padding bottom",
+        "maxWidthLabel": "Max width",
+        "hideOnMobile": "Hide on mobile",
+        "hideOnDesktop": "Hide on desktop",
+        "optNone": "None",
+        "optTight": "Tight",
+        "optNormal": "Normal",
+        "optLoose": "Loose",
+        "optXloose": "X-loose",
+        "maxWidthContained": "Contained (max-w-7xl)",
+        "maxWidthFull": "Edge-to-edge"
+      },
+      "dividers": {
+        "title": "Section dividers",
+        "hint": "Hairline dividers around each part of this section. Pick which slots show a divider; the styling below applies to all enabled slots so they stay visually consistent.",
+        "above": "Above this section",
+        "aroundKicker": "Around kicker text",
+        "aroundTitle": "Around title",
+        "aroundSubtitle": "Around subtitle",
+        "belowHeading": "Below heading (before content)",
+        "style": "Style",
+        "optSolid": "Solid",
+        "optDashed": "Dashed",
+        "optDotted": "Dotted",
+        "optDouble": "Double",
+        "thickness": "Thickness",
+        "width": "Width",
+        "optShort": "Short",
+        "optContained": "Contained",
+        "optEdgeToEdge": "Edge-to-edge",
+        "color": "Color",
+        "colorAuto": "Auto (theme border token)",
+        "colorForeground": "Foreground (high contrast)",
+        "colorAccent": "Brand accent (primary)",
+        "colorCustom": "Custom — brand token or hex",
+        "spacing": "Spacing"
+      },
+      "aiSectionFill": {
+        "failedTitle": "AI generation failed",
+        "successTitle": "AI filled empty kicker + subtitle fields",
+        "generating": "Generating…",
+        "generateWithAi": "Generate with AI"
       }
     },
     "devices": {
@@ -1241,6 +1785,36 @@
       "toast": {
         "emailSent": "Invoice emailed to customer"
       }
+    },
+    "paymentLinkButton": {
+      "linkCopied": "Link copied to clipboard",
+      "clipboardError": "Could not access clipboard — copy the link manually",
+      "issueFailed": "Failed to issue payment link",
+      "emailSent": "Email sent to {email}",
+      "customerFallback": "customer",
+      "copyAria": "Copy payment link",
+      "openAria": "Open payment link",
+      "issueNewLink": "Issue a new link",
+      "buttonLabel": "Payment Link",
+      "modalTitle": "Issue Payment Link",
+      "modalSubtitle": "Order {orderNumber} — generate a MyFatoorah link to collect payment.",
+      "option": {
+        "copyLink": {
+          "title": "Copy link",
+          "description": "Generate the URL — copy it and share via WhatsApp, email, or any channel you prefer."
+        },
+        "email": {
+          "title": "Send via email",
+          "description": "MyFatoorah delivers the payment link directly to the customer's email on file."
+        }
+      },
+      "issuing": "Issuing payment link…",
+      "successEmailSent": "✓ Email sent to {email}",
+      "successGenerated": "✓ Payment link generated",
+      "paymentUrlLabel": "Payment URL",
+      "copyButton": "Copy",
+      "paidAutoUpdateNote": "The customer can pay anytime from this link. Once paid, the order's payment status updates automatically via webhook.",
+      "doneButton": "Done"
     }
   },
   "customers": {
@@ -1289,7 +1863,10 @@
         "lost": "Lost",
         "activeBuyer": "Active Buyer",
         "new": "New"
-      }
+      },
+      "colLastPayment": "Last Payment",
+      "colAddress": "Address",
+      "statusCancelled": "Cancelled"
     },
     "detail": {
       "loading": "Loading…",
@@ -1710,6 +2287,43 @@
       "arabicNumerals": {
         "title": "Arabic numerals (٠١٢٣)",
         "hint": "Show Eastern Arabic-Indic digits on the Arabic storefront. Off = Western digits (0-9) everywhere."
+      },
+      "socialIconColors": {
+        "title": "Social icon colors",
+        "hint": "By default social icons inherit the footer's text color (monochrome). Enable original brand colors to show each platform in its registered color (Instagram pink, WhatsApp green, etc.).",
+        "footerLabel": "Use original brand colors in footer social icons",
+        "widgetLabel": "Use original brand colors in floating widget buttons (overrides custom button colors)"
+      },
+      "webPush": {
+        "title": "Storefront web push",
+        "hint": "Off by default. When on, shoppers can subscribe to web push (requires the Push Notifications plan feature).",
+        "enableLabel": "Enable storefront web push opt-in"
+      },
+      "personaChrome": {
+        "title": "Persona chrome completion",
+        "hint": "Off by default on existing stores; new stores are created with this on. Adds theme-specific chrome using your existing colors: hairline-flanked heading + whisper see-all link on Elegant, circular category tiles on Classic, bordered header + inverted footer on Bold. No change to card sizes, product name/price text, fonts, or colors.",
+        "enableLabel": "Enable persona chrome completion"
+      },
+      "cardFrameDedup": {
+        "title": "Remove doubled card frame",
+        "hint": "Off by default on existing stores; new stores are created with this on. When your homepage carousels/strips have \"Show card frame\" enabled, this removes the extra inner border so each card shows a single frame instead of two nested ones.",
+        "enableLabel": "Enable single card frame"
+      },
+      "rtlPolish": {
+        "title": "RTL arrow polish (Elegant)",
+        "hint": "Off by default on existing stores; new stores are created with this on. Fixes the Elegant theme's empty-state CTA arrow to point the correct reading direction in Arabic (← instead of always →).",
+        "enableLabel": "Enable RTL arrow polish"
+      },
+      "uppercaseStyle": {
+        "title": "Uppercase text styling (nav, headings, labels)",
+        "hint": "When enabled, nav links, footer column headings, section headings, category captions, hero text, and testimonial author names render in uppercase. Off by default (natural case). Product names have their own control on Page Builder.",
+        "enableLabel": "Enable uppercase chrome styling"
+      },
+      "footerLogo": {
+        "title": "Footer logo (optional)",
+        "hint": "Upload a different logo for the footer when your footer background is dark and the main logo doesn't read well. Leave empty to use the main logo.",
+        "invertLabel": "Or invert the main logo to white (CSS filter — useful for dark footer backgrounds when uploading a separate logo isn't worth it). Ignored when a footer logo is uploaded above.",
+        "hideMobileLabel": "Hide footer logo on mobile (desktop footer logo stays visible). Useful when the header logo on mobile is already large and the footer reads better as text-only."
       },
       "logoSize": {
         "title": "Logo size",
@@ -2236,7 +2850,10 @@
     "page": {
       "title": "Delivery areas & fees",
       "subtitle": "Set per-area delivery fees for every Kuwait district",
-      "intro": "A shipping zone is a group of areas you charge a single rate to deliver to. Define a zone for each region you ship to so checkout can quote the right delivery fee."
+      "intro": "A shipping zone is a group of areas you charge a single rate to deliver to. Define a zone for each region you ship to so checkout can quote the right delivery fee.",
+      "carriersBannerTitle": "Shipping Carriers enabled",
+      "carriersBannerHint": "Configure iCarry & Aramex credentials, test connections, and view shipments.",
+      "carriersBannerLink": "Manage carriers →"
     },
     "toolbar": {
       "addZone": "Add Zone"
@@ -2765,7 +3382,8 @@
         "approve": "Approve",
         "reject": "Reject",
         "suspend": "Suspend",
-        "payout": "Payout"
+        "payout": "Payout",
+        "viewEvents": "View events"
       },
       "empty": {
         "title": "No Affiliates Yet",
@@ -2859,6 +3477,32 @@
       },
       "inviteError": {
         "message": "Failed to add affiliate. The email may already be registered."
+      }
+    },
+    "auditTrail": {
+      "title": "Audit Trail",
+      "titleFallback": "Affiliate Audit Trail",
+      "titleWithName": "{name} — Audit Trail",
+      "backToAffiliates": "Back to Affiliates",
+      "referralsAndPayouts": "Referrals & Payouts",
+      "description": "Append-only status change history from the <code>affiliate_events</code> table",
+      "noEvents": "No audit events yet",
+      "noEventsHint": "Status changes (approve / reject / suspend) appear here once they occur.",
+      "loadError": "Failed to load audit trail",
+      "eventsCount": "{count, plural, one {# event} other {# events}}",
+      "reasonLabel": "Reason: {reason}",
+      "commissionLabel": "Commission:",
+      "payoutLabelText": "Payout:",
+      "eventTypes": {
+        "created": "Affiliate created",
+        "approve": "Application approved",
+        "reject": "Application rejected",
+        "suspend": "Account suspended",
+        "reactivate": "Account reactivated",
+        "commission_recorded": "Commission recorded",
+        "payout_initiated": "Payout initiated",
+        "payout_completed": "Payout completed",
+        "payout_failed": "Payout failed"
       }
     }
   },
@@ -3697,7 +4341,12 @@
         "expire": "Expired",
         "adjust": "Adjustment",
         "tier_changed": "Tier Changed"
-      }
+      },
+      "filterTypeAriaLabel": "Filter by transaction type",
+      "dateFromAriaLabel": "From date",
+      "dateToAriaLabel": "To date",
+      "customerIdPlaceholder": "Customer ID...",
+      "customerIdAriaLabel": "Filter by customer ID"
     }
   },
   "paymentSettings": {
@@ -3878,6 +4527,57 @@
     "row": {
       "enabledBy": "Enabled by",
       "enabledOn": "on"
+    },
+    "matrix": {
+      "storePlanHeading": "Store Plan",
+      "storePlanSubtitle": "Current plan determines the feature baseline.",
+      "changePlanOption": "Change plan…",
+      "planChangeNote": "Plan changes preserve all existing overrides. Baseline features update immediately.",
+      "featureCount": "{count, plural, one {# feature} other {# features}}",
+      "loadStoreFailed": "Failed to load store.",
+      "badges": {
+        "includedIn": "Included in {plan}",
+        "grantedByOverride": "Granted by override",
+        "revokedByOverride": "Revoked by override",
+        "notIn": "Not in {plan}"
+      },
+      "dangerZone": {
+        "heading": "Danger Zone",
+        "reactivateTitle": "Reactivate Store",
+        "suspendTitle": "Suspend Store",
+        "reactivateDescription": "Allow customers to access and purchase from this store.",
+        "suspendDescription": "Block customer access to this store without deleting data.",
+        "resetTitle": "Reset to Plan Defaults",
+        "resetDescription": "Clear ALL feature overrides for this store. The store will use its plan baseline only.",
+        "resetButton": "Reset Overrides",
+        "auditLogsLink": "View audit logs →"
+      },
+      "modals": {
+        "changePlanTitle": "Change Plan",
+        "changePlanBody": "Changing plan to <b>{plan}</b>. Feature overrides will be preserved. Continue?",
+        "suspendBody": "Suspend {name}? Customers will not be able to access or purchase from the store.",
+        "reactivateBody": "Reactivate {name}? Customers will regain access immediately.",
+        "confirmReactivate": "Reactivate",
+        "confirmSuspend": "Suspend",
+        "resetBody": "This will clear ALL feature overrides for this store. The store will fall back to its <b>{plan}</b> plan baseline. This cannot be undone.",
+        "resetAllButton": "Reset All Overrides"
+      },
+      "toasts": {
+        "loadFeaturesFailed": "Failed to load features",
+        "featureUpdateFailed": "Feature update failed",
+        "planUpdated": "Plan updated",
+        "planUpdatedDescription": "Store plan changed to {plan}.",
+        "planChangeFailed": "Plan change failed",
+        "storeSuspended": "Store suspended",
+        "storeReactivated": "Store reactivated",
+        "storeStatusDescription": "{name} is now {status}.",
+        "statusActive": "active",
+        "statusSuspended": "suspended",
+        "statusChangeFailed": "Status change failed",
+        "overridesCleared": "Overrides cleared",
+        "overridesClearedDescription": "Store is now using plan defaults.",
+        "resetFailed": "Reset failed"
+      }
     }
   },
   "template": {
@@ -4097,7 +4797,23 @@
       "toastDeletedBody": "\"{name}\" has been removed.",
       "errorTitle": "Error",
       "deleteFailed": "Failed to delete category",
-      "searchPlaceholder": "Search categories…"
+      "searchPlaceholder": "Search categories…",
+      "bestSellersCoverTitle": "Best Sellers cover",
+      "bestSellersCoverHint": "Shown on the storefront's Best Sellers tile alongside your real categories. The tile only renders when at least one product is flagged as a best seller.",
+      "uploadCoverLabel": "Upload cover",
+      "showBestSellersCardTitle": "Show Best Sellers card",
+      "showBestSellersCardHint": "Turn off to remove the Best Sellers card from the homepage category strip and the Categories page. The Best Sellers carousel and its page stay.",
+      "countUnitTitle": "Product count label",
+      "countUnitHint": "The word shown after the product count on category cards, e.g. \"4 pieces\". Leave blank to use the default (\"pieces\").",
+      "countUnitEnglishLabel": "English label",
+      "countUnitArabicLabel": "Arabic label",
+      "saveLabelButton": "Save label",
+      "previewLabel": "Preview:",
+      "countUnitSaved": "Category count label saved",
+      "bestSellersTileShown": "Best Sellers tile shown",
+      "bestSellersTileHidden": "Best Sellers tile hidden",
+      "bestSellersCoverUpdated": "Best Sellers cover updated",
+      "bestSellersCoverRemoved": "Best Sellers cover removed"
     },
     "form": {
       "editTitle": "Edit Category",
@@ -4132,7 +4848,23 @@
       "updateFailed": "Failed to update category",
       "createFailed": "Failed to create category",
       "slugInUse": "This slug is already in use",
-      "connectionError": "Unable to connect to the server"
+      "connectionError": "Unable to connect to the server",
+      "seoSaveFirst": "Save the category first, then generate SEO.",
+      "seoGenerationFailed": "AI generation failed",
+      "seoFilled": "AI filled the SEO fields. Click save to persist.",
+      "seoNetworkError": "Network error contacting AI",
+      "seoHeading": "SEO",
+      "seoSubheading": "How this category appears on Google.",
+      "seoGenerating": "Generating…",
+      "seoFillEmpty": "AI fill empty",
+      "seoRegenerateAll": "Regenerate all",
+      "metaTitleLabel": "Meta title ({count}/60)",
+      "metaTitleArLabel": "Meta title AR ({count}/60)",
+      "metaDescriptionLabel": "Meta description ({count}/160)",
+      "metaDescriptionArLabel": "Meta description AR ({count}/160)",
+      "aeoIntro": "<b>AEO</b> — Conversational copy for AI answer engines. Auto-filled by the AEO sweep; you can edit here.",
+      "aeoMetaEnLabel": "AEO meta EN ({count}/160)",
+      "aeoMetaArLabel": "AEO meta AR ({count}/160)"
     },
     "table": {
       "label": "Categories",
@@ -4293,7 +5025,10 @@
       "mfaBackupSubtitle": "Enter one of your saved backup codes",
       "mfaTotpLink": "Use authenticator app instead",
       "mfaInvalid": "Invalid or expired code. Please try again.",
-      "rememberMe": "Remember my email"
+      "rememberMe": "Remember my email",
+      "serverError": "Server returned an invalid response. Please try again.",
+      "accessDenied": "Access denied. Admin or staff privileges required.",
+      "mfaVerifyFailed": "Verification failed"
     }
   },
   "users": {
@@ -4386,8 +5121,22 @@
         "customer": "Customer",
         "store_admin": "Store Admin",
         "super_admin": "Super Admin"
-      }
-    }
+      },
+      "passwordMismatch": "Passwords do not match",
+      "deleteFailed": "Delete failed",
+      "deleteNetworkError": "Network error",
+      "userDeleted": "User deleted",
+      "newPasswordSectionTitle": "Set new password",
+      "newPasswordSectionHint": "Leave blank to keep the current password. Minimum 8 characters.",
+      "newPasswordPlaceholder": "New password",
+      "confirmPasswordPlaceholder": "Confirm password",
+      "dangerZoneTitle": "Danger zone",
+      "dangerZoneDescription": "Permanently delete this user account. Cannot be undone.",
+      "deleteUserButton": "Delete user",
+      "deleteConfirmTitle": "Delete user?",
+      "deleteConfirmBody": "This will permanently delete <b>{name}</b> ({email}). This action cannot be undone."
+    },
+    "roleLabel": "Role"
   },
   "components": {
     "commandPalette": {
@@ -4539,7 +5288,10 @@
         "enableNotifications": "Enable order notifications",
         "notificationsEnabled": "Notifications on",
         "focusModeHint": "Collapses the app to orders only on this device"
-      }
+      },
+      "staffBadge": "Staff",
+      "staffBadgeHint": "Limited access",
+      "hubSectionsAriaLabel": "Hub sections"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -4640,7 +5392,78 @@
         "quotaExceeded": "AI quota reached. Try again tomorrow.",
         "extractionFailed": "AI extraction failed.",
         "extractionFailedRetry": "AI extraction failed. Please try again."
+      },
+      "closeOverrideEditor": "Close override editor",
+      "sectionLabels": {
+        "hero": "Hero",
+        "categories": "Categories",
+        "newArrivals": "New arrivals",
+        "bestSellers": "Best sellers",
+        "testimonials": "Testimonials"
       }
+    },
+    "paymentEventsTimeline": {
+      "toggleLabel": "View payment events",
+      "superAdminBadge": "(super-admin)",
+      "loadingEvents": "Loading events…",
+      "couldNotLoadEvents": "Could not load events",
+      "noEventsYet": "No events recorded yet",
+      "viewRawPayload": "View raw payload",
+      "rawPayloadModalTitle": "Raw provider payload",
+      "payloadLoadFailed": "Failed to load payload",
+      "unknownError": "Unknown error",
+      "eventTypes": {
+        "created": "Payment created",
+        "status_change": "Status changed",
+        "webhook_received": "Webhook received",
+        "admin_action": "Admin action",
+        "reconciliation": "Reconciliation",
+        "refund_initiated": "Refund initiated",
+        "refund_completed": "Refund completed",
+        "refund_failed": "Refund failed",
+        "retry": "Retry attempt",
+        "expired": "Payment expired",
+        "cancelled": "Payment cancelled",
+        "completed": "Payment completed",
+        "failed": "Payment failed"
+      }
+    },
+    "colorField": {
+      "tokens": {
+        "primary": "Brand: Primary",
+        "secondary": "Brand: Secondary",
+        "accent": "Brand: Accent",
+        "card": "Surface: Card",
+        "muted": "Surface: Muted",
+        "foreground": "Text: Foreground",
+        "border": "Border"
+      },
+      "customHex": "Custom hex…",
+      "themeDefault": "— Theme default —",
+      "inheritedLabel": "Brand: {token} ({hex})",
+      "colorPickerAriaLabel": "Color picker",
+      "hexValueAriaLabel": "Hex color value",
+      "clear": "Clear"
+    },
+    "bottomSheet": {
+      "close": "Close"
+    },
+    "sectionPreview": {
+      "kickerDefault": "EXPLORE",
+      "subtitleDefault": "Curated picks",
+      "productNamePlaceholder": "Product",
+      "addToCartLabel": "Add",
+      "headingSuffix": "{label} heading"
+    },
+    "colorContrastPreview": {
+      "backgroundLabel": "Background: {label}",
+      "roles": {
+        "heading": "Heading",
+        "subtitle": "Subtitle",
+        "bodyCta": "Body / CTA"
+      },
+      "autoFixedLabel": "Auto-fixed:",
+      "pickedTextWarning": "Picked text {ratio} : 1 — AA needs {min} : 1"
     }
   },
   "finance": {
@@ -4806,7 +5629,23 @@
           "timeout": "OCR taking longer than expected. Check the Expenses list in a moment.",
           "unsupported": "Only JPG, PNG, and WebP are supported.",
           "manualHint": "Or fill in manually below"
-        }
+        },
+        "supplierLabel": "Supplier",
+        "expenseCategoryLabel": "Expense Category",
+        "paidFromAccountLabel": "Paid From Account",
+        "currencyLabel": "Currency",
+        "fxRateLabel": "FX Rate (1 {currency} = ? KWD)",
+        "fxRateHint": "Enter the exchange rate from your bank or receipt date.",
+        "fxRatePlaceholder": "e.g. 0.30700",
+        "errorExpenseDateRequired": "Expense date is required",
+        "errorExpenseCategoryRequired": "Expense category is required",
+        "errorPaidFromRequired": "Paid-from account is required",
+        "errorAmountRequired": "Amount must be greater than 0",
+        "errorFxRateRequired": "FX rate is required for {currency} expenses and must be a positive number",
+        "uploadFailedGeneric": "Upload failed ({status})",
+        "uploadFailedRetry": "Upload failed. Please try again.",
+        "totalInKwdConverted": "Total in KWD (converted @ {rate} rate):",
+        "minorUnitsSuffix": "({currency} minor units)"
       }
     },
     "reports": {
@@ -4904,7 +5743,10 @@
         "importButton": "Import",
         "parseErrors": "Parse warnings",
         "success": "Imported {count} transactions.",
-        "error": "Import failed."
+        "error": "Import failed.",
+        "fileTypesHint": "CSV, Excel (.xlsx), or OFX (max 5 MB)",
+        "skippedLabel": "Skipped",
+        "viewReconciliation": "View Reconciliation"
       },
       "tx": {
         "date": "Date",
@@ -4990,7 +5832,8 @@
       "openBackorders": "Open Backorders",
       "reorderSuggestions": "Reorder suggestions",
       "deadStockCount": "Dead stock SKUs",
-      "viewAll": "View all"
+      "viewAll": "View all",
+      "couldntLoad": "Couldn't load"
     },
     "inventory": {
       "title": "Inventory",
@@ -5122,11 +5965,14 @@
       "description": "Suppliers you place purchase orders with.",
       "newButton": "+ New Supplier",
       "name": "Name",
+      "nameArLabel": "Name (Arabic)",
       "contact": "Contact",
+      "contactPlaceholder": "Contact person",
       "phone": "Phone",
       "email": "Email",
       "paymentTerms": "Payment Terms",
       "active": "Active",
+      "nameRequired": "Name is required.",
       "terms": {
         "net0": "Cash on delivery",
         "net15": "Net 15 days",
@@ -5140,7 +5986,9 @@
         "notes": "Notes (English)",
         "notesAr": "Notes (Arabic)",
         "submit": "Create supplier",
-        "paymentTermsTip": "Payment terms = how long after receiving goods you've agreed to pay this supplier. Net 30 = within 30 days of invoice. Net 0 = immediately. Custom = your own number of days."
+        "paymentTermsTip": "Payment terms = how long after receiving goods you've agreed to pay this supplier. Net 30 = within 30 days of invoice. Net 0 = immediately. Custom = your own number of days.",
+        "leadTimeDays": "Net lead time (days)",
+        "leadTimeDaysTip": "Number of days from placing an order with this supplier until stock arrives. Used by the reorder engine when no per-product rule overrides it."
       },
       "searchPlaceholder": "Search suppliers…"
     },
@@ -5319,7 +6167,8 @@
       "topSkus": "Top 5 SKUs (last 7 days)",
       "yesterdayFunnel": "Yesterday's Conversion",
       "aiCallout": "AI:",
-      "noDataYet": "Insights will populate after the first nightly rollup at 02:00 KW."
+      "noDataYet": "Insights will populate after the first nightly rollup at 02:00 KW.",
+      "asOf": "As of"
     },
     "cohorts": {
       "title": "Customer Cohorts",
@@ -5358,7 +6207,14 @@
       },
       "count": "Customers",
       "revenue": "Revenue",
-      "recommendedAction": "Recommended Action"
+      "recommendedAction": "Recommended Action",
+      "totalSegmentedCustomers": "Total Segmented Customers",
+      "totalMonetaryValue": "Total Monetary Value",
+      "noSegmentData": "No segment data yet. Insights populate after the first nightly rollup at 02:00 KW.",
+      "aiLabel": "AI:",
+      "shareOfCustomers": "{pct}% of customers",
+      "shareOfTotal": "{pct}% of total",
+      "loadFailed": "Failed to load segments data"
     },
     "products": {
       "title": "Product Velocity",
@@ -5568,7 +6424,8 @@
       "categoryAssign": "Category assignment",
       "imageAlt": "Image alt-text",
       "excerpt": "Product excerpts",
-      "productTags": "Product tags"
+      "productTags": "Product tags",
+      "descriptionRevert": "Revert description balance"
     },
     "activeJob": {
       "sweepSuffix": "sweep",
@@ -5609,6 +6466,102 @@
       "completed": "completed",
       "failed": "failed",
       "cancelled": "cancelled"
+    },
+    "sweepResults": {
+      "header": "Sweep results",
+      "refreshing": "Refreshing…",
+      "refresh": "Refresh",
+      "lastFetched": "Last fetched: {time}",
+      "panels": {
+        "translate": {
+          "title": "Translation fill rate"
+        },
+        "seo": {
+          "title": "SEO meta fill rate"
+        },
+        "faq": {
+          "title": "FAQ AEO"
+        },
+        "howto": {
+          "title": "HowTo guides AEO"
+        },
+        "metaAeo": {
+          "title": "Meta AEO rewrites"
+        },
+        "categorize": {
+          "title": "Category assignment"
+        },
+        "imageAlt": {
+          "title": "Image alt-text"
+        },
+        "excerpt": {
+          "title": "Product excerpts"
+        },
+        "tags": {
+          "title": "Product tags"
+        }
+      },
+      "fillRateLabels": {
+        "productsAr": "Products AR",
+        "categoriesAr": "Categories AR",
+        "store": "Store",
+        "products": "Products",
+        "categories": "Categories",
+        "productsCategorized": "Products categorized",
+        "imagesWithAlt": "Images with alt-text",
+        "productsWithExcerpt": "Products with excerpt",
+        "productsTagged": "Products tagged"
+      },
+      "totalTags": "Total tags",
+      "recentlyTranslated": "Recently translated (last 30 days)",
+      "openCatalogProducts": "Open Catalog → Products",
+      "latestSeoFills": "Latest SEO fills",
+      "titleLabel": "Title:",
+      "descLabel": "Desc:",
+      "copied": "Copied!",
+      "copy": "Copy",
+      "openSeoPage": "Open SEO page",
+      "faqUnit": "{count, plural, one {FAQ} other {FAQs}}",
+      "lastUpdated": "Last updated: {time}",
+      "noFaqsYet": "No FAQs yet. Run the FAQ sweep above.",
+      "aiBadge": "AI",
+      "editedBadge": "edited",
+      "viewFaqsOnSeoPage": "View FAQs on SEO page",
+      "guideUnit": "{count, plural, one {guide} other {guides}}",
+      "noHowtosYet": "No HowTo guides yet. Run the HowTo sweep above.",
+      "stepCount": "{count, plural, one {# step} other {# steps}}",
+      "viewHowtosOnSeoPage": "View HowTos on SEO page",
+      "storeAeoDescriptionLabel": "Store AEO description:",
+      "recentlyRewritten": "Recently rewritten",
+      "recentlyCategorized": "Recently categorized",
+      "recentlyFilled": "Recently filled",
+      "loading": "Loading…"
+    },
+    "geoResults": {
+      "title": "GEO sweep results",
+      "refresh": "Refresh",
+      "loading": "Loading GEO results…",
+      "errorFailed": "Failed to load GEO results",
+      "empty": "empty",
+      "view": "View",
+      "notGenerated": "Not yet generated. Click <b>Generate</b> above to run the sweep.",
+      "copy": "Copy",
+      "copyJson": "Copy JSON",
+      "copiedToast": "{label} copied",
+      "llmsTxt": {
+        "label": "LLMs.txt",
+        "charsSuffix": "chars"
+      },
+      "brandFacts": {
+        "label": "Brand facts",
+        "keysSuffix": "keys",
+        "jsonLabel": "Brand facts JSON"
+      },
+      "citationCopy": {
+        "label": "Citation copy",
+        "filledOfTotal": "{filled} of {total} products filled",
+        "hint": "Per-product values are visible on each product's edit page under <b>Citation copy</b>."
+      }
     }
   },
   "account": {
@@ -5648,7 +6601,11 @@
       "errorVerify": "Invalid code. Please check your authenticator app and try again.",
       "errorDisable": "Invalid code. Please try again.",
       "successEnabled": "2FA has been enabled for your account.",
-      "successDisabled": "2FA has been disabled."
+      "successDisabled": "2FA has been disabled.",
+      "continueButton": "Continue",
+      "statusOn": "ON",
+      "statusOff": "OFF",
+      "qrCodeAlt": "2FA QR code"
     }
   },
   "answerEngine": {
@@ -5772,7 +6729,8 @@
       "toastWaOffTitle": "WA ordering disabled",
       "toastWaOnBody": "Customers can now order directly via WhatsApp DM.",
       "toastWaOffBody": "WhatsApp DM ordering has been turned off.",
-      "toastWaSaveFailedBody": "Could not update WA ordering setting"
+      "toastWaSaveFailedBody": "Could not update WA ordering setting",
+      "apiKeyPlaceholder": "Paste key from WBS admin → Client → Force AI Store Bridge"
     },
     "templates": {
       "generating": "Generating…",
@@ -5831,7 +6789,8 @@
       "toastResetTitle": "Reset {count} rejected templates",
       "toastNoRejectedTitle": "No rejected templates",
       "toastResetBody": "Templates flipped to draft with the latest canonical body. Click Sync to resubmit.",
-      "toastNoRejectedBody": "There are no rejected templates to reset."
+      "toastNoRejectedBody": "There are no rejected templates to reset.",
+      "resetRejectedHint": "Refresh rejected templates from the latest canonical body, then click Sync to resubmit"
     },
     "orderUpdates": {
       "notConnected": "Not connected yet.",
@@ -5905,7 +6864,10 @@
       "toastUnknownError": "Unknown error",
       "toastSentTitle": "Payment link sent",
       "toastSentBody": "{phone} will receive the MyFatoorah checkout link via WhatsApp.",
-      "toastSendFailedTitle": "Send failed"
+      "toastSendFailedTitle": "Send failed",
+      "removeItemAriaLabel": "Remove item",
+      "orderNumberLabel": "Order #{orderNumber}",
+      "invoiceIdLabel": "Invoice {invoiceId}"
     },
     "botAnalytics": {
       "notConnected": "WBS is not connected for this store. Configure the integration in the Connection tab first.",
@@ -5997,6 +6959,68 @@
       "confirmNew": "This will call Meta Graph API to create a brand-new Commerce Catalog under the Force AI parent Business Manager and assign it to this store. Continue?",
       "catalogIdPlaceholder": "e.g. 123456789012345",
       "businessIdPlaceholder": "e.g. 987654321098765"
+    },
+    "botCopy": {
+      "editorTitle": "Bot Copy Editor",
+      "editorDescription": "Customize the wording your WhatsApp ordering bot uses when talking to customers. Leave a field blank to use the canonical default (shown as placeholder text).",
+      "customizedCount": "{count} of {total} messages customized",
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "variablesLegendLabel": "Variables",
+      "variablesLegendText": "— use <code>variableName</code> syntax in your text.",
+      "variablesLegendSupported": "are supported per message (see label next to each row).",
+      "customizedBadge": "customized",
+      "resetToDefault": "Reset to default",
+      "enColumnLabel": "EN",
+      "arColumnLabel": "AR",
+      "saveFailedTitle": "Save failed",
+      "saveFailedBody": "Could not save bot copy settings",
+      "saveFailedGeneric": "An unexpected error occurred",
+      "savedTitle": "Bot copy saved",
+      "savedBody": "Your bot wording overrides are now live.",
+      "groups": {
+        "Greeting": "Greeting",
+        "Products": "Products",
+        "Cart": "Cart",
+        "Checkout": "Checkout",
+        "Search": "Search",
+        "Prompts": "Prompts"
+      },
+      "keys": {
+        "catalog_preparing": "Catalog preparing",
+        "welcome_header": "Welcome header",
+        "welcome_body": "Welcome body",
+        "welcome_button_text": "Categories button",
+        "welcome_footer": "Welcome footer",
+        "categories_section_title": "Categories section title",
+        "no_products": "No products message",
+        "products_body": "Products list body",
+        "products_button_text": "Products button",
+        "products_section_title": "Products section title",
+        "products_more_footer": "More products footer",
+        "out_of_stock": "Out-of-stock badge",
+        "product_out_of_stock": "Product out of stock message",
+        "add_to_cart_body": "Add-to-cart message",
+        "qty_1": "Qty button: 1",
+        "qty_2": "Qty button: 2",
+        "qty_more": "Qty button: more",
+        "qty_prompt": "Quantity prompt",
+        "qty_range": "Quantity range error",
+        "cart_updated": "Cart updated",
+        "btn_add_more": "Add more button",
+        "btn_checkout": "Checkout button",
+        "btn_cancel": "Cancel button",
+        "cart_cleared": "Cart cleared message",
+        "checkout_unavailable": "Checkout unavailable",
+        "checkout_error": "Checkout error",
+        "checkout_ready": "Checkout ready",
+        "checkout_resend": "Checkout resend",
+        "search_found_n": "Search found results",
+        "search_no_results": "Search no results",
+        "search_section_title": "Search section title",
+        "tap_a_product": "Tap a product prompt",
+        "tap_a_flow_button": "Tap a flow button prompt"
+      }
     }
   },
   "staff": {
@@ -6306,6 +7330,184 @@
       "minted": "Key issued",
       "revokeFailedTitle": "Could not revoke key",
       "revoked": "Key revoked"
+    }
+  },
+  "floatingWidget": {
+    "kind": {
+      "whatsapp": "WhatsApp",
+      "instagram": "Instagram",
+      "phone": "Phone",
+      "email": "Email",
+      "music": "Background music",
+      "custom": "Custom link",
+      "tiktok": "TikTok",
+      "snapchat": "Snapchat",
+      "youtube": "YouTube",
+      "facebook": "Facebook",
+      "x": "X (Twitter)",
+      "telegram": "Telegram"
+    },
+    "position": {
+      "br": "Bottom-right",
+      "bl": "Bottom-left",
+      "tr": "Top-right",
+      "tl": "Top-left"
+    },
+    "expand": {
+      "up": "Upward",
+      "down": "Downward",
+      "left": "Leftward",
+      "right": "Rightward"
+    },
+    "pageTitle": "Floating widget",
+    "common": {
+      "loading": "Loading…"
+    },
+    "premiumSubtitle": "Premium add-on",
+    "featureNotEnabledTitle": "Feature not enabled",
+    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Force AI to request access.",
+    "mainSubtitle": "Sticky button group your customers see on every page",
+    "showWidgetLabel": "Show widget on storefront",
+    "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
+    "positionLabel": "Position",
+    "expandDirectionLabel": "Expand direction",
+    "startExpandedLabel": "Start expanded on every page load",
+    "hideOnMobile": "Hide on mobile",
+    "hideOnDesktop": "Hide on desktop",
+    "toggleButtonTitle": "Toggle button",
+    "toggleButtonHint": "The always-visible circle. Click expands the rest.",
+    "backgroundColorLabel": "Background color",
+    "tooltipEnLabel": "Tooltip (English)",
+    "tooltipArLabel": "Tooltip (Arabic)",
+    "customIconUrlLabel": "Custom icon URL (optional)",
+    "buttonsTitle": "Buttons",
+    "buttonsHint": "Actions revealed when the toggle expands. Reorder with the arrows.",
+    "addButton": "+ Add button",
+    "noButtonsHint": "No buttons yet — add one above (WhatsApp, Instagram, music, etc.).",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "removeButtonAria": "Remove button",
+    "kindLabel": "Kind",
+    "tooltipEnPlaceholder": "Tooltip (EN)",
+    "tooltipArPlaceholder": "Tooltip (AR)",
+    "whatsappPhoneLabel": "Phone (international, no + or spaces)",
+    "usingStoreWhatsapp": "Using store WhatsApp: {value}",
+    "whatsappMessageLabel": "Pre-filled message (optional)",
+    "instagramHandleLabel": "Instagram handle (no @)",
+    "usingStoreInstagram": "Using store Instagram: {value}",
+    "phoneNumberLabel": "Phone number",
+    "usingStorePhone": "Using store phone: {value}",
+    "tiktokHandleLabel": "TikTok handle (no @)",
+    "usingStoreTiktok": "Using store TikTok: {value}",
+    "snapchatHandleLabel": "Snapchat username",
+    "usingStoreSnapchat": "Using store Snapchat: {value}",
+    "youtubeUrlLabel": "YouTube channel URL",
+    "usingStoreYoutube": "Using store YouTube: {value}",
+    "facebookUrlLabel": "Facebook page URL",
+    "usingStoreFacebook": "Using store Facebook: {value}",
+    "xHandleLabel": "X handle (no @)",
+    "usingStoreX": "Using store X: {value}",
+    "telegramHandleLabel": "Telegram handle (no @)",
+    "usingStoreTelegram": "Using store Telegram: {value}",
+    "emailAddressLabel": "Email address",
+    "emailSubjectLabel": "Default subject (optional)",
+    "audioUrlLabel": "Audio URL (mp3 / ogg / m4a)",
+    "loopAudioLabel": "Loop audio (background music)",
+    "targetUrlLabel": "Target URL",
+    "iconUrlLabel": "Icon URL (optional)",
+    "buttonBackgroundColorLabel": "Background color (optional)",
+    "iconColorLabel": "Icon color (optional)",
+    "saveFailedFallback": "Save failed",
+    "savedToast": "Floating widget saved",
+    "saveHint": "Changes apply to the live storefront after save.",
+    "saving": "Saving…",
+    "saveChanges": "Save changes"
+  },
+  "zoneEditor": {
+    "resetToDefault": "Reset to default",
+    "inherit": "inherit",
+    "inheritWithValue": "inherit ({value})",
+    "fontFamilyLabel": "Font family",
+    "fontSizeLabel": "Font size",
+    "fontSizeExample": "e.g. 16px or 1rem",
+    "fontSizeHint": "Bare number auto-converts to px (16 → 16px). Allowed: 12 / 14 / 16 / 18 / 22px.",
+    "arbitrarySizeNotAllowed": "Arbitrary Tailwind sizes (text-[…]) are not allowed.\nUse a px value (e.g. 12px / 14px / 16px / 18px / 22px) or\na named token: text-xs / text-sm / text-base / text-lg / text-xl / text-2xl.",
+    "fontWeightLabel": "Font weight",
+    "fontWeightExample": "e.g. 400, 600, 700",
+    "fontWeightHint": "400 regular · 600 semibold · 700 bold",
+    "letterSpacingLabel": "Letter spacing",
+    "letterSpacingExample": "e.g. 0.05em or 1px",
+    "lineHeightLabel": "Line height",
+    "lineHeightExample": "e.g. 1.6 or 24px",
+    "textTransformLabel": "Text transform",
+    "textTransformOptions": {
+      "inherit": "Inherit (none)",
+      "uppercase": "Uppercase",
+      "lowercase": "Lowercase",
+      "capitalize": "Capitalize",
+      "explicitNone": "None (explicit)"
+    },
+    "textDecorationLabel": "Text decoration",
+    "textDecorationOptions": {
+      "inherit": "Use default (inherit)",
+      "none": "No decoration (force off)",
+      "underline": "Underline",
+      "overline": "Overline",
+      "strikethrough": "Strikethrough"
+    },
+    "textAlignmentLabel": "Text alignment",
+    "textAlign": {
+      "auto": {
+        "label": "Auto",
+        "title": "Inherit (use consumer default)"
+      },
+      "start": {
+        "label": "Start",
+        "title": "Left in LTR, right in RTL"
+      },
+      "center": {
+        "label": "Center",
+        "title": "Always centered"
+      },
+      "end": {
+        "label": "End",
+        "title": "Right in LTR, left in RTL"
+      }
+    },
+    "textAlignAriaLabel": "{label} — {title}",
+    "textColorLabel": "Text color",
+    "colorInheriting": "Inheriting: {value}",
+    "colorHint": "Leave empty to inherit from active theme."
+  },
+  "answerEngineProviders": {
+    "pageTitle": "Answer-engine providers",
+    "pageSubtitle": "Enable Perplexity/OpenAI checks with an API key. Gemini runs on the platform key by default.",
+    "loadFailedBody": "Failed to load answer-engine provider config.",
+    "retry": "Retry",
+    "geminiTitle": "Gemini",
+    "geminiHint": "Always active on the platform's own key — no per-provider config needed.",
+    "geminiActiveBadge": "Active (platform key)",
+    "statusActive": "Active",
+    "statusOff": "Off",
+    "apiKeyLabel": "API key",
+    "apiKeyMaskedHint": "(masked — leave as-is to keep it)",
+    "apiKeyPlaceholderMasked": "sk_****",
+    "apiKeyPlaceholderEmpty": "Enter API key",
+    "enabledLabel": "Enabled",
+    "saveButton": "Save",
+    "savingButton": "Saving…",
+    "saveFailed": "Save failed: {message}",
+    "saved": "Saved",
+    "genericError": "error",
+    "engines": {
+      "perplexity": {
+        "label": "Perplexity (Sonar)",
+        "hint": "Web-grounded answers via the Perplexity Sonar API."
+      },
+      "openai": {
+        "label": "OpenAI (Responses API + web search)",
+        "hint": "Web-grounded answers via the OpenAI Responses API."
+      }
     }
   }
 }

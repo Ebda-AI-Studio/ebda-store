@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { useT } from '@/i18n/useT';
 
 interface BottomSheetProps {
   open: boolean;
@@ -43,6 +44,8 @@ export function BottomSheet({
   footer,
   maxHeightVh = 90,
 }: BottomSheetProps) {
+  const t = useT('components.bottomSheet');
+
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
@@ -79,7 +82,7 @@ export function BottomSheet({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t('close')}
           className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted-foreground/30 sm:hidden"
         />
 
@@ -89,7 +92,7 @@ export function BottomSheet({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t('close')}
               className="-me-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

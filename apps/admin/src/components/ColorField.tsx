@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import { ColorContrastPreview } from './ColorContrastPreview';
 import { COLOR_TOKENS, resolveColor } from '@force/shared';
 import type { StoreTheme, ColorToken } from '@force/shared';
+import { useT } from '@/i18n/useT';
 
 interface ColorFieldProps {
   label: string;
@@ -33,16 +34,6 @@ interface ColorFieldProps {
    */
   showContrastPreview?: boolean;
 }
-
-const TOKEN_LABELS: Record<(typeof COLOR_TOKENS)[number], string> = {
-  primary: 'Brand: Primary',
-  secondary: 'Brand: Secondary',
-  accent: 'Brand: Accent',
-  card: 'Surface: Card',
-  muted: 'Surface: Muted',
-  foreground: 'Text: Foreground',
-  border: 'Border',
-};
 
 const CUSTOM = '__custom__';
 
@@ -78,6 +69,11 @@ export function ColorField({
   inheritFromToken,
   showContrastPreview = true,
 }: ColorFieldProps) {
+  const t = useT('components.colorField');
+  const tokenLabel = useCallback(
+    (token: (typeof COLOR_TOKENS)[number]) => t(`tokens.${token}` as Parameters<typeof t>[0]),
+    [t]
+  );
   const isToken = value?.startsWith('token:') ?? false;
   const tokenName = isToken ? (value as string).slice(6) : '';
   const hexValue = !isToken ? value || '' : '';
@@ -119,8 +115,8 @@ export function ColorField({
       : undefined;
   const inheritedLabel =
     inheritedResolvedHex && inheritFromToken
-      ? `Brand: ${TOKEN_LABELS[inheritFromToken]} (${inheritedResolvedHex})`
-      : '— Theme default —';
+      ? t('inheritedLabel', { token: tokenLabel(inheritFromToken), hex: inheritedResolvedHex })
+      : t('themeDefault');
 
   const handleSelectChange = (next: string) => {
     if (next === '') {
@@ -182,12 +178,12 @@ export function ColorField({
           className="rounded border border-border bg-background px-2 py-1 text-sm"
         >
           <option value="">{inheritedLabel}</option>
-          {COLOR_TOKENS.map(t => (
-            <option key={t} value={t}>
-              {TOKEN_LABELS[t]}
+          {COLOR_TOKENS.map(token => (
+            <option key={token} value={token}>
+              {tokenLabel(token)}
             </option>
           ))}
-          <option value={CUSTOM}>Custom hex…</option>
+          <option value={CUSTOM}>{t('customHex')}</option>
         </select>
         {!isToken && value ? (
           <>
@@ -201,7 +197,7 @@ export function ColorField({
                 setRawHex(next);
               }}
               className="h-11 w-11 cursor-pointer rounded border border-border bg-background p-0.5"
-              aria-label="Color picker"
+              aria-label={t('colorPickerAriaLabel')}
             />
             {/* Hex text field — primary input path; ≥44px touch target. */}
             <input
@@ -213,7 +209,7 @@ export function ColorField({
               placeholder="#RRGGBB"
               maxLength={7}
               className="h-11 w-28 rounded border border-border bg-background px-2 py-1 font-mono text-sm uppercase text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-              aria-label="Hex color value"
+              aria-label={t('hexValueAriaLabel')}
             />
           </>
         ) : null}
@@ -226,7 +222,7 @@ export function ColorField({
             }}
             className="min-h-[44px] px-2 text-xs text-muted-foreground underline"
           >
-            Clear
+            {t('clear')}
           </button>
         ) : null}
       </div>

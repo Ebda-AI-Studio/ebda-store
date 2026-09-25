@@ -233,7 +233,7 @@ export default function LoyaltyTransactionsPage() {
           <select
             value={typeFilter}
             onChange={e => handleFilterChange(setTypeFilter, e.target.value)}
-            aria-label="Filter by transaction type"
+            aria-label={t('filterTypeAriaLabel')}
             className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {TYPE_FILTERS.map(type => (
@@ -248,7 +248,7 @@ export default function LoyaltyTransactionsPage() {
             type="date"
             value={dateFrom}
             onChange={e => handleFilterChange(setDateFrom, e.target.value)}
-            aria-label="From date"
+            aria-label={t('dateFromAriaLabel')}
             className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
 
@@ -257,7 +257,7 @@ export default function LoyaltyTransactionsPage() {
             type="date"
             value={dateTo}
             onChange={e => handleFilterChange(setDateTo, e.target.value)}
-            aria-label="To date"
+            aria-label={t('dateToAriaLabel')}
             className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
 
@@ -267,8 +267,8 @@ export default function LoyaltyTransactionsPage() {
               type="text"
               value={customerFilter}
               onChange={e => setCustomerFilter(e.target.value)}
-              placeholder="Customer ID..."
-              aria-label="Filter by customer ID"
+              placeholder={t('customerIdPlaceholder')}
+              aria-label={t('customerIdAriaLabel')}
               className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <button

@@ -1,6 +1,7 @@
 'use client';
 
 import { resolveColor, pickReadableForeground } from '@force/shared';
+import { useT } from '@/i18n/useT';
 import type {
   StoreTheme,
   CardFrameSize,
@@ -185,6 +186,7 @@ export function SectionPreview({
   hideCards,
   theme,
 }: SectionPreviewProps) {
+  const t = useT('components.sectionPreview');
   const resolvedBg = resolveColor(bgColor, theme) ?? '#FFFFFF';
   const autoFg = pickReadableForeground(resolvedBg) ?? '#000000';
   const headingColor = resolveColor(headingZone?.color, theme) ?? autoFg;
@@ -244,9 +246,9 @@ export function SectionPreview({
     });
   };
 
-  const titleDisplayText = titleText || `${label} heading`;
-  const kickerDisplayText = kickerText || 'EXPLORE';
-  const subtitleDisplayText = subtitleText || 'Curated picks';
+  const titleDisplayText = titleText || t('headingSuffix', { label });
+  const kickerDisplayText = kickerText || t('kickerDefault');
+  const subtitleDisplayText = subtitleText || t('subtitleDefault');
 
   return (
     <div className="overflow-hidden rounded-lg">
@@ -360,7 +362,7 @@ export function SectionPreview({
                       fontWeight: productNameZone?.fontWeight,
                     }}
                   >
-                    Product
+                    {t('productNamePlaceholder')}
                   </div>
                   <div
                     className="font-semibold"
@@ -384,7 +386,7 @@ export function SectionPreview({
                       fontWeight: productCtaZone?.fontWeight,
                     }}
                   >
-                    Add
+                    {t('addToCartLabel')}
                   </div>
                 </div>
               </div>

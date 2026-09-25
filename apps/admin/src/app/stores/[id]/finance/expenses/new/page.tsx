@@ -191,13 +191,15 @@ export default function NewExpensePage() {
       if (!uploadRes.ok) {
         const body = await uploadRes.json().catch(() => ({}));
         setOcrStatus('error');
-        setOcrMessage(body?.error?.message ?? `Upload failed (${uploadRes.status})`);
+        setOcrMessage(
+          body?.error?.message ?? t('uploadFailedGeneric', { status: uploadRes.status })
+        );
         setOcrUploading(false);
         return;
       }
     } catch {
       setOcrStatus('error');
-      setOcrMessage('Upload failed. Please try again.');
+      setOcrMessage(t('uploadFailedRetry'));
       setOcrUploading(false);
       return;
     }
@@ -266,23 +268,23 @@ export default function NewExpensePage() {
   async function submit() {
     setError(null);
     if (!expenseDate) {
-      setError('Expense date is required');
+      setError(t('errorExpenseDateRequired'));
       return;
     }
     if (!expenseAccountId) {
-      setError('Expense category is required');
+      setError(t('errorExpenseCategoryRequired'));
       return;
     }
     if (!paidFromAccountId) {
-      setError('Paid-from account is required');
+      setError(t('errorPaidFromRequired'));
       return;
     }
     if (!amount || rawAmountFils <= 0) {
-      setError('Amount must be greater than 0');
+      setError(t('errorAmountRequired'));
       return;
     }
     if (isNonKwd && (!fxRate || fxRateNum <= 0)) {
-      setError(`FX rate is required for ${currency} expenses and must be a positive number`);
+      setError(t('errorFxRateRequired', { currency }));
       return;
     }
 
@@ -418,7 +420,7 @@ export default function NewExpensePage() {
 
         {/* Supplier */}
         <label className="block space-y-1">
-          <span className="text-sm font-medium">Supplier</span>
+          <span className="text-sm font-medium">{t('supplierLabel')}</span>
           <select
             value={supplierId}
             onChange={e => setSupplierId(e.target.value)}
@@ -436,7 +438,7 @@ export default function NewExpensePage() {
         {/* Expense Account */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            Expense Category <span className="text-red-500">*</span>
+            {t('expenseCategoryLabel')} <span className="text-red-500">*</span>
           </span>
           <select
             value={expenseAccountId}
@@ -456,7 +458,7 @@ export default function NewExpensePage() {
         {/* Paid From Account */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            Paid From Account <span className="text-red-500">*</span>
+            {t('paidFromAccountLabel')} <span className="text-red-500">*</span>
           </span>
           <select
             value={paidFromAccountId}
@@ -477,7 +479,7 @@ export default function NewExpensePage() {
         {multiCurrencyEnabled && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Currency</span>
+              <span className="text-sm font-medium">{t('currencyLabel')}</span>
               <select
                 value={currency}
                 onChange={e => {
@@ -497,7 +499,7 @@ export default function NewExpensePage() {
             {requiresFxRate(currency) && (
               <label className="block space-y-1">
                 <span className="text-sm font-medium">
-                  FX Rate (1 {currency} = ? KWD) <span className="text-red-500">*</span>
+                  {t('fxRateLabel', { currency })} <span className="text-red-500">*</span>
                 </span>
                 <input
                   type="number"
@@ -506,12 +508,10 @@ export default function NewExpensePage() {
                   value={fxRate}
                   onChange={e => setFxRate(e.target.value)}
                   className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
-                  placeholder="e.g. 0.30700"
+                  placeholder={t('fxRatePlaceholder')}
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Enter the exchange rate from your bank or receipt date.
-                </p>
+                <p className="text-xs text-muted-foreground">{t('fxRateHint')}</p>
               </label>
             )}
           </div>
@@ -521,7 +521,7 @@ export default function NewExpensePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="block space-y-1">
             <span className="text-sm font-medium">
-              {t('amount')} {isNonKwd ? `(${currency} minor units)` : '(KWD)'}{' '}
+              {t('amount')} {isNonKwd ? t('minorUnitsSuffix', { currency }) : ''}{' '}
               <span className="text-red-500">*</span>
             </span>
             <input
@@ -540,7 +540,7 @@ export default function NewExpensePage() {
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium">
-              {t('taxAmount')} {isNonKwd ? `(${currency} minor units)` : '(KWD)'}
+              {t('taxAmount')} {isNonKwd ? t('minorUnitsSuffix', { currency }) : ''}
             </span>
             <input
               type="number"
@@ -561,7 +561,7 @@ export default function NewExpensePage() {
           {isNonKwd && fxRateNum > 0 ? (
             <>
               <span className="text-muted-foreground">
-                Total in KWD (converted @ {fxRateNum} rate):{' '}
+                {t('totalInKwdConverted', { rate: fxRateNum })}{' '}
               </span>
               <span className="font-semibold font-mono">{totalKwd} KWD</span>
             </>

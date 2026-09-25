@@ -420,7 +420,7 @@ export function SmartPaletteModal({
                     aria-expanded={expandedSection === key}
                   >
                     <SectionPreview
-                      label={key.charAt(0).toUpperCase() + key.slice(1)}
+                      label={t(`sectionLabels.${key}` as Parameters<typeof t>[0])}
                       bgColor={palette[key].bgColor}
                       cardFrameColor={palette[key].cardFrameColor}
                       cardFrameWidth={palette[key].cardFrameWidth}
@@ -440,13 +440,13 @@ export function SmartPaletteModal({
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {t('overridePrefix')}{' '}
-                    {expandedSection.charAt(0).toUpperCase() + expandedSection.slice(1)}
+                    {t(`sectionLabels.${expandedSection}` as Parameters<typeof t>[0])}
                   </span>
                   <button
                     type="button"
                     onClick={() => setExpandedSection(null)}
                     className="text-xs text-muted-foreground hover:text-foreground"
-                    aria-label="Close override editor"
+                    aria-label={t('closeOverrideEditor')}
                   >
                     ✕
                   </button>

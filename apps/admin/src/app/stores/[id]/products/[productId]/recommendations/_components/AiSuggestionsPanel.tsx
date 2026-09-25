@@ -19,6 +19,7 @@ import Image from 'next/image';
 import { Button, Modal, useToast } from '@force/ui';
 import { apiGet } from '../../../../../../../lib/api';
 import type { ProductSummary } from './ProductSearch';
+import { useT } from '@/i18n/useT';
 
 /** Number of promotable items above which a confirmation modal is shown. */
 const PROMOTE_ALL_CONFIRM_THRESHOLD = 5;
@@ -64,6 +65,8 @@ export function AiSuggestionsPanel({
   onDemoteAll,
   maxCrossSell,
 }: Props) {
+  const t = useT('products.recommendations.aiSuggestions');
+  const tCommon = useT('common');
   const [recs, setRecs] = useState<AiRec[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,13 +81,13 @@ export function AiSuggestionsPanel({
       `/api/v1/stores/${storeId}/ai/results/recommendations?productId=${productId}`
     );
     if (err) {
-      setError(err.message || 'Failed to load AI suggestions');
+      setError(err.message || t('errorLoadFailed'));
       setLoading(false);
       return;
     }
     setRecs(data?.recommendations ?? []);
     setLoading(false);
-  }, [storeId, productId]);
+  }, [storeId, productId, t]);
 
   useEffect(() => {
     load();
@@ -100,7 +103,7 @@ export function AiSuggestionsPanel({
       status: 'active',
     };
     onPromote(product);
-    toastSuccess(`Added "${rec.targetProduct.name}" to cross-sell`);
+    toastSuccess(t('addedToCrossSell', { name: rec.targetProduct.name }));
   };
 
   // Suggestions that aren't already in the manual cross-sell list AND
@@ -145,10 +148,10 @@ export function AiSuggestionsPanel({
     const capped = Math.min(promoted, maxCrossSell - alreadyInCrossSell.length);
     toastSuccess(
       capped < promoted
-        ? `Promoted ${capped} (max ${maxCrossSell} reached — ${promoted - capped} skipped)`
-        : `Promoted ${promoted} AI picks to manual cross-sell`
+        ? t('promotedCapped', { capped, max: maxCrossSell, skipped: promoted - capped })
+        : t('promotedAll', { count: promoted })
     );
-  }, [promotableRecs, onPromote, maxCrossSell, alreadyInCrossSell.length, toastSuccess]);
+  }, [promotableRecs, onPromote, maxCrossSell, alreadyInCrossSell.length, toastSuccess, t]);
 
   /**
    * Entry point for the "Promote all" button.
@@ -166,22 +169,16 @@ export function AiSuggestionsPanel({
 
   const demoteAll = () => {
     if (aiIdsAlreadyAdded.length === 0) return;
-    const ok = window.confirm(
-      `Remove ${aiIdsAlreadyAdded.length} AI-promoted product(s) from the manual cross-sell list? ` +
-        `The storefront will fall back to AI picks (priority tier 2) on the next render.`
-    );
+    const ok = window.confirm(t('demoteConfirm', { count: aiIdsAlreadyAdded.length }));
     if (!ok) return;
     onDemoteAll(aiIdsAlreadyAdded);
-    toastSuccess(`Demoted ${aiIdsAlreadyAdded.length} AI picks back to fallback rendering`);
+    toastSuccess(t('demotedToast', { count: aiIdsAlreadyAdded.length }));
   };
 
   return (
     <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-        <h3 className="text-sm font-semibold text-foreground">
-          AI suggestions{' '}
-          <span className="text-muted-foreground font-normal">/ اقتراحات الذكاء الاصطناعي</span>
-        </h3>
+        <h3 className="text-sm font-semibold text-foreground">{t('heading')}</h3>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Bulk actions — disabled when there's nothing to act on so the
               empty state is unambiguous. The per-row Promote button still
@@ -195,14 +192,13 @@ export function AiSuggestionsPanel({
             }
             title={
               promotableRecs.length === 0
-                ? 'Nothing to promote — all suggestions already in the cross-sell list'
+                ? t('promoteAllTitleEmpty')
                 : alreadyInCrossSell.length >= maxCrossSell
-                  ? `Cross-sell list at max (${maxCrossSell}). Remove an entry first.`
-                  : `Promote ${promotableRecs.length} suggestion(s)`
+                  ? t('promoteAllTitleMax', { max: maxCrossSell })
+                  : t('promoteAllTitleReady', { count: promotableRecs.length })
             }
           >
-            Promote all{' '}
-            <span className="text-muted-foreground/70 ml-1 font-normal">/ ترقية الكل</span>
+            {t('promoteAllButton')}
           </Button>
           <Button
             onClick={demoteAll}
@@ -211,36 +207,34 @@ export function AiSuggestionsPanel({
             disabled={loading || aiIdsAlreadyAdded.length === 0}
             title={
               aiIdsAlreadyAdded.length === 0
-                ? 'Nothing to demote — none of the AI picks are in the manual cross-sell list'
-                : `Demote ${aiIdsAlreadyAdded.length} AI pick(s) back to fallback rendering`
+                ? t('demoteAllTitleEmpty')
+                : t('demoteAllTitleReady', { count: aiIdsAlreadyAdded.length })
             }
           >
-            Demote all <span className="text-muted-foreground/70 ml-1 font-normal">/ خفض الكل</span>
+            {t('demoteAllButton')}
           </Button>
           <Button onClick={load} size="sm" variant="outline">
-            Refresh
+            {t('refresh')}
           </Button>
         </div>
       </div>
 
       <p className="text-xs text-muted-foreground mb-3">
-        Picks from the last <strong>AI recommendations</strong> sweep. These show automatically on
-        the storefront "You might also like" section when no manual cross-sell is set. Click{' '}
-        <strong>Promote</strong> to add a single pick, or use <strong>Promote all</strong> /{' '}
-        <strong>Demote all</strong> at the top to flip the whole list. Promoted picks take priority
-        over the AI defaults on the storefront.
+        {t.rich('description', { b: chunks => <strong>{chunks}</strong> })}
       </p>
 
-      {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
+      {loading && <div className="text-sm text-muted-foreground">{t('loading')}</div>}
       {error && <div className="text-sm text-destructive">{error}</div>}
       {!loading && !error && recs.length === 0 && (
         <div className="rounded-md bg-background border border-border p-3 text-sm text-muted-foreground">
-          No AI suggestions yet for this product. Run the <strong>AI recommendations</strong> sweep
-          from{' '}
-          <a href={`/stores/${storeId}/ai-tools`} className="text-primary underline">
-            AI Tools
-          </a>
-          .
+          {t.rich('emptyState', {
+            b: chunks => <strong>{chunks}</strong>,
+            a: chunks => (
+              <a href={`/stores/${storeId}/ai-tools`} className="text-primary underline">
+                {chunks}
+              </a>
+            ),
+          })}
         </div>
       )}
       {!loading && recs.length > 0 && (
@@ -286,7 +280,7 @@ export function AiSuggestionsPanel({
                   onClick={() => promote(rec)}
                   className="shrink-0"
                 >
-                  {alreadyAdded ? 'Already added' : 'Promote'}
+                  {alreadyAdded ? t('alreadyAdded') : t('promoteButton')}
                 </Button>
               </li>
             );
@@ -300,20 +294,18 @@ export function AiSuggestionsPanel({
       <Modal
         isOpen={showPromoteAllModal}
         onClose={() => setShowPromoteAllModal(false)}
-        title="Promote all recommendations?"
+        title={t('confirmModal.title')}
         size="sm"
       >
-        <p className="text-sm text-muted-foreground mb-1">
-          This will add <strong>{promotableRecs.length}</strong> AI-suggested product
-          {promotableRecs.length !== 1 ? 's' : ''} to the manual cross-sell list.
-        </p>
-        <p className="text-xs text-muted-foreground mb-4">
-          <span className="font-medium">ترقية {promotableRecs.length} توصية؟</span> سيتم إضافتها إلى
-          قائمة البيع المتقاطع اليدوي.
+        <p className="text-sm text-muted-foreground mb-4">
+          {t.rich('confirmModal.body', {
+            count: promotableRecs.length,
+            b: chunks => <strong>{chunks}</strong>,
+          })}
         </p>
         <div className="flex justify-end gap-3">
           <Button size="sm" variant="outline" onClick={() => setShowPromoteAllModal(false)}>
-            Cancel <span className="text-muted-foreground/70 ml-1 font-normal">/ إلغاء</span>
+            {tCommon('cancel')}
           </Button>
           <Button
             size="sm"
@@ -322,8 +314,7 @@ export function AiSuggestionsPanel({
               executePromoteAll();
             }}
           >
-            Promote {promotableRecs.length}{' '}
-            <span className="text-muted-foreground/70 ml-1 font-normal">/ ترقية الكل</span>
+            {t('confirmModal.confirmButton', { count: promotableRecs.length })}
           </Button>
         </div>
       </Modal>

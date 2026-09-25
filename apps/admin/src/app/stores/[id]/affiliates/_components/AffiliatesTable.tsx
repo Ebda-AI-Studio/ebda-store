@@ -105,7 +105,7 @@ export function AffiliatesTable({
             href={`/stores/${storeId}/affiliates/${affiliate.id}/events`}
             className="min-h-11 inline-flex items-center px-3 py-2 text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
           >
-            View events
+            {t('actions.viewEvents')}
           </Link>
           {affiliate.status === 'pending' && (
             <>

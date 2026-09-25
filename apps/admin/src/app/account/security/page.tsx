@@ -29,6 +29,7 @@ interface EnrollBeginData {
 
 export default function SecurityPage() {
   const t = useT('account.security');
+  const tc = useT('common');
   const { user } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -259,7 +260,7 @@ export default function SecurityPage() {
                 <div className="flex justify-center">
                   <img
                     src={enrollData.qr}
-                    alt="2FA QR code"
+                    alt={t('qrCodeAlt')}
                     className="h-48 w-48 rounded-xl border border-border"
                   />
                 </div>
@@ -311,7 +312,7 @@ export default function SecurityPage() {
                         setEnrollError('');
                       }}
                     >
-                      Cancel
+                      {tc('cancel')}
                     </Button>
                     <Button
                       type="submit"
@@ -372,7 +373,7 @@ export default function SecurityPage() {
                         setDisableError('');
                       }}
                     >
-                      Cancel
+                      {tc('cancel')}
                     </Button>
                     <Button
                       type="submit"
@@ -434,7 +435,7 @@ export default function SecurityPage() {
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    {status?.mfaEnabled ? 'ON' : 'OFF'}
+                    {status?.mfaEnabled ? t('statusOn') : t('statusOff')}
                   </div>
                 </div>
 
@@ -488,7 +489,7 @@ export default function SecurityPage() {
                           onClick={handleBeginEnroll}
                           disabled={isSubmitting || currentCode.length !== 6}
                         >
-                          {isSubmitting ? '…' : 'Continue'}
+                          {isSubmitting ? '…' : t('continueButton')}
                         </Button>
                       </div>
                     </div>

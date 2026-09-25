@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGet } from '../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -121,6 +122,7 @@ interface TagsResult {
 // ---------------------------------------------------------------------------
 
 export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
@@ -170,12 +172,7 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
     <div className="mt-8">
       {/* Section header */}
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-foreground">
-          Sweep results
-          <span className="ms-1.5 text-muted-foreground" dir="rtl">
-            / نتائج المسح
-          </span>
-        </h2>
+        <h2 className="text-base font-semibold text-foreground">{t('header')}</h2>
         <button
           type="button"
           onClick={fetchAll}
@@ -187,88 +184,75 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
           ) : (
             <RefreshIcon className="h-3.5 w-3.5" />
           )}
-          <span>{loading ? 'Refreshing…' : 'Refresh'}</span>
-          {/* AR: تحديث */}
-          <span className="text-muted-foreground" dir="rtl">
-            / تحديث
-          </span>
+          <span>{loading ? t('refreshing') : t('refresh')}</span>
         </button>
       </div>
       {lastFetched && (
         <p className="mb-3 text-xs text-muted-foreground">
-          Last fetched: {lastFetched.toLocaleTimeString()}
+          {t('lastFetched', { time: lastFetched.toLocaleTimeString() })}
         </p>
       )}
 
       {/* Panels stacked */}
       <div className="flex flex-col gap-3">
         <CollapsiblePanel
-          title="Translation fill rate"
-          titleAr="معدل ملء الترجمة"
+          title={t('panels.translate.title')}
           badge={translate ? `${pct(translate.products.fillRate)}% products` : undefined}
         >
           {translate ? <TranslatePanel data={translate} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="SEO meta fill rate"
-          titleAr="معدل ملء بيانات السيو"
+          title={t('panels.seo.title')}
           badge={seo ? `${pct(seo.products.fillRate)}% products` : undefined}
         >
           {seo ? <SeoPanel data={seo} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="FAQ AEO"
-          titleAr="الأسئلة الشائعة"
+          title={t('panels.faq.title')}
           badge={faqs ? `${faqs.count} FAQ${faqs.count !== 1 ? 's' : ''}` : undefined}
         >
           {faqs ? <FaqPanel data={faqs} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="HowTo guides AEO"
-          titleAr="أدلة الإرشادات"
+          title={t('panels.howto.title')}
           badge={howtos ? `${howtos.count} guide${howtos.count !== 1 ? 's' : ''}` : undefined}
         >
           {howtos ? <HowtoPanel data={howtos} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Meta AEO rewrites"
-          titleAr="وصف AEO التحادثي"
+          title={t('panels.metaAeo.title')}
           badge={metaAeo ? `${pct(metaAeo.products.fillRate)}% products` : undefined}
         >
           {metaAeo ? <MetaAeoPanel data={metaAeo} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Category assignment"
-          titleAr="تعيين الفئات"
+          title={t('panels.categorize.title')}
           badge={categorize ? `${pct(categorize.products.fillRate)}% products` : undefined}
         >
           {categorize ? <CategorizePanel data={categorize} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Image alt-text"
-          titleAr="نص بديل للصور"
+          title={t('panels.imageAlt.title')}
           badge={imageAlt ? `${pct(imageAlt.images.fillRate)}% images` : undefined}
         >
           {imageAlt ? <ImageAltPanel data={imageAlt} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Product excerpts"
-          titleAr="ملخصات المنتجات"
+          title={t('panels.excerpt.title')}
           badge={excerpt ? `${pct(excerpt.products.fillRate)}% products` : undefined}
         >
           {excerpt ? <ExcerptPanel data={excerpt} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Product tags"
-          titleAr="وسوم المنتجات"
+          title={t('panels.tags.title')}
           badge={tags ? `${pct(tags.products.fillRate)}% products` : undefined}
         >
           {tags ? <TagsPanel data={tags} storeId={storeId} /> : <Loading />}
@@ -283,20 +267,19 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
 // ---------------------------------------------------------------------------
 
 function TranslatePanel({ data, storeId }: { data: TranslateResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-4">
       {/* Fill-rate cards side-by-side */}
       <div className="grid grid-cols-2 gap-3">
         <FillRateCard
-          label="Products AR"
-          labelAr="منتجات بالعربي"
+          label={t('fillRateLabels.productsAr')}
           filled={data.products.filled}
           total={data.products.total}
           rate={data.products.fillRate}
         />
         <FillRateCard
-          label="Categories AR"
-          labelAr="فئات بالعربي"
+          label={t('fillRateLabels.categoriesAr')}
           filled={data.categories.filled}
           total={data.categories.total}
           rate={data.categories.fillRate}
@@ -307,7 +290,7 @@ function TranslatePanel({ data, storeId }: { data: TranslateResult; storeId: str
       {data.recentlyTranslated.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Recently translated (last 30 days) / المترجمة مؤخراً (آخر 30 يوماً)
+            {t('recentlyTranslated')}
           </p>
           <ul className="divide-y rounded-lg border bg-card text-sm">
             {data.recentlyTranslated.map(p => (
@@ -334,7 +317,7 @@ function TranslatePanel({ data, storeId }: { data: TranslateResult; storeId: str
         href={`/stores/${storeId}/products`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        Open Catalog → Products / فتح المنتجات
+        {t('openCatalogProducts')}
         <ArrowIcon />
       </Link>
     </div>
@@ -342,6 +325,7 @@ function TranslatePanel({ data, storeId }: { data: TranslateResult; storeId: str
 }
 
 function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   const [copied, setCopied] = useState<string | null>(null);
 
   async function copy(text: string, id: string) {
@@ -359,22 +343,19 @@ function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
       {/* 3 fill-rate cards */}
       <div className="grid grid-cols-3 gap-3">
         <FillRateCard
-          label="Store"
-          labelAr="المتجر"
+          label={t('fillRateLabels.store')}
           filled={data.storeMetaFilled ? 1 : 0}
           total={1}
           rate={data.storeMetaFilled ? 1 : 0}
         />
         <FillRateCard
-          label="Products"
-          labelAr="المنتجات"
+          label={t('fillRateLabels.products')}
           filled={data.products.filled}
           total={data.products.total}
           rate={data.products.fillRate}
         />
         <FillRateCard
-          label="Categories"
-          labelAr="الفئات"
+          label={t('fillRateLabels.categories')}
           filled={data.categories.filled}
           total={data.categories.total}
           rate={data.categories.fillRate}
@@ -385,7 +366,7 @@ function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
       {data.recentProducts.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Latest SEO fills / آخر تعبئة سيو
+            {t('latestSeoFills')}
           </p>
           <ul className="divide-y rounded-lg border bg-card text-sm">
             {data.recentProducts.map(p => (
@@ -398,27 +379,27 @@ function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
                 </div>
                 {p.metaTitle && (
                   <div className="mt-1 flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">Title:</span>
+                    <span className="text-xs text-muted-foreground">{t('titleLabel')}</span>
                     <span className="text-xs">{p.metaTitle}</span>
                     <button
                       type="button"
                       onClick={() => copy(p.metaTitle!, `title-${p.id}`)}
                       className="ms-auto shrink-0 text-xs text-primary hover:underline"
                     >
-                      {copied === `title-${p.id}` ? 'Copied!' : 'Copy'}
+                      {copied === `title-${p.id}` ? t('copied') : t('copy')}
                     </button>
                   </div>
                 )}
                 {p.metaDescription && (
                   <div className="mt-0.5 flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">Desc:</span>
+                    <span className="text-xs text-muted-foreground">{t('descLabel')}</span>
                     <span className="text-xs">{p.metaDescription}</span>
                     <button
                       type="button"
                       onClick={() => copy(p.metaDescription!, `desc-${p.id}`)}
                       className="ms-auto shrink-0 text-xs text-primary hover:underline"
                     >
-                      {copied === `desc-${p.id}` ? 'Copied!' : 'Copy'}
+                      {copied === `desc-${p.id}` ? t('copied') : t('copy')}
                     </button>
                   </div>
                 )}
@@ -432,7 +413,7 @@ function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
         href={`/stores/${storeId}/seo`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        Open SEO page / فتح صفحة السيو
+        {t('openSeoPage')}
         <ArrowIcon />
       </Link>
     </div>
@@ -440,28 +421,25 @@ function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
 }
 
 function FaqPanel({ data, storeId }: { data: FaqResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-3">
       {/* Summary row */}
       <div className="flex items-center gap-4 text-sm">
         <span>
           <strong>{data.count}</strong>
-          <span className="ms-1 text-muted-foreground">
-            FAQ{data.count !== 1 ? 's' : ''} / سؤال
-          </span>
+          <span className="ms-1 text-muted-foreground">{t('faqUnit', { count: data.count })}</span>
         </span>
         {data.lastUpdated && (
           <span className="text-muted-foreground text-xs">
-            Last updated: {relativeDate(data.lastUpdated)}
+            {t('lastUpdated', { time: relativeDate(data.lastUpdated) })}
           </span>
         )}
       </div>
 
       {/* FAQ list */}
       {data.faqs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No FAQs yet. Run the FAQ sweep above. / لا توجد أسئلة بعد.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('noFaqsYet')}</p>
       ) : (
         <ul className="divide-y rounded-lg border bg-card text-sm">
           {data.faqs.map(f => (
@@ -471,12 +449,12 @@ function FaqPanel({ data, storeId }: { data: FaqResult; storeId: string }) {
                 <div className="flex shrink-0 items-center gap-1.5">
                   {f.aiDrafted && !f.manuallyEdited && (
                     <span className="rounded-full bg-[#fc6b02]/10 px-2 py-0.5 text-[10px] font-medium text-[#fc6b02]">
-                      AI
+                      {t('aiBadge')}
                     </span>
                   )}
                   {f.manuallyEdited && (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                      edited
+                      {t('editedBadge')}
                     </span>
                   )}
                 </div>
@@ -499,7 +477,7 @@ function FaqPanel({ data, storeId }: { data: FaqResult; storeId: string }) {
         href={`/stores/${storeId}/seo#faqs`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        View FAQs on SEO page / عرض الأسئلة في صفحة السيو
+        {t('viewFaqsOnSeoPage')}
         <ArrowIcon />
       </Link>
     </div>
@@ -507,6 +485,7 @@ function FaqPanel({ data, storeId }: { data: FaqResult; storeId: string }) {
 }
 
 function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-3">
       {/* Summary row */}
@@ -514,21 +493,19 @@ function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
         <span>
           <strong>{data.count}</strong>
           <span className="ms-1 text-muted-foreground">
-            guide{data.count !== 1 ? 's' : ''} / دليل
+            {t('guideUnit', { count: data.count })}
           </span>
         </span>
         {data.lastUpdated && (
           <span className="text-xs text-muted-foreground">
-            Last updated: {relativeDate(data.lastUpdated)}
+            {t('lastUpdated', { time: relativeDate(data.lastUpdated) })}
           </span>
         )}
       </div>
 
       {/* HowTo list */}
       {data.howtos.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No HowTo guides yet. Run the HowTo sweep above. / لا توجد أدلة بعد.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('noHowtosYet')}</p>
       ) : (
         <ul className="divide-y rounded-lg border bg-card text-sm">
           {data.howtos.map(h => (
@@ -537,16 +514,16 @@ function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
                 <p className="font-medium">{h.title}</p>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">
-                    {h.stepCount} step{h.stepCount !== 1 ? 's' : ''}
+                    {t('stepCount', { count: h.stepCount })}
                   </span>
                   {h.aiDrafted && !h.manuallyEdited && (
                     <span className="rounded-full bg-[#fc6b02]/10 px-2 py-0.5 text-[10px] font-medium text-[#fc6b02]">
-                      AI
+                      {t('aiBadge')}
                     </span>
                   )}
                   {h.manuallyEdited && (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                      edited
+                      {t('editedBadge')}
                     </span>
                   )}
                 </div>
@@ -569,7 +546,7 @@ function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
         href={`/stores/${storeId}/seo#howtos`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        View HowTos on SEO page / عرض الأدلة في صفحة السيو
+        {t('viewHowtosOnSeoPage')}
         <ArrowIcon />
       </Link>
     </div>
@@ -577,27 +554,25 @@ function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
 }
 
 function MetaAeoPanel({ data, storeId }: { data: MetaAeoResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-4">
       {/* Fill-rate cards */}
       <div className="grid grid-cols-3 gap-3">
         <FillRateCard
-          label="Store"
-          labelAr="المتجر"
+          label={t('fillRateLabels.store')}
           filled={data.storeAeoFilled ? 1 : 0}
           total={1}
           rate={data.storeAeoFilled ? 1 : 0}
         />
         <FillRateCard
-          label="Products"
-          labelAr="المنتجات"
+          label={t('fillRateLabels.products')}
           filled={data.products.filled}
           total={data.products.total}
           rate={data.products.fillRate}
         />
         <FillRateCard
-          label="Categories"
-          labelAr="الفئات"
+          label={t('fillRateLabels.categories')}
           filled={data.categories.filled}
           total={data.categories.total}
           rate={data.categories.fillRate}
@@ -607,7 +582,7 @@ function MetaAeoPanel({ data, storeId }: { data: MetaAeoResult; storeId: string 
       {/* Store-level AEO description if set */}
       {data.storeMetaDescriptionAeo && (
         <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs">
-          <p className="mb-1 font-medium text-muted-foreground">Store AEO description:</p>
+          <p className="mb-1 font-medium text-muted-foreground">{t('storeAeoDescriptionLabel')}</p>
           <p>{data.storeMetaDescriptionAeo}</p>
         </div>
       )}
@@ -616,7 +591,7 @@ function MetaAeoPanel({ data, storeId }: { data: MetaAeoResult; storeId: string 
       {data.recentProducts.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Recently rewritten / مُعاد صياغتها مؤخراً
+            {t('recentlyRewritten')}
           </p>
           <ul className="divide-y rounded-lg border bg-card text-sm">
             {data.recentProducts.map(p => (
@@ -642,7 +617,7 @@ function MetaAeoPanel({ data, storeId }: { data: MetaAeoResult; storeId: string 
         href={`/stores/${storeId}/seo`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        Open SEO page / فتح صفحة السيو
+        {t('openSeoPage')}
         <ArrowIcon />
       </Link>
     </div>
@@ -650,11 +625,11 @@ function MetaAeoPanel({ data, storeId }: { data: MetaAeoResult; storeId: string 
 }
 
 function CategorizePanel({ data, storeId }: { data: CategorizeResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-4">
       <FillRateCard
-        label="Products categorized"
-        labelAr="منتجات مصنّفة"
+        label={t('fillRateLabels.productsCategorized')}
         filled={data.products.filled}
         total={data.products.total}
         rate={data.products.fillRate}
@@ -663,7 +638,7 @@ function CategorizePanel({ data, storeId }: { data: CategorizeResult; storeId: s
       {data.recentProducts.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Recently categorized / المصنّفة مؤخراً
+            {t('recentlyCategorized')}
           </p>
           <ul className="divide-y rounded-lg border bg-card text-sm">
             {data.recentProducts.map(p => (
@@ -682,7 +657,7 @@ function CategorizePanel({ data, storeId }: { data: CategorizeResult; storeId: s
         href={`/stores/${storeId}/products`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        Open Catalog → Products / فتح المنتجات
+        {t('openCatalogProducts')}
         <ArrowIcon />
       </Link>
     </div>
@@ -690,11 +665,11 @@ function CategorizePanel({ data, storeId }: { data: CategorizeResult; storeId: s
 }
 
 function ImageAltPanel({ data, storeId }: { data: ImageAltResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-4">
       <FillRateCard
-        label="Images with alt-text"
-        labelAr="صور بنص بديل"
+        label={t('fillRateLabels.imagesWithAlt')}
         filled={data.images.filled}
         total={data.images.total}
         rate={data.images.fillRate}
@@ -704,7 +679,7 @@ function ImageAltPanel({ data, storeId }: { data: ImageAltResult; storeId: strin
         href={`/stores/${storeId}/products`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        Open Catalog → Products / فتح المنتجات
+        {t('openCatalogProducts')}
         <ArrowIcon />
       </Link>
     </div>
@@ -712,11 +687,11 @@ function ImageAltPanel({ data, storeId }: { data: ImageAltResult; storeId: strin
 }
 
 function ExcerptPanel({ data, storeId }: { data: ExcerptResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-4">
       <FillRateCard
-        label="Products with excerpt"
-        labelAr="منتجات بملخص"
+        label={t('fillRateLabels.productsWithExcerpt')}
         filled={data.products.filled}
         total={data.products.total}
         rate={data.products.fillRate}
@@ -725,7 +700,7 @@ function ExcerptPanel({ data, storeId }: { data: ExcerptResult; storeId: string 
       {data.recentProducts.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Recently filled / المملوءة مؤخراً
+            {t('recentlyFilled')}
           </p>
           <ul className="divide-y rounded-lg border bg-card text-sm">
             {data.recentProducts.map(p => (
@@ -747,7 +722,7 @@ function ExcerptPanel({ data, storeId }: { data: ExcerptResult; storeId: string 
         href={`/stores/${storeId}/products`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        Open Catalog → Products / فتح المنتجات
+        {t('openCatalogProducts')}
         <ArrowIcon />
       </Link>
     </div>
@@ -755,22 +730,19 @@ function ExcerptPanel({ data, storeId }: { data: ExcerptResult; storeId: string 
 }
 
 function TagsPanel({ data, storeId }: { data: TagsResult; storeId: string }) {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <FillRateCard
-          label="Products tagged"
-          labelAr="منتجات موسومة"
+          label={t('fillRateLabels.productsTagged')}
           filled={data.products.filled}
           total={data.products.total}
           rate={data.products.fillRate}
         />
         <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-center">
           <div className="text-2xl font-bold text-foreground">{data.totalTags}</div>
-          <div className="mt-1 text-[11px] font-medium text-foreground">Total tags</div>
-          <div className="text-[10px] text-muted-foreground" dir="rtl">
-            إجمالي الوسوم
-          </div>
+          <div className="mt-1 text-[11px] font-medium text-foreground">{t('totalTags')}</div>
         </div>
       </div>
 
@@ -778,7 +750,7 @@ function TagsPanel({ data, storeId }: { data: TagsResult; storeId: string }) {
         href={`/stores/${storeId}/products`}
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
-        Open Catalog → Products / فتح المنتجات
+        {t('openCatalogProducts')}
         <ArrowIcon />
       </Link>
     </div>
@@ -791,12 +763,10 @@ function TagsPanel({ data, storeId }: { data: TagsResult; storeId: string }) {
 
 function CollapsiblePanel({
   title,
-  titleAr,
   badge,
   children,
 }: {
   title: string;
-  titleAr: string;
   badge?: string;
   children: React.ReactNode;
 }) {
@@ -812,9 +782,6 @@ function CollapsiblePanel({
       >
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-medium text-sm text-foreground">{title}</span>
-          <span className="text-xs text-muted-foreground" dir="rtl">
-            {titleAr}
-          </span>
           {badge && (
             <span className="rounded-full bg-[#fc6b02]/10 px-2 py-0.5 text-[10px] font-semibold text-[#fc6b02]">
               {badge}
@@ -832,13 +799,11 @@ function CollapsiblePanel({
 
 function FillRateCard({
   label,
-  labelAr,
   filled,
   total,
   rate,
 }: {
   label: string;
-  labelAr: string;
   filled: number;
   total: number;
   rate: number;
@@ -854,9 +819,6 @@ function FillRateCard({
         {filled}/{total}
       </div>
       <div className="mt-1 text-[11px] font-medium text-foreground">{label}</div>
-      <div className="text-[10px] text-muted-foreground" dir="rtl">
-        {labelAr}
-      </div>
       {/* Thin fill-rate bar */}
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
         <div className="h-full bg-[#fc6b02] transition-all" style={{ width: `${percentage}%` }} />
@@ -866,10 +828,11 @@ function FillRateCard({
 }
 
 function Loading() {
+  const t = useT('aiTools.sweepResults');
   return (
     <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
       <SpinIcon className="h-4 w-4 animate-spin" />
-      Loading… / جارٍ التحميل
+      {t('loading')}
     </div>
   );
 }

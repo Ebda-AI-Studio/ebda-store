@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button, Modal, useToast } from '@force/ui';
+import { useLocale } from 'next-intl';
 import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
 import {
   PLAN_LABELS,
@@ -15,6 +16,7 @@ import {
   type FeatureDefinition,
 } from '@force/shared';
 import { ToggleSwitch } from './_components/ToggleSwitch';
+import { useT } from '@/i18n/useT';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,44 +70,38 @@ const CATEGORY_ORDER: FeatureCategory[] = [
   'engagement',
 ];
 
-const CATEGORY_LABELS: Record<FeatureCategory, { en: string; ar: string }> = {
-  commerce: { en: 'Commerce', ar: 'التجارة' },
-  marketing: { en: 'Marketing', ar: 'التسويق' },
-  operations: { en: 'Operations', ar: 'العمليات' },
-  storefront: { en: 'Storefront', ar: 'الواجهة' },
-  engagement: { en: 'Engagement', ar: 'التفاعل' },
-};
-
 import { formatDate } from '@/lib/format';
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
 function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
-  const planLabel = PLAN_LABELS[plan].en;
+  const t = useT('features.matrix');
+  const locale = useLocale();
+  const planLabel = locale === 'ar' ? PLAN_LABELS[plan].ar : PLAN_LABELS[plan].en;
   const configs: Record<TriState, { color: string; dot: string; label: string }> = {
     baseline_on: {
       color:
         'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
       dot: 'bg-emerald-500',
-      label: `Included in ${planLabel}`,
+      label: t('badges.includedIn', { plan: planLabel }),
     },
     override_on: {
       color:
         'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
       dot: 'bg-blue-500',
-      label: 'Granted by override',
+      label: t('badges.grantedByOverride'),
     },
     override_off: {
       color:
         'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800',
       dot: 'bg-orange-500',
-      label: 'Revoked by override',
+      label: t('badges.revokedByOverride'),
     },
     baseline_off: {
       color:
         'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
       dot: 'bg-gray-400',
-      label: `Not in ${planLabel}`,
+      label: t('badges.notIn', { plan: planLabel }),
     },
   };
   const cfg = configs[state];
@@ -130,6 +126,7 @@ interface FeatureRowProps {
 }
 
 function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureRowProps) {
+  const tFeatures = useT('features');
   const state = triState(plan, def.key, overrideRow);
   const isEffectivelyOn = state === 'baseline_on' || state === 'override_on';
 
@@ -151,7 +148,8 @@ function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureR
           <TriStateBadge state={state} plan={plan} />
           {(state === 'override_on' || state === 'override_off') && overrideRow?.enabledBy && (
             <span className="text-xs text-muted-foreground">
-              by <span className="font-medium text-foreground">{overrideRow.enabledBy}</span>
+              {tFeatures('row.enabledBy')}{' '}
+              <span className="font-medium text-foreground">{overrideRow.enabledBy}</span>
               {overrideRow.enabledAt ? ` · ${formatDate(overrideRow.enabledAt)}` : ''}
             </span>
           )}
@@ -187,14 +185,15 @@ function CategorySection({
   inFlightKeys,
   onAction,
 }: CategorySectionProps) {
-  const label = CATEGORY_LABELS[category];
+  const t = useT('features.matrix');
+  const tFeatures = useT('features');
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/40">
         <div>
-          <h2 className="font-semibold text-foreground">{label.en}</h2>
-          <p className="text-xs text-muted-foreground" dir="rtl">
-            {label.ar} · {features.length} features
+          <h2 className="font-semibold text-foreground">{tFeatures(`categories.${category}`)}</h2>
+          <p className="text-xs text-muted-foreground">
+            {t('featureCount', { count: features.length })}
           </p>
         </div>
         <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
@@ -225,6 +224,13 @@ interface FeatureMatrixProps {
 
 export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   const { success: toastSuccess, error: toastError } = useToast();
+  const t = useT('features.matrix');
+  const tCommon = useT('common');
+  const locale = useLocale();
+  const planLabelFor = useCallback(
+    (p: StorePlan) => (locale === 'ar' ? PLAN_LABELS[p].ar : PLAN_LABELS[p].en),
+    [locale]
+  );
 
   // Store info (plan + name)
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
@@ -265,12 +271,12 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       `/api/v1/admin/stores/${storeId}/features`
     );
     if (apiErr) {
-      toastError('Failed to load features', apiErr.message);
+      toastError(t('toasts.loadFeaturesFailed'), apiErr.message);
     } else if (data) {
       setOverrideMap(new Map(data.metadata.map(m => [m.featureKey, m])));
     }
     setFeaturesLoading(false);
-  }, [storeId, toastError]);
+  }, [storeId, toastError, t]);
 
   useEffect(() => {
     fetchStore();
@@ -294,7 +300,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       }
 
       if (result.error) {
-        toastError('Feature update failed', result.error.message);
+        toastError(t('toasts.featureUpdateFailed'), result.error.message);
       } else {
         await fetchFeatures();
       }
@@ -305,7 +311,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
         return next;
       });
     },
-    [inFlightKeys, storeId, fetchFeatures, toastError]
+    [inFlightKeys, storeId, fetchFeatures, toastError, t]
   );
 
   // ── Plan change ────────────────────────────────────────────────────────────
@@ -316,15 +322,18 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       plan: pendingPlan,
     });
     if (apiErr) {
-      toastError('Plan change failed', apiErr.message);
+      toastError(t('toasts.planChangeFailed'), apiErr.message);
     } else {
-      toastSuccess('Plan updated', `Store plan changed to ${PLAN_LABELS[pendingPlan].en}.`);
+      toastSuccess(
+        t('toasts.planUpdated'),
+        t('toasts.planUpdatedDescription', { plan: planLabelFor(pendingPlan) })
+      );
       await fetchStore();
     }
     setPlanChanging(false);
     setPlanModalOpen(false);
     setPendingPlan(null);
-  }, [pendingPlan, storeId, fetchStore, toastSuccess, toastError]);
+  }, [pendingPlan, storeId, fetchStore, toastSuccess, toastError, t, planLabelFor]);
 
   // ── Suspend / reactivate ───────────────────────────────────────────────────
   const handleStatusChange = useCallback(async () => {
@@ -335,31 +344,35 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       status: newStatus,
     });
     if (apiErr) {
-      toastError('Status change failed', apiErr.message);
+      toastError(t('toasts.statusChangeFailed'), apiErr.message);
     } else {
       toastSuccess(
-        newStatus === 'suspended' ? 'Store suspended' : 'Store reactivated',
-        `${storeInfo.name} is now ${newStatus}.`
+        newStatus === 'suspended' ? t('toasts.storeSuspended') : t('toasts.storeReactivated'),
+        t('toasts.storeStatusDescription', {
+          name: storeInfo.name,
+          status:
+            newStatus === 'suspended' ? t('toasts.statusSuspended') : t('toasts.statusActive'),
+        })
       );
       await fetchStore();
     }
     setStatusChanging(false);
     setSuspendModalOpen(false);
-  }, [storeInfo, storeId, fetchStore, toastSuccess, toastError]);
+  }, [storeInfo, storeId, fetchStore, toastSuccess, toastError, t]);
 
   // ── Reset overrides ────────────────────────────────────────────────────────
   const handleReset = useCallback(async () => {
     setResetting(true);
     const { error: apiErr } = await apiDelete(`/api/v1/admin/stores/${storeId}/features`);
     if (apiErr) {
-      toastError('Reset failed', apiErr.message);
+      toastError(t('toasts.resetFailed'), apiErr.message);
     } else {
-      toastSuccess('Overrides cleared', 'Store is now using plan defaults.');
+      toastSuccess(t('toasts.overridesCleared'), t('toasts.overridesClearedDescription'));
       await fetchFeatures();
     }
     setResetting(false);
     setResetModalOpen(false);
-  }, [storeId, fetchFeatures, toastSuccess, toastError]);
+  }, [storeId, fetchFeatures, toastSuccess, toastError, t]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -376,9 +389,9 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   if (!storeInfo) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        Failed to load store.{' '}
+        {t('loadStoreFailed')}{' '}
         <button type="button" onClick={fetchStore} className="underline">
-          Retry
+          {tCommon('retry')}
         </button>
       </div>
     );
@@ -406,17 +419,12 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       <div className="bg-card rounded-xl border border-border p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="font-semibold text-foreground">Store Plan</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Current plan determines the feature baseline.
-            </p>
+            <h2 className="font-semibold text-foreground">{t('storePlanHeading')}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">{t('storePlanSubtitle')}</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-medium">
-              {PLAN_LABELS[plan].en}
-              <span className="text-primary/70" dir="rtl">
-                · {PLAN_LABELS[plan].ar}
-              </span>
+              {planLabelFor(plan)}
             </span>
             <select
               className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -429,21 +437,16 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
                 }
               }}
             >
-              <option value="">Change plan…</option>
+              <option value="">{t('changePlanOption')}</option>
               {STORE_PLANS.filter(p => p !== plan).map(p => (
                 <option key={p} value={p}>
-                  {PLAN_LABELS[p].en} — {PLAN_LABELS[p].ar}
+                  {planLabelFor(p)}
                 </option>
               ))}
             </select>
           </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Plan changes preserve all existing overrides. Baseline features update immediately.
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground" dir="rtl">
-          تغيير الخطة يحافظ على كل الإعدادات المخصصة. تتحدث الميزات الأساسية فوراً.
-        </p>
+        <p className="mt-3 text-xs text-muted-foreground">{t('planChangeNote')}</p>
       </div>
 
       {/* ── Feature Matrix ───────────────────────────────────────────────────── */}
@@ -467,18 +470,18 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
 
       {/* ── Danger Zone ──────────────────────────────────────────────────────── */}
       <div className="mt-8">
-        <h2 className="mb-4 font-semibold text-destructive">Danger Zone</h2>
+        <h2 className="mb-4 font-semibold text-destructive">{t('dangerZone.heading')}</h2>
         <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
           {/* Suspend / Reactivate */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-medium text-foreground">
-                {isSuspended ? 'Reactivate Store' : 'Suspend Store'}
+                {isSuspended ? t('dangerZone.reactivateTitle') : t('dangerZone.suspendTitle')}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {isSuspended
-                  ? 'Allow customers to access and purchase from this store.'
-                  : 'Block customer access to this store without deleting data.'}
+                  ? t('dangerZone.reactivateDescription')
+                  : t('dangerZone.suspendDescription')}
               </p>
             </div>
             <div className="shrink-0">
@@ -487,7 +490,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
                 onClick={() => setSuspendModalOpen(true)}
                 disabled={statusChanging}
               >
-                {isSuspended ? 'Reactivate Store' : 'Suspend Store'}
+                {isSuspended ? t('dangerZone.reactivateTitle') : t('dangerZone.suspendTitle')}
               </Button>
             </div>
           </div>
@@ -497,10 +500,9 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
           {/* Reset overrides */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-foreground">Reset to Plan Defaults</p>
+              <p className="text-sm font-medium text-foreground">{t('dangerZone.resetTitle')}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Clear ALL feature overrides for this store. The store will use its plan baseline
-                only.
+                {t('dangerZone.resetDescription')}
               </p>
             </div>
             <div className="shrink-0">
@@ -509,7 +511,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
                 onClick={() => setResetModalOpen(true)}
                 disabled={resetting}
               >
-                Reset Overrides
+                {t('dangerZone.resetButton')}
               </Button>
             </div>
           </div>
@@ -517,7 +519,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
           {/* Audit log link */}
           <div className="border-t border-destructive/20 pt-3">
             <Link href="/audit-logs" className="text-sm text-primary hover:underline">
-              View audit logs →
+              {t('dangerZone.auditLogsLink')}
             </Link>
           </div>
         </div>
@@ -532,16 +534,14 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
           setPlanModalOpen(false);
           setPendingPlan(null);
         }}
-        title="Change Plan"
+        title={t('modals.changePlanTitle')}
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
-          Changing plan to <strong>{pendingPlan ? PLAN_LABELS[pendingPlan].en : ''}</strong>.
-          Feature overrides will be preserved. Continue?
-        </p>
-        <p className="text-sm text-muted-foreground mt-1" dir="rtl">
-          تغيير الخطة إلى <strong>{pendingPlan ? PLAN_LABELS[pendingPlan].ar : ''}</strong>. ستُحفظ
-          الإعدادات المخصصة. المتابعة؟
+          {t.rich('modals.changePlanBody', {
+            b: chunks => <strong>{chunks}</strong>,
+            plan: pendingPlan ? planLabelFor(pendingPlan) : '',
+          })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button
@@ -552,7 +552,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
             }}
             disabled={planChanging}
           >
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="default"
@@ -560,7 +560,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
             disabled={planChanging}
             isLoading={planChanging}
           >
-            Confirm
+            {tCommon('confirm')}
           </Button>
         </div>
       </Modal>
@@ -569,13 +569,13 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       <Modal
         isOpen={suspendModalOpen}
         onClose={() => setSuspendModalOpen(false)}
-        title={isSuspended ? 'Reactivate Store' : 'Suspend Store'}
+        title={isSuspended ? t('dangerZone.reactivateTitle') : t('dangerZone.suspendTitle')}
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
           {isSuspended
-            ? `Reactivate ${storeInfo.name}? Customers will regain access immediately.`
-            : `Suspend ${storeInfo.name}? Customers will not be able to access or purchase from the store.`}
+            ? t('modals.reactivateBody', { name: storeInfo.name })
+            : t('modals.suspendBody', { name: storeInfo.name })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button
@@ -583,7 +583,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
             onClick={() => setSuspendModalOpen(false)}
             disabled={statusChanging}
           >
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             variant={isSuspended ? 'default' : 'destructive'}
@@ -591,7 +591,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
             disabled={statusChanging}
             isLoading={statusChanging}
           >
-            {isSuspended ? 'Reactivate' : 'Suspend'}
+            {isSuspended ? t('modals.confirmReactivate') : t('modals.confirmSuspend')}
           </Button>
         </div>
       </Modal>
@@ -600,16 +600,18 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       <Modal
         isOpen={resetModalOpen}
         onClose={() => setResetModalOpen(false)}
-        title="Reset to Plan Defaults"
+        title={t('dangerZone.resetTitle')}
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
-          This will clear ALL feature overrides for this store. The store will fall back to its{' '}
-          <strong>{PLAN_LABELS[plan].en}</strong> plan baseline. This cannot be undone.
+          {t.rich('modals.resetBody', {
+            b: chunks => <strong>{chunks}</strong>,
+            plan: planLabelFor(plan),
+          })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setResetModalOpen(false)} disabled={resetting}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="destructive"
@@ -617,7 +619,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
             disabled={resetting}
             isLoading={resetting}
           >
-            Reset All Overrides
+            {t('modals.resetAllButton')}
           </Button>
         </div>
       </Modal>

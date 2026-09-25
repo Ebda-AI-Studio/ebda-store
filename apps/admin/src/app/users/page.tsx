@@ -445,7 +445,7 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="invite-role">{t('role') || 'Role'}</Label>
+              <Label htmlFor="invite-role">{t('roleLabel')}</Label>
               <select
                 id="invite-role"
                 className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

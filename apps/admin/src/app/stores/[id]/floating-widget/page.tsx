@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { ColorField } from '../../../../components/ColorField';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { useT } from '@/i18n/useT';
 import type {
   FloatingButton,
   FloatingButtonKind,
@@ -44,34 +45,28 @@ interface StoreInfo {
   socialLinks?: StoreSocialLinks;
 }
 
-const KIND_LABELS: Record<FloatingButtonKind, { en: string; ar: string }> = {
-  whatsapp: { en: 'WhatsApp', ar: 'واتساب' },
-  instagram: { en: 'Instagram', ar: 'إنستغرام' },
-  phone: { en: 'Phone', ar: 'هاتف' },
-  email: { en: 'Email', ar: 'البريد' },
-  music: { en: 'Background music', ar: 'موسيقى' },
-  custom: { en: 'Custom link', ar: 'رابط مخصص' },
-  tiktok: { en: 'TikTok', ar: 'تيك توك' },
-  snapchat: { en: 'Snapchat', ar: 'سناب شات' },
-  youtube: { en: 'YouTube', ar: 'يوتيوب' },
-  facebook: { en: 'Facebook', ar: 'فيسبوك' },
-  x: { en: 'X (Twitter)', ar: 'إكس' },
-  telegram: { en: 'Telegram', ar: 'تيليغرام' },
-};
+// Kind labels are translated via t(`kind.${k}`) at the select below (was a
+// static {en,ar} map — next-intl now picks the admin's own locale).
+const ALL_BUTTON_KINDS: FloatingButtonKind[] = [
+  'whatsapp',
+  'instagram',
+  'phone',
+  'email',
+  'music',
+  'custom',
+  'tiktok',
+  'snapchat',
+  'youtube',
+  'facebook',
+  'x',
+  'telegram',
+];
 
-const POSITION_LABELS: Record<FloatingPosition, string> = {
-  br: 'Bottom-right',
-  bl: 'Bottom-left',
-  tr: 'Top-right',
-  tl: 'Top-left',
-};
+// Translated via t(`position.${k}`) at the select below.
+const ALL_POSITIONS: FloatingPosition[] = ['br', 'bl', 'tr', 'tl'];
 
-const EXPAND_LABELS: Record<FloatingExpandDirection, string> = {
-  up: 'Upward',
-  down: 'Downward',
-  left: 'Leftward',
-  right: 'Rightward',
-};
+// Translated via t(`expand.${k}`) at the select below.
+const ALL_EXPAND_DIRECTIONS: FloatingExpandDirection[] = ['up', 'down', 'left', 'right'];
 
 function genId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -88,6 +83,7 @@ export default function FloatingWidgetPage() {
   // 2026-05-21 — ahmad enabled floating_widget but the page kept
   // showing 'Feature not enabled' until this hook was used.
   const { isEnabled, isLoading: featuresLoading } = useFeatures();
+  const t = useT('floatingWidget');
 
   const [store, setStore] = useState<StoreInfo | null>(null);
   const [config, setConfig] = useState<FloatingWidgetConfig>(DEFAULT_FLOATING_WIDGET_CONFIG);
@@ -123,11 +119,11 @@ export default function FloatingWidgetPage() {
     const res = await apiPut(`/api/v1/stores/${storeId}/floating-widget`, config);
     setSaving(false);
     if (res.error) {
-      toastError(res.error.message || 'Save failed');
+      toastError(res.error.message || t('saveFailedFallback'));
     } else {
-      toastSuccess('Floating widget saved');
+      toastSuccess(t('savedToast'));
     }
-  }, [store, storeId, config, toastSuccess, toastError]);
+  }, [store, storeId, config, toastSuccess, toastError, t]);
 
   const patch = (next: Partial<FloatingWidgetConfig>) => setConfig(prev => ({ ...prev, ...next }));
 
@@ -162,41 +158,37 @@ export default function FloatingWidgetPage() {
 
   if (loading || featuresLoading) {
     return (
-      <AdminLayout title="Floating widget" subtitle="Loading…">
-        <div className="text-sm text-muted-foreground">Loading…</div>
+      <AdminLayout title={t('pageTitle')} subtitle={t('common.loading')}>
+        <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
       </AdminLayout>
     );
   }
 
   if (!featureEnabled) {
     return (
-      <AdminLayout title="Floating widget" subtitle="Premium add-on">
+      <AdminLayout title={t('pageTitle')} subtitle={t('premiumSubtitle')}>
         <div className="max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
-          <h2 className="mb-2 text-lg font-semibold text-foreground">Feature not enabled</h2>
-          <p className="text-sm text-muted-foreground">
-            Floating widget is a premium add-on. A super admin must enable it for this store before
-            you can configure it. Contact Force AI to request access.
-          </p>
+          <h2 className="mb-2 text-lg font-semibold text-foreground">
+            {t('featureNotEnabledTitle')}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t('featureNotEnabledBody')}</p>
         </div>
       </AdminLayout>
     );
   }
 
   return (
-    <AdminLayout
-      title="Floating widget"
-      subtitle="Sticky button group your customers see on every page"
-    >
+    <AdminLayout title={t('pageTitle')} subtitle={t('mainSubtitle')}>
       <div className="space-y-6 pb-32">
         {/* Master enable */}
         <section className="rounded-2xl border border-border bg-card p-6">
           <label className="flex items-center justify-between gap-4 cursor-pointer">
             <span className="flex-1 min-w-0">
               <span className="block text-sm font-semibold text-foreground">
-                Show widget on storefront
+                {t('showWidgetLabel')}
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
-                When off, no widget renders even though the feature is enabled.
+                {t('showWidgetHint')}
               </span>
             </span>
             <input
@@ -211,29 +203,31 @@ export default function FloatingWidgetPage() {
         {/* Position + expand direction */}
         <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 md:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Position</span>
+            <span className="text-xs font-medium text-muted-foreground">{t('positionLabel')}</span>
             <select
               value={config.position ?? 'br'}
               onChange={e => patch({ position: e.target.value as FloatingPosition })}
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
             >
-              {Object.entries(POSITION_LABELS).map(([k, v]) => (
+              {ALL_POSITIONS.map(k => (
                 <option key={k} value={k}>
-                  {v}
+                  {t(`position.${k}`)}
                 </option>
               ))}
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Expand direction</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('expandDirectionLabel')}
+            </span>
             <select
               value={config.expandDirection ?? 'up'}
               onChange={e => patch({ expandDirection: e.target.value as FloatingExpandDirection })}
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
             >
-              {Object.entries(EXPAND_LABELS).map(([k, v]) => (
+              {ALL_EXPAND_DIRECTIONS.map(k => (
                 <option key={k} value={k}>
-                  {v}
+                  {t(`expand.${k}`)}
                 </option>
               ))}
             </select>
@@ -245,7 +239,7 @@ export default function FloatingWidgetPage() {
               onChange={e => patch({ startExpanded: e.target.checked })}
               className="h-4 w-4 cursor-pointer accent-primary"
             />
-            <span className="text-sm text-foreground">Start expanded on every page load</span>
+            <span className="text-sm text-foreground">{t('startExpandedLabel')}</span>
           </label>
           <div className="flex flex-wrap items-center gap-4 text-sm text-foreground">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -255,7 +249,7 @@ export default function FloatingWidgetPage() {
                 onChange={e => patch({ hideOnMobile: e.target.checked })}
                 className="h-4 w-4 cursor-pointer accent-primary"
               />
-              Hide on mobile
+              {t('hideOnMobile')}
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -264,7 +258,7 @@ export default function FloatingWidgetPage() {
                 onChange={e => patch({ hideOnDesktop: e.target.checked })}
                 className="h-4 w-4 cursor-pointer accent-primary"
               />
-              Hide on desktop
+              {t('hideOnDesktop')}
             </label>
           </div>
         </section>
@@ -272,20 +266,20 @@ export default function FloatingWidgetPage() {
         {/* Toggle button styling */}
         <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
           <header>
-            <h2 className="text-base font-semibold text-foreground">Toggle button</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              The always-visible circle. Click expands the rest.
-            </p>
+            <h2 className="text-base font-semibold text-foreground">{t('toggleButtonTitle')}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('toggleButtonHint')}</p>
           </header>
           <ColorField
-            label="Background color"
+            label={t('backgroundColorLabel')}
             value={config.toggleBgColor}
             onChange={v => patch({ toggleBgColor: v || undefined })}
             theme={store?.theme}
           />
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Tooltip (English)</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('tooltipEnLabel')}
+              </span>
               <input
                 type="text"
                 value={config.toggleLabel ?? ''}
@@ -295,7 +289,9 @@ export default function FloatingWidgetPage() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Tooltip (Arabic)</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('tooltipArLabel')}
+              </span>
               <input
                 type="text"
                 value={config.toggleLabelAr ?? ''}
@@ -308,7 +304,7 @@ export default function FloatingWidgetPage() {
           </div>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">
-              Custom icon URL (optional)
+              {t('customIconUrlLabel')}
             </span>
             <input
               type="url"
@@ -324,23 +320,19 @@ export default function FloatingWidgetPage() {
         <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
           <header className="flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-base font-semibold text-foreground">Buttons</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Actions revealed when the toggle expands. Reorder with the arrows.
-              </p>
+              <h2 className="text-base font-semibold text-foreground">{t('buttonsTitle')}</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('buttonsHint')}</p>
             </div>
             <button
               type="button"
               onClick={addButton}
               className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
             >
-              + Add button
+              {t('addButton')}
             </button>
           </header>
           {(config.buttons ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No buttons yet — add one above (WhatsApp, Instagram, music, etc.).
-            </p>
+            <p className="text-sm text-muted-foreground">{t('noButtonsHint')}</p>
           ) : (
             <ul className="space-y-3">
               {(config.buttons ?? []).map((b, i, arr) => (
@@ -352,7 +344,7 @@ export default function FloatingWidgetPage() {
                         onClick={() => moveButton(b.id, -1)}
                         disabled={i === 0}
                         className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
-                        aria-label="Move up"
+                        aria-label={t('moveUp')}
                       >
                         ▲
                       </button>
@@ -361,7 +353,7 @@ export default function FloatingWidgetPage() {
                         onClick={() => moveButton(b.id, 1)}
                         disabled={i === arr.length - 1}
                         className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
-                        aria-label="Move down"
+                        aria-label={t('moveDown')}
                       >
                         ▼
                       </button>
@@ -369,7 +361,9 @@ export default function FloatingWidgetPage() {
                     <div className="flex-1 space-y-3">
                       <div className="grid gap-3 md:grid-cols-2">
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-muted-foreground">Kind</span>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {t('kindLabel')}
+                          </span>
                           <select
                             value={b.kind}
                             onChange={e =>
@@ -377,9 +371,9 @@ export default function FloatingWidgetPage() {
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           >
-                            {Object.entries(KIND_LABELS).map(([k, v]) => (
+                            {ALL_BUTTON_KINDS.map(k => (
                               <option key={k} value={k}>
-                                {v.en} / {v.ar}
+                                {t(`kind.${k}`)}
                               </option>
                             ))}
                           </select>
@@ -389,14 +383,14 @@ export default function FloatingWidgetPage() {
                             type="text"
                             value={b.label ?? ''}
                             onChange={e => updateButton(b.id, { label: e.target.value })}
-                            placeholder="Tooltip (EN)"
+                            placeholder={t('tooltipEnPlaceholder')}
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                           <input
                             type="text"
                             value={b.labelAr ?? ''}
                             onChange={e => updateButton(b.id, { labelAr: e.target.value })}
-                            placeholder="التسمية"
+                            placeholder={t('tooltipArPlaceholder')}
                             dir="rtl"
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -408,7 +402,7 @@ export default function FloatingWidgetPage() {
                         <div className="grid gap-3 md:grid-cols-2">
                           <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Phone (international, no + or spaces)
+                              {t('whatsappPhoneLabel')}
                             </span>
                             <input
                               type="text"
@@ -416,7 +410,7 @@ export default function FloatingWidgetPage() {
                               onChange={e => updateButton(b.id, { whatsappPhone: e.target.value })}
                               placeholder={
                                 store?.whatsapp
-                                  ? `Using store WhatsApp: ${store.whatsapp}`
+                                  ? t('usingStoreWhatsapp', { value: store.whatsapp })
                                   : '96522668490'
                               }
                               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -424,7 +418,7 @@ export default function FloatingWidgetPage() {
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Pre-filled message (optional)
+                              {t('whatsappMessageLabel')}
                             </span>
                             <input
                               type="text"
@@ -441,7 +435,7 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'instagram' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            Instagram handle (no @)
+                            {t('instagramHandleLabel')}
                           </span>
                           <input
                             type="text"
@@ -449,7 +443,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { instagramHandle: e.target.value })}
                             placeholder={
                               store?.socialLinks?.instagram
-                                ? `Using store Instagram: ${store.socialLinks.instagram}`
+                                ? t('usingStoreInstagram', { value: store.socialLinks.instagram })
                                 : 'wadyaljuz'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -459,14 +453,16 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'phone' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            Phone number
+                            {t('phoneNumberLabel')}
                           </span>
                           <input
                             type="text"
                             value={b.phoneNumber ?? ''}
                             onChange={e => updateButton(b.id, { phoneNumber: e.target.value })}
                             placeholder={
-                              store?.phone ? `Using store phone: ${store.phone}` : '+96522668490'
+                              store?.phone
+                                ? t('usingStorePhone', { value: store.phone })
+                                : '+96522668490'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -475,7 +471,7 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'tiktok' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            TikTok handle (no @) / تيك توك (بدون @)
+                            {t('tiktokHandleLabel')}
                           </span>
                           <input
                             type="text"
@@ -483,7 +479,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { tiktokHandle: e.target.value })}
                             placeholder={
                               store?.socialLinks?.tiktok
-                                ? `Using store TikTok: ${store.socialLinks.tiktok}`
+                                ? t('usingStoreTiktok', { value: store.socialLinks.tiktok })
                                 : 'mystore'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -493,7 +489,7 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'snapchat' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            Snapchat username / سناب شات
+                            {t('snapchatHandleLabel')}
                           </span>
                           <input
                             type="text"
@@ -501,7 +497,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { snapchatHandle: e.target.value })}
                             placeholder={
                               store?.socialLinks?.snapchat
-                                ? `Using store Snapchat: ${store.socialLinks.snapchat}`
+                                ? t('usingStoreSnapchat', { value: store.socialLinks.snapchat })
                                 : 'mystore'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -511,7 +507,7 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'youtube' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            YouTube channel URL / رابط يوتيوب
+                            {t('youtubeUrlLabel')}
                           </span>
                           <input
                             type="url"
@@ -519,7 +515,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { youtubeUrl: e.target.value })}
                             placeholder={
                               store?.socialLinks?.youtube
-                                ? `Using store YouTube: ${store.socialLinks.youtube}`
+                                ? t('usingStoreYoutube', { value: store.socialLinks.youtube })
                                 : 'https://youtube.com/@mystore'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -529,7 +525,7 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'facebook' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            Facebook page URL / رابط فيسبوك
+                            {t('facebookUrlLabel')}
                           </span>
                           <input
                             type="url"
@@ -537,7 +533,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { facebookUrl: e.target.value })}
                             placeholder={
                               store?.socialLinks?.facebook
-                                ? `Using store Facebook: ${store.socialLinks.facebook}`
+                                ? t('usingStoreFacebook', { value: store.socialLinks.facebook })
                                 : 'https://facebook.com/mystore'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -547,7 +543,7 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'x' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            X handle (no @) / إكس (بدون @)
+                            {t('xHandleLabel')}
                           </span>
                           <input
                             type="text"
@@ -555,7 +551,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { xHandle: e.target.value })}
                             placeholder={
                               store?.socialLinks?.twitter
-                                ? `Using store X: ${store.socialLinks.twitter}`
+                                ? t('usingStoreX', { value: store.socialLinks.twitter })
                                 : 'mystore'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -565,7 +561,7 @@ export default function FloatingWidgetPage() {
                       {b.kind === 'telegram' && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            Telegram handle (no @) / تيليغرام (بدون @)
+                            {t('telegramHandleLabel')}
                           </span>
                           <input
                             type="text"
@@ -573,7 +569,7 @@ export default function FloatingWidgetPage() {
                             onChange={e => updateButton(b.id, { telegramHandle: e.target.value })}
                             placeholder={
                               store?.socialLinks?.telegram
-                                ? `Using store Telegram: ${store.socialLinks.telegram}`
+                                ? t('usingStoreTelegram', { value: store.socialLinks.telegram })
                                 : 'mystore'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -584,7 +580,7 @@ export default function FloatingWidgetPage() {
                         <div className="grid gap-3 md:grid-cols-2">
                           <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Email address
+                              {t('emailAddressLabel')}
                             </span>
                             <input
                               type="email"
@@ -596,7 +592,7 @@ export default function FloatingWidgetPage() {
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Default subject (optional)
+                              {t('emailSubjectLabel')}
                             </span>
                             <input
                               type="text"
@@ -612,7 +608,7 @@ export default function FloatingWidgetPage() {
                         <div className="space-y-3">
                           <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Audio URL (mp3 / ogg / m4a)
+                              {t('audioUrlLabel')}
                             </span>
                             <input
                               type="url"
@@ -629,7 +625,7 @@ export default function FloatingWidgetPage() {
                               onChange={e => updateButton(b.id, { musicLoop: e.target.checked })}
                               className="h-4 w-4 cursor-pointer accent-primary"
                             />
-                            Loop audio (background music)
+                            {t('loopAudioLabel')}
                           </label>
                         </div>
                       )}
@@ -637,7 +633,7 @@ export default function FloatingWidgetPage() {
                         <div className="grid gap-3 md:grid-cols-2">
                           <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Target URL
+                              {t('targetUrlLabel')}
                             </span>
                             <input
                               type="url"
@@ -649,7 +645,7 @@ export default function FloatingWidgetPage() {
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Icon URL (optional)
+                              {t('iconUrlLabel')}
                             </span>
                             <input
                               type="url"
@@ -664,13 +660,13 @@ export default function FloatingWidgetPage() {
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <ColorField
-                          label="Background color (optional)"
+                          label={t('buttonBackgroundColorLabel')}
                           value={b.bgColor}
                           onChange={v => updateButton(b.id, { bgColor: v || undefined })}
                           theme={store?.theme}
                         />
                         <ColorField
-                          label="Icon color (optional)"
+                          label={t('iconColorLabel')}
                           value={b.iconColor}
                           onChange={v => updateButton(b.id, { iconColor: v || undefined })}
                           theme={store?.theme}
@@ -681,7 +677,7 @@ export default function FloatingWidgetPage() {
                       type="button"
                       onClick={() => removeButton(b.id)}
                       className="rounded p-2 text-destructive hover:bg-destructive/10"
-                      aria-label="Remove button"
+                      aria-label={t('removeButtonAria')}
                     >
                       ✕
                     </button>
@@ -699,16 +695,14 @@ export default function FloatingWidgetPage() {
           md:hidden (desktop = sidebar). */}
       <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur md:left-64">
         <div className="flex items-center justify-between gap-4 px-6 py-4">
-          <span className="text-xs text-muted-foreground">
-            Changes apply to the live storefront after save.
-          </span>
+          <span className="text-xs text-muted-foreground">{t('saveHint')}</span>
           <button
             type="button"
             disabled={saving}
             onClick={handleSave}
             className="rounded-xl bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? t('saving') : t('saveChanges')}
           </button>
         </div>
       </div>

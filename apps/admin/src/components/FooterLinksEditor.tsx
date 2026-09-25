@@ -680,9 +680,7 @@ export function FooterLinksEditor({
           saver. Otherwise the standalone editor keeps its own sticky save. */}
       {!saveRef && (
         <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-xl border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
-          <p className="text-xs text-muted-foreground hidden sm:block">
-            {t('saveHintEmpty') || 'Changes apply after Save.'}
-          </p>
+          <p className="text-xs text-muted-foreground hidden sm:block">{t('saveHintEmpty')}</p>
           <button
             type="button"
             onClick={() => handleSave()}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button, Modal, useToast } from '@force/ui';
 import { apiPost } from '../../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface RefundButtonProps {
   storeId: string;
@@ -40,6 +41,8 @@ export function RefundButton({
   onRefunded,
   disabled = false,
 }: RefundButtonProps) {
+  const t = useT('orders.detail.refundViaProvider');
+  const tCommon = useT('common');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState('');
@@ -63,7 +66,7 @@ export function RefundButton({
         reason: reason.trim() || undefined,
       });
       if (error || !data) {
-        toastError('Refund failed', error?.message ?? '');
+        toastError(t('toastFailedTitle'), error?.message ?? '');
         return;
       }
       // MyFatoorah refunds are queued for their finance team's review,
@@ -71,13 +74,20 @@ export function RefundButton({
       // Same wording works for Tap/Hesabe/UPayments which are typically
       // faster but still asynchronous on the provider side.
       toastSuccess(
-        `Refund of ${(data.refundAmount / 1000).toFixed(3)} ${currency} requested via ${data.provider} — customer's card will reflect in 1-3 business days`
+        t('toastSuccessBody', {
+          amount: (data.refundAmount / 1000).toFixed(3),
+          currency,
+          provider: data.provider,
+        })
       );
       onRefunded?.();
       setReason('');
       setOpen(false);
     } catch (e) {
-      toastError('Refund failed', e instanceof Error ? e.message : 'Unknown error');
+      toastError(
+        t('toastFailedTitle'),
+        e instanceof Error ? e.message : tCommon('errors.boundary.unknown')
+      );
     } finally {
       setBusy(false);
     }
@@ -89,7 +99,7 @@ export function RefundButton({
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled || busy}
-        title="Refund the customer via the original payment provider"
+        title={t('buttonTooltip')}
         className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-4 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60 transition-colors cursor-pointer"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
@@ -100,27 +110,22 @@ export function RefundButton({
             d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
           />
         </svg>
-        Refund via provider
+        {t('button')}
       </button>
 
-      <Modal isOpen={open} onClose={closeIfIdle} title={`Refund order ${orderNumber}?`} size="sm">
+      <Modal isOpen={open} onClose={closeIfIdle} title={t('modalTitle', { orderNumber })} size="sm">
         <p className="text-sm text-muted-foreground">
-          A refund request of{' '}
-          <strong className="text-foreground">
-            {(total / 1000).toFixed(3)} {currency}
-          </strong>{' '}
-          will be sent to the payment provider. The customer&apos;s card typically reflects the
-          refund in 1-3 business days (MyFatoorah refunds are reviewed by their finance team before
-          execution).
+          {t.rich('modalBodyIntro', {
+            b: chunks => <strong className="text-foreground">{chunks}</strong>,
+            amount: (total / 1000).toFixed(3),
+            currency,
+          })}
         </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Inventory will be restored, coupon usage decremented, loyalty points reversed, and the
-          customer will be notified by email. This cannot be undone.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">{t('modalBodySideEffects')}</p>
 
         <div className="mt-4">
           <label htmlFor="refund-reason" className="block text-xs font-medium text-foreground mb-1">
-            Reason (optional, shown to the customer)
+            {t('reasonLabel')}
           </label>
           <textarea
             id="refund-reason"
@@ -129,17 +134,17 @@ export function RefundButton({
             disabled={busy}
             rows={2}
             maxLength={500}
-            placeholder="Out of stock, customer request, duplicate charge…"
+            placeholder={t('reasonPlaceholder')}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
           />
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={closeIfIdle} disabled={busy}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button variant="destructive" onClick={handleRefund} disabled={busy} isLoading={busy}>
-            {busy ? 'Refunding…' : 'Refund now'}
+            {busy ? t('refundingButton') : t('refundNowButton')}
           </Button>
         </div>
       </Modal>

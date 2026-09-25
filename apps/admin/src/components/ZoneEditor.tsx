@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { ZoneOverride, StoreTheme, ColorToken } from '@force/shared';
 import { ColorField } from './ColorField';
+import { useT } from '@/i18n/useT';
 
 export interface ZoneEditorProps {
   /** Unique key identifying the zone (e.g. 'sectionHeading', 'kicker'). Used as label prefix. */
@@ -106,12 +107,13 @@ export function ZoneEditor({
   className,
   inheritFromToken,
 }: ZoneEditorProps) {
+  const t = useT('zoneEditor');
   const hasValues = hasAnyValue(values);
 
   // Build placeholder text for each field from the inherited zone values.
   const ph = (field: keyof ZoneOverride): string => {
     const v = placeholder?.[field];
-    return typeof v === 'string' && v ? `inherit (${v})` : 'inherit';
+    return typeof v === 'string' && v ? t('inheritWithValue', { value: v }) : t('inherit');
   };
 
   const handleSize = (field: 'fontSize' | 'letterSpacing' | 'lineHeight', raw: string) => {
@@ -137,7 +139,7 @@ export function ZoneEditor({
               onClick={onReset}
               className="text-[11px] text-destructive hover:underline shrink-0"
             >
-              Reset to default
+              {t('resetToDefault')}
             </button>
           )}
         </div>
@@ -150,7 +152,7 @@ export function ZoneEditor({
             onClick={onReset}
             className="text-[11px] text-destructive hover:underline shrink-0"
           >
-            Reset to default
+            {t('resetToDefault')}
           </button>
         </div>
       )}
@@ -160,7 +162,7 @@ export function ZoneEditor({
             has a curated font library); free-form text input otherwise (page-builder
             context where no font library is loaded). */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Font family</span>
+          <span className="text-xs font-medium text-muted-foreground">{t('fontFamilyLabel')}</span>
           {fontFamilyOptions ? (
             <select
               value={values.fontFamily ?? ''}
@@ -186,7 +188,7 @@ export function ZoneEditor({
 
         {/* Font size */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Font size</span>
+          <span className="text-xs font-medium text-muted-foreground">{t('fontSizeLabel')}</span>
           <input
             type="text"
             value={values.fontSize ?? ''}
@@ -202,45 +204,41 @@ export function ZoneEditor({
               const v = normaliseSizeValue(e.target.value);
               if (v && /text-\[/.test(v)) {
                 onChange({ fontSize: '' });
-                alert(
-                  'Arbitrary Tailwind sizes (text-[…]) are not allowed.\n' +
-                    'Use a px value (e.g. 12px / 14px / 16px / 18px / 22px) or\n' +
-                    'a named token: text-xs / text-sm / text-base / text-lg / text-xl / text-2xl.'
-                );
+                alert(t('arbitrarySizeNotAllowed'));
               }
             }}
-            placeholder={ph('fontSize') === 'inherit' ? 'e.g. 16px or 1rem' : ph('fontSize')}
+            placeholder={ph('fontSize') === t('inherit') ? t('fontSizeExample') : ph('fontSize')}
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
-          <span className="text-[11px] text-muted-foreground/80">
-            Bare number auto-converts to px (16 → 16px). Allowed: 12 / 14 / 16 / 18 / 22px.
-          </span>
+          <span className="text-[11px] text-muted-foreground/80">{t('fontSizeHint')}</span>
         </label>
 
         {/* Font weight */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Font weight</span>
+          <span className="text-xs font-medium text-muted-foreground">{t('fontWeightLabel')}</span>
           <input
             type="text"
             value={values.fontWeight ?? ''}
             onChange={e => onChange({ fontWeight: e.target.value })}
-            placeholder={ph('fontWeight') === 'inherit' ? 'e.g. 400, 600, 700' : ph('fontWeight')}
+            placeholder={
+              ph('fontWeight') === t('inherit') ? t('fontWeightExample') : ph('fontWeight')
+            }
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
-          <span className="text-[11px] text-muted-foreground/80">
-            400 regular · 600 semibold · 700 bold
-          </span>
+          <span className="text-[11px] text-muted-foreground/80">{t('fontWeightHint')}</span>
         </label>
 
         {/* Letter spacing */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Letter spacing</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('letterSpacingLabel')}
+          </span>
           <input
             type="text"
             value={values.letterSpacing ?? ''}
             onChange={e => handleSize('letterSpacing', e.target.value)}
             placeholder={
-              ph('letterSpacing') === 'inherit' ? 'e.g. 0.05em or 1px' : ph('letterSpacing')
+              ph('letterSpacing') === t('inherit') ? t('letterSpacingExample') : ph('letterSpacing')
             }
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
@@ -248,19 +246,23 @@ export function ZoneEditor({
 
         {/* Line height */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Line height</span>
+          <span className="text-xs font-medium text-muted-foreground">{t('lineHeightLabel')}</span>
           <input
             type="text"
             value={values.lineHeight ?? ''}
             onChange={e => handleSize('lineHeight', e.target.value)}
-            placeholder={ph('lineHeight') === 'inherit' ? 'e.g. 1.6 or 24px' : ph('lineHeight')}
+            placeholder={
+              ph('lineHeight') === t('inherit') ? t('lineHeightExample') : ph('lineHeight')
+            }
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
         </label>
 
         {/* Text transform */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Text transform</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('textTransformLabel')}
+          </span>
           <select
             value={values.textTransform ?? ''}
             onChange={e =>
@@ -273,11 +275,11 @@ export function ZoneEditor({
             }
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Inherit (none)</option>
-            <option value="uppercase">Uppercase</option>
-            <option value="lowercase">Lowercase</option>
-            <option value="capitalize">Capitalize</option>
-            <option value="none">None (explicit)</option>
+            <option value="">{t('textTransformOptions.inherit')}</option>
+            <option value="uppercase">{t('textTransformOptions.uppercase')}</option>
+            <option value="lowercase">{t('textTransformOptions.lowercase')}</option>
+            <option value="capitalize">{t('textTransformOptions.capitalize')}</option>
+            <option value="none">{t('textTransformOptions.explicitNone')}</option>
           </select>
         </label>
 
@@ -285,7 +287,9 @@ export function ZoneEditor({
             Sits beside text-transform; applies via inline style.textDecoration
             on the zone's text element. */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">Text decoration</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {t('textDecorationLabel')}
+          </span>
           <select
             value={values.textDecoration ?? ''}
             onChange={e =>
@@ -298,11 +302,11 @@ export function ZoneEditor({
             }
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Use default (inherit)</option>
-            <option value="none">No decoration (force off)</option>
-            <option value="underline">Underline</option>
-            <option value="overline">Overline</option>
-            <option value="line-through">Strikethrough</option>
+            <option value="">{t('textDecorationOptions.inherit')}</option>
+            <option value="none">{t('textDecorationOptions.none')}</option>
+            <option value="underline">{t('textDecorationOptions.underline')}</option>
+            <option value="overline">{t('textDecorationOptions.overline')}</option>
+            <option value="line-through">{t('textDecorationOptions.strikethrough')}</option>
           </select>
         </label>
       </div>
@@ -318,23 +322,25 @@ export function ZoneEditor({
           between options. Each label has an aria-label spelling out the
           LTR/RTL effect for screen readers. */}
       <div className="mt-3 flex flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Text alignment</span>
+        <span className="text-xs font-medium text-muted-foreground">{t('textAlignmentLabel')}</span>
         <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-border">
           {(
             [
-              { value: '', label: 'Auto', title: 'Inherit (use consumer default)' },
-              { value: 'start', label: 'Start', title: 'Left in LTR, right in RTL' },
-              { value: 'center', label: 'Center', title: 'Always centered' },
-              { value: 'end', label: 'End', title: 'Right in LTR, left in RTL' },
+              { value: '', key: 'auto' },
+              { value: 'start', key: 'start' },
+              { value: 'center', key: 'center' },
+              { value: 'end', key: 'end' },
             ] as const
           ).map((opt, i) => {
             const active = (values.textAlign ?? '') === opt.value;
+            const label = t(`textAlign.${opt.key}.label`);
+            const title = t(`textAlign.${opt.key}.title`);
             return (
               <button
                 key={opt.value || 'auto'}
                 type="button"
-                title={opt.title}
-                aria-label={`${opt.label} — ${opt.title}`}
+                title={title}
+                aria-label={t('textAlignAriaLabel', { label, title })}
                 onClick={() =>
                   onChange({
                     textAlign:
@@ -349,7 +355,7 @@ export function ZoneEditor({
                     : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
-                {opt.label}
+                {label}
               </button>
             );
           })}
@@ -365,13 +371,13 @@ export function ZoneEditor({
           renderColorField()
         ) : (
           <ColorField
-            label="Text color"
+            label={t('textColorLabel')}
             value={values.color}
             onChange={v => onChange({ color: v })}
             hint={
               placeholder?.color
-                ? `Inheriting: ${placeholder.color}`
-                : 'Leave empty to inherit from active theme.'
+                ? t('colorInheriting', { value: placeholder.color })
+                : t('colorHint')
             }
             theme={theme}
             inheritFromToken={inheritFromToken}

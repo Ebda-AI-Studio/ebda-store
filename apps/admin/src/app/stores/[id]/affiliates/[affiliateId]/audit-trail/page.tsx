@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
 import { formatPrice } from '@/lib/format';
+import { useT } from '@/i18n/useT';
 
 // ---------------------------------------------------------------------------
 // Types — shape returned by GET /affiliates/:id/audit-trail
@@ -34,28 +35,27 @@ interface AffiliateInfo {
 }
 
 // ---------------------------------------------------------------------------
-// Bilingual EN/AR labels for event types in affiliate_events table
+// Event type → locale-aware label (falls back to a de-slugged event type for
+// anything not in the affiliates.auditTrail.eventTypes catalog).
 // ---------------------------------------------------------------------------
 
-const EVENT_TYPE_LABELS: Record<string, { en: string; ar: string }> = {
-  created: { en: 'Affiliate created', ar: 'تم إنشاء المسوّق' },
-  approve: { en: 'Application approved', ar: 'تمت الموافقة على الطلب' },
-  reject: { en: 'Application rejected', ar: 'تم رفض الطلب' },
-  suspend: { en: 'Account suspended', ar: 'تم تعليق الحساب' },
-  reactivate: { en: 'Account reactivated', ar: 'تم إعادة تفعيل الحساب' },
-  commission_recorded: { en: 'Commission recorded', ar: 'تم تسجيل العمولة' },
-  payout_initiated: { en: 'Payout initiated', ar: 'بدأت عملية الدفع' },
-  payout_completed: { en: 'Payout completed', ar: 'اكتملت عملية الدفع' },
-  payout_failed: { en: 'Payout failed', ar: 'فشلت عملية الدفع' },
-};
+const KNOWN_EVENT_TYPES = new Set([
+  'created',
+  'approve',
+  'reject',
+  'suspend',
+  'reactivate',
+  'commission_recorded',
+  'payout_initiated',
+  'payout_completed',
+  'payout_failed',
+]);
 
-function getLabel(eventType: string): { en: string; ar: string } {
-  return (
-    EVENT_TYPE_LABELS[eventType] ?? {
-      en: eventType.replace(/_/g, ' '),
-      ar: eventType.replace(/_/g, ' '),
-    }
-  );
+function getLabel(t: ReturnType<typeof useT>, eventType: string): string {
+  if (KNOWN_EVENT_TYPES.has(eventType)) {
+    return t(`eventTypes.${eventType}`);
+  }
+  return eventType.replace(/_/g, ' ');
 }
 
 type IconVariant = 'success' | 'reject' | 'money' | 'default';
@@ -147,6 +147,9 @@ function StatusTransitionChip({ from, to }: { from: string; to: string }) {
 // ---------------------------------------------------------------------------
 
 export default function AffiliateAuditTrailPage() {
+  const t = useT('affiliates.auditTrail');
+  const tTabs = useT('affiliates.tabs');
+  const tCommon = useT('common');
   const params = useParams();
   const storeId = params?.id as string;
   const affiliateId = params?.affiliateId as string;
@@ -170,11 +173,11 @@ export default function AffiliateAuditTrailPage() {
       if (eventsRes.data) setEvents(eventsRes.data.events ?? []);
       if (affiliateRes.data) setAffiliate(affiliateRes.data.affiliate ?? null);
     } catch {
-      setError('Failed to load audit trail / تعذّر تحميل سجل التدقيق');
+      setError(t('loadError'));
     } finally {
       setLoading(false);
     }
-  }, [storeId, affiliateId]);
+  }, [storeId, affiliateId, t]);
 
   useEffect(() => {
     fetchEvents();
@@ -184,8 +187,8 @@ export default function AffiliateAuditTrailPage() {
     <AdminLayout
       mode="store_admin"
       storeId={storeId}
-      title={affiliate ? `${affiliate.name} — Audit Trail` : 'Affiliate Audit Trail'}
-      subtitle="Affiliates / المسوقون"
+      title={affiliate ? t('titleWithName', { name: affiliate.name }) : t('titleFallback')}
+      subtitle={tTabs('affiliates')}
     >
       <div className="mx-auto max-w-3xl px-4 pb-12 pt-4 sm:px-6">
         {/* Back link */}
@@ -207,7 +210,7 @@ export default function AffiliateAuditTrailPage() {
               d="M15 19l-7-7 7-7"
             />
           </svg>
-          Back to Affiliates / العودة للمسوقين
+          {t('backToAffiliates')}
         </Link>
 
         {/* Affiliate info card */}
@@ -229,7 +232,7 @@ export default function AffiliateAuditTrailPage() {
                   href={`/stores/${storeId}/affiliates/${affiliateId}/events`}
                   className="text-xs text-primary hover:underline"
                 >
-                  Referrals &amp; Payouts →
+                  {t('referralsAndPayouts')} →
                 </Link>
               </div>
             </div>
@@ -238,10 +241,11 @@ export default function AffiliateAuditTrailPage() {
 
         {/* Page heading */}
         <div className="mb-4">
-          <h2 className="text-base font-semibold text-foreground">Audit Trail / سجل التدقيق</h2>
+          <h2 className="text-base font-semibold text-foreground">{t('title')}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Append-only status change history from the{' '}
-            <code className="text-xs bg-muted px-1 rounded">affiliate_events</code> table
+            {t.rich('description', {
+              code: chunks => <code className="text-xs bg-muted px-1 rounded">{chunks}</code>,
+            })}
           </p>
         </div>
 
@@ -259,19 +263,15 @@ export default function AffiliateAuditTrailPage() {
               onClick={fetchEvents}
               className="mt-3 rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 cursor-pointer"
             >
-              Retry / إعادة المحاولة
+              {tCommon('retry')}
             </button>
           </div>
         )}
 
         {!loading && !error && events.length === 0 && (
           <div className="rounded-2xl border border-border bg-card p-12 text-center">
-            <p className="text-muted-foreground">
-              No audit events yet / لا توجد أحداث تدقيق حتى الآن
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Status changes (approve / reject / suspend) appear here once they occur.
-            </p>
+            <p className="text-muted-foreground">{t('noEvents')}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t('noEventsHint')}</p>
           </div>
         )}
 
@@ -279,13 +279,15 @@ export default function AffiliateAuditTrailPage() {
           <div className="rounded-2xl border border-border bg-card">
             <div className="border-b border-border px-5 py-3 flex items-center justify-between">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Audit Trail / سجل التدقيق
+                {t('title')}
               </h3>
-              <span className="text-xs text-muted-foreground">{events.length} events</span>
+              <span className="text-xs text-muted-foreground">
+                {t('eventsCount', { count: events.length })}
+              </span>
             </div>
             <ol className="px-5 py-4 space-y-0">
               {events.map((event, idx) => {
-                const label = getLabel(event.eventType);
+                const label = getLabel(t, event.eventType);
                 const iconVariant = getIconVariant(event.eventType);
                 return (
                   <li key={event.id} className="relative flex gap-3 pb-6 last:pb-0">
@@ -297,15 +299,7 @@ export default function AffiliateAuditTrailPage() {
                     )}
                     <EventIcon variant={iconVariant} />
                     <div className="flex-1 min-w-0 pt-1">
-                      {/* Bilingual label */}
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span dir="ltr" className="text-sm font-medium text-foreground">
-                          {label.en}
-                        </span>
-                        <span dir="rtl" className="text-xs text-muted-foreground">
-                          {label.ar}
-                        </span>
-                      </div>
+                      <span className="text-sm font-medium text-foreground">{label}</span>
 
                       {/* Status transition chip */}
                       {event.fromStatus && event.toStatus && (
@@ -317,11 +311,13 @@ export default function AffiliateAuditTrailPage() {
                       {/* Details */}
                       {event.details && Object.keys(event.details).length > 0 && (
                         <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                          {!!event.details.reason && <p>Reason: {String(event.details.reason)}</p>}
+                          {!!event.details.reason && (
+                            <p>{t('reasonLabel', { reason: String(event.details.reason) })}</p>
+                          )}
                           {!!event.details.notes && <p>{String(event.details.notes)}</p>}
                           {event.details.commissionAmount !== undefined && (
                             <p>
-                              Commission:{' '}
+                              {t('commissionLabel')}{' '}
                               <span className="font-medium text-success">
                                 +{formatPrice(Number(event.details.commissionAmount))}
                               </span>
@@ -329,7 +325,7 @@ export default function AffiliateAuditTrailPage() {
                           )}
                           {event.details.payoutAmount !== undefined && (
                             <p>
-                              Payout:{' '}
+                              {t('payoutLabelText')}{' '}
                               <span className="font-medium">
                                 {formatPrice(Number(event.details.payoutAmount))}
                               </span>

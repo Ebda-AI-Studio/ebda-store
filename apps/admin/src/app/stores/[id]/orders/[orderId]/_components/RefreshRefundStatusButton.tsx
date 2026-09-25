@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useToast } from '@force/ui';
 import { apiPost } from '../../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface RefreshRefundStatusButtonProps {
   storeId: string;
@@ -30,6 +31,8 @@ export function RefreshRefundStatusButton({
   onRefreshed,
   disabled = false,
 }: RefreshRefundStatusButtonProps) {
+  const t = useT('orders.detail.refreshRefundStatus');
+  const tCommon = useT('common');
   const [busy, setBusy] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -44,23 +47,26 @@ export function RefreshRefundStatusButton({
         statusChanged: boolean;
       }>(`/api/v1/stores/${storeId}/orders/${orderId}/refresh-refund-status`, {});
       if (error || !data) {
-        toastError('Refund status refresh failed', error?.message ?? '');
+        toastError(t('toastFailedTitle'), error?.message ?? '');
         return;
       }
       if (data.statusChanged) {
         const label =
           data.refundStatus === 'completed'
-            ? 'completed — customer card has been credited'
+            ? t('statusCompleted')
             : data.refundStatus === 'failed'
-              ? 'canceled by provider'
-              : 'still pending finance team review';
-        toastSuccess(`Refund status: ${label}`);
+              ? t('statusCanceled')
+              : t('statusPending');
+        toastSuccess(t('toastStatusChanged', { label }));
         onRefreshed?.();
       } else {
-        toastSuccess(`Refund still ${data.refundStatus} (no change)`);
+        toastSuccess(t('toastNoChange', { status: data.refundStatus }));
       }
     } catch (e) {
-      toastError('Refund status refresh failed', e instanceof Error ? e.message : 'Unknown error');
+      toastError(
+        t('toastFailedTitle'),
+        e instanceof Error ? e.message : tCommon('errors.boundary.unknown')
+      );
     } finally {
       setBusy(false);
     }
@@ -71,7 +77,7 @@ export function RefreshRefundStatusButton({
       type="button"
       onClick={handleRefresh}
       disabled={disabled || busy}
-      title="Re-check refund status with the provider (use when refund webhook didn't fire)"
+      title={t('buttonTooltip')}
       className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-warning bg-warning/5 px-4 py-2.5 text-sm font-semibold text-warning hover:bg-warning/10 disabled:opacity-60 transition-colors cursor-pointer"
     >
       <svg
@@ -88,7 +94,7 @@ export function RefreshRefundStatusButton({
           d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
         />
       </svg>
-      {busy ? 'Checking refund…' : 'Refresh refund status'}
+      {busy ? t('checkingButton') : t('button')}
     </button>
   );
 }

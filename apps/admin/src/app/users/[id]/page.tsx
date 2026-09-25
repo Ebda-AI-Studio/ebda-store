@@ -29,6 +29,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> =
 
 export default function UserDetailPage() {
   const t = useT('users.detail');
+  const tCommon = useT('common');
   const params = useParams();
   const userId = params?.id as string;
 
@@ -99,7 +100,7 @@ export default function UserDetailPage() {
     if (!user) return;
     // If a new password is being set, require the confirmation match.
     if (editPassword && editPassword !== confirmPassword) {
-      setSaveMessage({ type: 'error', text: 'Passwords do not match' });
+      setSaveMessage({ type: 'error', text: t('passwordMismatch') });
       return;
     }
     setIsSaving(true);
@@ -153,14 +154,14 @@ export default function UserDetailPage() {
     try {
       const { error: apiError } = await apiDelete(`/api/v1/admin/users/${userId}`);
       if (apiError) {
-        toastError('Delete failed', apiError.message ?? '');
+        toastError(t('deleteFailed'), apiError.message ?? '');
         setIsDeleting(false);
         return;
       }
-      toastSuccess('User deleted');
+      toastSuccess(t('userDeleted'));
       router.push('/users');
     } catch {
-      toastError('Delete failed', 'Network error');
+      toastError(t('deleteFailed'), t('deleteNetworkError'));
       setIsDeleting(false);
     }
   };
@@ -341,14 +342,14 @@ export default function UserDetailPage() {
                   fields = leave existing password alone. Doesn't
                   surface the existing hash. */}
               <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
-                <p className="text-sm font-medium text-foreground">Set new password</p>
-                <p className="text-xs text-muted-foreground">
-                  Leave blank to keep the current password. Minimum 8 characters.
+                <p className="text-sm font-medium text-foreground">
+                  {t('newPasswordSectionTitle')}
                 </p>
+                <p className="text-xs text-muted-foreground">{t('newPasswordSectionHint')}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input
                     type="password"
-                    placeholder="New password"
+                    placeholder={t('newPasswordPlaceholder')}
                     autoComplete="new-password"
                     value={editPassword}
                     onChange={e => setEditPassword(e.target.value)}
@@ -356,7 +357,7 @@ export default function UserDetailPage() {
                   />
                   <input
                     type="password"
-                    placeholder="Confirm password"
+                    placeholder={t('confirmPasswordPlaceholder')}
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
@@ -364,7 +365,7 @@ export default function UserDetailPage() {
                   />
                 </div>
                 {editPassword && editPassword !== confirmPassword && (
-                  <p className="text-xs text-destructive">Passwords do not match</p>
+                  <p className="text-xs text-destructive">{t('passwordMismatch')}</p>
                 )}
               </div>
 
@@ -453,9 +454,9 @@ export default function UserDetailPage() {
               <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium text-destructive">Danger zone</p>
+                    <p className="font-medium text-destructive">{t('dangerZoneTitle')}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Permanently delete this user account. Cannot be undone.
+                      {t('dangerZoneDescription')}
                     </p>
                   </div>
                   <button
@@ -463,7 +464,7 @@ export default function UserDetailPage() {
                     onClick={() => setShowDeleteConfirm(true)}
                     className="rounded-lg border border-destructive bg-card px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
                   >
-                    Delete user
+                    {t('deleteUserButton')}
                   </button>
                 </div>
               </div>
@@ -481,13 +482,13 @@ export default function UserDetailPage() {
             className="w-full max-w-sm rounded-xl bg-card p-6 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-foreground">Delete user?</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('deleteConfirmTitle')}</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              This will permanently delete{' '}
-              <strong>
-                {user.firstName} {user.lastName}
-              </strong>{' '}
-              ({user.email}). This action cannot be undone.
+              {t.rich('deleteConfirmBody', {
+                b: chunks => <strong>{chunks}</strong>,
+                name: `${user.firstName} ${user.lastName}`,
+                email: user.email,
+              })}
             </p>
             <div className="mt-6 flex items-center justify-end gap-3">
               <Button
@@ -496,7 +497,7 @@ export default function UserDetailPage() {
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={isDeleting}
               >
-                Cancel
+                {tCommon('cancel')}
               </Button>
               <Button
                 type="button"
@@ -505,7 +506,7 @@ export default function UserDetailPage() {
                 disabled={isDeleting}
                 isLoading={isDeleting}
               >
-                {isDeleting ? 'Deleting…' : 'Delete user'}
+                {isDeleting ? tCommon('deleting') : t('deleteUserButton')}
               </Button>
             </div>
           </div>

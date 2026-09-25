@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useToast } from '@force/ui';
 import { apiPost } from '../../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface RefreshPaymentButtonProps {
   storeId: string;
@@ -25,6 +26,8 @@ export function RefreshPaymentButton({
   onRefreshed,
   disabled = false,
 }: RefreshPaymentButtonProps) {
+  const t = useT('orders.detail.refreshPayment');
+  const tCommon = useT('common');
   const [busy, setBusy] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -37,17 +40,20 @@ export function RefreshPaymentButton({
         statusChanged: boolean;
       }>(`/api/v1/stores/${storeId}/orders/${orderId}/refresh-payment-status`, {});
       if (error || !data) {
-        toastError('Refresh failed', error?.message ?? '');
+        toastError(t('toastFailedTitle'), error?.message ?? '');
         return;
       }
       if (data.statusChanged) {
-        toastSuccess(`Payment status updated to ${data.paymentStatus}`);
+        toastSuccess(t('toastUpdated', { status: data.paymentStatus }));
         onRefreshed?.();
       } else {
-        toastSuccess(`Provider status: ${data.providerStatus} (no change)`);
+        toastSuccess(t('toastNoChange', { status: data.providerStatus }));
       }
     } catch (e) {
-      toastError('Refresh failed', e instanceof Error ? e.message : 'Unknown error');
+      toastError(
+        t('toastFailedTitle'),
+        e instanceof Error ? e.message : tCommon('errors.boundary.unknown')
+      );
     } finally {
       setBusy(false);
     }
@@ -58,7 +64,7 @@ export function RefreshPaymentButton({
       type="button"
       onClick={handleRefresh}
       disabled={disabled || busy}
-      title="Re-check payment status with the provider (use when webhook didn't fire)"
+      title={t('buttonTooltip')}
       className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-warning bg-warning/5 px-4 py-2.5 text-sm font-semibold text-warning hover:bg-warning/10 disabled:opacity-60 transition-colors cursor-pointer"
     >
       <svg
@@ -75,7 +81,7 @@ export function RefreshPaymentButton({
           d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
         />
       </svg>
-      {busy ? 'Checking…' : 'Refresh payment'}
+      {busy ? t('checkingButton') : t('button')}
     </button>
   );
 }

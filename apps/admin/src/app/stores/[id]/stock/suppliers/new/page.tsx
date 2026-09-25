@@ -40,6 +40,7 @@ export default function NewSupplierPage() {
   const searchParams = useSearchParams();
   const t = useT('stock.suppliers');
   const tNew = useT('stock.suppliers.new');
+  const tCommon = useT('common');
 
   const supplierId = searchParams?.get('supplierId') ?? null;
   const isEdit = !!supplierId;
@@ -85,7 +86,7 @@ export default function NewSupplierPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      setError('Name is required.');
+      setError(t('nameRequired'));
       return;
     }
     setSubmitting(true);
@@ -129,7 +130,7 @@ export default function NewSupplierPage() {
   if (loading) {
     return (
       <AdminLayout title={tNew('title')}>
-        <div className="p-6 text-muted-foreground text-sm">Loading…</div>
+        <div className="p-6 text-muted-foreground text-sm">{tCommon('loading')}</div>
       </AdminLayout>
     );
   }
@@ -153,7 +154,7 @@ export default function NewSupplierPage() {
             />
           </label>
           <label className="space-y-1" dir="rtl">
-            <span className="text-sm font-medium">الاسم (عربي)</span>
+            <span className="text-sm font-medium">{t('nameArLabel')}</span>
             <input
               type="text"
               value={nameAr}
@@ -174,7 +175,7 @@ export default function NewSupplierPage() {
               value={contactName}
               onChange={e => setContactName(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-              placeholder="Contact person"
+              placeholder={t('contactPlaceholder')}
             />
           </label>
           <label className="space-y-1">
@@ -239,8 +240,8 @@ export default function NewSupplierPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="space-y-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-medium">Net lead time (days) / مدة التوريد (أيام)</span>
-              <HelpTip text="Number of days from placing an order with this supplier until stock arrives. Used by the reorder engine when no per-product rule overrides it." />
+              <span className="text-sm font-medium">{tNew('leadTimeDays')}</span>
+              <HelpTip text={tNew('leadTimeDaysTip')} />
             </div>
             <input
               type="number"
@@ -288,14 +289,14 @@ export default function NewSupplierPage() {
             disabled={submitting}
             className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : tNew('submit')}
+            {submitting ? tCommon('saving') : tNew('submit')}
           </button>
           <button
             type="button"
             onClick={() => router.push(`/stores/${storeId}/stock/suppliers`)}
             className="px-4 py-2 border border-border rounded text-sm"
           >
-            Cancel
+            {tCommon('cancel')}
           </button>
         </div>
       </form>

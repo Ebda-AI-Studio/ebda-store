@@ -2,6 +2,7 @@
 
 import { resolveColor, pickReadableForeground, contrastRatio } from '@force/shared';
 import type { StoreTheme } from '@force/shared';
+import { useT } from '@/i18n/useT';
 
 interface ColorContrastPreviewProps {
   /** Current ColorField value — hex, 'token:<name>', or empty. */
@@ -16,6 +17,7 @@ const HEADING_AA_MIN = 4.5; // WCAG AA normal text
 const LARGE_AA_MIN = 3.0; // WCAG AA large text
 
 export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPreviewProps) {
+  const t = useT('components.colorContrastPreview');
   const resolved = resolveColor(bg, theme);
   if (!resolved) return null;
 
@@ -30,14 +32,18 @@ export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPrevi
 
   const warn = merchantRatio !== null && merchantRatio < HEADING_AA_MIN;
 
+  const roles = [t('roles.heading'), t('roles.subtitle'), t('roles.bodyCta')];
+
   return (
     <div className="mt-2 rounded-lg border border-border p-3 text-xs">
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-semibold text-foreground">Background: {displayLabel}</span>
+        <span className="font-semibold text-foreground">
+          {t('backgroundLabel', { label: displayLabel })}
+        </span>
         <span className="font-mono text-[11px] text-muted-foreground">{resolved}</span>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {(['Heading', 'Subtitle', 'Body / CTA'] as const).map(role => (
+        {roles.map(role => (
           <div
             key={role}
             className="rounded p-2 text-center"
@@ -49,12 +55,17 @@ export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPrevi
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
         <span className="text-muted-foreground">
-          Auto-fixed: <span className="font-mono">{autoFg}</span> · WCAG {autoRatio.toFixed(1)} : 1{' '}
+          {t('autoFixedLabel')} <span className="font-mono">{autoFg}</span> · WCAG{' '}
+          {autoRatio.toFixed(1)} : 1{' '}
           {autoRatio >= HEADING_AA_MIN ? '✓' : autoRatio >= LARGE_AA_MIN ? '⚠' : '✗'}
         </span>
         {warn && merchantRatio !== null ? (
           <span className="text-amber-600">
-            ⚠ Picked text {merchantRatio.toFixed(1)} : 1 — AA needs {HEADING_AA_MIN} : 1
+            ⚠{' '}
+            {t('pickedTextWarning', {
+              ratio: merchantRatio.toFixed(1),
+              min: HEADING_AA_MIN,
+            })}
           </span>
         ) : null}
       </div>

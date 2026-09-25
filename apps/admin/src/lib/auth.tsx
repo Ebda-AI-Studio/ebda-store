@@ -17,6 +17,7 @@ import {
   clearStoredSession,
 } from './api';
 import { isIosWebkit, safeInternalPath } from '@force/shared';
+import { useT } from '@/i18n/useT';
 
 interface User {
   id: string;
@@ -46,6 +47,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = `${getApiUrl()}/api/v1`;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const t = useT('auth.login');
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -243,11 +245,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       data = await response.json();
     } catch {
-      throw new Error('Server returned an invalid response. Please try again.');
+      throw new Error(t('serverError'));
     }
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Login failed');
+      throw new Error(data.error?.message || t('loginFailed'));
     }
 
     // MFA challenge: API returns { mfaRequired: true, challengeToken } instead
@@ -259,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check if user is admin or staff
     const adminRoles = ['super_admin', 'store_admin', 'staff'];
     if (!adminRoles.includes(data.data.user.role)) {
-      throw new Error('Access denied. Admin or staff privileges required.');
+      throw new Error(t('accessDenied'));
     }
 
     // Mirror the access token into localStorage for the iOS PWA path —
@@ -283,16 +285,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       data = await response.json();
     } catch {
-      throw new Error('Server returned an invalid response. Please try again.');
+      throw new Error(t('serverError'));
     }
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Verification failed');
+      throw new Error(data.error?.message || t('mfaVerifyFailed'));
     }
 
     const adminRolesMfa = ['super_admin', 'store_admin', 'staff'];
     if (!adminRolesMfa.includes(data.data.user.role)) {
-      throw new Error('Access denied. Admin or staff privileges required.');
+      throw new Error(t('accessDenied'));
     }
 
     storeSession(data.data);

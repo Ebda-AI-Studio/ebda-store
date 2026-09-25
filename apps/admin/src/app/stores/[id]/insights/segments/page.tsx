@@ -60,8 +60,8 @@ export default function InsightsSegmentsPage() {
         if (apiError) setError(apiError.message);
         else if (d) setData(d);
       })
-      .catch(() => setError('Failed to load segments data'));
-  }, [storeId]);
+      .catch(() => setError(t('loadFailed')));
+  }, [storeId, t]);
 
   if (error) {
     return (
@@ -93,7 +93,8 @@ export default function InsightsSegmentsPage() {
         {/* AI narration callout */}
         {data.narration?.en && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
-            <span className="not-italic font-semibold text-primary">AI:</span> {data.narration.en}
+            <span className="not-italic font-semibold text-primary">{t('aiLabel')}</span>{' '}
+            {data.narration.en}
           </div>
         )}
 
@@ -102,13 +103,13 @@ export default function InsightsSegmentsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-xl border border-border p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                Total Segmented Customers
+                {t('totalSegmentedCustomers')}
               </p>
               <p className="text-2xl font-semibold font-mono">{totalCustomers}</p>
             </div>
             <div className="rounded-xl border border-border p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                Total Monetary Value
+                {t('totalMonetaryValue')}
               </p>
               <p className="text-2xl font-semibold font-mono text-green-700">
                 {filsToKwd(totalRevenue)}
@@ -120,7 +121,7 @@ export default function InsightsSegmentsPage() {
 
         {sorted.length === 0 ? (
           <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
-            No segment data yet. Insights populate after the first nightly rollup at 02:00 KW.
+            {t('noSegmentData')}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -137,7 +138,9 @@ export default function InsightsSegmentsPage() {
                 <div key={seg.segment} className={`rounded-xl border p-4 space-y-3 ${colorClass}`}>
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold">{icon}</span>
-                    <span className="text-xs font-medium opacity-70">{sharePct}% of customers</span>
+                    <span className="text-xs font-medium opacity-70">
+                      {t('shareOfCustomers', { pct: sharePct })}
+                    </span>
                   </div>
                   <div>
                     <h3 className="text-base font-semibold capitalize">
@@ -155,7 +158,9 @@ export default function InsightsSegmentsPage() {
                       <p className="font-mono font-semibold">
                         {filsToKwd(seg.totalMonetaryFils)} KWD
                       </p>
-                      <p className="text-xs opacity-60">{revSharePct}% of total</p>
+                      <p className="text-xs opacity-60">
+                        {t('shareOfTotal', { pct: revSharePct })}
+                      </p>
                     </div>
                   </div>
                   {seg.recommendedAction && (

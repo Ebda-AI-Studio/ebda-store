@@ -64,6 +64,8 @@ export interface ProductFaqSectionHandle {
 export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
   function ProductFaqSection({ storeId, productId }, ref) {
     const t = useT('products.edit.faqs');
+    const tBadge = useT('products.aiFieldBadge');
+    const tCommon = useT('common');
     const { success: toastSuccess, error: toastError } = useToast();
 
     const [faqs, setFaqs] = useState<ProductFaq[]>([]);
@@ -437,7 +439,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
                     </div>
                     <div className="flex items-center justify-between">
                       {faq.aiDrafted && !faq.manuallyEdited && (
-                        <span className="text-xs text-muted-foreground">AI</span>
+                        <span className="text-xs text-muted-foreground">{tBadge('aiLabel')}</span>
                       )}
                       <div className="ml-auto flex gap-2">
                         <Button
@@ -446,7 +448,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
                           size="sm"
                           onClick={() => startEdit(faq)}
                         >
-                          Edit
+                          {tCommon('edit')}
                         </Button>
                         <Button
                           type="button"
@@ -454,7 +456,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
                           size="sm"
                           onClick={() => deleteFaq(faq.id)}
                         >
-                          Delete
+                          {tCommon('delete')}
                         </Button>
                       </div>
                     </div>

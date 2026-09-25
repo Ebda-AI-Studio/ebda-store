@@ -375,7 +375,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
             onClick={resetRejected}
             disabled={resetting || loading}
             variant="outline"
-            title="Refresh rejected templates from the latest canonical body, then click Sync to resubmit"
+            title={t('resetRejectedHint')}
           >
             <Icon.Refresh className={`me-2 h-4 w-4 ${resetting ? 'animate-spin' : ''}`} />
             {resetting ? t('resetting') : t('resetRejectedCount', { count: rejectedCount })}

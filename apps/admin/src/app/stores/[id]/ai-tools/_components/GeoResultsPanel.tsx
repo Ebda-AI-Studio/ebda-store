@@ -12,6 +12,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet } from '../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface GeoResults {
   llmsTxt: string | null;
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
+  const t = useT('aiTools.geoResults');
   const [data, setData] = useState<GeoResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,13 +44,13 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
       `/api/v1/stores/${storeId}/ai/results/geo`
     );
     if (err) {
-      setError(err.message || 'Failed to load GEO results');
+      setError(err.message || t('errorFailed'));
       setLoading(false);
       return;
     }
     setData(res ?? null);
     setLoading(false);
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     load();
@@ -57,7 +59,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
   const copy = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toastSuccess(`${label} copied`);
+      toastSuccess(t('copiedToast', { label }));
     } catch {
       // older browser fallback — silent
     }
@@ -66,7 +68,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
   if (loading) {
     return (
       <div className="mt-4 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-        Loading GEO results…
+        {t('loading')}
       </div>
     );
   }
@@ -86,11 +88,9 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
   return (
     <div className="mt-4 rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-foreground">
-          GEO sweep results <span className="text-muted-foreground font-normal">/ النتائج</span>
-        </h3>
+        <h3 className="text-sm font-semibold text-foreground">{t('title')}</h3>
         <Button onClick={load} size="sm" variant="outline">
-          Refresh
+          {t('refresh')}
         </Button>
       </div>
 
@@ -99,16 +99,16 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
         <details className="rounded-md border border-border bg-background p-3 group">
           <summary className="cursor-pointer text-sm font-medium text-foreground flex items-center justify-between">
             <span>
-              LLMs.txt{' '}
+              {t('llmsTxt.label')}{' '}
               {llmsLength > 0 ? (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 ml-1">
-                  ✓ {llmsLength} chars
+                  ✓ {llmsLength} {t('llmsTxt.charsSuffix')}
                 </span>
               ) : (
-                <span className="text-xs text-muted-foreground ml-1">empty</span>
+                <span className="text-xs text-muted-foreground ml-1">{t('empty')}</span>
               )}
             </span>
-            <span className="text-xs text-muted-foreground group-open:hidden">View</span>
+            <span className="text-xs text-muted-foreground group-open:hidden">{t('view')}</span>
           </summary>
           {data.llmsTxt ? (
             <div className="mt-3">
@@ -119,14 +119,14 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
                 size="sm"
                 variant="outline"
                 className="mt-2"
-                onClick={() => data.llmsTxt && copy(data.llmsTxt, 'LLMs.txt')}
+                onClick={() => data.llmsTxt && copy(data.llmsTxt, t('llmsTxt.label'))}
               >
-                Copy
+                {t('copy')}
               </Button>
             </div>
           ) : (
             <p className="mt-3 text-xs text-muted-foreground">
-              Not yet generated. Click <strong>Generate</strong> above to run the sweep.
+              {t.rich('notGenerated', { b: chunks => <strong>{chunks}</strong> })}
             </p>
           )}
         </details>
@@ -135,16 +135,16 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
         <details className="rounded-md border border-border bg-background p-3 group">
           <summary className="cursor-pointer text-sm font-medium text-foreground flex items-center justify-between">
             <span>
-              Brand facts{' '}
+              {t('brandFacts.label')}{' '}
               {factsKeys > 0 ? (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 ml-1">
-                  ✓ {factsKeys} keys
+                  ✓ {factsKeys} {t('brandFacts.keysSuffix')}
                 </span>
               ) : (
-                <span className="text-xs text-muted-foreground ml-1">empty</span>
+                <span className="text-xs text-muted-foreground ml-1">{t('empty')}</span>
               )}
             </span>
-            <span className="text-xs text-muted-foreground group-open:hidden">View</span>
+            <span className="text-xs text-muted-foreground group-open:hidden">{t('view')}</span>
           </summary>
           {data.brandFacts ? (
             <div className="mt-3">
@@ -155,31 +155,32 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
                 size="sm"
                 variant="outline"
                 className="mt-2"
-                onClick={() => copy(JSON.stringify(data.brandFacts, null, 2), 'Brand facts JSON')}
+                onClick={() =>
+                  copy(JSON.stringify(data.brandFacts, null, 2), t('brandFacts.jsonLabel'))
+                }
               >
-                Copy JSON
+                {t('copyJson')}
               </Button>
             </div>
           ) : (
             <p className="mt-3 text-xs text-muted-foreground">
-              Not yet generated. Click <strong>Generate</strong> above to run the sweep.
+              {t.rich('notGenerated', { b: chunks => <strong>{chunks}</strong> })}
             </p>
           )}
         </details>
 
         {/* Citation copy fill summary */}
         <div className="rounded-md border border-border bg-background p-3">
-          <p className="text-sm font-medium text-foreground mb-2">
-            Citation copy{' '}
-            <span className="text-muted-foreground font-normal">/ نسخة الاستشهاد</span>
-          </p>
+          <p className="text-sm font-medium text-foreground mb-2">{t('citationCopy.label')}</p>
           <p className="text-3xl font-semibold text-primary">{fillPct}%</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {data.citationCopy.filledProducts} of {data.citationCopy.totalProducts} products filled
+            {t('citationCopy.filledOfTotal', {
+              filled: data.citationCopy.filledProducts,
+              total: data.citationCopy.totalProducts,
+            })}
           </p>
           <p className="text-xs text-muted-foreground mt-2">
-            Per-product values are visible on each product's edit page under{' '}
-            <strong>Citation copy</strong>.
+            {t.rich('citationCopy.hint', { b: chunks => <strong>{chunks}</strong> })}
           </p>
         </div>
       </div>

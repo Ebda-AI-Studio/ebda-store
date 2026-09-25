@@ -41,6 +41,7 @@ export default function ImportStatementPage() {
   const router = useRouter();
   const t = useT('finance.bankRec');
   const ti = useT('finance.bankRec.import');
+  const tc = useT('common');
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -113,7 +114,7 @@ export default function ImportStatementPage() {
             onClick={() => router.back()}
             className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"
           >
-            ← Back
+            ← {tc('back')}
           </button>
           <h1 className="text-xl font-semibold text-gray-900">{ti('title')}</h1>
         </div>
@@ -163,7 +164,7 @@ export default function ImportStatementPage() {
               {file ? (
                 <p className="text-sm font-medium text-gray-700">{file.name}</p>
               ) : (
-                <p className="text-sm text-gray-500">CSV, Excel (.xlsx), or OFX (max 5 MB)</p>
+                <p className="text-sm text-gray-500">{ti('fileTypesHint')}</p>
               )}
               <input
                 ref={fileRef}
@@ -196,14 +197,14 @@ export default function ImportStatementPage() {
         {result && (
           <div className="rounded-xl border border-green-100 bg-green-50 p-5 space-y-3">
             <p className="text-sm font-medium text-green-800">
-              {ti('success').replace('{count}', String(result.imported))}
+              {ti('success', { count: result.imported })}
             </p>
             <div className="text-sm text-green-700 space-y-1">
               <p>
-                Imported: <strong>{result.imported}</strong>
+                {t('imported')}: <strong>{result.imported}</strong>
               </p>
               <p>
-                Skipped: <strong>{result.skipped}</strong>
+                {ti('skippedLabel')}: <strong>{result.skipped}</strong>
               </p>
             </div>
             {result.parseErrors.length > 0 && (
@@ -229,7 +230,7 @@ export default function ImportStatementPage() {
               }
               className="mt-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
             >
-              View Reconciliation →
+              {ti('viewReconciliation')} →
             </button>
           </div>
         )}

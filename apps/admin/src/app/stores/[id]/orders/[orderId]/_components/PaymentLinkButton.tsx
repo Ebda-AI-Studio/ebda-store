@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useToast } from '@force/ui';
 import { apiPost } from '../../../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface PaymentLinkButtonProps {
   storeId: string;
@@ -45,6 +46,8 @@ export function PaymentLinkButton({
   disabled = false,
   existingPaymentUrl,
 }: PaymentLinkButtonProps) {
+  const t = useT('orders.paymentLinkButton');
+  const tCommon = useT('common');
   const [open, setOpen] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [result, setResult] = useState<PaymentLinkResult | null>(null);
@@ -56,10 +59,10 @@ export function PaymentLinkButton({
     try {
       await navigator.clipboard.writeText(existingPaymentUrl);
       setCopiedExisting(true);
-      toastSuccess('Link copied to clipboard');
+      toastSuccess(t('linkCopied'));
       setTimeout(() => setCopiedExisting(false), 2000);
     } catch {
-      toastError('Could not access clipboard — copy the link manually');
+      toastError(t('clipboardError'));
     }
   };
 
@@ -71,15 +74,18 @@ export function PaymentLinkButton({
         { notifyVia }
       );
       if (apiError || !data) {
-        toastError('Failed to issue payment link', apiError?.message ?? '');
+        toastError(t('issueFailed'), apiError?.message ?? '');
         return;
       }
       setResult(data);
       if (notifyVia === 'email') {
-        toastSuccess(`Email sent to ${data.customerEmail ?? 'customer'}`);
+        toastSuccess(t('emailSent', { email: data.customerEmail ?? t('customerFallback') }));
       }
     } catch (e) {
-      toastError('Failed to issue payment link', e instanceof Error ? e.message : 'Unknown error');
+      toastError(
+        t('issueFailed'),
+        e instanceof Error ? e.message : tCommon('errors.boundary.unknown')
+      );
     } finally {
       setIsIssuing(false);
     }
@@ -89,9 +95,9 @@ export function PaymentLinkButton({
     if (!result?.paymentUrl) return;
     try {
       await navigator.clipboard.writeText(result.paymentUrl);
-      toastSuccess('Link copied to clipboard');
+      toastSuccess(t('linkCopied'));
     } catch {
-      toastError('Could not access clipboard — copy the link manually');
+      toastError(t('clipboardError'));
     }
   };
 
@@ -133,8 +139,8 @@ export function PaymentLinkButton({
               onClick={copyExistingLink}
               disabled={disabled}
               className="text-info hover:bg-info/10 rounded-md p-1.5 flex-shrink-0 cursor-pointer"
-              aria-label="Copy payment link"
-              title="Copy payment link"
+              aria-label={t('copyAria')}
+              title={t('copyAria')}
             >
               {copiedExisting ? (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -161,8 +167,8 @@ export function PaymentLinkButton({
               target="_blank"
               rel="noopener noreferrer"
               className="text-info hover:bg-info/10 rounded-md p-1.5 flex-shrink-0"
-              aria-label="Open payment link"
-              title="Open payment link"
+              aria-label={t('openAria')}
+              title={t('openAria')}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -180,7 +186,7 @@ export function PaymentLinkButton({
             disabled={disabled || isIssuing}
             className="text-[11px] text-muted-foreground hover:text-foreground underline self-start"
           >
-            Issue a new link
+            {t('issueNewLink')}
           </button>
         </div>
       ) : (
@@ -204,7 +210,7 @@ export function PaymentLinkButton({
               d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-2.828 2.828a4 4 0 01-5.656 0L11 18.828m-1.828-7.656a4 4 0 00-5.656 0L1.69 12.586a4 4 0 000 5.656l2.828 2.828a4 4 0 005.656 0L11.828 19.5"
             />
           </svg>
-          Payment Link
+          {t('buttonLabel')}
         </button>
       )}
 
@@ -223,16 +229,16 @@ export function PaymentLinkButton({
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h2 id="payment-link-modal-title" className="text-lg font-bold text-foreground">
-                  Issue Payment Link
+                  {t('modalTitle')}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Order {orderNumber} — generate a MyFatoorah link to collect payment.
+                  {t('modalSubtitle', { orderNumber })}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={close}
-                aria-label="Close"
+                aria-label={tCommon('close')}
                 className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
                 <svg
@@ -277,10 +283,11 @@ export function PaymentLinkButton({
                         />
                       </svg>
                       <div>
-                        <p className="font-semibold text-foreground">Copy link</p>
+                        <p className="font-semibold text-foreground">
+                          {t('option.copyLink.title')}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Generate the URL — copy it and share via WhatsApp, email, or any channel
-                          you prefer.
+                          {t('option.copyLink.description')}
                         </p>
                       </div>
                     </div>
@@ -308,10 +315,9 @@ export function PaymentLinkButton({
                         />
                       </svg>
                       <div>
-                        <p className="font-semibold text-foreground">Send via email</p>
+                        <p className="font-semibold text-foreground">{t('option.email.title')}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          MyFatoorah delivers the payment link directly to the customer&apos;s email
-                          on file.
+                          {t('option.email.description')}
                         </p>
                       </div>
                     </div>
@@ -319,9 +325,7 @@ export function PaymentLinkButton({
                 </div>
 
                 {isIssuing && (
-                  <p className="mt-4 text-center text-sm text-muted-foreground">
-                    Issuing payment link…
-                  </p>
+                  <p className="mt-4 text-center text-sm text-muted-foreground">{t('issuing')}</p>
                 )}
               </>
             ) : (
@@ -329,14 +333,14 @@ export function PaymentLinkButton({
                 <div className="rounded-xl bg-success/10 border border-success/20 p-4">
                   <p className="text-sm font-semibold text-success">
                     {result.notifyVia === 'email'
-                      ? `✓ Email sent to ${result.customerEmail}`
-                      : '✓ Payment link generated'}
+                      ? t('successEmailSent', { email: result.customerEmail ?? '' })
+                      : t('successGenerated')}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                    Payment URL
+                    {t('paymentUrlLabel')}
                   </label>
                   <div className="flex items-stretch gap-2">
                     <input
@@ -366,22 +370,19 @@ export function PaymentLinkButton({
                           d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                         />
                       </svg>
-                      Copy
+                      {t('copyButton')}
                     </button>
                   </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                  The customer can pay anytime from this link. Once paid, the order&apos;s payment
-                  status updates automatically via webhook.
-                </p>
+                <p className="text-xs text-muted-foreground">{t('paidAutoUpdateNote')}</p>
 
                 <button
                   type="button"
                   onClick={close}
                   className="w-full rounded-xl bg-muted px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
                 >
-                  Done
+                  {t('doneButton')}
                 </button>
               </div>
             )}

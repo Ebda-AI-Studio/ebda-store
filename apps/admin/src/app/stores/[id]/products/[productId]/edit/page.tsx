@@ -77,6 +77,7 @@ export default function EditProductPage() {
   const tSections = useT('products.edit.sections');
   const tFields = useT('products.edit.fields');
   const tStatusOptions = useT('products.edit.statusOptions');
+  const tSeo = useT('products.edit.seoSection');
   const locale = useLocale();
 
   // Plain products-list URL — the fallback whenever `returnTo` is absent or
@@ -366,7 +367,9 @@ export default function EditProductPage() {
       const faqOk = settled[2].status === 'fulfilled' ? settled[2].value : false;
 
       if (seoResult.error || !seoResult.data) {
-        failures.push(`SEO (${seoResult.error?.message || 'failed'})`);
+        failures.push(
+          tSeo('failureSeo', { message: seoResult.error?.message || tSeo('genericFailed') })
+        );
       } else {
         const s = seoResult.data.suggestion;
         setFormData(prev => ({
@@ -383,7 +386,9 @@ export default function EditProductPage() {
       }
 
       if (aeoResult.error || !aeoResult.data) {
-        failures.push(`AEO (${aeoResult.error?.message || 'failed'})`);
+        failures.push(
+          tSeo('failureAeo', { message: aeoResult.error?.message || tSeo('genericFailed') })
+        );
       } else {
         const aeo = aeoResult.data.aeo;
         setFormData(prev => ({
@@ -396,16 +401,18 @@ export default function EditProductPage() {
       }
 
       if (!faqOk) {
-        failures.push('FAQs (failed)');
+        failures.push(tSeo('failureFaqs'));
       }
 
       setSeoMessage(
         failures.length === 0
-          ? 'AI filled SEO + AEO and drafted FAQs (review the FAQ section below). Review then click Save changes.'
-          : `AI generation partially failed — ${failures.join(', ')}. The rest were applied; review then click Save changes.`
+          ? tSeo('generateSuccessMessage')
+          : tSeo('generatePartialFailureMessage', {
+              failures: failures.join(locale === 'ar' ? '، ' : ', '),
+            })
       );
     } catch {
-      setSeoMessage('Network error contacting AI');
+      setSeoMessage(tSeo('networkError'));
     } finally {
       setSeoGenerating(false);
     }
@@ -929,10 +936,8 @@ export default function EditProductPage() {
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">SEO</h2>
-                  <p className="text-xs text-muted-foreground">
-                    How this product appears on Google and when shared.
-                  </p>
+                  <h2 className="text-lg font-semibold text-foreground">{tSections('seo')}</h2>
+                  <p className="text-xs text-muted-foreground">{tSeo('hint')}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -942,7 +947,7 @@ export default function EditProductPage() {
                     className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span aria-hidden>✨</span>
-                    {seoGenerating ? 'Generating…' : 'AI fill empty'}
+                    {seoGenerating ? tSeo('generating') : tSeo('aiFillEmpty')}
                   </button>
                   <button
                     type="button"
@@ -950,7 +955,7 @@ export default function EditProductPage() {
                     disabled={seoGenerating}
                     className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02] px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Regenerate all
+                    {tSeo('aiRegenerateAll')}
                   </button>
                 </div>
               </div>
@@ -967,7 +972,7 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Input
-                    label={`Meta title (${formData.metaTitle.length}/70)`}
+                    label={tSeo('metaTitleLabel', { count: formData.metaTitle.length })}
                     value={formData.metaTitle}
                     onChange={e => updateField('metaTitle', e.target.value)}
                     maxLength={70}
@@ -984,7 +989,7 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Input
-                    label={`Meta title AR (${formData.metaTitleAr.length}/70)`}
+                    label={tSeo('metaTitleArLabel', { count: formData.metaTitleAr.length })}
                     value={formData.metaTitleAr}
                     onChange={e => updateField('metaTitleAr', e.target.value)}
                     maxLength={70}
@@ -1003,7 +1008,9 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Textarea
-                    label={`Meta description (${formData.metaDescription.length}/180)`}
+                    label={tSeo('metaDescriptionLabel', {
+                      count: formData.metaDescription.length,
+                    })}
                     value={formData.metaDescription}
                     onChange={e => updateField('metaDescription', e.target.value)}
                     maxLength={180}
@@ -1021,7 +1028,9 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Textarea
-                    label={`Meta description AR (${formData.metaDescriptionAr.length}/180)`}
+                    label={tSeo('metaDescriptionArLabel', {
+                      count: formData.metaDescriptionAr.length,
+                    })}
                     value={formData.metaDescriptionAr}
                     onChange={e => updateField('metaDescriptionAr', e.target.value)}
                     maxLength={180}
@@ -1033,20 +1042,24 @@ export default function EditProductPage() {
               </div>
               <div className="col-span-2 border-t border-border pt-4 mt-1">
                 <p className="text-xs text-muted-foreground mb-3">
-                  <span className="font-medium text-foreground">AEO</span> — Conversational
-                  answer-engine copy for AI search (Perplexity, Google AI Overview). Filled by
-                  "Generate with AI" above (or the catalogue-wide AEO sweep); you can edit here.
+                  {tSeo.rich('aeoExplanation', {
+                    b: chunks => <span className="font-medium text-foreground">{chunks}</span>,
+                  })}
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Textarea
-                    label={`AEO meta description EN (${formData.metaDescriptionAeo.length}/180)`}
+                    label={tSeo('aeoMetaDescriptionEnLabel', {
+                      count: formData.metaDescriptionAeo.length,
+                    })}
                     value={formData.metaDescriptionAeo}
                     onChange={e => updateField('metaDescriptionAeo', e.target.value)}
                     maxLength={180}
                     rows={3}
                   />
                   <Textarea
-                    label={`AEO meta description AR (${formData.metaDescriptionAeoAr.length}/180)`}
+                    label={tSeo('aeoMetaDescriptionArLabel', {
+                      count: formData.metaDescriptionAeoAr.length,
+                    })}
                     value={formData.metaDescriptionAeoAr}
                     onChange={e => updateField('metaDescriptionAeoAr', e.target.value)}
                     maxLength={180}

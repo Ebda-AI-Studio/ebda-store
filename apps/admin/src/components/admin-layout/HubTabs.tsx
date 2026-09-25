@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useT } from '@/i18n/useT';
 
 export interface HubTab {
   label: string;
@@ -22,6 +23,7 @@ interface Props {
  */
 export function HubTabs({ items }: Props) {
   const pathname = usePathname();
+  const t = useT('components.adminLayout');
 
   // Active tab: longest href prefix that matches the current pathname.
   const active = items.reduce<string | null>((best, t) => {
@@ -33,7 +35,10 @@ export function HubTabs({ items }: Props) {
 
   return (
     <div className="border-b border-border bg-background sticky top-0 z-10">
-      <nav className="flex gap-1 overflow-x-auto px-4 py-1 text-sm" aria-label="Hub sections">
+      <nav
+        className="flex gap-1 overflow-x-auto px-4 py-1 text-sm"
+        aria-label={t('hubSectionsAriaLabel')}
+      >
         {items.map(t => (
           <Link
             key={t.href}

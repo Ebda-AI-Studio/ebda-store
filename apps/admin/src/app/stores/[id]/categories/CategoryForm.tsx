@@ -58,7 +58,7 @@ export function CategoryForm({
 
   async function generateSeo(mode: 'fill-empty' | 'overwrite') {
     if (!editingId) {
-      setSeoMessage('Save the category first, then generate SEO.');
+      setSeoMessage(t('seoSaveFirst'));
       return;
     }
     setSeoMessage(null);
@@ -73,7 +73,7 @@ export function CategoryForm({
         };
       }>(`/api/v1/stores/${storeId}/ai/seo`, { kind: 'category', id: editingId });
       if (error || !data) {
-        setSeoMessage(error?.message || 'AI generation failed');
+        setSeoMessage(error?.message || t('seoGenerationFailed'));
         return;
       }
       const s = data.suggestion;
@@ -88,9 +88,9 @@ export function CategoryForm({
             ? s.descriptionAr
             : prev.metaDescriptionAr,
       }));
-      setSeoMessage('AI filled the SEO fields. Click save to persist.');
+      setSeoMessage(t('seoFilled'));
     } catch {
-      setSeoMessage('Network error contacting AI');
+      setSeoMessage(t('seoNetworkError'));
     } finally {
       setSeoGenerating(false);
     }
@@ -266,8 +266,8 @@ export function CategoryForm({
         <div className="rounded-lg border border-border p-4">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">SEO</h3>
-              <p className="text-xs text-muted-foreground">How this category appears on Google.</p>
+              <h3 className="text-sm font-semibold text-foreground">{t('seoHeading')}</h3>
+              <p className="text-xs text-muted-foreground">{t('seoSubheading')}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -277,7 +277,7 @@ export function CategoryForm({
                 className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span aria-hidden>✨</span>
-                {seoGenerating ? 'Generating…' : 'AI fill empty'}
+                {seoGenerating ? t('seoGenerating') : t('seoFillEmpty')}
               </button>
               <button
                 type="button"
@@ -285,7 +285,7 @@ export function CategoryForm({
                 disabled={seoGenerating}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02] px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Regenerate all
+                {t('seoRegenerateAll')}
               </button>
             </div>
           </div>
@@ -293,7 +293,7 @@ export function CategoryForm({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">
-                Meta title ({(form.metaTitle ?? '').length}/60)
+                {t('metaTitleLabel', { count: (form.metaTitle ?? '').length })}
               </label>
               <input
                 type="text"
@@ -305,7 +305,7 @@ export function CategoryForm({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">
-                Meta title AR ({(form.metaTitleAr ?? '').length}/60)
+                {t('metaTitleArLabel', { count: (form.metaTitleAr ?? '').length })}
               </label>
               <input
                 type="text"
@@ -319,7 +319,7 @@ export function CategoryForm({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">
-                Meta description ({(form.metaDescription ?? '').length}/160)
+                {t('metaDescriptionLabel', { count: (form.metaDescription ?? '').length })}
               </label>
               <textarea
                 maxLength={180}
@@ -331,7 +331,7 @@ export function CategoryForm({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">
-                Meta description AR ({(form.metaDescriptionAr ?? '').length}/160)
+                {t('metaDescriptionArLabel', { count: (form.metaDescriptionAr ?? '').length })}
               </label>
               <textarea
                 maxLength={180}
@@ -347,13 +347,14 @@ export function CategoryForm({
             </div>
             <div className="col-span-2">
               <p className="mb-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">AEO</span> — Conversational copy for
-                AI answer engines. Auto-filled by the AEO sweep; you can edit here.
+                {t.rich('aeoIntro', {
+                  b: chunks => <span className="font-medium text-foreground">{chunks}</span>,
+                })}
               </p>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">
-                AEO meta EN ({(form.metaDescriptionAeo ?? '').length}/160)
+                {t('aeoMetaEnLabel', { count: (form.metaDescriptionAeo ?? '').length })}
               </label>
               <textarea
                 maxLength={180}
@@ -367,7 +368,7 @@ export function CategoryForm({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">
-                AEO meta AR ({(form.metaDescriptionAeoAr ?? '').length}/160)
+                {t('aeoMetaArLabel', { count: (form.metaDescriptionAeoAr ?? '').length })}
               </label>
               <textarea
                 maxLength={180}

@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 // ─── Canonical defaults (mirror of WBS botCopyDefaults.js) ───────────────────
 // These are the out-of-the-box bot messages shipped with the WBS service.
@@ -126,104 +127,49 @@ const CANONICAL_DEFAULTS: Record<string, { en: string; ar: string }> = {
   },
 };
 
-// ─── Key metadata (display name + available variables) ───────────────────────
+// ─── Key metadata (available variables + group; display label comes from
+// i18n via `keys.<key>` in the whatsappIntegration.botCopy namespace so it
+// follows the admin's locale) ─────────────────────────────────────────────
 
 interface KeyMeta {
-  label: string;
-  labelAr: string;
   group: string;
   vars?: string;
 }
 
 const KEY_META: Record<string, KeyMeta> = {
-  catalog_preparing: { label: 'Catalog preparing', labelAr: 'التحضير', group: 'Greeting' },
-  welcome_header: { label: 'Welcome header', labelAr: 'الترحيب', group: 'Greeting' },
-  welcome_body: {
-    label: 'Welcome body',
-    labelAr: 'نص الترحيب',
-    group: 'Greeting',
-    vars: '{storeName}',
-  },
-  welcome_button_text: { label: 'Categories button', labelAr: 'زر الفئات', group: 'Greeting' },
-  welcome_footer: { label: 'Welcome footer', labelAr: 'تذييل الترحيب', group: 'Greeting' },
-  categories_section_title: {
-    label: 'Categories section title',
-    labelAr: 'عنوان الفئات',
-    group: 'Greeting',
-  },
-  no_products: { label: 'No products message', labelAr: 'لا توجد منتجات', group: 'Products' },
-  products_body: { label: 'Products list body', labelAr: 'قائمة المنتجات', group: 'Products' },
-  products_button_text: { label: 'Products button', labelAr: 'زر المنتجات', group: 'Products' },
-  products_section_title: {
-    label: 'Products section title',
-    labelAr: 'عنوان المنتجات',
-    group: 'Products',
-  },
-  products_more_footer: {
-    label: 'More products footer',
-    labelAr: 'المزيد من المنتجات',
-    group: 'Products',
-  },
-  out_of_stock: { label: 'Out-of-stock badge', labelAr: 'نفذ المخزون', group: 'Products' },
-  product_out_of_stock: {
-    label: 'Product out of stock message',
-    labelAr: 'رسالة نفاد المخزون',
-    group: 'Products',
-  },
-  add_to_cart_body: {
-    label: 'Add-to-cart message',
-    labelAr: 'رسالة الإضافة للسلة',
-    group: 'Cart',
-    vars: '{name} {price}',
-  },
-  qty_1: { label: 'Qty button: 1', labelAr: 'زر الكمية ١', group: 'Cart' },
-  qty_2: { label: 'Qty button: 2', labelAr: 'زر الكمية ٢', group: 'Cart' },
-  qty_more: { label: 'Qty button: more', labelAr: 'زر الكمية أكثر', group: 'Cart' },
-  qty_prompt: { label: 'Quantity prompt', labelAr: 'طلب الكمية', group: 'Cart' },
-  qty_range: { label: 'Quantity range error', labelAr: 'خطأ نطاق الكمية', group: 'Cart' },
-  cart_updated: {
-    label: 'Cart updated',
-    labelAr: 'تحديث السلة',
-    group: 'Cart',
-    vars: '{qty} {name} {total} {currency}',
-  },
-  btn_add_more: { label: 'Add more button', labelAr: 'زر إضافة المزيد', group: 'Cart' },
-  btn_checkout: { label: 'Checkout button', labelAr: 'زر إتمام الطلب', group: 'Cart' },
-  btn_cancel: { label: 'Cancel button', labelAr: 'زر الإلغاء', group: 'Cart' },
-  cart_cleared: { label: 'Cart cleared message', labelAr: 'رسالة مسح السلة', group: 'Cart' },
-  checkout_unavailable: {
-    label: 'Checkout unavailable',
-    labelAr: 'الدفع غير متاح',
-    group: 'Checkout',
-  },
-  checkout_error: {
-    label: 'Checkout error',
-    labelAr: 'خطأ في الدفع',
-    group: 'Checkout',
-    vars: '{error}',
-  },
-  checkout_ready: {
-    label: 'Checkout ready',
-    labelAr: 'رابط الدفع جاهز',
-    group: 'Checkout',
-    vars: '{url}',
-  },
-  checkout_resend: {
-    label: 'Checkout resend',
-    labelAr: 'إعادة إرسال الرابط',
-    group: 'Checkout',
-    vars: '{url}',
-  },
-  search_found_n: {
-    label: 'Search found results',
-    labelAr: 'نتائج البحث',
-    group: 'Search',
-    vars: '{count} {query}',
-  },
-  search_no_results: { label: 'Search no results', labelAr: 'لا نتائج', group: 'Search' },
-  search_section_title: { label: 'Search section title', labelAr: 'عنوان البحث', group: 'Search' },
-  tap_a_product: { label: 'Tap a product prompt', labelAr: 'اختر منتجا', group: 'Prompts' },
-  tap_a_flow_button: { label: 'Tap a flow button prompt', labelAr: 'اختر زرا', group: 'Prompts' },
+  catalog_preparing: { group: 'Greeting' },
+  welcome_header: { group: 'Greeting' },
+  welcome_body: { group: 'Greeting', vars: '{storeName}' },
+  welcome_button_text: { group: 'Greeting' },
+  welcome_footer: { group: 'Greeting' },
+  categories_section_title: { group: 'Greeting' },
+  no_products: { group: 'Products' },
+  products_body: { group: 'Products' },
+  products_button_text: { group: 'Products' },
+  products_section_title: { group: 'Products' },
+  products_more_footer: { group: 'Products' },
+  out_of_stock: { group: 'Products' },
+  product_out_of_stock: { group: 'Products' },
+  add_to_cart_body: { group: 'Cart', vars: '{name} {price}' },
+  qty_1: { group: 'Cart' },
+  qty_2: { group: 'Cart' },
+  qty_more: { group: 'Cart' },
+  qty_prompt: { group: 'Cart' },
+  qty_range: { group: 'Cart' },
+  cart_updated: { group: 'Cart', vars: '{qty} {name} {total} {currency}' },
+  btn_add_more: { group: 'Cart' },
+  btn_checkout: { group: 'Cart' },
+  btn_cancel: { group: 'Cart' },
+  cart_cleared: { group: 'Cart' },
+  checkout_unavailable: { group: 'Checkout' },
+  checkout_error: { group: 'Checkout', vars: '{error}' },
+  checkout_ready: { group: 'Checkout', vars: '{url}' },
+  checkout_resend: { group: 'Checkout', vars: '{url}' },
+  search_found_n: { group: 'Search', vars: '{count} {query}' },
+  search_no_results: { group: 'Search' },
+  search_section_title: { group: 'Search' },
+  tap_a_product: { group: 'Prompts' },
+  tap_a_flow_button: { group: 'Prompts' },
 };
 
 const GROUPS = ['Greeting', 'Products', 'Cart', 'Checkout', 'Search', 'Prompts'];
@@ -235,6 +181,7 @@ type BotCopyOverrides = Record<string, { en?: string; ar?: string }>;
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function BotCopyTab({ storeId }: { storeId: string }) {
+  const t = useT('whatsappIntegration.botCopy');
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -309,13 +256,13 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
         botCopy: Object.keys(payload).length > 0 ? payload : null,
       });
       if (error) {
-        toastError('Save failed', error.message || 'Could not save bot copy settings');
+        toastError(t('saveFailedTitle'), error.message || t('saveFailedBody'));
       } else {
-        toastSuccess('Bot copy saved', 'Your bot wording overrides are now live.');
+        toastSuccess(t('savedTitle'), t('savedBody'));
         await fetchConfig();
       }
     } catch {
-      toastError('Save failed', 'An unexpected error occurred');
+      toastError(t('saveFailedTitle'), t('saveFailedGeneric'));
     } finally {
       setSaving(false);
     }
@@ -340,32 +287,36 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-medium text-foreground">Bot Copy Editor</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Customize the wording your WhatsApp ordering bot uses when talking to customers. Leave
-              a field blank to use the canonical default (shown as placeholder text).
-            </p>
+            <h3 className="font-medium text-foreground">{t('editorTitle')}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{t('editorDescription')}</p>
             {overrideCount > 0 && (
               <p className="text-xs text-primary mt-1.5 font-medium">
-                {overrideCount} of {allKeys.length} messages customized
+                {t('customizedCount', { count: overrideCount, total: allKeys.length })}
               </p>
             )}
           </div>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? t('saving') : t('saveChanges')}
           </Button>
         </div>
 
         {/* Variable legend */}
         <div className="mt-4 rounded-lg bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Variables</span> — use{' '}
-          <code className="font-mono bg-background rounded px-1 py-0.5">{'{variableName}'}</code>{' '}
-          syntax in your text.{' '}
+          <span className="font-medium text-foreground">{t('variablesLegendLabel')}</span>{' '}
+          {t.rich('variablesLegendText', {
+            code: chunks => (
+              <code className="font-mono bg-background rounded px-1 py-0.5">
+                {'{'}
+                {chunks}
+                {'}'}
+              </code>
+            ),
+          })}{' '}
           <span className="font-mono">
             {'{storeName}'} {'{name}'} {'{price}'} {'{qty}'} {'{total}'} {'{currency}'} {'{url}'}{' '}
             {'{error}'} {'{count}'} {'{query}'}
           </span>{' '}
-          are supported per message (see label next to each row).
+          {t('variablesLegendSupported')}
         </div>
       </div>
 
@@ -381,7 +332,9 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
           >
             {/* Group heading */}
             <div className="px-5 py-3 border-b border-border bg-muted/30">
-              <h4 className="text-sm font-semibold text-foreground">{group}</h4>
+              <h4 className="text-sm font-semibold text-foreground">
+                {t(`groups.${group}` as Parameters<typeof t>[0])}
+              </h4>
             </div>
 
             <div className="divide-y divide-border">
@@ -397,7 +350,9 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
                     {/* Row header */}
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <span className="text-sm font-medium text-foreground">{meta?.label}</span>
+                        <span className="text-sm font-medium text-foreground">
+                          {t(`keys.${key}` as Parameters<typeof t>[0])}
+                        </span>
                         {meta?.vars && (
                           <span className="ml-2 text-xs text-muted-foreground font-mono">
                             {meta.vars}
@@ -405,7 +360,7 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
                         )}
                         {isOverridden && (
                           <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
-                            customized
+                            {t('customizedBadge')}
                           </span>
                         )}
                       </div>
@@ -415,7 +370,7 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
                           onClick={() => resetKey(key)}
                           className="text-xs text-muted-foreground hover:text-red-500 transition-colors shrink-0"
                         >
-                          Reset to default
+                          {t('resetToDefault')}
                         </button>
                       )}
                     </div>
@@ -425,7 +380,7 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
                       {/* English */}
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                          EN
+                          {t('enColumnLabel')}
                         </label>
                         <textarea
                           rows={canonical?.en?.includes('\n') ? 4 : 2}
@@ -439,7 +394,7 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
                       {/* Arabic */}
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                          AR
+                          {t('arColumnLabel')}
                         </label>
                         <textarea
                           rows={canonical?.ar?.includes('\n') ? 4 : 2}
@@ -462,7 +417,7 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
       {/* Bottom save */}
       <div className="flex justify-end pb-6">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Save changes'}
+          {saving ? t('saving') : t('saveChanges')}
         </Button>
       </div>
     </div>

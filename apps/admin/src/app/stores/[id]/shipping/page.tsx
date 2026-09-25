@@ -53,17 +53,15 @@ export default function ShippingSettingsPage() {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-medium text-cyan-900">Shipping Carriers enabled</p>
-                <p className="text-xs text-cyan-700">
-                  Configure iCarry &amp; Aramex credentials, test connections, and view shipments.
-                </p>
+                <p className="text-sm font-medium text-cyan-900">{tPage('carriersBannerTitle')}</p>
+                <p className="text-xs text-cyan-700">{tPage('carriersBannerHint')}</p>
               </div>
             </div>
             <Link
               href={`/stores/${storeId}/shipping-carriers`}
               className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-cyan-700 border border-cyan-300 rounded-lg hover:bg-cyan-100 transition-colors"
             >
-              Manage carriers →
+              {tPage('carriersBannerLink')}
             </Link>
           </div>
         )}

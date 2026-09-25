@@ -107,8 +107,8 @@ export function SidebarHeader({
               ST
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-semibold text-foreground">Staff</span>
-              <p className="text-[10px] text-muted-foreground truncate">Limited access</p>
+              <span className="text-xs font-semibold text-foreground">{t('staffBadge')}</span>
+              <p className="text-[10px] text-muted-foreground truncate">{t('staffBadgeHint')}</p>
             </div>
           </div>
         </div>

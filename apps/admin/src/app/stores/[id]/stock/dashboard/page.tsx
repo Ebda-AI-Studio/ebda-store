@@ -204,7 +204,7 @@ export default function StockDashboardPage() {
               </p>
               {kpi.errMsg && (
                 <p className="text-xs text-destructive truncate" title={kpi.errMsg}>
-                  Couldn't load
+                  {t('couldntLoad')}
                 </p>
               )}
               {kpi.href && !kpi.errMsg && (

@@ -9,6 +9,7 @@ import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { formatPrice } from '@/lib/format';
+import { useT } from '@/i18n/useT';
 
 interface ProductVariant {
   id: string;
@@ -70,6 +71,8 @@ export default function NewOrderPage() {
   const { success: toastSuccess, error: toastError } = useToast();
   const locale = useLocale();
   const isRtl = locale === 'ar';
+  const t = useT('orders.new');
+  const tCommon = useT('common');
 
   // Customer state — either an existing User.id (selected from search)
   // or guest info typed into the form.
@@ -330,11 +333,11 @@ export default function NewOrderPage() {
 
   const handleSubmit = useCallback(async () => {
     if (items.length === 0) {
-      toastError('Add at least one product before placing the order');
+      toastError(t('errors.noItems'));
       return;
     }
     if (!firstName.trim() || !phone.trim()) {
-      toastError('First name and phone are required');
+      toastError(t('errors.missingRequired'));
       return;
     }
     setIsSubmitting(true);
@@ -369,13 +372,16 @@ export default function NewOrderPage() {
         order: { id: string; orderNumber: string };
       }>(`/api/v1/stores/${storeId}/orders/admin`, payload);
       if (apiError || !data) {
-        toastError('Failed to create order', apiError?.message ?? '');
+        toastError(t('errors.createFailed'), apiError?.message ?? '');
         return;
       }
-      toastSuccess(`Order ${data.order.orderNumber} created`);
+      toastSuccess(t('toast.created', { orderNumber: data.order.orderNumber }));
       router.push(`/stores/${storeId}/orders/${data.order.id}`);
     } catch (e) {
-      toastError('Failed to create order', e instanceof Error ? e.message : 'Unknown error');
+      toastError(
+        t('errors.createFailed'),
+        e instanceof Error ? e.message : t('errors.unknownError')
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -398,6 +404,7 @@ export default function NewOrderPage() {
     router,
     toastSuccess,
     toastError,
+    t,
   ]);
 
   // Area options for the currently selected governorate.
@@ -405,12 +412,12 @@ export default function NewOrderPage() {
 
   return (
     <AdminLayout
-      title="New order (phone order)"
-      subtitle="Create an order on behalf of a customer, then issue a payment link"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <Link href={`/stores/${storeId}/orders`}>
           <Button type="button" variant="outline">
-            Cancel
+            {tCommon('cancel')}
           </Button>
         </Link>
       }
@@ -419,7 +426,7 @@ export default function NewOrderPage() {
         {/* Customer card */}
         <section className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Customer
+            {t('customerSection.heading')}
           </h2>
           <div className="mb-4 flex gap-2">
             <button
@@ -434,7 +441,7 @@ export default function NewOrderPage() {
                   : 'border-border text-muted-foreground hover:bg-muted'
               }`}
             >
-              Existing customer
+              {t('customerSection.existingTab')}
             </button>
             <button
               type="button"
@@ -449,14 +456,14 @@ export default function NewOrderPage() {
                   : 'border-border text-muted-foreground hover:bg-muted'
               }`}
             >
-              New / Guest
+              {t('customerSection.guestTab')}
             </button>
           </div>
           {customerMode === 'existing' && (
             <div className="relative mb-4">
               <input
                 type="text"
-                placeholder="Search by name, email, or phone…"
+                placeholder={t('customerSection.searchPlaceholder')}
                 value={customerSearch}
                 onChange={e => setCustomerSearch(e.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -481,7 +488,7 @@ export default function NewOrderPage() {
                         )}
                         {c.isGuest && (
                           <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
-                            guest
+                            {t('customerSection.guestBadge')}
                           </span>
                         )}
                       </button>
@@ -491,17 +498,35 @@ export default function NewOrderPage() {
               )}
               {selectedCustomerId && (
                 <p className="mt-2 text-xs text-success">
-                  ✓ Linked to existing customer {selectedCustomerId.slice(0, 8)}…
+                  ✓{' '}
+                  {t('customerSection.linkedToCustomer', {
+                    id: selectedCustomerId.slice(0, 8),
+                  })}
                 </p>
               )}
             </div>
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Input label="First name *" value={firstName} onChange={setFirstName} required />
-            <Input label="Last name" value={lastName} onChange={setLastName} />
-            <Input label="Email" type="email" value={email} onChange={setEmail} dir="ltr" />
             <Input
-              label="Phone *"
+              label={t('customerSection.firstNameLabel')}
+              value={firstName}
+              onChange={setFirstName}
+              required
+            />
+            <Input
+              label={t('customerSection.lastNameLabel')}
+              value={lastName}
+              onChange={setLastName}
+            />
+            <Input
+              label={t('customerSection.emailLabel')}
+              type="email"
+              value={email}
+              onChange={setEmail}
+              dir="ltr"
+            />
+            <Input
+              label={t('customerSection.phoneLabel')}
               type="tel"
               value={phone}
               onChange={setPhone}
@@ -514,11 +539,11 @@ export default function NewOrderPage() {
         {/* Shipping address */}
         <section className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Shipping address
+            {t('shippingSection.heading')}
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
-              label="Address line"
+              label={t('shippingSection.addressLabel')}
               value={address1}
               onChange={setAddress1}
               className="sm:col-span-2"
@@ -526,13 +551,16 @@ export default function NewOrderPage() {
 
             {/* Governorate select */}
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-muted-foreground">Governorate / المحافظة</span>
+              <span className="text-muted-foreground">{t('shippingSection.governorateLabel')}</span>
               <select
                 value={governorate}
                 onChange={e => handleGovernorateChange(e.target.value)}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
-                <option value="">— Select governorate —</option>
+                <option value="">{t('shippingSection.selectGovernoratePlaceholder')}</option>
+                {/* Governorate names are shown in both languages together on purpose —
+                    the merchant and the delivery driver may read different locales,
+                    so this bilingual place-name data is not swapped by admin locale. */}
                 {KUWAIT_GOVERNORATES.map(gov => (
                   <option key={gov.en} value={gov.en}>
                     {gov.en} / {gov.ar}
@@ -543,7 +571,7 @@ export default function NewOrderPage() {
 
             {/* Area select — filtered by selected governorate */}
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-muted-foreground">Area / المنطقة</span>
+              <span className="text-muted-foreground">{t('shippingSection.areaLabel')}</span>
               <select
                 value={area}
                 onChange={e => setArea(e.target.value)}
@@ -551,8 +579,11 @@ export default function NewOrderPage() {
                 className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">
-                  {governorate ? '— Select area —' : '— Select governorate first —'}
+                  {governorate
+                    ? t('shippingSection.selectAreaPlaceholder')
+                    : t('shippingSection.selectGovernorateFirstPlaceholder')}
                 </option>
+                {/* Same bilingual-by-design data as governorate above. */}
                 {areaOptions.map(a => (
                   <option key={a.en} value={a.en}>
                     {a.en} / {a.ar}
@@ -561,34 +592,40 @@ export default function NewOrderPage() {
               </select>
             </label>
 
-            <Input label="Country" value={country} onChange={setCountry} />
+            <Input
+              label={t('shippingSection.countryLabel')}
+              value={country}
+              onChange={setCountry}
+            />
           </div>
 
           {/* Live shipping preview */}
           {(shippingPreview || shippingPreviewLoading) && (
             <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Calculated shipping fee
+                {t('shippingSection.calculatedFeeTitle')}
               </p>
               {shippingPreviewLoading ? (
-                <p className="text-muted-foreground">Calculating…</p>
+                <p className="text-muted-foreground">{t('shippingSection.calculating')}</p>
               ) : shippingPreview ? (
                 shippingPreview.matched ? (
                   shippingPreview.freeShipping ? (
-                    <p className="font-medium text-success">Free delivery</p>
+                    <p className="font-medium text-success">{t('shippingSection.freeDelivery')}</p>
                   ) : (
                     <p className="font-semibold text-foreground">
                       {formatPrice(shippingPreview.shippingCost)}
                       <span className="ms-2 text-xs font-normal text-muted-foreground">
-                        (via {shippingPreview.source === 'area-rate' ? 'area rate' : 'zone'})
+                        {t('shippingSection.viaSource', {
+                          source:
+                            shippingPreview.source === 'area-rate'
+                              ? t('shippingSection.viaAreaRate')
+                              : t('shippingSection.viaZone'),
+                        })}
                       </span>
                     </p>
                   )
                 ) : (
-                  <p className="text-warning">
-                    No rate configured for this area — set a fee below or the order will save with 0
-                    KWD shipping.
-                  </p>
+                  <p className="text-warning">{t('shippingSection.noRateConfigured')}</p>
                 )
               ) : null}
             </div>
@@ -597,14 +634,12 @@ export default function NewOrderPage() {
           {/* Manual shipping override */}
           <div className="mt-3">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-muted-foreground">
-                Shipping fee override (KWD) — leave blank to use the calculated fee
-              </span>
+              <span className="text-muted-foreground">{t('shippingSection.overrideLabel')}</span>
               <input
                 type="number"
                 min="0"
                 step="0.001"
-                placeholder="e.g. 1.500"
+                placeholder={t('shippingSection.overridePlaceholder')}
                 value={shippingOverrideKwd}
                 onChange={e => setShippingOverrideKwd(e.target.value)}
                 dir="ltr"
@@ -612,8 +647,10 @@ export default function NewOrderPage() {
               />
               {typeof shippingOverrideFils === 'number' && (
                 <p className="text-xs text-primary">
-                  Override active: {formatPrice(shippingOverrideFils)} ({shippingOverrideFils} fils)
-                  will be used instead of the calculated fee.
+                  {t('shippingSection.overrideActive', {
+                    price: formatPrice(shippingOverrideFils),
+                    fils: shippingOverrideFils,
+                  })}
                 </p>
               )}
             </label>
@@ -623,12 +660,12 @@ export default function NewOrderPage() {
         {/* Products */}
         <section className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Products
+            {t('productsSection.heading')}
           </h2>
           <div className="relative mb-4">
             <input
               type="text"
-              placeholder="Search products by name or SKU…"
+              placeholder={t('productsSection.searchPlaceholder')}
               value={productSearch}
               onChange={e => setProductSearch(e.target.value)}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -651,14 +688,17 @@ export default function NewOrderPage() {
               </ul>
             )}
             {loadingVariants && (
-              <p className="mt-2 text-xs text-muted-foreground">Loading variants…</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t('productsSection.loadingVariants')}
+              </p>
             )}
             {/* Variant picker — shown inline after merchant picks a variant product */}
             {pendingVariantProduct && (
               <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
                 <p className="mb-2 text-xs font-semibold text-muted-foreground">
-                  {displayName(pendingVariantProduct.name, pendingVariantProduct.nameAr)} — choose a
-                  variant:
+                  {t('productsSection.chooseVariantPrompt', {
+                    name: displayName(pendingVariantProduct.name, pendingVariantProduct.nameAr),
+                  })}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(pendingVariantProduct.variants ?? [])
@@ -674,7 +714,7 @@ export default function NewOrderPage() {
                         <span className="ms-1.5 text-muted-foreground">{formatPrice(v.price)}</span>
                         {v.inventory <= 0 && (
                           <span className="ms-1.5 text-destructive/70 text-[10px]">
-                            (out of stock)
+                            {t('productsSection.outOfStock')}
                           </span>
                         )}
                       </button>
@@ -685,14 +725,14 @@ export default function NewOrderPage() {
                   onClick={() => setPendingVariantProduct(null)}
                   className="mt-2 text-xs text-muted-foreground underline"
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </button>
               </div>
             )}
           </div>
           {items.length === 0 ? (
             <p className="rounded-lg bg-muted/30 p-4 text-center text-sm text-muted-foreground">
-              No products yet. Search above to add the first item.
+              {t('productsSection.noProductsYet')}
             </p>
           ) : (
             <ul className="divide-y divide-border rounded-lg border border-border">
@@ -718,7 +758,7 @@ export default function NewOrderPage() {
                   <button
                     type="button"
                     onClick={() => removeItem(it.productId, it.variantId)}
-                    aria-label="Remove"
+                    aria-label={t('productsSection.removeItemAria')}
                     className="rounded p-1 text-destructive hover:bg-destructive/10"
                   >
                     ✕
@@ -728,34 +768,38 @@ export default function NewOrderPage() {
             </ul>
           )}
           <div className="mt-4 flex items-center justify-end gap-3 text-sm">
-            <span className="text-muted-foreground">Subtotal:</span>
+            <span className="text-muted-foreground">{t('productsSection.subtotalLabel')}</span>
             <span className="text-lg font-bold text-foreground">{formatPrice(subtotal)}</span>
           </div>
           {/* Show projected total when shipping is known */}
           {(shippingPreview?.matched || typeof shippingOverrideFils === 'number') && (
             <div className="mt-1 flex items-center justify-end gap-3 text-sm">
-              <span className="text-muted-foreground">Shipping:</span>
+              <span className="text-muted-foreground">{t('productsSection.shippingLabel')}</span>
               <span className="font-medium text-foreground">
                 {typeof shippingOverrideFils === 'number'
-                  ? `${formatPrice(shippingOverrideFils)} (override)`
+                  ? `${formatPrice(shippingOverrideFils)} ${t('productsSection.overrideSuffix')}`
                   : shippingPreview?.freeShipping
-                    ? 'Free'
+                    ? t('productsSection.freeShort')
                     : formatPrice(shippingPreview!.shippingCost)}
               </span>
             </div>
           )}
           <p className="mt-1 text-end text-xs text-muted-foreground">
             {governorate && area
-              ? 'Shipping fee shown is a preview — tax is calculated on save.'
-              : 'Select governorate + area above to preview the shipping fee.'}
+              ? t('productsSection.previewHintReady')
+              : t('productsSection.previewHintPending')}
           </p>
         </section>
 
         {/* Notes + coupon */}
         <section className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Input label="Coupon code (optional)" value={couponCode} onChange={setCouponCode} />
-            <Input label="Notes (optional)" value={notes} onChange={setNotes} />
+            <Input
+              label={t('notesSection.couponLabel')}
+              value={couponCode}
+              onChange={setCouponCode}
+            />
+            <Input label={t('notesSection.notesLabel')} value={notes} onChange={setNotes} />
           </div>
         </section>
 
@@ -766,7 +810,7 @@ export default function NewOrderPage() {
         <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:bg-card sm:p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              {items.length} item{items.length === 1 ? '' : 's'} ·{' '}
+              {t('footer.itemCount', { count: items.length })} ·{' '}
               <span className="font-semibold text-foreground">{formatPrice(subtotal)}</span>
             </p>
             <Button
@@ -774,13 +818,10 @@ export default function NewOrderPage() {
               onClick={handleSubmit}
               disabled={isSubmitting || items.length === 0}
             >
-              {isSubmitting ? 'Creating…' : 'Place order'}
+              {isSubmitting ? t('footer.creating') : t('footer.placeOrder')}
             </Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Order created in unpaid state. Issue a MyFatoorah payment link from the order detail
-            page after save.
-          </p>
+          <p className="mt-2 text-xs text-muted-foreground">{t('footer.unpaidHint')}</p>
         </div>
       </div>
     </AdminLayout>

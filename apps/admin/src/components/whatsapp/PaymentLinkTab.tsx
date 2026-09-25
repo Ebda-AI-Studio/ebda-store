@@ -374,7 +374,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                       type="button"
                       onClick={() => removeLine(idx)}
                       className="text-red-400 hover:text-red-600 p-1 mt-1"
-                      aria-label="Remove item"
+                      aria-label={t('removeItemAriaLabel')}
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -478,8 +478,14 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
           <div className="text-xs text-emerald-800 space-y-1.5">
             <p>{t('sentDescription')}</p>
             <p className="flex items-center gap-2 flex-wrap text-[11px] text-emerald-700">
-              <span className="font-mono">Order #{result.orderNumber}</span>
-              {result.invoiceId && <span className="font-mono">· Invoice {result.invoiceId}</span>}
+              <span className="font-mono">
+                {t('orderNumberLabel', { orderNumber: result.orderNumber })}
+              </span>
+              {result.invoiceId && (
+                <span className="font-mono">
+                  · {t('invoiceIdLabel', { invoiceId: result.invoiceId })}
+                </span>
+              )}
               <a
                 href={`/stores/${storeId}/orders/${result.orderId}`}
                 className="ms-auto inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-emerald-700 hover:bg-emerald-100 font-medium"

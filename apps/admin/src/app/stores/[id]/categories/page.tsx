@@ -46,6 +46,7 @@ export default function StoreCategoriesPage() {
   const storeId = params?.id as string;
   const t = useT('categories.page');
   const tForm = useT('categories.form');
+  const tCommon = useT('common');
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,7 +107,7 @@ export default function StoreCategoriesPage() {
           showError(t('errorTitle'), apiError.message ?? '');
           return;
         }
-        toastSuccess('Category count label saved');
+        toastSuccess(t('countUnitSaved'));
       } finally {
         setSavingCountUnit(false);
       }
@@ -130,7 +131,7 @@ export default function StoreCategoriesPage() {
           showError(t('errorTitle'), apiError.message ?? '');
           return;
         }
-        toastSuccess(next ? 'Best Sellers tile shown' : 'Best Sellers tile hidden');
+        toastSuccess(next ? t('bestSellersTileShown') : t('bestSellersTileHidden'));
       } finally {
         setSavingShowBestSellersTile(false);
       }
@@ -160,7 +161,7 @@ export default function StoreCategoriesPage() {
           return;
         }
         setBestSellersImage(image);
-        toastSuccess(image ? 'Best Sellers cover updated' : 'Best Sellers cover removed');
+        toastSuccess(image ? t('bestSellersCoverUpdated') : t('bestSellersCoverRemoved'));
       } finally {
         setSavingBestSellersImage(false);
       }
@@ -468,11 +469,10 @@ export default function StoreCategoriesPage() {
       <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-base font-semibold text-foreground">Best Sellers cover</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Shown on the storefront's Best Sellers tile alongside your real categories. The tile
-              only renders when at least one product is flagged as a best seller.
-            </p>
+            <h3 className="text-base font-semibold text-foreground">
+              {t('bestSellersCoverTitle')}
+            </h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('bestSellersCoverHint')}</p>
           </div>
           <div className="md:w-64">
             <ImageUpload
@@ -481,7 +481,7 @@ export default function StoreCategoriesPage() {
               onRemove={() => saveBestSellersImage(null)}
               folder="categories"
               storeId={storeId}
-              label={savingBestSellersImage ? 'Saving…' : 'Upload cover'}
+              label={savingBestSellersImage ? tCommon('saving') : t('uploadCoverLabel')}
               accept="image/jpeg,image/png,image/webp"
               aspectRatio="1/1"
               recommendedSizeHint={recommendedSizeTextForTemplate('categorySquare', storeTemplate)}
@@ -496,11 +496,8 @@ export default function StoreCategoriesPage() {
             Best Sellers product carousel and its listing page stay regardless. */}
         <div className="mt-4 flex items-center justify-between gap-3 border-t pt-4">
           <div>
-            <p className="text-sm font-medium text-foreground">Show Best Sellers card</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Turn off to remove the Best Sellers card from the homepage category strip and the
-              Categories page. The Best Sellers carousel and its page stay.
-            </p>
+            <p className="text-sm font-medium text-foreground">{t('showBestSellersCardTitle')}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('showBestSellersCardHint')}</p>
           </div>
           <button
             type="button"
@@ -525,19 +522,8 @@ export default function StoreCategoriesPage() {
           on category cards (e.g. "4 pieces" / "4 قطعة"). Saved on StoreTheme JSON. */}
       <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
         <div className="mb-3">
-          <h3 className="text-base font-semibold text-foreground">
-            Product count label
-            <span className="ms-2 text-sm font-normal text-muted-foreground">/ تسمية العدد</span>
-          </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            The word shown after the product count on category cards, e.g. &ldquo;4{' '}
-            <strong>pieces</strong>&rdquo; / &ldquo;4 <strong>قطعة</strong>&rdquo;. Leave blank to
-            use the default (&ldquo;pieces&rdquo; / &ldquo;قطعة&rdquo;).
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground" dir="rtl">
-            الكلمة التي تظهر بعد عدد المنتجات في بطاقات الأقسام، مثلاً &quot;4 <strong>قطعة</strong>
-            &quot; / &quot;4 <strong>pieces</strong>&quot;.
-          </p>
+          <h3 className="text-base font-semibold text-foreground">{t('countUnitTitle')}</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('countUnitHint')}</p>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -545,7 +531,7 @@ export default function StoreCategoriesPage() {
               className="mb-1 block text-xs font-medium text-foreground"
               htmlFor="count-unit-en"
             >
-              English label
+              {t('countUnitEnglishLabel')}
             </label>
             <input
               id="count-unit-en"
@@ -563,7 +549,7 @@ export default function StoreCategoriesPage() {
               htmlFor="count-unit-ar"
               dir="rtl"
             >
-              التسمية بالعربي
+              {t('countUnitArabicLabel')}
             </label>
             <input
               id="count-unit-ar"
@@ -584,10 +570,10 @@ export default function StoreCategoriesPage() {
             onClick={() => saveCountUnit(countUnitEn, countUnitAr)}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {savingCountUnit ? 'Saving…' : 'Save label'}
+            {savingCountUnit ? tCommon('saving') : t('saveLabelButton')}
           </button>
           <span className="text-xs text-muted-foreground">
-            Preview: <strong>{countUnitEn || 'pieces'}</strong> /{' '}
+            {t('previewLabel')} <strong>{countUnitEn || 'pieces'}</strong> /{' '}
             <strong dir="rtl">{countUnitAr || 'قطعة'}</strong>
           </span>
         </div>

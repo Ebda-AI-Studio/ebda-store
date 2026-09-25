@@ -227,14 +227,8 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       {/* ── Social icon brand colors ────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">
-            Social icon colors / ألوان أيقونات التواصل الاجتماعي
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            By default social icons inherit the footer&apos;s text color (monochrome). Enable
-            original brand colors to show each platform in its registered color (Instagram pink,
-            WhatsApp green, etc.).
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('socialIconColors.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('socialIconColors.hint')}</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -248,10 +242,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Use original brand colors in footer social icons / استخدام ألوان العلامة التجارية
-            الأصلية في أيقونات التواصل الاجتماعي بالتذييل
-          </span>
+          <span className="text-xs text-foreground">{t('socialIconColors.footerLabel')}</span>
         </label>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -265,23 +256,15 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Use original brand colors in floating widget buttons (overrides custom button colors) /
-            استخدام ألوان العلامة التجارية الأصلية في أزرار القطعة العائمة
-          </span>
+          <span className="text-xs text-foreground">{t('socialIconColors.widgetLabel')}</span>
         </label>
       </div>
 
       {/* ── Storefront web push ───────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">
-            Storefront web push / إشعارات الويب للمتجر
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Off by default. When on, shoppers can subscribe to web push (requires the Push
-            Notifications plan feature).
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('webPush.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('webPush.hint')}</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -295,24 +278,15 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Enable storefront web push opt-in / تفعيل اشتراك إشعارات الويب في المتجر
-          </span>
+          <span className="text-xs text-foreground">{t('webPush.enableLabel')}</span>
         </label>
       </div>
 
       {/* ── Persona chrome (2026-07-12) ──────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">
-            Persona chrome completion / إتمام هوية القالب
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Off by default on existing stores; new stores are created with this on. Adds
-            theme-specific chrome using your existing colors: hairline-flanked heading + whisper
-            see-all link on Elegant, circular category tiles on Classic, bordered header + inverted
-            footer on Bold. No change to card sizes, product name/price text, fonts, or colors.
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('personaChrome.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('personaChrome.hint')}</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -326,23 +300,15 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Enable persona chrome completion / تفعيل إتمام هوية القالب
-          </span>
+          <span className="text-xs text-foreground">{t('personaChrome.enableLabel')}</span>
         </label>
       </div>
 
       {/* ── Card-frame dedup (2026-07-12) ────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">
-            Remove doubled card frame / إزالة الإطار المزدوج للبطاقات
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Off by default on existing stores; new stores are created with this on. When your
-            homepage carousels/strips have "Show card frame" enabled, this removes the extra inner
-            border so each card shows a single frame instead of two nested ones.
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('cardFrameDedup.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('cardFrameDedup.hint')}</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -356,23 +322,15 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Enable single card frame / تفعيل إطار واحد للبطاقات
-          </span>
+          <span className="text-xs text-foreground">{t('cardFrameDedup.enableLabel')}</span>
         </label>
       </div>
 
       {/* ── RTL polish (2026-07-12) ───────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">
-            RTL arrow polish (Elegant) / تحسين اتجاه السهم للعربية
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Off by default on existing stores; new stores are created with this on. Fixes the
-            Elegant theme's empty-state CTA arrow to point the correct reading direction in Arabic
-            (← instead of always →).
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('rtlPolish.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('rtlPolish.hint')}</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -386,23 +344,15 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Enable RTL arrow polish / تفعيل تحسين اتجاه السهم
-          </span>
+          <span className="text-xs text-foreground">{t('rtlPolish.enableLabel')}</span>
         </label>
       </div>
 
       {/* ── Uppercase styling ─────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">
-            Uppercase text styling (nav, headings, labels) / نمط الأحرف الكبيرة
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            When enabled, nav links, footer column headings, section headings, category captions,
-            hero text, and testimonial author names render in uppercase. Off by default (natural
-            case). Product names have their own control on Page Builder.
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('uppercaseStyle.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('uppercaseStyle.hint')}</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -416,9 +366,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Enable uppercase chrome styling / تفعيل نمط الأحرف الكبيرة في الواجهة
-          </span>
+          <span className="text-xs text-foreground">{t('uppercaseStyle.enableLabel')}</span>
         </label>
       </div>
 
@@ -447,11 +395,8 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
       {/* ── Footer logo ───────────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">Footer logo (optional)</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Upload a different logo for the footer when your footer background is dark and the main
-            logo doesn&apos;t read well. Leave empty to use the main logo.
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('footerLogo.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('footerLogo.hint')}</p>
         </div>
         <ImageUpload
           value={branding.theme.footerLogo}
@@ -484,11 +429,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Or invert the main logo to white (CSS filter — useful for dark footer backgrounds when
-            uploading a separate logo isn&apos;t worth it). Ignored when a footer logo is uploaded
-            above.
-          </span>
+          <span className="text-xs text-foreground">{t('footerLogo.invertLabel')}</span>
         </label>
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -502,10 +443,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             }
             className="h-4 w-4 cursor-pointer accent-primary"
           />
-          <span className="text-xs text-foreground">
-            Hide footer logo on mobile (desktop footer logo stays visible). Useful when the header
-            logo on mobile is already large and the footer reads better as text-only.
-          </span>
+          <span className="text-xs text-foreground">{t('footerLogo.hideMobileLabel')}</span>
         </label>
       </div>
     </div>
