@@ -366,6 +366,80 @@ describe('CartService', () => {
     });
   });
 
+  // FORCE-API-2B: `PUT /public/cart/items/:id` 500'd with P2025 when the line
+  // was deleted (a second stepper tap / a racing "remove") between the
+  // cart-scoped findFirst and the by-id write.
+  describe('concurrent removal of the line (P2025)', () => {
+    const lineGone = () =>
+      Object.assign(new Error('No record was found for an update.'), { code: 'P2025' });
+    const line = {
+      id: 'item-123',
+      cartId: mockCart.id,
+      productId: 'prod-123',
+      quantity: 2,
+      product: mockProduct,
+    };
+
+    beforeEach(() => {
+      // mockReset, not just the file-level clearAllMocks: a leftover *Once
+      // queue from a failed first attempt would let vitest's `retry: 1` pass
+      // the second attempt for the wrong reason.
+      vi.mocked(prisma.cartItem.findFirst).mockReset();
+      vi.mocked(prisma.cartItem.update).mockReset();
+      vi.mocked(prisma.cartItem.delete).mockReset();
+      vi.mocked(prisma.cart.findFirst).mockResolvedValue(mockCart as any);
+      vi.mocked(prisma.cartItem.findFirst).mockResolvedValue(line as any);
+    });
+
+    it('updateItem answers the 404 the findFirst guard answers, not a raw P2025', async () => {
+      vi.mocked(prisma.cartItem.update).mockRejectedValueOnce(lineGone());
+
+      await expect(
+        CartService.updateItem(mockStoreId, mockSessionId, 'item-123', 5)
+      ).rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' });
+    });
+
+    it('updateItem to 0 of an already-deleted line is a no-op', async () => {
+      vi.mocked(prisma.cartItem.delete).mockRejectedValueOnce(lineGone());
+
+      await expect(
+        CartService.updateItem(mockStoreId, mockSessionId, 'item-123', 0)
+      ).resolves.toBeDefined();
+    });
+
+    it('removeItem of an already-deleted line is a no-op', async () => {
+      vi.mocked(prisma.cartItem.delete).mockRejectedValueOnce(lineGone());
+
+      await expect(
+        CartService.removeItem(mockStoreId, mockSessionId, 'item-123')
+      ).resolves.toBeDefined();
+    });
+
+    it('any OTHER write error still propagates unchanged', async () => {
+      const boom = Object.assign(new Error('connection reset'), { code: 'P1017' });
+      vi.mocked(prisma.cartItem.update).mockRejectedValueOnce(boom);
+
+      await expect(CartService.updateItem(mockStoreId, mockSessionId, 'item-123', 5)).rejects.toBe(
+        boom
+      );
+    });
+
+    it('addItem re-reads and CREATES the line when the one it meant to increment vanished', async () => {
+      vi.mocked(prisma.product.findFirst).mockResolvedValue(mockProduct as any);
+      vi.mocked(prisma.cartItem.findFirst)
+        .mockResolvedValueOnce({ id: 'item-123', quantity: 2 } as any)
+        .mockResolvedValueOnce(null);
+      vi.mocked(prisma.cartItem.update).mockRejectedValueOnce(lineGone());
+      vi.mocked(prisma.cartItem.create).mockResolvedValue({} as any);
+
+      await CartService.addItem(mockStoreId, mockSessionId, 'prod-123', 3);
+
+      expect(prisma.cartItem.create).toHaveBeenCalledWith({
+        data: { cartId: mockCart.id, productId: 'prod-123', variantId: null, quantity: 3 },
+      });
+    });
+  });
+
   describe('removeItem', () => {
     it('should remove item from cart', async () => {
       vi.mocked(prisma.cart.findFirst).mockResolvedValue(mockCart as any);

@@ -3,6 +3,7 @@ import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { clientErrorStatus } from '../middleware/error-handler';
 
 // ==========================================
 // Sentry Error Monitoring Service (v8 API)
@@ -66,7 +67,13 @@ export class SentryService {
       // captured — the source of the 4957x/242x/115x Sentry noise. Prefer
       // statusCode, fall back to status; capture only 5xx or unknown-code errors
       // (no code = a genuine uncaught crash, which we DO want). 2026-06-10 audit F1.
-      const code = err.statusCode ?? err.status;
+      //
+      // Errors that carry no status of their own but that `errorHandler` still
+      // answers with a 4xx (ZodError → 400, Prisma P2002 → 409, …) are
+      // classified by the same function that handler uses — without it every
+      // `schema.parse(req.body)` failure reached Sentry as a crash
+      // (FORCE-API-2C/1B/25/27).
+      const code = err.statusCode ?? err.status ?? clientErrorStatus(err);
       if (this.isInitialized && (!code || code >= 500)) {
         const { authorization, cookie, 'x-csrf-token': csrfToken, ...safeHeaders } = req.headers;
         // suppress unused-var warning — these are intentionally dropped

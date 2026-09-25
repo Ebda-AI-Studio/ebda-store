@@ -2,6 +2,7 @@ import { prisma, Prisma, withMoneyTx, withRlsBypass } from '@force/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
+import { retryOnWriteConflict } from '../lib/db-retry';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -17,6 +18,21 @@ import logger from '../lib/logger';
 // release that repeats this shape bumps to the next unused version.
 const CACHE_PREFIX = 'features:store:v3:';
 const CACHE_TTL = 300; // 5 minutes
+
+// Prisma's connection-level failures: P1001 "Can't reach database server",
+// P1002 "timed out", P1017 "Server has closed the connection." On Neon's
+// pooler these are transient — a dropped idle connection or a compute blip —
+// and FORCE-API-2D / 2E were each a single one of them 500ing
+// `GET /public/store/resolve` from inside `readFromDb`. One retry on a FRESH
+// transaction (`withRlsBypass` opens its own, so a dead connection is not
+// reused) absorbs them. Deliberately NOT a stale-value fallback: this map gates
+// paid features, so a second failure still throws (fail closed) instead of
+// serving a map that might say ON for something that was turned off.
+const DB_READ_RETRY = {
+  retries: 1,
+  baseDelayMs: 100,
+  extraRetryCodes: ['P1001', 'P1002', 'P1017'],
+};
 
 class FeatureService {
   /**
@@ -179,7 +195,10 @@ class FeatureService {
 
     const pending = (async () => {
       logger.debug({ storeId }, '[FeatureService] Cache miss, reading from DB');
-      const features = await this.readFromDb(storeId);
+      const features = await retryOnWriteConflict(() => this.readFromDb(storeId), {
+        ...DB_READ_RETRY,
+        label: 'feature.readFromDb',
+      });
 
       // 3. Populate cache (best-effort)
       await this.writeToCache(storeId, features);

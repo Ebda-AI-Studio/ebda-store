@@ -89,6 +89,31 @@ async function tryResolveCartBundle(
  */
 const AMBIENT_TX_RETRY = { retries: 1, baseDelayMs: 5 } as const;
 
+/**
+ * P2025 = the row a by-id `update`/`delete` targeted no longer exists. Every
+ * line write below reads the line first (scoped to this cart) and then writes
+ * it by id, and nothing locks the row in between: a second tap on the
+ * quantity stepper or a "remove" racing it can delete the line in that window.
+ * FORCE-API-2B (2026-09-12, `PUT /public/cart/items/:id`) was exactly that —
+ * a 500 for a line the customer had just removed. Duck-typed on `.code` for
+ * the same reason as `lib/db-retry.ts` (instanceof breaks under the mocked
+ * `@force/database`).
+ */
+function isLineGone(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === 'P2025';
+}
+
+/** Deleting a line that a concurrent request already deleted is a no-op. */
+function ignoreLineGone(err: unknown): void {
+  if (!isLineGone(err)) throw err;
+}
+
+// The add paths (addItem / addItems / addBundle) hit the same window from the
+// other side: their merge branch increments a line by id, and if that line was
+// removed after their `findFirst`, the UPDATE finds nothing. They pass 'P2025'
+// to `retryOnWriteConflict` so the re-run reads again, sees no line, and takes
+// the create branch.
+
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
     // Shared include fragment to avoid repetition. `product` uses the
@@ -372,7 +397,11 @@ export class CartService {
       // describes.
       await retryOnWriteConflict(
         () => withSavepoint(() => writeLine(prisma as unknown as Prisma.TransactionClient)),
-        { label: 'cart.addItem(ambient-tx)', extraRetryCodes: ['P2002'], ...AMBIENT_TX_RETRY }
+        {
+          label: 'cart.addItem(ambient-tx)',
+          extraRetryCodes: ['P2002', 'P2025'],
+          ...AMBIENT_TX_RETRY,
+        }
       );
     } else {
       // No tenant context (crons, scripts, tests) — own transaction as before.
@@ -393,7 +422,7 @@ export class CartService {
             maxWait: 10000,
             timeout: 30000,
           }),
-        { label: 'cart.addItem', extraRetryCodes: ['P2002'] }
+        { label: 'cart.addItem', extraRetryCodes: ['P2002', 'P2025'] }
       );
     }
 
@@ -486,7 +515,11 @@ export class CartService {
     const result = hasTenantContext()
       ? await retryOnWriteConflict(
           () => withSavepoint(() => writeBundleLine(prisma as unknown as Prisma.TransactionClient)),
-          { label: 'cart.addBundle(ambient-tx)', extraRetryCodes: ['P2002'], ...AMBIENT_TX_RETRY }
+          {
+            label: 'cart.addBundle(ambient-tx)',
+            extraRetryCodes: ['P2002', 'P2025'],
+            ...AMBIENT_TX_RETRY,
+          }
         )
       : await retryOnWriteConflict(
           () =>
@@ -495,7 +528,7 @@ export class CartService {
               maxWait: 10000,
               timeout: 30000,
             }),
-          { label: 'cart.addBundle', extraRetryCodes: ['P2002'] }
+          { label: 'cart.addBundle', extraRetryCodes: ['P2002', 'P2025'] }
         );
 
     if (!result.ok) {
@@ -526,7 +559,7 @@ export class CartService {
       throw new AppError(404, 'NOT_FOUND', 'Cart bundle not found');
     }
 
-    await prisma.cartBundle.delete({ where: { id: cartBundleId } });
+    await prisma.cartBundle.delete({ where: { id: cartBundleId } }).catch(ignoreLineGone);
 
     await prisma.cart.update({
       where: { id: cart.id, storeId },
@@ -670,7 +703,11 @@ export class CartService {
       // four lines that already succeeded and silently double them.
       await retryOnWriteConflict(
         () => withSavepoint(() => writeItems(prisma as unknown as Prisma.TransactionClient)),
-        { label: 'cart.addItems(ambient-tx)', extraRetryCodes: ['P2002'], ...AMBIENT_TX_RETRY }
+        {
+          label: 'cart.addItems(ambient-tx)',
+          extraRetryCodes: ['P2002', 'P2025'],
+          ...AMBIENT_TX_RETRY,
+        }
       );
     } else {
       // No tenant context (the public storefront route, crons, scripts,
@@ -683,7 +720,7 @@ export class CartService {
             maxWait: 10000,
             timeout: 30000,
           }),
-        { label: 'cart.addItems', extraRetryCodes: ['P2002'] }
+        { label: 'cart.addItems', extraRetryCodes: ['P2002', 'P2025'] }
       );
     }
 
@@ -727,7 +764,7 @@ export class CartService {
     }
 
     if (quantity <= 0) {
-      await prisma.cartItem.delete({ where: { id: itemId } });
+      await prisma.cartItem.delete({ where: { id: itemId } }).catch(ignoreLineGone);
     } else {
       // Variant lines are authoritative on the VARIANT row; only a
       // variant-less line falls back to the product column. Mirrors
@@ -743,10 +780,17 @@ export class CartService {
         throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
       }
 
-      await prisma.cartItem.update({
-        where: { id: itemId },
-        data: { quantity },
-      });
+      await prisma.cartItem
+        .update({
+          where: { id: itemId },
+          data: { quantity },
+        })
+        .catch((err: unknown) => {
+          // Removed concurrently (see isLineGone): the same 404 the
+          // `findFirst` guard above answers, not a 500.
+          if (isLineGone(err)) throw new AppError(404, 'NOT_FOUND', 'Cart item not found');
+          throw err;
+        });
     }
 
     // Track activity for abandonment detection
@@ -769,7 +813,7 @@ export class CartService {
       throw new AppError(404, 'NOT_FOUND', 'Cart item not found');
     }
 
-    await prisma.cartItem.delete({ where: { id: itemId } });
+    await prisma.cartItem.delete({ where: { id: itemId } }).catch(ignoreLineGone);
 
     // Track activity for abandonment detection
     await prisma.cart.update({

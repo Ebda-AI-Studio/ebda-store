@@ -22,6 +22,32 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * The status `errorHandler` below will answer with, for every error class it
+ * maps to a CLIENT error (4xx) without that status living on the error object.
+ * Returns undefined for anything that becomes a 500.
+ *
+ * `SentryService.errorHandler()` runs BEFORE `errorHandler` and decides
+ * capture from `err.statusCode ?? err.status`. A ZodError, a body-parser
+ * SyntaxError and a Prisma P2002/P2025/P2003 carry neither, so every one of
+ * them looked like an uncaught crash and was reported even though the client
+ * got a 400/404/409 — FORCE-API-2C (158 events), 1B, 25, 27 (ZodError from
+ * `schema.parse` in public/auth/admin routes) and 2A (duplicate-SKU P2002).
+ * Both middlewares now classify through this one function; a parity test
+ * (`tests/unit/error-status-parity.test.ts`) pins it to the responses below.
+ */
+export function clientErrorStatus(err: unknown): number | undefined {
+  if (err instanceof AppError) return err.statusCode < 500 ? err.statusCode : undefined;
+  if (err instanceof SyntaxError && 'body' in err) return 400;
+  if (err instanceof ZodError) return 400;
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') return 409;
+    if (err.code === 'P2025') return 404;
+    if (err.code === 'P2003') return 400;
+  }
+  return undefined;
+}
+
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
   // Correlation id (set by the `requestId` middleware in security.ts). Returned
   // to the client on server-side (5xx) errors so support can map a customer's

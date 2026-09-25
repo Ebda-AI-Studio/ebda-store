@@ -8,6 +8,43 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25 — Sentry open-issues sweep (branch `fix/sentry-open-issues`)
+
+**Ruling SN-1 — FORCE-WEB-K/M/Q (`RangeError: Maximum call stack size exceeded`) and FORCE-WEB-N/P
+(`Error: La`) are Chrome for iOS's own injected script, not FWB code; they are filtered at the Sentry
+boundary, not "fixed".** All 63 events (100%) are `Chrome Mobile iOS`, zero from Mobile Safari on the
+same WebKit engine. Every frame is attributed to the DOCUMENT URL (`app:///`, `app:///products`) at
+lines 190-464, while the served HTML is 11-12 lines and the largest `/_next/static/chunks/*.js` the
+storefront loads is 51 lines (Playwright WebKit + Chromium, iPhone profile, the breadcrumb sequence
+home → category tile → logo/back, x6: no pageerror, 23 JS responses, none ≥190 lines, none defining
+`Ok`/`Qk`/`Nk`/`Pk`). The line:col positions are identical across FWB releases two weeks apart
+(2214be88 → ad17d6e4) while the Closure-style names change with the Chrome version (152 `Nk`/`Pk`,
+154 `Ok`/`Qk`). `isHostInjectedScriptEvent` (`@force/shared`) drops an event only when the UA is an
+iOS host app AND no frame comes from a script file. Cost if wrong: a genuine recursion in an inline
+script of ours, seen only by Chrome-for-iOS users, would go unreported — Safari/Android/desktop
+still report it, and any frame in a shipped chunk keeps the event.
+
+**Ruling SN-2 — FORCE-API-28 (cart P2003 `cart_items_cart_id_fkey`) needs no new change.** All 3
+events are 2026-08-31 16:15-16:53 UTC; #1108 (2dd34917, 19:56 UTC the same day) moved addItem onto
+the ambient tenant transaction, and the issue has no event since. Cost if wrong: a first add-to-cart
+500 would reappear and re-open the issue on its own.
+
+**Ruling SN-3 — FORCE-API-29 (MyFatoorah `TimeoutError`) needs no code change.** The 8s
+`AbortSignal.timeout` fired on `/v2/InitiatePayment`, i.e. before any invoice existed; the
+`/payments/create` catch runs `rollbackForPaymentFailure` (order cancelled, inventory + cart restored,
+idempotent), and the storefront shows its generic "try again" copy. 8s per call (16s worst case for
+Initiate + Execute) is inside the checkout's patience. Cost if wrong: a timeout on
+`ExecutePayment` after MyFatoorah minted the invoice leaves a payable invoice for a cancelled
+order — the same window every provider timeout has, closed by the webhook/reconciler, not by a
+shorter timeout. Observed, not changed: `CheckoutClient` clears the saved checkout form from
+sessionStorage before it checks the payment result, so a reload after a failed payment loses the
+typed form (in-page state survives, so an immediate retry does not).
+
+**Ruling SN-4 — FeatureService retries a connection-level DB failure once and otherwise fails
+closed; no stale-map fallback.** The map gates paid features; serving a remembered map could say ON
+for a feature a super-admin just turned off. Cost if wrong: two consecutive Neon connection failures
+still 500 `/public/store/resolve` for that request.
+
 ## 2026-09-25
 
 Context: `docs/plans/2026-09-25-customer-wallet.md` — D1, the customer wallet
