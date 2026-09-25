@@ -68,6 +68,7 @@ import {
   answerEngineScanOnDemand,
 } from './answer-engine-citation-scan';
 import { gscIngestCron, gscIngestOnDemand } from './gsc-ingest';
+import { campaignSend } from './campaign-send';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -192,4 +193,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // its on-demand twin.
   gscIngestCron,
   gscIngestOnDemand,
+  // D2 email campaigns: event-triggered only (a merchant pressing send) —
+  // no cron, so registering it sends nothing on its own.
+  campaignSend,
 ];

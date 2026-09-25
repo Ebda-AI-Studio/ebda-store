@@ -1587,6 +1587,24 @@ export class AuthService {
         }
       }
 
+      // Newsletter + email-campaign copies of the same address (D2,
+      // 2026-09-25). Both are keyed by (store, email) with no FK to `users`,
+      // and newsletter emails are lowercased on write, so an exact match on
+      // the lowercased address is exactly this data subject in this store —
+      // no ambiguity guard is needed here, unlike the CRM branch above.
+      // Hard delete: a subscription row is nothing but the address + consent,
+      // and a recipient row is nothing but the address + send status. The
+      // campaign's aggregate counts survive on `campaigns`.
+      if (user.storeId && user.email) {
+        const normalizedEmail = user.email.trim().toLowerCase();
+        await tx.campaignRecipient.deleteMany({
+          where: { storeId: user.storeId, email: normalizedEmail },
+        });
+        await tx.newsletterSubscriber.deleteMany({
+          where: { storeId: user.storeId, email: normalizedEmail },
+        });
+      }
+
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
       // into the original credential. Email is rewritten (not nulled) so

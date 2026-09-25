@@ -10,6 +10,87 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ## 2026-09-25
 
+Context: `docs/plans/2026-09-25-email-campaigns.md` — D2 email campaigns, shipped behind the
+per-store `email_campaigns` feature key (in no plan baseline, so OFF for every store).
+
+**Ruling EC-1 — the audience is newsletter subscribers only; customers are not a source.** The spec
+allowed "customers with a marketing-consent flag if one exists". None exists: `Customer` has no
+consent column and `Order.smsOptIn` is SMS-only and per order (`schema.prisma`, grep "consent" /
+"marketing"). Having bought once is not consent to marketing email. A recipient's `customer_id` is
+linked for display only and never widens the audience. Cost if wrong: merchants reach fewer people
+than they expect until a checkout email-consent checkbox exists — a reach cost, never a consent
+breach.
+
+**Ruling EC-2 — "confirmed subscriber" means `is_active = true AND unsubscribed_at IS NULL`; there is
+no double opt-in.** `newsletter_subscribers` has no confirmation field and the storefront signup
+(`public.routes.ts /newsletter/subscribe`) activates on submit. Adding double opt-in would change a
+live signup flow on 3 stores. Cost if wrong: an address someone else typed into a store's footer
+can receive that store's campaigns until it clicks unsubscribe — mitigated by the one-click
+unsubscribe and the per-store 24h cap.
+
+**Ruling EC-3 — on an enqueue failure the campaign returns to `draft`, not `failed`.** The spec says
+"if the Inngest send throws, mark the campaign failed". The send route answers 503, and a 5xx rolls
+back the whole request transaction (`middleware/request-transaction.ts`), so the `draft → scheduled`
+flip is undone and a `failed` write would be undone with it. The outcome the rule exists for — no
+campaign left `scheduled` with no job behind it — holds, and the merchant can simply press send
+again. The job-side failure path (`onFailure`) does mark the campaign and every still-queued
+recipient `failed`. Cost if wrong: an enqueue failure leaves no persistent trace on the campaign
+itself — it is in the API error log and the merchant saw the 503.
+
+**Ruling EC-4 — the request sends the Inngest event inside its own transaction, and the job treats
+`draft` as "not committed yet" and retries.** `deferAfterTenantCommit` would remove the race but
+turns an enqueue failure into a post-response event with nothing to retry it, i.e. a campaign
+stuck `scheduled`. `scheduledAt` travels in the event as a per-request nonce: the claim and
+`onFailure` only act when `campaigns.scheduled_at` still equals it, so an event from a rolled-back
+or superseded request can neither send nor fail a newer one. Cost if wrong: a send whose COMMIT
+fails after the event went out burns up to 5 job attempts on a campaign that stays `draft`.
+
+**Ruling EC-5 — the storefront unsubscribe link lands on a confirm page; the GET never
+unsubscribes.** Link scanners (Outlook Safe Links, corporate gateways) and mail-client previews
+fetch GET URLs automatically; an unsubscribe-on-GET would silently withdraw consent for people who
+never clicked. True one-click is the RFC 8058 `List-Unsubscribe-Post` header, which the mailbox
+provider POSTs. Cost if wrong: a subscriber clicking the body link needs one more tap.
+
+**Ruling EC-6 — the legacy newsletter broadcast was fixed for the address leak but NOT migrated
+onto campaigns.** It sent each 50-address chunk as one email with all 50 in `to:`, disclosing every
+subscriber to every other; it now sends 50 separate emails per Resend batch call (same call count).
+It still sends inline, has no unsubscribe link and no cap. Retiring it changes a live merchant
+surface on 3 stores and is outside this change. Cost if wrong: until it is retired or gated behind
+campaigns, a broadcast is an unsubscribable, uncapped bulk send through the platform sender —
+recommended follow-up: hide the broadcast button once `email_campaigns` is on for a store.
+
+**Ruling EC-7 — `CampaignRecipientStatus.bounced` exists but nothing sets it.** There is no Resend
+webhook handler in the API (`grep -rn "email.bounced\|svix" apps/api/src` → none). The value is
+reserved so a later webhook needs no enum migration, and the admin renders it. Cost if wrong: a
+hard-bouncing address stays `sent` and keeps being mailed by later campaigns, which slowly costs
+sender reputation — the next piece of work for this feature.
+
+**Ruling EC-8 — the test send and the AI draft run inline in the request.** Both are one external
+call made by a merchant who is waiting for the result (one Resend send to their own address; one
+Gemini call, quota-capped, the same shape as every other `/stores/:id/ai/*` suggestion route).
+Neither fans out. Cost if wrong: a slow Gemini response holds one tenant transaction open for its
+duration (bounded by the 30s transaction timeout).
+
+**Ruling EC-10 — the migration resets every `email_campaigns` override to OFF, and the feature
+cache moves to a new Redis prefix.** Production had one stale row (palora, `enabled = true`, read-only
+check 2026-09-25) from when the flag was hidden and did nothing; without the reset, palora would have
+live campaign sending the moment this merged. `UPDATE store_features SET enabled = false WHERE
+feature_key = 'email_campaigns'` is the migration's only data write. It only ever sets false, and
+`tests/unit/campaign-migration.test.ts` fails if it is changed to true or removed (mutation-checked).
+`rollback.sql` deliberately does not restore `true`: re-enabling is a manual super-admin toggle.
+`feature.service.ts` `CACHE_PREFIX` moved to `features:store:v2:` so a map cached before the UPDATE
+(TTL 300s) is never read by the new release. Cost if wrong: palora loses an "enabled" flag that never
+did anything, and every store's feature map misses the cache once after deploy (single-flight
+protected).
+
+**Ruling EC-9 — super-admin still bypasses the feature gate.** `requireFeature` lets `super_admin`
+through on every feature by design (`middleware/feature-gate.ts`). A super-admin can therefore
+create and send a campaign for a store whose feature is off — but only by explicitly creating and
+sending one. Cost if wrong: platform staff can send on a merchant's behalf without the merchant
+having enabled the feature.
+
+---
+
 Context: the pre-clone finish program (Ahmad, 2026-09-25): every unfinished
 FWB item is finished before the repo is cloned into Ebda (Whisky 11, Egypt).
 Branch `fix/pre-clone-batch-a`.

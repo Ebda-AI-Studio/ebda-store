@@ -280,7 +280,7 @@ model Store {
   // migration needed. See packages/database/prisma/migrations/
   // 20260925120000_store_pwa_settings_gin for the (JSON-shape-agnostic) index
   // this feature added instead.
-  pwaSettings Json @default("{}") @map("pwa_settings")
+  pwaSettings Json    @default("{}") @map("pwa_settings")
 
   // Blog (Bucket E1, 2026-05-17) — opt-in per store. When false the
   // /blog routes return 404 and BlogCarousel hides on the homepage.
@@ -409,6 +409,8 @@ model Store {
   loyaltyTransactions      LoyaltyTransaction[]
   wishlists                Wishlist[]
   newsletters              NewsletterSubscriber[]
+  campaigns                Campaign[]
+  campaignRecipients       CampaignRecipient[]
   reviews                  Review[]
   returns                  Return[]
   inventoryHistory         InventoryHistory[]
@@ -666,9 +668,10 @@ model Customer {
   /// group must never delete customers.
   groupId String? @map("group_id")
 
-  store     Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  addresses CustomerAddress[]
-  group     CustomerGroup?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  addresses          CustomerAddress[]
+  group              CustomerGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  campaignRecipients CampaignRecipient[]
 
   @@unique([storeId, email])
   // Phone is the primary shopper identity in the GCC — the group-assignment
@@ -2672,12 +2675,115 @@ model NewsletterSubscriber {
   subscribedAt   DateTime  @default(now()) @map("subscribed_at")
   unsubscribedAt DateTime? @map("unsubscribed_at")
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  campaignRecipients CampaignRecipient[]
 
   @@unique([storeId, email])
   @@index([storeId])
   @@index([isActive])
   @@map("newsletter_subscribers")
+}
+
+// ==========================================
+// Email campaigns (D2, 2026-09-25)
+// ==========================================
+//
+// Gated by the per-store `email_campaigns` feature key, which is in NO plan
+// baseline — it resolves OFF for every store until a super-admin enables it.
+// Nothing here sends by itself: a row only reaches Resend after a merchant
+// creates a campaign AND presses send (POST /stores/:id/campaigns/:id/send).
+// Plan: docs/plans/2026-09-25-email-campaigns.md.
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  sent
+  cancelled
+  failed
+}
+
+enum CampaignRecipientStatus {
+  queued
+  sent
+  failed
+  /// Reserved for a provider bounce webhook. Nothing sets it yet — see
+  /// Ruling EC-7 in docs/RULINGS.md.
+  bounced
+  unsubscribed
+}
+
+/// A merchant-composed marketing email. Rendered in the admin at
+/// /stores/[id]/campaigns (list) and /stores/[id]/campaigns/[campaignId].
+model Campaign {
+  id             String         @id @default(uuid())
+  storeId        String         @map("store_id")
+  name           String
+  subject        String
+  subjectAr      String?        @map("subject_ar")
+  /// Sanitized with sanitizeNewsletterHtml on write, and again at send.
+  bodyHtml       String         @map("body_html")
+  bodyHtmlAr     String?        @map("body_html_ar")
+  /// 'subscriber' (each recipient's signup language, else the store default)
+  /// | 'en' | 'ar'. Missing content in the chosen language falls back to the
+  /// other one.
+  localeStrategy String         @default("subscriber") @map("locale_strategy")
+  /// Audience definition. Only `{"source":"newsletter"}` exists: active,
+  /// consented newsletter subscribers of this store.
+  audience       Json           @default("{\"source\":\"newsletter\"}")
+  status         CampaignStatus @default(draft)
+  scheduledAt    DateTime?      @map("scheduled_at")
+  sentAt         DateTime?      @map("sent_at")
+  recipientCount Int            @default(0) @map("recipient_count")
+  sentCount      Int            @default(0) @map("sent_count")
+  failedCount    Int            @default(0) @map("failed_count")
+  /// Machine-readable reason when status = failed (e.g. DAILY_CAP_EXCEEDED).
+  lastError      String?        @map("last_error")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  store      Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  recipients CampaignRecipient[]
+
+  @@index([storeId, createdAt])
+  @@map("campaigns")
+}
+
+/// One address a campaign was (or will be) sent to. UNIQUE(campaignId, email)
+/// is the idempotency key: a retried materialize step cannot add a second row,
+/// and a retried send step skips any row that is no longer `queued`.
+model CampaignRecipient {
+  id                String                  @id @default(uuid())
+  campaignId        String                  @map("campaign_id")
+  storeId           String                  @map("store_id")
+  /// Lowercased + trimmed.
+  email             String
+  subscriberId      String?                 @map("subscriber_id")
+  customerId        String?                 @map("customer_id")
+  /// 'en' | 'ar' — the language this recipient's email was rendered in.
+  locale            String
+  status            CampaignRecipientStatus @default(queued)
+  providerMessageId String?                 @map("provider_message_id")
+  error             String?
+  sentAt            DateTime?               @map("sent_at")
+  unsubscribedAt    DateTime?               @map("unsubscribed_at")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+
+  campaign   Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  store      Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscriber NewsletterSubscriber? @relation(fields: [subscriberId], references: [id], onDelete: SetNull)
+  customer   Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+  // The rolling-24h per-store send cap counts sent rows by sentAt.
+  @@index([storeId, status, sentAt])
+  // FK-only indexes so the subscriber / customer delete RI check does not
+  // sequential-scan this table.
+  @@index([subscriberId])
+  @@index([customerId])
+  @@map("campaign_recipients")
 }
 
 // ==========================================

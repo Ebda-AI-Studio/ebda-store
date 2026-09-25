@@ -243,6 +243,17 @@ export const translations = {
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
   'Powered by Force AI': 'مدعوم من Force AI',
+
+  // Campaign unsubscribe page (/unsubscribe, D2 email campaigns).
+  'Email preferences': 'تفضيلات البريد الإلكتروني',
+  'Stop receiving marketing emails at': 'إيقاف استلام الرسائل التسويقية على',
+  'Order and account emails are not affected.': 'لن تتأثر رسائل الطلبات والحساب.',
+  Unsubscribe: 'إلغاء الاشتراك',
+  'Unsubscribing…': 'جارٍ إلغاء الاشتراك…',
+  'You have been unsubscribed. You will not receive marketing emails from us.':
+    'تم إلغاء اشتراكك. لن تصلك رسائل تسويقية منا بعد الآن.',
+  'This unsubscribe link is invalid.': 'رابط إلغاء الاشتراك هذا غير صالح.',
+  'Something went wrong. Please try again later.': 'حدث خطأ ما. يرجى المحاولة مرة أخرى لاحقاً.',
 } as const;
 
 export type TranslationKey = keyof typeof translations;

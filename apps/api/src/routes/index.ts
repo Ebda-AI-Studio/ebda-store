@@ -40,6 +40,8 @@ import recommendationRoutes from './recommendation.routes';
 import shippingCarrierRoutes from './shipping-carrier.routes';
 import affiliateRoutes from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
+import campaignRoutes from './campaign.routes';
+import campaignPublicRoutes from './campaign-public.routes';
 import onesignalRoutes from './onesignal.routes';
 import storeLayoutRoutes from './store-layout.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
@@ -281,6 +283,12 @@ router.use('/public', affiliateRoutes);
 // sequentially awaited in-request — a large subscriber list can run well
 // past 30s, which would blow the RLS transaction's timeout.
 router.use('/stores', tenantContext, newsletterRoutes);
+// D2 email campaigns. Admin router under a `:storeId` mount so tenantContext
+// really sets the RLS GUCs (unlike the bare '/stores' mounts above); every
+// route inside also requires the `email_campaigns` feature. The public router
+// is the login-free unsubscribe endpoint (store comes from the signed token).
+router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);
+router.use('/public/campaigns', campaignPublicRoutes);
 
 // WBS integration routes (Force AI Store ↔ WBS bridge config).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): handlers

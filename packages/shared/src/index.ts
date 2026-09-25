@@ -8,6 +8,7 @@ export * from './features';
 export * from './plan-baselines';
 export * from './notifications';
 export * from './schemas/location';
+export * from './schemas/campaign';
 export * from './data/kuwait-areas';
 export * from './bundle-pricing';
 export * from './order-lines';

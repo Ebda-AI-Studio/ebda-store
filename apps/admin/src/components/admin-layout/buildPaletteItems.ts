@@ -66,6 +66,7 @@ const PAGE_KEYWORDS: Record<string, string> = {
   'ai-tools': 'ai gemini translate seo bulk autofill ذكاء اصطناعي ترجمة تعبئة تلقائية',
   notifications: 'push alerts onesignal إشعارات تنبيهات',
   newsletter: 'email campaign broadcast نشرة بريدية حملة بريد',
+  campaigns: 'email campaign newsletter marketing send حملات بريد تسويق نشرة إرسال',
   'abandoned-carts': 'cart recovery abandoned سلة متروكة استرداد',
   'marketing-pixels': 'facebook tiktok snapchat google ads tracking بكسل تتبع إعلانات',
   affiliates: 'referral partners commission تسويق بالعمولة شركاء إحالة',

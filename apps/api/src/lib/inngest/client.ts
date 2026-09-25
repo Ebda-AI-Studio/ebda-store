@@ -272,6 +272,18 @@ type GscIngestRequestedEvent = EventPayload & {
   };
 };
 
+// D2 email campaigns: emitted ONLY by POST /stores/:storeId/campaigns/:id/send
+// (a merchant pressing send). `scheduledAt` (ISO) doubles as the per-request
+// nonce — see functions/campaign-send.ts.
+type CampaignSendRequestedEvent = EventPayload & {
+  name: 'campaign/send-requested';
+  data: {
+    campaignId: string;
+    storeId: string;
+    scheduledAt: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -300,7 +312,8 @@ export type AppEvent =
   | BulkAiTagsEvent
   | AccountErasedEvent
   | AnswerEngineScanRequestedEvent
-  | GscIngestRequestedEvent;
+  | GscIngestRequestedEvent
+  | CampaignSendRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

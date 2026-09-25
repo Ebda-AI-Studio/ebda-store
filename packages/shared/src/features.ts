@@ -104,9 +104,8 @@ export interface FeatureDefinition {
    * Hide this feature from the admin features list. The key remains
    * valid in the API/DB so existing rows aren't broken, but merchants
    * can no longer toggle it. Used for:
-   *   1. Features that aren't actually implemented yet (customer_wallet,
-   *      email_campaigns, staff_accounts) — flag them hidden until the
-   *      backing code lands.
+   *   1. Features that aren't actually implemented yet (customer_wallet)
+   *      — flag them hidden until the backing code lands.
    *   2. Platform-level features that are universal and have no
    *      per-store impact (seo, search_autocomplete) — toggling them
    *      did nothing, which was misleading.
@@ -241,11 +240,14 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'email_campaigns',
     name: 'Email Campaigns',
     nameAr: 'حملات البريد الإلكتروني',
-    description: 'Create and send marketing email campaigns to customer segments.',
-    descriptionAr: 'إنشاء وإرسال حملات البريد الإلكتروني التسويقية لشرائح العملاء.',
+    description:
+      'Write bilingual marketing emails and send them to newsletter subscribers who opted in.',
+    descriptionAr: 'كتابة رسائل تسويقية بالعربية والإنجليزية وإرسالها لمشتركي النشرة الذين وافقوا.',
     category: 'marketing',
     tier: 'experimental',
-    hidden: true, // No campaign builder yet — transactional email is separate.
+    // Un-hidden 2026-09-25 (D2): the campaign builder shipped. Still in NO plan
+    // baseline (plan-baselines.ts), so it resolves OFF for every store until a
+    // super-admin StoreFeature override turns it on.
   },
   abandoned_cart: {
     key: 'abandoned_cart',

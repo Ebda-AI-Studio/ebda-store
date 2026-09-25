@@ -56,6 +56,9 @@ const KNOWN_APP_ROUTES = new Set([
   'shipping',
   'wishlist',
   'review',
+  // Campaign-email unsubscribe landing page (D2) — linked from every campaign
+  // email as <storefront>/unsubscribe?token=…, including platform-path stores.
+  'unsubscribe',
   '_next',
   'api',
   'manifest',

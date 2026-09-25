@@ -319,6 +319,8 @@ export {
   AnomalyMetric,
   AnomalySeverity,
   RfmSegment,
+  CampaignStatus,
+  CampaignRecipientStatus,
 } from '@prisma/client';
 
 export { prisma as db };

@@ -69,7 +69,8 @@ type Feature =
   | 'excerpt'
   | 'answer_engine_gemini'
   | 'answer_engine_perplexity'
-  | 'answer_engine_openai';
+  | 'answer_engine_openai'
+  | 'campaign';
 type Lang = 'en' | 'ar';
 
 export type TranslationKind =
@@ -255,6 +256,13 @@ export const sectionContentSchema = z.object({
   kickerAr: z.string().max(200),
   subtitle: z.string().max(600),
   subtitleAr: z.string().max(600),
+});
+
+export const campaignDraftAiSchema = z.object({
+  subject: z.string().max(200),
+  subjectAr: z.string().max(200),
+  bodyHtml: z.string().max(20_000),
+  bodyHtmlAr: z.string().max(20_000),
 });
 
 export const categorizeSchema = z.object({
@@ -538,6 +546,81 @@ export class AIService {
     await recordUsage(
       input.storeId,
       'section',
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false
+    );
+
+    await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
+    return { suggestion: parsed, cached: false };
+  }
+
+  /**
+   * Draft a marketing email (subject + simple HTML body) in EN and AR from a
+   * merchant's one-line brief. Used by the campaign editor's "AI draft"
+   * button (D2). The caller sanitizes the HTML before returning it; the
+   * merchant reviews and edits before anything can be sent.
+   */
+  static async suggestCampaignDraft(input: {
+    storeId: string;
+    brief: string;
+    storeName: string;
+    storeNameAr?: string | null;
+    storeDescription?: string | null;
+    storeDescriptionAr?: string | null;
+  }): Promise<{ suggestion: z.infer<typeof campaignDraftAiSchema>; cached: boolean }> {
+    ensureEnabled();
+
+    const key = cacheKey('campaign', input);
+    const hit = await redis.get(key);
+    if (hit) {
+      await recordUsage(input.storeId, 'campaign', 0, 0, true);
+      return { suggestion: JSON.parse(hit) as z.infer<typeof campaignDraftAiSchema>, cached: true };
+    }
+
+    await assertAiQuota({ storeId: input.storeId });
+    await checkBudget(input.storeId);
+
+    const systemInstruction =
+      'You write short marketing emails for Kuwaiti e-commerce stores. Output only valid ' +
+      'JSON matching this shape exactly: {"subject": string, "subjectAr": string, ' +
+      '"bodyHtml": string, "bodyHtmlAr": string}. subject: max 70 chars, no emoji spam, ' +
+      'no ALL CAPS. bodyHtml: 2-4 short paragraphs using ONLY <p>, <h2>, <strong>, <em>, ' +
+      '<ul>, <li> and <a href="https://..."> tags — no <html>/<head>/<body>, no styles, no ' +
+      'images, no scripts. Do not invent prices, discounts, codes, dates or URLs that the ' +
+      'brief does not give; if the brief gives none, write copy that needs none. Do not add ' +
+      'an unsubscribe line (the platform adds one). The Arabic version is natural Gulf-' +
+      'friendly Modern Standard Arabic, not a literal translation. Match how Kuwaiti shoppers ' +
+      'actually talk: warm, professional, no fake hype.';
+
+    const detailLines = [
+      `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
+      input.storeDescription && `About: ${input.storeDescription}`,
+      input.storeDescriptionAr && `About (AR): ${input.storeDescriptionAr}`,
+      `Brief from the merchant: ${input.brief}`,
+    ].filter(Boolean);
+
+    const model = getClient().getGenerativeModel({
+      model: MODEL,
+      systemInstruction,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+    let res;
+    try {
+      res = await model.generateContent(`Write this campaign email:\n\n${detailLines.join('\n')}`);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI campaign draft generation failed');
+    }
+    const raw = stripJsonFences(res.response.text());
+    const parsed = parseAiJson(campaignDraftAiSchema, raw, {
+      storeId: input.storeId,
+      kind: 'campaign draft',
+    });
+
+    const usage = res.response.usageMetadata;
+    await recordUsage(
+      input.storeId,
+      'campaign',
       usage?.promptTokenCount ?? 0,
       usage?.candidatesTokenCount ?? 0,
       false

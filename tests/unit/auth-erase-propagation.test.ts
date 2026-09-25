@@ -63,6 +63,8 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     loyaltyPoints: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     customer: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
     customerAddress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    newsletterSubscriber: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    campaignRecipient: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     $transaction: vi.fn(),
     // `SET LOCAL app.bypass_rls` brackets the addresses delete — see the
     // rls-bypass test below for why removing it silently under-erases.
@@ -291,5 +293,41 @@ describe('AuthService.eraseAccount — the CRM scrub refuses an ambiguous identi
     );
     expect(scrubbed).toEqual(['crm-email']);
     expect(scrubbed).not.toContain('crm-other');
+  });
+});
+
+// D2 (2026-09-25): the newsletter subscription and every email-campaign
+// recipient row for the erased address in THIS store go too — both are keyed
+// by (store, email) with no FK to users, so no userId delete reaches them.
+describe('AuthService.eraseAccount — newsletter + campaign copies', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockPrisma));
+    mockPrisma.oneSignalSubscription.findMany.mockResolvedValue([]);
+    mockPrisma.customer.findMany.mockResolvedValue([]);
+    sendMock.mockResolvedValue({ ids: ['evt-1'] });
+  });
+
+  it('deletes the store-scoped subscriber and recipient rows by lowercased email', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      ...CUSTOMER,
+      email: '  Shopper@Example.com ',
+      phone: null,
+    });
+
+    await AuthService.eraseAccount(CUSTOMER.id);
+
+    const where = { storeId: CUSTOMER.storeId, email: 'shopper@example.com' };
+    expect(mockPrisma.newsletterSubscriber.deleteMany).toHaveBeenCalledWith({ where });
+    expect(mockPrisma.campaignRecipient.deleteMany).toHaveBeenCalledWith({ where });
+  });
+
+  it('touches neither table when the account has no email', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ ...CUSTOMER, email: null, phone: '9655' });
+
+    await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(mockPrisma.newsletterSubscriber.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.campaignRecipient.deleteMany).not.toHaveBeenCalled();
   });
 });

@@ -70,6 +70,7 @@ export type HubLabels = {
   marketingPixels: string;
   notifications: string;
   newsletter: string;
+  campaigns: string;
   affiliates: string;
   abandonedCarts: string;
   paymentAbandonments: string;
@@ -184,6 +185,7 @@ export const HUBS: HubDefinition[] = [
       '/marketing-pixels',
       '/notifications',
       '/newsletter',
+      '/campaigns',
       '/affiliates',
       '/abandoned-carts',
       '/payment-abandonments',
@@ -195,6 +197,10 @@ export const HUBS: HubDefinition[] = [
       { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.newsletter, href: `/stores/${storeId}/newsletter` },
+      // Feature-gated (`email_campaigns` is in NO plan baseline) via
+      // useRequireFeature('email_campaigns') — same "tab always renders,
+      // the page itself gates" pattern as bundles/coupons/loyalty above.
+      { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },
       { label: labels.paymentAbandonments, href: `/stores/${storeId}/payment-abandonments` },
       { label: labels.marketingPixels, href: `/stores/${storeId}/marketing-pixels` },

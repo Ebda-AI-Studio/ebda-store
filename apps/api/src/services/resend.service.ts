@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
-import { resolveSender } from './email-sender';
+import { resolveSender, type StoreSenderShape } from './email-sender';
 
 // Resend SDK wrapper — single platform-wide account. Merchant domains
 // live under it as verified senders. See spec at
@@ -32,6 +32,21 @@ function isResendNotFound(error: unknown): boolean {
     e.statusCode === 404 ||
     (typeof e.message === 'string' && /not\s*found/i.test(e.message))
   );
+}
+
+/**
+ * A failed Resend send, carrying the provider's machine-readable error name
+ * (`rate_limit_exceeded`, `validation_error`, …) so a caller can tell a
+ * transient throttle from a permanent per-recipient rejection.
+ */
+export class ResendSendError extends Error {
+  constructor(
+    readonly code: string,
+    message: string
+  ) {
+    super(`Resend send failed: ${message}`);
+    this.name = 'ResendSendError';
+  }
 }
 
 let _client: Resend | null = null;
@@ -318,6 +333,94 @@ export class ResendService {
       throw new Error(`Resend send failed: ${error?.message ?? 'unknown'}`);
     }
     return { id: data.id };
+  }
+
+  /**
+   * One marketing email to ONE address (email campaigns, D2). The caller has
+   * already loaded the store, so this does no DB read per recipient.
+   *
+   * - `to` is a single string on purpose: a marketing send must never put two
+   *   subscribers in one `to:` header (see `sendBrandedBatch`).
+   * - `headers` carries only List-Unsubscribe / List-Unsubscribe-Post, built by
+   *   `campaign.service#listUnsubscribeHeaders` from our own origin + token.
+   * - `idempotencyKey` makes a retried step that already reached Resend a
+   *   no-op on Resend's side (24h window), closing the crash-between-send-and-
+   *   mark gap the recipient-status check cannot see.
+   */
+  static async sendMarketingEmail(
+    store: StoreSenderShape,
+    opts: {
+      to: string;
+      subject: string;
+      html: string;
+      headers?: Record<string, string>;
+      idempotencyKey?: string;
+    }
+  ): Promise<{ id: string }> {
+    const sender = resolveSender(store);
+    const client = ensureClient();
+
+    type SendPayload = Parameters<typeof client.emails.send>[0];
+    const sdkPayload: SendPayload = {
+      from: sender.from,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+    };
+    if (sender.replyTo) sdkPayload.replyTo = sender.replyTo;
+    if (opts.headers) sdkPayload.headers = opts.headers;
+
+    const { data, error } = await client.emails.send(
+      sdkPayload,
+      opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined
+    );
+    if (error || !data) {
+      throw new ResendSendError(error?.name ?? 'unknown', error?.message ?? 'unknown');
+    }
+    return { id: data.id };
+  }
+
+  /**
+   * The same branded email to several addresses as SEPARATE messages — one
+   * address per email, up to 100 per Resend batch call. Used by the legacy
+   * newsletter broadcast, which previously passed a 50-address chunk as one
+   * `to:` array so every subscriber received the other 49 addresses.
+   */
+  static async sendBrandedBatch(
+    storeId: string,
+    opts: { to: string[]; subject: string; html: string; text?: string }
+  ): Promise<{ ids: string[] }> {
+    if (opts.to.length === 0) return { ids: [] };
+    if (opts.to.length > 100) throw new Error('Resend batch accepts at most 100 emails');
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        email: true,
+        emailSenderLocalPart: true,
+        emailDomainStatus: true,
+      },
+    });
+    if (!store) throw new Error(`Store ${storeId} not found`);
+
+    const sender = resolveSender(store);
+    const client = ensureClient();
+    type BatchPayload = Parameters<typeof client.batch.send>[0];
+    const payload: BatchPayload = opts.to.map(address => ({
+      from: sender.from,
+      to: [address],
+      subject: opts.subject,
+      html: opts.html,
+      ...(opts.text ? { text: opts.text } : {}),
+      ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
+    }));
+    const { data, error } = await client.batch.send(payload);
+    if (error || !data) {
+      throw new Error(`Resend batch send failed: ${error?.message ?? 'unknown'}`);
+    }
+    return { ids: (data.data ?? []).map(d => d.id) };
   }
 }
 

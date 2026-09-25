@@ -3,7 +3,11 @@ import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@
 import { redis } from './redis.service';
 import logger from '../lib/logger';
 
-const CACHE_PREFIX = 'features:store:';
+// `v2` (2026-09-25, D2 email campaigns): the 20260925120000 migration resets
+// every `email_campaigns` override to OFF. Maps cached under the old prefix
+// before that UPDATE could still say ON for up to CACHE_TTL; a new prefix means
+// the new release never reads them (they expire on their own).
+const CACHE_PREFIX = 'features:store:v2:';
 const CACHE_TTL = 300; // 5 minutes
 
 class FeatureService {

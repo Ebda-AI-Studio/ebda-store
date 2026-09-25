@@ -270,7 +270,10 @@ router.post(
       const safeHtml = sanitizeNewsletterHtml(body.html);
       const wrappedHtml = renderBrandedShell(safeHtml, storeContext);
 
-      // Send in chunks of 50 (well within Resend's per-call limit)
+      // Send in chunks of 50. Each chunk is ONE Resend batch call carrying 50
+      // SEPARATE emails, one address each. It used to be one email with the
+      // whole chunk in its `to:` header, which showed every subscriber the
+      // other 49 addresses (fixed 2026-09-25 with D2 — Ruling EC-6).
       const CHUNK = 50;
       let sent = 0;
       const errors: string[] = [];
@@ -278,7 +281,7 @@ router.post(
       for (let i = 0; i < emails.length; i += CHUNK) {
         const chunk = emails.slice(i, i + CHUNK);
         try {
-          await ResendService.sendBrandedEmail(storeId, {
+          await ResendService.sendBrandedBatch(storeId, {
             to: chunk,
             subject: body.subject,
             html: wrappedHtml,

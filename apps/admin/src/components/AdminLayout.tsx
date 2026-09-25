@@ -160,6 +160,7 @@ export function AdminLayout({
     marketingPixels: t('hubTabs.marketingPixels'),
     notifications: t('hubTabs.notifications'),
     newsletter: t('hubTabs.newsletter'),
+    campaigns: t('hubTabs.campaigns'),
     affiliates: t('hubTabs.affiliates'),
     abandonedCarts: t('hubTabs.abandonedCarts'),
     paymentAbandonments: t('hubTabs.paymentAbandonments'),

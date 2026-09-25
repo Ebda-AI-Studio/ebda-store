@@ -1,0 +1,280 @@
+'use client';
+
+/**
+ * /stores/[id]/campaigns — email campaign list (D2).
+ *
+ * Feature-gated via `useRequireFeature('email_campaigns')` — the key is in
+ * no plan baseline, so every route in `campaign.routes.ts` 403s
+ * (`FEATURE_DISABLED`) until a super-admin turns it on for this store; the
+ * page renders the upsell gate instead, same pattern as `bundles/page.tsx`.
+ *
+ * Audience is always "active newsletter subscribers who opted in" — there is
+ * no other source (Ruling EC-1, docs/plans/2026-09-25-email-campaigns.md) —
+ * so the header states that plainly rather than implying "customers".
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
+import { useT } from '@/i18n/useT';
+import { formatDateTime } from '@/lib/format';
+import { AdminLayout } from '../../../../components/AdminLayout';
+import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
+import { apiGet, apiPost } from '../../../../lib/api';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+
+type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
+
+interface CampaignListItem {
+  id: string;
+  name: string;
+  status: CampaignStatus;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AudienceInfo {
+  count: number;
+  dailyCap: number;
+  sentLast24h: number;
+  remainingToday: number;
+}
+
+// Colors reused for the status badge — subtle, distinct per status, dark-mode
+// aware (same shape OrderStatusBadge already renders for orders/returns).
+// Plain `as const` (no Record<K,V> annotation) mirrors returns/types.ts'
+// RETURN_COLORS — passed straight into `colorMap`'s `Record<string, ...>`.
+const CAMPAIGN_STATUS_COLORS = {
+  draft: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  scheduled: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
+  sending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  sent: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  cancelled: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
+  failed: { bg: 'bg-destructive/5', text: 'text-destructive', dot: 'bg-destructive' },
+} as const;
+
+// Known lastError codes the send job can leave behind (campaign-send.ts) —
+// translated when recognized (shared `campaigns.errors` namespace, also used
+// by the editor/detail page), shown raw otherwise so a new backend code is
+// still visible rather than silently swallowed.
+const LAST_ERROR_KEYS: Record<string, string> = {
+  DAILY_CAP_EXCEEDED: 'dailyCapExceeded',
+  EMPTY_AUDIENCE: 'emptyAudience',
+  SEND_JOB_FAILED: 'sendJobFailed',
+  ALL_RECIPIENTS_FAILED: 'allRecipientsFailed',
+};
+
+export default function CampaignsListPage() {
+  const { gate } = useRequireFeature('email_campaigns');
+
+  const params = useParams();
+  const router = useRouter();
+  const storeId = params?.id as string;
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
+  const t = useT('campaigns.list');
+  const tErr = useT('campaigns.errors');
+
+  const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [audience, setAudience] = useState<AudienceInfo | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const fetchAudience = useCallback(async () => {
+    const { data } = await apiGet<AudienceInfo>(`/api/v1/stores/${storeId}/campaigns/audience`);
+    if (data) setAudience(data);
+  }, [storeId]);
+
+  const fetchCampaigns = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: err } = await apiGet<{
+      campaigns: CampaignListItem[];
+      nextCursor: string | null;
+    }>(`/api/v1/stores/${storeId}/campaigns`);
+    if (err) {
+      setError(err.message || t('loadFailed'));
+    } else if (data) {
+      setCampaigns(data.campaigns);
+      setNextCursor(data.nextCursor);
+    }
+    setLoading(false);
+  }, [storeId, t]);
+
+  useEffect(() => {
+    if (!storeId) return;
+    void fetchCampaigns();
+    void fetchAudience();
+  }, [storeId, fetchCampaigns, fetchAudience]);
+
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    setLoadingMore(true);
+    const { data, error: err } = await apiGet<{
+      campaigns: CampaignListItem[];
+      nextCursor: string | null;
+    }>(`/api/v1/stores/${storeId}/campaigns?cursor=${nextCursor}`);
+    if (!err && data) {
+      setCampaigns(prev => [...prev, ...data.campaigns]);
+      setNextCursor(data.nextCursor);
+    }
+    setLoadingMore(false);
+  };
+
+  const createCampaign = async () => {
+    setCreating(true);
+    setError(null);
+    const { data, error: err } = await apiPost<{ campaign: { id: string } }>(
+      `/api/v1/stores/${storeId}/campaigns`,
+      { name: t('untitledCampaign') }
+    );
+    setCreating(false);
+    if (err) {
+      setError(err.message || t('createFailed'));
+      return;
+    }
+    if (data?.campaign) {
+      router.push(`/stores/${storeId}/campaigns/${data.campaign.id}`);
+    }
+  };
+
+  const dateCell = (c: CampaignListItem) => {
+    if (c.sentAt) return t('dateSent', { date: formatDateTime(c.sentAt) });
+    if (c.scheduledAt && c.status === 'scheduled') {
+      return t('dateScheduled', { date: formatDateTime(c.scheduledAt) });
+    }
+    return t('dateCreated', { date: formatDateTime(c.createdAt) });
+  };
+
+  const lastErrorText = (code: string | null) => {
+    if (!code) return null;
+    const key = LAST_ERROR_KEYS[code];
+    return key ? tErr(key) : code;
+  };
+
+  if (gate) return gate;
+
+  return (
+    <AdminLayout
+      title={t('title')}
+      subtitle={t('subtitle')}
+      mode="store_admin"
+      storeId={storeId}
+      actions={
+        <button
+          type="button"
+          onClick={() => void createCampaign()}
+          disabled={creating}
+          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {creating ? t('creating') : t('newCampaign')}
+        </button>
+      }
+    >
+      <div className="mx-auto max-w-5xl px-4 py-6">
+        {audience && (
+          <div className="mb-4 rounded-md border border-border bg-muted/30 p-3 text-sm">
+            <p className="font-medium text-foreground">
+              {t('audienceCount', { count: audience.count })}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('audienceExplanation')}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t('audienceRemaining', {
+                remaining: audience.remainingToday,
+                cap: audience.dailyCap,
+              })}
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">{t('loading')}</p>
+        ) : campaigns.length === 0 ? (
+          <div className="rounded-md border border-dashed py-12 text-center">
+            <p className="text-sm font-medium">{t('emptyTitle')}</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{t('emptyBody')}</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="px-3 py-2 text-start font-medium">{t('colName')}</th>
+                  <th className="px-3 py-2 text-start font-medium">{t('colStatus')}</th>
+                  <th className="px-3 py-2 text-start font-medium">{t('colRecipients')}</th>
+                  <th className="px-3 py-2 text-start font-medium">{t('colSent')}</th>
+                  <th className="px-3 py-2 text-start font-medium">{t('colFailed')}</th>
+                  <th className="px-3 py-2 text-start font-medium">{t('colDate')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.map(c => (
+                  <tr key={c.id} className="border-t align-top">
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/stores/${storeId}/campaigns/${c.id}`)}
+                        className="font-medium text-primary hover:underline text-start"
+                      >
+                        {c.name}
+                      </button>
+                      {lastErrorText(c.lastError) && (
+                        <p className="mt-0.5 text-xs text-destructive">
+                          {lastErrorText(c.lastError)}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <OrderStatusBadge
+                        status={c.status}
+                        namespace="campaigns.status"
+                        colorMap={CAMPAIGN_STATUS_COLORS}
+                      />
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">{c.recipientCount}</td>
+                    <td className="px-3 py-2 tabular-nums">{c.sentCount}</td>
+                    <td className="px-3 py-2 tabular-nums">{c.failedCount}</td>
+                    <td className="px-3 py-2 text-muted-foreground" dir={isRtl ? 'rtl' : 'ltr'}>
+                      {dateCell(c)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {nextCursor && (
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              className="rounded-md border px-4 py-2 text-sm hover:bg-muted disabled:opacity-50"
+            >
+              {loadingMore ? t('loading') : t('loadMore')}
+            </button>
+          </div>
+        )}
+      </div>
+    </AdminLayout>
+  );
+}
