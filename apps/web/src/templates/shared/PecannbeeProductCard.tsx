@@ -31,7 +31,7 @@ import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
-import { getDiscountBadgeColor, getDiscountBadgePosition } from './discount-badge';
+import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, resolveCardBadges } from './custom-badge';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
@@ -186,27 +186,33 @@ function PecannbeeProductCardImpl({
     nameCase,
     viewOnly,
   } = resolveProductCardDefaults(layout);
-  // Discount/sale badge — merchant-configurable corner + color. Unset
-  // position defaults to bottom-left (physical, not RTL-mirrored).
-  const discountBadgePositionCls = getDiscountBadgePosition(
-    defaults?.discountBadge?.position,
-    isRtl
-  );
+  // Discount/sale + custom badge — merchant-configurable corner + color.
+  // `resolveCardBadges` is the SINGLE owner of both chips' final render
+  // corner: it suppresses the custom badge when the product isn't
+  // orderable, suppresses the DISCOUNT badge when both would land on the
+  // same physical corner, and (issues #1609/#1611/#548) moves either chip
+  // off whichever corner the wishlist heart occupies. `topStartReserved`
+  // is always true here — PecannbeeProductCard's heart is the one theme
+  // surface anchored at top-start (every other theme's heart, when it has
+  // one, is top-end); there is no compare button on this card.
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
-  // Custom (merchant-authored) badge — the free text the merchant typed on
-  // the product itself. `resolveCardBadges` is the SINGLE owner of the mutex
-  // between this chip and the discount chip: it suppresses the custom badge
-  // when the product isn't orderable, and suppresses the DISCOUNT badge when
-  // both would land on the same physical corner. No label = both values fall
-  // back to today's behaviour exactly.
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
-  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+  const {
+    customBadgeText,
+    discountBadgeAllowed,
+    customBadgePositionCls,
+    discountBadgePositionCls,
+  } = resolveCardBadges({
     discountVisible: Boolean(onSale && discountBadgeText),
     product,
     isRtl,
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    topStartReserved: true,
+    // No bottom-band CTA overlay here — Pecannbee's Add-to-Cart button is a
+    // normal block element below the name/price, not an image overlay.
+    bottomOverlay: 'none',
   });
 
   // CTA shape + size classes (additive — '' when unset so pack styles win).
@@ -360,6 +366,10 @@ function PecannbeeProductCardImpl({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
+            // Issue #548 — same reservation as the badge mutex above: this
+            // card's heart is at top-start, so an OOS pill left at its
+            // top-start default must move off it, not just narrow in place.
+            topStartReserved
           />
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
               badge (z-10) and above the product image. */}

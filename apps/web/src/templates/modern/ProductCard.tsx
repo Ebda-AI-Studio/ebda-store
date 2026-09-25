@@ -20,7 +20,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
-import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
+import { getDiscountBadgeColor } from '../shared/discount-badge';
 import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
@@ -140,27 +140,36 @@ function ModernProductCard({
     nameCase,
     viewOnly,
   } = resolveProductCardDefaults(layout);
-  // Discount/sale badge — merchant-configurable corner + color. Unset
-  // position defaults to bottom-left (physical, not RTL-mirrored).
-  const discountBadgePositionCls = getDiscountBadgePosition(
-    defaults?.discountBadge?.position,
-    isRtl
-  );
+  // Discount/sale + custom badge — merchant-configurable corner + color.
+  // `resolveCardBadges` is the SINGLE owner of both chips' final render
+  // corner (issues #1609/#1611/#548): it suppresses the custom badge when
+  // the product isn't orderable, suppresses the DISCOUNT badge when both
+  // would land on the same physical corner, and moves either chip off
+  // whichever corner the wishlist heart / compare button occupies, and off
+  // the bottom band the mobile quick-add CTA always renders.
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
-  // Custom (merchant-authored) badge — the free text the merchant typed on
-  // the product itself. `resolveCardBadges` is the SINGLE owner of the mutex
-  // between this chip and the discount chip: it suppresses the custom badge
-  // when the product isn't orderable, and suppresses the DISCOUNT badge when
-  // both would land on the same physical corner. No label = both values fall
-  // back to today's behaviour exactly.
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
-  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+  const {
+    customBadgeText,
+    discountBadgeAllowed,
+    customBadgePositionCls,
+    discountBadgePositionCls,
+  } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
     isRtl,
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    // Compare button renders at top-start; the wishlist heart (below)
+    // renders at top-end whenever it — or its wishlist-page substitute,
+    // RemoveFromWishlistButton — is shown.
+    topStartReserved: Boolean(onToggleCompare),
+    topEndReserved: Boolean(onRemoveFromWishlist || onAddToWishlist !== undefined),
+    // The mobile quick-add CTA band below is an unconditional full-width
+    // overlay (hidden only via a `lg:` desktop hover state, never removed
+    // from the DOM), so it reserves the whole bottom edge.
+    bottomOverlay: 'both',
   });
 
   return (
@@ -320,6 +329,8 @@ function ModernProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
+            topStartReserved={Boolean(onToggleCompare)}
+            topEndReserved={Boolean(onRemoveFromWishlist || onAddToWishlist !== undefined)}
           />
 
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS

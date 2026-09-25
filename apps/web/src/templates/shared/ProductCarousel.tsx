@@ -30,7 +30,7 @@ import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
-import { getDiscountBadgeColor, getDiscountBadgePosition } from './discount-badge';
+import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, resolveCardBadges } from './custom-badge';
 
 /**
@@ -129,16 +129,11 @@ export function ProductCarousel({
     nameCase,
     viewOnly,
   } = resolveProductCardDefaults(layout);
-  // Discount/sale badge — merchant-configurable corner + color. Unset
-  // position defaults to bottom-left (physical, not RTL-mirrored).
-  const discountBadgePositionCls = getDiscountBadgePosition(
-    cardDefaults?.discountBadge?.position,
-    isRtl
-  );
+  // Discount/sale + custom badge styling — the per-product FINAL corner
+  // decision (`resolveCardBadges`) happens inside the map below, since it
+  // depends on that product's own label + stock state AND (issue #1609)
+  // whether quick-add will actually render for THIS product.
   const discountBadgeColor = getDiscountBadgeColor(cardDefaults?.discountBadge?.color, store.theme);
-  // Custom (merchant-authored) badge styling — the per-product decision
-  // (`resolveCardBadges`) happens inside the map below, since it depends on
-  // that product's own label + stock state.
   const customBadgeColor = getCustomBadgeColor(cardDefaults?.customBadge?.color, store.theme);
   // Build CTA extra classes for inline carousel CTA buttons.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
@@ -344,17 +339,31 @@ export function ProductCarousel({
               // Task 13: backorder-aware orderable signal.
               const orderable = inStock || product.acceptsBackorder === true;
               const showNewBadge = inStock && isProductNew(product);
+              // Issue #1609 — mirror the EXACT expression the quick-add
+              // button below renders on, so a badge only lifts for a
+              // product that will actually get a quick-add circle overlaid
+              // on it.
+              const showsQuickAddForThisProduct =
+                showQuickAdd && orderable && !hasVariants && !viewOnly && Boolean(onAddToCart);
               // Badge mutex — single owner, same call as every other card
               // path. No label on this product = today's rendering exactly.
-              const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } =
-                resolveCardBadges({
-                  discountVisible: Boolean(onSale && discountBadgeText),
-                  product,
-                  isRtl: isRtl ?? false,
-                  orderable,
-                  customPosition: cardDefaults?.customBadge?.position,
-                  discountPosition: cardDefaults?.discountBadge?.position,
-                });
+              const {
+                customBadgeText,
+                discountBadgeAllowed,
+                customBadgePositionCls,
+                discountBadgePositionCls,
+              } = resolveCardBadges({
+                discountVisible: Boolean(onSale && discountBadgeText),
+                product,
+                isRtl: isRtl ?? false,
+                orderable,
+                customPosition: cardDefaults?.customBadge?.position,
+                discountPosition: cardDefaults?.discountBadge?.position,
+                // The carousel has no heart/compare/remove-wishlist button —
+                // only the quick-add (+) circle, which is corner-only
+                // (logical bottom-end), not a full-width band.
+                bottomOverlay: showsQuickAddForThisProduct ? 'end' : 'none',
+              });
 
               return (
                 <li
@@ -518,10 +527,12 @@ export function ProductCarousel({
                             overlay — Bank Alkahraman pattern. Single tap = add
                             to cart, no PDP navigation. Renders only when
                             opt-in flag is set + in-stock + not a variant
-                            parent + onAddToCart handler present. Position
-                            bottom-end of image so it doesn't fight the
-                            wishlist heart top-start. */}
-                        {showQuickAdd && orderable && !hasVariants && !viewOnly && onAddToCart && (
+                            parent + onAddToCart handler present — the exact
+                            `showsQuickAddForThisProduct` expression above,
+                            which the badge mutex also reads (issue #1609) so
+                            a badge only lifts for a product this button will
+                            actually render on. */}
+                        {showsQuickAddForThisProduct && onAddToCart && (
                           <button
                             type="button"
                             onClick={e => {

@@ -146,9 +146,30 @@ describe('no card may compute its own badge corner', () => {
   it.each(CARD_FILES)('%s takes its corner from resolveCardBadges', file => {
     const src = fs.readFileSync(path.resolve(process.cwd(), file), 'utf-8');
     expect(src).not.toContain('getCustomBadgePosition');
+    // 2026-09-25 (issues #1609/#1611/#548): the discount chip's corner moved
+    // into the same single owner, for the same reason — its collision
+    // avoidance needs both badges' reserved/overlay context in scope.
+    expect(src).not.toContain('getDiscountBadgePosition');
     expect(src).toContain('customBadgePositionCls');
     expect(src).toContain('discountVisible:');
   });
+
+  // `minimal` is the one surface whose discount indicator is inline text,
+  // not a corner chip (`discountOccupiesCorner: false`) — it has no use for
+  // `discountBadgePositionCls`. Every OTHER card file renders the discount
+  // chip as a corner overlay and must take that corner from the same single
+  // owner as the custom chip.
+  const CARD_FILES_WITH_DISCOUNT_CORNER = CARD_FILES.filter(
+    f => !f.includes('/minimal/ProductCard.tsx')
+  );
+
+  it.each(CARD_FILES_WITH_DISCOUNT_CORNER)(
+    '%s takes its discount corner from resolveCardBadges',
+    file => {
+      const src = fs.readFileSync(path.resolve(process.cwd(), file), 'utf-8');
+      expect(src).toContain('discountBadgePositionCls');
+    }
+  );
 
   // `discountVisible` must be the SAME expression the surface renders the chip
   // on. Several cards gate it on their own hasSale/onSale as well as on the

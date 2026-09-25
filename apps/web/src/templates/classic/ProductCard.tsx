@@ -25,7 +25,7 @@ import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
-import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
+import { getDiscountBadgeColor } from '../shared/discount-badge';
 import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
 
 /**
@@ -125,27 +125,34 @@ function ClassicProductCard({
     nameCase,
     viewOnly,
   } = resolveProductCardDefaults(layout);
-  // Discount/sale badge — merchant-configurable corner + color. Unset
-  // position defaults to bottom-left (physical, not RTL-mirrored).
-  const discountBadgePositionCls = getDiscountBadgePosition(
-    defaults?.discountBadge?.position,
-    isRtl
-  );
+  // Discount/sale + custom badge — merchant-configurable corner + color.
+  // `resolveCardBadges` is the SINGLE owner of both chips' final render
+  // corner (issues #1609/#1611/#548): it suppresses the custom badge when
+  // the product isn't orderable, suppresses the DISCOUNT badge when both
+  // would land on the same physical corner, and moves either chip off
+  // whichever corner the compare / remove-from-wishlist button occupies
+  // (classic has no add-to-wishlist heart), and off the bottom band the
+  // mobile quick-add CTA always renders.
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
-  // Custom (merchant-authored) badge — the free text the merchant typed on
-  // the product itself. `resolveCardBadges` is the SINGLE owner of the mutex
-  // between this chip and the discount chip: it suppresses the custom badge
-  // when the product isn't orderable, and suppresses the DISCOUNT badge when
-  // both would land on the same physical corner. No label = both values fall
-  // back to today's behaviour exactly.
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
-  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+  const {
+    customBadgeText,
+    discountBadgeAllowed,
+    customBadgePositionCls,
+    discountBadgePositionCls,
+  } = resolveCardBadges({
     discountVisible: Boolean(hasSale && discountBadgeText),
     product,
     isRtl,
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    topStartReserved: Boolean(onToggleCompare),
+    topEndReserved: Boolean(onRemoveFromWishlist),
+    // The mobile quick-add CTA band below is an unconditional full-width
+    // overlay (hidden only via a `lg:` desktop hover state, never removed
+    // from the DOM), so it reserves the whole bottom edge.
+    bottomOverlay: 'both',
   });
 
   return (
@@ -322,6 +329,8 @@ function ClassicProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
+            topStartReserved={Boolean(onToggleCompare)}
+            topEndReserved={Boolean(onRemoveFromWishlist)}
           />
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
               badge (z-10) and above the product image. */}

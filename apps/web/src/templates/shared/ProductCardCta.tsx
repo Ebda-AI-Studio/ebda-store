@@ -7,6 +7,7 @@ import type { StoreTheme } from '@force/shared';
 import { resolveColor } from '@force/shared';
 import type { CtaShape, CtaSize } from './card-size';
 import { ctaShapeClass, ctaSizeClass, labelShapeClass, oosPlacementClass } from './card-size';
+import { avoidReservedCorner } from './badge-collision';
 
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
@@ -190,6 +191,16 @@ interface OutOfStockRibbonProps {
   oosLabelColor?: string;
   oosLabelTextColor?: string;
   theme?: StoreTheme;
+  /**
+   * Issue #548 — which LOGICAL top corner(s), if any, an action button
+   * (wishlist heart / compare button / remove-from-wishlist button) already
+   * occupies on this surface. Same contract as `resolveCardBadges`'
+   * `topStartReserved`/`topEndReserved` in `custom-badge.ts` — pass the exact
+   * boolean the surface uses to decide whether it renders that button. Both
+   * default to false (no reserved corner — byte-identical to today).
+   */
+  topStartReserved?: boolean;
+  topEndReserved?: boolean;
 }
 
 /**
@@ -222,6 +233,8 @@ export function OutOfStockRibbon({
   oosLabelColor,
   oosLabelTextColor,
   theme,
+  topStartReserved = false,
+  topEndReserved = false,
 }: OutOfStockRibbonProps) {
   if (inStock) return null;
 
@@ -246,7 +259,30 @@ export function OutOfStockRibbon({
     // wishlist heart-collision guard below needs to reserve.
     const labelText =
       (isRtl ? oosLabelTextAr : oosLabelTextEn) ?? (isRtl ? 'نفدت الكمية' : 'Sold Out');
-    const placementCls = oosPlacementClass(oosLabelPlacement);
+
+    // Issue #548 — the guard below used to reserve the heart's footprint on
+    // EVERY top placement via a symmetric max-width, which only actually
+    // clears the heart when the merchant explicitly chose top-end: the
+    // default (unset → top-start) is the SAME corner a heart at top-start
+    // (PecannbeeProductCard) or a compare button occupies, and a max-width
+    // with no matching inset just narrows the pill in place — it still
+    // starts under the heart. Fixed the same way `custom-badge.ts` fixes
+    // the sale/custom chips: resolve the NAMED placement, then move it off
+    // whichever logical top corner is actually reserved on this surface
+    // (falling to the bottom, same side, if both top corners are taken).
+    const namedPlacement = oosLabelPlacement ?? 'top-start';
+    const [namedV, namedH] = namedPlacement.split('-') as ['top' | 'bottom', 'start' | 'end'];
+    const avoidedPlacement = avoidReservedCorner<'start' | 'end'>({
+      v: namedV,
+      h: namedH,
+      otherH: namedH === 'start' ? 'end' : 'start',
+      hReserved: namedH === 'start' ? topStartReserved : topEndReserved,
+      otherHReserved: namedH === 'start' ? topEndReserved : topStartReserved,
+    });
+    const finalPlacement = `${avoidedPlacement.v}-${avoidedPlacement.h}` as NonNullable<
+      OutOfStockRibbonProps['oosLabelPlacement']
+    >;
+    const placementCls = oosPlacementClass(finalPlacement);
     const shapeCls = labelShapeClass(oosLabelShape);
     // Defaults match the admin ColorField inheritFromToken hints (muted bg /
     // foreground text) so an UNSET color renders the same token the merchant saw
@@ -260,19 +296,16 @@ export function OutOfStockRibbon({
         ? resolveColor(oosLabelTextColor, theme)
         : 'hsl(var(--foreground))';
 
-    // Wishlist-heart collision guard (2026-07-10, pecannbee live bug): the
-    // heart button is a fixed 40px circle inset ~12px from a TOP corner on
-    // every card that has one (PecannbeeProductCard / elegant / modern). On
-    // compact cards (110-200px wide) a wide EN badge placed in the corner
-    // OPPOSITE the heart can still physically reach into the heart's
-    // footprint and get clipped behind it — confirmed live: 'OUT OF STOCK'
-    // (~100px) overlapped the heart by ~12px while the shorter Arabic
-    // equivalent (~68px) cleared it by ~20px. Reserve the heart's footprint
-    // on any top-row placement so the pill can never grow into it; truncate
-    // as a last resort for a merchant's very long custom text. Bottom
-    // placements skip the guard — the heart never lives there.
-    const isTopPlacement = !oosLabelPlacement || oosLabelPlacement.startsWith('top');
-    const collisionGuardCls = isTopPlacement ? 'max-w-[calc(100%-3.5rem)] truncate' : '';
+    // Width safety net (2026-07-10, pecannbee live bug, narrowed scope
+    // 2026-09-25 per issue #548): even after the corner-avoidance above, an
+    // unusually long merchant string on a compact card (110-200px wide)
+    // could still stretch far enough to brush the card's OTHER top corner.
+    // Truncate as a last resort on any top placement — never a substitute
+    // for avoidance, since a plain max-width with no offset does not move
+    // the pill out from under a reserved corner (that was the #548 bug).
+    // Bottom placements skip the guard — no action button ever lives there.
+    const collisionGuardCls =
+      avoidedPlacement.v === 'top' ? 'max-w-[calc(100%-3.5rem)] truncate' : '';
 
     return (
       <span

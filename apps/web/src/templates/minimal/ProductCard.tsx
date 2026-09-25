@@ -149,6 +149,14 @@ function MinimalProductCard({
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
     discountOccupiesCorner: false,
+    // Issues #1609/#1611/#548 — minimal has no add-to-wishlist heart, only
+    // the optional compare (top-start) / remove-from-wishlist (top-end)
+    // buttons, plus the unconditional desktop-hover quick-add band, which
+    // is visible-by-default on mobile (`opacity-100 lg:opacity-0`) so it
+    // reserves the whole bottom edge same as the other 4 themes.
+    topStartReserved: Boolean(onToggleCompare),
+    topEndReserved: Boolean(onRemoveFromWishlist),
+    bottomOverlay: 'both',
   });
 
   return (
@@ -188,6 +196,8 @@ function MinimalProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
+            topStartReserved={Boolean(onToggleCompare)}
+            topEndReserved={Boolean(onRemoveFromWishlist)}
           />
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
               badge (z-10) and above the product image. */}

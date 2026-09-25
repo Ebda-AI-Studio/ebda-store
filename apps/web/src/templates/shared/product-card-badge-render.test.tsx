@@ -448,3 +448,193 @@ describe('custom badge — out of stock on the two non-grid paths', () => {
     expect(renderListItem({ ...oos, ...LABEL })).toBe(renderListItem(oos));
   });
 });
+
+// ── 6. Heart / quick-add collision avoidance, on the REAL wiring ───────────
+//
+// tests/unit/product-badge-heart-collision.test.ts covers the resolver
+// function exhaustively; these render the actual card components so a wrong
+// (or missing) `topStartReserved`/`topEndReserved`/`bottomOverlay` prop on
+// any ONE surface — a copy/paste error the resolver-only tests cannot see —
+// turns red here instead of shipping.
+
+describe('heart collision — PecannbeeProductCard (heart at top-start)', () => {
+  it("a badge explicitly placed at top-right — the heart's RTL corner — moves to top-left", () => {
+    const html = render(
+      PecannbeeProductCard,
+      { ...NO_SALE, ...LABEL },
+      {
+        language: 'ar',
+        layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }),
+      }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 left-3\b/);
+  });
+
+  it('the same top-right choice is untouched in LTR — the heart is on the other side', () => {
+    const html = render(
+      PecannbeeProductCard,
+      { ...NO_SALE, ...LABEL },
+      { layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }) }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 right-3\b/);
+  });
+});
+
+/**
+ * modern's wishlist heart only renders when `onAddToWishlist` is provided
+ * (elegant's renders unconditionally) — the plain `render()` helper above
+ * never passes it, so these two tests need their own small variant that
+ * does, matching how a real page wires an "add to wishlist" handler.
+ */
+function renderWithWishlistHandler(
+  Card: (typeof CARDS)[number][1],
+  product: Record<string, unknown>,
+  { layout = undefined as StoreLayoutSettings | undefined } = {}
+): string {
+  languageState.language = 'en';
+  storeState.layout = layout;
+  return renderToStaticMarkup(
+    React.createElement(Card as never, {
+      product: product as never,
+      isRtl: false,
+      currency: 'KWD',
+      onAddToWishlist: () => {},
+    })
+  );
+}
+
+describe('heart collision — modern/elegant (heart at top-end)', () => {
+  it.each([
+    ['modern/ProductCard', ModernProductCard],
+    ['elegant/ProductCard', ElegantProductCard],
+  ] as const)('%s: a top-left badge is untouched (heart is on the END side)', (_name, Card) => {
+    const html = renderWithWishlistHandler(
+      Card,
+      { ...NO_SALE, ...LABEL },
+      {
+        layout: layoutWith({ position: 'top-left', color: BADGE_COLOR }),
+      }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 left-3\b/);
+  });
+
+  it.each([
+    ['modern/ProductCard', ModernProductCard],
+    ['elegant/ProductCard', ElegantProductCard],
+  ] as const)('%s: a top-right badge (LTR heart corner) moves to top-left', (_name, Card) => {
+    const html = renderWithWishlistHandler(
+      Card,
+      { ...NO_SALE, ...LABEL },
+      {
+        layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }),
+      }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 left-3\b/);
+  });
+
+  it('modern: with NO wishlist handler (heart absent), top-right is untouched', () => {
+    // The plain `render()` helper never passes onAddToWishlist, so modern's
+    // heart does not mount — nothing to avoid.
+    const html = render(
+      ModernProductCard,
+      { ...NO_SALE, ...LABEL },
+      { layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }) }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 right-3\b/);
+  });
+});
+
+describe('bottom-band collision — the 5 theme cards never sit under the mobile CTA (issue #1611)', () => {
+  // PecannbeeProductCard's Add-to-Cart button is a normal block element
+  // below the image, not an overlay, so it is excluded here on purpose —
+  // there is nothing for its badge to lift above.
+  const FIVE_THEMES = CARDS.filter(([name]) => name !== 'shared/PecannbeeProductCard');
+
+  it.each(FIVE_THEMES)(
+    '%s: the default corner lifts above the always-mounted CTA band',
+    (_name, Card) => {
+      const html = render(
+        Card,
+        { ...NO_SALE, ...LABEL },
+        { layout: layoutWith({ color: BADGE_COLOR }) }
+      );
+      const chip = stripBadgeChip(html).chips[0];
+      expect(chip).toMatch(/\bbottom-24\b/);
+      expect(chip).not.toMatch(/\bbottom-3\b/);
+    }
+  );
+
+  it('PecannbeeProductCard: the default corner does NOT lift — no overlay to clear', () => {
+    const html = render(
+      PecannbeeProductCard,
+      { ...NO_SALE, ...LABEL },
+      { layout: layoutWith({ color: BADGE_COLOR }) }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\bbottom-3 right-3\b/);
+  });
+});
+
+describe('quick-add collision — ProductCarousel only lifts the side quick-add occupies (issue #1609)', () => {
+  function renderCarouselWithAddToCart(
+    product: Record<string, unknown>,
+    { layout = undefined as StoreLayoutSettings | undefined } = {}
+  ): string {
+    languageState.language = 'en';
+    storeState.layout = layout;
+    return renderToStaticMarkup(
+      React.createElement(ProductCarousel as never, {
+        products: [product] as never,
+        isRtl: false,
+        currency: 'KWD',
+        onAddToCart: () => {},
+      })
+    );
+  }
+
+  it('quick-add OFF (store flag unset): the default corner never lifts', () => {
+    const html = renderCarouselWithAddToCart(
+      { ...NO_SALE, ...LABEL },
+      { layout: layoutWith({ color: BADGE_COLOR }) }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\bbottom-3 right-3\b/);
+  });
+
+  it('quick-add ON + orderable + no variants: the default corner lifts', () => {
+    storeState.store.theme = { showQuickAdd: true };
+    try {
+      const html = renderCarouselWithAddToCart(
+        { ...NO_SALE, ...LABEL },
+        { layout: layoutWith({ color: BADGE_COLOR }) }
+      );
+      const chip = stripBadgeChip(html).chips[0];
+      expect(chip).toMatch(/\bbottom-24 right-3\b/);
+    } finally {
+      storeState.store.theme = {};
+    }
+  });
+
+  it('quick-add ON but this product has variants (no quick-add button rendered): no lift', () => {
+    storeState.store.theme = { showQuickAdd: true };
+    try {
+      const html = renderCarouselWithAddToCart(
+        {
+          ...NO_SALE,
+          ...LABEL,
+          variants: [{ id: 'v1', name: 'Small', price: 5000 }],
+        },
+        { layout: layoutWith({ color: BADGE_COLOR }) }
+      );
+      const chip = stripBadgeChip(html).chips[0];
+      expect(chip).toMatch(/\bbottom-3 right-3\b/);
+    } finally {
+      storeState.store.theme = {};
+    }
+  });
+});

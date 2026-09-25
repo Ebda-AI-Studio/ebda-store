@@ -12,10 +12,7 @@ import { resolveColor } from '@force/shared';
 import { cn, CartIcon } from '@force/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
-import {
-  getDiscountBadgeColor,
-  getDiscountBadgePosition,
-} from '../../templates/shared/discount-badge';
+import { getDiscountBadgeColor } from '../../templates/shared/discount-badge';
 import { getCustomBadgeColor, resolveCardBadges } from '../../templates/shared/custom-badge';
 
 interface ProductListItemProps {
@@ -79,18 +76,19 @@ export function ProductListItem({
     nameCase,
     viewOnly,
   } = resolveProductCardDefaults(layout);
-  // Discount/sale badge — merchant-configurable corner + color. Unset
-  // position defaults to bottom-left (physical, not RTL-mirrored).
-  const discountBadgePositionCls = getDiscountBadgePosition(
-    defaults?.discountBadge?.position,
-    isRtl
-  );
-  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
-  // Custom (merchant-authored) badge — same single-owner mutex as the grid
+  // Discount/sale + custom badge — same single-owner mutex as the grid
   // cards. `orderable` here is the list view's richer inventory-based signal
-  // computed above, not `product.inStock`.
+  // computed above, not `product.inStock`. No collision inputs needed here:
+  // the list thumbnail has no heart/compare/quick-add overlay (its compare
+  // button and CTA render inline in the content row, not over the image).
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
-  const { customBadgeText, discountBadgeAllowed, customBadgePositionCls } = resolveCardBadges({
+  const {
+    customBadgeText,
+    discountBadgeAllowed,
+    customBadgePositionCls,
+    discountBadgePositionCls,
+  } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
     isRtl,

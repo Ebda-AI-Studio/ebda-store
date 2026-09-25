@@ -156,6 +156,7 @@ describe('resolveCardBadges — rule 1: no label = byte-identical to today', () 
       customBadgeText: null,
       discountBadgeAllowed: true,
       customBadgePositionCls: 'bottom-3 right-3',
+      discountBadgePositionCls: 'bottom-3 left-3',
     });
   });
 
@@ -171,6 +172,7 @@ describe('resolveCardBadges — rule 1: no label = byte-identical to today', () 
       customBadgeText: null,
       discountBadgeAllowed: true,
       customBadgePositionCls: 'bottom-3 left-3',
+      discountBadgePositionCls: 'bottom-3 left-3',
     });
   });
 });

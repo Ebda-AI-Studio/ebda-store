@@ -1,6 +1,7 @@
 import type { StoreTheme } from '@force/shared';
 import { resolveColor } from '@force/shared';
 import { DISCOUNT_BADGE_DEFAULT_POSITION, type DiscountBadgePosition } from './discount-badge';
+import { avoidReservedCorner, type CornerV } from './badge-collision';
 
 /**
  * Custom (merchant-authored) product badge — the free-text chip a merchant
@@ -79,10 +80,78 @@ export function getCustomBadgePosition(
   }
 }
 
-/** Which horizontal edge a corner sits on — the axis the two chips share. */
-function edgeOf(position: CustomBadgePosition): 'top' | 'bottom' {
-  return position.startsWith('top') ? 'top' : 'bottom';
+type PhysicalH = 'left' | 'right';
+
+/** Split a named physical corner ('top-left' etc.) into its v/h parts. */
+function parsePhysicalCorner(position: CustomBadgePosition): { v: CornerV; h: PhysicalH } {
+  const [v, h] = position.split('-') as [CornerV, PhysicalH];
+  return { v, h };
 }
+
+/**
+ * Vertical/horizontal tier a badge renders at, spelled out as full literal
+ * class strings (not composed via template interpolation) so Tailwind's
+ * source-text scanner keeps every rule — the same discipline the codebase
+ * already documents on `getCustomBadgePosition` above.
+ *
+ * `stacked`  — rule 4: this badge shares an edge with the other configured
+ *              badge and must move up/down one row (unchanged from before
+ *              this fix; only ever applied to the custom chip).
+ * `lifted`   — issues #1609/#1611: a quick-add button or the mobile CTA
+ *              band occupies the bottom of THIS corner; move above it.
+ *
+ * The `lifted` offset (96px = `bottom-24`) is a MEASURED value, not a guess:
+ * rendered live via the badge-preview harness (2026-09-25), the 5 theme
+ * cards' mobile CTA band is 44-92px tall at the platform's default 'sm'
+ * card size (170px, `productSizeClass`) — modern 88px, minimal 92px,
+ * classic 51px, elegant/bold 44px. 96px clears the tallest (minimal, 92px)
+ * with a small margin on every theme measured; 64px (the first value tried)
+ * did not clear modern's 88px band at all. `lifted-stacked` adds the same
+ * 36px separation `stacked` alone already used (rule 4), rounded up to the
+ * next Tailwind step for margin.
+ *
+ * KNOWN RESIDUAL: on modern/minimal's default 'sm' size, a card that ALSO
+ * has a wishlist heart (top-end, ~56px footprint) leaves only a ~20-24px
+ * safe vertical band between the heart and the CTA — enough for exactly one
+ * un-stacked badge, not one lifted AND stacked. Neither issue #1609 nor
+ * #1611 describes that compound (heart + sale badge + custom badge +
+ * overlay, all at once) — clearing the CTA band is this tier's job and is
+ * verified 0px in that shape; the heart-adjacent compound case is a
+ * pre-existing tightness between the heart and the CTA band themselves
+ * (both existed before this fix) that static corner-shifting cannot fully
+ * resolve without also changing card sizing or CTA height — out of scope
+ * here. Documented rather than silently left; see the PR description.
+ */
+function topCornerClass(h: PhysicalH, stacked: boolean): string {
+  if (h === 'left') return stacked ? 'top-12 left-3' : 'top-3 left-3';
+  return stacked ? 'top-12 right-3' : 'top-3 right-3';
+}
+
+function bottomCornerClass(h: PhysicalH, stacked: boolean, lifted: boolean): string {
+  if (h === 'left') {
+    if (stacked && lifted) return 'bottom-36 left-3';
+    if (lifted) return 'bottom-24 left-3';
+    if (stacked) return 'bottom-12 left-3';
+    return 'bottom-3 left-3';
+  }
+  if (stacked && lifted) return 'bottom-36 right-3';
+  if (lifted) return 'bottom-24 right-3';
+  if (stacked) return 'bottom-12 right-3';
+  return 'bottom-3 right-3';
+}
+
+/**
+ * Which bottom side(s), if any, a quick-add button or CTA band occupies on
+ * this surface:
+ *   'none' — no bottom-band overlay ever renders over the image on this
+ *            surface (PecannbeeProductCard's CTA is a normal block element
+ *            below the image, not an overlay; same for ProductListItem/PDP).
+ *   'end'  — a corner-only quick-add circle at the logical bottom-END
+ *            (ProductCarousel's Bucket E3 (+) button).
+ *   'both' — a full-width CTA band across the whole bottom edge (the 5
+ *            theme ProductCard.tsx mobile quick-add bar).
+ */
+export type BadgeBottomOverlay = 'none' | 'end' | 'both';
 
 /**
  * Resolve the merchant's custom-badge color (token:* or hex) via
@@ -157,6 +226,34 @@ export interface ResolveCardBadgesInput {
    * not fire and steal the discount badge. Defaults to true.
    */
   discountOccupiesCorner?: boolean;
+  /**
+   * Issues #1609/#1611/#548 — corner-collision avoidance. The wishlist
+   * heart STAYS where each theme already renders it (Ahmad 2026-09-25:
+   * option (a)); every badge instead avoids whichever LOGICAL top corner an
+   * action button already occupies on THIS surface. Pass the exact same
+   * boolean a surface uses to decide whether it renders that button —
+   * these do not default from `product`/`orderable`, they are per-surface
+   * platform facts (which action buttons this template mounts), so getting
+   * them wrong is a copy/paste error, not a data bug.
+   *
+   *   topStartReserved — true when a compare button (`CompareButton`,
+   *     always logical top-start) renders, OR on `PecannbeeProductCard`,
+   *     whose wishlist heart is the one theme surface anchored at
+   *     top-start instead of top-end.
+   *   topEndReserved   — true when a wishlist heart (modern/elegant) or a
+   *     `RemoveFromWishlistButton` (any theme, wishlist page) renders —
+   *     both are logical top-end.
+   *
+   * Both default to false (no reserved corner — byte-identical to today).
+   */
+  topStartReserved?: boolean;
+  topEndReserved?: boolean;
+  /**
+   * Issues #1609/#1611 — which bottom side(s), if any, a quick-add button
+   * or the mobile add-to-cart CTA band occupies on this surface. See
+   * `BadgeBottomOverlay` above. Defaults to `'none'`.
+   */
+  bottomOverlay?: BadgeBottomOverlay;
 }
 
 export interface ResolvedCardBadges {
@@ -169,12 +266,21 @@ export interface ResolvedCardBadges {
    */
   discountBadgeAllowed: boolean;
   /**
-   * Position classes for the custom chip, INCLUDING any stacking offset.
-   * Callers must render from this rather than calling
-   * `getCustomBadgePosition` themselves — the offset is only knowable here,
-   * where both badges' corners are in scope.
+   * Position classes for the custom chip, INCLUDING any stacking offset AND
+   * any heart/quick-add collision avoidance. Callers must render from this
+   * rather than calling `getCustomBadgePosition` themselves — the offset is
+   * only knowable here, where both badges' corners (and the reserved
+   * corners) are in scope.
    */
   customBadgePositionCls: string;
+  /**
+   * Position classes for the discount chip, resolved the same way as
+   * `customBadgePositionCls` (heart/quick-add avoidance, never a stacking
+   * offset — rule 4 only ever moves the custom chip). Callers must render
+   * from this rather than calling `getDiscountBadgePosition` themselves, for
+   * the same single-owner reason.
+   */
+  discountBadgePositionCls: string;
 }
 
 /**
@@ -221,6 +327,9 @@ export function resolveCardBadges({
   discountPosition,
   discountOccupiesCorner = true,
   discountVisible = false,
+  topStartReserved = false,
+  topEndReserved = false,
+  bottomOverlay = 'none',
 }: ResolveCardBadgesInput): ResolvedCardBadges {
   const label = getCustomBadgeText(product, isRtl);
 
@@ -261,14 +370,57 @@ export function resolveCardBadges({
   // `discountBadgeAllowed`, so `bothRender` is false and the same-corner case
   // can never reach here. Mutation testing confirmed the clause was dead — it
   // is left out rather than kept as reassurance no test can hold to account.
-  const sameEdge = edgeOf(resolvedCustom) === edgeOf(resolvedDiscount);
   const bothRender =
     Boolean(customBadgeText) && discountVisible && discountBadgeAllowed && discountOccupiesCorner;
-  const stacked = bothRender && sameEdge;
+
+  // Issues #1609/#1611/#548 — corner-collision avoidance. Convert the two
+  // LOGICAL reserved sides (top-start / top-end, which mirror with reading
+  // direction — that's how every theme renders its heart/compare/remove
+  // button) into the PHYSICAL left/right corners this module renders in.
+  const topLeftReserved = isRtl ? topEndReserved : topStartReserved;
+  const topRightReserved = isRtl ? topStartReserved : topEndReserved;
+  // The quick-add button / CTA band is itself LOGICAL (bottom-end on the
+  // carousel, or the full bottom-band on the 5 theme cards) — same
+  // start/end → left/right conversion.
+  const overlayLeftReserved = bottomOverlay === 'both' || (bottomOverlay === 'end' && isRtl);
+  const overlayRightReserved = bottomOverlay === 'both' || (bottomOverlay === 'end' && !isRtl);
+
+  /** Avoid a reserved top corner only — no stacking/lift yet. */
+  function avoidOnly(named: CustomBadgePosition): { v: CornerV; h: PhysicalH } {
+    const parsed = parsePhysicalCorner(named);
+    return avoidReservedCorner<PhysicalH>({
+      v: parsed.v,
+      h: parsed.h,
+      otherH: parsed.h === 'left' ? 'right' : 'left',
+      hReserved: parsed.h === 'left' ? topLeftReserved : topRightReserved,
+      otherHReserved: parsed.h === 'left' ? topRightReserved : topLeftReserved,
+    });
+  }
+
+  const avoidedCustom = avoidOnly(resolvedCustom);
+  const avoidedDiscount = avoidOnly(resolvedDiscount);
+
+  // Rule 4, recomputed from the POST-avoidance edge rather than the merchant's
+  // NAMED corner: heart/compare avoidance can itself move a badge from top to
+  // bottom (when BOTH top corners are reserved — compare button + heart both
+  // showing), which can newly put it on the same edge as the other badge even
+  // though their named corners never collided. Comparing the resolved edge
+  // catches that case for free — no separate "did avoidance just create a
+  // collision" branch needed.
+  const stacked = bothRender && avoidedCustom.v === avoidedDiscount.v;
+
+  function classFor(avoided: { v: CornerV; h: PhysicalH }, stack: boolean): string {
+    if (avoided.v === 'top') return topCornerClass(avoided.h, stack);
+    const lifted = avoided.h === 'left' ? overlayLeftReserved : overlayRightReserved;
+    return bottomCornerClass(avoided.h, stack, lifted);
+  }
 
   return {
     customBadgeText,
     discountBadgeAllowed,
-    customBadgePositionCls: getCustomBadgePosition(resolvedCustom, isRtl, stacked),
+    customBadgePositionCls: classFor(avoidedCustom, stacked),
+    // Rule 4 only ever lifts the CUSTOM chip (stack=false here) — the
+    // discount chip stays at its base row so the two never both move.
+    discountBadgePositionCls: classFor(avoidedDiscount, false),
   };
 }
