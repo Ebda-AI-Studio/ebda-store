@@ -10,6 +10,7 @@ import { apiGet, apiPost } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useT } from '@/i18n/useT';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface User {
   id: string;
@@ -157,6 +158,92 @@ export default function UsersPage() {
     }
   }
 
+  const columns: DataTableColumn<User>[] = [
+    {
+      header: t('colUser'),
+      primaryOnMobile: true,
+      cell: user => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <span className="text-sm font-bold">
+              {user.firstName[0]}
+              {user.lastName[0]}
+            </span>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">
+              {user.firstName} {user.lastName}
+            </p>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: t('colRole'),
+      mobileBadge: true,
+      cell: user => <Badge variant={roleColors[user.role]}>{t(`role.${user.role}`)}</Badge>,
+    },
+    {
+      header: t('colStatus'),
+      mobileBadge: true,
+      cell: user => <Badge variant={statusColors[user.status]}>{t(`status.${user.status}`)}</Badge>,
+    },
+    {
+      header: t('colStores'),
+      cell: user => (
+        <span className="text-sm text-muted-foreground">
+          {user.stores && user.stores.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {user.stores.slice(0, 2).map(store => (
+                <Link
+                  key={store.id}
+                  href={`/stores/${store.id}`}
+                  className="text-primary hover:underline"
+                >
+                  {store.name}
+                </Link>
+              ))}
+              {user.stores.length > 2 && (
+                <span className="text-muted-foreground">
+                  {t('moreCount', { count: user.stores.length - 2 })}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      header: t('colJoined'),
+      hideOnMobile: true,
+      cell: user => (
+        <span className="text-sm text-muted-foreground">{formatDate(user.createdAt)}</span>
+      ),
+    },
+    {
+      header: t('colLastLogin'),
+      hideOnMobile: true,
+      cell: user => (
+        <span className="text-sm text-muted-foreground">{formatDate(user.lastLoginAt)}</span>
+      ),
+    },
+    {
+      header: t('colActions'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: user => (
+        <Link href={`/users/${user.id}`}>
+          <Button variant="outline" size="sm" className="max-md:min-h-11 max-md:px-4">
+            {t('view')}
+          </Button>
+        </Link>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout
       title={t('title')}
@@ -228,179 +315,52 @@ export default function UsersPage() {
 
       {/* Users Table */}
       {!error && (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden overflow-x-auto">
-          <table className="w-full" aria-label={t('tableLabel')}>
-            <thead className="bg-muted border-b">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  {t('colUser')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  {t('colRole')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  {t('colStatus')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  {t('colStores')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  {t('colJoined')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  {t('colLastLogin')}
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  {t('colActions')}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
-                        <div>
-                          <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-                          <div className="h-3 w-40 bg-muted rounded animate-pulse mt-1" />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-6 w-20 bg-muted rounded animate-pulse" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-6 w-16 bg-muted rounded animate-pulse" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-8 w-16 bg-muted rounded animate-pulse ms-auto" />
-                    </td>
-                  </tr>
-                ))
-              ) : users.length > 0 ? (
-                users.map(user => (
-                  <tr key={user.id} className="hover:bg-muted">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          <span className="text-sm font-bold">
-                            {user.firstName[0]}
-                            {user.lastName[0]}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {user.firstName} {user.lastName}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant={roleColors[user.role]}>{t(`role.${user.role}`)}</Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant={statusColors[user.status]}>
-                        {t(`status.${user.status}`)}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {user.stores && user.stores.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {user.stores.slice(0, 2).map(store => (
-                            <Link
-                              key={store.id}
-                              href={`/stores/${store.id}`}
-                              className="text-primary hover:underline"
-                            >
-                              {store.name}
-                            </Link>
-                          ))}
-                          {user.stores.length > 2 && (
-                            <span className="text-muted-foreground">
-                              {t('moreCount', { count: user.stores.length - 2 })}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {formatDate(user.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {formatDate(user.lastLoginAt)}
-                    </td>
-                    <td className="px-6 py-4 text-end">
-                      <Link href={`/users/${user.id}`}>
-                        <Button variant="outline" size="sm">
-                          {t('view')}
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center">
-                      <svg
-                        className="h-12 w-12 text-muted-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1}
-                          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                        />
-                      </svg>
-                      <p className="mt-4 text-muted-foreground">{t('empty')}</p>
+        <>
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-40 bg-muted rounded animate-pulse" />
                     </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <DataTable<User>
+              columns={columns}
+              rows={users}
+              rowKey={user => user.id}
+              emptyState={
+                <div className="rounded-xl border bg-card shadow-sm px-6 py-12 text-center">
+                  <div className="flex flex-col items-center">
+                    <svg
+                      className="h-12 w-12 text-muted-foreground"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                      />
+                    </svg>
+                    <p className="mt-4 text-muted-foreground">{t('empty')}</p>
+                  </div>
+                </div>
+              }
+            />
+          )}
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between border-t px-6 py-3">
+            <div className="mt-4 flex items-center justify-between rounded-xl border bg-card px-6 py-3 shadow-sm">
               <p className="text-sm text-muted-foreground">
                 {t('paginationShowing', {
                   from: (pagination.page - 1) * pagination.limit + 1,
@@ -428,7 +388,7 @@ export default function UsersPage() {
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
       <Modal
         isOpen={inviteOpen}

@@ -11,6 +11,7 @@ import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useT } from '../../../../i18n/useT';
+import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -285,6 +286,55 @@ export default function AiToolsPage() {
     await fetchMasterJobs(sweep);
     await fetchJobs();
   }
+
+  const recentRunsColumns: DataTableColumn<BulkAiJob>[] = [
+    {
+      header: t('recentRuns.colStarted'),
+      primaryOnMobile: true,
+      cell: j => (
+        <span className="text-muted-foreground">{new Date(j.createdAt).toLocaleString()}</span>
+      ),
+    },
+    {
+      header: t('recentRuns.colKind'),
+      cell: j => <span className="font-medium">{jobKindLabel(j.kind, j.direction, t)}</span>,
+    },
+    {
+      header: t('recentRuns.colStatus'),
+      mobileBadge: true,
+      cell: j => <StatusBadge status={j.status} t={t} />,
+    },
+    {
+      header: t('recentRuns.colFilled'),
+      alignEnd: true,
+      cell: j => <span className="font-medium text-emerald-600">{j.filled}</span>,
+    },
+    {
+      header: t('recentRuns.colSkipped'),
+      alignEnd: true,
+      hideOnMobile: true,
+      cell: j => <span className="text-muted-foreground">{j.skipped}</span>,
+    },
+    {
+      header: t('recentRuns.colFailed'),
+      alignEnd: true,
+      cell: j => <span className="font-medium text-destructive">{j.failed}</span>,
+    },
+    {
+      header: '',
+      alignEnd: true,
+      mobileActions: true,
+      cell: j => (
+        <button
+          type="button"
+          onClick={() => fetchActiveJob(j.id).then(() => undefined)}
+          className="text-xs text-primary hover:underline"
+        >
+          {t('recentRuns.details')}
+        </button>
+      ),
+    },
+  ];
 
   // Render gate (upsell page) for store_admin when feature is disabled.
   // Super-admin always passes through so they can configure the feature.
@@ -607,52 +657,12 @@ export default function AiToolsPage() {
       {/* Recent runs table */}
       <div className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">{t('recentRuns.title')}</h2>
-        {jobs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('recentRuns.empty')}</p>
-        ) : (
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-            <table className="w-full text-sm">
-              <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 text-start">{t('recentRuns.colStarted')}</th>
-                  <th className="px-4 py-3 text-start">{t('recentRuns.colKind')}</th>
-                  <th className="px-4 py-3 text-start">{t('recentRuns.colStatus')}</th>
-                  <th className="px-4 py-3 text-end">{t('recentRuns.colFilled')}</th>
-                  <th className="px-4 py-3 text-end">{t('recentRuns.colSkipped')}</th>
-                  <th className="px-4 py-3 text-end">{t('recentRuns.colFailed')}</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map(j => (
-                  <tr key={j.id} className="border-t">
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(j.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 font-medium">
-                      {jobKindLabel(j.kind, j.direction, t)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={j.status} t={t} />
-                    </td>
-                    <td className="px-4 py-3 text-end font-medium text-emerald-600">{j.filled}</td>
-                    <td className="px-4 py-3 text-end text-muted-foreground">{j.skipped}</td>
-                    <td className="px-4 py-3 text-end font-medium text-destructive">{j.failed}</td>
-                    <td className="px-4 py-3 text-end">
-                      <button
-                        type="button"
-                        onClick={() => fetchActiveJob(j.id).then(() => undefined)}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        {t('recentRuns.details')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable<BulkAiJob>
+          columns={recentRunsColumns}
+          rows={jobs}
+          rowKey={j => j.id}
+          emptyState={<p className="text-sm text-muted-foreground">{t('recentRuns.empty')}</p>}
+        />
       </div>
     </AdminLayout>
   );

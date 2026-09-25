@@ -117,7 +117,7 @@ export default function WhatsAppMasterPage() {
               role="tab"
               aria-selected={activeTab === key}
               onClick={() => switchTab(key)}
-              className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-t ${
+              className={`whitespace-nowrap px-4 py-2.5 max-sm:min-h-11 max-sm:inline-flex max-sm:items-center text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-t ${
                 activeTab === key
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'

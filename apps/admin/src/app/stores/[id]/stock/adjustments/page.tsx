@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { SearchInput } from '@/components/SearchInput';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
@@ -73,6 +74,68 @@ export default function StockAdjustmentsPage() {
     );
   }, [adjustments, search]);
 
+  const columns: DataTableColumn<AdjustmentRow>[] = [
+    {
+      header: t('number'),
+      primaryOnMobile: true,
+      className: 'w-28',
+      cell: adj => <span className="font-mono text-xs">{adj.adjustmentNumber}</span>,
+    },
+    {
+      header: t('type'),
+      className: 'w-32',
+      cell: adj => (
+        <span className="text-muted-foreground">
+          {/* Localized adjustment-type label. */}
+          {t(`types.${adj.type}`)}
+        </span>
+      ),
+    },
+    {
+      header: t('status'),
+      mobileBadge: true,
+      className: 'w-24',
+      cell: adj => {
+        const isDraft = adj.status === 'draft';
+        return (
+          <span
+            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+              isDraft ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+            }`}
+          >
+            {adj.status}
+          </span>
+        );
+      },
+    },
+    {
+      header: t('date'),
+      className: 'w-32',
+      cell: adj => (
+        <span className="text-muted-foreground">
+          {new Date(adj.createdAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      header: t('impact'),
+      alignEnd: true,
+      cell: adj => {
+        const impact = adj.totalValueImpact / 1000;
+        const impactStr = `${impact >= 0 ? '+' : ''}${impact.toFixed(3)}`;
+        return (
+          <span
+            className={`font-mono text-xs font-semibold ${
+              adj.totalValueImpact < 0 ? 'text-red-600' : 'text-green-700'
+            }`}
+          >
+            {impactStr}
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -114,72 +177,16 @@ export default function StockAdjustmentsPage() {
             </button>
           </div>
 
-          {(filteredAdjustments ?? adjustments).length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No stock adjustments yet. Create one with the button above.
-            </p>
-          ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                      {t('number')}
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-32">
-                      {t('type')}
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-24">
-                      {t('status')}
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-32">
-                      {t('date')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                      {t('impact')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(filteredAdjustments ?? adjustments).map(adj => {
-                    const isDraft = adj.status === 'draft';
-                    const impact = adj.totalValueImpact / 1000;
-                    const impactStr = `${impact >= 0 ? '+' : ''}${impact.toFixed(3)}`;
-                    return (
-                      <tr key={adj.id} className="border-t border-border/40">
-                        <td className="px-3 py-2 font-mono text-xs">{adj.adjustmentNumber}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {/* Localized adjustment-type label. */}
-                          {t(`types.${adj.type}`)}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                              isDraft
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}
-                          >
-                            {adj.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {new Date(adj.createdAt).toLocaleDateString()}
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-end font-mono text-xs font-semibold ${
-                            adj.totalValueImpact < 0 ? 'text-red-600' : 'text-green-700'
-                          }`}
-                        >
-                          {impactStr}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable<AdjustmentRow>
+            columns={columns}
+            rows={filteredAdjustments ?? adjustments}
+            rowKey={adj => adj.id}
+            emptyState={
+              <p className="text-muted-foreground text-sm">
+                No stock adjustments yet. Create one with the button above.
+              </p>
+            }
+          />
         </div>
       )}
     </AdminLayout>

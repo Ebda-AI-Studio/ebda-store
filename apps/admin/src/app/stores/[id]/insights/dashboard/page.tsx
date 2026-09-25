@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,32 @@ export default function InsightsDashboardPage() {
   const aovThis = data.aov?.thisPeriodFils ?? 0;
   const aovLast = data.aov?.lastPeriodFils ?? 0;
   const aovChange = aovLast > 0 ? ((aovThis - aovLast) / aovLast) * 100 : 0;
+
+  const topSkusColumns: DataTableColumn<TopSku>[] = [
+    {
+      header: 'SKU',
+      cell: (sku, i) => (
+        <span className="font-mono text-xs text-muted-foreground">{sku.sku ?? `#${i + 1}`}</span>
+      ),
+    },
+    {
+      header: 'Name',
+      primaryOnMobile: true,
+      cell: sku => sku.name,
+    },
+    {
+      header: 'Sold 7d',
+      alignEnd: true,
+      cell: sku => <span className="font-mono">{sku.unitsSold7d}</span>,
+    },
+    {
+      header: 'Velocity',
+      alignEnd: true,
+      cell: sku => (
+        <span className="font-mono text-xs text-muted-foreground">{num(sku.velocity, 2)}/day</span>
+      ),
+    },
+  ];
 
   return (
     <AdminLayout title={t('title')}>
@@ -226,40 +253,11 @@ export default function InsightsDashboardPage() {
                 </span>
               )}
             </div>
-            <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/60 bg-muted/40">
-                    <th className="px-3 py-2 text-start text-xs font-medium text-muted-foreground">
-                      SKU
-                    </th>
-                    <th className="px-3 py-2 text-start text-xs font-medium text-muted-foreground">
-                      Name
-                    </th>
-                    <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                      Sold 7d
-                    </th>
-                    <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                      Velocity
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.topSkus.map((sku, i) => (
-                    <tr key={sku.productId} className="border-b border-border/40 last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                        {sku.sku ?? `#${i + 1}`}
-                      </td>
-                      <td className="px-3 py-2">{sku.name}</td>
-                      <td className="px-3 py-2 text-end font-mono">{sku.unitsSold7d}</td>
-                      <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                        {num(sku.velocity, 2)}/day
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable<TopSku>
+              columns={topSkusColumns}
+              rows={data.topSkus}
+              rowKey={sku => sku.productId}
+            />
           </section>
         )}
       </div>

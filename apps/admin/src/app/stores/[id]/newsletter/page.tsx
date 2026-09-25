@@ -6,6 +6,7 @@ import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 /**
  * Admin newsletter page.
@@ -159,6 +160,45 @@ export default function NewsletterPage() {
     }
   };
 
+  const columns: DataTableColumn<Subscriber>[] = [
+    {
+      header: tTable('email'),
+      primaryOnMobile: true,
+      cell: s => <span className="font-mono text-xs">{s.email}</span>,
+    },
+    {
+      header: tTable('language'),
+      cell: s => <>{s.language || '—'}</>,
+    },
+    {
+      header: tTable('source'),
+      cell: s => <>{s.source || '—'}</>,
+    },
+    {
+      header: tTable('status'),
+      mobileBadge: true,
+      cell: s => (
+        <span
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+            s.isActive
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+              : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          {s.isActive ? tTable('active') : tTable('unsubscribed')}
+        </span>
+      ),
+    },
+    {
+      header: tTable('subscribedAt'),
+      cell: s => (
+        <span className="text-muted-foreground">
+          {new Date(s.subscribedAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout
       title={tPage('title')}
@@ -218,42 +258,7 @@ export default function NewsletterPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left">
-                <tr>
-                  <th className="px-4 py-3 font-medium">{tTable('email')}</th>
-                  <th className="px-4 py-3 font-medium">{tTable('language')}</th>
-                  <th className="px-4 py-3 font-medium">{tTable('source')}</th>
-                  <th className="px-4 py-3 font-medium">{tTable('status')}</th>
-                  <th className="px-4 py-3 font-medium">{tTable('subscribedAt')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subs.map(s => (
-                  <tr key={s.id} className="border-t border-border">
-                    <td className="px-4 py-3 font-mono text-xs">{s.email}</td>
-                    <td className="px-4 py-3">{s.language || '—'}</td>
-                    <td className="px-4 py-3">{s.source || '—'}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          s.isActive
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {s.isActive ? tTable('active') : tTable('unsubscribed')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(s.subscribedAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<Subscriber> columns={columns} rows={subs} rowKey={s => s.id} />
         )}
       </div>
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
+import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { useFeatures } from '@/hooks/useFeatures';
@@ -265,100 +266,108 @@ export default function WarehouseStockPage() {
       {/* Table */}
       {!loading && rows.length > 0 && (
         <>
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3 text-start">{t('colProduct')}</th>
-                  <th className="px-4 py-3 text-start">{t('colSku')}</th>
-                  <th className="px-4 py-3 text-start">{t('colVariant')}</th>
-                  <th className="px-4 py-3 text-end">{t('colQty')}</th>
-                  <th className="px-4 py-3 text-end">{tc('actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map(row => {
+          <DataTable<StockRow>
+            columns={[
+              {
+                header: t('colProduct'),
+                primaryOnMobile: true,
+                cell: row => <span className="font-medium">{row.productName}</span>,
+              },
+              {
+                header: t('colSku'),
+                cell: row => (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {row.variantSku ?? row.productSku ?? '—'}
+                  </span>
+                ),
+              },
+              {
+                header: t('colVariant'),
+                cell: row => (
+                  <span className="text-muted-foreground">{row.variantTitle ?? '—'}</span>
+                ),
+              },
+              {
+                header: t('colQty'),
+                alignEnd: true,
+                cell: row => {
+                  const isEditing = editing[row.id] !== undefined;
+                  return isEditing ? (
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-20 rounded border border-input bg-background px-2 py-1 text-end text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      value={editing[row.id]}
+                      onChange={e => setEditing(ed => ({ ...ed, [row.id]: e.target.value }))}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSetQty(row);
+                        if (e.key === 'Escape')
+                          setEditing(ed => {
+                            const c = { ...ed };
+                            delete c[row.id];
+                            return c;
+                          });
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className="cursor-pointer tabular-nums hover:underline"
+                      onClick={() => setEditing(ed => ({ ...ed, [row.id]: String(row.quantity) }))}
+                      title={t('clickToEdit')}
+                    >
+                      {row.quantity}
+                    </span>
+                  );
+                },
+              },
+              {
+                header: tc('actions'),
+                alignEnd: true,
+                mobileActions: true,
+                cell: row => {
                   const isEditing = editing[row.id] !== undefined;
                   const isSaving = saving[row.id] === true;
-
                   return (
-                    <tr key={row.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium">{row.productName}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {row.variantSku ?? row.productSku ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.variantTitle ?? '—'}</td>
-                      <td className="px-4 py-3 text-end">
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            min={0}
-                            className="w-20 rounded border border-input bg-background px-2 py-1 text-end text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            value={editing[row.id]}
-                            onChange={e => setEditing(ed => ({ ...ed, [row.id]: e.target.value }))}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') handleSetQty(row);
-                              if (e.key === 'Escape')
-                                setEditing(ed => {
-                                  const c = { ...ed };
-                                  delete c[row.id];
-                                  return c;
-                                });
-                            }}
-                            autoFocus
-                          />
-                        ) : (
-                          <span
-                            className="cursor-pointer tabular-nums hover:underline"
-                            onClick={() =>
-                              setEditing(ed => ({ ...ed, [row.id]: String(row.quantity) }))
-                            }
-                            title={t('clickToEdit')}
+                    <div className="flex items-center justify-end gap-1">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => handleSetQty(row)}
+                            disabled={isSaving}
+                            className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
                           >
-                            {row.quantity}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-end">
-                        <div className="flex items-center justify-end gap-1">
-                          {isEditing ? (
-                            <>
-                              <button
-                                onClick={() => handleSetQty(row)}
-                                disabled={isSaving}
-                                className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
-                              >
-                                {isSaving ? tc('saving') : tc('save')}
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setEditing(ed => {
-                                    const c = { ...ed };
-                                    delete c[row.id];
-                                    return c;
-                                  })
-                                }
-                                className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
-                              >
-                                {tc('cancel')}
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => setAdjustModal({ row, delta: 0, reason: '' })}
-                              className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
-                            >
-                              {t('adjust')}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            {isSaving ? tc('saving') : tc('save')}
+                          </button>
+                          <button
+                            onClick={() =>
+                              setEditing(ed => {
+                                const c = { ...ed };
+                                delete c[row.id];
+                                return c;
+                              })
+                            }
+                            className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
+                          >
+                            {tc('cancel')}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setAdjustModal({ row, delta: 0, reason: '' })}
+                          className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
+                        >
+                          {t('adjust')}
+                        </button>
+                      )}
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                },
+              },
+            ]}
+            rows={rows}
+            rowKey={row => row.id}
+          />
 
           {/* Pagination */}
           {totalPages > 1 && (

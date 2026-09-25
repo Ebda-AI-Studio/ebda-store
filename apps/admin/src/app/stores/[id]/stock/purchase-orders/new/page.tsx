@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
@@ -97,6 +98,89 @@ export default function NewPurchaseOrderPage() {
   }
 
   const subtotalFils = lines.reduce((acc, l) => acc + lineTotal(l), 0);
+
+  const lineColumns: DataTableColumn<POLineItem>[] = [
+    {
+      header: 'Product',
+      primaryOnMobile: true,
+      cell: (line, i) => (
+        <select
+          value={line.productId}
+          onChange={e => updateLine(i, { productId: e.target.value })}
+          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+        >
+          <option value="">— Select product —</option>
+          {products.map(p => (
+            <option key={p.id} value={p.id}>
+              {p.sku ? `[${p.sku}] ` : ''}
+              {p.name}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      header: tNew('qty'),
+      alignEnd: true,
+      className: 'w-24',
+      cell: (line, i) => (
+        <input
+          type="number"
+          min="1"
+          step="1"
+          value={line.qty}
+          onChange={e => updateLine(i, { qty: e.target.value })}
+          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          placeholder="1"
+        />
+      ),
+    },
+    {
+      header: tNew('unitCost'),
+      alignEnd: true,
+      className: 'w-36',
+      cell: (line, i) => (
+        <input
+          type="number"
+          min="0"
+          step="0.001"
+          value={line.unitCost}
+          onChange={e => updateLine(i, { unitCost: e.target.value })}
+          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          placeholder="0.000"
+        />
+      ),
+    },
+    {
+      header: tNew('lineTotal'),
+      alignEnd: true,
+      className: 'w-32',
+      cell: line => {
+        const lt = lineTotal(line);
+        return (
+          <span className="font-mono text-xs text-muted-foreground">
+            {lt > 0 ? formatPrice(lt) : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      header: '',
+      alignEnd: true,
+      mobileActions: true,
+      className: 'w-10 text-center',
+      cell: (_line, i) => (
+        <button
+          type="button"
+          onClick={() => removeLine(i)}
+          disabled={lines.length <= 1}
+          className="text-red-600 disabled:opacity-30 hover:underline text-xs max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+        >
+          ✕
+        </button>
+      ),
+    },
+  ];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -206,94 +290,14 @@ export default function NewPurchaseOrderPage() {
         </div>
 
         {/* Line items */}
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30">
-              <tr>
-                <th className="text-start px-3 py-2 font-medium text-muted-foreground">Product</th>
-                <th className="text-end px-3 py-2 w-24 font-medium text-muted-foreground">
-                  {tNew('qty')}
-                </th>
-                <th className="text-end px-3 py-2 w-36 font-medium text-muted-foreground">
-                  {tNew('unitCost')}
-                </th>
-                <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
-                  {tNew('lineTotal')}
-                </th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line, i) => {
-                const lt = lineTotal(line);
-                return (
-                  <tr key={i} className="border-t border-border/40">
-                    <td className="px-3 py-2">
-                      <select
-                        value={line.productId}
-                        onChange={e => updateLine(i, { productId: e.target.value })}
-                        className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
-                      >
-                        <option value="">— Select product —</option>
-                        {products.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.sku ? `[${p.sku}] ` : ''}
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={line.qty}
-                        onChange={e => updateLine(i, { qty: e.target.value })}
-                        className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
-                        placeholder="1"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.001"
-                        value={line.unitCost}
-                        onChange={e => updateLine(i, { unitCost: e.target.value })}
-                        className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
-                        placeholder="0.000"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                      {lt > 0 ? formatPrice(lt) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => removeLine(i)}
-                        disabled={lines.length <= 1}
-                        className="text-red-600 disabled:opacity-30 hover:underline text-xs"
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="bg-muted/20 border-t border-border">
-              <tr>
-                <td colSpan={3} className="px-3 py-2 text-end text-sm font-medium">
-                  {tNew('subtotal')}
-                </td>
-                <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
-                  {formatPrice(subtotalFils)}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
+        <div>
+          <DataTable<POLineItem> columns={lineColumns} rows={lines} rowKey={(_l, i) => String(i)} />
+          {/* DataTable has no footer concept, so the subtotal is a summary bar
+              right below the table — visible on both layouts. */}
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+            <span>{tNew('subtotal')}</span>
+            <span className="font-mono font-semibold">{formatPrice(subtotalFils)}</span>
+          </div>
         </div>
 
         <div>

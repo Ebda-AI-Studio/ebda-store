@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { HelpTip } from '@/components/HelpTip';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@force/shared';
@@ -151,6 +152,61 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
     : 0;
   const errorRowCount = parseResult ? Object.keys(parseResult.errors).length : 0;
 
+  const previewColumns: DataTableColumn<StockAdjustParsedRow>[] = parseResult
+    ? [
+        {
+          header: '#',
+          hideOnMobile: true,
+          cell: row => <span className="text-muted-foreground">{row.rowNumber}</span>,
+        },
+        {
+          header: 'SKU',
+          primaryOnMobile: true,
+          cell: row => <span className="font-mono">{row.sku ?? '—'}</span>,
+        },
+        {
+          header: 'Barcode',
+          cell: row => <span className="font-mono">{row.barcode ?? '—'}</span>,
+        },
+        {
+          header: 'New Qty',
+          alignEnd: true,
+          cell: row => (
+            <span className="font-mono">{row.newQuantity !== null ? row.newQuantity : '—'}</span>
+          ),
+        },
+        {
+          header: 'Delta',
+          alignEnd: true,
+          cell: row => (
+            <span className="font-mono">
+              {row.delta !== null ? (row.delta >= 0 ? `+${row.delta}` : row.delta) : '—'}
+            </span>
+          ),
+        },
+        {
+          header: 'Reason',
+          hideOnMobile: true,
+          cell: row => <span className="truncate max-w-[120px] block">{row.reason ?? '—'}</span>,
+        },
+        {
+          header: 'Status',
+          mobileBadge: true,
+          cell: row => {
+            const rowErrors = parseResult.errors[row.rowNumber];
+            const isError = Boolean(rowErrors?.length);
+            return isError ? (
+              <span className="text-destructive font-medium" title={rowErrors?.join('; ')}>
+                Error
+              </span>
+            ) : (
+              <span className="text-[hsl(var(--success))]">OK</span>
+            );
+          },
+        },
+      ]
+    : [];
+
   return (
     <div className="space-y-5">
       {/* Instructions card */}
@@ -276,66 +332,19 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
 
       {/* Parse preview */}
       {parseResult && parseResult.rows.length > 0 && (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="px-3 py-2 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground">
+        <div className="space-y-2">
+          <div className="px-1 text-xs font-medium text-muted-foreground">
             Preview — first {Math.min(parseResult.rows.length, 50)} rows
             {parseResult.rows.length > 50 && ` (of ${parseResult.rows.length})`}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border/40">
-                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">#</th>
-                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">SKU</th>
-                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">
-                    Barcode
-                  </th>
-                  <th className="text-end px-3 py-2 text-muted-foreground font-medium">New Qty</th>
-                  <th className="text-end px-3 py-2 text-muted-foreground font-medium">Delta</th>
-                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">Reason</th>
-                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {parseResult.rows.slice(0, 50).map((row: StockAdjustParsedRow) => {
-                  const rowErrors = parseResult.errors[row.rowNumber];
-                  const isError = Boolean(rowErrors?.length);
-                  return (
-                    <tr
-                      key={row.rowNumber}
-                      className={`border-t border-border/30 ${isError ? 'bg-destructive/5' : ''}`}
-                    >
-                      <td className="px-3 py-1.5 text-muted-foreground">{row.rowNumber}</td>
-                      <td className="px-3 py-1.5 font-mono">{row.sku ?? '—'}</td>
-                      <td className="px-3 py-1.5 font-mono">{row.barcode ?? '—'}</td>
-                      <td className="px-3 py-1.5 text-end font-mono">
-                        {row.newQuantity !== null ? row.newQuantity : '—'}
-                      </td>
-                      <td className="px-3 py-1.5 text-end font-mono">
-                        {row.delta !== null ? (row.delta >= 0 ? `+${row.delta}` : row.delta) : '—'}
-                      </td>
-                      <td className="px-3 py-1.5 truncate max-w-[120px]">{row.reason ?? '—'}</td>
-                      <td className="px-3 py-1.5">
-                        {isError ? (
-                          <span
-                            className="text-destructive font-medium"
-                            title={rowErrors?.join('; ')}
-                          >
-                            Error
-                          </span>
-                        ) : (
-                          <span className="text-[hsl(var(--success))]">OK</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<StockAdjustParsedRow>
+            columns={previewColumns}
+            rows={parseResult.rows.slice(0, 50)}
+            rowKey={row => String(row.rowNumber)}
+          />
           {/* Row-level errors */}
           {errorRowCount > 0 && (
-            <div className="border-t border-border p-3 bg-destructive/5">
+            <div className="rounded-xl border border-border p-3 bg-destructive/5">
               <p className="text-xs font-medium text-destructive mb-1">
                 Row errors (skipped during import):
               </p>
@@ -475,6 +484,59 @@ export default function NewStockAdjustmentPage() {
   function removeItem(i: number) {
     setItems(cur => (cur.length <= 1 ? cur : cur.filter((_, idx) => idx !== i)));
   }
+
+  const itemColumns: DataTableColumn<ItemDraft>[] = [
+    {
+      header: tNew('selectProduct'),
+      primaryOnMobile: true,
+      cell: (item, i) => (
+        <select
+          value={item.productId}
+          onChange={e => updateItem(i, { productId: e.target.value })}
+          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+        >
+          <option value="">— {tNew('selectProduct')} —</option>
+          {products.map(p => (
+            <option key={p.id} value={p.id}>
+              {p.sku ? `[${p.sku}] ` : ''}
+              {p.name}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      header: tNew('newQty'),
+      alignEnd: true,
+      className: 'w-36',
+      cell: (item, i) => (
+        <input
+          type="number"
+          min="0"
+          step="1"
+          value={item.newQty}
+          onChange={e => updateItem(i, { newQty: e.target.value })}
+          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+        />
+      ),
+    },
+    {
+      header: '',
+      alignEnd: true,
+      mobileActions: true,
+      className: 'w-12 text-center',
+      cell: (_item, i) => (
+        <button
+          type="button"
+          onClick={() => removeItem(i)}
+          disabled={items.length <= 1}
+          className="text-red-600 disabled:opacity-30 hover:underline text-xs max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+        >
+          ✕
+        </button>
+      ),
+    },
+  ];
 
   async function submitDraft() {
     setError(null);
@@ -665,62 +727,11 @@ export default function NewStockAdjustmentPage() {
             </label>
 
             {/* Items table */}
-            <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                      {tNew('selectProduct')}
-                    </th>
-                    <th className="text-end px-3 py-2 w-36 font-medium text-muted-foreground">
-                      {tNew('newQty')}
-                    </th>
-                    <th className="w-12" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, i) => (
-                    <tr key={i} className="border-t border-border/40">
-                      <td className="px-3 py-2">
-                        <select
-                          value={item.productId}
-                          onChange={e => updateItem(i, { productId: e.target.value })}
-                          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
-                        >
-                          <option value="">— {tNew('selectProduct')} —</option>
-                          {products.map(p => (
-                            <option key={p.id} value={p.id}>
-                              {p.sku ? `[${p.sku}] ` : ''}
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={item.newQty}
-                          onChange={e => updateItem(i, { newQty: e.target.value })}
-                          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(i)}
-                          disabled={items.length <= 1}
-                          className="text-red-600 disabled:opacity-30 hover:underline text-xs"
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable<ItemDraft>
+              columns={itemColumns}
+              rows={items}
+              rowKey={(_it, i) => String(i)}
+            />
 
             {/* Add product row */}
             <div>

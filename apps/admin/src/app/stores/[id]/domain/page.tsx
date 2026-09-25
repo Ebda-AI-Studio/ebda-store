@@ -8,6 +8,15 @@ import { Alert } from '../../../../components/Alert';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+
+interface DnsRecordRow {
+  type: string;
+  name: string;
+  value: string;
+  priority?: number;
+  ttl?: string;
+}
 
 export default function StoreDomainPage() {
   const params = useParams();
@@ -324,6 +333,70 @@ export default function StoreDomainPage() {
                 // in then disappeared on every page refresh).
                 const emailVerified = domainStatus?.emailSender?.status === 'verified';
                 const needsDnsRecords = !isFullyLive || !emailVerified;
+                // Cloudflare-for-SaaS uses a single CNAME regardless of apex or
+                // subdomain — the fallback row only appears when the API returned
+                // no records at all (undefined/null), not when it returned an
+                // empty array (matches the original `.map() || fallback` behavior).
+                const dnsRows: DnsRecordRow[] = domainStatus?.dnsRecords ?? [
+                  { type: 'CNAME', name: domain, value: 'cf.force-ai.co' },
+                ];
+                const dnsColumns: DataTableColumn<DnsRecordRow>[] = [
+                  {
+                    header: t('colType'),
+                    mobileBadge: true,
+                    className: 'whitespace-nowrap',
+                    cell: record => <span className="font-mono text-xs">{record.type}</span>,
+                  },
+                  {
+                    header: t('colName'),
+                    primaryOnMobile: true,
+                    className: 'whitespace-nowrap',
+                    cell: record => <span className="font-mono text-xs">{record.name}</span>,
+                  },
+                  {
+                    header: t('colValue'),
+                    cell: record => (
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="flex-1 min-w-0 select-all font-mono text-xs break-all">
+                          {record.value}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(record.value);
+                          }}
+                          className="max-md:min-h-11 max-md:min-w-11 shrink-0 rounded border border-border bg-background px-2 py-0.5 max-md:px-3 text-[10px] font-medium text-foreground hover:bg-muted transition-colors"
+                          aria-label={`Copy ${record.type} value`}
+                          title="Copy"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    ),
+                  },
+                  {
+                    header: t('colPriority'),
+                    className: 'whitespace-nowrap',
+                    cell: record => (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {typeof record.priority === 'number'
+                          ? record.priority
+                          : record.type === 'MX'
+                            ? 10
+                            : '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    header: t('colTtl'),
+                    className: 'whitespace-nowrap',
+                    cell: record => (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {record.ttl ?? '1 Hour'}
+                      </span>
+                    ),
+                  },
+                ];
                 return (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -349,103 +422,12 @@ export default function StoreDomainPage() {
                         <p className="mt-1 text-sm">
                           {isDnsPointingWrong ? t('dnsPointingMessage') : t('dnsInstructions')}
                         </p>
-                        <div className="mt-3 overflow-hidden rounded-md border border-warning/40 bg-background">
-                          <table className="w-full text-sm" aria-label={t('dnsTableLabel')}>
-                            <thead>
-                              <tr className="border-b border-warning/40 bg-warning/10">
-                                <th scope="col" className="px-3 py-2 text-start font-medium">
-                                  {t('colType')}
-                                </th>
-                                <th scope="col" className="px-3 py-2 text-start font-medium">
-                                  {t('colName')}
-                                </th>
-                                <th scope="col" className="px-3 py-2 text-start font-medium">
-                                  {t('colValue')}
-                                </th>
-                                <th scope="col" className="px-3 py-2 text-start font-medium">
-                                  {t('colPriority')}
-                                </th>
-                                <th scope="col" className="px-3 py-2 text-start font-medium">
-                                  {t('colTtl')}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {domainStatus?.dnsRecords?.map((record, i) => (
-                                <tr key={i} className="border-b border-warning/20 last:border-0">
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                    {record.type}
-                                  </td>
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                    {record.name}
-                                  </td>
-                                  <td className="px-3 py-2 font-mono text-xs align-top break-all">
-                                    {/* DKIM TXT values (resend._domainkey) are ~400-char
-                                        base64 strings — without `break-all` the cell
-                                        either truncates with overflow:hidden or runs
-                                        off the right edge of the layout. `align-top`
-                                        keeps short cells (type, name, priority, ttl)
-                                        aligned with the first line of the wrapped value. */}
-                                    <div className="flex items-start justify-between gap-2">
-                                      <span className="flex-1 min-w-0 select-all">
-                                        {record.value}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          void navigator.clipboard.writeText(record.value);
-                                        }}
-                                        className="shrink-0 rounded border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-foreground hover:bg-muted transition-colors"
-                                        aria-label={`Copy ${record.type} value`}
-                                        title="Copy"
-                                      >
-                                        Copy
-                                      </button>
-                                    </div>
-                                  </td>
-                                  {/* MX records require a priority at registrars; for
-                                      all other types the field is left empty so the
-                                      merchant doesn't try to enter something. */}
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                    {typeof record.priority === 'number'
-                                      ? record.priority
-                                      : record.type === 'MX'
-                                        ? 10
-                                        : '—'}
-                                  </td>
-                                  {/* TTL defaults to 1 hour (3600) when the provider
-                                      didn't return one — that's the GoDaddy default
-                                      and the safe value for every DNS record. */}
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                    {record.ttl ?? '1 Hour'}
-                                  </td>
-                                </tr>
-                              )) || (
-                                // Fallback when the API returned no records (e.g. the
-                                // provider is unreachable). Cloudflare-for-SaaS uses a
-                                // single CNAME regardless of apex or subdomain — both
-                                // the domain and its www variant are enrolled as custom
-                                // hostnames pointing at the same fallback origin.
-                                <tr>
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                    CNAME
-                                  </td>
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                    {domain}
-                                  </td>
-                                  <td className="px-3 py-2 font-mono text-xs align-top break-all">
-                                    cf.force-ai.co
-                                  </td>
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                    —
-                                  </td>
-                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                    1 Hour
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                        <div className="mt-3">
+                          <DataTable<DnsRecordRow>
+                            columns={dnsColumns}
+                            rows={dnsRows}
+                            rowKey={(record, i) => `${record.type}-${record.name}-${i}`}
+                          />
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <p className="text-xs opacity-80">{t('dnsPropagation')}</p>

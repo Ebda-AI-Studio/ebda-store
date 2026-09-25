@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,44 @@ export default function InsightsFunnelPage() {
     : [];
 
   const maxStep = steps.reduce((m, s) => Math.max(m, s.value), 1) || 1;
+
+  const sortedDays = data
+    ? [...data.days].sort(
+        (a, b) => new Date(b.periodDate).getTime() - new Date(a.periodDate).getTime()
+      )
+    : [];
+
+  const dailyColumns: DataTableColumn<FunnelDay>[] = [
+    {
+      header: 'Date',
+      primaryOnMobile: true,
+      cell: day => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {day.periodDate.slice(0, 10)}
+        </span>
+      ),
+    },
+    {
+      header: t('carts'),
+      alignEnd: true,
+      cell: day => <span className="font-mono">{day.cartsCreated}</span>,
+    },
+    {
+      header: t('checkouts'),
+      alignEnd: true,
+      cell: day => <span className="font-mono">{day.checkoutsStarted}</span>,
+    },
+    {
+      header: t('completed'),
+      alignEnd: true,
+      cell: day => <span className="font-mono">{day.ordersCompleted}</span>,
+    },
+    {
+      header: t('revenue'),
+      alignEnd: true,
+      cell: day => <span className="font-mono">{filsToKwd(day.revenueFils)}</span>,
+    },
+  ];
 
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
@@ -195,54 +234,11 @@ export default function InsightsFunnelPage() {
             {/* Daily trend table */}
             <section>
               <h2 className="text-base font-semibold mb-3">Daily Breakdown</h2>
-              <div className="rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-max">
-                    <thead>
-                      <tr className="border-b border-border/60 bg-muted/40">
-                        <th className="px-3 py-2 text-start text-xs font-medium text-muted-foreground">
-                          Date
-                        </th>
-                        <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                          {t('carts')}
-                        </th>
-                        <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                          {t('checkouts')}
-                        </th>
-                        <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                          {t('completed')}
-                        </th>
-                        <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                          {t('revenue')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...data.days]
-                        .sort(
-                          (a, b) =>
-                            new Date(b.periodDate).getTime() - new Date(a.periodDate).getTime()
-                        )
-                        .map(day => (
-                          <tr
-                            key={day.periodDate}
-                            className="border-b border-border/40 last:border-0"
-                          >
-                            <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                              {day.periodDate.slice(0, 10)}
-                            </td>
-                            <td className="px-3 py-2 text-end font-mono">{day.cartsCreated}</td>
-                            <td className="px-3 py-2 text-end font-mono">{day.checkoutsStarted}</td>
-                            <td className="px-3 py-2 text-end font-mono">{day.ordersCompleted}</td>
-                            <td className="px-3 py-2 text-end font-mono">
-                              {filsToKwd(day.revenueFils)}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <DataTable<FunnelDay>
+                columns={dailyColumns}
+                rows={sortedDays}
+                rowKey={day => day.periodDate}
+              />
             </section>
           </>
         )}

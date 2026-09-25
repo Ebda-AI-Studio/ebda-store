@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,6 +86,88 @@ export default function InsightsCohortsPage() {
     cellMap.set(`${c.cohortMonth}::${c.periodOffset}`, c);
   }
 
+  const retentionColumns: DataTableColumn<string>[] = [
+    {
+      header: t('monthLabel'),
+      primaryOnMobile: true,
+      cell: month => <span className="font-mono">{month}</span>,
+    },
+    {
+      header: t('customers'),
+      cell: month => {
+        const baseCell = cellMap.get(`${month}::0`);
+        const total = baseCell?.customersTotal ?? 0;
+        return <span className="font-mono">{total}</span>;
+      },
+    },
+    ...offsets.map(
+      (o): DataTableColumn<string> => ({
+        header: (
+          <>
+            {t('periodLabel')} {o}
+          </>
+        ),
+        cell: month => {
+          const baseCell = cellMap.get(`${month}::0`);
+          const total = baseCell?.customersTotal ?? 0;
+          const cell = cellMap.get(`${month}::${o}`);
+          if (!cell) {
+            return <span className="text-muted-foreground/40">—</span>;
+          }
+          const rate = total > 0 ? cell.customersActive / total : 0;
+          return (
+            <span
+              className={`inline-block rounded px-1.5 py-0.5 font-medium ${retentionColor(rate)}`}
+              title={`${cell.customersActive} / ${total} customers active`}
+            >
+              {(rate * 100).toFixed(0)}%
+            </span>
+          );
+        },
+      })
+    ),
+  ];
+
+  const ltvColumns: DataTableColumn<string>[] = [
+    {
+      header: 'Cohort',
+      primaryOnMobile: true,
+      cell: month => <span className="font-mono text-xs">{month}</span>,
+    },
+    {
+      header: 'Customers',
+      alignEnd: true,
+      cell: month => {
+        const baseCell = cellMap.get(`${month}::0`);
+        const total = baseCell?.customersTotal ?? 0;
+        return <span className="font-mono">{total}</span>;
+      },
+    },
+    {
+      header: 'Total Revenue (KWD)',
+      alignEnd: true,
+      cell: month => {
+        const totalRevenue = data.cohorts
+          .filter(c => c.cohortMonth === month)
+          .reduce((sum, c) => sum + c.revenueInPeriod, 0);
+        return <span className="font-mono">{filsToKwd(totalRevenue)}</span>;
+      },
+    },
+    {
+      header: 'LTV / Customer',
+      alignEnd: true,
+      cell: month => {
+        const baseCell = cellMap.get(`${month}::0`);
+        const total = baseCell?.customersTotal ?? 0;
+        const totalRevenue = data.cohorts
+          .filter(c => c.cohortMonth === month)
+          .reduce((sum, c) => sum + c.revenueInPeriod, 0);
+        const ltv = total > 0 ? totalRevenue / total : 0;
+        return <span className="font-mono">{filsToKwd(ltv)}</span>;
+      },
+    },
+  ];
+
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-5xl space-y-6">
@@ -104,68 +187,11 @@ export default function InsightsCohortsPage() {
             {/* Retention matrix */}
             <section>
               <h2 className="text-base font-semibold mb-3">Retention Matrix</h2>
-              <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="text-xs min-w-max">
-                  <thead>
-                    <tr className="border-b border-border/60 bg-muted/40">
-                      <th className="px-3 py-2 text-start font-medium text-muted-foreground sticky left-0 bg-muted/40">
-                        {t('monthLabel')}
-                      </th>
-                      <th className="px-3 py-2 text-center font-medium text-muted-foreground">
-                        {t('customers')}
-                      </th>
-                      {offsets.map(o => (
-                        <th
-                          key={o}
-                          className="px-2 py-2 text-center font-medium text-muted-foreground"
-                        >
-                          {t('periodLabel')} {o}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cohortMonths.map(month => {
-                      const baseCell = cellMap.get(`${month}::0`);
-                      const total = baseCell?.customersTotal ?? 0;
-                      return (
-                        <tr key={month} className="border-b border-border/40 last:border-0">
-                          <td className="px-3 py-2 font-mono sticky left-0 bg-background">
-                            {month}
-                          </td>
-                          <td className="px-3 py-2 text-center font-mono">{total}</td>
-                          {offsets.map(o => {
-                            const cell = cellMap.get(`${month}::${o}`);
-                            if (!cell) {
-                              return (
-                                <td
-                                  key={o}
-                                  className="px-2 py-2 text-center text-muted-foreground/40"
-                                >
-                                  —
-                                </td>
-                              );
-                            }
-                            const rate = total > 0 ? cell.customersActive / total : 0;
-                            return (
-                              <td key={o} className="px-2 py-2 text-center">
-                                <span
-                                  className={`inline-block rounded px-1.5 py-0.5 font-medium ${retentionColor(
-                                    rate
-                                  )}`}
-                                  title={`${cell.customersActive} / ${total} customers active`}
-                                >
-                                  {(rate * 100).toFixed(0)}%
-                                </span>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<string>
+                columns={retentionColumns}
+                rows={cohortMonths}
+                rowKey={month => month}
+              />
               <p className="mt-2 text-xs text-muted-foreground">
                 Cells show % of cohort customers who placed an order in that period. Green = high
                 retention, red = low.
@@ -175,47 +201,7 @@ export default function InsightsCohortsPage() {
             {/* LTV data table (simple) */}
             <section>
               <h2 className="text-base font-semibold mb-3">Cumulative LTV by Cohort</h2>
-              <div className="rounded-xl border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border/60 bg-muted/40">
-                      <th className="px-3 py-2 text-start text-xs font-medium text-muted-foreground">
-                        Cohort
-                      </th>
-                      <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                        Customers
-                      </th>
-                      <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                        Total Revenue (KWD)
-                      </th>
-                      <th className="px-3 py-2 text-end text-xs font-medium text-muted-foreground">
-                        LTV / Customer
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cohortMonths.map(month => {
-                      const baseCell = cellMap.get(`${month}::0`);
-                      const total = baseCell?.customersTotal ?? 0;
-                      // Sum revenue across all offsets
-                      const totalRevenue = data.cohorts
-                        .filter(c => c.cohortMonth === month)
-                        .reduce((sum, c) => sum + c.revenueInPeriod, 0);
-                      const ltv = total > 0 ? totalRevenue / total : 0;
-                      return (
-                        <tr key={month} className="border-b border-border/40 last:border-0">
-                          <td className="px-3 py-2 font-mono text-xs">{month}</td>
-                          <td className="px-3 py-2 text-end font-mono">{total}</td>
-                          <td className="px-3 py-2 text-end font-mono">
-                            {filsToKwd(totalRevenue)}
-                          </td>
-                          <td className="px-3 py-2 text-end font-mono">{filsToKwd(ltv)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<string> columns={ltvColumns} rows={cohortMonths} rowKey={month => month} />
             </section>
           </>
         )}

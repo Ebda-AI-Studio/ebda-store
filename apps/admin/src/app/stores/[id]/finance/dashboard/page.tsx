@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 
@@ -167,6 +168,50 @@ export default function FinanceDashboardPage() {
     totalEquity: 0,
   };
   const netPositive = thisMonth.net >= 0;
+
+  const cashColumns: DataTableColumn<CashAccountRow>[] = [
+    {
+      header: '',
+      hideOnMobile: true,
+      className: 'w-16',
+      cell: row => <span className="font-mono text-xs text-muted-foreground">{row.code}</span>,
+    },
+    {
+      header: '',
+      primaryOnMobile: true,
+      cell: row => (
+        <>
+          {row.nameEn}
+          {row.nameAr && (
+            <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
+              — {row.nameAr}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: '',
+      alignEnd: true,
+      mobileBadge: true,
+      cell: row => {
+        const isNeg = row.balance < 0;
+        return (
+          <span
+            className={isNeg ? 'font-mono text-red-600' : 'font-mono'}
+            title={isNeg ? t('negativeBalanceTooltip') : undefined}
+          >
+            {isNeg && (
+              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-red-100 text-red-700 rounded">
+                !
+              </span>
+            )}
+            {kwd(row.balance)} KWD
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
     <AdminLayout title={t('title')}>
@@ -338,51 +383,24 @@ export default function FinanceDashboardPage() {
             {/* Cash by Account */}
             <section>
               <h2 className="text-base font-semibold mb-3">{t('cash')}</h2>
-              <div className="rounded-xl border border-border overflow-hidden">
-                {dashboardErr ? (
-                  <div className="p-4 text-sm text-muted-foreground" title={dashboardErr}>
-                    — <span className="text-xs text-destructive">Couldn't load</span>
-                  </div>
-                ) : cash.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">—</div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {cash.map((row, i) => {
-                        const isNeg = row.balance < 0;
-                        return (
-                          <tr key={i} className="border-b border-border/40 last:border-0">
-                            <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
-                              {row.code}
-                            </td>
-                            <td className="px-3 py-2">
-                              {row.nameEn}
-                              {row.nameAr && (
-                                <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-                                  — {row.nameAr}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-end font-mono">
-                              <span
-                                className={isNeg ? 'text-red-600' : ''}
-                                title={isNeg ? t('negativeBalanceTooltip') : undefined}
-                              >
-                                {isNeg && (
-                                  <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-red-100 text-red-700 rounded">
-                                    !
-                                  </span>
-                                )}
-                                {kwd(row.balance)} KWD
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              {dashboardErr ? (
+                <div
+                  className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground"
+                  title={dashboardErr}
+                >
+                  — <span className="text-xs text-destructive">Couldn't load</span>
+                </div>
+              ) : cash.length === 0 ? (
+                <div className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground">
+                  —
+                </div>
+              ) : (
+                <DataTable<CashAccountRow>
+                  columns={cashColumns}
+                  rows={cash}
+                  rowKey={(row, i) => `${row.code}-${i}`}
+                />
+              )}
             </section>
 
             {/* Balance Sheet Summary */}

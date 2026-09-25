@@ -693,8 +693,11 @@ export default function FloatingWidgetPage() {
         </section>
       </div>
 
-      {/* Sticky save bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur md:left-64">
+      {/* Sticky save bar — lifted above the fixed MobileBottomNav (h-14 =
+          56px) + safe-area on mobile so it isn't hidden behind it; rule 6
+          "fixed-bottom UI" recipe. md:bottom-0 because the nav is
+          md:hidden (desktop = sidebar). */}
+      <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur md:left-64">
         <div className="flex items-center justify-between gap-4 px-6 py-4">
           <span className="text-xs text-muted-foreground">
             Changes apply to the live storefront after save.

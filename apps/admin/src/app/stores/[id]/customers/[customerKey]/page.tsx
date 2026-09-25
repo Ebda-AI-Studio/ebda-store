@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../../lib/api';
 import { useAuth } from '../../../../../lib/auth';
 import { EraseCustomerModal } from './_components/EraseCustomerModal';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface CustomerGroupOption {
   id: string;
@@ -282,6 +283,108 @@ export default function CustomerDetailPage() {
       ? [...activeGroups, { ...customer.group, isActive: false }]
       : activeGroups;
 
+  const orderColumns: DataTableColumn<OrderRow>[] = [
+    {
+      header: t('colOrderNum'),
+      primaryOnMobile: true,
+      cell: order => (
+        <span className="text-sm font-medium text-foreground">
+          {order.orderNumber || order.id.slice(0, 8)}
+        </span>
+      ),
+    },
+    {
+      header: t('colDate'),
+      cell: order => (
+        <span className="text-sm text-muted-foreground">{formatDate(order.createdAt)}</span>
+      ),
+    },
+    {
+      header: t('colStatus'),
+      mobileBadge: true,
+      cell: order => <StatusChip status={order.status} />,
+    },
+    {
+      header: t('colPayment'),
+      mobileBadge: true,
+      cell: order => {
+        // Find the refund payment (most-recent payment row with a non-zero
+        // refundedAmount). Refund metadata travels on the Payment row, not
+        // the Order, so it's surfaced here as an extra line rather than the
+        // original separate full-width banner row — DataTable renders one
+        // cell per column, so the refund detail now lives alongside the
+        // payment status it explains instead of below it.
+        const refundedPayment = order.payments.find(
+          p => (p.refundedAmount ?? 0) > 0 || p.status === 'refunded'
+        );
+        return (
+          <div>
+            <div className="flex items-center gap-2">
+              <StatusChip status={order.paymentStatus} />
+              {order.payments[0] && (
+                <span className="text-xs text-muted-foreground">
+                  {t('via')} {order.payments[0].provider}
+                </span>
+              )}
+            </div>
+            {refundedPayment && (
+              <p className="mt-1 text-xs text-destructive">
+                <span className="font-semibold">{t('refunded')}</span>
+                {' · '}-{formatKwd(refundedPayment.refundedAmount ?? order.total)} {t('via')}{' '}
+                {refundedPayment.provider}
+                {refundedPayment.metadata?.refundedAt && (
+                  <>
+                    {' '}
+                    {t('refundedOn')} {formatDate(refundedPayment.metadata.refundedAt)}
+                  </>
+                )}
+                {refundedPayment.metadata?.refundReason && (
+                  <>
+                    {' · '}
+                    {t('refundedReason')} <em>{refundedPayment.metadata.refundReason}</em>
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      header: t('colItems'),
+      hideOnMobile: true,
+      className: 'hidden md:table-cell',
+      cell: order => (
+        <span className="text-sm text-muted-foreground">
+          {order.items.length}{' '}
+          <span className="text-xs">
+            ({order.items.reduce((sum, it) => sum + it.quantity, 0)} {t('units')})
+          </span>
+        </span>
+      ),
+    },
+    {
+      header: t('colTotal'),
+      alignEnd: true,
+      cell: order => (
+        <span className="text-sm font-bold text-foreground">{formatKwd(order.total)}</span>
+      ),
+    },
+    {
+      header: t('colAction'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: order => (
+        <Link
+          href={`/stores/${storeId}/orders/${order.id}`}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 max-md:min-h-11 max-md:px-4 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          {t('viewOrder')}
+        </Link>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout
       title={displayName}
@@ -490,119 +593,11 @@ export default function CustomerDetailPage() {
               </div>
 
               {/* Orders table */}
-              <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-                <div className="border-b bg-muted/40 px-6 py-3">
-                  <h2 className="text-sm font-semibold text-foreground">
-                    {t('ordersSection', { count: orders.length })}
-                  </h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="border-b bg-muted/20">
-                      <tr>
-                        <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          {t('colOrderNum')}
-                        </th>
-                        <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          {t('colDate')}
-                        </th>
-                        <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          {t('colStatus')}
-                        </th>
-                        <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          {t('colPayment')}
-                        </th>
-                        <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
-                          {t('colItems')}
-                        </th>
-                        <th className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          {t('colTotal')}
-                        </th>
-                        <th className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          {t('colAction')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {orders.map(order => {
-                        // Find the refund payment (most-recent payment row with a
-                        // non-zero refundedAmount). Refund metadata travels on
-                        // the Payment row, not the Order, so the line below the
-                        // main row needs to dig it out for display.
-                        const refundedPayment = order.payments.find(
-                          p => (p.refundedAmount ?? 0) > 0 || p.status === 'refunded'
-                        );
-                        return (
-                          <Fragment key={order.id}>
-                            <tr className="hover:bg-muted/30 transition-colors">
-                              <td className="px-6 py-4 text-sm font-medium text-foreground">
-                                {order.orderNumber || order.id.slice(0, 8)}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-muted-foreground">
-                                {formatDate(order.createdAt)}
-                              </td>
-                              <td className="px-6 py-4">
-                                <StatusChip status={order.status} />
-                              </td>
-                              <td className="px-6 py-4">
-                                <StatusChip status={order.paymentStatus} />
-                                {order.payments[0] && (
-                                  <span className="ms-2 text-xs text-muted-foreground">
-                                    {t('via')} {order.payments[0].provider}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
-                                {order.items.length}{' '}
-                                <span className="text-xs">
-                                  ({order.items.reduce((sum, it) => sum + it.quantity, 0)}{' '}
-                                  {t('units')})
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-end text-sm font-bold text-foreground">
-                                {formatKwd(order.total)}
-                              </td>
-                              <td className="px-6 py-4 text-end">
-                                <Link
-                                  href={`/stores/${storeId}/orders/${order.id}`}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-                                >
-                                  {t('viewOrder')}
-                                </Link>
-                              </td>
-                            </tr>
-                            {refundedPayment && (
-                              <tr className="bg-destructive/5">
-                                <td
-                                  colSpan={7}
-                                  className="px-6 py-2 text-xs text-destructive border-t border-destructive/10"
-                                >
-                                  <span className="font-semibold">{t('refunded')}</span>
-                                  {' · '}-{formatKwd(refundedPayment.refundedAmount ?? order.total)}{' '}
-                                  {t('via')} {refundedPayment.provider}
-                                  {refundedPayment.metadata?.refundedAt && (
-                                    <>
-                                      {' '}
-                                      {t('refundedOn')}{' '}
-                                      {formatDate(refundedPayment.metadata.refundedAt)}
-                                    </>
-                                  )}
-                                  {refundedPayment.metadata?.refundReason && (
-                                    <>
-                                      {' · '}
-                                      {t('refundedReason')}{' '}
-                                      <em>{refundedPayment.metadata.refundReason}</em>
-                                    </>
-                                  )}
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+              <div>
+                <h2 className="mb-3 text-sm font-semibold text-foreground">
+                  {t('ordersSection', { count: orders.length })}
+                </h2>
+                <DataTable<OrderRow> columns={orderColumns} rows={orders} rowKey={o => o.id} />
               </div>
 
               {/* Privacy & data — merchant-initiated erasure/export.

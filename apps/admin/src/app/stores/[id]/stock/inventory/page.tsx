@@ -1,13 +1,43 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { Button, useToast } from '@force/ui';
+
+// ─── Select-all checkbox (indeterminate-aware) ─────────────────────────────────
+
+function IndeterminateCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  ariaLabel,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+  ariaLabel: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="rounded border-border"
+      aria-label={ariaLabel}
+    />
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -387,123 +417,156 @@ export default function StockInventoryPage() {
                 {t('truncatedNotice', { shown: visibleProducts.length, total: totalSkus })}
               </div>
             )}
-            <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="px-3 py-2 w-10">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleSelectAll}
-                        aria-label={t('selectAll')}
-                        className="rounded border-border"
-                      />
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                      {t('sku')}
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                      {t('name')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                      {t('onHand')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                      {t('lowStockThreshold')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                      {t('cost')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                      {t('price')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                      {t('salesQuantity')}
-                    </th>
-                    <th className="text-center px-3 py-2 font-medium text-muted-foreground w-28">
-                      {t('allowsBackorder')}
-                    </th>
-                    <th className="px-3 py-2 w-28" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleProducts.map(p => {
-                    // Variant products carry their stock on the variants, so the
-                    // API returns a variant-aware `totalInventory`. Resolve On-Hand
-                    // + low-stock colouring against that value.
-                    const onHand = p.hasVariants ? (p.totalInventory ?? 0) : p.inventory;
-                    const isLow = onHand > 0 && onHand <= p.lowStockThreshold;
+            {(() => {
+              const someSelected = selectedIds.length > 0;
+              const inventoryColumns: DataTableColumn<ProductRow>[] = [
+                {
+                  header: '',
+                  className: 'w-10',
+                  // Select-all checkbox is injected via the overlay below.
+                  cell: p => (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(p.id)}
+                      onChange={() => toggleSelection(p.id)}
+                      onClick={e => e.stopPropagation()}
+                      aria-label={p.name}
+                      className="rounded border-border"
+                    />
+                  ),
+                },
+                {
+                  header: t('sku'),
+                  className: 'w-28',
+                  cell: p => (
+                    <span className="font-mono text-xs text-muted-foreground">{p.sku ?? '—'}</span>
+                  ),
+                },
+                {
+                  header: t('name'),
+                  primaryOnMobile: true,
+                  cell: p => {
                     const hasReorder = suggestedSet.has(p.id);
                     const hasDead = deadSet.has(p.id);
                     return (
-                      <tr key={p.id} className="border-t border-border/40">
-                        <td className="px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(p.id)}
-                            onChange={() => toggleSelection(p.id)}
-                            aria-label={p.name}
-                            className="rounded border-border"
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                          {p.sku ?? '—'}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="truncate max-w-[10rem]">{p.name}</span>
-                            {hasReorder && (
-                              <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 shrink-0">
-                                {t('badgeReorder')}
-                              </span>
-                            )}
-                            {hasDead && (
-                              <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 shrink-0">
-                                {t('badgeDeadstock')}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-end font-mono text-xs font-semibold ${
-                            onHand === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''
-                          }`}
-                        >
-                          {onHand}
-                        </td>
-                        <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                          {p.lowStockThreshold}
-                        </td>
-                        <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                          {p.costPrice == null ? '—' : formatPrice(p.costPrice)}
-                        </td>
-                        <td className="px-3 py-2 text-end font-mono text-xs">
-                          {formatPrice(p.price)}
-                        </td>
-                        <td className="px-3 py-2 text-end font-mono text-xs">{p.soldQuantity}</td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">
-                          {p.allowBackorder ? '✓' : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-end">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              router.push(
-                                `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.hasVariants ? (p.totalInventory ?? 0) : p.inventory}`
-                              )
-                            }
-                            className="text-primary text-xs underline underline-offset-2 hover:opacity-80"
-                          >
-                            {t('quickAdjust')}
-                          </button>
-                        </td>
-                      </tr>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="truncate max-w-[10rem]">{p.name}</span>
+                        {hasReorder && (
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 shrink-0">
+                            {t('badgeReorder')}
+                          </span>
+                        )}
+                        {hasDead && (
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 shrink-0">
+                            {t('badgeDeadstock')}
+                          </span>
+                        )}
+                      </div>
                     );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  },
+                },
+                {
+                  header: t('onHand'),
+                  alignEnd: true,
+                  className: 'w-24',
+                  cell: p => {
+                    const onHand = p.hasVariants ? (p.totalInventory ?? 0) : p.inventory;
+                    const isLow = onHand > 0 && onHand <= p.lowStockThreshold;
+                    return (
+                      <span
+                        className={`font-mono text-xs font-semibold ${
+                          onHand === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''
+                        }`}
+                      >
+                        {onHand}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  header: t('lowStockThreshold'),
+                  alignEnd: true,
+                  hideOnMobile: true,
+                  className: 'w-24',
+                  cell: p => (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {p.lowStockThreshold}
+                    </span>
+                  ),
+                },
+                {
+                  header: t('cost'),
+                  alignEnd: true,
+                  className: 'w-24',
+                  cell: p => (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {p.costPrice == null ? '—' : formatPrice(p.costPrice)}
+                    </span>
+                  ),
+                },
+                {
+                  header: t('price'),
+                  alignEnd: true,
+                  className: 'w-24',
+                  cell: p => <span className="font-mono text-xs">{formatPrice(p.price)}</span>,
+                },
+                {
+                  header: t('salesQuantity'),
+                  alignEnd: true,
+                  hideOnMobile: true,
+                  className: 'w-24',
+                  cell: p => <span className="font-mono text-xs">{p.soldQuantity}</span>,
+                },
+                {
+                  header: t('allowsBackorder'),
+                  className: 'w-28',
+                  cell: p => (
+                    <div className="text-center text-muted-foreground">
+                      {p.allowBackorder ? '✓' : '—'}
+                    </div>
+                  ),
+                },
+                {
+                  header: '',
+                  alignEnd: true,
+                  mobileActions: true,
+                  className: 'w-28',
+                  cell: p => (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.hasVariants ? (p.totalInventory ?? 0) : p.inventory}`
+                        )
+                      }
+                      className="text-primary text-xs underline underline-offset-2 hover:opacity-80 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+                    >
+                      {t('quickAdjust')}
+                    </button>
+                  ),
+                },
+              ];
+              return (
+                <div className="relative">
+                  {/* Inject the select-all checkbox into the first column header
+                      via a sibling overlay (matches ProductsTable's convention)
+                      so DataTable itself doesn't need a header-checkbox concept. */}
+                  <div className="hidden md:flex absolute top-0 start-0 h-11 w-10 items-center justify-center z-10 pointer-events-auto">
+                    <IndeterminateCheckbox
+                      checked={allSelected}
+                      indeterminate={!allSelected && someSelected}
+                      onChange={toggleSelectAll}
+                      ariaLabel={t('selectAll')}
+                    />
+                  </div>
+                  <DataTable<ProductRow>
+                    columns={inventoryColumns}
+                    rows={visibleProducts}
+                    rowKey={p => p.id}
+                  />
+                </div>
+              );
+            })()}
             {/* Paginator — Prev/Next + "page X of N". Disabled at the ends. */}
             {totalPages > 1 && (
               <div className="mt-3 flex items-center justify-between gap-3">

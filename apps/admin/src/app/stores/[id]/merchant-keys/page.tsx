@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { apiDelete, apiGet, apiPost, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 /**
  * Merchant screen for the MCP merchant-admin keys — issue, review, revoke.
@@ -183,6 +184,95 @@ export default function MerchantKeysPage() {
 
   const fmt = (v: string | null) => (v ? new Date(v).toLocaleString() : t('table.never'));
 
+  const keyColumns: DataTableColumn<KeyRow>[] = [
+    {
+      header: t('table.name'),
+      primaryOnMobile: true,
+      cell: row => (
+        <span className="text-foreground" dir="auto">
+          {row.name}
+        </span>
+      ),
+    },
+    {
+      header: t('table.key'),
+      hideOnMobile: true,
+      cell: row => (
+        // Forced LTR: a base64url prefix must not be bidi-reordered
+        // in an Arabic admin.
+        <span className="font-mono text-muted-foreground" dir="ltr">
+          {row.prefix}…
+        </span>
+      ),
+    },
+    {
+      header: t('table.scopes'),
+      cell: row => (
+        <div className="flex flex-wrap gap-1">
+          {row.scopes.map(s => (
+            <span
+              key={s}
+              className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground"
+              dir="ltr"
+            >
+              {s.replace('merchant:', '')}
+            </span>
+          ))}
+          {row.scopes.length === 0 ? (
+            <span className="text-muted-foreground">{t('table.noScopes')}</span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      header: t('table.user'),
+      cell: row => (
+        <span className="text-muted-foreground" dir="auto">
+          {row.user?.email ?? '—'}
+        </span>
+      ),
+    },
+    {
+      header: t('table.lastUsed'),
+      hideOnMobile: true,
+      cell: row => <span className="text-muted-foreground">{fmt(row.lastUsedAt)}</span>,
+    },
+    {
+      header: t('table.status'),
+      mobileBadge: true,
+      cell: row => (
+        <span
+          className={
+            row.active
+              ? 'rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+              : 'rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground'
+          }
+          dir="auto"
+        >
+          {row.active ? t('table.active') : row.revokedAt ? t('table.revoked') : t('table.expired')}
+        </span>
+      ),
+    },
+    {
+      header: '',
+      alignEnd: true,
+      mobileActions: true,
+      cell: row =>
+        row.active ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="max-md:min-h-11 max-md:px-4"
+            onClick={() => setRevokeTarget(row)}
+            disabled={busy !== null}
+          >
+            {t('actions.revoke')}
+          </Button>
+        ) : null,
+    },
+  ];
+
   if (gate) return gate;
 
   return (
@@ -222,93 +312,19 @@ export default function MerchantKeysPage() {
           ) : null}
         </div>
 
-        {data && data.keys.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center">
-            <p className="text-sm text-muted-foreground" dir="auto">
-              {t('empty.body')}
-            </p>
-          </div>
-        ) : null}
-
-        {data && data.keys.length > 0 ? (
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full min-w-[720px] text-left text-xs">
-              <thead className="bg-muted/50 text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">{t('table.name')}</th>
-                  <th className="px-3 py-2 font-medium">{t('table.key')}</th>
-                  <th className="px-3 py-2 font-medium">{t('table.scopes')}</th>
-                  <th className="px-3 py-2 font-medium">{t('table.user')}</th>
-                  <th className="px-3 py-2 font-medium">{t('table.lastUsed')}</th>
-                  <th className="px-3 py-2 font-medium">{t('table.status')}</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.keys.map(row => (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-3 py-2 text-foreground" dir="auto">
-                      {row.name}
-                    </td>
-                    {/* Forced LTR: a base64url prefix must not be bidi-reordered
-                        in an Arabic admin. */}
-                    <td className="px-3 py-2 font-mono text-muted-foreground" dir="ltr">
-                      {row.prefix}…
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1">
-                        {row.scopes.map(s => (
-                          <span
-                            key={s}
-                            className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground"
-                            dir="ltr"
-                          >
-                            {s.replace('merchant:', '')}
-                          </span>
-                        ))}
-                        {row.scopes.length === 0 ? (
-                          <span className="text-muted-foreground">{t('table.noScopes')}</span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground" dir="auto">
-                      {row.user?.email ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">{fmt(row.lastUsedAt)}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={
-                          row.active
-                            ? 'rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                            : 'rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground'
-                        }
-                        dir="auto"
-                      >
-                        {row.active
-                          ? t('table.active')
-                          : row.revokedAt
-                            ? t('table.revoked')
-                            : t('table.expired')}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {row.active ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setRevokeTarget(row)}
-                          disabled={busy !== null}
-                        >
-                          {t('actions.revoke')}
-                        </Button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {data ? (
+          <DataTable<KeyRow>
+            columns={keyColumns}
+            rows={data.keys}
+            rowKey={row => row.id}
+            emptyState={
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <p className="text-sm text-muted-foreground" dir="auto">
+                  {t('empty.body')}
+                </p>
+              </div>
+            }
+          />
         ) : null}
       </div>
 

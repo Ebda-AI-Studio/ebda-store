@@ -16,6 +16,7 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { ScopePicker } from '../_components/ScopePicker';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 type PromotionType = 'percentage' | 'fixed';
 
@@ -228,6 +229,86 @@ export default function PromotionsPage() {
     }
   };
 
+  const columns: DataTableColumn<Promotion>[] = [
+    {
+      header: t('name'),
+      primaryOnMobile: true,
+      cell: promo => (
+        <>
+          <span className="font-medium">{promo.name}</span>
+          {promo.nameAr && (
+            <span className="ms-2 text-muted-foreground" dir="rtl">
+              {promo.nameAr}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: t('discount'),
+      cell: promo => (
+        <span className="tabular-nums">
+          {promo.type === 'percentage'
+            ? t('valuePercentage', { value: promo.value })
+            : t('valueFixed', { value: promo.value })}
+        </span>
+      ),
+    },
+    {
+      header: t('targeting'),
+      cell: promo => (
+        <div className="flex flex-wrap gap-1">
+          {groupName(promo.customerGroupId) ? (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              {groupName(promo.customerGroupId)}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">{t('allCustomers')}</span>
+          )}
+          {promo.firstOrderOnly && (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{t('firstOrderBadge')}</span>
+          )}
+          {(promo.scopeProductIds.length > 0 || promo.scopeCategoryIds.length > 0) && (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{t('scopedBadge')}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: t('priority'),
+      hideOnMobile: true,
+      cell: promo => <span className="tabular-nums">{promo.priority}</span>,
+    },
+    {
+      header: t('status'),
+      mobileBadge: true,
+      cell: promo => <>{promo.isActive ? t('statusActive') : t('statusInactive')}</>,
+    },
+    {
+      header: t('actions'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: promo => (
+        <>
+          <button
+            type="button"
+            onClick={() => openEdit(promo)}
+            className="text-primary hover:underline"
+          >
+            {t('edit')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void remove(promo)}
+            className="ms-3 text-destructive hover:underline"
+          >
+            {t('delete')}
+          </button>
+        </>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout
       title={t('title')}
@@ -262,81 +343,7 @@ export default function PromotionsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-start font-medium">{t('name')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('discount')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('targeting')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('priority')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('status')}</th>
-                  <th className="px-3 py-2 text-end font-medium">{t('actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {promotions.map(promo => (
-                  <tr key={promo.id} className="border-t">
-                    <td className="px-3 py-2">
-                      <span className="font-medium">{promo.name}</span>
-                      {promo.nameAr && (
-                        <span className="ms-2 text-muted-foreground" dir="rtl">
-                          {promo.nameAr}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {promo.type === 'percentage'
-                        ? t('valuePercentage', { value: promo.value })
-                        : t('valueFixed', { value: promo.value })}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1">
-                        {groupName(promo.customerGroupId) ? (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                            {groupName(promo.customerGroupId)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{t('allCustomers')}</span>
-                        )}
-                        {promo.firstOrderOnly && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                            {t('firstOrderBadge')}
-                          </span>
-                        )}
-                        {(promo.scopeProductIds.length > 0 ||
-                          promo.scopeCategoryIds.length > 0) && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                            {t('scopedBadge')}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">{promo.priority}</td>
-                    <td className="px-3 py-2">
-                      {promo.isActive ? t('statusActive') : t('statusInactive')}
-                    </td>
-                    <td className="px-3 py-2 text-end">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(promo)}
-                        className="text-primary hover:underline"
-                      >
-                        {t('edit')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void remove(promo)}
-                        className="ms-3 text-destructive hover:underline"
-                      >
-                        {t('delete')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<Promotion> columns={columns} rows={promotions} rowKey={promo => promo.id} />
         )}
 
         {showModal && (

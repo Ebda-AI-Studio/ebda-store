@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../lib/api';
 import { textFieldValue } from '../../../../../lib/form-text';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface Location {
   id: string;
@@ -215,6 +216,101 @@ export function LocationsTab({ storeId }: { storeId: string }) {
   }
 
   const isEnabled = store?.locationsEnabled === true;
+
+  const sortedLocations = [...locations].sort((a, b) => a.position - b.position);
+
+  const locationColumns: DataTableColumn<Location>[] = [
+    {
+      header: t('colName'),
+      primaryOnMobile: true,
+      cell: loc => (
+        <>
+          <p className="font-medium text-foreground">{loc.name}</p>
+          {loc.nameAr && (
+            <p className="mt-0.5 text-xs text-muted-foreground" dir="rtl">
+              {loc.nameAr}
+            </p>
+          )}
+        </>
+      ),
+    },
+    {
+      header: t('colCountry'),
+      hideOnMobile: true,
+      className: 'hidden sm:table-cell',
+      cell: loc => <span className="text-muted-foreground">{loc.country}</span>,
+    },
+    {
+      header: t('colAddress'),
+      hideOnMobile: true,
+      className: 'hidden md:table-cell max-w-[200px] truncate',
+      cell: loc => <span className="text-muted-foreground">{loc.address}</span>,
+    },
+    {
+      header: t('colStatus'),
+      mobileBadge: true,
+      cell: loc => (
+        <span
+          className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+            loc.isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+          }`}
+        >
+          {loc.isPublished ? t('statusPublished') : t('statusDraft')}
+        </span>
+      ),
+    },
+    {
+      header: t('colPos'),
+      cell: loc => <span className="text-muted-foreground">{loc.position}</span>,
+    },
+    {
+      header: t('colActions'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: loc => (
+        <div className="flex items-center justify-end gap-2">
+          {/* Inline delete confirm */}
+          {confirmDeleteId === loc.id ? (
+            <>
+              <span className="text-xs text-destructive font-medium">{t('deleteConfirm')}</span>
+              <button
+                type="button"
+                disabled={deletingId === loc.id}
+                onClick={() => handleDelete(loc.id)}
+                className="max-md:min-h-11 inline-flex items-center rounded-lg bg-destructive px-2.5 py-1 max-md:px-4 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
+              >
+                {deletingId === loc.id ? '…' : t('deleteYes')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-border px-2.5 py-1 max-md:px-4 text-xs font-semibold text-foreground hover:bg-muted"
+              >
+                {t('cancel')}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => openEdit(loc)}
+                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-border px-3 py-1.5 max-md:px-4 text-xs font-semibold text-foreground hover:bg-muted"
+              >
+                {t('edit')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(loc.id)}
+                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 max-md:px-4 text-xs font-semibold text-destructive hover:bg-destructive/10"
+              >
+                {t('delete')}
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -497,8 +593,8 @@ export function LocationsTab({ storeId }: { storeId: string }) {
       )}
 
       {/* Locations table */}
-      <div className="rounded-xl border bg-card">
-        {isLoading ? (
+      {isLoading ? (
+        <div className="rounded-xl border bg-card">
           <ul className="divide-y">
             {Array.from({ length: 3 }).map((_, i) => (
               <li key={i} className="flex items-center gap-3 p-4 animate-pulse">
@@ -510,7 +606,9 @@ export function LocationsTab({ storeId }: { storeId: string }) {
               </li>
             ))}
           </ul>
-        ) : locations.length === 0 ? (
+        </div>
+      ) : locations.length === 0 ? (
+        <div className="rounded-xl border bg-card">
           <div className="p-10 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
               <svg
@@ -540,101 +638,14 @@ export function LocationsTab({ storeId }: { storeId: string }) {
               </button>
             )}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3">{t('colName')}</th>
-                  <th className="hidden px-4 py-3 sm:table-cell">{t('colCountry')}</th>
-                  <th className="hidden px-4 py-3 md:table-cell">{t('colAddress')}</th>
-                  <th className="px-4 py-3">{t('colStatus')}</th>
-                  <th className="px-4 py-3">{t('colPos')}</th>
-                  <th className="px-4 py-3 text-right">{t('colActions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {[...locations]
-                  .sort((a, b) => a.position - b.position)
-                  .map(loc => (
-                    <tr key={loc.id} className="hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-foreground">{loc.name}</p>
-                        {loc.nameAr && (
-                          <p className="mt-0.5 text-xs text-muted-foreground" dir="rtl">
-                            {loc.nameAr}
-                          </p>
-                        )}
-                      </td>
-                      <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
-                        {loc.country}
-                      </td>
-                      <td className="hidden max-w-[200px] truncate px-4 py-3 text-muted-foreground md:table-cell">
-                        {loc.address}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                            loc.isPublished
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {loc.isPublished ? t('statusPublished') : t('statusDraft')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{loc.position}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          {/* Inline delete confirm */}
-                          {confirmDeleteId === loc.id ? (
-                            <>
-                              <span className="text-xs text-destructive font-medium">
-                                {t('deleteConfirm')}
-                              </span>
-                              <button
-                                type="button"
-                                disabled={deletingId === loc.id}
-                                onClick={() => handleDelete(loc.id)}
-                                className="inline-flex items-center rounded-lg bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
-                              >
-                                {deletingId === loc.id ? '…' : t('deleteYes')}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="inline-flex items-center rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
-                              >
-                                {t('cancel')}
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => openEdit(loc)}
-                                className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
-                              >
-                                {t('edit')}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(loc.id)}
-                                className="inline-flex items-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
-                              >
-                                {t('delete')}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <DataTable<Location>
+          columns={locationColumns}
+          rows={sortedLocations}
+          rowKey={loc => loc.id}
+        />
+      )}
 
       {/* Generic error (e.g. from delete) when form is closed */}
       {formError && formMode === null && (

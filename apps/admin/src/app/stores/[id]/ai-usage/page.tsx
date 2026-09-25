@@ -19,6 +19,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet } from '../../../../lib/api';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
+import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -95,6 +96,44 @@ export default function AiUsagePage() {
 
   // ── Render ───────────────────────────────────────────────────────────
 
+  const columns: DataTableColumn<UsageRow>[] = [
+    {
+      header: 'Date / التاريخ',
+      primaryOnMobile: true,
+      cell: row => (
+        <span className="text-foreground whitespace-nowrap">{formatDate(row.createdAt)}</span>
+      ),
+    },
+    {
+      header: 'Feature / الميزة',
+      cell: row => <span className="text-foreground">{formatFeature(row.feature)}</span>,
+    },
+    {
+      header: 'Tokens / الرموز',
+      cell: row => (
+        <span className="text-muted-foreground tabular-nums">
+          {row.inputTokens + row.outputTokens > 0
+            ? (row.inputTokens + row.outputTokens).toLocaleString()
+            : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Status / الحالة',
+      mobileBadge: true,
+      cell: row =>
+        row.cachedHit ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            Cached / من الذاكرة
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+            Live / مباشر
+          </span>
+        ),
+    },
+  ];
+
   return (
     <AdminLayout
       title="AI Usage / استخدام الذكاء الاصطناعي"
@@ -133,47 +172,7 @@ export default function AiUsagePage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left text-xs text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">Date / التاريخ</th>
-                    <th className="px-4 py-3 font-medium">Feature / الميزة</th>
-                    <th className="px-4 py-3 font-medium">Tokens / الرموز</th>
-                    <th className="px-4 py-3 font-medium">Status / الحالة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {log.rows.map(row => (
-                    <tr
-                      key={row.id}
-                      className="border-b last:border-0 hover:bg-muted/20 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                        {formatDate(row.createdAt)}
-                      </td>
-                      <td className="px-4 py-3 text-foreground">{formatFeature(row.feature)}</td>
-                      <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                        {row.inputTokens + row.outputTokens > 0
-                          ? (row.inputTokens + row.outputTokens).toLocaleString()
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.cachedHit ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                            Cached / من الذاكرة
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                            Live / مباشر
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable<UsageRow> columns={columns} rows={log.rows} rowKey={row => row.id} />
 
             {/* Pagination */}
             {log.pages > 1 && (

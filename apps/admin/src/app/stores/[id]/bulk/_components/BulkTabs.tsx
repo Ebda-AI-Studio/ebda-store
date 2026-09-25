@@ -83,7 +83,7 @@ export function BulkTabs({ activeTab, onTabChange }: BulkTabsProps) {
               tabIndex={isActive ? 0 : -1}
               onClick={() => onTabChange(tab.id)}
               onKeyDown={e => handleKeyDown(e, index)}
-              className={`pb-3 text-sm font-medium transition ${
+              className={`pb-3 max-sm:min-h-11 max-sm:inline-flex max-sm:items-center text-sm font-medium transition ${
                 isActive
                   ? 'border-b-2 border-primary text-primary'
                   : 'text-muted-foreground hover:text-foreground'

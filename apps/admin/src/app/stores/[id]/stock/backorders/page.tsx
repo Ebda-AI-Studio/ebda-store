@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 
@@ -159,80 +160,83 @@ export default function BackordersPage() {
     );
   }
 
+  const columns: DataTableColumn<BackorderLine>[] = [
+    {
+      header: t('product'),
+      primaryOnMobile: true,
+      cell: line => (
+        <>
+          <span className="font-medium">{line.product.name}</span>
+          {line.product.sku && (
+            <span className="ms-1 text-xs text-muted-foreground font-mono">
+              ({line.product.sku})
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: t('orderNumber'),
+      className: 'w-28',
+      cell: line => (
+        <Link
+          href={`/stores/${storeId}/orders/${line.orderItem.order.id}`}
+          className="font-mono text-xs text-primary hover:underline"
+        >
+          #{line.orderItem.order.orderNumber}
+        </Link>
+      ),
+    },
+    {
+      header: t('customer'),
+      cell: line => {
+        const addr = line.orderItem.order.shippingAddress;
+        const customerName = addr ? `${addr.firstName} ${addr.lastName}`.trim() : '—';
+        return <span className="text-muted-foreground">{customerName}</span>;
+      },
+    },
+    {
+      header: t('qty'),
+      alignEnd: true,
+      className: 'w-16',
+      cell: line => <span className="font-mono text-xs">{line.qty}</span>,
+    },
+    {
+      header: t('daysWaiting'),
+      alignEnd: true,
+      className: 'w-28',
+      cell: line => (
+        <span className="text-muted-foreground text-xs">
+          {t('daysWaitingValue').replace('{days}', String(daysWaiting(line.createdAt)))}
+        </span>
+      ),
+    },
+    {
+      header: '',
+      alignEnd: true,
+      mobileActions: true,
+      className: 'w-20',
+      cell: line => (
+        <button
+          type="button"
+          onClick={() => setCancelTarget(line.id)}
+          className="px-2 py-1 rounded border border-destructive/40 text-destructive text-xs hover:bg-destructive/10 max-sm:min-h-11 max-sm:px-4"
+        >
+          {t('cancel')}
+        </button>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-5xl space-y-4">
-        {lines.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t('empty')}</p>
-        ) : (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('orderNumber')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                    {t('customer')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                    {t('product')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-16">
-                    {t('qty')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('daysWaiting')}
-                  </th>
-                  <th className="w-20" />
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map(line => {
-                  const order = line.orderItem.order;
-                  const addr = order.shippingAddress;
-                  const customerName = addr ? `${addr.firstName} ${addr.lastName}`.trim() : '—';
-                  const days = daysWaiting(line.createdAt);
-
-                  return (
-                    <tr key={line.id} className="border-t border-border/40">
-                      <td className="px-3 py-2">
-                        <Link
-                          href={`/stores/${storeId}/orders/${order.id}`}
-                          className="font-mono text-xs text-primary hover:underline"
-                        >
-                          #{order.orderNumber}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">{customerName}</td>
-                      <td className="px-3 py-2">
-                        <span className="font-medium">{line.product.name}</span>
-                        {line.product.sku && (
-                          <span className="ms-1 text-xs text-muted-foreground font-mono">
-                            ({line.product.sku})
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-end font-mono text-xs">{line.qty}</td>
-                      <td className="px-3 py-2 text-end text-muted-foreground text-xs">
-                        {t('daysWaitingValue').replace('{days}', String(days))}
-                      </td>
-                      <td className="px-3 py-2 text-end">
-                        <button
-                          type="button"
-                          onClick={() => setCancelTarget(line.id)}
-                          className="px-2 py-1 rounded border border-destructive/40 text-destructive text-xs hover:bg-destructive/10"
-                        >
-                          {t('cancel')}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable<BackorderLine>
+          columns={columns}
+          rows={lines}
+          rowKey={line => line.id}
+          emptyState={<p className="text-muted-foreground text-sm">{t('empty')}</p>}
+        />
       </div>
 
       {cancelTarget && (

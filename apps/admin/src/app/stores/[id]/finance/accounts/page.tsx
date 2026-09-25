@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,11 @@ interface AccountsTree {
   equity: AccountNode[];
   revenue: AccountNode[];
   expenses: AccountNode[];
+}
+
+interface AccountTreeRow {
+  node: AccountNode;
+  depth: number;
 }
 
 const GROUPS: { key: keyof AccountsTree; typeKey: string }[] = [
@@ -139,6 +145,37 @@ export default function AccountsPage() {
   }
 
   const total = tree ? GROUPS.reduce((sum, g) => sum + (tree[g.key]?.length ?? 0), 0) : 0;
+
+  const accountColumns: DataTableColumn<AccountTreeRow>[] = [
+    {
+      header: t('code'),
+      className: 'w-24',
+      cell: ({ node }) => (
+        <span className="font-mono text-xs text-muted-foreground">{node.code}</span>
+      ),
+    },
+    {
+      header: t('name'),
+      primaryOnMobile: true,
+      cell: ({ node, depth }) => (
+        <span style={{ paddingInlineStart: `${depth * 1.25}rem` }} className="block">
+          {node.nameEn}
+          {node.nameAr ? (
+            <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
+              — {node.nameAr}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      header: t('system'),
+      alignEnd: true,
+      mobileBadge: true,
+      className: 'w-24',
+      cell: ({ node }) => <span className="text-muted-foreground">{node.isSystem ? '✓' : ''}</span>,
+    },
+  ];
 
   if (error && !tree) {
     return (
@@ -267,48 +304,11 @@ export default function AccountsPage() {
             return (
               <section key={key}>
                 <h2 className="text-base font-semibold mb-2">{t(`type.${typeKey}`)}</h2>
-                <div className="rounded-xl border border-border overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30">
-                      <tr>
-                        <th className="text-start px-3 py-2 w-24 font-medium text-muted-foreground">
-                          {t('code')}
-                        </th>
-                        <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                          {t('name')}
-                        </th>
-                        <th className="text-end px-3 py-2 w-24 font-medium text-muted-foreground">
-                          {t('system')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map(({ node, depth }) => (
-                        <tr key={node.id} className="border-t border-border/40">
-                          <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                            {node.code}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              style={{ paddingInlineStart: `${depth * 1.25}rem` }}
-                              className="block"
-                            >
-                              {node.nameEn}
-                              {node.nameAr ? (
-                                <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-                                  — {node.nameAr}
-                                </span>
-                              ) : null}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-end text-muted-foreground">
-                            {node.isSystem ? '✓' : ''}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable<AccountTreeRow>
+                  columns={accountColumns}
+                  rows={rows}
+                  rowKey={({ node }) => node.id}
+                />
               </section>
             );
           })

@@ -169,8 +169,11 @@ export default function NewJournalEntryPage() {
           </label>
         </div>
 
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
+        {/* Debit/credit line grid — genuine accounting ledger (columns are
+            the point); kept as an isolated horizontal-scroll container per
+            the B1 mobile-table exception rather than card-stacked. */}
+        <div className="rounded-xl border border-border overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-muted/30">
               <tr>
                 <th className="text-start px-3 py-2 font-medium text-muted-foreground">

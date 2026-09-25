@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice, filsToKwd } from '@/lib/format';
@@ -166,6 +167,79 @@ export default function PurchaseOrderDetailPage() {
   const canReceive = ['draft', 'sent', 'partial'].includes(po.status);
   const canCancel = po.status === 'draft';
 
+  const itemColumns: DataTableColumn<POItem>[] = [
+    {
+      header: 'Product',
+      primaryOnMobile: true,
+      cell: item => <span className="truncate max-w-[12rem] block">{item.productName}</span>,
+    },
+    {
+      header: 'Ordered',
+      alignEnd: true,
+      className: 'w-24',
+      cell: item => <span className="font-mono text-xs">{item.qty}</span>,
+    },
+    {
+      header: tDetail('qtyReceived'),
+      alignEnd: true,
+      className: 'w-24',
+      cell: item => <span className="font-mono text-xs text-green-700">{item.qtyReceived}</span>,
+    },
+    {
+      header: tDetail('qtyRemaining'),
+      alignEnd: true,
+      className: 'w-24',
+      cell: item => {
+        const remaining = item.qty - item.qtyReceived;
+        return (
+          <span
+            className={`font-mono text-xs ${remaining > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}
+          >
+            {remaining}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'Unit Cost (KWD)',
+      alignEnd: true,
+      className: 'w-28',
+      cell: item => <span className="font-mono text-xs">{filsToKwd(item.unitCost)}</span>,
+    },
+    {
+      header: 'Line Total (KWD)',
+      alignEnd: true,
+      hideOnMobile: true,
+      className: 'w-28',
+      cell: item => (
+        <span className="font-mono text-xs">{((item.qty * item.unitCost) / 1000).toFixed(3)}</span>
+      ),
+    },
+    ...(canReceive
+      ? [
+          {
+            header: 'Receive Qty',
+            alignEnd: true,
+            className: 'w-28',
+            cell: (item: POItem) => {
+              const remaining = item.qty - item.qtyReceived;
+              return (
+                <input
+                  type="number"
+                  min="0"
+                  max={remaining}
+                  step="1"
+                  value={receiptQtys[item.id] ?? ''}
+                  onChange={e => setReceiptQtys(cur => ({ ...cur, [item.id]: e.target.value }))}
+                  className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                />
+              );
+            },
+          } satisfies DataTableColumn<POItem>,
+        ]
+      : []),
+  ];
+
   return (
     <AdminLayout title={po.poNumber} subtitle={po.supplier.name}>
       <div className="max-w-4xl space-y-6">
@@ -208,86 +282,14 @@ export default function PurchaseOrderDetailPage() {
         </div>
 
         {/* Items table */}
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30">
-              <tr>
-                <th className="text-start px-3 py-2 font-medium text-muted-foreground">Product</th>
-                <th className="text-end px-3 py-2 w-24 font-medium text-muted-foreground">
-                  Ordered
-                </th>
-                <th className="text-end px-3 py-2 w-24 font-medium text-muted-foreground">
-                  {tDetail('qtyReceived')}
-                </th>
-                <th className="text-end px-3 py-2 w-24 font-medium text-muted-foreground">
-                  {tDetail('qtyRemaining')}
-                </th>
-                <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                  Unit Cost (KWD)
-                </th>
-                <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                  Line Total (KWD)
-                </th>
-                {canReceive && (
-                  <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    Receive Qty
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {po.items.map(item => {
-                const remaining = item.qty - item.qtyReceived;
-                const lineTotal = (item.qty * item.unitCost) / 1000;
-                return (
-                  <tr key={item.id} className="border-t border-border/40">
-                    <td className="px-3 py-2 truncate max-w-[12rem]">{item.productName}</td>
-                    <td className="px-3 py-2 text-end font-mono text-xs">{item.qty}</td>
-                    <td className="px-3 py-2 text-end font-mono text-xs text-green-700">
-                      {item.qtyReceived}
-                    </td>
-                    <td
-                      className={`px-3 py-2 text-end font-mono text-xs ${
-                        remaining > 0 ? 'text-amber-600' : 'text-muted-foreground'
-                      }`}
-                    >
-                      {remaining}
-                    </td>
-                    <td className="px-3 py-2 text-end font-mono text-xs">
-                      {filsToKwd(item.unitCost)}
-                    </td>
-                    <td className="px-3 py-2 text-end font-mono text-xs">{lineTotal.toFixed(3)}</td>
-                    {canReceive && (
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max={remaining}
-                          step="1"
-                          value={receiptQtys[item.id] ?? ''}
-                          onChange={e =>
-                            setReceiptQtys(cur => ({ ...cur, [item.id]: e.target.value }))
-                          }
-                          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
-                        />
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="bg-muted/20 border-t border-border">
-              <tr>
-                <td colSpan={canReceive ? 5 : 4} className="px-3 py-2 text-end text-sm font-medium">
-                  Total
-                </td>
-                <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
-                  {formatPrice(po.totalCost)}
-                </td>
-                {canReceive && <td />}
-              </tr>
-            </tfoot>
-          </table>
+        <div>
+          <DataTable<POItem> columns={itemColumns} rows={po.items} rowKey={item => item.id} />
+          {/* DataTable has no footer concept, so the total is a summary bar
+              right below the table — visible on both layouts. */}
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+            <span>Total</span>
+            <span className="font-mono font-semibold">{formatPrice(po.totalCost)}</span>
+          </div>
         </div>
 
         {/* Receive section */}

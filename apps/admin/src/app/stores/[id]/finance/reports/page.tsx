@@ -379,7 +379,7 @@ function PnlTab({ storeId }: { storeId: string }) {
           {/* Revenue */}
           <section>
             <h3 className="text-sm font-semibold mb-2">{tp('revenue')}</h3>
-            <div className="rounded-xl border border-border overflow-hidden">
+            <div className="rounded-xl border border-border overflow-x-auto">
               <table className="w-full text-sm">
                 <tbody>
                   {data.revenue.accounts.map((a, i) => (
@@ -409,7 +409,7 @@ function PnlTab({ storeId }: { storeId: string }) {
           {/* Expenses */}
           <section>
             <h3 className="text-sm font-semibold mb-2">{tp('expenses')}</h3>
-            <div className="rounded-xl border border-border overflow-hidden">
+            <div className="rounded-xl border border-border overflow-x-auto">
               <table className="w-full text-sm">
                 <tbody>
                   {data.expenses.accounts.map((a, i) => (
@@ -503,7 +503,7 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
     return (
       <section>
         <h3 className="text-sm font-semibold mb-2">{label}</h3>
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <tbody>
               {section.accounts.map((a, i) => (
@@ -721,7 +721,7 @@ function TaxReportTab({ storeId }: { storeId: string }) {
           {data.summary.byRate.length > 0 && (
             <section>
               <h3 className="text-sm font-semibold mb-2">{tt('byRateBreakdown')}</h3>
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-xl border border-border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/30">
                     <tr>

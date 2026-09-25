@@ -21,6 +21,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet } from '../../lib/api';
+import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -238,6 +239,74 @@ function PlatformAiUsagePageInner() {
 
   const { platform } = data;
 
+  const columns: DataTableColumn<StoreUsageRow>[] = [
+    {
+      header: 'Store / المتجر',
+      primaryOnMobile: true,
+      cell: store => (
+        <div>
+          <div className="font-medium text-foreground">{store.name}</div>
+          <div className="text-xs text-muted-foreground">{store.slug}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Plan / الخطة',
+      mobileBadge: true,
+      cell: store => <PlanBadge plan={store.plan} />,
+    },
+    {
+      header: 'Today / اليوم',
+      alignEnd: true,
+      cell: store => (
+        <span className="font-bold tabular-nums text-foreground">
+          {store.today.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      header: 'Month / الشهر',
+      alignEnd: true,
+      cell: store => (
+        <span className="tabular-nums text-muted-foreground">{store.month.toLocaleString()}</span>
+      ),
+    },
+    {
+      header: 'Daily cap % / اليومي',
+      cell: store => <PctBar pct={store.dailyPct} />,
+    },
+    {
+      header: 'Monthly cap % / الشهري',
+      cell: store => <PctBar pct={store.monthlyPct} warn={store.monthlyPct >= 80} />,
+    },
+    {
+      header: 'Spend (month) / الإنفاق',
+      alignEnd: true,
+      cell: store => (
+        <div className="tabular-nums">
+          <div className="font-medium text-foreground">{formatSpend(store.monthCostMicros)}</div>
+          {store.monthUnpricedCalls > 0 && (
+            <div
+              className="text-[11px] text-amber-600 dark:text-amber-500"
+              title="These calls had no configured rate for their model, so they are NOT included in the amount above. The figure is a floor, not the true spend."
+            >
+              +{store.monthUnpricedCalls.toLocaleString()} unpriced
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: 'Last call / آخر استدعاء',
+      hideOnMobile: true,
+      cell: store => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {formatDate(store.lastCallAt)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <>
       {/* ── Platform totals ─────────────────────────────────────────── */}
@@ -363,72 +432,16 @@ function PlatformAiUsagePageInner() {
           </span>
         </div>
 
-        {filteredStores.length === 0 ? (
-          <div className="px-6 py-8 text-center">
-            <p className="text-sm text-muted-foreground">No stores match the current filters.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Store / المتجر</th>
-                  <th className="px-4 py-3 font-medium">Plan / الخطة</th>
-                  <th className="px-4 py-3 font-medium text-end">Today / اليوم</th>
-                  <th className="px-4 py-3 font-medium text-end">Month / الشهر</th>
-                  <th className="px-4 py-3 font-medium">Daily cap % / اليومي</th>
-                  <th className="px-4 py-3 font-medium">Monthly cap % / الشهري</th>
-                  <th className="px-4 py-3 font-medium text-end">Spend (month) / الإنفاق</th>
-                  <th className="px-4 py-3 font-medium">Last call / آخر استدعاء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStores.map(store => (
-                  <tr
-                    key={store.storeId}
-                    className="border-b last:border-0 hover:bg-muted/20 transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-foreground">{store.name}</div>
-                      <div className="text-xs text-muted-foreground">{store.slug}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <PlanBadge plan={store.plan} />
-                    </td>
-                    <td className="px-4 py-3 text-end font-bold tabular-nums text-foreground">
-                      {store.today.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-end tabular-nums text-muted-foreground">
-                      {store.month.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <PctBar pct={store.dailyPct} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <PctBar pct={store.monthlyPct} warn={store.monthlyPct >= 80} />
-                    </td>
-                    <td className="px-4 py-3 text-end tabular-nums">
-                      <div className="font-medium text-foreground">
-                        {formatSpend(store.monthCostMicros)}
-                      </div>
-                      {store.monthUnpricedCalls > 0 && (
-                        <div
-                          className="text-[11px] text-amber-600 dark:text-amber-500"
-                          title="These calls had no configured rate for their model, so they are NOT included in the amount above. The figure is a floor, not the true spend."
-                        >
-                          +{store.monthUnpricedCalls.toLocaleString()} unpriced
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDate(store.lastCallAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable<StoreUsageRow>
+          columns={columns}
+          rows={filteredStores}
+          rowKey={store => store.storeId}
+          emptyState={
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-muted-foreground">No stores match the current filters.</p>
+            </div>
+          }
+        />
       </div>
     </>
   );

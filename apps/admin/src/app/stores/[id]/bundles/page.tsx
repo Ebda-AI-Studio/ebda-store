@@ -49,6 +49,7 @@ import { ImageUpload } from '../../../../components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { BundleItemPicker, type BundleItemRow } from './_components/BundleItemPicker';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import {
   computeAvailability,
   computeComponentSum,
@@ -429,6 +430,88 @@ export default function BundlesPage() {
     }
   };
 
+  const columns: DataTableColumn<Bundle>[] = [
+    {
+      header: t('name'),
+      primaryOnMobile: true,
+      cell: bundle => (
+        <>
+          <span className="font-medium">{bundle.name}</span>
+          {bundle.nameAr && (
+            <span className="ms-2 text-muted-foreground" dir="rtl">
+              {bundle.nameAr}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: t('items'),
+      hideOnMobile: true,
+      cell: bundle => (
+        <span className="tabular-nums">{t('itemsCount', { count: bundle.lines.length })}</span>
+      ),
+    },
+    {
+      header: t('price'),
+      cell: bundle => (
+        <span className="tabular-nums">
+          <span className="font-medium">{formatPrice(bundle.price)}</span>
+          <span className="ms-1.5 text-xs text-muted-foreground">
+            {t('ofComponentSum', { sum: formatPrice(bundle.componentSum) })}
+          </span>
+        </span>
+      ),
+    },
+    {
+      header: t('availability'),
+      cell: bundle => (
+        <span className="tabular-nums">
+          {bundle.available >= UNTRACKED_AVAILABILITY_CAP
+            ? t('unlimited')
+            : t('availableCount', { count: bundle.available })}
+        </span>
+      ),
+    },
+    {
+      header: t('status'),
+      mobileBadge: true,
+      cell: bundle => (
+        <>
+          {bundle.isActive ? t('statusActive') : t('statusInactive')}
+          {bundle.isActive && !bundle.isPurchasable && (
+            <span className="ms-1.5 text-xs text-muted-foreground">{t('notPurchasableHint')}</span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: t('actions'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: bundle => (
+        <>
+          <button
+            type="button"
+            onClick={() => void openEdit(bundle)}
+            className="text-primary hover:underline"
+          >
+            {t('edit')}
+          </button>
+          {bundle.isActive && (
+            <button
+              type="button"
+              onClick={() => void deactivate(bundle)}
+              className="ms-3 text-destructive hover:underline"
+            >
+              {t('deactivate')}
+            </button>
+          )}
+        </>
+      ),
+    },
+  ];
+
   if (gate) return gate;
 
   return (
@@ -465,74 +548,7 @@ export default function BundlesPage() {
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-start font-medium">{t('name')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('items')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('price')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('availability')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('status')}</th>
-                  <th className="px-3 py-2 text-end font-medium">{t('actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bundles.map(bundle => (
-                  <tr key={bundle.id} className="border-t">
-                    <td className="px-3 py-2">
-                      <span className="font-medium">{bundle.name}</span>
-                      {bundle.nameAr && (
-                        <span className="ms-2 text-muted-foreground" dir="rtl">
-                          {bundle.nameAr}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {t('itemsCount', { count: bundle.lines.length })}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      <span className="font-medium">{formatPrice(bundle.price)}</span>
-                      <span className="ms-1.5 text-xs text-muted-foreground">
-                        {t('ofComponentSum', { sum: formatPrice(bundle.componentSum) })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {bundle.available >= UNTRACKED_AVAILABILITY_CAP
-                        ? t('unlimited')
-                        : t('availableCount', { count: bundle.available })}
-                    </td>
-                    <td className="px-3 py-2">
-                      {bundle.isActive ? t('statusActive') : t('statusInactive')}
-                      {bundle.isActive && !bundle.isPurchasable && (
-                        <span className="ms-1.5 text-xs text-muted-foreground">
-                          {t('notPurchasableHint')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-end">
-                      <button
-                        type="button"
-                        onClick={() => void openEdit(bundle)}
-                        className="text-primary hover:underline"
-                      >
-                        {t('edit')}
-                      </button>
-                      {bundle.isActive && (
-                        <button
-                          type="button"
-                          onClick={() => void deactivate(bundle)}
-                          className="ms-3 text-destructive hover:underline"
-                        >
-                          {t('deactivate')}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<Bundle> columns={columns} rows={bundles} rowKey={bundle => bundle.id} />
         )}
 
         {loadingDetail && (

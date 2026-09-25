@@ -82,8 +82,10 @@ export function AdminSkeletonTable({
         </div>
       )}
 
-      {/* Desktop table — hidden below sm */}
-      <div className="hidden sm:block rounded-xl border bg-card overflow-hidden shadow-sm">
+      {/* Desktop table — hidden below md (matches DataTable's md breakpoint,
+          so the skeleton never shows the desktop shape on a viewport where
+          the real, loaded table would already be cards). */}
+      <div className="hidden md:block rounded-xl border bg-card overflow-hidden shadow-sm">
         <table className="w-full" aria-hidden="true">
           <thead className="bg-muted/50 border-b">
             <tr>
@@ -111,8 +113,8 @@ export function AdminSkeletonTable({
         </table>
       </div>
 
-      {/* Mobile stacked cards — visible only below sm */}
-      <div className="space-y-3 sm:hidden">
+      {/* Mobile stacked cards — visible only below md */}
+      <div className="space-y-3 md:hidden">
         {Array.from({ length: Math.min(rows, 4) }).map((_, i) => (
           <div key={i} className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between">

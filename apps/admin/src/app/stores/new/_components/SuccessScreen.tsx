@@ -8,7 +8,14 @@ import { Alert } from '../../../../components/Alert';
 import { apiGet } from '../../../../lib/api';
 import { getPlatformStoreUrl, getStoreDisplayUrl } from '../../../../lib/store-url';
 import { useT } from '@/i18n/useT';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { CreatedOwner, CreatedStore, DomainStatus } from './types';
+
+interface DnsRecordRow {
+  type: string;
+  name: string;
+  value: string;
+}
 
 interface SuccessScreenProps {
   store: CreatedStore;
@@ -19,6 +26,30 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
   const t = useT('stores.new');
   const [domainStatus, setDomainStatus] = useState<DomainStatus | null>(null);
   const [isCheckingDns, setIsCheckingDns] = useState(false);
+
+  // Same fallback semantics as the original `.map() || fallback`: only shown
+  // when the API returned no records at all (undefined/null), not an empty array.
+  const dnsRows: DnsRecordRow[] = domainStatus?.dnsRecords ?? [
+    { type: 'CNAME', name: store.domain ?? '', value: 'cf.force-ai.co' },
+  ];
+  const dnsColumns: DataTableColumn<DnsRecordRow>[] = [
+    {
+      header: t('colType'),
+      mobileBadge: true,
+      className: 'whitespace-nowrap',
+      cell: record => <span className="font-mono text-xs">{record.type}</span>,
+    },
+    {
+      header: t('colName'),
+      primaryOnMobile: true,
+      className: 'whitespace-nowrap',
+      cell: record => <span className="font-mono text-xs">{record.name}</span>,
+    },
+    {
+      header: t('colValue'),
+      cell: record => <span className="font-mono text-xs break-all">{record.value}</span>,
+    },
+  ];
 
   const checkDomainStatus = useCallback(async (storeId: string) => {
     setIsCheckingDns(true);
@@ -106,37 +137,12 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
               }
             >
               <p className="mt-2 text-sm">{t('dnsInstructions')}</p>
-              <div className="mt-3 overflow-hidden rounded-md border border-warning/40 bg-card">
-                <table className="w-full text-sm" aria-label={t('dnsTableLabel')}>
-                  <thead>
-                    <tr className="border-b border-warning/40 bg-warning/10">
-                      <th scope="col" className="px-3 py-2 text-start font-medium">
-                        {t('colType')}
-                      </th>
-                      <th scope="col" className="px-3 py-2 text-start font-medium">
-                        {t('colName')}
-                      </th>
-                      <th scope="col" className="px-3 py-2 text-start font-medium">
-                        {t('colValue')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {domainStatus?.dnsRecords?.map((record, i) => (
-                      <tr key={i} className="border-b border-warning/20 last:border-0">
-                        <td className="px-3 py-2 font-mono text-xs">{record.type}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{record.name}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{record.value}</td>
-                      </tr>
-                    )) || (
-                      <tr>
-                        <td className="px-3 py-2 font-mono text-xs">CNAME</td>
-                        <td className="px-3 py-2 font-mono text-xs">{store.domain}</td>
-                        <td className="px-3 py-2 font-mono text-xs">cf.force-ai.co</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="mt-3">
+                <DataTable<DnsRecordRow>
+                  columns={dnsColumns}
+                  rows={dnsRows}
+                  rowKey={(record, i) => `${record.type}-${record.name}-${i}`}
+                />
               </div>
               <div className="mt-3 flex items-center justify-between">
                 <p className="text-xs opacity-80">{t('dnsPropagation')}</p>

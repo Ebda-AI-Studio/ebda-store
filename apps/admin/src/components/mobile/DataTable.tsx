@@ -4,8 +4,10 @@ import type { ReactNode } from 'react';
 
 export interface DataTableColumn<T> {
   /** Column header. Doubles as the per-row label on the mobile card
-   *  layout — keep it short and merchant-readable. */
-  header: string;
+   *  layout — keep it short and merchant-readable. Usually a plain
+   *  string, but accepts a ReactNode for the rare interactive header
+   *  (e.g. a select-all checkbox or a sort toggle). */
+  header: ReactNode;
   /** Renderer for the cell. Receives the row and its index so handlers
    *  can map back to the source array. */
   cell: (row: T, index: number) => ReactNode;
@@ -125,7 +127,13 @@ export function DataTable<T>({
                         c.alignEnd ? 'text-end' : 'text-start'
                       } ${c.className ?? ''}`}
                     >
-                      {c.cell(row, i)}
+                      {/* bdi isolates the cell value from the surrounding
+                          paragraph direction — without it, a neutral-character
+                          string (phone number, email, SKU, money) embedded in
+                          an RTL row gets its characters reordered by the
+                          bidi algorithm (e.g. "+965 2222 3333" rendering as
+                          "3333 2222 965+"). */}
+                      <bdi>{c.cell(row, i)}</bdi>
                     </td>
                   ))}
                 </tr>
@@ -151,12 +159,14 @@ export function DataTable<T>({
             {(primaryColumn || badgeColumns.length > 0) && (
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1 text-base font-semibold text-foreground">
-                  {primaryColumn?.cell(row, i)}
+                  <bdi>{primaryColumn?.cell(row, i)}</bdi>
                 </div>
                 {badgeColumns.length > 0 && (
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                     {badgeColumns.map((c, ci) => (
-                      <div key={ci}>{c.cell(row, i)}</div>
+                      <div key={ci}>
+                        <bdi>{c.cell(row, i)}</bdi>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -182,7 +192,7 @@ export function DataTable<T>({
                         c.alignEnd ? 'text-end' : 'text-start'
                       }`}
                     >
-                      {c.cell(row, i)}
+                      <bdi>{c.cell(row, i)}</bdi>
                     </dd>
                   </div>
                 ))}

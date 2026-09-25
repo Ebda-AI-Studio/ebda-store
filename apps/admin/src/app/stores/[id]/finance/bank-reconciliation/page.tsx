@@ -156,8 +156,11 @@ export default function BankReconciliationPage() {
 
         {/* Table */}
         {statements !== null && statements.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-            <table className="min-w-full divide-y divide-gray-100 text-sm">
+          /* Bank statements list — genuine accounting grid (columns are the
+             point); kept as an isolated horizontal-scroll container per the
+             B1 mobile-table exception rather than card-stacked. */
+          <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
+            <table className="min-w-[640px] w-full divide-y divide-gray-100 text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   {[

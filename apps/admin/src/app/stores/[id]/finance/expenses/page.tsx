@@ -7,6 +7,7 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 
@@ -103,6 +104,97 @@ export default function ExpensesPage() {
     }
   }
 
+  const columns: DataTableColumn<ExpenseRow>[] = [
+    {
+      header: t('number'),
+      primaryOnMobile: true,
+      cell: exp => (
+        <span className="font-mono text-xs text-muted-foreground">{exp.expenseNumber}</span>
+      ),
+    },
+    {
+      header: t('date'),
+      cell: exp => <span className="whitespace-nowrap">{exp.expenseDate?.slice(0, 10)}</span>,
+    },
+    {
+      header: t('vendor'),
+      cell: exp => <span>{exp.supplier?.name ?? '—'}</span>,
+    },
+    {
+      header: t('category'),
+      cell: exp => <span>{exp.expenseAccount?.nameEn ?? '—'}</span>,
+    },
+    {
+      header: t('amount'),
+      hideOnMobile: true,
+      alignEnd: true,
+      cell: exp => <span className="font-mono">{kwd(exp.amount)}</span>,
+    },
+    {
+      header: t('tax'),
+      hideOnMobile: true,
+      alignEnd: true,
+      cell: exp => <span className="font-mono">{kwd(exp.taxAmount)}</span>,
+    },
+    {
+      header: t('total'),
+      alignEnd: true,
+      cell: exp => <span className="font-mono font-medium">{kwd(exp.totalAmount)}</span>,
+    },
+    {
+      header: t('status'),
+      mobileBadge: true,
+      cell: exp => (
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[exp.status]}`}
+        >
+          {t(`statuses.${exp.status}`)}
+        </span>
+      ),
+    },
+    {
+      header: '',
+      mobileActions: true,
+      cell: exp => {
+        const isActing = actionLoading?.startsWith(exp.id + ':');
+        return (
+          <div className="flex gap-1">
+            {(exp.status === 'draft' || exp.status === 'pending') && (
+              <button
+                type="button"
+                disabled={isActing}
+                onClick={() => performAction(exp.id, 'approve')}
+                className="max-md:min-h-11 px-2 py-1 max-md:px-3 text-xs border border-border rounded hover:bg-muted disabled:opacity-50"
+              >
+                {t('actions.approve')}
+              </button>
+            )}
+            {exp.status === 'approved' && (
+              <button
+                type="button"
+                disabled={isActing}
+                onClick={() => performAction(exp.id, 'post')}
+                className="max-md:min-h-11 px-2 py-1 max-md:px-3 text-xs border border-border rounded hover:bg-muted disabled:opacity-50"
+              >
+                {t('actions.post')}
+              </button>
+            )}
+            {exp.status !== 'posted' && exp.status !== 'rejected' && (
+              <button
+                type="button"
+                disabled={isActing}
+                onClick={() => performAction(exp.id, 'reject')}
+                className="max-md:min-h-11 px-2 py-1 max-md:px-3 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+              >
+                {t('actions.reject')}
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <AdminLayout
       title={t('title')}
@@ -141,104 +233,7 @@ export default function ExpensesPage() {
           {expenses.length === 0 ? (
             <p className="text-muted-foreground text-sm">No expenses yet.</p>
           ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30">
-                    <tr>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                        {t('number')}
-                      </th>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                        {t('date')}
-                      </th>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                        {t('vendor')}
-                      </th>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                        {t('category')}
-                      </th>
-                      <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {t('amount')}
-                      </th>
-                      <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {t('tax')}
-                      </th>
-                      <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {t('total')}
-                      </th>
-                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                        {t('status')}
-                      </th>
-                      <th className="px-3 py-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenses.map(exp => {
-                      const isActing = actionLoading?.startsWith(exp.id + ':');
-                      return (
-                        <tr key={exp.id} className="border-t border-border/40">
-                          <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                            {exp.expenseNumber}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            {exp.expenseDate?.slice(0, 10)}
-                          </td>
-                          <td className="px-3 py-2">{exp.supplier?.name ?? '—'}</td>
-                          <td className="px-3 py-2">{exp.expenseAccount?.nameEn ?? '—'}</td>
-                          <td className="px-3 py-2 text-end font-mono">{kwd(exp.amount)}</td>
-                          <td className="px-3 py-2 text-end font-mono">{kwd(exp.taxAmount)}</td>
-                          <td className="px-3 py-2 text-end font-mono font-medium">
-                            {kwd(exp.totalAmount)}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[exp.status]}`}
-                            >
-                              {t(`statuses.${exp.status}`)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="flex gap-1">
-                              {(exp.status === 'draft' || exp.status === 'pending') && (
-                                <button
-                                  type="button"
-                                  disabled={isActing}
-                                  onClick={() => performAction(exp.id, 'approve')}
-                                  className="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-50"
-                                >
-                                  {t('actions.approve')}
-                                </button>
-                              )}
-                              {exp.status === 'approved' && (
-                                <button
-                                  type="button"
-                                  disabled={isActing}
-                                  onClick={() => performAction(exp.id, 'post')}
-                                  className="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-50"
-                                >
-                                  {t('actions.post')}
-                                </button>
-                              )}
-                              {exp.status !== 'posted' && exp.status !== 'rejected' && (
-                                <button
-                                  type="button"
-                                  disabled={isActing}
-                                  onClick={() => performAction(exp.id, 'reject')}
-                                  className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
-                                >
-                                  {t('actions.reject')}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <DataTable<ExpenseRow> columns={columns} rows={expenses} rowKey={exp => exp.id} />
           )}
         </div>
       )}

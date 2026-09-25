@@ -134,8 +134,11 @@ export default function JournalListPage() {
           {entries.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('noEntries')}</p>
           ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
+            /* Journal entries list — genuine accounting ledger (columns are
+               the point); kept as an isolated horizontal-scroll container
+               per the B1 mobile-table exception rather than card-stacked. */
+            <div className="rounded-xl border border-border overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead className="bg-muted/30">
                   <tr>
                     <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">

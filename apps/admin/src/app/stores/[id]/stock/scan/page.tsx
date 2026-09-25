@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 
@@ -556,42 +557,43 @@ function PickMode({ storeId }: { storeId: string }) {
           </div>
 
           {/* Item list */}
-          <div className="rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">Item</th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
-                    Picked
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.map(item => {
+          <DataTable<OrderItem>
+            columns={[
+              {
+                header: 'Item',
+                primaryOnMobile: true,
+                cell: item => {
                   const done = item.pickedQty >= item.quantity;
                   return (
-                    <tr
-                      key={item.id}
-                      className={`border-t border-border/40 ${done ? 'opacity-60' : ''}`}
-                    >
-                      <td className="px-3 py-2">
-                        <p className="font-medium">{item.productName}</p>
-                        {item.variantName && (
-                          <p className="text-xs text-muted-foreground">{item.variantName}</p>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-end font-mono text-xs">
-                        <span className={done ? 'text-green-700 font-semibold' : ''}>
-                          {item.pickedQty}/{item.quantity}
-                        </span>
-                        {done && ' ✓'}
-                      </td>
-                    </tr>
+                    <div className={done ? 'opacity-60' : ''}>
+                      <p className="font-medium">{item.productName}</p>
+                      {item.variantName && (
+                        <p className="text-xs text-muted-foreground">{item.variantName}</p>
+                      )}
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                },
+              },
+              {
+                header: 'Picked',
+                alignEnd: true,
+                className: 'w-20',
+                cell: item => {
+                  const done = item.pickedQty >= item.quantity;
+                  return (
+                    <span className={`font-mono text-xs ${done ? 'opacity-60' : ''}`}>
+                      <span className={done ? 'text-green-700 font-semibold' : ''}>
+                        {item.pickedQty}/{item.quantity}
+                      </span>
+                      {done && ' ✓'}
+                    </span>
+                  );
+                },
+              },
+            ]}
+            rows={order.items}
+            rowKey={item => item.id}
+          />
 
           {/* Barcode scanner */}
           {!order.fullyPicked && (
@@ -923,49 +925,54 @@ function CountMode({ storeId }: { storeId: string }) {
 
       {/* Lines table */}
       {activeSession.lines.length > 0 && (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30">
-              <tr>
-                <th className="text-start px-3 py-2 font-medium text-muted-foreground">Item</th>
-                <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
-                  {t('counting.counted')}
-                </th>
-                <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
-                  {t('counting.system')}
-                </th>
-                <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
-                  {t('counting.variance')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeSession.lines.map(line => (
-                <tr key={line.id} className="border-t border-border/40">
-                  <td className="px-3 py-2">
-                    <p className="font-medium text-xs">{line.productName}</p>
-                    {line.variantTitle && (
-                      <p className="text-xs text-muted-foreground">{line.variantTitle}</p>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-end font-mono text-xs">{line.countedQty}</td>
-                  <td className="px-3 py-2 text-end font-mono text-xs">{line.systemQty}</td>
-                  <td
-                    className={`px-3 py-2 text-end font-mono text-xs font-semibold ${
-                      line.variance > 0
-                        ? 'text-green-700'
-                        : line.variance < 0
-                          ? 'text-red-600'
-                          : 'text-muted-foreground'
-                    }`}
-                  >
-                    {line.variance > 0 ? `+${line.variance}` : line.variance}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<CountLine>
+          columns={[
+            {
+              header: 'Item',
+              primaryOnMobile: true,
+              cell: line => (
+                <>
+                  <p className="font-medium text-xs">{line.productName}</p>
+                  {line.variantTitle && (
+                    <p className="text-xs text-muted-foreground">{line.variantTitle}</p>
+                  )}
+                </>
+              ),
+            },
+            {
+              header: t('counting.counted'),
+              alignEnd: true,
+              className: 'w-20',
+              cell: line => <span className="font-mono text-xs">{line.countedQty}</span>,
+            },
+            {
+              header: t('counting.system'),
+              alignEnd: true,
+              className: 'w-20',
+              cell: line => <span className="font-mono text-xs">{line.systemQty}</span>,
+            },
+            {
+              header: t('counting.variance'),
+              alignEnd: true,
+              className: 'w-20',
+              cell: line => (
+                <span
+                  className={`font-mono text-xs font-semibold ${
+                    line.variance > 0
+                      ? 'text-green-700'
+                      : line.variance < 0
+                        ? 'text-red-600'
+                        : 'text-muted-foreground'
+                  }`}
+                >
+                  {line.variance > 0 ? `+${line.variance}` : line.variance}
+                </span>
+              ),
+            },
+          ]}
+          rows={activeSession.lines}
+          rowKey={line => line.id}
+        />
       )}
 
       {/* Actions */}

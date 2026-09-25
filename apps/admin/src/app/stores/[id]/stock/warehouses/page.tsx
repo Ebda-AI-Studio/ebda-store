@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 import { textFieldValue } from '@/lib/form-text';
@@ -199,88 +200,106 @@ export default function WarehousesPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && !err && warehouses?.length === 0 && (
-        <div className="rounded-lg border border-dashed border-border py-16 text-center">
-          <p className="text-muted-foreground">{t('empty')}</p>
-          <Button onClick={openNew} className="mt-4 min-h-[44px]">
-            {t('newButton')}
-          </Button>
-        </div>
-      )}
-
       {/* Warehouse table */}
-      {!loading && warehouses && warehouses.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-3 text-start">{t('colName')}</th>
-                <th className="px-4 py-3 text-start">{t('colCode')}</th>
-                <th className="px-4 py-3 text-center">{t('colPriority')}</th>
-                <th className="px-4 py-3 text-center">{t('colDefault')}</th>
-                <th className="px-4 py-3 text-end">{t('colSkus')}</th>
-                <th className="px-4 py-3 text-end">{t('colUnits')}</th>
-                <th className="px-4 py-3 text-end">{t('colLocation')}</th>
-                <th className="px-4 py-3 text-end">{tc('actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {warehouses.map(w => (
-                <tr key={w.id} className="transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium">{w.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{w.code}</td>
-                  <td className="px-4 py-3 text-center text-muted-foreground">{w.priority}</td>
-                  <td className="px-4 py-3 text-center">
-                    {w.isDefault ? (
-                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        {t('default')}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleSetDefault(w)}
-                        className="text-xs text-muted-foreground underline hover:text-foreground"
-                      >
-                        {t('setDefault')}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-end tabular-nums">{w.totalSkus}</td>
-                  <td className="px-4 py-3 text-end tabular-nums">{w.totalUnits}</td>
-                  <td className="px-4 py-3 text-end text-xs text-muted-foreground">
-                    {w.lat !== null && w.lng !== null
-                      ? `${w.lat.toFixed(4)}, ${w.lng.toFixed(4)}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-end">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => router.push(`/stores/${storeId}/stock/warehouses/${w.id}`)}
-                        className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary hover:bg-primary/10"
-                      >
-                        {t('viewStock')}
-                      </button>
-                      <button
-                        onClick={() => openEdit(w)}
-                        className="min-h-[44px] rounded-md px-3 text-xs font-medium hover:bg-muted"
-                      >
-                        {tc('edit')}
-                      </button>
-                      {!w.isDefault && (
-                        <button
-                          onClick={() => handleDeactivate(w)}
-                          className="min-h-[44px] rounded-md px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
-                        >
-                          {tc('deactivate')}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!loading && warehouses && (
+        <DataTable<Warehouse>
+          columns={[
+            {
+              header: t('colName'),
+              primaryOnMobile: true,
+              cell: w => <span className="font-medium">{w.name}</span>,
+            },
+            {
+              header: t('colCode'),
+              cell: w => <span className="font-mono text-xs text-muted-foreground">{w.code}</span>,
+            },
+            {
+              header: t('colPriority'),
+              className: 'text-center',
+              hideOnMobile: true,
+              cell: w => <span className="text-muted-foreground">{w.priority}</span>,
+            },
+            {
+              header: t('colDefault'),
+              className: 'text-center',
+              mobileBadge: true,
+              cell: w =>
+                w.isDefault ? (
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    {t('default')}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleSetDefault(w)}
+                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                  >
+                    {t('setDefault')}
+                  </button>
+                ),
+            },
+            {
+              header: t('colSkus'),
+              alignEnd: true,
+              cell: w => <span className="tabular-nums">{w.totalSkus}</span>,
+            },
+            {
+              header: t('colUnits'),
+              alignEnd: true,
+              cell: w => <span className="tabular-nums">{w.totalUnits}</span>,
+            },
+            {
+              header: t('colLocation'),
+              alignEnd: true,
+              hideOnMobile: true,
+              cell: w => (
+                <span className="text-xs text-muted-foreground">
+                  {w.lat !== null && w.lng !== null
+                    ? `${w.lat.toFixed(4)}, ${w.lng.toFixed(4)}`
+                    : '—'}
+                </span>
+              ),
+            },
+            {
+              header: tc('actions'),
+              alignEnd: true,
+              mobileActions: true,
+              cell: w => (
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => router.push(`/stores/${storeId}/stock/warehouses/${w.id}`)}
+                    className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary hover:bg-primary/10"
+                  >
+                    {t('viewStock')}
+                  </button>
+                  <button
+                    onClick={() => openEdit(w)}
+                    className="min-h-[44px] rounded-md px-3 text-xs font-medium hover:bg-muted"
+                  >
+                    {tc('edit')}
+                  </button>
+                  {!w.isDefault && (
+                    <button
+                      onClick={() => handleDeactivate(w)}
+                      className="min-h-[44px] rounded-md px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
+                    >
+                      {tc('deactivate')}
+                    </button>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+          rows={warehouses}
+          rowKey={w => w.id}
+          emptyState={
+            <div className="rounded-lg border border-dashed border-border py-16 text-center">
+              <p className="text-muted-foreground">{t('empty')}</p>
+              <Button onClick={openNew} className="mt-4 min-h-[44px]">
+                {t('newButton')}
+              </Button>
+            </div>
+          }
+        />
       )}
 
       {/* Create / Edit Modal */}

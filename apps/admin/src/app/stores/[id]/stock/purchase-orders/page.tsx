@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
+import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
@@ -112,68 +113,69 @@ export default function PurchaseOrdersPage() {
           </button>
         </div>
 
-        {filteredOrders !== null && filteredOrders.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No purchase orders yet. Create one with the button above.
-          </p>
-        ) : (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('poNumber')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                    {t('supplier')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('status')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('expectedDate')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('total')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('createdDate')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(filteredOrders ?? []).map(po => (
-                  <tr
-                    key={po.id}
-                    className="border-t border-border/40 cursor-pointer hover:bg-muted/20 transition-colors"
-                    onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders/${po.id}`)}
-                  >
-                    <td className="px-3 py-2 font-mono text-xs">{po.poNumber}</td>
-                    <td className="px-3 py-2 truncate max-w-[10rem]">{po.supplier.name}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                          STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {t(`statuses.${po.status}`)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
-                      {filsToKwd(po.totalCost)}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {new Date(po.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable<PurchaseOrder>
+          columns={[
+            {
+              header: t('poNumber'),
+              primaryOnMobile: true,
+              className: 'w-28',
+              cell: po => <span className="font-mono text-xs">{po.poNumber}</span>,
+            },
+            {
+              header: t('supplier'),
+              cell: po => <span className="truncate max-w-[10rem] block">{po.supplier.name}</span>,
+            },
+            {
+              header: t('status'),
+              mobileBadge: true,
+              className: 'w-28',
+              cell: po => (
+                <span
+                  className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                    STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {t(`statuses.${po.status}`)}
+                </span>
+              ),
+            },
+            {
+              header: t('expectedDate'),
+              className: 'w-28',
+              cell: po => (
+                <span className="text-muted-foreground">
+                  {po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : '—'}
+                </span>
+              ),
+            },
+            {
+              header: t('total'),
+              alignEnd: true,
+              className: 'w-28',
+              cell: po => (
+                <span className="font-mono text-xs font-semibold">{filsToKwd(po.totalCost)}</span>
+              ),
+            },
+            {
+              header: t('createdDate'),
+              hideOnMobile: true,
+              className: 'w-28',
+              cell: po => (
+                <span className="text-muted-foreground">
+                  {new Date(po.createdAt).toLocaleDateString()}
+                </span>
+              ),
+            },
+          ]}
+          rows={filteredOrders ?? []}
+          rowKey={po => po.id}
+          onRowClick={po => router.push(`/stores/${storeId}/stock/purchase-orders/${po.id}`)}
+          emptyState={
+            <p className="text-muted-foreground text-sm">
+              No purchase orders yet. Create one with the button above.
+            </p>
+          }
+        />
       </div>
     </AdminLayout>
   );

@@ -19,6 +19,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { apiGet, apiPost } from '@/lib/api';
 import { ALLOWED_CURRENCIES } from '@force/shared';
 import { useT } from '@/i18n/useT';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,33 @@ export default function FxRatesPage() {
       setSubmitting(false);
     }
   }
+
+  const rateColumns: DataTableColumn<FxRateEntry>[] = [
+    {
+      header: t('colCurrency'),
+      primaryOnMobile: true,
+      cell: r => <span className="font-mono font-medium">{r.currency}</span>,
+    },
+    {
+      header: t('colRate'),
+      alignEnd: true,
+      cell: r => <span className="font-mono">{Number(r.rate).toFixed(6)}</span>,
+    },
+    {
+      header: t('colDate'),
+      cell: r => (
+        <span className="text-muted-foreground">{new Date(r.rateDate).toLocaleDateString()}</span>
+      ),
+    },
+    {
+      header: t('colRecorded'),
+      cell: r => (
+        <span className="text-muted-foreground text-xs">
+          {new Date(r.createdAt).toLocaleString()}
+        </span>
+      ),
+    },
+  ];
 
   // Feature not active
   if (featureEnabled === false) {
@@ -236,40 +264,7 @@ export default function FxRatesPage() {
           ) : rates.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('noRates')}</p>
           ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">
-                      {t('colCurrency')}
-                    </th>
-                    <th className="text-end px-4 py-2 font-medium text-muted-foreground">
-                      {t('colRate')}
-                    </th>
-                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">
-                      {t('colDate')}
-                    </th>
-                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">
-                      {t('colRecorded')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rates.map(r => (
-                    <tr key={r.id} className="border-t border-border/40">
-                      <td className="px-4 py-2 font-mono font-medium">{r.currency}</td>
-                      <td className="px-4 py-2 text-end font-mono">{Number(r.rate).toFixed(6)}</td>
-                      <td className="px-4 py-2 text-muted-foreground">
-                        {new Date(r.rateDate).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-2 text-muted-foreground text-xs">
-                        {new Date(r.createdAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable<FxRateEntry> columns={rateColumns} rows={rates} rowKey={r => r.id} />
           )}
         </div>
       </div>

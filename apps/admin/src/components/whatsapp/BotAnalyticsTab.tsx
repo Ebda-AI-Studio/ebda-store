@@ -25,6 +25,7 @@ import { apiGet } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import type { Period, ResolvedDateRange } from '../../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../../app/stores/[id]/analytics/_components/types';
+import { DataTable, type DataTableColumn } from '../mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -174,6 +175,19 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
   // Input totals for % share
   const inputTotal = data ? Object.values(data.inputBreakdown).reduce((s, v) => s + v, 0) : 0;
 
+  const intentColumns: DataTableColumn<[string, number]>[] = [
+    {
+      header: t('intentColIntent'),
+      primaryOnMobile: true,
+      cell: ([intent]) => <span className="font-mono text-xs">{intent}</span>,
+    },
+    {
+      header: t('intentColCount'),
+      alignEnd: true,
+      cell: ([, count]) => <span className="tabular-nums">{count.toLocaleString()}</span>,
+    },
+  ];
+
   return (
     <div className="max-w-4xl space-y-6">
       {/* Date range picker */}
@@ -241,22 +255,11 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
           {intentEntries.length > 0 && (
             <div className="rounded-xl border border-border bg-card p-5">
               <h3 className="text-sm font-semibold mb-4">{t('intentTitle')}</h3>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="pb-2 text-start font-medium">{t('intentColIntent')}</th>
-                    <th className="pb-2 text-end font-medium">{t('intentColCount')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {intentEntries.map(([intent, count]) => (
-                    <tr key={intent} className="border-b border-border/50 last:border-0">
-                      <td className="py-2 font-mono text-xs">{intent}</td>
-                      <td className="py-2 text-end tabular-nums">{count.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable<[string, number]>
+                columns={intentColumns}
+                rows={intentEntries}
+                rowKey={([intent]) => intent}
+              />
             </div>
           )}
 

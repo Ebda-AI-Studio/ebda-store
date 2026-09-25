@@ -544,7 +544,7 @@ export function MassEditModal({
                   ))}
                 </div>
               ) : (
-                <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-border">
+                <div className="max-h-[50vh] overflow-y-auto overflow-x-auto rounded-lg border border-border">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>

@@ -9,6 +9,7 @@ import { useAuth } from '../../../../lib/auth';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface StaffMember {
   membershipId: string;
@@ -138,6 +139,73 @@ export default function StoreStaffPage() {
 
   if (gate) return gate;
 
+  const columns: DataTableColumn<StaffMember>[] = [
+    {
+      header: t('table.colMember'),
+      primaryOnMobile: true,
+      cell: member => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
+            <span className="text-sm font-bold">
+              {member.firstName[0]}
+              {member.lastName[0]}
+            </span>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">
+              {member.firstName} {member.lastName}
+            </p>
+            <p className="text-sm text-muted-foreground">{member.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: t('table.colStatus'),
+      mobileBadge: true,
+      cell: member => (
+        <Badge
+          variant={
+            member.status === 'active'
+              ? 'default'
+              : member.status === 'suspended'
+                ? 'destructive'
+                : 'secondary'
+          }
+        >
+          {member.status}
+        </Badge>
+      ),
+    },
+    {
+      header: t('table.colAdded'),
+      cell: member => (
+        <span className="text-sm text-muted-foreground">{formatDate(member.createdAt)}</span>
+      ),
+    },
+    {
+      header: t('table.colLastLogin'),
+      cell: member => (
+        <span className="text-sm text-muted-foreground">{formatDate(member.lastLoginAt)}</span>
+      ),
+    },
+    {
+      header: t('table.colActions'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: member => (
+        <Button
+          variant="outline"
+          size="sm"
+          className="max-md:min-h-11 max-md:px-4"
+          onClick={() => setRemoveTarget(member)}
+        >
+          {t('removeModal.removeButton')}
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout
       title={t('page.title')}
@@ -157,118 +225,48 @@ export default function StoreStaffPage() {
         </div>
       )}
 
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden overflow-x-auto">
-        <table className="w-full" aria-label={t('table.ariaLabel')}>
-          <thead className="bg-muted border-b">
-            <tr>
-              <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('table.colMember')}
-              </th>
-              <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('table.colStatus')}
-              </th>
-              <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('table.colAdded')}
-              </th>
-              <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('table.colLastLogin')}
-              </th>
-              <th className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('table.colActions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <tr key={i}>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
-                      <div>
-                        <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-                        <div className="h-3 w-40 bg-muted rounded animate-pulse mt-1" />
-                      </div>
-                    </div>
-                  </td>
-                  {[1, 2, 3, 4].map(j => (
-                    <td key={j} className="px-6 py-4">
-                      <div className="h-4 w-20 bg-muted rounded animate-pulse" />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : staff.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center">
-                  <div className="flex flex-col items-center">
-                    <svg
-                      className="h-12 w-12 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1}
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
-                    <p className="mt-4 text-muted-foreground">{t('empty.title')}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{t('empty.description')}</p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              staff.map(member => (
-                <tr key={member.membershipId} className="hover:bg-muted">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                        <span className="text-sm font-bold">
-                          {member.firstName[0]}
-                          {member.lastName[0]}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {member.firstName} {member.lastName}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge
-                      variant={
-                        member.status === 'active'
-                          ? 'default'
-                          : member.status === 'suspended'
-                            ? 'destructive'
-                            : 'secondary'
-                      }
-                    >
-                      {member.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">
-                    {formatDate(member.createdAt)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">
-                    {formatDate(member.lastLoginAt)}
-                  </td>
-                  <td className="px-6 py-4 text-end">
-                    <Button variant="outline" size="sm" onClick={() => setRemoveTarget(member)}>
-                      {t('removeModal.removeButton')}
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                  <div className="h-3 w-40 bg-muted rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <DataTable<StaffMember>
+          columns={columns}
+          rows={staff}
+          rowKey={member => member.membershipId}
+          emptyState={
+            <div className="rounded-xl border bg-card shadow-sm px-6 py-12 text-center">
+              <div className="flex flex-col items-center">
+                <svg
+                  className="h-12 w-12 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                <p className="mt-4 text-muted-foreground">{t('empty.title')}</p>
+                <p className="text-sm text-muted-foreground mt-1">{t('empty.description')}</p>
+              </div>
+            </div>
+          }
+        />
+      )}
 
       {/* Add staff modal */}
       <Modal

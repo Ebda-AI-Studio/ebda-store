@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface CustomerGroup {
   id: string;
@@ -121,6 +122,60 @@ export default function CustomerGroupsPage() {
     }
   };
 
+  const columns: DataTableColumn<CustomerGroup>[] = [
+    {
+      header: t('name'),
+      primaryOnMobile: true,
+      cell: group => (
+        <>
+          <span className="font-medium">{group.name}</span>
+          {group.nameAr && (
+            <span className="ms-2 text-muted-foreground" dir="rtl">
+              {group.nameAr}
+            </span>
+          )}
+          {group.isDefault && (
+            <span className="ms-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+              {t('defaultBadge')}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: t('customers'),
+      cell: group => <span className="tabular-nums">{group.customerCount}</span>,
+    },
+    {
+      header: t('status'),
+      mobileBadge: true,
+      cell: group => <>{group.isActive ? t('statusActive') : t('statusInactive')}</>,
+    },
+    {
+      header: t('actions'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: group => (
+        <>
+          <button
+            type="button"
+            onClick={() => openEdit(group)}
+            className="text-primary hover:underline"
+          >
+            {t('edit')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void remove(group)}
+            className="ms-3 text-destructive hover:underline"
+          >
+            {t('delete')}
+          </button>
+        </>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout
       title={t('title')}
@@ -155,57 +210,7 @@ export default function CustomerGroupsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-start font-medium">{t('name')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('customers')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('status')}</th>
-                  <th className="px-3 py-2 text-end font-medium">{t('actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map(group => (
-                  <tr key={group.id} className="border-t">
-                    <td className="px-3 py-2">
-                      <span className="font-medium">{group.name}</span>
-                      {group.nameAr && (
-                        <span className="ms-2 text-muted-foreground" dir="rtl">
-                          {group.nameAr}
-                        </span>
-                      )}
-                      {group.isDefault && (
-                        <span className="ms-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-                          {t('defaultBadge')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">{group.customerCount}</td>
-                    <td className="px-3 py-2">
-                      {group.isActive ? t('statusActive') : t('statusInactive')}
-                    </td>
-                    <td className="px-3 py-2 text-end">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(group)}
-                        className="text-primary hover:underline"
-                      >
-                        {t('edit')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void remove(group)}
-                        className="ms-3 text-destructive hover:underline"
-                      >
-                        {t('delete')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<CustomerGroup> columns={columns} rows={groups} rowKey={group => group.id} />
         )}
 
         {showModal && (

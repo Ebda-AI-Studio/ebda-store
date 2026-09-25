@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 /**
  * Super-admin: payment webhook inbox (WebhookEvent rows) + one-click replay.
@@ -89,6 +90,63 @@ export default function WebhookEventsPage() {
     setReplaying(null);
   };
 
+  const columns: DataTableColumn<WebhookEvent>[] = [
+    {
+      header: 'Received',
+      cell: ev => <span className="text-gray-600">{new Date(ev.receivedAt).toLocaleString()}</span>,
+    },
+    {
+      header: 'Provider',
+      primaryOnMobile: true,
+      cell: ev => <span className="font-medium text-gray-900">{ev.provider}</span>,
+    },
+    {
+      header: 'Status',
+      mobileBadge: true,
+      cell: ev => <Badge variant={statusVariant(ev.status)}>{ev.status}</Badge>,
+    },
+    {
+      header: 'Attempts',
+      hideOnMobile: true,
+      cell: ev => <span className="text-gray-600">{ev.attempts}</span>,
+    },
+    {
+      header: 'Result',
+      hideOnMobile: true,
+      cell: ev =>
+        ev.resultOrderId ? (
+          <span className="text-gray-600" title={ev.resultOrderId}>
+            {ev.resultStatus || 'ok'} · {ev.resultOrderId.slice(0, 8)}
+          </span>
+        ) : (
+          <span className="text-gray-600">—</span>
+        ),
+    },
+    {
+      header: 'Last error',
+      cell: ev => (
+        <span className="block max-w-[240px] truncate text-destructive" title={ev.lastError || ''}>
+          {ev.lastError || '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Action',
+      mobileActions: true,
+      cell: ev => (
+        <Button
+          variant="outline"
+          size="sm"
+          className="max-md:min-h-11 max-md:px-4"
+          disabled={replaying === ev.id}
+          onClick={() => replay(ev.id)}
+        >
+          {replaying === ev.id ? 'Replaying…' : 'Replay'}
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <AdminLayout
       title="Payment webhook inbox"
@@ -121,74 +179,22 @@ export default function WebhookEventsPage() {
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2">Received</th>
-                <th className="px-3 py-2">Provider</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Attempts</th>
-                <th className="px-3 py-2">Result</th>
-                <th className="px-3 py-2">Last error</th>
-                <th className="px-3 py-2">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
-                    Loading…
-                  </td>
-                </tr>
-              ) : events.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
-                    No webhook events
-                  </td>
-                </tr>
-              ) : (
-                events.map(ev => (
-                  <tr key={ev.id}>
-                    <td className="whitespace-nowrap px-3 py-2 text-gray-600">
-                      {new Date(ev.receivedAt).toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2 font-medium text-gray-900">{ev.provider}</td>
-                    <td className="px-3 py-2">
-                      <Badge variant={statusVariant(ev.status)}>{ev.status}</Badge>
-                    </td>
-                    <td className="px-3 py-2 text-gray-600">{ev.attempts}</td>
-                    <td className="px-3 py-2 text-gray-600">
-                      {ev.resultOrderId ? (
-                        <span title={ev.resultOrderId}>
-                          {ev.resultStatus || 'ok'} · {ev.resultOrderId.slice(0, 8)}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td
-                      className="max-w-[240px] truncate px-3 py-2 text-destructive"
-                      title={ev.lastError || ''}
-                    >
-                      {ev.lastError || '—'}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={replaying === ev.id}
-                        onClick={() => replay(ev.id)}
-                      >
-                        {replaying === ev.id ? 'Replaying…' : 'Replay'}
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {loading ? (
+          <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
+            Loading…
+          </div>
+        ) : (
+          <DataTable<WebhookEvent>
+            columns={columns}
+            rows={events}
+            rowKey={ev => ev.id}
+            emptyState={
+              <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
+                No webhook events
+              </div>
+            }
+          />
+        )}
       </div>
     </AdminLayout>
   );

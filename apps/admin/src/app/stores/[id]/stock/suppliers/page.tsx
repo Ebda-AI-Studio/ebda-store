@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
+import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPatch } from '@/lib/api';
 
@@ -115,86 +116,92 @@ export default function SuppliersPage() {
           </button>
         </div>
 
-        {filteredSuppliers !== null && filteredSuppliers.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No suppliers yet. Add one with the button above.
-          </p>
-        ) : (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                    {t('name')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-36">
-                    {t('contact')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-32">
-                    {t('phone')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-40">
-                    {t('email')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-32">
-                    {t('paymentTerms')}
-                  </th>
-                  <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20">
-                    {t('active')}
-                  </th>
-                  <th className="px-3 py-2 w-28" />
-                </tr>
-              </thead>
-              <tbody>
-                {(filteredSuppliers ?? []).map(s => (
-                  <tr key={s.id} className="border-t border-border/40">
-                    <td className="px-3 py-2 font-medium truncate max-w-[12rem]">{s.name}</td>
-                    <td className="px-3 py-2 text-muted-foreground truncate">
-                      {s.contactName ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground font-mono text-xs">
-                      {s.phone ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground truncate text-xs">
-                      {s.email ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {s.paymentTerms === 'custom'
-                        ? `${s.customTermsDays ?? '?'} days`
-                        : t(`terms.${s.paymentTerms}`)}
-                    </td>
-                    <td className="px-3 py-2 text-center text-muted-foreground">
-                      {s.isActive ? '✓' : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-end">
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            router.push(`/stores/${storeId}/stock/suppliers/new?supplierId=${s.id}`)
-                          }
-                          className="text-primary text-xs underline underline-offset-2 hover:opacity-80"
-                        >
-                          Edit
-                        </button>
-                        {s.isActive && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeactivate(s.id)}
-                            disabled={deleting === s.id}
-                            className="text-red-600 text-xs underline underline-offset-2 hover:opacity-80 disabled:opacity-40"
-                          >
-                            Deactivate
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable<Supplier>
+          columns={[
+            {
+              header: t('name'),
+              primaryOnMobile: true,
+              cell: s => <span className="font-medium truncate max-w-[12rem] block">{s.name}</span>,
+            },
+            {
+              header: t('contact'),
+              className: 'w-36',
+              cell: s => (
+                <span className="text-muted-foreground truncate block">{s.contactName ?? '—'}</span>
+              ),
+            },
+            {
+              header: t('phone'),
+              className: 'w-32',
+              cell: s => (
+                <span className="text-muted-foreground font-mono text-xs">{s.phone ?? '—'}</span>
+              ),
+            },
+            {
+              header: t('email'),
+              hideOnMobile: true,
+              className: 'w-40',
+              cell: s => (
+                <span className="text-muted-foreground truncate text-xs block">
+                  {s.email ?? '—'}
+                </span>
+              ),
+            },
+            {
+              header: t('paymentTerms'),
+              className: 'w-32',
+              cell: s => (
+                <span className="text-muted-foreground">
+                  {s.paymentTerms === 'custom'
+                    ? `${s.customTermsDays ?? '?'} days`
+                    : t(`terms.${s.paymentTerms}`)}
+                </span>
+              ),
+            },
+            {
+              header: t('active'),
+              mobileBadge: true,
+              className: 'w-20 text-center',
+              cell: s => <span className="text-muted-foreground">{s.isActive ? '✓' : '—'}</span>,
+            },
+            {
+              header: '',
+              alignEnd: true,
+              mobileActions: true,
+              className: 'w-28',
+              cell: s => (
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(`/stores/${storeId}/stock/suppliers/new?supplierId=${s.id}`)
+                    }
+                    className="text-primary text-xs underline underline-offset-2 hover:opacity-80 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+                  >
+                    Edit
+                  </button>
+                  {s.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeactivate(s.id)}
+                      disabled={deleting === s.id}
+                      className="text-red-600 text-xs underline underline-offset-2 hover:opacity-80 disabled:opacity-40 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+                    >
+                      Deactivate
+                    </button>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+          rows={filteredSuppliers ?? []}
+          rowKey={s => s.id}
+          emptyState={
+            <p className="text-muted-foreground text-sm">
+              No suppliers yet. Add one with the button above.
+            </p>
+          }
+        />
       </div>
     </AdminLayout>
   );
