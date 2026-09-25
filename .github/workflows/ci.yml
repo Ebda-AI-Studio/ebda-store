@@ -498,6 +498,19 @@ jobs:
       - name: Build API
         run: npm run build -w apps/api
 
+      - name: Give force_app a CI-only login for the API server
+        # RLS phase 3 moves PRODUCTION's API onto the non-bypass `force_app`
+        # role. Until now the whole integration suite drove an API logged in as
+        # the `test` superuser (BYPASSRLS), so no flow was ever proven under
+        # enforced RLS except the cross-tenant proof file. The API server below
+        # now runs as force_app, exactly as production will; the test harness
+        # keeps the superuser URL for fixtures and cleanup. This password only
+        # exists inside this disposable per-job container.
+        run: |
+          cat <<'SQL' | npx prisma db execute --url "postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test" --stdin
+          ALTER ROLE force_app WITH PASSWORD 'ci-only-force-app-pw' LOGIN;
+          SQL
+
       - name: Start API server
         # tests/integration hit a real HTTP server at localhost:4000.
         # Background-launch the built API and poll /health until it is
@@ -517,7 +530,7 @@ jobs:
           exit 1
         env:
           PORT: '4000'
-          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DATABASE_URL: postgresql://force_app:ci-only-force-app-pw@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
