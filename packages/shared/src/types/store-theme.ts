@@ -451,6 +451,19 @@ export interface StoreTheme {
 
   // Custom CSS (for advanced users)
   customCss?: string;
+
+  /**
+   * When true, the storefront footer renders a "Branches"/"فروعنا" column
+   * listing the store's published Locations (name + address, linked to
+   * `mapsUrl` when present, phone as a `tel:` link when present). Default
+   * false/undefined — a store that has locations enabled for the /locations
+   * page is UNAFFECTED until it explicitly opts in here (e.g. pecannbee's 8
+   * locations render nowhere in the footer until this flag is set). Also
+   * requires `Store.locationsEnabled === true` and at least one published
+   * location — either gate missing means no column. Toggled via
+   * Branding → Locations. 2026-09-25 (B3).
+   */
+  showBranchesInFooter?: boolean;
 }
 
 /**

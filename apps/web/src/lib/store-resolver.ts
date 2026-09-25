@@ -5,6 +5,7 @@ import {
   type StoreSocialLinks,
   type AnnouncementBar,
   type TemplateId,
+  type StoreLocationPublic,
   DEFAULT_THEME,
   getTemplateTheme,
 } from '@force/shared';
@@ -157,6 +158,15 @@ export interface ResolvedStore {
   }>;
 
   /**
+   * Published store locations, forwarded from the API only when
+   * `locationsEnabled && theme.showBranchesInFooter` (B3, 2026-09-25) — the
+   * storefront footer's opt-in "Branches" column. Absent otherwise, so a
+   * store that hasn't opted in pays no extra query and sees no change. See
+   * `templates/shared/display-helpers.ts::resolveFooterBranches`.
+   */
+  locations?: StoreLocationPublic[];
+
+  /**
    * Set ONLY on the `DEFAULT_STORE` fallback returned by the lenient
    * {@link getStore}, and only when the real store could not be resolved for a
    * TRANSIENT reason (429/5xx/network) rather than because the request carried
@@ -258,6 +268,26 @@ function logSafe(value: string): string {
  */
 function noStoreReason(data: { success?: unknown }): string {
   return data?.success ? 'response carried no store object' : 'API reported success:false';
+}
+
+/**
+ * Validate the `locations` sibling the API attaches to the store-resolve
+ * payload (only present when `locationsEnabled && theme.showBranchesInFooter`
+ * — see `public.routes.ts`). Malformed/absent input returns `undefined`
+ * rather than an empty array so `resolveFooterBranches` can distinguish
+ * "not sent" from "sent, empty" — both render nothing, but only the former
+ * is the expected shape for a store that hasn't opted in.
+ */
+function parsePublicLocations(raw: unknown): StoreLocationPublic[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.filter(
+    (l): l is StoreLocationPublic =>
+      !!l &&
+      typeof l === 'object' &&
+      typeof (l as { id?: unknown }).id === 'string' &&
+      typeof (l as { name?: unknown }).name === 'string' &&
+      typeof (l as { address?: unknown }).address === 'string'
+  );
 }
 
 /**
@@ -396,6 +426,9 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
         !Array.isArray(storeData.aboutJson)
           ? (storeData.aboutJson as Record<string, unknown>)
           : null,
+      // Sibling of `store`, not a store field — only present when the API
+      // decided to include it (locationsEnabled && showBranchesInFooter).
+      locations: parsePublicLocations(data.data.locations),
     };
   } catch (error) {
     // Already classified above — rethrow rather than re-wrap or downgrade.
@@ -552,6 +585,9 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
         !Array.isArray(storeData.aboutJson)
           ? (storeData.aboutJson as Record<string, unknown>)
           : null,
+      // Sibling of `store`, not a store field — only present when the API
+      // decided to include it (locationsEnabled && showBranchesInFooter).
+      locations: parsePublicLocations(data.data.locations),
     };
   } catch (error) {
     if (error instanceof StoreTemporarilyUnavailableError) throw error;

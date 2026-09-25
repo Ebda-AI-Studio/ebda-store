@@ -329,6 +329,18 @@ export interface FooterProps {
    * dedicated footer asset is assumed correct for their brand.
    */
   footerLogoAutoFilter?: string;
+  /**
+   * Published store locations, forwarded from the store-resolve payload
+   * (ShopChrome → `store.locations`). Only present when the API decided to
+   * include it — gated server-side on `locationsEnabled &&
+   * theme.showBranchesInFooter` so a store that hasn't opted in never pays
+   * for the extra query. Each theme resolves this via
+   * `resolveFooterBranches()` (templates/shared/display-helpers.ts), which
+   * ALSO re-checks `theme?.showBranchesInFooter` — the toggle is the single
+   * source of truth for whether the "Branches" column renders, not merely
+   * whether this prop is populated.
+   */
+  locations?: import('@force/shared').StoreLocationPublic[];
 }
 
 /**

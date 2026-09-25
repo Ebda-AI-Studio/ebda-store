@@ -3,7 +3,11 @@
 import { PoweredByForce } from '../shared/PoweredByForce';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { resolveFooterSections } from '../shared/display-helpers';
+import {
+  footerBranchesHeading,
+  resolveFooterBranches,
+  resolveFooterSections,
+} from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function MinimalFooter({
@@ -18,6 +22,7 @@ export default function MinimalFooter({
   hideFooterLogoMobile,
   footerLogoAutoFilter,
   theme,
+  locations,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -46,6 +51,12 @@ export default function MinimalFooter({
   // social URL is set, so the merchant's contact phone doubles as a chat
   // link without manual configuration.
   const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
+
+  // Opt-in "Branches" block — see resolveFooterBranches for the gating
+  // rules. Minimal's footer is a single flex row, not a grid, so this is
+  // just another flex item rather than a "column count" to recompute.
+  const branches = resolveFooterBranches(locations, theme, isRtl);
+  const showBranches = branches.length > 0;
 
   return (
     <footer
@@ -127,6 +138,44 @@ export default function MinimalFooter({
                   />
                 </a>
               ))}
+            </div>
+          )}
+
+          {/* Branches — opt-in, only rendered when the toggle is on AND at
+              least one published location exists. */}
+          {showBranches && (
+            <div className={`flex flex-col gap-3 ${isRtl ? 'items-end' : 'items-start'}`}>
+              <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
+                {footerBranchesHeading(isRtl)}
+              </h4>
+              <ul className="flex flex-col gap-2 text-start">
+                {branches.map(loc => (
+                  <li key={loc.id} className="text-sm text-muted-foreground">
+                    <p className="text-foreground">{loc.name}</p>
+                    {loc.mapsHref ? (
+                      <a
+                        href={loc.mapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-foreground transition-colors duration-200"
+                      >
+                        {loc.address}
+                      </a>
+                    ) : (
+                      <span>{loc.address}</span>
+                    )}
+                    {loc.phone && (
+                      <a
+                        href={`tel:${loc.phone}`}
+                        dir="ltr"
+                        className="block hover:text-foreground transition-colors duration-200"
+                      >
+                        {loc.phone}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

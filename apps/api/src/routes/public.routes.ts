@@ -1330,6 +1330,54 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+/**
+ * Public projection of a store's published Locations, threaded onto the
+ * store-resolve payloads below for the opt-in storefront-footer "Branches"
+ * column (B3, 2026-09-25). Gated on BOTH `locationsEnabled` (the existing
+ * Locations feature) AND `theme.showBranchesInFooter` (the new footer
+ * opt-in), so a store with Locations enabled for its /locations page but no
+ * footer opt-in — e.g. pecannbee's 8 locations — pays no extra query and its
+ * footer is unaffected until it explicitly turns this on. Narrower select
+ * than `LocationsService.listPublished` (drops country/whatsapp/hours/
+ * mapsEmbedUrl) since this rides EVERY page's store-resolve payload — the
+ * dedicated `/public/:storeId/locations` endpoint still returns the full row.
+ */
+async function fetchFooterLocations(store: {
+  id: string;
+  locationsEnabled: boolean | null;
+  theme: unknown;
+}): Promise<
+  | Array<{
+      id: string;
+      name: string;
+      nameAr: string | null;
+      address: string;
+      addressAr: string | null;
+      phone: string | null;
+      mapsUrl: string | null;
+    }>
+  | undefined
+> {
+  const theme =
+    store.theme && typeof store.theme === 'object'
+      ? (store.theme as Record<string, unknown>)
+      : null;
+  if (!store.locationsEnabled || theme?.showBranchesInFooter !== true) return undefined;
+  return prisma.storeLocation.findMany({
+    where: { storeId: store.id, isPublished: true },
+    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      nameAr: true,
+      address: true,
+      addressAr: true,
+      phone: true,
+      mapsUrl: true,
+    },
+  });
+}
+
 // GET /stores/:slugOrId - Get store by slug or ID (public, cached 120s)
 router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -1454,7 +1502,8 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         select: { slug: true },
       });
       const disabledCmsSlugs = disabledPages.map(p => p.slug);
-      return { store: publicStore, enabledFeatures, disabledCmsSlugs };
+      const locations = await fetchFooterLocations(store);
+      return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
     });
 
     if (!result) {
@@ -1654,7 +1703,8 @@ router.get(
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
         };
 
-        return { store: publicStore, enabledFeatures, disabledCmsSlugs };
+        const locations = await fetchFooterLocations(store);
+        return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
       });
 
       if (!result) {

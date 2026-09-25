@@ -1740,7 +1740,6 @@
       "brandColors": {
         "title": "Brand colors",
         "hint": "Set your 2–3 core brand colors. We generate the rest of the palette from them — then fine-tune any individual color in the Page Builder.",
-        "smartPaletteButton": "Generate from Smart Palette",
         "primary": "Primary",
         "secondary": "Secondary",
         "accent": "Accent",
@@ -1828,6 +1827,9 @@
       "disabledTitle": "Locations are currently disabled",
       "disabledDescription": "Locations you add here are saved but won't be visible on the storefront until you enable the toggle above.",
       "navHint": "Add the Locations link to your storefront via Page Builder → header navigation, footer links, or top utility bar.",
+      "showInFooterTitle": "Show branches in footer",
+      "showInFooterHint": "Adds a \"Branches\" column to your storefront footer listing your published locations (name, address, phone). Off by default — existing footers are unaffected until you turn this on.",
+      "showInFooterToggle": "Show a Branches column in the storefront footer",
       "count": "{count, plural, =0 {No locations} one {# location} other {# locations}}",
       "addButton": "+ Add location",
       "formNewTitle": "New Location",

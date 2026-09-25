@@ -169,6 +169,13 @@ export interface StoreData {
     steps: Array<{ name: string; text: string; image?: string }>;
     stepsAr?: Array<{ name: string; text: string; image?: string }> | null;
   }>;
+  /**
+   * Published store locations — mirrors `ResolvedStore.locations`
+   * (store-resolver.ts). Only present when the API included it, which it
+   * does only when `locationsEnabled && theme.showBranchesInFooter`. See
+   * `templates/shared/display-helpers.ts::resolveFooterBranches`.
+   */
+  locations?: import('@force/shared').StoreLocationPublic[];
 }
 
 interface StoreContextValue {

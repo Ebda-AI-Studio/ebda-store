@@ -222,6 +222,9 @@ export const translations = {
   // Locations page
   Locations: 'الفروع',
   'Our Locations': 'فروعنا',
+  // Storefront footer "Branches" column heading (B3, 2026-09-25) — opt-in
+  // per store via Branding → Locations → "Show branches in footer".
+  Branches: 'فروعنا',
   'Visit a store — tap a branch for directions, to call, or to message us.':
     'زر أحد فروعنا — اضغط على الفرع للاتجاهات أو الاتصال أو المراسلة.',
   'Open in Maps': 'افتح في الخرائط',

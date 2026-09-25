@@ -103,7 +103,9 @@ export default function StoreBrandingPage() {
 
         {activeTab === 'social' && <SocialLinksTab branding={branding} onChange={setBranding} />}
 
-        {activeTab === 'locations' && <LocationsTab storeId={storeId} />}
+        {activeTab === 'locations' && (
+          <LocationsTab storeId={storeId} branding={branding} onChange={setBranding} />
+        )}
       </div>
     </AdminLayout>
   );

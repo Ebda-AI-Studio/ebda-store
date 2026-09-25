@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { resolveAddressHref, resolveFooterSections } from '../shared/display-helpers';
+import {
+  footerBranchesHeading,
+  resolveAddressHref,
+  resolveFooterBranches,
+  resolveFooterSections,
+} from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function BoldFooter({
@@ -19,6 +24,7 @@ export default function BoldFooter({
   hideFooterLogoMobile,
   footerLogoAutoFilter,
   theme,
+  locations,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -45,13 +51,23 @@ export default function BoldFooter({
   // Hide the contact column entirely when the store has no contact details
   // configured — empty heading + empty list reads as half-built.
   const hasContact = !!(contact.email || displayPhone || displayAddress);
+  // Opt-in "Branches" column — see resolveFooterBranches for the gating
+  // rules. Off (+0) reduces this formula to exactly today's totalCells.
+  const branches = resolveFooterBranches(locations, theme, isRtl);
+  const showBranches = branches.length > 0;
 
   // Brand always spans 2 cols. With sections (1 fallback or N footerSections)
-  // + (contact?), total cells = 2 + N + (hasContact ? 1 : 0).
+  // + (contact?) + (branches?), total cells = 2 + N + (hasContact?1:0) + (showBranches?1:0).
   const linkColumnsCount = footerSections.length > 0 ? footerSections.length : 1;
-  const totalCells = 2 + linkColumnsCount + (hasContact ? 1 : 0);
+  const totalCells = 2 + linkColumnsCount + (hasContact ? 1 : 0) + (showBranches ? 1 : 0);
   const lgColsClass =
-    totalCells >= 6 ? 'lg:grid-cols-6' : totalCells === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4';
+    totalCells >= 7
+      ? 'lg:grid-cols-7'
+      : totalCells === 6
+        ? 'lg:grid-cols-6'
+        : totalCells === 5
+          ? 'lg:grid-cols-5'
+          : 'lg:grid-cols-4';
 
   // Item 2 (2026-07-12) persona-completion: bold's inverted footer
   // (design.md "inverted footer — accent is the only color on the bar").
@@ -225,6 +241,44 @@ export default function BoldFooter({
                     )}
                   </li>
                 )}
+              </ul>
+            </div>
+          )}
+
+          {/* Branches — opt-in, only rendered when the toggle is on AND at
+              least one published location exists. */}
+          {showBranches && (
+            <div>
+              <h4 className={`text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 ${fgFull}`}>
+                {footerBranchesHeading(isRtl)}
+              </h4>
+              <ul className="space-y-3">
+                {branches.map(loc => (
+                  <li key={loc.id} className={`text-sm ${fgMuted}`}>
+                    <p className={fgFull}>{loc.name}</p>
+                    {loc.mapsHref ? (
+                      <a
+                        href={loc.mapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-primary transition-colors duration-200"
+                      >
+                        {loc.address}
+                      </a>
+                    ) : (
+                      <span>{loc.address}</span>
+                    )}
+                    {loc.phone && (
+                      <a
+                        href={`tel:${loc.phone}`}
+                        dir="ltr"
+                        className="block hover:text-primary transition-colors duration-200"
+                      >
+                        {loc.phone}
+                      </a>
+                    )}
+                  </li>
+                ))}
               </ul>
             </div>
           )}

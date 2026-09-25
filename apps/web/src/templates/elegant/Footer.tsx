@@ -7,8 +7,10 @@ import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import {
+  footerBranchesHeading,
   isNewsletterEnabled,
   resolveAddressHref,
+  resolveFooterBranches,
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
@@ -25,6 +27,7 @@ export default function ElegantFooter({
   hideFooterLogoMobile,
   footerLogoAutoFilter,
   theme,
+  locations,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -79,6 +82,21 @@ export default function ElegantFooter({
     contact.addressUrl,
     contact.addressLink
   );
+  // Opt-in "Branches" column — see resolveFooterBranches for the gating
+  // rules. Off (+0) reduces this to the pre-existing footerSections-only
+  // formula below, so the toggle-off render is byte-identical.
+  const branches = resolveFooterBranches(locations, theme, isRtl);
+  const showBranches = branches.length > 0;
+  const baseCols = footerSections.length >= 3 ? 6 : footerSections.length === 2 ? 5 : 4;
+  const totalCols = baseCols + (showBranches ? 1 : 0);
+  const gridColsClass =
+    totalCols >= 7
+      ? 'md:grid-cols-7'
+      : totalCols === 6
+        ? 'md:grid-cols-6'
+        : totalCols === 5
+          ? 'md:grid-cols-5'
+          : 'md:grid-cols-4';
 
   return (
     <footer
@@ -156,15 +174,7 @@ export default function ElegantFooter({
       <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20 lg:py-24">
         {/* Brand + (sections|explore) + Contact + Follow. Grow the grid so
             extra sections don't crowd the contact / follow columns. */}
-        <div
-          className={`grid grid-cols-2 gap-8 sm:gap-10 ${
-            footerSections.length >= 3
-              ? 'md:grid-cols-6'
-              : footerSections.length === 2
-                ? 'md:grid-cols-5'
-                : 'md:grid-cols-4'
-          } md:gap-12`}
-        >
+        <div className={`grid grid-cols-2 gap-8 sm:gap-10 ${gridColsClass} md:gap-12`}>
           {/* Brand — desktop only. Logo centered at top on mobile (Ahmad 2026-06-20). */}
           <div className="col-span-2 md:col-span-1">
             {displayLogo && !hideFooterLogoMobile && (
@@ -321,6 +331,44 @@ export default function ElegantFooter({
                   </a>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Branches — opt-in, only rendered when the toggle is on AND at
+              least one published location exists. */}
+          {showBranches && (
+            <div>
+              <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-semibold text-foreground mb-6 font-serif">
+                {footerBranchesHeading(isRtl)}
+              </h4>
+              <ul className="space-y-4 text-sm">
+                {branches.map(loc => (
+                  <li key={loc.id} className="leading-loose">
+                    <p className="text-foreground/90">{loc.name}</p>
+                    {loc.mapsHref ? (
+                      <a
+                        href={loc.mapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                      >
+                        {loc.address}
+                      </a>
+                    ) : (
+                      <span className="text-foreground/70">{loc.address}</span>
+                    )}
+                    {loc.phone && (
+                      <a
+                        href={`tel:${loc.phone}`}
+                        dir="ltr"
+                        className="block text-foreground/70 hover:text-foreground transition-colors duration-700 ease-out tracking-wide cursor-pointer"
+                      >
+                        {loc.phone}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

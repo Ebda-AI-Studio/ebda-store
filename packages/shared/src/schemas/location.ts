@@ -78,6 +78,26 @@ export const locationInputSchema = z.object({
 });
 export type LocationInput = z.infer<typeof locationInputSchema>;
 
+/**
+ * Narrow, storefront-safe projection of a `StoreLocation` row — the shape
+ * threaded through the public store-resolve payload (`/public/store/resolve`,
+ * `/public/stores/:slugOrId`) into `FooterProps.locations` for the opt-in
+ * "Branches" footer column (B3, 2026-09). Deliberately drops fields the
+ * footer doesn't render (`country`, `whatsapp`, `hours`, `mapsEmbedUrl`,
+ * `isPublished`, `position`) to keep the per-page store payload small — the
+ * dedicated `/public/:storeId/locations` endpoint (the `/locations` page)
+ * still returns the full row.
+ */
+export interface StoreLocationPublic {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  address: string;
+  addressAr?: string | null;
+  phone?: string | null;
+  mapsUrl?: string | null;
+}
+
 export function mapsSearchUrl(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }

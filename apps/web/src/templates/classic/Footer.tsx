@@ -5,9 +5,11 @@ import { PoweredByForce } from '../shared/PoweredByForce';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
+  footerBranchesHeading,
   getDisplayBranding,
   getDisplayText,
   resolveAddressHref,
+  resolveFooterBranches,
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
@@ -24,6 +26,7 @@ export default function ClassicFooter({
   hideFooterLogoMobile,
   footerLogoAutoFilter,
   theme,
+  locations,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -48,6 +51,12 @@ export default function ClassicFooter({
     contact.addressUrl,
     contact.addressLink
   );
+  // Opt-in "Branches" column — see resolveFooterBranches for the gating
+  // rules. Rendering it bumps the grid from 5 to 6 columns; the fixed
+  // `lg:grid-cols-5` when off is untouched so every existing store's footer
+  // stays byte-identical.
+  const branches = resolveFooterBranches(locations, theme, isRtl);
+  const showBranches = branches.length > 0;
   const useDefaultNavChunks = footerSections.length === 0;
   const navChunks: (typeof navigation)[] = [];
   if (useDefaultNavChunks && navigation.length > 0) {
@@ -65,8 +74,10 @@ export default function ClassicFooter({
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-4 pt-16 pb-8">
-        {/* Main grid — brand + up to 4 nav columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-12 mb-12">
+        {/* Main grid — brand + up to 4 nav columns (+ Branches when opted in) */}
+        <div
+          className={`grid grid-cols-1 md:grid-cols-2 ${showBranches ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-10 lg:gap-12 mb-12`}
+        >
           {/* Brand column — logo centered at top on mobile (Ahmad 2026-06-20). */}
           <div className="lg:col-span-2 space-y-5">
             {displayLogo && !hideFooterLogoMobile && (
@@ -227,6 +238,44 @@ export default function ClassicFooter({
                   </ul>
                 </div>
               ))}
+
+          {/* Branches — opt-in, only rendered when the merchant turned the
+              toggle on AND at least one published location exists. */}
+          {showBranches && (
+            <div>
+              <h4 className="font-serif font-bold text-xs ui-caps-toggle tracking-[0.2em] text-foreground mb-5">
+                {footerBranchesHeading(isRtl)}
+              </h4>
+              <ul className="space-y-3">
+                {branches.map(loc => (
+                  <li key={loc.id} className="text-sm text-muted-foreground">
+                    <p className="text-foreground">{loc.name}</p>
+                    {loc.mapsHref ? (
+                      <a
+                        href={loc.mapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-foreground transition-colors duration-200"
+                      >
+                        {loc.address}
+                      </a>
+                    ) : (
+                      <span>{loc.address}</span>
+                    )}
+                    {loc.phone && (
+                      <a
+                        href={`tel:${loc.phone}`}
+                        dir="ltr"
+                        className="block hover:text-foreground transition-colors duration-200"
+                      >
+                        {loc.phone}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}

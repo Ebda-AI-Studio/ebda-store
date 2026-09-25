@@ -5,7 +5,8 @@
  * logic that was previously duplicated in every template.
  */
 
-import { sanitizeUrl } from '@force/shared';
+import { sanitizeUrl, type StoreLocationPublic, type StoreTheme } from '@force/shared';
+import { translations } from '../../contexts/LanguageContext';
 import type {
   FooterBottomBarConfig,
   FooterLinkSection,
@@ -257,4 +258,55 @@ export function buildMapsHref(address: string | undefined): string | null {
   const trimmed = address.trim();
   if (!trimmed) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trimmed)}`;
+}
+
+/** A store location ready to render in the footer's "Branches" column. */
+export interface ResolvedFooterLocation {
+  id: string;
+  name: string;
+  address: string;
+  /** Sanitized http(s) maps link, or undefined when absent/unsafe. */
+  mapsHref?: string;
+  /** Raw phone string for a `tel:` link, or undefined when absent. */
+  phone?: string;
+}
+
+/**
+ * The footer "Branches" column heading — routed through the storefront's
+ * `translations` map (LanguageContext.tsx) rather than hardcoded in a theme,
+ * per the platform's storefront-copy rule.
+ */
+export function footerBranchesHeading(isRtl: boolean): string {
+  return isRtl ? translations.Branches : 'Branches';
+}
+
+/**
+ * Resolve the opt-in "Branches" footer column. Returns `[]` (render nothing)
+ * unless BOTH gates hold: the merchant turned `theme.showBranchesInFooter` on
+ * AND at least one published location was forwarded. This is the single
+ * source of truth every theme's Footer calls — `locations` being present on
+ * the props does NOT by itself mean the column should render (the API only
+ * omits the array when the flag is off, but a theme must never assume that
+ * and skip re-checking the flag itself, since props can be hand-passed in
+ * tests/storybook-style usage without going through the real API gate).
+ *
+ * Rows missing a usable name+address are dropped rather than rendered blank.
+ */
+export function resolveFooterBranches(
+  locations: StoreLocationPublic[] | undefined,
+  theme: StoreTheme | undefined,
+  isRtl: boolean
+): ResolvedFooterLocation[] {
+  if (theme?.showBranchesInFooter !== true) return [];
+  if (!Array.isArray(locations) || locations.length === 0) return [];
+  return locations
+    .map((loc): ResolvedFooterLocation | null => {
+      const name = getDisplayText(loc.name, loc.nameAr ?? undefined, isRtl);
+      const address = getDisplayText(loc.address, loc.addressAr ?? undefined, isRtl);
+      if (!name?.trim() || !address?.trim()) return null;
+      const mapsHref = loc.mapsUrl ? sanitizeUrl(loc.mapsUrl, '') || undefined : undefined;
+      const phone = loc.phone?.trim() || undefined;
+      return { id: loc.id, name, address, mapsHref, phone };
+    })
+    .filter((l): l is ResolvedFooterLocation => l !== null);
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../lib/api';
 import { textFieldValue } from '../../../../../lib/form-text';
+import type { StoreBranding } from './types';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface Location {
@@ -62,16 +63,28 @@ interface StoreInfo {
   locationsEnabled?: boolean;
 }
 
+interface LocationsTabProps {
+  storeId: string;
+  /**
+   * Shared branding state — the LocationsTab only reads/writes
+   * `theme.showBranchesInFooter` from it (same shallow-merge PATCH pattern
+   * as ThemeTab; the top-level page's "Save" button PUTs the whole object).
+   */
+  branding: StoreBranding;
+  onChange: (branding: StoreBranding) => void;
+}
+
 /**
  * Admin locations CRUD page (Store Locations / Branches feature, 2026-06-16).
  *
  * Lists all locations (published + unpublished), inline create/edit form,
- * delete with inline confirm (no window.confirm), and an Enable Locations
- * toggle that PUTs locationsEnabled to the store-update endpoint.
+ * delete with inline confirm (no window.confirm), an Enable Locations toggle
+ * that PUTs locationsEnabled to the store-update endpoint, and (2026-09-25,
+ * B3) a "Show branches in footer" toggle on the shared theme state.
  *
  * Mirrors the blog list page structure and conventions exactly.
  */
-export function LocationsTab({ storeId }: { storeId: string }) {
+export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps) {
   const t = useT('branding.locations');
   const [locations, setLocations] = useState<Location[]>([]);
   const [store, setStore] = useState<StoreInfo | null>(null);
@@ -337,6 +350,35 @@ export function LocationsTab({ storeId }: { storeId: string }) {
           />
         </button>
       </div>
+
+      {/* Show branches in footer — a separate opt-in from the page-level
+          Enable Locations toggle above. Lives here (not Branding → Theme,
+          which is capped at 7 toggles) because a merchant tuning branches
+          looks at this tab, not the color/theme one. Reads/writes
+          theme.showBranchesInFooter on the shared branding state; the page's
+          top "Save" button PUTs it via the existing theme PATCH. */}
+      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-card p-4">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-foreground">
+            {t('showInFooterTitle')}
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {t('showInFooterHint')}
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          checked={branding.theme.showBranchesInFooter === true}
+          onChange={e =>
+            onChange({
+              ...branding,
+              theme: { ...branding.theme, showBranchesInFooter: e.target.checked },
+            })
+          }
+          aria-label={t('showInFooterToggle')}
+          className="h-5 w-5 cursor-pointer accent-primary"
+        />
+      </label>
 
       {/* Locations not enabled callout */}
       {store && !isEnabled && (

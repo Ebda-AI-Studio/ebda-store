@@ -7,10 +7,12 @@ import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import {
+  footerBranchesHeading,
   getDisplayBranding,
   getDisplayText,
   isNewsletterEnabled,
   resolveAddressHref,
+  resolveFooterBranches,
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
@@ -27,6 +29,7 @@ export default function ModernFooter({
   hideFooterLogoMobile,
   footerLogoAutoFilter,
   theme,
+  locations,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -89,16 +92,25 @@ export default function ModernFooter({
   // icon row above — repeating it under "Contact" is the duplication this
   // pass cleans up.
   const hasContact = !!(contact.email || displayPhone || displayAddress);
+  // Opt-in "Branches" column — see resolveFooterBranches for the gating
+  // rules. Adding its +1 to the SAME formula that already counts contact +
+  // newsletter means the off-case (showBranches=false, i.e. +0) reduces to
+  // exactly today's totalColumns — byte-identical when the toggle is off.
+  const branches = resolveFooterBranches(locations, theme, isRtl);
+  const showBranches = branches.length > 0;
   const linkColumnsCount = footerSections.length > 0 ? footerSections.length : 1;
-  const totalColumns = 1 + linkColumnsCount + (hasContact ? 1 : 0) + (showNewsletter ? 1 : 0);
+  const totalColumns =
+    1 + linkColumnsCount + (hasContact ? 1 : 0) + (showNewsletter ? 1 : 0) + (showBranches ? 1 : 0);
   const lgColsClass =
-    totalColumns >= 6
-      ? 'lg:grid-cols-6'
-      : totalColumns === 5
-        ? 'lg:grid-cols-5'
-        : totalColumns === 4
-          ? 'lg:grid-cols-4'
-          : 'lg:grid-cols-3';
+    totalColumns >= 7
+      ? 'lg:grid-cols-7'
+      : totalColumns === 6
+        ? 'lg:grid-cols-6'
+        : totalColumns === 5
+          ? 'lg:grid-cols-5'
+          : totalColumns === 4
+            ? 'lg:grid-cols-4'
+            : 'lg:grid-cols-3';
 
   return (
     <footer
@@ -361,6 +373,44 @@ export default function ModernFooter({
                   )}
                 </form>
               )}
+            </div>
+          )}
+
+          {/* Branches — opt-in, only rendered when the toggle is on AND at
+              least one published location exists. */}
+          {showBranches && (
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold text-foreground ui-caps-toggle tracking-[0.18em]">
+                {footerBranchesHeading(isRtl)}
+              </h4>
+              <ul className="space-y-3">
+                {branches.map(loc => (
+                  <li key={loc.id} className="text-sm text-foreground/60">
+                    <p className="text-foreground/90">{loc.name}</p>
+                    {loc.mapsHref ? (
+                      <a
+                        href={loc.mapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-foreground transition-colors duration-300 ease-out"
+                      >
+                        {loc.address}
+                      </a>
+                    ) : (
+                      <span>{loc.address}</span>
+                    )}
+                    {loc.phone && (
+                      <a
+                        href={`tel:${loc.phone}`}
+                        dir="ltr"
+                        className="block hover:text-foreground transition-colors duration-300 ease-out"
+                      >
+                        {loc.phone}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

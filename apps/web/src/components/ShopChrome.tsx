@@ -466,6 +466,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
             return footerLogoContrastFilter(themeBg, store.theme?.footerLogoInvert);
           })()}
           theme={store.theme}
+          locations={store.locations}
         />
       </div>
       {/* afterFooter — empty placeholder so any merchant-injected text

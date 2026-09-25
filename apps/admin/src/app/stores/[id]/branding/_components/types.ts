@@ -125,6 +125,14 @@ export interface StoreTheme {
    * Default false = Western digits (0-9) everywhere in both languages.
    */
   arabicNumerals?: boolean;
+  /**
+   * Show a "Branches"/"فروعنا" column in the storefront footer listing
+   * published Locations. Default false — a store with Locations enabled for
+   * the /locations page is unaffected until it opts in here. Also requires
+   * `locationsEnabled` and ≥1 published location. Toggled via Branding →
+   * Locations. Mirrors the @force/shared StoreTheme field. 2026-09-25 (B3).
+   */
+  showBranchesInFooter?: boolean;
 }
 
 export interface StoreBranding {
