@@ -33,6 +33,8 @@ interface OrderDetail {
   promotionDiscount?: number;
   /** The promotion that discounted this order, when `promotionDiscount` > 0. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
+  /** Part of `total` paid from the customer wallet (D1), in fils. */
+  walletAmount?: number;
   notes?: string;
   customerNotes?: string;
   /** Carrier tracking number, populated when the order is shipped */
@@ -653,6 +655,26 @@ export default function OrderDetailClient() {
               </span>
               <span className="font-semibold text-foreground">{formatPrice(order.total)}</span>
             </div>
+            {/* Customer wallet (D1): the part paid from store credit, and the
+                rest the customer paid (or pays on delivery). */}
+            {(order.walletAmount ?? 0) > 0 && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    {t('Paid from wallet', 'مدفوع من المحفظة')}
+                  </span>
+                  <span className="text-[hsl(var(--success))]">
+                    -{formatPrice(order.walletAmount ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground">{t('Amount due', 'المبلغ المستحق')}</span>
+                  <span className="text-foreground">
+                    {formatPrice(Math.max(0, order.total - (order.walletAmount ?? 0)))}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

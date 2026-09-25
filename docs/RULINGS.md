@@ -10,6 +10,90 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ## 2026-09-25
 
+Context: `docs/plans/2026-09-25-customer-wallet.md` — D1, the customer wallet
+(store credit). Owner's hard rule for the release: production must not break,
+and the three live stores see no change after deploy.
+
+**Ruling W-1 — stale `customer_wallet` overrides are reset to OFF by the
+migration, and the API feature cache moves to a new namespace.** A read-only
+production query (2026-09-25) found `store_features(palora, customer_wallet,
+enabled=true)`, set 2026-03-23 by an enable-everything sweep while the key was a
+hidden no-op (20 other keys were enabled with it, incl. the still-hidden
+`email_campaigns`). Feature resolution is baseline-then-override and the key is
+in no plan baseline (now pinned by `plan-baselines.test.ts`), so that one row
+would have switched the wallet ON for a live store at deploy. The migration
+runs `UPDATE store_features SET enabled = false …` (kept as an explicit off row
+so it also holds if the key ever joins a baseline; verified locally on a seeded
+row), and `features:store:` → `features:store:v3:` (v3 so it cannot collide with the email-campaigns release, #1939, which takes v2) so no cached `true` outlives
+it. rollback.sql does not restore it; re-enabling is a manual super-admin
+toggle. Cost if wrong: palora's merchant had in fact been relying on a wallet
+that never existed — nothing to lose, the toggle did nothing.
+
+**Ruling W-2 — spending the wallet at checkout ships behind a SECOND per-store
+key, `customer_wallet_checkout`.** It is the only part of D1 that changes what
+an order charges (gateway amount, COD collection, payment link, retry), so it is
+switched on separately from the credit/admin/customer-view half. Both keys are
+in no plan baseline. Every charging path reads `total − walletAmount`, which is
+byte-identical to `total` for every order that did not use the wallet (the
+column default, and every existing order). Cost if wrong: one more super-admin
+toggle than strictly necessary.
+
+**Ruling W-3 — wallet checkout is REFUSED while the store has accounting
+enabled; the GL does not model store credit yet.** The chart of accounts has no
+store-credit liability account, so `postOrderPaymentJournal` would book the
+wallet portion as cash that never arrived. `WalletService.getCheckoutAvailability`
+returns `accounting_enabled`, the admin Wallet page says so, and
+`postOrderPaymentJournal` refuses (warn log) a wallet-paid order that reached it
+anyway (accounting switched on between checkout and payment) — note that the WHOLE order then goes unjournaled, the cash actually collected included, not just its wallet portion; the warn log is the only trace until the GL follow-up. Store-credit
+RETURNS keep today's GL treatment (reversed as if cash left — the same
+pre-existing treatment `bank_transfer`/`cash` returns get). Measured: all three
+live stores have `accounting_enabled = true`, and it is the column default — so
+until a follow-up models account 2150 "Customer store credit" on issuance
+(returns, admin credits), redemption (checkout), reversal and write-off
+(erasure), and decides which account a goodwill credit hits, wallet checkout is
+unusable on those stores even with both keys on. That follow-up needs a product
+decision (where goodwill credits and forfeits land in the P&L), which is why it
+is not guessed here. Cost if wrong: the checkout half of D1 is built, tested
+and dark in practice until that follow-up lands.
+
+**Ruling W-4 — erasure keeps the wallet ledger, nulls its notes and forfeits the
+balance.** The ledger is a financial record of money the merchant owed and paid
+out; once `note` (the only free-text field) is nulled it holds no PII. A
+positive balance is written off with an `expire` entry because the anonymized
+account can never sign in to spend it, and leaving it would overstate the
+merchant's outstanding liability forever. The erase card warns the merchant when
+a balance exists. Re-running an erasure stays safe (the forfeit key is tied to
+the ledger position it zeroes). Cost if wrong: a customer who wanted the credit
+paid out in cash loses it unless the merchant pays it out before erasing.
+
+**Ruling W-5 — store credit for a return uses the gateway branch's allocator.**
+Partial return: `cashCredit` (goods net of the discount share, plus tax; no
+shipping), same as the provider refund. Full return: `cashCredit + shipping −
+walletAmount`, because the whole-order fanout puts the checkout wallet spend
+back separately. Exchanges never credit. With `customer_wallet` OFF,
+`store_credit` keeps its old off-platform meaning. Cost if wrong: a merchant
+who expected shipping back on a partial store-credit return adjusts it by hand.
+
+**Ruling W-6 — pre-existing defects found while building D1 are REPORTED, not
+fixed here.** Each fix changes behaviour on the live stores, which this
+release's owner rule forbids; each gets its own change:
+(a) the storefront's loyalty page and checkout redemption call
+`/api/v1/public/:storeId/loyalty/*`, which 404s in production (measured
+2026-09-25; the real path is `/api/v1/stores/public/…`), so both silently treat
+loyalty as disabled — the wallet uses the correct path and a contract test pins
+it; (b) by reading, the backorder single-line cancel fires the WHOLE-order `order/refunded`
+event, reversing the coupon, affiliate commission and loyalty for the entire
+order (the wallet reversal alone is opted out via `reverseWallet: false`);
+(c) by reading, `rollbackForPaymentFailure` does not re-credit redeemed loyalty points and
+stamps `refundReversedAt`, so the fanout never does either (the wallet spend IS
+reversed there); (d) by reading, a manual-method refund (off-platform
+store credit, bank transfer, cash) is not netted against a later full gateway
+refund of the same order; (e) the storefront account menu labels and "Sign Out"
+are English-only (the new Wallet entry is bilingual). Cost if wrong: each stays
+live until its own PR.
+
+---
+
 Context: `docs/plans/2026-09-25-email-campaigns.md` — D2 email campaigns, shipped behind the
 per-store `email_campaigns` feature key (in no plan baseline, so OFF for every store).
 

@@ -13,6 +13,9 @@ interface RefundMethodModalProps {
   onConfirm: (method: RefundMethod) => void;
   onClose: () => void;
   isLoading?: boolean;
+  /** The store has the customer wallet on: store credit lands in the
+   *  customer's wallet balance instead of being settled off-platform. */
+  walletEnabled?: boolean;
 }
 
 /**
@@ -26,6 +29,7 @@ export function RefundMethodModal({
   onConfirm,
   onClose,
   isLoading = false,
+  walletEnabled = false,
 }: RefundMethodModalProps) {
   const t = useT('returns.modal');
   const [method, setMethod] = useState<RefundMethod>('original');
@@ -61,7 +65,9 @@ export function RefundMethodModal({
                 {t(`refundMethodOptions.${value}.label`)}
               </span>
               <span className="block text-xs text-muted-foreground">
-                {t(`refundMethodOptions.${value}.description`)}
+                {value === 'store_credit' && walletEnabled
+                  ? t('refundMethodOptions.store_credit.descriptionWallet')
+                  : t(`refundMethodOptions.${value}.description`)}
               </span>
             </span>
           </label>

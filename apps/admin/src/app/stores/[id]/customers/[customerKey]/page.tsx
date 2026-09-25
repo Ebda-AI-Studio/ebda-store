@@ -8,6 +8,8 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../../lib/api';
 import { useAuth } from '../../../../../lib/auth';
 import { EraseCustomerModal } from './_components/EraseCustomerModal';
+import { CustomerWalletCard } from './_components/CustomerWalletCard';
+import { useFeatures } from '../../../../../hooks/useFeatures';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface CustomerGroupOption {
@@ -127,6 +129,13 @@ export default function CustomerDetailPage() {
   // 'super_admin')` on both routes. Hiding the card for staff/other roles
   // is UX only; the API is the real gate.
   const canManagePrivacy = user?.role === 'store_admin' || user?.role === 'super_admin';
+  // Customer wallet (D1): the card renders only once the feature map has
+  // loaded AND `customer_wallet` is on — never on the loading default — so a
+  // store without the feature sees this page exactly as before.
+  const { isEnabled: isFeatureEnabled, isLoading: featuresLoading } = useFeatures();
+  const walletEnabled = !featuresLoading && isFeatureEnabled('customer_wallet');
+  const [walletBalance, setWalletBalance] = useState(0);
+  const tWallet = useT('customers.detail.wallet');
 
   const fetchDetail = useCallback(async () => {
     if (!storeId || !customerKey) return;
@@ -600,6 +609,17 @@ export default function CustomerDetailPage() {
                 <DataTable<OrderRow> columns={orderColumns} rows={orders} rowKey={o => o.id} />
               </div>
 
+              {/* Customer wallet (store credit) — registered customers only:
+                  a guest has no account to hold a balance. */}
+              {walletEnabled && !customer.isGuest && (
+                <CustomerWalletCard
+                  storeId={storeId}
+                  customerId={customer.id}
+                  canAdjust={canManagePrivacy}
+                  onBalance={setWalletBalance}
+                />
+              )}
+
               {/* Privacy & data — merchant-initiated erasure/export.
                   Registered customers only: a guest has no User row for
                   AuthService.eraseAccount/exportAccount to act on (their
@@ -634,6 +654,11 @@ export default function CustomerDetailPage() {
                         <p className="text-sm text-muted-foreground">
                           {tPrivacy('eraseDescription')}
                         </p>
+                        {walletEnabled && walletBalance > 0 && (
+                          <p className="mt-1 text-sm font-medium text-destructive">
+                            {tWallet('forfeitWarning', { amount: formatKwd(walletBalance) })}
+                          </p>
+                        )}
                       </div>
                       <Button variant="destructive" onClick={() => setShowEraseModal(true)}>
                         {tPrivacy('eraseButton')}

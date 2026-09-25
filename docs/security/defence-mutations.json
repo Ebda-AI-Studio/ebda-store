@@ -780,6 +780,36 @@
       "find": "          if (byEmail.length === 1) {\n            crmIdSet.add(byEmail[0].id);\n          } else if (byEmail.length > 1) {",
       "replace": "          if (byEmail.length >= 1) {\n            for (const c of byEmail) crmIdSet.add(c.id);\n          } else if (byEmail.length > 1) {",
       "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "money-wallet-no-negative-balance",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a wallet debit larger than the balance is accepted, letting a customer spend store credit they do not have (the DB CHECK would then 500 the request instead of a clean refusal)",
+      "source": "apps/api/src/services/wallet.service.ts",
+      "find": "      if (!wallet || newBalance < 0) {",
+      "replace": "      if (!wallet) {",
+      "test": "tests/unit/wallet-service.test.ts"
+    },
+    {
+      "id": "money-wallet-idempotent-replay",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a replayed wallet write (redelivered refund event, double-clicked adjust, retried return completion) moves the money a second time",
+      "source": "apps/api/src/services/wallet.service.ts",
+      "find": "      if (prior) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/wallet-service.test.ts"
+    },
+    {
+      "id": "money-wallet-row-lock",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "the wallet row is read without FOR UPDATE, so two concurrent debits both pass the balance check and the customer spends the same credit twice",
+      "source": "apps/api/src/services/wallet.service.ts",
+      "find": "        WHERE store_id = ${storeId} AND customer_id = ${customerId}\n        FOR UPDATE`;",
+      "replace": "        WHERE store_id = ${storeId} AND customer_id = ${customerId}`;",
+      "test": "tests/integration/customer-wallet.test.ts"
     }
   ]
 }

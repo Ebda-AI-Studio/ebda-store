@@ -174,7 +174,9 @@ export function ActionFooter({
             storeId={storeId}
             orderId={order.id}
             orderNumber={order.orderNumber}
-            total={order.total}
+            // What the PROVIDER refunds: the order value less any customer-wallet
+            // spend (D1), which the refund fanout returns to the wallet instead.
+            total={order.total - (order.walletAmount ?? 0)}
             currency={order.currency}
             disabled={isUpdating}
             onRefunded={onPaymentRefreshed}

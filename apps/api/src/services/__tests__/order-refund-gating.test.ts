@@ -178,7 +178,13 @@ describe('OrderService.applyRefundEffects — fires order/refunded with reversal
     expect(inngest.send).toHaveBeenCalledTimes(1);
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'order/refunded',
-      data: { orderId: 'order-123', storeId: 'store-1', restoreInventory: true, notify: false },
+      data: {
+        orderId: 'order-123',
+        storeId: 'store-1',
+        restoreInventory: true,
+        notify: false,
+        reverseWallet: true,
+      },
     });
   });
 
@@ -188,7 +194,13 @@ describe('OrderService.applyRefundEffects — fires order/refunded with reversal
     expect(inngest.send).toHaveBeenCalledTimes(1);
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'order/refunded',
-      data: { orderId: 'order-123', storeId: 'store-1', restoreInventory: true, notify: true },
+      data: {
+        orderId: 'order-123',
+        storeId: 'store-1',
+        restoreInventory: true,
+        notify: true,
+        reverseWallet: true,
+      },
     });
   });
 
@@ -200,7 +212,13 @@ describe('OrderService.applyRefundEffects — fires order/refunded with reversal
 
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'order/refunded',
-      data: { orderId: 'order-123', storeId: 'store-1', restoreInventory: false, notify: false },
+      data: {
+        orderId: 'order-123',
+        storeId: 'store-1',
+        restoreInventory: false,
+        notify: false,
+        reverseWallet: true,
+      },
     });
   });
 

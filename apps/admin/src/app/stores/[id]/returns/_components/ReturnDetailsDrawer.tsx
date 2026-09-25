@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { Button, Badge } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { useFeatures } from '@/hooks/useFeatures';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { ReturnLifecycleTimeline } from '../../../../../components/return-timeline/ReturnLifecycleTimeline';
 import { RETURN_COLORS } from './types';
@@ -95,6 +96,8 @@ export function ReturnDetailsDrawer({
 }: ReturnDetailsDrawerProps) {
   const t = useT('returns.details');
   const tType = useT('returns.type');
+  const { isEnabled: isFeatureEnabled, isLoading: featuresLoading } = useFeatures();
+  const walletEnabled = !featuresLoading && isFeatureEnabled('customer_wallet');
 
   if (!open || !record) return null;
 
@@ -178,11 +181,20 @@ export function ReturnDetailsDrawer({
           </div>
 
           {/* Refund Info */}
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-            <span className="font-medium text-foreground">{t('refundAmount')}</span>
-            <span className="text-lg font-bold text-primary">
-              {formatCurrency(record.refundAmount)}
-            </span>
+          <div className="p-4 bg-muted rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-foreground">{t('refundAmount')}</span>
+              <span className="text-lg font-bold text-primary">
+                {formatCurrency(record.refundAmount)}
+              </span>
+            </div>
+            {/* Customer wallet (D1): a completed store-credit refund landed in
+                the wallet — only true while the feature is on. */}
+            {walletEnabled &&
+              record.status === 'completed' &&
+              record.refundMethod === 'store_credit' && (
+                <p className="mt-1 text-xs text-muted-foreground">{t('creditedToWallet')}</p>
+              )}
           </div>
 
           {/* Lifecycle timeline — collapsible, read-only audit trail */}

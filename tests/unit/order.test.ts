@@ -1411,7 +1411,15 @@ describe('OrderService', () => {
       expect(refundedCalls).toHaveLength(1);
       expect(refundedCalls[0][0]).toEqual({
         name: 'order/refunded',
-        data: { orderId: 'order-123', storeId: mockStoreId, restoreInventory: true, notify: true },
+        // reverseWallet: whole-order cancels/refunds put any customer-wallet
+        // spend back (D1); only the backorder single-line cancel opts out.
+        data: {
+          orderId: 'order-123',
+          storeId: mockStoreId,
+          restoreInventory: true,
+          notify: true,
+          reverseWallet: true,
+        },
       });
 
       // No inline reversal — that now happens in the order-refunded fanout.

@@ -66,6 +66,9 @@ on:
       - 'apps/api/src/services/shipping-carrier.service.ts'
       - 'apps/api/src/services/notification-config.service.ts'
       - 'apps/api/src/lib/inngest/functions/order-refunded.ts'
+      # Customer wallet (D1): the no-negative-balance guard, the idempotent
+      # replay and the wallet row lock.
+      - 'apps/api/src/services/wallet.service.ts'
       - 'apps/web/src/lib/consent-cookie.ts'
       - 'apps/web/src/lib/store-resolver.ts'
       - 'tests/unit/**'

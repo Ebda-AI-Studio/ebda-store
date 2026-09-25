@@ -29,6 +29,21 @@ export interface LoyaltyRedeemControl {
   loyaltyDiscount: number;
 }
 
+/** Customer-wallet (store credit, D1) spend control, threaded from
+ *  CheckoutClient. Present only for signed-in customers with a positive
+ *  balance on a store whose wallet checkout the API reports as available;
+ *  undefined otherwise (nothing renders). */
+export interface WalletSpendControl {
+  /** Current wallet balance in fils. */
+  balance: number;
+  /** Whether the customer chose to pay from the wallet for this order. */
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  /** Fils the wallet covers on this order (display estimate; the server
+   *  re-resolves it at order creation). */
+  applied: number;
+}
+
 /** Resolved summary-label color overrides from StoreTheme flags. */
 export interface SummaryColors {
   /** CSS color for row labels (Order Summary heading, Subtotal, Shipping). */
@@ -62,6 +77,8 @@ interface OrderSummaryProps {
   couponError: string;
   /** Loyalty redemption control — omitted for guests / no balance. */
   loyalty?: LoyaltyRedeemControl;
+  /** Wallet spend control — omitted unless wallet checkout is available. */
+  wallet?: WalletSpendControl;
   /** Per-store checkout typography (page-builder → Checkout page). */
   typography?: { heading?: CSSProperties; label?: CSSProperties; price?: CSSProperties };
   /** Per-store summary-label color + bold overrides from StoreTheme. */
@@ -84,6 +101,7 @@ export function OrderSummary({
   onRemoveCoupon,
   couponError,
   loyalty,
+  wallet,
   typography,
   summaryColors,
 }: OrderSummaryProps) {
@@ -305,6 +323,32 @@ export function OrderSummary({
           </div>
         )}
 
+        {/* Customer wallet (store credit) — only when the API reports wallet
+            checkout as available for this signed-in customer. */}
+        {wallet && (
+          <div className="mt-6 border-t pt-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wallet.enabled}
+                onChange={e => wallet.onToggle(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary"
+              />
+              <span className="flex-1">
+                <span className="text-sm font-medium text-foreground">
+                  {t('Use wallet balance', 'استخدام رصيد المحفظة')} ({formatPrice(wallet.balance)})
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {t(
+                    'Your store credit is applied first; you pay the rest as usual.',
+                    'يُخصم رصيد المتجر أولاً، وتدفع الباقي بالطريقة المعتادة.'
+                  )}
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+
         {/* Totals */}
         <div className="mt-6 space-y-3 border-t pt-6">
           <div className="flex justify-between text-sm">
@@ -407,6 +451,35 @@ export function OrderSummary({
               {formatPrice(total)}
             </span>
           </div>
+          {wallet && wallet.enabled && wallet.applied > 0 && (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                  {t('Paid from wallet', 'مدفوع من المحفظة')}
+                </span>
+                <span
+                  className="font-medium text-[hsl(var(--success))] tabular-nums"
+                  style={typography?.price}
+                >
+                  -{formatPrice(wallet.applied)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span
+                  className={`${summaryFontWeight} text-foreground`}
+                  style={{ ...typography?.label, ...labelColorStyle }}
+                >
+                  {t('Amount due', 'المبلغ المستحق')}
+                </span>
+                <span
+                  className={`${summaryFontWeight} text-foreground tabular-nums`}
+                  style={typography?.price}
+                >
+                  {formatPrice(Math.max(0, total - wallet.applied))}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

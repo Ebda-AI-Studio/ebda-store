@@ -1,5 +1,6 @@
 import type { NavItem } from './buildStoreAdminNav';
 import { HUBS, type HubLabels } from './hubs';
+import type { HubTab } from './HubTabs';
 
 /**
  * A single searchable destination in the ⌘K command palette.
@@ -52,6 +53,7 @@ const PAGE_KEYWORDS: Record<string, string> = {
   promotions: 'automatic discounts sale deals عروض ترويجية خصومات تلقائية عروض',
   loyalty: 'points rewards tiers نقاط مكافآت ولاء',
   bundles: 'kits combos sets product bundles باقات مجموعات عروض مجمعة',
+  wallet: 'store credit balance refund wallet محفظة رصيد المتجر رصيد استرداد',
   inventory: 'stock quantity warehouse مخزون كمية مستودع جرد',
   warehouses: 'locations stores depot مستودعات مخازن مواقع',
   suppliers: 'vendors purchasing موردين بائعين شراء',
@@ -109,7 +111,9 @@ export function buildStorePaletteItems(
   navItems: NavItem[],
   storeId: string,
   hubLabels: HubLabels,
-  settings: SettingsPaletteLabels
+  settings: SettingsPaletteLabels,
+  /** Same gate the hub tab bar applies to feature-keyed tabs. */
+  isTabVisible: (tab: HubTab) => boolean = () => true
 ): PaletteItem[] {
   const items: PaletteItem[] = [];
 
@@ -133,6 +137,7 @@ export function buildStorePaletteItems(
     const group = hubNameByKey.get(hub.key);
     if (!group) continue;
     for (const tab of hub.buildTabs(storeId, hubLabels)) {
+      if (!isTabVisible(tab)) continue;
       items.push({ name: tab.label, href: tab.href, group, keywords: keywordsForHref(tab.href) });
     }
   }

@@ -32,6 +32,8 @@ const h = vi.hoisted(() => ({
   reverseCommission: vi.fn(),
   reverseEarnedPointsFromOrder: vi.fn(),
   reverseRedeemedPointsFromOrder: vi.fn(),
+  // Customer wallet (D1): the reverse-wallet-payment step.
+  reverseOrderPayment: vi.fn(),
   // Task 4: order-refunded's new reconcile-warehouse-stock step calls this
   // for every order item. Mocked here (real impl is covered by
   // tests/integration/warehouse/reconcile-orders.test.ts against a real DB)
@@ -93,6 +95,9 @@ vi.mock('@api/services/loyalty.service', () => ({
     reverseRedeemedPointsFromOrder: h.reverseRedeemedPointsFromOrder,
   },
 }));
+vi.mock('@api/services/wallet.service', () => ({
+  WalletService: { reverseOrderPayment: h.reverseOrderPayment },
+}));
 vi.mock('@api/lib/public-cache', () => ({
   invalidateStoreProductCaches: h.invalidateStoreProductCaches,
 }));
@@ -143,6 +148,7 @@ beforeEach(() => {
   h.reverseCommission.mockResolvedValue(null);
   h.reverseEarnedPointsFromOrder.mockResolvedValue(null);
   h.reverseRedeemedPointsFromOrder.mockResolvedValue(null);
+  h.reverseOrderPayment.mockResolvedValue({ replayed: false });
   h.backorderLineUpdateMany.mockResolvedValue({ count: 0 });
   for (const fn of [
     h.sendOrderRefunded,
@@ -626,6 +632,44 @@ describe('order-refunded fanout — claim-reversed step', () => {
         where: expect.objectContaining({ refundReversedAt: null }),
       })
     );
+  });
+});
+
+describe('order-refunded fanout — reverse-wallet-payment step (D1 customer wallet)', () => {
+  it('puts the wallet spend back on a whole-order cancel/refund, inside a tenant context', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, customerId: 'c1', walletAmount: 3500 });
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.reverseOrderPayment).toHaveBeenCalledTimes(1);
+    expect(h.reverseOrderPayment).toHaveBeenCalledWith({ storeId: 's1', orderId: 'o1' });
+    expect(h.runInTenant).toHaveBeenCalledWith('s1', expect.any(Function));
+  });
+
+  it('does nothing for an order that never spent from a wallet (every order before D1)', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, walletAmount: 0 });
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.reverseOrderPayment).not.toHaveBeenCalled();
+  });
+
+  it('never reverses on a PARTIAL return — the customer kept the rest of the order', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, walletAmount: 3500 });
+    await handleOrderRefunded('o1', 's1', true, true, stepStub, {
+      items: [{ orderItemId: 'oi1', quantity: 1 }],
+      refundKey: 'r1',
+    });
+    expect(h.reverseOrderPayment).not.toHaveBeenCalled();
+  });
+
+  it('never reverses when the caller opted out (backorder single-line cancel)', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, walletAmount: 3500 });
+    await handleOrderRefunded('o1', 's1', false, true, stepStub, undefined, false);
+    expect(h.reverseOrderPayment).not.toHaveBeenCalled();
+  });
+
+  it('throws (so Inngest retries) when the reversal fails, before the completion stamp', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, walletAmount: 3500 });
+    h.reverseOrderPayment.mockRejectedValueOnce(new Error('db down'));
+    await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).rejects.toThrow('db down');
+    expect(h.orderUpdateMany).not.toHaveBeenCalled();
   });
 });
 

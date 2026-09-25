@@ -25,6 +25,7 @@ import customerGroupRoutes from './customer-groups.routes';
 import promotionRoutes from './promotion.routes';
 import bundleRoutes from './bundle.routes';
 import loyaltyRoutes from './loyalty.routes';
+import walletRoutes from './wallet.routes';
 import pwaRoutes from './pwa.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
@@ -215,6 +216,8 @@ router.use('/stores', tenantContext, customerGroupRoutes);
 router.use('/stores', tenantContext, promotionRoutes);
 router.use('/stores', tenantContext, bundleRoutes);
 router.use('/stores', tenantContext, loyaltyRoutes);
+// Customer wallet (store credit) — every route behind requireFeature('customer_wallet').
+router.use('/stores', tenantContext, walletRoutes);
 router.use('/stores', tenantContext, pwaRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);

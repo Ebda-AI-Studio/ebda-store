@@ -8,6 +8,8 @@ import { OrderService } from './order.service';
 import { PaymentService } from './payment-providers/payment.factory';
 import logger from '../lib/logger';
 import { allocatePartialReturn } from './accounting/posting/partial-return-allocation';
+import { featureService } from './feature.service';
+import { WalletService } from './wallet.service';
 
 interface CreateReturnItemInput {
   orderItemId: string;
@@ -881,6 +883,38 @@ export class ReturnService {
         gatewayRanFullEffects = refundAmount == null || refundAmount >= refundableRemaining;
       }
 
+      // STORE CREDIT → CUSTOMER WALLET (D1). Only when the store has the
+      // `customer_wallet` feature: with it OFF, `store_credit` keeps its old
+      // meaning (the merchant settles it off-platform) and nothing below runs.
+      // Only a return/refund moves money — an exchange never does, the same
+      // rule the gateway branch enforces above. The credit is written after
+      // the completion row, on the same (request) transaction, so the two
+      // commit or roll back together; the idempotency key (the return id)
+      // makes a replayed completion a no-op rather than a second credit.
+      let walletCreditAmount: number | undefined;
+      if (
+        refundMethod === 'store_credit' &&
+        isInventoryRestoring &&
+        returnRequest.orderId &&
+        (await featureService.isFeatureEnabled(storeId, 'customer_wallet'))
+      ) {
+        walletCreditAmount = await this.computeStoreCreditAmount(
+          storeId,
+          returnId,
+          returnRequest.orderId,
+          orderLines,
+          returnRequest.items,
+          isFullReturn
+        );
+        if (!isFullReturn && walletCreditAmount <= 0) {
+          throw new AppError(
+            400,
+            'PARTIAL_REFUND_NOTHING_TO_REFUND',
+            'This partial return resolves to a zero refund — every claimed line is already covered by an earlier completed return.'
+          );
+        }
+      }
+
       const updatedReturn = await prisma.return.update({
         where: { id: returnId, storeId },
         data: {
@@ -893,8 +927,20 @@ export class ReturnService {
           // refund moves whatever the merchant chose outside this system, and
           // inventing a figure for it would be worse than the estimate.
           ...(refundAmount != null ? { refundAmount } : {}),
+          // Same, for store credit that actually landed in the wallet.
+          ...(walletCreditAmount != null ? { refundAmount: walletCreditAmount } : {}),
         },
       });
+
+      if (walletCreditAmount != null && walletCreditAmount > 0 && returnRequest.orderId) {
+        await WalletService.creditForReturn({
+          storeId,
+          customerId: returnRequest.customerId,
+          returnId,
+          orderId: returnRequest.orderId,
+          amount: walletCreditAmount,
+        });
+      }
 
       // Side-effects (inventory + coupon + commission + loyalty) routing:
       //
@@ -931,7 +977,8 @@ export class ReturnService {
               // returned item — the exact bug that fallback's comment records.
               // Manual and store-credit methods move money outside this system,
               // so the merchant's own figure is the only honest one there.
-              refundAmount: refundAmount ?? returnRequest.refundAmount ?? undefined,
+              refundAmount:
+                refundAmount ?? walletCreditAmount ?? returnRequest.refundAmount ?? undefined,
             },
           });
         }
@@ -971,6 +1018,65 @@ export class ReturnService {
         );
       throw err;
     }
+  }
+
+  /**
+   * How much store credit a completed return puts in the customer's wallet.
+   *
+   * The SAME allocation the gateway branch refunds and the GL books
+   * (`allocatePartialReturn`, prior completed returns subtracted), so the
+   * wallet, the card and the journal can never quote three different numbers
+   * for one return:
+   *
+   *   - partial return → `cashCredit` (goods net of the discount share, plus
+   *     the tax share). Shipping is not refunded on a partial, as on the
+   *     gateway path.
+   *   - full return → `cashCredit + shipping − order.walletAmount`, floored at
+   *     0. The whole-order `order/refunded` fanout separately puts the part of
+   *     the order that was PAID from the wallet back (`reverse-wallet-payment`),
+   *     so subtracting it here is what makes the customer end up with exactly
+   *     what the order cost, once.
+   */
+  private static async computeStoreCreditAmount(
+    storeId: string,
+    returnId: string,
+    orderId: string,
+    orderLines: Array<{ id: string; quantity: number; price: number }>,
+    items: Array<{ orderItemId: string; quantity: number }>,
+    isFullReturn: boolean
+  ): Promise<number> {
+    const [priorReturns, order] = await Promise.all([
+      prisma.return.findMany({
+        where: {
+          storeId,
+          orderId,
+          status: 'completed',
+          type: { in: ['return', 'refund'] },
+          id: { not: returnId },
+        },
+        select: { items: { select: { orderItemId: true, quantity: true } } },
+      }),
+      prisma.order.findFirst({
+        where: { id: orderId, storeId },
+        select: { subtotal: true, discount: true, tax: true, shipping: true, walletAmount: true },
+      }),
+    ]);
+    const prevQty = new Map<string, number>();
+    for (const ret of priorReturns) {
+      for (const it of ret.items) {
+        prevQty.set(it.orderItemId, (prevQty.get(it.orderItemId) ?? 0) + it.quantity);
+      }
+    }
+    const alloc = allocatePartialReturn({
+      subtotal: order?.subtotal ?? 0,
+      discount: order?.discount ?? 0,
+      tax: order?.tax ?? 0,
+      lines: orderLines,
+      prevQty,
+      requested: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
+    });
+    if (!isFullReturn) return alloc.cashCredit;
+    return Math.max(0, alloc.cashCredit + (order?.shipping ?? 0) - (order?.walletAmount ?? 0));
   }
 
   /**

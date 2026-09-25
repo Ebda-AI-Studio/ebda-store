@@ -102,6 +102,10 @@ export interface OrderDetail {
   /** The promotion that discounted this order, when `promotionDiscount` > 0.
    *  Null when a coupon (or nothing) was the winning lever. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
+  /** Customer-wallet (store credit) portion of `total`, in fils (D1). The
+   *  gateway / courier collects `total - walletAmount`. 0 or absent for every
+   *  order that did not use the wallet. */
+  walletAmount?: number;
   /**
    * Reporting-only: Σ(componentSum − bundlePrice) across every bundle box in
    * the order. Unlike `couponDiscount`/`promotionDiscount`, this is NOT a

@@ -61,6 +61,11 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     verificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     loyaltyTransaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     loyaltyPoints: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    // Customer wallet (D1): erasure scrubs ledger notes and forfeits any
+    // balance. No wallet here — the forfeit path itself is covered against a
+    // real DB in tests/integration/customer-wallet.test.ts.
+    walletTransaction: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    customerWallet: { findMany: vi.fn().mockResolvedValue([]) },
     customer: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
     customerAddress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     newsletterSubscriber: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },

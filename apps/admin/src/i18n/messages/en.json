@@ -1242,7 +1242,9 @@
         "statusPending": "still pending finance team review",
         "toastStatusChanged": "Refund status: {label}",
         "toastNoChange": "Refund still {status} (no change)"
-      }
+      },
+      "paidFromWallet": "Paid from wallet",
+      "amountDue": "Amount due"
     },
     "layout": {
       "title": "Storefront layout",
@@ -1932,6 +1934,52 @@
         "cancelButton": "Cancel",
         "confirmEraseButton": "Erase customer",
         "erasing": "Erasing…"
+      },
+      "wallet": {
+        "title": "Wallet",
+        "subtitle": "Store credit this customer can spend in your store.",
+        "balance": "Balance",
+        "adjust": "Adjust balance",
+        "empty": "No wallet activity yet.",
+        "loadMore": "Load more",
+        "loadFailed": "Could not load the wallet.",
+        "colDate": "Date",
+        "colType": "Type",
+        "colAmount": "Amount",
+        "colBalance": "Balance after",
+        "colReference": "Reference",
+        "colNote": "Note",
+        "refOrder": "Order {number}",
+        "refReturn": "Return {number}",
+        "types": {
+          "credit": "Credit",
+          "debit": "Debit",
+          "refund_credit": "Return refund",
+          "order_payment": "Paid for order",
+          "order_payment_reversal": "Order payment returned",
+          "admin_adjust": "Manual adjustment",
+          "expire": "Written off"
+        },
+        "forfeitWarning": "This customer holds {amount} in store credit. Erasing the account writes it off — it cannot be spent afterwards.",
+        "modal": {
+          "title": "Adjust wallet balance",
+          "directionLabel": "Change",
+          "credit": "Add credit",
+          "debit": "Deduct",
+          "amountLabel": "Amount (KWD)",
+          "amountPlaceholder": "0.000",
+          "noteLabel": "Reason",
+          "notePlaceholder": "Why is this balance changing? Only your team sees this.",
+          "currentBalance": "Current balance: {amount}",
+          "newBalance": "New balance: {amount}",
+          "submit": "Save adjustment",
+          "cancel": "Cancel",
+          "invalidAmount": "Enter an amount greater than 0 with at most 3 decimals.",
+          "noteRequired": "A reason is required.",
+          "exceedsBalance": "You cannot deduct more than the current balance.",
+          "successTitle": "Wallet updated",
+          "failed": "Could not update the wallet."
+        }
       }
     }
   },
@@ -2391,7 +2439,8 @@
         },
         "accentOptionalHint": "Optional — leave empty and we'll generate it from Primary & Secondary.",
         "generateButton": "Generate palette from brand colors",
-        "pageBuilderLink": "Fine-tune colors in Page Builder"
+        "pageBuilderLink": "Fine-tune colors in Page Builder",
+        "smartPaletteButton": "Generate from Smart Palette"
       }
     },
     "preview": {
@@ -3883,7 +3932,8 @@
         "markReceived": "Mark as Received",
         "completeRefund": "Complete & Process Refund",
         "close": "Close"
-      }
+      },
+      "creditedToWallet": "Credited to the customer's wallet"
     },
     "messages": {
       "approveSuccessTitle": "Return Approved",
@@ -3918,7 +3968,8 @@
         },
         "store_credit": {
           "label": "Store credit",
-          "description": "Issue store credit the customer can spend on future orders."
+          "description": "Issue store credit the customer can spend on future orders.",
+          "descriptionWallet": "Adds the refund to the customer's wallet balance, ready to spend on their next order. Shipping is refunded only on a full return."
         },
         "bank_transfer": {
           "label": "Bank transfer",
@@ -5383,7 +5434,8 @@
         "abandonedCarts": "Abandoned Carts",
         "paymentAbandonments": "Payment Abandonments",
         "locations": "Locations",
-        "customerGroups": "Customer groups"
+        "customerGroups": "Customer groups",
+        "wallet": "Wallet"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -5826,7 +5878,8 @@
         "byRateBreakdown": "Breakdown by Rate",
         "transactions": "Transactions",
         "noTransactions": "No taxable transactions in this period."
-      }
+      },
+      "exportXlsxComing": "XLSX export coming soon"
     },
     "bankRec": {
       "title": "Bank Reconciliation",
@@ -7632,5 +7685,27 @@
         "hint": "Web-grounded answers via the OpenAI Responses API."
       }
     }
+  },
+  "wallet": {
+    "title": "Customer wallets",
+    "subtitle": "Store credit your customers hold. Returns refunded as store credit land here.",
+    "outstanding": "Outstanding store credit",
+    "outstandingHint": "What your store owes customers in credit right now.",
+    "walletsWithBalance": "Customers with a balance",
+    "checkoutTitle": "Pay with wallet at checkout",
+    "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Force AI support to turn it on.",
+    "checkoutAccounting": "Unavailable while accounting is on — the ledger does not yet record store credit as a liability, so wallet payments would be booked as cash.",
+    "colCustomer": "Customer",
+    "colContact": "Contact",
+    "colBalance": "Balance",
+    "colUpdated": "Last change",
+    "view": "View",
+    "empty": "No customer holds store credit yet.",
+    "loadMore": "Load more",
+    "loadFailed": "Could not load wallets.",
+    "retry": "Retry",
+    "statusOn": "On",
+    "statusOff": "Off"
   }
 }

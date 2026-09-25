@@ -3,11 +3,19 @@ import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@
 import { redis } from './redis.service';
 import logger from '../lib/logger';
 
-// `v2` (2026-09-25, D2 email campaigns): the 20260925120000 migration resets
-// every `email_campaigns` override to OFF. Maps cached under the old prefix
-// before that UPDATE could still say ON for up to CACHE_TTL; a new prefix means
-// the new release never reads them (they expire on their own).
-const CACHE_PREFIX = 'features:store:v2:';
+// Versioned namespace (2026-09-25, customer wallet D1). The release that wired
+// behaviour to the previously hidden `customer_wallet` key also resets a stale
+// enabled override for it to false (migration 20260925150000_customer_wallet).
+// A map cached by the previous release would keep that `true` alive for up to
+// CACHE_TTL after the reset, switching the wallet on for a live store; a new
+// namespace guarantees the first read after deploy is resolved from the DB.
+// One cold miss per store.
+//
+// `v3`, not `v2`: the email-campaigns release (PR #1939) bumps the same prefix
+// to `features:store:v2:` for the same reason, and whichever of the two merges
+// second must still land on a namespace the other never wrote. Any future
+// release that repeats this shape bumps to the next unused version.
+const CACHE_PREFIX = 'features:store:v3:';
 const CACHE_TTL = 300; // 5 minutes
 
 class FeatureService {

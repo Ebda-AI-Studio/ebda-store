@@ -16,6 +16,13 @@ export const FEATURE_KEYS_ARRAY = [
   'tax',
   'bulk_operations',
   'customer_wallet',
+  // Customer wallet — spending the balance at checkout (2026-09-25). A SECOND,
+  // separate key from `customer_wallet` because it is the only part of the
+  // wallet that touches the payment amount of an order. NOT in any plan
+  // baseline: OFF for every store until a super-admin turns it on, and it is
+  // inert unless `customer_wallet` is ALSO on. See
+  // docs/plans/2026-09-25-customer-wallet.md.
+  'customer_wallet_checkout',
   'upsell_crosssell',
   'whatsapp',
   'sms',
@@ -104,8 +111,9 @@ export interface FeatureDefinition {
    * Hide this feature from the admin features list. The key remains
    * valid in the API/DB so existing rows aren't broken, but merchants
    * can no longer toggle it. Used for:
-   *   1. Features that aren't actually implemented yet (customer_wallet)
-   *      — flag them hidden until the backing code lands.
+   *   1. Features that aren't actually implemented yet — flag them hidden
+   *      until the backing code lands. (customer_wallet and email_campaigns
+   *      were both un-hidden 2026-09-25 when they shipped.)
    *   2. Platform-level features that are universal and have no
    *      per-store impact (seo, search_autocomplete) — toggling them
    *      did nothing, which was misleading.
@@ -190,11 +198,25 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'customer_wallet',
     name: 'Customer Wallet',
     nameAr: 'محفظة العميل',
-    description: 'Enable store credit wallets for customers to store and spend funds.',
-    descriptionAr: 'تمكين محافظ رصيد المتجر للعملاء لتخزين الأموال وإنفاقها.',
+    description:
+      'Store credit wallets: refunds as store credit land in the customer wallet, merchants can adjust balances, and customers see their balance in their account.',
+    descriptionAr:
+      'محافظ رصيد المتجر: تُضاف المبالغ المستردة كرصيد متجر إلى محفظة العميل، ويمكن للتاجر تعديل الأرصدة، ويرى العميل رصيده في حسابه.',
     category: 'commerce',
-    tier: 'experimental',
-    hidden: true, // No backing model/service/UI yet — un-hide when shipped.
+    tier: 'addon',
+    // Un-hidden 2026-09-25 (D1). NOT in any plan baseline, so it resolves OFF
+    // for every store until a super-admin override turns it on.
+  },
+  customer_wallet_checkout: {
+    key: 'customer_wallet_checkout',
+    name: 'Pay with Wallet at Checkout',
+    nameAr: 'الدفع من المحفظة عند الشراء',
+    description:
+      'Lets signed-in customers pay part or all of an order from their wallet balance. Requires Customer Wallet. Unavailable while accounting is enabled.',
+    descriptionAr:
+      'يتيح للعملاء المسجلين دفع جزء من الطلب أو كامله من رصيد المحفظة. يتطلب محفظة العميل. غير متاح أثناء تفعيل المحاسبة.',
+    category: 'commerce',
+    tier: 'addon',
   },
   upsell_crosssell: {
     key: 'upsell_crosssell',

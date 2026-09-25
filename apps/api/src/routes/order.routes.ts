@@ -375,6 +375,8 @@ const createOrderSchema = z.object({
   // Loyalty points requested for redemption — re-resolved server-side
   // against the customer's balance + store caps (never a trusted discount).
   pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
+  // Pay from the customer wallet (D1) — a request, resolved server-side.
+  useWallet: z.boolean().optional(),
 });
 
 const updateStatusSchema = z.object({
@@ -1609,7 +1611,10 @@ router.post(
         {
           orderId: order.id,
           orderNumber: order.orderNumber,
-          amount: order.total,
+          // Amount due: the order value less any customer-wallet spend (D1) —
+          // a link for an order the customer part-paid from their wallet must
+          // not charge that part again. === order.total when no wallet was used.
+          amount: order.total - order.walletAmount,
           currency: order.currency as Currency,
           customer: {
             id: order.customer?.id ?? `guest-${order.id}`,

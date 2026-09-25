@@ -1648,7 +1648,9 @@ export class PaymentService {
       {
         orderId: order.id,
         orderNumber: order.orderNumber,
-        amount: order.total,
+        // Amount due: the order value less any customer-wallet spend (D1).
+        // === order.total for every order that did not use the wallet.
+        amount: order.total - (order.walletAmount ?? 0),
         currency: order.currency as Currency,
         customer: {
           id: order.customerId ?? `guest-${order.id}`,

@@ -89,6 +89,10 @@ export interface Messages {
     coupon: string;
     promotion: string;
     total: string;
+    /** Customer wallet (D1) — store credit applied to this order. */
+    paidFromWallet: string;
+    /** Customer wallet (D1) — what the gateway / courier collects. */
+    amountDue: string;
     notes: string;
     customerNotes: string;
     payment: string;
@@ -300,6 +304,8 @@ export const MESSAGES: Record<Locale, Messages> = {
       coupon: 'Coupon',
       promotion: 'Promotion',
       total: 'Total',
+      paidFromWallet: 'Paid from wallet',
+      amountDue: 'Amount due',
       notes: 'Internal notes',
       customerNotes: 'Customer notes',
       payment: 'Payment',
@@ -513,6 +519,8 @@ export const MESSAGES: Record<Locale, Messages> = {
       coupon: 'كوبون',
       promotion: 'عرض ترويجي',
       total: 'الإجمالي',
+      paidFromWallet: 'مدفوع من المحفظة',
+      amountDue: 'المبلغ المستحق',
       notes: 'ملاحظات داخلية',
       customerNotes: 'ملاحظات العميل',
       payment: 'الدفع',

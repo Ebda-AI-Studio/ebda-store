@@ -60,6 +60,12 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
 vi.mock('@api/services/order.service', () => ({
   OrderService: { applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a) },
 }));
+// Customer wallet (D1) OFF, as for every store at deploy: `store_credit`
+// keeps its old off-platform meaning in this file. The wallet-ON branch is
+// covered against a real DB in tests/integration/customer-wallet.test.ts.
+vi.mock('@api/services/feature.service', () => ({
+  featureService: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
+}));
 vi.mock('@api/services/email.service', () => ({ EmailService: {} }));
 vi.mock('@api/services/socket.service', () => ({ socketService: { emitToStore: vi.fn() } }));
 vi.mock('@api/lib/logger', () => ({

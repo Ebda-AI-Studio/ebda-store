@@ -21,6 +21,7 @@ import { inngest } from '../lib/inngest/client';
 import { handleOrderStatusChanged } from '../lib/inngest/functions/order-status-changed';
 import { ShippingService } from './shipping.service';
 import { LoyaltyService, computeRedemption } from './loyalty.service';
+import { WalletService } from './wallet.service';
 import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
@@ -111,6 +112,11 @@ interface CreateOrderData {
    *  redemption settings (min/max/percentage cap) — it is a REQUEST, never a
    *  trusted discount. Ignored for guest checkout (no customerId). */
   pointsToRedeem?: number;
+  /** Customer-wallet spend request (D1). A REQUEST, never a trusted amount:
+   *  the server spends min(balance, order total) and only when the store has
+   *  BOTH `customer_wallet` and `customer_wallet_checkout` on and accounting
+   *  off (WalletService.getCheckoutAvailability). Ignored for guests. */
+  useWallet?: boolean;
   /** Buyer's UI locale at checkout time. Stored on the order so
    *  transactional emails are sent in the buyer's language. */
   locale?: 'en' | 'ar';
@@ -737,6 +743,26 @@ export class OrderService {
     const discount = primaryDiscount + loyaltyDiscount;
     const total = Math.max(0, subtotal + tax + shipping - discount);
 
+    // Customer wallet (D1). Resolved on the SERVER from the real balance; the
+    // debit itself happens inside the order transaction below and re-checks the
+    // balance under the wallet row lock, so a concurrent spend that drained it
+    // throws INSUFFICIENT_WALLET_BALANCE there and rolls this whole order back.
+    // `total` keeps meaning "order value"; the gateway / COD courier collects
+    // `total - walletAmount`. With useWallet absent (every existing client) or
+    // either feature off, walletAmount stays 0 and nothing below changes.
+    let walletAmount = 0;
+    if (customerId && data.useWallet === true && total > 0) {
+      const availability = await WalletService.getCheckoutAvailability(storeId);
+      if (availability.available) {
+        const balance = await WalletService.getBalance(storeId, customerId);
+        walletAmount = Math.min(balance, total);
+      }
+    }
+    // Wallet covers the whole order: nothing is left for a gateway, so the
+    // order is paid the moment it is created (see the notification block
+    // after the transaction, and the /payments/create guard).
+    const paidInFullByWallet = walletAmount > 0 && walletAmount === total;
+
     // Generate order number
     const orderNumber = generateOrderNumber();
 
@@ -1062,7 +1088,12 @@ export class OrderService {
           storeId,
           customerId,
           orderNumber,
-          status: 'pending',
+          // A fully wallet-paid order has no gateway step to wait for — it is
+          // created paid, the same end state a completed gateway webhook
+          // leaves (payment-confirm.service: confirmed + paid).
+          status: paidInFullByWallet ? 'confirmed' : 'pending',
+          ...(paidInFullByWallet ? { paymentStatus: 'paid' as const } : {}),
+          walletAmount,
           subtotal,
           tax,
           shipping,
@@ -1245,6 +1276,16 @@ export class OrderService {
         );
       }
 
+      // Spend from the customer wallet INSIDE the order transaction, for the
+      // same reason as the loyalty redemption above: the balance is never
+      // spent without an order and the order never exists without the spend.
+      if (walletAmount > 0 && customerId) {
+        await WalletService.debitForOrder(
+          { storeId, customerId, orderId: newOrder.id, amount: walletAmount },
+          tx
+        );
+      }
+
       // Clear cart. Bundles live in their own table — clearing the cart
       // must clear both, or a gateway redirect that never lands leaves a
       // PAID bundle in the cart at a live price, and the customer checks
@@ -1306,14 +1347,17 @@ export class OrderService {
     // abandons at the gateway and the order rolls back. Online-payment
     // notifications fire from PaymentService.handleWebhook once payment
     // transitions to 'completed' (see payment.factory.ts).
-    if (data.paymentMethod === 'cod') {
+    //
+    // A fully wallet-paid order is in the same position as COD: nothing will
+    // ever arrive from a gateway webhook to fire these, so fire them now.
+    if (data.paymentMethod === 'cod' || paidInFullByWallet) {
       inngest
         .send({
           name: 'order/created',
           data: {
             orderId: order.id,
             storeId,
-            paymentMethod: data.paymentMethod,
+            paymentMethod: paidInFullByWallet ? 'wallet' : data.paymentMethod,
             locale: order.locale ?? undefined,
           },
         })
@@ -1453,6 +1497,15 @@ export class OrderService {
             metadata: { source: 'rollbackForPaymentFailure' },
           },
         });
+      }
+
+      // 2b. Put back any customer-wallet spend (D1). This rollback stamps
+      //     `refundReversedAt` below, so the order/refunded fanout — which is
+      //     where a cancel normally returns the wallet portion — will never
+      //     run for this order; the reversal has to happen here, in the same
+      //     transaction. Idempotent on `order-payment-reversal:<orderId>`.
+      if (order.walletAmount > 0) {
+        await WalletService.reverseOrderPayment({ storeId, orderId: order.id }, tx);
       }
 
       // 3. Rebuild the cart from the order items so the customer can retry
@@ -1763,6 +1816,15 @@ export class OrderService {
       restoreInventory?: boolean;
       fireRefundNotification?: boolean;
       /**
+       * Whether the whole-order fanout may put the order's customer-wallet
+       * spend back (D1, `reverse-wallet-payment` step). Defaults true — every
+       * whole-order cancel/refund returns it. The backorder single-LINE cancel
+       * passes false: it fires this whole-order event for one line, and must
+       * never hand back the entire wallet payment for it. Partial events never
+       * reverse the wallet regardless.
+       */
+      reverseWallet?: boolean;
+      /**
        * Item-level (partial-return) reversal. When present, the
        * `order-refunded` fanout restores ONLY the listed order-item
        * lines/quantities and SKIPS every whole-order reversal (coupon,
@@ -1806,7 +1868,14 @@ export class OrderService {
     // silent money-loss failure mode this redesign removes.
     await inngest.send({
       name: 'order/refunded',
-      data: { orderId, storeId, restoreInventory, notify, partial: options.partial },
+      data: {
+        orderId,
+        storeId,
+        restoreInventory,
+        notify,
+        partial: options.partial,
+        reverseWallet: options.reverseWallet ?? true,
+      },
     });
   }
 

@@ -13,7 +13,7 @@ import {
   type NavLabels,
   type StoreBranding,
 } from './admin-layout/buildStoreAdminNav';
-import { HubTabs } from './admin-layout/HubTabs';
+import { HubTabs, type HubTab } from './admin-layout/HubTabs';
 import { detectHub, type HubLabels } from './admin-layout/hubs';
 import {
   buildStorePaletteItems,
@@ -63,7 +63,12 @@ export function AdminLayout({
   const [isDark, setIsDark] = useState(false);
   const { user, logout, isLoading } = useAuth();
   const { selectedStoreId: globalStoreId } = useStore();
-  const { isEnabled: isFeatureEnabled } = useFeatures();
+  const { isEnabled: isFeatureEnabled, isLoading: featuresLoading } = useFeatures();
+  // Feature-keyed hub tabs (see HubTab.featureKey) appear only once the
+  // feature map has loaded AND the feature is on — never on the loading
+  // default, so a store without the feature never sees the tab flash.
+  const isHubTabVisible = (tab: HubTab) =>
+    !tab.featureKey || (!featuresLoading && isFeatureEnabled(tab.featureKey));
   const { isFocused, focusStoreId, enterFocusMode } = useFocusMode();
 
   // When a super_admin is browsing inside a specific store
@@ -125,6 +130,7 @@ export function AdminLayout({
     promotions: t('hubTabs.promotions'),
     loyalty: t('hubTabs.loyalty'),
     bundles: t('hubTabs.bundles'),
+    wallet: t('hubTabs.wallet'),
     // Stock tabs
     stockDashboard: t('hubTabs.stockDashboard'),
     inventory: t('hubTabs.inventory'),
@@ -294,7 +300,13 @@ export function AdminLayout({
   };
   const paletteItems: PaletteItem[] =
     mode === 'store_admin' && navStoreId
-      ? buildStorePaletteItems(navItems, navStoreId, hubLabels, settingsPaletteLabels)
+      ? buildStorePaletteItems(
+          navItems,
+          navStoreId,
+          hubLabels,
+          settingsPaletteLabels,
+          isHubTabVisible
+        )
       : navItems.map(n => ({ name: n.name, href: n.href, icon: n.icon, group: n.name }));
 
   // Hub detection — only applies to store-admin mode with a resolved storeId.
@@ -309,12 +321,14 @@ export function AdminLayout({
     if (!hub) return { activeHubKey: null, hubTabs: [] };
     return {
       activeHubKey: hub.key,
-      hubTabs: hub.buildTabs(navStoreId, hubLabels),
+      hubTabs: hub.buildTabs(navStoreId, hubLabels).filter(isHubTabVisible),
     };
     // hubLabels object is rebuilt on every render (from translation strings) but
     // its values are stable strings — useMemo deps on pathname + navStoreId is sufficient.
+    // `featuresLoading` + `isFeatureEnabled` re-run it once the feature map lands,
+    // so a feature-keyed tab appears then (see isHubTabVisible).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, navStoreId, pathname]);
+  }, [mode, navStoreId, pathname, featuresLoading, isFeatureEnabled]);
 
   // Auto-derive store branding for the sidebar header when the page didn't
   // pass it explicitly. The shared useCurrentStore hook already fetched the

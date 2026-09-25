@@ -33,6 +33,7 @@ export type HubLabels = {
   promotions: string;
   loyalty: string;
   bundles: string;
+  wallet: string;
   // Stock tabs
   stockDashboard: string;
   inventory: string;
@@ -114,6 +115,7 @@ export const HUBS: HubDefinition[] = [
       '/promotions',
       '/loyalty',
       '/bundles',
+      '/wallet',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.orders, href: `/stores/${storeId}/orders` },
@@ -134,6 +136,11 @@ export const HUBS: HubDefinition[] = [
       // useRequireFeature('bundles') — same "tab always renders, the page
       // itself gates" pattern as coupons/loyalty above.
       { label: labels.bundles, href: `/stores/${storeId}/bundles` },
+      // Customer wallet (store credit, D1). Unlike the tabs above it is hidden
+      // outright for a store without the feature — it is OFF for every store
+      // at launch, and a new upsell tab appearing for every merchant on deploy
+      // is exactly the visible change the launch must not make.
+      { label: labels.wallet, href: `/stores/${storeId}/wallet`, featureKey: 'customer_wallet' },
     ],
   },
   {

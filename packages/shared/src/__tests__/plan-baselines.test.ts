@@ -211,11 +211,26 @@ describe('lowestPlanForFeature', () => {
     expect(lowestPlanForFeature('abandoned_cart')).toBe('starter');
   });
 
-  // A feature not in any baseline — use customer_wallet which is hidden/experimental
-  // and intentionally absent from every plan baseline.
+  // A feature not in any baseline — customer_wallet is intentionally absent
+  // from every plan baseline (sold per store via a super-admin override).
   it('returns null for a feature not in any plan baseline (customer_wallet)', () => {
     expect(lowestPlanForFeature('customer_wallet')).toBe(null);
   });
+
+  // The customer wallet ships DEFAULT OFF for every store (D1, 2026-09-25):
+  // feature resolution is baseline-then-override, so a key that is in no
+  // baseline resolves false until a StoreFeature override row turns it on.
+  // Adding either key to a baseline would switch the wallet (or wallet
+  // spending at checkout) on for every store on that plan at deploy time.
+  it.each(['customer_wallet', 'customer_wallet_checkout'] as const)(
+    '%s is in NO plan baseline (default OFF for every store)',
+    key => {
+      for (const plan of STORE_PLANS) {
+        expect(isInBaseline(plan, key)).toBe(false);
+      }
+      expect(lowestPlanForFeature(key)).toBe(null);
+    }
+  );
 });
 
 // Plan key shape — guard against accidental rename in the type

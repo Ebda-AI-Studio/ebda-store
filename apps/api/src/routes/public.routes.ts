@@ -145,6 +145,10 @@ export const createOrderSchema = z.object({
    *  real balance + store caps. Ignored for guests. Bounded to a sane
    *  integer ceiling so a malformed value can't overflow the math. */
   pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
+  /** Pay from the customer wallet (D1). A request: the server spends
+   *  min(balance, total) only when the store's wallet checkout is available.
+   *  Ignored for guests. */
+  useWallet: z.boolean().optional(),
   /** Buyer's UI locale. Stored on the order so transactional emails
    *  arrive in the buyer's language regardless of the store default. */
   locale: z.enum(['en', 'ar']).optional(),

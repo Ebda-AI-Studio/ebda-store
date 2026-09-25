@@ -7,8 +7,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
 import { ShopChrome } from '../../components';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { useWallet } from '../../hooks/useWallet';
 
-const accountNav = [
+const accountNav: Array<{ name: string; nameAr?: string; href: string; icon: string }> = [
   {
     name: 'Dashboard',
     href: '/account',
@@ -30,6 +32,14 @@ const accountNav = [
     icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
   },
   {
+    // Customer wallet (store credit, D1). Shown only when the API confirms the
+    // wallet for this store (see useWallet) — never on enabledFeatures alone.
+    name: 'Wallet',
+    nameAr: 'المحفظة',
+    href: '/account/wallet',
+    icon: 'M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3',
+  },
+  {
     name: 'Settings',
     href: '/account/settings',
     icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
@@ -42,6 +52,8 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const storeUrl = useStoreUrl();
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const { isEnabled } = useFeatures();
+  const { t } = useLanguage();
+  const { wallet } = useWallet();
 
   // Redirect to login if not authenticated once loading completes.
   //
@@ -103,6 +115,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                   .filter(item => {
                     if (item.href === '/account/loyalty') return isEnabled('loyalty');
                     if (item.href === '/account/returns') return isEnabled('returns');
+                    if (item.href === '/account/wallet') return wallet !== null;
                     return true;
                   })
                   .map(item => {
@@ -130,7 +143,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                             d={item.icon}
                           />
                         </svg>
-                        {item.name}
+                        {item.nameAr ? t(item.name, item.nameAr) : item.name}
                       </Link>
                     );
                   })}

@@ -5,6 +5,7 @@ import { notificationDispatcher } from '../../../services/notification-dispatche
 import { OneSignalService } from '../../../services/onesignal.service';
 import { affiliateService } from '../../../services/affiliate.service';
 import { LoyaltyService } from '../../../services/loyalty.service';
+import { WalletService } from '../../../services/wallet.service';
 import { WarehouseService } from '../../../services/warehouse.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';
@@ -87,7 +88,11 @@ export async function handleOrderRefunded(
   step: FanoutStep,
   // Optional item-level payload — presence flips the fanout into
   // partial-return mode (item-restore only, no whole-order reversals).
-  partial?: PartialRefund
+  partial?: PartialRefund,
+  // Whether a whole-order event may put the order's customer-wallet spend back
+  // (D1). Absent/true for every cancel/refund; false only from the backorder
+  // single-line cancel, which borrows this whole-order event for one line.
+  reverseWallet: boolean = true
 ): Promise<{ skipped?: string } | void> {
   if (!orderId || !storeId) {
     logger.warn({ orderId, storeId }, 'order/refunded fired without ids — skipping');
@@ -338,6 +343,26 @@ export async function handleOrderRefunded(
       await LoyaltyService.reverseEarnedPointsFromOrder(storeId, orderId);
       await LoyaltyService.reverseRedeemedPointsFromOrder(storeId, orderId);
       return { skipped: false };
+    });
+  });
+
+  // Put back the part of the order that was paid from the customer wallet at
+  // checkout (D1). Money reversal tier: throws on failure so Inngest retries.
+  // Idempotent on the `order-payment-reversal:<orderId>` ledger key — a
+  // redelivered event, the stuck-sweep re-send and a concurrent second event
+  // all queue on the wallet row lock and the loser replays. No-op for an order
+  // that never spent from a wallet (walletAmount 0 — every order before D1).
+  await step.run('reverse-wallet-payment', async () => {
+    // Partial return: the customer kept the rest of the order; the wallet
+    // spend on it stays spent (store credit for the returned lines is issued
+    // by ReturnService, not here).
+    if (isPartial) return { skipped: true };
+    if (!reverseWallet) return { skipped: true };
+    if (!order.walletAmount || order.walletAmount <= 0) return { skipped: true };
+
+    return runInTenantContext(storeId, async () => {
+      const result = await WalletService.reverseOrderPayment({ storeId, orderId });
+      return { skipped: result === null, replayed: result?.replayed ?? false };
     });
   });
 
@@ -608,7 +633,7 @@ export async function handleOrderRefunded(
 export const orderRefunded: InngestFunction.Any = inngest.createFunction(
   {
     id: 'order-refunded-fanout',
-    name: 'Order refunded — inventory/coupon/affiliate/loyalty reversal + email + push + dispatcher fan-out',
+    name: 'Order refunded — inventory/coupon/affiliate/loyalty/wallet reversal + email + push + dispatcher fan-out',
     // Same per-store concurrency cap as order-created so a single tenant
     // batch-refund storm can't monopolize Inngest workers.
     concurrency: { key: 'event.data.storeId', limit: 5 },
@@ -616,14 +641,17 @@ export const orderRefunded: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'order/refunded' }],
   },
   async ({ event, step }) => {
-    const { orderId, storeId, restoreInventory, notify, partial } = event.data;
+    const { orderId, storeId, restoreInventory, notify, partial, reverseWallet } = event.data;
     return handleOrderRefunded(
       orderId,
       storeId,
       restoreInventory !== false,
       notify !== false,
       step,
-      partial as PartialRefund | undefined
+      partial as PartialRefund | undefined,
+      // Events enqueued before D1 carry no flag: treat absent as true. Such
+      // an order has walletAmount 0, so the step is a no-op for it anyway.
+      reverseWallet !== false
     );
   }
 );

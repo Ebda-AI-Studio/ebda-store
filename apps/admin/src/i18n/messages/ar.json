@@ -1242,7 +1242,9 @@
         "statusPending": "لا يزال قيد مراجعة الفريق المالي",
         "toastStatusChanged": "حالة الاسترداد: {label}",
         "toastNoChange": "الاسترداد لا يزال {status} (لا تغيير)"
-      }
+      },
+      "paidFromWallet": "مدفوع من المحفظة",
+      "amountDue": "المبلغ المستحق"
     },
     "layout": {
       "title": "تخطيط المتجر",
@@ -1932,6 +1934,52 @@
         "cancelButton": "إلغاء",
         "confirmEraseButton": "حذف العميل",
         "erasing": "جارٍ الحذف…"
+      },
+      "wallet": {
+        "title": "المحفظة",
+        "subtitle": "رصيد المتجر الذي يمكن لهذا العميل إنفاقه في متجرك.",
+        "balance": "الرصيد",
+        "adjust": "تعديل الرصيد",
+        "empty": "لا توجد حركات في المحفظة بعد.",
+        "loadMore": "تحميل المزيد",
+        "loadFailed": "تعذّر تحميل المحفظة.",
+        "colDate": "التاريخ",
+        "colType": "النوع",
+        "colAmount": "المبلغ",
+        "colBalance": "الرصيد بعد الحركة",
+        "colReference": "المرجع",
+        "colNote": "ملاحظة",
+        "refOrder": "طلب {number}",
+        "refReturn": "مرتجع {number}",
+        "types": {
+          "credit": "إضافة رصيد",
+          "debit": "خصم",
+          "refund_credit": "استرداد مرتجع",
+          "order_payment": "دفع طلب",
+          "order_payment_reversal": "إرجاع دفعة طلب",
+          "admin_adjust": "تعديل يدوي",
+          "expire": "رصيد مشطوب"
+        },
+        "forfeitWarning": "لدى هذا العميل رصيد متجر بقيمة {amount}. حذف الحساب يشطب هذا الرصيد ولا يمكن إنفاقه بعد ذلك.",
+        "modal": {
+          "title": "تعديل رصيد المحفظة",
+          "directionLabel": "نوع التعديل",
+          "credit": "إضافة رصيد",
+          "debit": "خصم",
+          "amountLabel": "المبلغ (د.ك)",
+          "amountPlaceholder": "0.000",
+          "noteLabel": "السبب",
+          "notePlaceholder": "لماذا يتغير الرصيد؟ يظهر هذا لفريقك فقط.",
+          "currentBalance": "الرصيد الحالي: {amount}",
+          "newBalance": "الرصيد الجديد: {amount}",
+          "submit": "حفظ التعديل",
+          "cancel": "إلغاء",
+          "invalidAmount": "أدخل مبلغاً أكبر من 0 وبثلاث خانات عشرية كحد أقصى.",
+          "noteRequired": "السبب مطلوب.",
+          "exceedsBalance": "لا يمكن خصم مبلغ أكبر من الرصيد الحالي.",
+          "successTitle": "تم تحديث المحفظة",
+          "failed": "تعذّر تحديث المحفظة."
+        }
       }
     }
   },
@@ -2391,7 +2439,8 @@
         },
         "accentOptionalHint": "اختياري — اتركه فارغًا وسنولّده من اللونين الأساسي والثانوي.",
         "generateButton": "توليد لوحة الألوان من ألوان العلامة",
-        "pageBuilderLink": "اضبط الألوان في منشئ الصفحات"
+        "pageBuilderLink": "اضبط الألوان في منشئ الصفحات",
+        "smartPaletteButton": "توليد من اللوحة الذكية"
       }
     },
     "preview": {
@@ -3883,7 +3932,8 @@
         "markReceived": "تعليم كمستلم",
         "completeRefund": "الإكمال ومعالجة الاسترداد",
         "close": "إغلاق"
-      }
+      },
+      "creditedToWallet": "أُضيف إلى رصيد محفظة العميل"
     },
     "messages": {
       "approveSuccessTitle": "تم اعتماد الإرجاع",
@@ -3918,7 +3968,8 @@
         },
         "store_credit": {
           "label": "رصيد المتجر",
-          "description": "منح العميل رصيدًا في المتجر يمكن استخدامه في الطلبات القادمة."
+          "description": "منح العميل رصيدًا في المتجر يمكن استخدامه في الطلبات القادمة.",
+          "descriptionWallet": "يضيف المبلغ المسترد إلى رصيد محفظة العميل ليستخدمه في طلبه القادم. تُسترد رسوم الشحن فقط عند إرجاع الطلب كاملاً."
         },
         "bank_transfer": {
           "label": "تحويل بنكي",
@@ -5383,7 +5434,8 @@
         "paymentAbandonments": "التخلي عن بوابة الدفع",
         "whatsapp": "واتساب",
         "locations": "الفروع",
-        "customerGroups": "مجموعات العملاء"
+        "customerGroups": "مجموعات العملاء",
+        "wallet": "المحفظة"
       },
       "superAdmin": "مدير عام",
       "superAdminHint": "صلاحية كاملة على المنصة",
@@ -5826,7 +5878,8 @@
         "byRateBreakdown": "التفصيل حسب النسبة",
         "transactions": "المعاملات",
         "noTransactions": "لا توجد معاملات خاضعة للضريبة في هذه الفترة."
-      }
+      },
+      "exportXlsxComing": "تصدير XLSX قادم قريباً"
     },
     "bankRec": {
       "title": "مطابقة كشف البنك",
@@ -7632,5 +7685,27 @@
         "hint": "إجابات مستندة إلى الويب عبر OpenAI Responses API."
       }
     }
+  },
+  "wallet": {
+    "title": "محافظ العملاء",
+    "subtitle": "رصيد المتجر لدى عملائك. المرتجعات المستردة كرصيد متجر تُضاف هنا.",
+    "outstanding": "رصيد المتجر القائم",
+    "outstandingHint": "المبلغ المستحق لعملائك كرصيد في الوقت الحالي.",
+    "walletsWithBalance": "عملاء لديهم رصيد",
+    "checkoutTitle": "الدفع من المحفظة عند الشراء",
+    "checkoutOn": "مفعّل — يمكن للعملاء المسجلين دفع جزء من الطلب أو كامله من رصيدهم.",
+    "checkoutOff": "غير مفعّل — يرى العملاء رصيدهم في حساباتهم لكن لا يمكنهم إنفاقه عند الشراء بعد. تواصل مع دعم Force AI لتفعيله.",
+    "checkoutAccounting": "غير متاح أثناء تفعيل المحاسبة — دفتر الحسابات لا يسجل رصيد المتجر كالتزام بعد، فستُسجَّل مدفوعات المحفظة كنقد.",
+    "colCustomer": "العميل",
+    "colContact": "التواصل",
+    "colBalance": "الرصيد",
+    "colUpdated": "آخر تغيير",
+    "view": "عرض",
+    "empty": "لا يوجد عميل لديه رصيد متجر بعد.",
+    "loadMore": "تحميل المزيد",
+    "loadFailed": "تعذّر تحميل المحافظ.",
+    "retry": "إعادة المحاولة",
+    "statusOn": "مفعّل",
+    "statusOff": "غير مفعّل"
   }
 }

@@ -15,7 +15,9 @@ interface PaymentCardProps {
 export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   const t = useT('orders.detail');
   const isPaid = order.paymentStatus === 'paid';
-  const remain = isPaid ? 0 : order.total;
+  // What is still to be collected: the order value less any part paid from
+  // the customer wallet at checkout (D1). === order.total without a wallet.
+  const remain = isPaid ? 0 : Math.max(0, order.total - (order.walletAmount ?? 0));
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
 
   // Pick the most-recent successful payment for the details row, falling

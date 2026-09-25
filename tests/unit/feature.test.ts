@@ -51,8 +51,10 @@ describe('Feature Registry', () => {
     // 2026-09-11: 43 keys (added `merchant_mcp` — the merchant-admin MCP
     //   surface, in NO plan baseline so the whole surface is dark until a
     //   super-admin enables it per store).
-    it('has exactly 43 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(43);
+    // 2026-09-25: 44 keys (added `customer_wallet_checkout` — spending the
+    //   wallet at checkout, a second toggle in NO plan baseline).
+    it('has exactly 44 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(44);
     });
   });
 

@@ -11,6 +11,7 @@ import { redis } from './redis.service';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { inngest } from '../lib/inngest/client';
+import { WalletService } from './wallet.service';
 
 interface TokenPayload {
   userId: string;
@@ -1475,6 +1476,15 @@ export class AuthService {
       await tx.loyaltyTransaction.deleteMany({ where: { customerId: userId } });
       await tx.loyaltyPoints.deleteMany({ where: { customerId: userId } });
 
+      // Customer wallet (D1, Ruling W-4). Unlike loyalty, the wallet ledger is
+      // a FINANCIAL record of money the merchant owed and paid out, so it is
+      // kept — it carries no PII once its one free-text field (`note`) is
+      // nulled. Any remaining balance is written off with an `expire` entry:
+      // the anonymized account can no longer sign in to spend it, and leaving
+      // it would overstate the merchant's outstanding store-credit liability
+      // forever. Runs on this erasure transaction, so it is atomic with it.
+      await WalletService.forfeitOnErasure(userId, tx);
+
       // Merchant-CRM copy of the same identity (`customers` +
       // `customer_addresses`). Without this the shopper's name, email,
       // phone, notes and street addresses stay fully readable after an
@@ -1723,6 +1733,8 @@ export class AuthService {
       returns,
       loyaltyPoints,
       loyaltyTransactions,
+      wallets,
+      walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
     ] = await Promise.all([
@@ -1744,6 +1756,26 @@ export class AuthService {
       prisma.return.findMany({ where: { customerId: userId } }),
       prisma.loyaltyPoints.findMany({ where: { customerId: userId } }),
       prisma.loyaltyTransaction.findMany({ where: { customerId: userId } }),
+      // Customer wallet (D1): balance + full ledger — the customer's own money.
+      prisma.customerWallet.findMany({
+        where: { customerId: userId },
+        select: { id: true, storeId: true, balance: true, createdAt: true, updatedAt: true },
+      }),
+      prisma.walletTransaction.findMany({
+        where: { customerId: userId },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          storeId: true,
+          amount: true,
+          balanceAfter: true,
+          type: true,
+          orderId: true,
+          returnId: true,
+          note: true,
+          createdAt: true,
+        },
+      }),
       prisma.pushSubscription.findMany({
         where: { customerId: userId },
         select: { id: true, endpoint: true, createdAt: true },
@@ -1765,6 +1797,8 @@ export class AuthService {
       returns,
       loyaltyPoints,
       loyaltyTransactions,
+      wallets,
+      walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
     };

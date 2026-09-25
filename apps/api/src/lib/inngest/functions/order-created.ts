@@ -253,7 +253,10 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
         // Fire "New order" only when NO payment-received push will follow: a
         // cash/COD order (paid on delivery) or a not-yet-paid order. Online-paid
         // is fully covered by "Payment received".
-        const isCash = ['cod', 'cash', 'cash_on_delivery'].includes(
+        // 'wallet' = paid in full from the customer wallet at checkout (D1):
+        // paid, but no gateway webhook exists to fire a "Payment received"
+        // push, so it takes the same branch as cash.
+        const isCash = ['cod', 'cash', 'cash_on_delivery', 'wallet'].includes(
           (paymentMethod || '').toLowerCase()
         );
         if (order.paymentStatus === 'paid' && !isCash) {

@@ -39,6 +39,7 @@ export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
  *   - Order not found (logged as warn)
  *   - Order.paymentStatus is not 'paid' (logged as info)
  *   - Order.store.accountingEnabled is false (logged as info)
+ *   - Order.walletAmount > 0 (logged as warn — Ruling W-3, see below)
  *   - Order.store has no seeded COA — postEntry throws via getSystemAccountIdByCode
  */
 export async function postOrderPaymentJournal(args: {
@@ -75,6 +76,21 @@ export async function postOrderPaymentJournal(args: {
     logger.info(
       { orderId, storeId: order.storeId },
       'postOrderPaymentJournal: accounting disabled'
+    );
+    return;
+  }
+  // Customer-wallet spend (D1). The chart of accounts has no store-credit
+  // liability account yet (Ruling W-3), so the cash line below — `order.total`
+  // — would book the wallet portion as cash that never arrived. Wallet
+  // checkout is refused while accounting is on (WalletService.
+  // getCheckoutAvailability), so reaching here means accounting was switched
+  // on between checkout and payment. Refuse to post a wrong entry and say so;
+  // the order stays un-journaled, which the refund path already tolerates
+  // (postRefundJournal no-ops when no entry exists).
+  if (order.walletAmount > 0) {
+    logger.warn(
+      { orderId, storeId: order.storeId, walletAmount: order.walletAmount },
+      'postOrderPaymentJournal: wallet-paid order NOT journaled — store-credit liability is not modelled in the GL (Ruling W-3)'
     );
     return;
   }

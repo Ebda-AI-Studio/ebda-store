@@ -27,6 +27,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
   // bundlePrice, never componentSum), so it is shown as its own informational
   // line and never subtracted from anything here.
   const bundleSavings = order.bundleDiscount ?? 0;
+  const walletAmount = order.walletAmount ?? 0;
   const promotionName = order.appliedPromotion
     ? locale === 'ar' && order.appliedPromotion.nameAr
       ? order.appliedPromotion.nameAr
@@ -101,6 +102,24 @@ export function SummaryCard({ order }: SummaryCardProps) {
             {formatMoney(order.total, order.currency)}
           </dd>
         </div>
+        {/* Customer wallet (D1): the part of the total the customer paid from
+            store credit, and what the gateway / courier actually collects. */}
+        {walletAmount > 0 && (
+          <>
+            <div className="flex items-center justify-between">
+              <dt className="text-foreground">{t('paidFromWallet')}</dt>
+              <dd className="font-medium text-foreground">
+                −{formatMoney(walletAmount, order.currency)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="font-semibold text-foreground">{t('amountDue')}</dt>
+              <dd className="font-semibold text-foreground">
+                {formatMoney(Math.max(0, order.total - walletAmount), order.currency)}
+              </dd>
+            </div>
+          </>
+        )}
       </dl>
     </section>
   );

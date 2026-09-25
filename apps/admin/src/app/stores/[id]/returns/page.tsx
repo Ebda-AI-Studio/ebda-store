@@ -13,11 +13,16 @@ import { StatsGrid } from './_components/StatsGrid';
 import type { ReturnRecord } from './_components/types';
 import { useReturns } from './_hooks/useReturns';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { useFeatures } from '../../../../hooks/useFeatures';
 
 type StringResolver = (value: string | null) => void;
 
 export default function ReturnsPage() {
   const { gate } = useRequireFeature('returns');
+  // Customer wallet (D1): with it on, "Store credit" lands in the customer's
+  // wallet — say so in the picker. Off (every store at launch): unchanged copy.
+  const { isEnabled: isFeatureEnabled, isLoading: featuresLoading } = useFeatures();
+  const walletEnabled = !featuresLoading && isFeatureEnabled('customer_wallet');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -157,6 +162,7 @@ export default function ReturnsPage() {
         open={refundOpen}
         onConfirm={handleRefundConfirm}
         onClose={handleRefundCancel}
+        walletEnabled={walletEnabled}
       />
     </AdminLayout>
   );

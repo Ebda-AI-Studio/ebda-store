@@ -120,6 +120,10 @@ export interface OrderDetail extends Order {
   promotionDiscount?: number;
   /** The promotion that discounted this order, when `promotionDiscount` > 0. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
+  /** Customer-wallet (store credit) portion of `total`, in fils (D1). The
+   *  gateway / courier collects `total - walletAmount`. 0 or absent for every
+   *  order that did not use the wallet. */
+  walletAmount?: number;
   notes: string | null;
   customerNotes: string | null;
   shippingAddress: AddressJson | null;

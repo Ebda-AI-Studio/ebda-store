@@ -46,6 +46,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 import { useLastListing } from '../../hooks/useLastListing';
+import { useWallet } from '../../hooks/useWallet';
 
 // Lazy-load the payment step component (includes PaymentIcons SVGs)
 // so it is only fetched when the user advances past the shipping form.
@@ -304,6 +305,15 @@ export default function CheckoutClient() {
   } | null>(null);
   const [redeemEnabled, setRedeemEnabled] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
+
+  // Customer wallet (store credit, D1). `wallet` is non-null only when the API
+  // confirms the wallet for this signed-in customer; the "Use wallet balance"
+  // option additionally needs the store's wallet checkout to be available and
+  // a positive balance. Opt-in per order (defaults off), and — like loyalty —
+  // the amount is display-only: the server spends min(balance, total).
+  const { wallet, refresh: refreshWallet } = useWallet();
+  const walletSpendable = !!wallet && wallet.checkoutAvailable && wallet.balance > 0;
+  const [useWalletBalance, setUseWalletBalance] = useState(false);
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -911,6 +921,9 @@ export default function CheckoutClient() {
   const discount = primaryDiscount + loyaltyDiscount;
   const shipping = freeShipping ? 0 : shippingCost;
   const total = Math.max(0, subtotal - discount + shipping);
+  // Display estimate of the wallet portion; the server re-resolves it.
+  const walletApplied =
+    walletSpendable && useWalletBalance && wallet ? Math.min(wallet.balance, total) : 0;
 
   // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
   // fils; 0/unset = no minimum). Defense-in-depth for direct navigation to
@@ -1086,6 +1099,9 @@ export default function CheckoutClient() {
         // amount clears the store minimum. The server re-validates against the
         // real balance + caps regardless.
         pointsToRedeem: pointsToSend > 0 ? pointsToSend : undefined,
+        // Only sent when the customer ticked "Use wallet balance" on a store
+        // where the API reports wallet checkout as available.
+        useWallet: walletApplied > 0 ? true : undefined,
       });
 
       if (!orderResult.success || !orderResult.data?.order) {
@@ -1102,6 +1118,26 @@ export default function CheckoutClient() {
       }
 
       const order = orderResult.data.order;
+
+      // Paid in full from the customer wallet: the order was created paid and
+      // there is nothing left for a gateway — /payments/create would refuse it.
+      // Go straight to the success page.
+      const orderWalletAmount = order.walletAmount ?? 0;
+      if (orderWalletAmount > 0 && orderWalletAmount >= order.total) {
+        if (typeof window !== 'undefined') {
+          try {
+            if (checkoutStorageKey) window.sessionStorage.removeItem(checkoutStorageKey);
+            if (promoStorageKey) window.sessionStorage.removeItem(promoStorageKey);
+          } catch {
+            // Non-fatal
+          }
+        }
+        refreshWallet();
+        // The success page's verify-on-return answers "paid" straight from
+        // the order's paymentStatus for this order — no gateway round-trip.
+        router.push(storeUrl(`/checkout/success?orderId=${order.id}`));
+        return;
+      }
 
       // Create payment.
       // Send RELATIVE paths so the api can absolutify them against the order's
@@ -1291,6 +1327,17 @@ export default function CheckoutClient() {
           setStep(1);
           break;
         }
+        // A concurrent spend (another tab/device) drained the wallet between
+        // the summary and the order: the server refused and rolled the whole
+        // order back. Refresh the balance so the summary tells the truth.
+        case 'INSUFFICIENT_WALLET_BALANCE':
+          friendly = t(
+            'Your wallet balance changed. Please review your order and try again.',
+            'تغيّر رصيد محفظتك. يرجى مراجعة طلبك والمحاولة مرة أخرى.'
+          );
+          refreshWallet();
+          setUseWalletBalance(false);
+          break;
         case 'COUPON_LIMIT_REACHED':
           friendly = t(
             'The coupon you applied has reached its usage limit. Please remove it and try again.',
@@ -1961,6 +2008,16 @@ export default function CheckoutClient() {
                       pointsToRedeem,
                       onPointsChange: setPointsToRedeem,
                       loyaltyDiscount,
+                    }
+                  : undefined
+              }
+              wallet={
+                walletSpendable && wallet
+                  ? {
+                      balance: wallet.balance,
+                      enabled: useWalletBalance,
+                      onToggle: setUseWalletBalance,
+                      applied: walletApplied,
                     }
                   : undefined
               }

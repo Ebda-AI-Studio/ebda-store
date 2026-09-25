@@ -270,6 +270,25 @@ router.post(
         // daily auto-cancel reconciler.
       }
 
+      // Customer wallet (D1): `order.total` is the order VALUE; the part paid
+      // from the wallet at checkout is `order.walletAmount`, and only the
+      // remainder is ever charged here. 0 for every order that did not use the
+      // wallet, so both amounts below are exactly what they always were.
+      const walletAmount = order.walletAmount ?? 0;
+      // An order the wallet paid in full was created paid and never needs a
+      // gateway or courier collection. Refuse rather than mint an invoice for
+      // money that has already been paid (a replayed or stale checkout).
+      if (walletAmount > 0 && order.total - walletAmount <= 0) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'ORDER_ALREADY_PAID',
+            message: 'This order was paid in full from the customer wallet',
+          },
+        });
+        return;
+      }
+
       // Set rollback context for the catch block. We only roll back if there's
       // no payment yet — paid orders don't get auto-cancelled by retry attempts.
       const sessionIdHeader = (req.headers['x-session-id'] as string | undefined) ?? '';
@@ -367,6 +386,10 @@ router.post(
               data: { total: chargedTotal },
             });
           }
+          // What the courier collects: the order value (incl. any COD fee)
+          // less the part already paid from the wallet. === chargedTotal when
+          // the wallet was not used.
+          const collectAmount = chargedTotal - walletAmount;
 
           // Create payment record with cod_pending status
           const payment = await prisma.payment.create({
@@ -375,9 +398,13 @@ router.post(
               provider: 'cod',
               method: 'cod',
               status: 'cod_pending',
-              amount: chargedTotal,
+              amount: collectAmount,
               currency: order.currency,
-              metadata: { codFee, originalTotal: chargedTotal - codFee },
+              metadata: {
+                codFee,
+                originalTotal: chargedTotal - codFee,
+                ...(walletAmount > 0 ? { walletAmount } : {}),
+              },
             },
           });
 
@@ -393,7 +420,12 @@ router.post(
             toStatus: 'cod_pending',
             provider: 'cod',
             triggeredByUserId: req.user?.userId ?? null,
-            details: { amount: chargedTotal, codFee, originalTotal: chargedTotal - codFee },
+            details: {
+              amount: collectAmount,
+              codFee,
+              originalTotal: chargedTotal - codFee,
+              ...(walletAmount > 0 ? { walletAmount } : {}),
+            },
           });
 
           await auditLog({
@@ -404,9 +436,10 @@ router.post(
             resourceId: payment.id,
             details: {
               orderId: order.id,
-              amount: chargedTotal,
+              amount: collectAmount,
               codFee,
               provider: 'cod',
+              ...(walletAmount > 0 ? { walletAmount } : {}),
             },
             ip: req.ip,
             userAgent: req.headers['user-agent'],
@@ -445,7 +478,9 @@ router.post(
           {
             orderId: order.id,
             orderNumber: order.orderNumber,
-            amount: order.total,
+            // Amount due — see the wallet note above. === order.total when the
+            // wallet was not used.
+            amount: order.total - walletAmount,
             currency: order.currency as Currency,
             customer: (() => {
               // Guest checkout has order.customer = null but the checkout
@@ -499,8 +534,9 @@ router.post(
           resourceId: result.transactionId,
           details: {
             orderId: order.id,
-            amount: order.total,
+            amount: order.total - walletAmount,
             provider: result.provider,
+            ...(walletAmount > 0 ? { walletAmount } : {}),
           },
           ip: req.ip,
           userAgent: req.headers['user-agent'],

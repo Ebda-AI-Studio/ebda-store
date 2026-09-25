@@ -244,6 +244,9 @@ interface Order {
   status: string;
   paymentStatus: string;
   total: number;
+  /** Part of `total` paid from the customer wallet (D1), in fils. The
+   *  gateway charges `total - walletAmount`. 0 when the wallet was not used. */
+  walletAmount?: number;
   items: Array<{
     id: string;
     productId: string;
@@ -351,6 +354,9 @@ interface CreateOrderData {
   /** Loyalty points the customer requests to redeem. Re-validated server-side
    *  against the real balance + store caps; ignored for guest checkout. */
   pointsToRedeem?: number;
+  /** Pay from the customer wallet (D1). A request — the server spends
+   *  min(balance, total) only when the store's wallet checkout is on. */
+  useWallet?: boolean;
 }
 
 /**
@@ -1044,6 +1050,31 @@ class ApiClient {
     return this.request<{ suggestions: SearchSuggestion[] }>(
       `/public/${this.storeId}/search/suggest?q=${encodeURIComponent(trimmed)}`
     );
+  }
+
+  // Customer wallet (store credit, D1). Mounted under /stores (the wallet
+  // router's own path is /public/:storeId/wallet) — NOT /public/:storeId/…,
+  // which belongs to a different router and 404s.
+  async getWallet(storeId: string) {
+    return this.request<{ balance: number; checkoutAvailable: boolean }>(
+      `/stores/public/${encodeURIComponent(storeId)}/wallet`
+    );
+  }
+
+  async getWalletTransactions(storeId: string, cursor?: string) {
+    const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    return this.request<{
+      transactions: Array<{
+        id: string;
+        amount: number;
+        balanceAfter: number;
+        type: string;
+        createdAt: string;
+        order: { orderNumber: string } | null;
+        return: { returnNumber: string } | null;
+      }>;
+      nextCursor: string | null;
+    }>(`/stores/public/${encodeURIComponent(storeId)}/wallet/transactions${qs}`);
   }
 
   // Generic methods for other endpoints

@@ -102,6 +102,9 @@ export async function cancelBackorder(
   // 3. Fire refund pipeline outside the transaction (best-effort)
   OrderService.applyRefundEffects(storeId, bo.orderItem.orderId, {
     restoreInventory: false, // Inventory was never reserved for a backordered item
+    // One cancelled LINE must never return the whole order's wallet spend
+    // (D1). The order itself is still live; its wallet portion stays spent.
+    reverseWallet: false,
   }).catch(err => {
     logger.error(
       { err, storeId, backorderId, orderId: bo.orderItem.orderId, userId },

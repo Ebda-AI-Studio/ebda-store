@@ -7,6 +7,15 @@ import { useT } from '@/i18n/useT';
 export interface HubTab {
   label: string;
   href: string;
+  /**
+   * When set, the tab is shown ONLY once the store's feature map has loaded
+   * and this feature is on — never while loading (the features context
+   * defaults to "enabled" while loading, which would flash the tab). Used for
+   * tabs that must not appear at all for stores without the feature
+   * (e.g. the customer wallet, OFF for every store at launch). Tabs without a
+   * key keep the older "tab always renders, the page gates" behaviour.
+   */
+  featureKey?: string;
 }
 
 interface Props {

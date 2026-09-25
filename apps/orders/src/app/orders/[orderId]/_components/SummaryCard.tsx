@@ -25,6 +25,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
   const couponPortion = order.couponDiscount ?? 0;
   const promotionPortion = order.promotionDiscount ?? 0;
   const otherDiscount = Math.max(0, order.discount - couponPortion - promotionPortion);
+  const walletAmount = order.walletAmount ?? 0;
   const promotionName = order.appliedPromotion
     ? locale === 'ar' && order.appliedPromotion.nameAr
       ? order.appliedPromotion.nameAr
@@ -90,6 +91,24 @@ export function SummaryCard({ order }: SummaryCardProps) {
             {formatMoney(order.total, order.currency)}
           </dd>
         </div>
+        {/* Customer wallet (D1): what the courier collects on a COD order is
+            the amount due, not the total, when part was paid from store credit. */}
+        {walletAmount > 0 && (
+          <>
+            <div className="flex items-center justify-between">
+              <dt className="text-foreground">{t.detail.paidFromWallet}</dt>
+              <dd className="font-medium text-foreground">
+                −{formatMoney(walletAmount, order.currency)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="font-semibold text-foreground">{t.detail.amountDue}</dt>
+              <dd className="font-semibold text-foreground">
+                {formatMoney(Math.max(0, order.total - walletAmount), order.currency)}
+              </dd>
+            </div>
+          </>
+        )}
       </dl>
     </section>
   );
