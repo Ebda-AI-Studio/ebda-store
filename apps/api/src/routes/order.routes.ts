@@ -15,6 +15,7 @@ import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
+import { sendAlert } from '../services/alerts.service';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
@@ -1218,6 +1219,24 @@ router.post(
       // returns flow owns item-level effects and carries the line data this
       // route does not have.
       const refundIsFull = updateData.status === 'refunded';
+      // A partial out-of-band refund recorded here reaches no GL poster — the
+      // partial journal needs line data only the returns flow has (#1455).
+      // Nothing books it, so say so instead of leaving it to a log line.
+      if (updateData.status === 'partially_refunded') {
+        const store = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { name: true },
+        });
+        await sendAlert({
+          level: 'p1',
+          scope: 'store',
+          store: { id: storeId, name: store?.name ?? storeId },
+          source: 'payment.refund.partial_no_gl',
+          title: 'Partial refund with no ledger entry',
+          body: `Order ${orderId}: a partial refund (${status.refundId ?? payment.refundId}) made outside a return was recorded by a refund-status refresh. Nothing posts it to the general ledger — book it by hand.`,
+          context: { paymentId: payment.id, refundId: status.refundId ?? payment.refundId },
+        }).catch(() => undefined);
+      }
       const needsSideEffects =
         status.status === 'completed' &&
         statusChanged &&

@@ -73,7 +73,10 @@ type IconVariant = 'success' | 'failure' | 'webhook' | 'admin';
 
 function getIconVariant(eventType: string): IconVariant {
   if (['completed', 'refund_completed'].includes(eventType)) return 'success';
-  if (['failed', 'refund_failed', 'cancelled', 'expired'].includes(eventType)) return 'failure';
+  if (
+    ['failed', 'refund_failed', 'refund_indeterminate', 'cancelled', 'expired'].includes(eventType)
+  )
+    return 'failure';
   if (['webhook_received', 'status_change', 'retry'].includes(eventType)) return 'webhook';
   return 'admin';
 }

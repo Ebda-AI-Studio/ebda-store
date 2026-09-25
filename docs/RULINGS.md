@@ -8,6 +8,104 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25 — returns/refunds money batch (M1)
+
+Context: branch `fix/p2-m1-returns-refunds`, 19 issues in the return-completion
+and provider-refund path. Measured against Postgres 17 before any change: every
+gateway refund made inside a request hung 30,006 ms and ended in P2028, because
+the post-provider write was a client-level array transaction that waited on the
+row lock its own request held. That finding shapes the rulings below.
+
+**Ruling M1-1 — the refund's records commit on their own transaction, not the
+request's.** The claim, the release or indeterminate mark, and the confirmation
+each run in `runInTenantContext` of their own. The request transaction rolls
+back on any 5xx, and the provider call cannot be rolled back with it: before
+this, a failure after the money left erased every record of it and the retry
+paid again (`tests/integration/refund-transaction-boundaries.test.ts`, red on
+main). Cost if wrong: a claim committed before a process dies inflates the
+payment's refunded total until someone reconciles it — which is why it is
+written as a `refund_initiated` event the stuck-claim check raises (M1-6).
+
+**Ruling M1-2 — the per-order returns lock is a transaction-scoped ADVISORY
+lock, not `SELECT … FOR UPDATE` on the order row.** The brief asked for the
+row lock. `complete()` holds the lock across the provider call, and
+PaymentService now commits the order's `refunded` flip on its own transaction;
+a row lock held by the request would make that commit wait on the request
+while the request waits on it (the same shape as the 30 s hang above). The
+advisory key serialises every return create/complete on one order and locks no
+row. Proven on Postgres by `tests/integration/return-order-lock.test.ts` (red
+with the lock removed). Cost if wrong: none for money — anything else that
+needs to serialise with return completion must take the same key, not the row.
+
+**Ruling M1-3 — a provider failure releases the claim only when it proves
+nothing was sent.** A 4xx (except 408) or a 2xx whose body says failure is a
+rejection; a timeout, network error, 5xx or unparseable body keeps the claim
+and returns `PROVIDER_REFUND_INDETERMINATE`. A MyFatoorah failure before
+`MakeRefund` is sent counts as not sent. Cost if wrong: a refund that did not
+execute blocks further gateway refunds on that payment until reconciled; the
+opposite error pays the customer twice.
+
+**Ruling M1-4 — a provider's `success: false` refund response is NOT treated
+as a rejection.** Tap's mapping marks anything but `PENDING`/`CAPTURED` as
+unsuccessful, and whether its completed-refund status is one of those is not
+verified here. Releasing on it could free a refund that went through. Cost if
+wrong: a genuinely declined refund is recorded as sent until the settle webhook
+or a refresh says otherwise.
+
+**Ruling M1-5 — #1349 and #1361 are closed by the refund key, not by a
+release endpoint or a stale-claim window.** The Return's `refundedAt` claim
+lives in the request transaction, so a crash or any 5xx rolls it back — it
+cannot strand a return (verified on Postgres: the return is `received` again
+after a rolled-back completion). The real hazard behind both issues was the
+retry after the money left; `PaymentService.refund` now refuses a second
+refund under `return:<id>` while an earlier one is unreleased, and the admin
+offers "Already refunded — record only" (`refundMethod: 'manual'`). Cost if
+wrong: none known; a claim can only persist if a caller runs `complete()`
+outside a transaction.
+
+**Ruling M1-6 — #1317's automatic rollback of an unconfirmed claim needs the
+owner.** The claim is now recorded and raised (P1 alert on the
+refund-reversal sweep's tick, visible on the order's payment timeline), but
+without a provider refund id nothing can be asked of the provider, so undoing
+the balance needs a human. Question for the owner: may a store admin, or only
+a super admin, reduce a payment's refunded total, and on what evidence?
+
+**Ruling M1-7 — no GL entry is posted for partial refunds made outside a
+return (#1209, #1455); they are raised instead.** Both need an amount-only
+journal (DR sales returns + tax pro-rata by amount, or DR a refunds contra
+account, CR the sale's cash account) and the account choice changes the books
+of live stores. Until the owner picks one, each such refund fires a P1
+`payment.refund.partial_no_gl` alert naming the order. Cost if wrong: the
+ledger keeps understating refunds for these until booked by hand.
+
+**Ruling M1-8 — the partial-return cash credit keeps its current account and
+amount for every refund method (#1207, #1351).** Crediting a store-credit
+liability for `store_credit`, cash-on-hand for `cash`, and the actual refunded
+amount with a variance line all change what is posted, and PR #1943 (customer
+wallet) is about to give `store_credit` a real liability. Owner decision:
+which account each method credits, and where a pro-rata-vs-actual difference
+goes. Cost if wrong: store-credit and bank-transfer partial returns keep
+crediting the provider cash account.
+
+**Ruling M1-9 — a FULL return on a manual method keeps its recorded figure.**
+#1340 is about partial returns; for a whole order settled off-platform nothing
+in the system knows what the merchant hands back (shipping, fees), so the
+creation-time figure is left alone. Cost if wrong: the admin shows the gross
+line total for such returns.
+
+**Ruling M1-10 — merging main's customer wallet (#1943): with the wallet on,
+the refund preview and confirm step show what the WALLET receives, not
+`recordedAmount`.** The two differ on a full return (`computeStoreCreditAmount`
+adds shipping and nets out `order.walletAmount`, which the `order/refunded`
+fanout returns separately), so the merged confirm step would otherwise have
+asked the merchant to confirm a figure `complete()` does not credit. The
+preview now carries `storeCreditToWallet` from the same helper `complete()`
+credits with (null when the wallet is off). Both sides' guards are kept
+unchanged: this branch's order lock, claim, refund key and zero-partial
+refusal, and main's exchange exclusion and idempotent `creditForReturn`.
+Cost if wrong: none for money moved — only the figure displayed before
+confirming would be wrong.
+
 ## 2026-09-25 — buy-flow parity harness (`scripts/buy-flow-parity/`)
 
 **Ruling BFP-1: background Inngest functions are EXECUTED by a local executor.

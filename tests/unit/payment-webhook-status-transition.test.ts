@@ -37,6 +37,7 @@ vi.mock('@force/database', () => ({
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
+      findUnique: vi.fn().mockResolvedValue({ metadata: {} }),
     },
     order: {
       update: (...a: unknown[]) => orderUpdate(...a),
@@ -47,8 +48,16 @@ vi.mock('@force/database', () => ({
       findMany: (...a: unknown[]) => paymentConfigFindMany(...a),
     },
     $transaction: (ops: unknown[]) => txMock(ops),
+    // PaymentService.refund's ledger rows (claim / completed / released).
+    paymentEvent: {
+      create: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
   Prisma: {},
+  // Each refund record commits on its own transaction; with no database the
+  // callback simply runs.
+  runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
 }));
 
 vi.mock('@api/config', () => ({
@@ -731,5 +740,151 @@ describe('refund webhook — whole-order effects only for a refund that exhausts
 
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
     expect(refundWrite()?.status).toBe('refunded');
+  });
+});
+
+describe('refund webhook — what it cannot book is raised, not logged (#1477, #1455)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProviderConfig();
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockResolvedValue(undefined);
+  });
+
+  function webhookFor(
+    payment: { refundedAmount: number; status: string; metadata: Record<string, unknown> },
+    refund: { refundId: string; amount?: number }
+  ) {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      amount: 5000,
+      currency: 'KWD',
+      provider: 'myfatoorah',
+      ...payment,
+      order: {
+        storeId: STORE_ID,
+        orderNumber: 'ORD-1',
+        store: { name: 'Test Store' },
+        status: 'delivered',
+      },
+    });
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', ...refund },
+    });
+  }
+
+  const alertSources = async () => {
+    const { sendAlert } = await import('@api/services/alerts.service');
+    return vi.mocked(sendAlert).mock.calls.map(c => (c[0] as { source: string }).source);
+  };
+
+  /**
+   * #1477. 2000 of a 5000 payment is accounted (rf_a). A NEW refund id arrives
+   * with no usable amount: the total is held — it cannot be added blind — so if
+   * it is a genuine second refund the payment still looks 3000 refundable, and
+   * a later return would pay that out again. The hold is right; silence is not.
+   */
+  it('a refund nothing has counted, reported without an amount, raises an alert', async () => {
+    webhookFor(
+      {
+        refundedAmount: 2000,
+        status: 'partially_refunded',
+        metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+      },
+      { refundId: 'rf_new' }
+    );
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(await alertSources()).toContain('payment.refund.held_unaccounted');
+  });
+
+  it('the settle notice for an already-counted refund raises nothing (control)', async () => {
+    webhookFor(
+      {
+        refundedAmount: 2000,
+        status: 'partially_refunded',
+        metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'pending' } },
+      },
+      { refundId: 'rf_a', amount: 2000 }
+    );
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(await alertSources()).toEqual([]);
+  });
+
+  /**
+   * #1455. A partial refund made in the provider's dashboard is now counted in
+   * the balance, but no GL poster can book it (the partial journal needs line
+   * data only a Return carries). Nothing books it, so it is raised.
+   */
+  it('a partial out-of-band refund raises a no-ledger-entry alert', async () => {
+    webhookFor(
+      { refundedAmount: 0, status: 'completed', metadata: {} },
+      {
+        refundId: 'rf_p',
+        amount: 2000,
+      }
+    );
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(await alertSources()).toContain('payment.refund.partial_no_gl');
+  });
+});
+
+describe('PaymentService.refund — a partial refund outside a return is raised (#1209)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProviderConfig();
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      amount: 5000,
+      refundedAmount: 0,
+      status: 'completed',
+      provider: 'myfatoorah',
+      metadata: {},
+      order: {
+        storeId: STORE_ID,
+        orderNumber: 'ORD-1',
+        store: { name: 'Test Store' },
+        status: 'delivered',
+      },
+    });
+    paymentUpdateMany.mockResolvedValue({ count: 1 });
+    providerRefund.mockResolvedValue({
+      success: true,
+      provider: 'myfatoorah',
+      refundId: 'rf_1',
+      transactionId: TRANSACTION_ID,
+      amount: 1000,
+      status: 'pending',
+    });
+  });
+
+  const alertSources = async () => {
+    const { sendAlert } = await import('@api/services/alerts.service');
+    return vi.mocked(sendAlert).mock.calls.map(c => (c[0] as { source: string }).source);
+  };
+
+  it('the order page partial refund posts no GL entry, so it alerts', async () => {
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 });
+    expect(await alertSources()).toContain('payment.refund.partial_no_gl');
+  });
+
+  it('a return books its own partial journal, so it does not (control)', async () => {
+    await PaymentService.refund({
+      transactionId: TRANSACTION_ID,
+      amount: 1000,
+      refundKey: 'return:r1',
+      itemLevel: true,
+    });
+    expect(await alertSources()).toEqual([]);
   });
 });

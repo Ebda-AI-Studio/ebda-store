@@ -13,6 +13,7 @@ import {
   PaymentStatus,
 } from './types';
 import logger from '../../lib/logger';
+import { providerRequestError } from './refund-outcome';
 
 // ==========================================
 // Tap Payments Provider
@@ -87,7 +88,11 @@ export class TapPaymentProvider implements IPaymentProvider {
 
     if (!response.ok) {
       logger.error({ statusCode: response.status, errors: data.errors }, 'Tap API request failed');
-      throw new Error(data.errors?.[0]?.description || 'Tap API request failed');
+      throw providerRequestError(
+        data.errors?.[0]?.description || 'Tap API request failed',
+        response.status,
+        false
+      );
     }
 
     return data as T;

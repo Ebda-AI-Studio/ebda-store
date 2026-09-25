@@ -67,8 +67,8 @@
       "tier": "unit",
       "why": "provider refund fires on a stale order state (double refund)",
       "source": "apps/api/src/services/payment-providers/payment.factory.ts",
-      "find": "    if (isFullRefund && payment.order) {\n      assertValidTransition(payment.order.status, 'refunded');",
-      "replace": "    if (isFullRefund && payment.order) {\n      /* transition guard removed */",
+      "find": "    if (flipsOrder && payment.order) {\n      assertValidTransition(payment.order.status, 'refunded');",
+      "replace": "    if (flipsOrder && payment.order) {\n      /* transition guard removed */",
       "test": "tests/unit/payment-webhook-status-transition.test.ts"
     },
     {
@@ -150,6 +150,66 @@
       "find": "        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId);",
       "replace": "        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId).catch(\n          () => {}\n        );",
       "test": "tests/unit/payment-webhook-status-transition.test.ts"
+    },
+    {
+      "id": "money-refund-key-single-issue",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a retry after the request rolled back refunds the same return a second time at the provider",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "        if (outstanding.length > 0) {",
+      "replace": "        if (false) {",
+      "test": "tests/unit/payment-service-refund.test.ts"
+    },
+    {
+      "id": "money-return-refund-key-guard",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "completing a return whose refund already went out sends it to the gateway again",
+      "source": "apps/api/src/services/return.service.ts",
+      "find": "    if (outstanding.length > 0) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/return-complete-gateway-refund.test.ts"
+    },
+    {
+      "id": "money-refund-timeout-keeps-claim",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a provider timeout resets the refunded balance and invites a retry that pays twice",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "      if (providerError instanceof ProviderRejectedError) {",
+      "replace": "      if (true) {",
+      "test": "tests/unit/payment-service-refund.test.ts"
+    },
+    {
+      "id": "money-refund-item-level-no-order-flip",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a partial return that uses up the payment reverses the whole order: kept lines restocked, whole sale journal reversed",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "    const flipsOrder = isFullRefund && !request.itemLevel;",
+      "replace": "    const flipsOrder = isFullRefund;",
+      "test": "tests/unit/payment-service-refund.test.ts"
+    },
+    {
+      "id": "money-return-follows-payment-decision",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "the return re-derives the full-refund decision from a stale read and suppresses (or doubles) the only refund fanout",
+      "source": "apps/api/src/services/return.service.ts",
+      "find": "          gatewayRanFullEffects = result.wholeOrderEffectsApplied === true;",
+      "replace": "          gatewayRanFullEffects = plan.amount == null || plan.amount >= plan.refundableRemaining;",
+      "test": "tests/unit/return-complete-gateway-refund.test.ts"
+    },
+    {
+      "id": "money-return-order-lock",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "two returns on one order complete together and both refund the same line",
+      "source": "apps/api/src/services/return.service.ts",
+      "find": "    if (returnRequest.orderId) await lockOrderReturns(returnRequest.orderId);",
+      "replace": "    /* order lock removed */",
+      "test": "tests/unit/return-complete-gateway-refund.test.ts"
     },
     {
       "id": "csrf-cookieless-bypass-must-stay-narrow",

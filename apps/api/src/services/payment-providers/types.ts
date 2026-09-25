@@ -123,6 +123,20 @@ export interface RefundRequest {
   transactionId: string;
   amount?: number; // Partial refund amount in fils
   reason?: string;
+  /**
+   * PaymentService.refund only — never sent to a provider. A stable key for
+   * the business event this refund settles (ReturnService passes
+   * `return:<id>`). A second refund under a key whose earlier refund may have
+   * gone out is refused, so a retry after a failed request cannot pay twice.
+   */
+  refundKey?: string;
+  /**
+   * PaymentService.refund only. The caller applies ITEM-LEVEL effects itself
+   * (a partial return), so even a refund that uses up the payment must not
+   * flip the order to refunded or run the whole-order reversals: lines the
+   * customer kept stay sold.
+   */
+  itemLevel?: boolean;
 }
 
 export interface RefundResponse {
@@ -133,6 +147,13 @@ export interface RefundResponse {
   amount: number;
   status: 'pending' | 'completed' | 'failed';
   metadata?: Record<string, unknown>;
+  /**
+   * Set by PaymentService.refund, not by providers: whether THIS call flipped
+   * the order to refunded and dispatched the whole-order effects. Callers read
+   * it instead of re-deriving the decision from their own, older read of the
+   * payment (#1473).
+   */
+  wholeOrderEffectsApplied?: boolean;
 }
 
 export interface RefundStatusResponse {

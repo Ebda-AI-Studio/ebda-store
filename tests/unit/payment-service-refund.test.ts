@@ -34,6 +34,8 @@ const paymentConfigFindMany = vi.fn();
 // (`prisma.payment.update(...)`, `prisma.order.update(...)`), so those two
 // must resolve on their own before `$transaction` ever runs.
 const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
+const paymentEventFindMany = vi.fn().mockResolvedValue([]);
+const paymentEventCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@force/database', () => ({
   prisma: {
@@ -41,6 +43,7 @@ vi.mock('@force/database', () => ({
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
+      findUnique: vi.fn().mockResolvedValue({ metadata: {} }),
     },
     order: {
       findUnique: (...a: unknown[]) => orderFindUnique(...a),
@@ -50,8 +53,16 @@ vi.mock('@force/database', () => ({
       findMany: (...a: unknown[]) => paymentConfigFindMany(...a),
     },
     $transaction: (ops: unknown[]) => txMock(ops),
+    // PaymentService.refund's ledger rows (claim / completed / released).
+    paymentEvent: {
+      create: (...a: unknown[]) => paymentEventCreate(...a),
+      findMany: (...a: unknown[]) => paymentEventFindMany(...a),
+    },
   },
   Prisma: {},
+  // Each refund record commits on its own transaction; with no database the
+  // callback simply runs.
+  runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
 }));
 
 vi.mock('@api/config', () => ({
@@ -308,5 +319,125 @@ describe('PaymentService.refund — an absent transaction id is refused, not loo
 
     expect(paymentFindFirst).toHaveBeenCalled();
     expect(providerRefund).toHaveBeenCalled();
+  });
+});
+
+describe('PaymentService.refund — one refund per key (a retry after a rollback)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    paymentEventFindMany.mockResolvedValue([]);
+  });
+
+  /**
+   * The caller's own mutex (the Return's completion claim) lives in the
+   * request transaction and is rolled back by the very 5xx that follows a
+   * failure after the money left, so the return is retryable while the refund
+   * stands. The committed claim for the same key is what refuses the retry.
+   */
+  it('refuses a key whose earlier refund was never released, before the provider', async () => {
+    mockHappyPathUpToEffects();
+    paymentEventFindMany.mockResolvedValue([
+      { eventType: 'refund_initiated', details: { claimId: 'c-earlier', refundKey: 'return:r1' } },
+    ]);
+
+    await expect(
+      PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000, refundKey: 'return:r1' })
+    ).rejects.toMatchObject({ code: 'REFUND_ALREADY_ISSUED', statusCode: 409 });
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it('a released earlier claim does not block a retry (control)', async () => {
+    mockHappyPathUpToEffects();
+    paymentEventFindMany.mockResolvedValue([
+      { eventType: 'refund_initiated', details: { claimId: 'c-earlier', refundKey: 'return:r1' } },
+      { eventType: 'refund_failed', details: { claimId: 'c-earlier', refundKey: 'return:r1' } },
+    ]);
+
+    await PaymentService.refund({
+      transactionId: TRANSACTION_ID,
+      amount: 1000,
+      refundKey: 'return:r1',
+    });
+    expect(providerRefund).toHaveBeenCalledOnce();
+  });
+});
+
+describe('PaymentService.refund — a provider failure keeps or releases the claim by what it proves', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    paymentEventFindMany.mockResolvedValue([]);
+  });
+
+  /** The release is the decrement write; the claim is the compare-and-swap. */
+  const releaseWrites = () =>
+    paymentUpdateMany.mock.calls.filter(
+      c => (c[0] as { data: { refundedAmount?: unknown } }).data.refundedAmount instanceof Object
+    );
+
+  it('a timeout KEEPS the claim and reports that the refund may have gone out (#1359)', async () => {
+    mockHappyPathUpToEffects();
+    providerRefund.mockRejectedValue(new Error('The operation was aborted due to timeout'));
+
+    const err = await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 }).catch(
+      e => e
+    );
+
+    expect(err).toMatchObject({ code: 'PROVIDER_REFUND_INDETERMINATE' });
+    const { refundMayHaveExecuted } =
+      await import('@api/services/payment-providers/refund-outcome');
+    expect(refundMayHaveExecuted(err)).toBe(true);
+    expect(releaseWrites(), 'the balance must not be reset on a timeout').toEqual([]);
+  });
+
+  it('an explicit provider refusal RELEASES the claim', async () => {
+    mockHappyPathUpToEffects();
+    const { ProviderRejectedError, refundMayHaveExecuted } =
+      await import('@api/services/payment-providers/refund-outcome');
+    providerRefund.mockRejectedValue(new ProviderRejectedError('Invalid amount', 400));
+    paymentUpdateMany.mockResolvedValue({ count: 1 });
+
+    const err = await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 }).catch(
+      e => e
+    );
+
+    expect(err).toBeInstanceOf(ProviderRejectedError);
+    expect(refundMayHaveExecuted(err)).toBe(false);
+    expect(releaseWrites()).toHaveLength(1);
+  });
+});
+
+describe('PaymentService.refund — an item-level refund never reverses the order (#1402)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    paymentEventFindMany.mockResolvedValue([]);
+  });
+
+  it('uses up the payment but leaves the order and its whole-order effects alone', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    const result = await PaymentService.refund({
+      transactionId: TRANSACTION_ID,
+      amount: 5000, // the whole payment
+      itemLevel: true,
+      refundKey: 'return:r1',
+    });
+
+    expect(result.wholeOrderEffectsApplied).toBe(false);
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+    expect(orderUpdate).not.toHaveBeenCalled();
+    // The PAYMENT is still spent — only the order is left as it is.
+    const claim = paymentUpdateMany.mock.calls[0]?.[0] as { data: { status: string } };
+    expect(claim.data.status).toBe('refunded');
+  });
+
+  it('without the flag the same amount reverses the order (control)', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    const result = await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 5000 });
+
+    expect(result.wholeOrderEffectsApplied).toBe(true);
+    expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
   });
 });

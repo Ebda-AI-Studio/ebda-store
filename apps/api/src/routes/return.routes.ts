@@ -360,6 +360,26 @@ router.post(
   }
 );
 
+// GET /stores/:storeId/returns/admin/:id/refund-preview - What completing would refund.
+// Read-only; the admin's refund-method dialog shows it before the merchant
+// confirms, and hides "Original payment method" when the gateway cannot take it.
+router.get(
+  '/admin/:id/refund-preview',
+  authenticate,
+  requirePermission('returns:read'),
+  requireStoreAccess,
+  requireFeature('returns'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
+      const preview = await ReturnService.refundPreview(storeId, id);
+      res.json({ success: true, data: { preview } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /stores/:storeId/returns/admin/:id/complete - Complete return and refund
 router.post(
   '/admin/:id/complete',

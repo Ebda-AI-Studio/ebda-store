@@ -13,6 +13,7 @@ import {
   PaymentStatus,
 } from './types';
 import logger from '../../lib/logger';
+import { providerRequestError } from './refund-outcome';
 
 // ==========================================
 // Hesabe Payment Provider
@@ -123,7 +124,11 @@ export class HesabePaymentProvider implements IPaymentProvider {
         { statusCode: response.status, code: result.code, message: result.message },
         'Hesabe API request failed'
       );
-      throw new Error(result.message || 'Hesabe API request failed');
+      throw providerRequestError(
+        result.message || 'Hesabe API request failed',
+        response.status,
+        response.ok
+      );
     }
 
     // Decrypt response if it contains encrypted data

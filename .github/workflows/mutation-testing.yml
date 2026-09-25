@@ -54,6 +54,10 @@ on:
       # deterministic unique violation in the guest-cart merge.
       - 'apps/api/src/services/cart.service.ts'
       - 'apps/api/src/services/payment-providers/**'
+      # ReturnService.complete drives the gateway refund: the order-level returns
+      # lock, the per-return refund key, and following PaymentService's own
+      # whole-order decision are defended sources there.
+      - 'apps/api/src/services/return.service.ts'
       # Carrier clients: iCarry's resolveBaseUrl is the SSRF defence
       # (assertPublicHttpUrl on a merchant-supplied baseUrl). Added because
       # `mutation-gate-trigger-coverage` failed without it — the defence was

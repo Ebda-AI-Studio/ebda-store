@@ -63,6 +63,17 @@ export interface RefundSettlement {
    * would never be added at all.
    */
   accountedThisEvent: boolean;
+  /**
+   * True when the event names a refund id nothing has accounted, and the
+   * total was nonetheless HELD — no credible amount came with it, so it could
+   * not be added. That is either a genuine second refund whose amount the
+   * provider did not report, or a redelivery whose provenance is unknown; the
+   * rule cannot tell them apart and holds on purpose (paying twice is worse
+   * than understating). It must not also be silent (#1477): a real refund here
+   * leaves a phantom refundable balance that a later return would pay out
+   * again, so callers raise it for reconciliation.
+   */
+  heldUnaccountedEvent: boolean;
 }
 
 export function resolveRefundSettlement(input: {
@@ -143,12 +154,19 @@ export function resolveRefundSettlement(input: {
   const unknownMeansFull = credibleAmount === null && !hasAccountedRefund;
   const isFullRefund = unknownMeansFull || paymentAmount <= 0 || settled >= paymentAmount;
 
+  const accountedThisEvent = isUnaccountedEvent && credibleAmount !== null;
   return {
     reportedAmount,
     // A full refund exhausts the payment even when nothing was reported.
     settledTotal: isFullRefund ? Math.max(settled, Math.max(paymentAmount, 0)) : settled,
     isFullRefund,
-    accountedThisEvent: isUnaccountedEvent && credibleAmount !== null,
+    accountedThisEvent,
+    heldUnaccountedEvent:
+      typeof reportedEventId === 'string' &&
+      reportedEventId.length > 0 &&
+      !ids.includes(reportedEventId) &&
+      !accountedThisEvent &&
+      !isFullRefund,
   };
 }
 

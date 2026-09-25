@@ -37,6 +37,8 @@ const paymentFindFirst = vi.fn();
 const providerRefund = vi.fn();
 const applyRefundEffects = vi.fn();
 const getById = vi.fn();
+const executeRaw = vi.fn();
+const findOutstandingRefundClaims = vi.fn();
 
 vi.mock('@force/database', () => ({
   prisma: {
@@ -48,6 +50,8 @@ vi.mock('@force/database', () => ({
     order: { findFirst: (...a: unknown[]) => orderFindFirst(...a) },
     orderItem: { findMany: (...a: unknown[]) => orderItemFindMany(...a) },
     payment: { findFirst: (...a: unknown[]) => paymentFindFirst(...a) },
+    // The order-level returns lock (pg_advisory_xact_lock).
+    $executeRaw: (...a: unknown[]) => executeRaw(...a),
   },
   Prisma: {},
   ReturnStatus: {},
@@ -56,6 +60,7 @@ vi.mock('@force/database', () => ({
 
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: { refund: (...a: unknown[]) => providerRefund(...a) },
+  findOutstandingRefundClaims: (...a: unknown[]) => findOutstandingRefundClaims(...a),
 }));
 vi.mock('@api/services/order.service', () => ({
   OrderService: { applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a) },
@@ -73,6 +78,8 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 import { ReturnService } from '@api/services/return.service';
+import { AppError } from '@api/middleware/error-handler';
+import { markRefundMayHaveExecuted } from '@api/services/payment-providers/refund-outcome';
 
 const STORE_ID = 'store-1';
 const RETURN_ID = 'ret-1';
@@ -138,8 +145,26 @@ function setup({
   returnUpdate.mockImplementation((args: { data: unknown }) => ({ id: RETURN_ID, ...args.data }));
   // The atomic claim wins by default; individual tests override it to lose.
   returnUpdateMany.mockResolvedValue({ count: 1 });
-  providerRefund.mockResolvedValue({ success: true, refundId: 'rf-1' });
+  // Answers the way PaymentService.refund does: it reports whether IT ran the
+  // whole-order effects — only for a refund that uses up what is left on the
+  // payment and is not flagged item-level by the caller.
+  providerRefund.mockImplementation(
+    async (req: { amount?: number; itemLevel?: boolean; transactionId?: string }) => {
+      const p = (await paymentFindFirst({ where: {} })) as {
+        amount: number;
+        refundedAmount?: number;
+      } | null;
+      const remaining = (p?.amount ?? 0) - (p?.refundedAmount ?? 0);
+      return {
+        success: true,
+        refundId: 'rf-1',
+        wholeOrderEffectsApplied: !req.itemLevel && (req.amount == null || req.amount >= remaining),
+      };
+    }
+  );
   applyRefundEffects.mockResolvedValue(undefined);
+  executeRaw.mockResolvedValue(1);
+  findOutstandingRefundClaims.mockResolvedValue([]);
 }
 
 /** The amount handed to the payment provider on the single refund call. */
@@ -456,10 +481,43 @@ describe('ReturnService.complete — piecewise returns on a zero-shipping order'
     });
 
     await expect(ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'gateway')).rejects.toThrow(
-      /more than the payment has left/i
+      /only 0\.100 KWD is left on the payment/i
     );
 
     expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  /**
+   * #1403. The amount is derived and the merchant cannot edit it, and a
+   * one-line return can never be completed as a full one — so the refusal is a
+   * dead end unless it names the way out. It happens when money already left
+   * the payment outside any return (a goodwill refund from the order page, a
+   * refund in the provider's dashboard), which the allocator cannot see.
+   */
+  it('names the amounts and the way out when the payment has too little left', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-b', quantity: 1 }] });
+    paymentFindFirst.mockResolvedValue({
+      id: 'pay-1',
+      transactionId: 'txn-1',
+      amount: 8900,
+      refundedAmount: 8800,
+      status: 'partially_refunded',
+    });
+
+    const err = (await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original').catch(
+      e => e
+    )) as AppError;
+
+    expect(err.code).toBe('PARTIAL_REFUND_EXCEEDS_PAYMENT');
+    expect(err.message).toMatch(/store credit or bank transfer/i);
+    expect(err.message).toMatch(/4\.945 KWD/);
+    expect(err.details).toEqual({ refundAmount: 4945, refundableRemaining: 100 });
+    // A manual method is the stated way out, and it does complete.
+    vi.resetAllMocks();
+    setup({ returnedItems: [{ orderItemId: 'oi-b', quantity: 1 }] });
+    await expect(
+      ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'bank_transfer')
+    ).resolves.toBeTruthy();
   });
 });
 
@@ -497,48 +555,31 @@ describe('ReturnService.complete — the claim is retained once money may have m
   });
 
   /**
-   * A throw from PaymentService.refund does NOT prove no money moved: it
-   * commits its own claim (status + refundedAmount) BEFORE the provider
-   * round-trip and only unwinds it when the provider call itself threw. If its
-   * post-provider transaction fails it rethrows with the real refund standing.
-   * So the Payment row is the evidence, not the exception.
+   * PaymentService says whether its request reached the provider (#1359,
+   * #1431). The balance probe this replaced re-read `Payment.refundedAmount`,
+   * which could not tell this return's refund from a concurrent one, and which
+   * PaymentService used to reset on a timeout — the one failure where the
+   * refund most likely DID go out.
    */
-  it('treats a refund throw as EXECUTED when the payment balance moved', async () => {
+  it('treats a refund throw as EXECUTED when PaymentService says the money may have moved', async () => {
     setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
-    providerRefund.mockRejectedValueOnce(new Error('post-refund tx failed'));
-    // Re-read shows the balance advanced: the refund really happened.
-    paymentFindFirst
-      .mockResolvedValueOnce({
-        id: 'pay-1',
-        transactionId: 'txn-1',
-        amount: PAYMENT_TOTAL,
-        refundedAmount: 0,
-        status: 'completed',
-      })
-      .mockResolvedValueOnce({ refundedAmount: 1978 });
+    providerRefund.mockRejectedValueOnce(
+      markRefundMayHaveExecuted(new Error('post-refund tx failed'))
+    );
 
     await expect(ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'gateway')).rejects.toThrow(
-      /do not retry/i
+      /do not refund it again/i
     );
 
     const releases = returnUpdateMany.mock.calls.filter(
       c => (c[0] as { data: { refundedAt: unknown } }).data.refundedAt === null
     );
-    expect(releases, 'money moved — the claim must be retained').toEqual([]);
+    expect(releases, 'money may have moved — the claim must not be released').toEqual([]);
   });
 
-  it('releases when the refund threw and the payment balance did NOT move', async () => {
+  it('releases when PaymentService says nothing was sent', async () => {
     setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
-    providerRefund.mockRejectedValueOnce(new Error('connection refused'));
-    paymentFindFirst
-      .mockResolvedValueOnce({
-        id: 'pay-1',
-        transactionId: 'txn-1',
-        amount: PAYMENT_TOTAL,
-        refundedAmount: 0,
-        status: 'completed',
-      })
-      .mockResolvedValueOnce({ refundedAmount: 0 }); // untouched
+    providerRefund.mockRejectedValueOnce(new Error('provider refused'));
 
     await expect(ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'gateway')).rejects.toThrow(
       /retry or switch refund method/i
@@ -550,9 +591,23 @@ describe('ReturnService.complete — the claim is retained once money may have m
     expect(releases.length, 'no money moved — the return must stay retryable').toBe(1);
   });
 
-  it('assumes the worst when the payment row cannot be re-read', async () => {
+  /**
+   * #1431. Two returns on one order completing together: the loser fails
+   * PaymentService's compare-and-swap BEFORE any provider call, while the
+   * winner has already raised the balance. The old probe read that raised
+   * balance as "my refund executed", kept the claim and told the merchant not
+   * to retry — a return stranded for a request where nothing went wrong.
+   */
+  it('a concurrent refund raising the balance does not strand this return', async () => {
     setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
-    providerRefund.mockRejectedValueOnce(new Error('timeout'));
+    providerRefund.mockRejectedValueOnce(
+      new AppError(
+        400,
+        'INVALID_STATE',
+        'Payment is not refundable or a refund is already in progress'
+      )
+    );
+    // What the old probe would have read: the WINNER's refund.
     paymentFindFirst
       .mockResolvedValueOnce({
         id: 'pay-1',
@@ -561,16 +616,231 @@ describe('ReturnService.complete — the claim is retained once money may have m
         refundedAmount: 0,
         status: 'completed',
       })
-      .mockRejectedValueOnce(new Error('db unreachable'));
+      .mockResolvedValue({
+        id: 'pay-1',
+        transactionId: 'txn-1',
+        amount: PAYMENT_TOTAL,
+        refundedAmount: 3956,
+        status: 'partially_refunded',
+      });
 
-    await expect(ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'gateway')).rejects.toThrow(
-      /do not retry/i
+    const err = (await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'gateway').catch(
+      e => e
+    )) as AppError;
+
+    expect(err.code, 'a refusal before the provider is passed through, not "do not retry"').toBe(
+      'INVALID_STATE'
     );
-
     const releases = returnUpdateMany.mock.calls.filter(
       c => (c[0] as { data: { refundedAt: unknown } }).data.refundedAt === null
     );
-    expect(releases, 'unknown state must bias to stranding, not double-refunding').toEqual([]);
+    expect(releases.length).toBe(1);
+  });
+
+  it('passes a refund already issued for this return through, so the merchant can record it', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    providerRefund.mockRejectedValueOnce(
+      new AppError(409, 'REFUND_ALREADY_ISSUED', 'A refund for this was already sent')
+    );
+
+    await expect(
+      ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original')
+    ).rejects.toMatchObject({ code: 'REFUND_ALREADY_ISSUED', statusCode: 409 });
+  });
+});
+
+describe('ReturnService.complete — one refund per return, one completion per order', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+  });
+
+  /**
+   * A refund for this return already went out; its completion then failed and
+   * the request rolled back, so the return is 'received' again. Every other
+   * check would now give a misleading reason (the balance is short BECAUSE of
+   * that refund), and a retry would pay twice.
+   */
+  it('refuses the gateway, before any amount check, when this return already sent a refund', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    findOutstandingRefundClaims.mockResolvedValue(['claim-earlier']);
+
+    await expect(
+      ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original')
+    ).rejects.toMatchObject({ code: 'REFUND_ALREADY_ISSUED' });
+
+    expect(providerRefund, 'the customer must not be paid twice').not.toHaveBeenCalled();
+    expect(findOutstandingRefundClaims).toHaveBeenCalledWith('pay-1', `return:${RETURN_ID}`);
+    // A manual method records it without touching the gateway.
+    await expect(
+      ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'manual')
+    ).resolves.toBeTruthy();
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it('keys the gateway refund to this return, so a retry after a rollback is refused', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original');
+
+    const req = providerRefund.mock.calls[0]?.[0] as { refundKey?: string };
+    expect(req.refundKey).toBe(`return:${RETURN_ID}`);
+  });
+
+  /**
+   * #1393. The claim is per Return row, so two DIFFERENT returns on one order
+   * both passed it and both read prior returns without the other. The order
+   * lock must be taken before the claim and before the prior-returns read.
+   */
+  it('takes the order-level returns lock before claiming or reading prior returns', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'manual');
+
+    expect(executeRaw).toHaveBeenCalledOnce();
+    const sql = (executeRaw.mock.calls[0]?.[0] as TemplateStringsArray).join('?');
+    expect(sql).toMatch(/pg_advisory_xact_lock/);
+    expect(executeRaw.mock.calls[0]?.[1]).toBe(`return-order:${ORDER_ID}`);
+    const lockAt = executeRaw.mock.invocationCallOrder[0];
+    expect(lockAt).toBeLessThan(returnUpdateMany.mock.invocationCallOrder[0]);
+    expect(lockAt).toBeLessThan(returnFindMany.mock.invocationCallOrder[0]);
+  });
+});
+
+describe('ReturnService.complete — the payment balance is not the order', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+  });
+
+  /**
+   * #1402. A 3500-fil goodwill refund from the order page leaves exactly line
+   * A's share on the payment. Returning line A then "uses up" the payment, and
+   * PaymentService used to read that as a whole-order refund: order flipped to
+   * refunded, line B's stock restored while the customer still holds it,
+   * coupon, affiliate and loyalty reversed, whole sale journal reversed.
+   */
+  it('flags a partial return that leaves lines with the customer as item-level', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    paymentFindFirst.mockResolvedValue({
+      id: 'pay-1',
+      transactionId: 'txn-1',
+      amount: PAYMENT_TOTAL,
+      refundedAmount: PAYMENT_TOTAL - 1978, // only this line's share is left
+      status: 'partially_refunded',
+    });
+
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original');
+
+    const req = providerRefund.mock.calls[0]?.[0] as { amount?: number; itemLevel?: boolean };
+    expect(req.amount).toBe(1978);
+    expect(req.itemLevel, 'lines remain — the order must not be reversed').toBe(true);
+    // PaymentService ran no whole-order effects, so the return fires its own.
+    const [, , opts] = applyRefundEffects.mock.calls[0] as [string, string, { partial?: unknown }];
+    expect(opts?.partial).toBeTruthy();
+  });
+
+  it('the final piece, with every line now back, is not item-level', async () => {
+    setup({
+      returnedItems: [{ orderItemId: 'oi-b', quantity: 1 }],
+      priorReturns: [{ items: [{ orderItemId: 'oi-a', quantity: 2 }] }],
+    });
+
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original');
+
+    const req = providerRefund.mock.calls[0]?.[0] as { itemLevel?: boolean };
+    expect(req.itemLevel).toBe(false);
+  });
+
+  /**
+   * #1473. The decision to skip the local event is PaymentService's own
+   * answer, never re-derived from the payment row read before the call. Here
+   * the pre-call read says the piece exhausts the payment, but a webhook moved
+   * the balance in between and PaymentService took the partial branch — so the
+   * return must still fire its item-level event, or nothing restocks the line.
+   */
+  it("follows PaymentService's own answer, not a re-derivation from a stale read", async () => {
+    setup({
+      returnedItems: [{ orderItemId: 'oi-b', quantity: 1 }],
+      priorReturns: [{ items: [{ orderItemId: 'oi-a', quantity: 2 }] }],
+    });
+    paymentFindFirst.mockResolvedValue({
+      id: 'pay-1',
+      transactionId: 'txn-1',
+      amount: 8900,
+      refundedAmount: 3956, // remaining 4944 == this piece, as read BEFORE the call
+      status: 'partially_refunded',
+    });
+    providerRefund.mockResolvedValueOnce({
+      success: true,
+      refundId: 'rf-1',
+      wholeOrderEffectsApplied: false,
+    });
+
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original');
+
+    expect(applyRefundEffects).toHaveBeenCalledOnce();
+    const [, , opts] = applyRefundEffects.mock.calls[0] as [string, string, { partial?: unknown }];
+    expect(opts?.partial).toBeTruthy();
+  });
+});
+
+describe('ReturnService.complete — a manual partial return records the NET amount (#1340)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+  });
+
+  /**
+   * The journal books 1978 for this line (2000 − 222 discount share + 200
+   * tax share). Keeping the creation-time gross 2000 on a manual or
+   * store-credit completion showed the merchant — and emailed the customer —
+   * a figure the ledger never matched.
+   */
+  it.each(['store_credit', 'bank_transfer', 'manual', 'cash'])(
+    '%s writes and announces the net allocation, not the gross estimate',
+    async method => {
+      setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+
+      await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', method);
+
+      const data = (returnUpdate.mock.calls[0]?.[0] as { data: { refundAmount?: number } }).data;
+      expect(data.refundAmount).toBe(1978);
+      const [, , opts] = applyRefundEffects.mock.calls[0] as [
+        string,
+        string,
+        { partial?: { refundAmount?: number } },
+      ];
+      expect(opts.partial?.refundAmount).toBe(1978);
+      expect(providerRefund).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses a manual partial return whose lines were all returned already', async () => {
+    setup({
+      returnedItems: [{ orderItemId: 'oi-a', quantity: 2 }],
+      priorReturns: [{ items: [{ orderItemId: 'oi-a', quantity: 2 }] }],
+    });
+
+    await expect(
+      ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'bank_transfer')
+    ).rejects.toMatchObject({ code: 'PARTIAL_REFUND_NOTHING_TO_REFUND' });
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+  });
+
+  it('a full manual return keeps its recorded figure (nothing here decides it)', async () => {
+    setup({
+      returnedItems: [
+        { orderItemId: 'oi-a', quantity: 2 },
+        { orderItemId: 'oi-b', quantity: 1 },
+      ],
+    });
+
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'bank_transfer');
+
+    const data = (returnUpdate.mock.calls[0]?.[0] as { data: { refundAmount?: number } }).data;
+    expect(data.refundAmount).toBeUndefined();
+    expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
   });
 });
 
@@ -772,5 +1042,123 @@ describe('a COD order cannot refund at the gateway', () => {
     expect(providerRefund).toHaveBeenCalledOnce();
     const arg = providerRefund.mock.calls[0]?.[0] as { transactionId?: string };
     expect(arg.transactionId).toBe('txn-1');
+  });
+});
+
+describe('ReturnService.refundPreview — what the admin confirms is what complete() sends', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+  });
+
+  it('a partial return: the net allocation, on both the gateway and manual paths', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.recordedAmount).toBe(1978);
+    expect(preview.gateway).toEqual({
+      available: true,
+      amount: 1978,
+      refundableRemaining: PAYMENT_TOTAL,
+      unavailableReason: null,
+    });
+    // And complete() sends exactly that.
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original');
+    expect(refundedAmount()).toBe(preview.gateway.amount);
+  });
+
+  it('a full return: the whole remaining payment, not the gross line estimate', async () => {
+    setup({
+      returnedItems: [
+        { orderItemId: 'oi-a', quantity: 2 },
+        { orderItemId: 'oi-b', quantity: 1 },
+      ],
+    });
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.gateway.amount).toBe(PAYMENT_TOTAL);
+  });
+
+  it('a COD order: the gateway is unavailable, and says why', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    paymentFindFirst.mockResolvedValue(null);
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.gateway.available).toBe(false);
+    expect(preview.gateway.unavailableReason).toBe('NO_COMPLETED_PAYMENT');
+    expect(providerRefund, 'a preview never moves money').not.toHaveBeenCalled();
+  });
+
+  it('an exchange: never the gateway', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    getById.mockResolvedValue({
+      id: RETURN_ID,
+      status: 'received',
+      type: 'exchange',
+      orderId: ORDER_ID,
+      refundAmount: 2000,
+      items: [{ orderItemId: 'oi-a', quantity: 1 }],
+    });
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.gateway.unavailableReason).toBe('EXCHANGE_CANNOT_REFUND_TO_GATEWAY');
+  });
+
+  it('a refund already sent for this return: unavailable, with that reason', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    findOutstandingRefundClaims.mockResolvedValue(['c1']);
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.gateway.unavailableReason).toBe('REFUND_ALREADY_ISSUED');
+  });
+
+  it('wallet OFF: no wallet figure — store credit keeps its off-platform meaning', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.storeCreditToWallet).toBeNull();
+  });
+
+  it('wallet ON: previews the figure complete() credits (full return adds shipping, nets out the wallet-paid part)', async () => {
+    setup({
+      returnedItems: [
+        { orderItemId: 'oi-a', quantity: 2 },
+        { orderItemId: 'oi-b', quantity: 1 },
+      ],
+    });
+    orderFindFirst.mockResolvedValue({
+      subtotal: 9000,
+      discount: 1000,
+      tax: 900,
+      shipping: 500,
+      walletAmount: 2000,
+    });
+    const { featureService } = await import('@api/services/feature.service');
+    vi.mocked(featureService.isFeatureEnabled).mockResolvedValue(true);
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    // 8900 net + 500 shipping − 2000 already paid from the wallet (returned by
+    // the order/refunded fanout, not by this credit).
+    expect(preview.storeCreditToWallet).toBe(7400);
+    // The off-platform figure is unchanged, and is NOT what the wallet gets.
+    expect(preview.recordedAmount).toBe(9000);
+  });
+
+  it('wallet ON, partial return: the wallet figure is the same net allocation', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    const { featureService } = await import('@api/services/feature.service');
+    vi.mocked(featureService.isFeatureEnabled).mockResolvedValue(true);
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.storeCreditToWallet).toBe(1978);
+    expect(preview.storeCreditToWallet).toBe(preview.recordedAmount);
   });
 });

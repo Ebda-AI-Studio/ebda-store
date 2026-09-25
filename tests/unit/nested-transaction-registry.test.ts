@@ -73,7 +73,6 @@ const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'loyalty-automation.service.ts',
   'loyalty.service.ts',
   'payment-confirm.service.ts',
-  'payment-providers/payment.factory.ts',
   'shipping-carrier.service.ts',
   'shipping.service.ts',
 ]);
@@ -112,7 +111,7 @@ describe('nested-transaction registry', () => {
   it('keeps the unreviewed list from growing', () => {
     // The list is a debt ledger. It may shrink; it may not grow. A new entry
     // means someone met the question and wrote "later" instead of answering.
-    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.size).toBeLessThanOrEqual(12);
+    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.size).toBeLessThanOrEqual(11);
   });
 
   it('does not list a file that has since been fixed', () => {

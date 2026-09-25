@@ -3,6 +3,7 @@ import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
+import { handleStuckRefundClaimSweep } from './refund-claim-stuck-sweep';
 
 /**
  * Stuck refund-reversal sweep — scheduled safety net (every 5 min).
@@ -180,5 +181,10 @@ export const refundReversalStuckSweep: InngestFunction.Any = inngest.createFunct
     // saving comes from leaving a gap LONGER than the 300s suspend timeout.
     triggers: [{ cron: '*/15 * * * *' }], // every 15 min — see CADENCE NOTE
   },
-  async ({ step }) => handleRefundReversalStuckSweep(step)
+  async ({ step }) => {
+    const reversals = await handleRefundReversalStuckSweep(step);
+    // Same tick, same wake-up of the database — see refund-claim-stuck-sweep.ts.
+    const claims = await handleStuckRefundClaimSweep(step);
+    return { ...reversals, stuckRefundClaims: claims.stuck };
+  }
 );

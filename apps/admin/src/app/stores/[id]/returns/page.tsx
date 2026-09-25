@@ -33,6 +33,7 @@ export default function ReturnsPage() {
   const [showDetails, setShowDetails] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [refundReturnId, setRefundReturnId] = useState<string | null>(null);
 
   // Promise resolvers held in refs so the modal flow can be modeled as an
   // async function in the hook. When the user confirms or cancels, we resolve
@@ -47,7 +48,8 @@ export default function ReturnsPage() {
     });
   }, []);
 
-  const requestRefundMethod = useCallback(() => {
+  const requestRefundMethod = useCallback((returnId: string) => {
+    setRefundReturnId(returnId);
     setRefundOpen(true);
     return new Promise<string | null>(resolve => {
       refundResolverRef.current = resolve;
@@ -160,6 +162,8 @@ export default function ReturnsPage() {
 
       <RefundMethodModal
         open={refundOpen}
+        storeId={storeId}
+        returnId={refundReturnId}
         onConfirm={handleRefundConfirm}
         onClose={handleRefundCancel}
         walletEnabled={walletEnabled}

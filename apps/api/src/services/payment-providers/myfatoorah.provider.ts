@@ -14,6 +14,7 @@ import {
   PaymentStatus,
 } from './types';
 import logger from '../../lib/logger';
+import { providerRequestError, ProviderRejectedError } from './refund-outcome';
 
 // ==========================================
 // MyFatoorah Payment Provider
@@ -164,8 +165,10 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
         })
         .filter(Boolean)
         .join('; ');
-      throw new Error(
-        [data.Message, fieldErrors].filter(Boolean).join(' — ') || 'MyFatoorah API request failed'
+      throw providerRequestError(
+        [data.Message, fieldErrors].filter(Boolean).join(' — ') || 'MyFatoorah API request failed',
+        response.status,
+        response.ok
       );
     }
 
@@ -324,7 +327,19 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     // *request* that's reviewed and executed by MyFatoorah's finance team
     // (typically 1-3 business days). The API returns success on submission,
     // not on settlement.
-    const status = await this.getPaymentStatus(request.transactionId);
+    // Any failure up to MakeRefund means no refund was ever requested, so it
+    // is reported as not executed — the caller may release its claim and let
+    // the merchant retry. Only a failure of MakeRefund itself can leave the
+    // outcome unknown.
+    let status: PaymentStatusResponse;
+    try {
+      status = await this.getPaymentStatus(request.transactionId);
+    } catch (err) {
+      throw new ProviderRejectedError(
+        `Refund not sent: could not read the payment first (${err instanceof Error ? err.message : String(err)})`,
+        0
+      );
+    }
     const paymentId = status.metadata?.paymentId as string | undefined;
     const refundKey = paymentId || request.transactionId;
     // MyFatoorah's working sample (and PHP/C#/Python SDKs) use lowercase
@@ -338,7 +353,10 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     // expects the account's default currency unit (KWD for Wady Aljuz).
     const amountFils = request.amount ?? status.paidAmount ?? status.amount;
     if (!amountFils || amountFils <= 0) {
-      throw new Error('Cannot determine refund amount — payment has no paid amount on record');
+      throw new ProviderRejectedError(
+        'Cannot determine refund amount — payment has no paid amount on record',
+        0
+      );
     }
     const amountKwd = amountFils / 1000;
 

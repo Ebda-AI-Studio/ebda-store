@@ -13,6 +13,7 @@ import {
   PaymentStatus,
 } from './types';
 import logger from '../../lib/logger';
+import { providerRequestError } from './refund-outcome';
 
 // ==========================================
 // UPayments Provider
@@ -93,7 +94,11 @@ export class UPaymentsProvider implements IPaymentProvider {
         { statusCode: response.status, message: data.message },
         'UPayments API request failed'
       );
-      throw new Error(data.message || 'UPayments API request failed');
+      throw providerRequestError(
+        data.message || 'UPayments API request failed',
+        response.status,
+        response.ok
+      );
     }
 
     return data as T;

@@ -15,10 +15,36 @@ interface UseReturnsArgs {
   requestRejectReason: () => Promise<string | null>;
   /**
    * Called when the user invokes Complete. Should resolve with the chosen
-   * refund method, or null if the user cancelled.
+   * refund method, or null if the user cancelled. Receives the return so the
+   * dialog can show what each method would refund for it.
    */
-  requestRefundMethod: () => Promise<string | null>;
+  requestRefundMethod: (returnId: string) => Promise<string | null>;
 }
+
+/**
+ * Completion refusals the merchant can act on, each with its own EN + AR copy
+ * under `returns.messages.completeErrors` (#1318). The API's own text is
+ * English-only, so it is never shown directly.
+ */
+const COMPLETE_ERROR_CODES = new Set([
+  'PROVIDER_REFUND_INDETERMINATE',
+  'REFUND_ALREADY_ISSUED',
+  'RETURN_ALREADY_COMPLETING',
+  'PARTIAL_REFUND_EXCEEDS_PAYMENT',
+  'PARTIAL_REFUND_NOTHING_TO_REFUND',
+  'PAYMENT_FULLY_REFUNDED',
+  'NO_COMPLETED_PAYMENT',
+  'EXCHANGE_CANNOT_REFUND_TO_GATEWAY',
+  'PROVIDER_REFUND_FAILED',
+  'INVALID_STATUS',
+]);
+
+/**
+ * Money may already have reached the customer. These must not vanish after
+ * a few seconds like a transient failure: the merchant's next move must be
+ * to check the provider, not to click Complete again.
+ */
+const MONEY_MAY_HAVE_MOVED = new Set(['PROVIDER_REFUND_INDETERMINATE', 'REFUND_ALREADY_ISSUED']);
 
 /**
  * Encapsulates the returns list + stats fetches and the four lifecycle
@@ -149,7 +175,7 @@ export function useReturns({ storeId, requestRejectReason, requestRefundMethod }
 
   const complete = useCallback(
     async (returnId: string) => {
-      const refundMethod = await requestRefundMethod();
+      const refundMethod = await requestRefundMethod(returnId);
       if (!refundMethod) return false;
       try {
         const { error } = await apiPost(
@@ -157,7 +183,24 @@ export function useReturns({ storeId, requestRejectReason, requestRefundMethod }
           { refundMethod }
         );
         if (error) {
-          toast.error(tMessages('completeErrorTitle'), tMessages('completeErrorBody'));
+          // Say WHY. One generic toast for every failure turned "the refund
+          // went out, do not retry" into "please try again" (#1318).
+          const body = COMPLETE_ERROR_CODES.has(error.code)
+            ? tMessages(`completeErrors.${error.code}`)
+            : tMessages('completeErrorBody');
+          if (MONEY_MAY_HAVE_MOVED.has(error.code)) {
+            toast.addToast({
+              type: 'error',
+              title: tMessages('completeErrorTitle'),
+              message: body,
+              duration: 0,
+            });
+          } else {
+            toast.error(tMessages('completeErrorTitle'), body);
+          }
+          // The row may have moved on under us (completed elsewhere, or a
+          // refund is now on record) — show its current state.
+          refreshAll();
           return false;
         }
         toast.success(tMessages('completeSuccessTitle'), tMessages('completeSuccessBody'));

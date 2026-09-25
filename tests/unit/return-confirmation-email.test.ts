@@ -34,6 +34,8 @@ const {
   prismaMock: {
     order: { findFirst: vi.fn() },
     return: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+    // create() takes the order's returns lock (pg_advisory_xact_lock).
+    $executeRaw: vi.fn().mockResolvedValue(1),
   },
   runInTenantContextMock: vi.fn(
     async (_storeId: string | undefined, fn: () => Promise<unknown>, _userId?: string) => fn()

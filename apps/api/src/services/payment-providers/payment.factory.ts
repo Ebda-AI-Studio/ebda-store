@@ -1,4 +1,5 @@
-import { prisma, Prisma } from '@force/database';
+import crypto from 'crypto';
+import { prisma, Prisma, runInTenantContext } from '@force/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
@@ -36,6 +37,14 @@ import {
   isRefundEventAlreadySeen,
   recordRefundStatus,
 } from './refund-settlement';
+import {
+  ProviderRejectedError,
+  markRefundMayHaveExecuted,
+  REFUND_CLAIM_EVENT,
+  REFUND_EXECUTED_EVENT,
+  REFUND_RELEASED_EVENT,
+  REFUND_INDETERMINATE_EVENT,
+} from './refund-outcome';
 
 // ==========================================
 // Payment Factory
@@ -536,6 +545,48 @@ export async function alertIfDuplicateCapture(
 }
 
 // ==========================================
+// Refund ledger (payment_events)
+// ==========================================
+
+/**
+ * Run `fn` in a transaction of its own that commits when `fn` resolves —
+ * whatever later happens to the caller's request transaction. Inside it the
+ * `prisma` proxy routes to the new transaction, with the store's RLS GUC set.
+ * See PaymentService.refund for why the refund's records cannot share the
+ * request's fate.
+ */
+function commitOnOwnTransaction<T>(storeId: string | undefined, fn: () => Promise<T>): Promise<T> {
+  return runInTenantContext(storeId, fn);
+}
+
+/**
+ * Claim ids for `refundKey` on this payment that were never released — each is
+ * a refund that went out, or may have. A released claim (the provider refused,
+ * or the request was never sent) does not count.
+ */
+export async function findOutstandingRefundClaims(
+  paymentId: string,
+  refundKey: string
+): Promise<string[]> {
+  const rows = await prisma.paymentEvent.findMany({
+    where: {
+      paymentId,
+      eventType: { in: [REFUND_CLAIM_EVENT, REFUND_RELEASED_EVENT] },
+      details: { path: ['refundKey'], equals: refundKey },
+    },
+    select: { eventType: true, details: true },
+  });
+  const claimed = new Set<string>();
+  const released = new Set<string>();
+  for (const row of rows) {
+    const id = (row.details as Record<string, unknown> | null)?.claimId;
+    if (typeof id !== 'string') continue;
+    (row.eventType === REFUND_CLAIM_EVENT ? claimed : released).add(id);
+  }
+  return [...claimed].filter(id => !released.has(id));
+}
+
+// ==========================================
 // Unified Payment Service
 // ==========================================
 
@@ -691,12 +742,38 @@ export class PaymentService {
 
   /**
    * Process refund
+   *
+   * TRANSACTION BOUNDARIES. Every write this method makes about the money —
+   * the claim before the provider call, the release or the indeterminate mark
+   * after a failure, the confirmation after success — COMMITS ON ITS OWN, in a
+   * transaction opened here (`commitOnOwnTransaction`), never on the caller's.
+   *
+   * Both HTTP callers (`POST /returns/admin/:id/complete`, the order page's
+   * `refund-via-provider`) run inside the request's tenant transaction, which
+   * commits only when the response is < 500. The provider call is not part of
+   * that transaction and cannot be rolled back, so a record of it that lives
+   * there is lost exactly when it matters: any 5xx after the refund went out
+   * (an Inngest enqueue blip in the fanout, a failed completion write) rolled
+   * back the claim, the status flip and the refund id together, leaving money
+   * at the customer and a payment that still read as refundable — the retry
+   * refunded again. Committing each step separately keeps the record of every
+   * refund that may have left, whatever happens to the request afterwards.
+   *
+   * It also removes a hang. The post-provider write used to be an array
+   * transaction on the client, which is not routed to the ambient tenant
+   * transaction (see tests/unit/nested-transaction-registry.test.ts): it
+   * opened a second connection that waited on the row lock the claim held in
+   * the first, while the first waited on it. Nothing in Postgres sees that
+   * cycle, so every gateway refund inside a request stalled until the request
+   * transaction timed out at 30s — rolling back the claim — and then committed
+   * the status flip with the old balance. Measured on Postgres 17 before this
+   * change: 30,006 ms, then P2028.
    */
   static async refund(
     request: RefundRequest,
     provider?: PaymentProvider,
     storeId?: string
-  ): Promise<RefundResponse> {
+  ): Promise<RefundResponse & { wholeOrderEffectsApplied: boolean }> {
     // Find payment to get provider
     // Refuse an absent transaction id BEFORE the lookup. Prisma drops
     // `undefined` filters, so `where: { transactionId: undefined }` is an EMPTY
@@ -769,7 +846,15 @@ export class PaymentService {
       );
     }
     const amountToRefund = request.amount ?? refundableRemaining;
+    // Does this refund use up the payment? That decides the PAYMENT's status.
     const isFullRefund = amountToRefund >= refundableRemaining;
+    // Does it reverse the ORDER? Not the same question (#1402). Payment
+    // exhaustion only means the money is gone; `refund-via-provider` and the
+    // settle webhook raise `refundedAmount` without any Return row, so a
+    // partial return's allocation can equal what is left while lines the
+    // customer kept are still on the order. A caller that applies item-level
+    // effects itself says so, and then the order stays as it is.
+    const flipsOrder = isFullRefund && !request.itemLevel;
 
     // Reject a stale/invalid order state BEFORE any money moves. A full
     // refund flips `Order.status` to 'refunded' below (bypassing
@@ -779,9 +864,32 @@ export class PaymentService {
     // checked here, before the payment claim and the provider call, not at
     // the DB-write site further down — an invalid transition must never
     // reach the gateway (money-integrity: no undo API for a real refund).
-    if (isFullRefund && payment.order) {
+    if (flipsOrder && payment.order) {
       assertValidTransition(payment.order.status, 'refunded');
     }
+
+    // The payment's own store, not the caller's: RLS for the separately
+    // committed writes below must scope to the row being written.
+    const moneyStoreId = payment.order?.storeId ?? storeId;
+    const claimId = crypto.randomUUID();
+    const refundEvent = (
+      eventType: string,
+      reason: string,
+      extra: Record<string, unknown> = {}
+    ): Prisma.PaymentEventUncheckedCreateInput => ({
+      paymentId: payment.id,
+      storeId: moneyStoreId ?? '',
+      orderId: payment.orderId,
+      eventType,
+      provider: payment.provider,
+      details: {
+        reason,
+        claimId,
+        amount: amountToRefund,
+        refundKey: request.refundKey ?? null,
+        ...extra,
+      } as Prisma.InputJsonValue,
+    });
 
     // Atomically CLAIM the payment before touching the provider. A plain
     // `status === 'completed'` read-check is a TOCTOU race: two concurrent
@@ -803,100 +911,219 @@ export class PaymentService {
     // of two concurrent requests only the one that still sees the old balance
     // matches. (This is also why the increment moved out of the post-provider
     // transaction below — it IS the claim now.)
+    //
+    // The claim is recorded as a `refund_initiated` payment event in the SAME
+    // committed transaction (#1317). A process that dies between this commit
+    // and the provider's answer leaves a balance raised by money that may
+    // never have moved; the event is what lets the stuck-claim sweep find it
+    // and an operator see it on the order page, instead of a column value
+    // indistinguishable from a real refund.
     const claimedStatus = isFullRefund ? 'refunded' : 'partially_refunded';
-    const claim = await prisma.payment.updateMany({
-      where: {
-        id: payment.id,
-        status: { in: ['completed', 'partially_refunded'] },
-        refundedAmount: alreadyRefunded,
-      },
-      data: { status: claimedStatus, refundedAmount: alreadyRefunded + amountToRefund },
+    await commitOnOwnTransaction(moneyStoreId, async () => {
+      const claim = await prisma.payment.updateMany({
+        where: {
+          id: payment.id,
+          status: { in: ['completed', 'partially_refunded'] },
+          refundedAmount: alreadyRefunded,
+        },
+        data: { status: claimedStatus, refundedAmount: alreadyRefunded + amountToRefund },
+      });
+      if (claim.count === 0) {
+        throw new AppError(
+          400,
+          'INVALID_STATE',
+          'Payment is not refundable or a refund is already in progress'
+        );
+      }
+      // One refund per business event. The caller's own mutex (the Return's
+      // completion claim) lives in the request transaction, so it is released
+      // by the very rollback that follows a failure AFTER the money left —
+      // leaving the return retryable while the refund stands. This check is
+      // committed state, so the retry is refused here instead of paying again.
+      // Evaluated after the CAS so the payment row lock serialises two claims
+      // for the same key.
+      if (request.refundKey) {
+        const outstanding = await findOutstandingRefundClaims(payment.id, request.refundKey);
+        if (outstanding.length > 0) {
+          throw new AppError(
+            409,
+            'REFUND_ALREADY_ISSUED',
+            'A refund for this was already sent to the payment provider and may have gone through. Check the provider dashboard before refunding again.',
+            { refundKey: request.refundKey }
+          );
+        }
+      }
+      await prisma.paymentEvent.create({
+        data: {
+          ...refundEvent(REFUND_CLAIM_EVENT, 'refund_claimed'),
+          fromStatus: payment.status,
+          toStatus: claimedStatus,
+        },
+      });
     });
-    if (claim.count === 0) {
-      throw new AppError(
-        400,
-        'INVALID_STATE',
-        'Payment is not refundable or a refund is already in progress'
-      );
-    }
+
+    // Undo the claim — ONLY for a failure that proves nothing was sent. A
+    // decrement rather than a compare-and-swap back to the old balance: the
+    // claim is committed now, so another refund on the same payment may have
+    // raised the balance past ours in the meantime, and a CAS on our old value
+    // would silently fail to release anything.
+    const releaseClaim = async (reason: string, err: unknown) => {
+      try {
+        await commitOnOwnTransaction(moneyStoreId, async () => {
+          const released = await prisma.payment.updateMany({
+            where: { id: payment.id, refundedAmount: { gte: amountToRefund } },
+            data: { refundedAmount: { decrement: amountToRefund } },
+          });
+          if (released.count !== 1) {
+            throw new Error('refund claim no longer on the payment row');
+          }
+          const row = await prisma.payment.findUnique({
+            where: { id: payment.id },
+            select: { amount: true, refundedAmount: true },
+          });
+          const left = row?.refundedAmount ?? 0;
+          await prisma.payment.update({
+            where: { id: payment.id },
+            data: {
+              status:
+                left <= 0
+                  ? payment.status
+                  : left >= (row?.amount ?? payment.amount)
+                    ? 'refunded'
+                    : 'partially_refunded',
+            },
+          });
+          await prisma.paymentEvent.create({
+            data: {
+              ...refundEvent(REFUND_RELEASED_EVENT, reason, {
+                error: err instanceof Error ? err.message : String(err),
+              }),
+              fromStatus: claimedStatus,
+            },
+          });
+        });
+      } catch (releaseError) {
+        // The claim stays on the row and stays OUTSTANDING in the event log,
+        // so the stuck-claim sweep reports it rather than it vanishing.
+        logger.error(
+          { err: releaseError, paymentId: payment.id, claimId },
+          '[PAYMENT] failed to release refund claim after a refund that was not sent — balance overstated, manual reconciliation required'
+        );
+      }
+    };
 
     const providerName = provider || (payment.provider as PaymentProvider);
     const effectiveStoreId = storeId || payment.order?.storeId;
+    // Resolving the provider is not a provider call: a failure here sent nothing.
+    let providerImpl: IPaymentProvider;
+    try {
+      providerImpl = await factory.getProvider(providerName, effectiveStoreId);
+    } catch (resolveError) {
+      await releaseClaim('provider_unavailable', resolveError);
+      throw resolveError;
+    }
+
     let response: RefundResponse;
     try {
       // An ABSENT amount means "the whole payment" to every provider, so it
       // would send the ORIGINAL amount back — paying the already-refunded
       // portion a second time. Once anything has been refunded, spell the
-      // remaining balance out.
-      const providerRequest =
-        request.amount == null && alreadyRefunded > 0
-          ? { ...request, amount: refundableRemaining }
-          : request;
-      response = await (
-        await factory.getProvider(providerName, effectiveStoreId)
-      ).refund(providerRequest);
+      // remaining balance out. Only the provider's own fields are passed on.
+      response = await providerImpl.refund({
+        transactionId: request.transactionId,
+        reason: request.reason,
+        amount:
+          request.amount == null && alreadyRefunded > 0 ? refundableRemaining : request.amount,
+      });
     } catch (providerError) {
-      // The provider refund did NOT execute (no money moved) — release the
-      // claim back to the pre-claim status AND balance so the admin can
-      // legitimately retry.
-      await prisma.payment
-        .updateMany({
-          where: {
-            id: payment.id,
-            status: claimedStatus,
-            refundedAmount: alreadyRefunded + amountToRefund,
-          },
-          data: { status: payment.status, refundedAmount: alreadyRefunded },
-        })
-        .catch(releaseError => {
-          logger.error(
-            { err: releaseError, paymentId: payment.id },
-            '[PAYMENT] failed to release refund claim after provider error — payment status may be stuck, manual reconciliation required'
-          );
+      if (providerError instanceof ProviderRejectedError) {
+        // The provider answered and refused, or the request was never sent:
+        // no money moved. Release the claim so the admin can legitimately retry.
+        await releaseClaim('provider_rejected', providerError);
+        throw providerError;
+      }
+      // A timeout, a dropped connection, a 5xx: the refund may have executed
+      // (#1359). Releasing here is how a timeout became a second real refund —
+      // the balance was reset, the caller's "did the balance move?" probe read
+      // no, and the merchant was told to retry. Keep the claim: the balance
+      // then errs toward "refunded", which blocks a second refund instead of
+      // funding one, and the event marks it for reconciliation.
+      await commitOnOwnTransaction(moneyStoreId, async () => {
+        await prisma.paymentEvent.create({
+          data: refundEvent(REFUND_INDETERMINATE_EVENT, 'provider_no_clear_answer', {
+            error: providerError instanceof Error ? providerError.message : String(providerError),
+          }),
         });
-      throw providerError;
+      }).catch(eventError =>
+        logger.error(
+          { err: eventError, paymentId: payment.id, claimId },
+          '[PAYMENT] failed to record an indeterminate refund — the claim stands, reconcile manually'
+        )
+      );
+      logger.error(
+        { err: providerError, paymentId: payment.id, claimId, amount: amountToRefund },
+        '[PAYMENT] provider gave no clear answer to a refund — claim KEPT, outcome unknown, reconcile with the provider'
+      );
+      throw markRefundMayHaveExecuted(
+        new AppError(
+          502,
+          'PROVIDER_REFUND_INDETERMINATE',
+          'The payment provider did not confirm the refund (timeout or server error), so it may have gone through. It is recorded as pending reconciliation — check the provider dashboard before refunding again.'
+        )
+      );
     }
 
-    // Wrap the two db writes in a transaction so payment + order rows can't
-    // disagree after a partial failure (e.g. payment marked 'refunded' but
-    // the order still shows status 'paid'). External provider refund stays
-    // OUTSIDE the transaction — refunds are terminal at the provider level
-    // (no undo API), and money is already back to the customer. If the
-    // transaction below fails, log loudly with the refund transaction id
-    // so finance can manually reconcile the rows; we cannot reverse the
-    // refund itself.
+    // Record the executed refund. The claim above already applied the
+    // balance and the payment status, so this adds the refund id and — for a
+    // refund that reverses the order — the order flip. It does NOT rewrite the
+    // status: the claim is committed, so a later claim on the same payment
+    // may already have moved it on, and writing ours back would regress it.
+    // Refunds are terminal at the provider (no undo API); if this write fails,
+    // log loudly with the refund id so finance can reconcile, and tell the
+    // caller the money moved.
     try {
-      await prisma.$transaction([
-        prisma.payment.update({
+      await commitOnOwnTransaction(moneyStoreId, async () => {
+        const current = await prisma.payment.findUnique({
+          where: { id: payment.id },
+          select: { metadata: true },
+        });
+        const currentMetadata = current?.metadata ?? payment.metadata;
+        await prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: isFullRefund ? 'refunded' : 'partially_refunded',
             refundId: response.refundId,
             // NO `refundedAmount` write here — the atomic claim above already
             // applied it, and re-incrementing would double-count the balance
             // and let a later refund overshoot the payment.
             metadata: {
-              ...((payment.metadata as object) || {}),
+              ...((currentMetadata as object) || {}),
               refundId: response.refundId,
               // The atomic claim above already added this refund's amount to
               // `refundedAmount`, so record its id: the provider's async settle
               // webhook for the SAME refund must not add it a second time.
-              [REFUND_EVENT_IDS_KEY]: appendRefundEventId(payment.metadata, response.refundId),
+              [REFUND_EVENT_IDS_KEY]: appendRefundEventId(currentMetadata, response.refundId),
               refundStatus: response.status,
               refundReason: request.reason ?? null,
               refundedAt: new Date().toISOString(),
             },
           },
-        }),
-        ...(isFullRefund
-          ? [
-              prisma.order.update({
-                where: { id: payment.orderId },
-                data: { status: 'refunded', paymentStatus: 'refunded' },
-              }),
-            ]
-          : []),
-      ]);
+        });
+        if (flipsOrder) {
+          await prisma.order.update({
+            where: { id: payment.orderId },
+            data: { status: 'refunded', paymentStatus: 'refunded' },
+          });
+        }
+        await prisma.paymentEvent.create({
+          data: {
+            ...refundEvent(REFUND_EXECUTED_EVENT, 'refund_sent', {
+              refundId: response.refundId,
+              providerStatus: response.status,
+            }),
+            toStatus: claimedStatus,
+          },
+        });
+      });
       // Bust the admin aggregated-customers snapshot on a paymentStatus
       // transition — this changes the paid/refunded counts it aggregates.
       if (effectiveStoreId) await invalidateCustomersCache(effectiveStoreId);
@@ -912,7 +1139,24 @@ export class PaymentService {
         },
         '[PAYMENT] DB transaction failed AFTER provider refund succeeded — manual reconciliation required (refund already executed at provider, cannot undo)'
       );
-      throw txError;
+      throw markRefundMayHaveExecuted(txError);
+    }
+
+    // A partial refund that no item-level flow will book leaves the ledger
+    // without it: `order/refunded`'s GL poster needs line data for a partial,
+    // and only ReturnService (which always passes a refundKey) has it. Until
+    // an amount-only GL adjustment exists (#1209 — the account choice is the
+    // owner's), make the gap visible instead of silent.
+    if (!flipsOrder && !request.refundKey && moneyStoreId) {
+      await sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store: { id: moneyStoreId, name: payment.order?.store?.name ?? moneyStoreId },
+        source: 'payment.refund.partial_no_gl',
+        title: 'Partial refund with no ledger entry',
+        body: `Order ${payment.order?.orderNumber ?? payment.orderId}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return. Nothing posts it to the general ledger — book it by hand.`,
+        context: { paymentId: payment.id, orderId: payment.orderId, refundId: response.refundId },
+      }).catch(() => undefined);
     }
 
     // Refund effects: inventory restore, coupon usage decrement, affiliate
@@ -921,7 +1165,7 @@ export class PaymentService {
     // customer kept (most of) the items. Idempotent at the OrderService
     // level so a same-order full-refund-after-partial-refund won't
     // double-up the restore.
-    if (isFullRefund) {
+    if (flipsOrder) {
       const order = await prisma.order.findUnique({
         where: { id: payment.orderId },
         select: { storeId: true },
@@ -939,11 +1183,19 @@ export class PaymentService {
         // signal to the caller, leaving the admin `refund-via-provider`
         // route free to report HTTP 200 for a refund whose reversal chain
         // never ran (money-integrity audit F2). The caller must see this.
-        await OrderService.applyRefundEffects(order.storeId, payment.orderId);
+        //
+        // And it is recoverable (#766): the order flip committed on its own
+        // above, so refund-reversal-stuck-sweep finds a `refunded` order with
+        // no `refundReversedAt` and re-sends the event.
+        try {
+          await OrderService.applyRefundEffects(order.storeId, payment.orderId);
+        } catch (effectsError) {
+          throw markRefundMayHaveExecuted(effectsError);
+        }
       }
     }
 
-    return response;
+    return { ...response, wholeOrderEffectsApplied: flipsOrder };
   }
 
   /**
@@ -1161,6 +1413,7 @@ export class PaymentService {
         settledTotal: settledRefund,
         isFullRefund: refundIsFull,
         accountedThisEvent,
+        heldUnaccountedEvent,
       } = resolveRefundSettlement({
         paymentAmount: payment.amount,
         alreadyRefunded: payment.refundedAmount,
@@ -1321,8 +1574,48 @@ export class PaymentService {
           refundId: webhookData.refund.refundId,
           refundStatus: newStatus,
           refundReference: webhookData.refund.refundReference ?? null,
+          ...(newStatus === 'completed' && heldUnaccountedEvent
+            ? { heldUnaccountedRefund: true, reason: 'refund_amount_not_reported' }
+            : {}),
         },
       });
+
+      // Neither of these two cases changes what is booked — each needs a
+      // decision nobody has made yet — but both used to be a single info log.
+      if (newStatus === 'completed' && payment.order) {
+        const alertStore = {
+          id: payment.order.storeId,
+          name: payment.order.store?.name ?? payment.order.storeId,
+        };
+        if (heldUnaccountedEvent) {
+          // #1477: a refund nothing has counted, reported without a usable
+          // amount. The balance was held, so if this is a real second refund
+          // the payment still looks refundable by that much — and a later
+          // return would pay it out again.
+          await sendAlert({
+            level: 'p1',
+            scope: 'store',
+            store: alertStore,
+            source: 'payment.refund.held_unaccounted',
+            title: 'Refund reported without an amount',
+            body: `Order ${payment.order.orderNumber}: the provider reported refund ${webhookData.refund.refundId} as completed without an amount this system can use, so the refunded total was NOT raised. Check the provider dashboard: if this is a new refund, the payment's refundable balance is overstated.`,
+            context: { paymentId: payment.id, refundId: webhookData.refund.refundId },
+          }).catch(() => undefined);
+        } else if (accountedThisEvent && !refundIsFull) {
+          // #1455: a partial refund taken outside the platform. The balance
+          // is now right, but the GL poster needs line data only the returns
+          // flow has, so nothing books it.
+          await sendAlert({
+            level: 'p1',
+            scope: 'store',
+            store: alertStore,
+            source: 'payment.refund.partial_no_gl',
+            title: 'Partial refund with no ledger entry',
+            body: `Order ${payment.order.orderNumber}: a partial refund (${webhookData.refund.refundId}) was made in the provider's dashboard, outside a return. Nothing posts it to the general ledger — book it by hand.`,
+            context: { paymentId: payment.id, refundId: webhookData.refund.refundId },
+          }).catch(() => undefined);
+        }
+      }
 
       return { success: true, status: newStatus, orderId: payment.orderId };
     }

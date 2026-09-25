@@ -3951,7 +3951,19 @@
       "completeSuccessTitle": "Return Completed",
       "completeSuccessBody": "The return has been completed and refund processed.",
       "completeErrorTitle": "Error",
-      "completeErrorBody": "Failed to complete return. Please try again."
+      "completeErrorBody": "Failed to complete return. Please try again.",
+      "completeErrors": {
+        "PROVIDER_REFUND_INDETERMINATE": "The refund reached the payment provider, but the return could not be completed. Do NOT refund it again: check the provider dashboard, then complete the return with \"Already refunded — record only\".",
+        "REFUND_ALREADY_ISSUED": "A refund for this return was already sent to the payment provider. Check the provider dashboard, then complete the return with \"Already refunded — record only\".",
+        "RETURN_ALREADY_COMPLETING": "This return is already being completed. Refresh the page before trying again.",
+        "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Part of this payment was already refunded outside this return, so what is left is less than this return is worth. Complete it with store credit or bank transfer and settle the difference with the customer.",
+        "PARTIAL_REFUND_NOTHING_TO_REFUND": "Every item in this return was already refunded by an earlier return.",
+        "PAYMENT_FULLY_REFUNDED": "This payment has already been refunded in full.",
+        "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
+        "EXCHANGE_CANNOT_REFUND_TO_GATEWAY": "An exchange does not refund the customer. Choose store credit or complete it as a return.",
+        "PROVIDER_REFUND_FAILED": "The payment provider refused the refund. Nothing was sent — try again or choose another method.",
+        "INVALID_STATUS": "Mark the return as received before completing it."
+      }
     },
     "modal": {
       "rejectTitle": "Reject Return",
@@ -3964,7 +3976,7 @@
       "refundMethodOptions": {
         "original": {
           "label": "Original payment method",
-          "description": "Refund to the card or wallet used at checkout."
+          "description": "Sends a real refund through the payment provider to the card or wallet used at checkout."
         },
         "store_credit": {
           "label": "Store credit",
@@ -3974,7 +3986,31 @@
         "bank_transfer": {
           "label": "Bank transfer",
           "description": "Send the refund to the customer's bank account manually."
+        },
+        "manual": {
+          "label": "Already refunded — record only",
+          "description": "The refund already reached the customer. Complete the return without sending anything."
         }
+      },
+      "previewLoading": "Working out the refund…",
+      "previewError": "Couldn't load the refund amount. The original payment method is unavailable until it loads — close and reopen to retry.",
+      "alreadyIssuedNotice": "A refund for this return was already sent to the payment provider. Check the provider dashboard. If the customer has their money, choose \"Already refunded — record only\" to complete the return without refunding again.",
+      "continue": "Continue",
+      "back": "Back",
+      "confirmOriginal": "Send {amount} back to the customer's original payment method?",
+      "confirmIrreversible": "This sends a real refund through the payment provider right away. It cannot be undone.",
+      "confirmSendRefund": "Send refund",
+      "confirmWallet": "Complete this return and add {amount} to the customer's wallet? They can spend it on their next order.",
+      "confirmManual": "Complete this return and record {amount} as refunded by {method}? You pay the customer outside the platform.",
+      "confirmRecordOnly": "Complete this return and record the refund already sent ({amount})? Nothing will be sent to the customer.",
+      "gatewayUnavailable": {
+        "NO_COMPLETED_PAYMENT": "Not available: this order has no online payment to refund (for example, cash on delivery).",
+        "PAYMENT_FULLY_REFUNDED": "Not available: this payment has already been refunded in full.",
+        "PARTIAL_REFUND_EXCEEDS_PAYMENT": "Not available: part of this payment was already refunded outside this return, so what is left is less than this return is worth. Use store credit or bank transfer.",
+        "PARTIAL_REFUND_NOTHING_TO_REFUND": "Not available: every item in this return was already refunded by an earlier return.",
+        "EXCHANGE_CANNOT_REFUND_TO_GATEWAY": "Not available: an exchange swaps goods and does not refund the customer.",
+        "REFUND_ALREADY_ISSUED": "Not available: a refund for this return was already sent.",
+        "default": "Not available for this order."
       },
       "cancel": "Cancel"
     }
@@ -5596,6 +5632,7 @@
         "refund_initiated": "Refund initiated",
         "refund_completed": "Refund completed",
         "refund_failed": "Refund failed",
+        "refund_indeterminate": "Refund unconfirmed — check the provider",
         "retry": "Retry attempt",
         "expired": "Payment expired",
         "cancelled": "Payment cancelled",

@@ -1,0 +1,187 @@
+// @vitest-environment jsdom
+/**
+ * The refund-method dialog is where a merchant's click turns into a real,
+ * irreversible provider refund, so its guards are money guards (#1485, #1474):
+ *
+ *   - nothing is preselected — "Original payment method" used to be the
+ *     default, so the default click sent money the merchant never saw;
+ *   - each option shows the amount it would send or record, from the API's
+ *     refund preview, never the creation-time estimate;
+ *   - "Original payment method" is disabled, with the reason, when the order
+ *     cannot take a gateway refund (cash on delivery, fully refunded, …);
+ *   - nothing is sent until a second, explicit confirmation of the amount;
+ *   - "Already refunded — record only" appears only when a refund for this
+ *     return already went to the provider.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+vi.mock('next-intl', () => {
+  const t = Object.assign(
+    (key: string, values?: Record<string, unknown>) =>
+      values ? `${key} ${JSON.stringify(values)}` : key,
+    { has: () => true }
+  );
+  return { useTranslations: () => t, useLocale: () => 'en' };
+});
+
+const apiGet = vi.fn();
+vi.mock('../../../../../lib/api', () => ({ apiGet: (...a: unknown[]) => apiGet(...a) }));
+
+import { RefundMethodModal } from './RefundMethodModal';
+
+type Gateway = {
+  available: boolean;
+  amount: number | null;
+  refundableRemaining: number | null;
+  unavailableReason: string | null;
+};
+
+function previewWith(gateway: Gateway, recordedAmount = 1978) {
+  apiGet.mockResolvedValue({
+    data: { preview: { isFullReturn: false, recordedAmount, gateway } },
+    error: null,
+  });
+}
+
+const GATEWAY_OK: Gateway = {
+  available: true,
+  amount: 1978,
+  refundableRemaining: 8900,
+  unavailableReason: null,
+};
+
+function renderModal(onConfirm = vi.fn()) {
+  render(
+    <RefundMethodModal
+      open
+      storeId="store-1"
+      returnId="ret-1"
+      onConfirm={onConfirm}
+      onClose={vi.fn()}
+    />
+  );
+  return onConfirm;
+}
+
+const radio = (value: string) =>
+  document.querySelector(`input[name="refundMethod"][value="${value}"]`) as HTMLInputElement | null;
+
+beforeEach(() => {
+  apiGet.mockReset();
+});
+afterEach(() => {
+  cleanup();
+});
+
+describe('RefundMethodModal', () => {
+  it('preselects nothing, and Continue needs a choice', async () => {
+    previewWith(GATEWAY_OK);
+    renderModal();
+    await waitFor(() => expect(radio('original')?.disabled).toBe(false));
+
+    for (const v of ['original', 'store_credit', 'bank_transfer']) {
+      expect(radio(v)?.checked, `${v} must not be preselected`).toBe(false);
+    }
+    expect((screen.getByRole('button', { name: 'continue' }) as HTMLButtonElement).disabled).toBe(
+      true
+    );
+  });
+
+  it('loads the preview for THIS return and shows the amount each option moves', async () => {
+    previewWith(GATEWAY_OK, 1978);
+    renderModal();
+
+    await waitFor(() => expect(screen.getAllByText(/1\.978/).length).toBeGreaterThanOrEqual(3));
+    expect(apiGet).toHaveBeenCalledWith(
+      '/api/v1/stores/store-1/returns/admin/ret-1/refund-preview'
+    );
+  });
+
+  it('disables the original payment method, with the reason, for a COD order', async () => {
+    previewWith({
+      available: false,
+      amount: null,
+      refundableRemaining: null,
+      unavailableReason: 'NO_COMPLETED_PAYMENT',
+    });
+    renderModal();
+
+    await waitFor(() =>
+      expect(screen.getByText('gatewayUnavailable.NO_COMPLETED_PAYMENT')).toBeTruthy()
+    );
+    expect(radio('original')?.disabled).toBe(true);
+    expect(radio('bank_transfer')?.disabled).toBe(false);
+  });
+
+  it('never offers the gateway when the preview could not load', async () => {
+    apiGet.mockResolvedValue({
+      data: null,
+      error: { code: 'SERVER_ERROR', message: 'x', status: 500 },
+    });
+    renderModal();
+
+    await waitFor(() => expect(screen.getByText('previewError')).toBeTruthy());
+    expect(radio('original')?.disabled).toBe(true);
+  });
+
+  it('sends nothing until the amount is confirmed on the second step', async () => {
+    previewWith(GATEWAY_OK);
+    const onConfirm = renderModal();
+    await waitFor(() => expect(radio('original')?.disabled).toBe(false));
+
+    fireEvent.click(radio('original')!);
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }));
+
+    expect(onConfirm, 'choosing is not confirming').not.toHaveBeenCalled();
+    expect(screen.getByText(/confirmOriginal .*1\.978/)).toBeTruthy();
+    expect(screen.getByText('confirmIrreversible')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'confirmSendRefund' }));
+    expect(onConfirm).toHaveBeenCalledWith('original');
+  });
+
+  it('offers "record only" only when a refund for this return already went out', async () => {
+    previewWith(GATEWAY_OK);
+    renderModal();
+    await waitFor(() => expect(radio('original')?.disabled).toBe(false));
+    expect(radio('manual'), 'hidden in the normal case').toBeNull();
+    cleanup();
+
+    previewWith({
+      available: false,
+      amount: null,
+      refundableRemaining: 3000,
+      unavailableReason: 'REFUND_ALREADY_ISSUED',
+    });
+    renderModal();
+    await waitFor(() => expect(radio('manual')).not.toBeNull());
+    expect(radio('original')?.disabled).toBe(true);
+    expect(screen.getByText('alreadyIssuedNotice')).toBeTruthy();
+  });
+  it('with the wallet on, store credit shows and confirms what the wallet receives', async () => {
+    // A full return: the wallet gets cashCredit + shipping − walletAmount,
+    // which is NOT the recorded figure. The merchant must confirm the former.
+    apiGet.mockResolvedValue({
+      data: {
+        preview: {
+          isFullReturn: true,
+          recordedAmount: 9000,
+          storeCreditToWallet: 7500,
+          gateway: GATEWAY_OK,
+        },
+      },
+      error: null,
+    });
+    const onConfirm = renderModal();
+    await waitFor(() => expect(screen.getAllByText(/7\.500/).length).toBeGreaterThanOrEqual(1));
+
+    fireEvent.click(radio('store_credit')!);
+    fireEvent.click(screen.getByRole('button', { name: 'continue' }));
+    expect(screen.getByText(/confirmWallet .*7\.500/)).toBeTruthy();
+    expect(screen.queryByText(/9\.000/), 'never the off-platform figure').toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'refundMethodConfirm' }));
+    expect(onConfirm).toHaveBeenCalledWith('store_credit');
+  });
+});
