@@ -185,6 +185,15 @@ npm run test:coverage
 npm run test -- path/to/test.ts
 ```
 
+### Buy-flow parity (money paths)
+
+Any PR touching cart, order, payment, checkout, coupon, promotion, shipping, tax,
+stock, bundle, refund/return or webhook code must run
+`node scripts/buy-flow-parity/run.mjs --head <your-branch>` and paste the verdict
+table into the PR. It replays the storefront's real buy sequences against the
+baseline customers bought on (`96814545`) and your branch, and it diffs every
+order, payment, stock and gateway field. See `scripts/buy-flow-parity/README.md`.
+
 ### Writing Tests
 
 - Write unit tests for all business logic

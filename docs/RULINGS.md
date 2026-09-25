@@ -8,6 +8,47 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25 — buy-flow parity harness (`scripts/buy-flow-parity/`)
+
+**Ruling BFP-1: background Inngest functions are EXECUTED by a local executor.
+They are not only recorded.** Restock and coupon reversal on cancel
+(`order/refunded`) and webhook processing (`payment/webhook.received`) run as
+Inngest functions. A harness that only recorded events reported a cancelled COD
+order as `vase=2, coupon usage 1` (nothing returned), while the executed run
+shows `vase=4, usage 0`. The executor gives each step one attempt and has no
+concurrency or idempotency windows, and it applies these limits identically to
+both refs. Cost if wrong: a defect that only appears on an Inngest RETRY is not
+compared.
+
+**Ruling BFP-2: `walletAmount` absent is compared as `0`, in the order row AND in
+order-shaped API responses.** The owner specified this for the row. Without it
+every scenario diffs on `walletAmount: 0` added by b1b5bbd1. Other wallet
+additions (the `reverseWallet` event flag, the `reverse-wallet-payment` step) are
+NOT normalised and show as diffs. Cost if wrong: a response consumer that breaks
+on a new key is not flagged by this harness.
+
+**Ruling BFP-3: a 5xx body is compared by the LAST line of its message, with
+digits masked.** The full dev-mode message holds a Prisma code frame and elapsed
+milliseconds, so two runs of the same code differ. Replacing the whole message
+hid a real difference: base "Cannot transition from cancelled to refunded" vs
+head "Transaction already closed". Cost if wrong: two different failures whose
+last lines are identical compare equal.
+
+**Ruling BFP-4: the admin "refund via provider" 30-second self-lock is reported,
+not fixed, in the harness PR.** On base 96814545 and on main b1b5bbd1 alike,
+`POST /stores/:id/orders/:id/refund-via-provider` for a paid MyFatoorah order
+waits 30s and returns 502 `REFUND_FAILED` (Transaction already closed). Two
+things lock each other. `PaymentService.refund` takes its claim `updateMany` in
+the request transaction, and then its `prisma.$transaction([...])` batch, which
+is not proxied to the tenant transaction (packages/database/src/index.ts), waits
+on that row lock on a second connection until the request transaction times out.
+MakeRefund has already been sent to the gateway by then. The result is order +
+payment `refunded`, `payments.refunded_amount = 0`, and no `order/refunded`
+event, so stock is not returned. Unit tests mock Prisma, so no test drives this
+over HTTP. It is identical on both refs, so it is not a parity difference. It
+belongs in its own fix PR. Cost if wrong: merchants who refund from the admin
+see an error for a refund that did go through, and the stock is not restored.
+
 ## 2026-09-25 — Sentry open-issues sweep (branch `fix/sentry-open-issues`)
 
 **Ruling SN-1 — FORCE-WEB-K/M/Q (`RangeError: Maximum call stack size exceeded`) and FORCE-WEB-N/P
