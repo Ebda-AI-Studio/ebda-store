@@ -35,6 +35,7 @@ jobs:
   snapshot:
     name: Create Neon branch from production
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 15
     steps:
       - name: Ensure jq (self-hosted runner may lack it + can't sudo)
         run: |

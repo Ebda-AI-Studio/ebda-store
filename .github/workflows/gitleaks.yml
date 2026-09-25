@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  # superseded PR pushes are cancelled; a push to main always finishes
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   scan:
     name: Scan for leaked secrets
