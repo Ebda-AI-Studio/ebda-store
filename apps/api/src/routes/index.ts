@@ -24,7 +24,7 @@ import taxRoutes from './tax.routes';
 import customerGroupRoutes from './customer-groups.routes';
 import promotionRoutes from './promotion.routes';
 import bundleRoutes from './bundle.routes';
-import loyaltyRoutes from './loyalty.routes';
+import loyaltyRoutes, { publicLoyaltyRoutes } from './loyalty.routes';
 import walletRoutes from './wallet.routes';
 import pwaRoutes from './pwa.routes';
 import inventoryRoutes from './inventory.routes';
@@ -215,13 +215,36 @@ router.use('/stores', tenantContext, taxRoutes);
 router.use('/stores', tenantContext, customerGroupRoutes);
 router.use('/stores', tenantContext, promotionRoutes);
 router.use('/stores', tenantContext, bundleRoutes);
-router.use('/stores', tenantContext, loyaltyRoutes);
 // Customer wallet (store credit) — every route behind requireFeature('customer_wallet').
 router.use('/stores', tenantContext, walletRoutes);
 router.use('/stores', tenantContext, pwaRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
 router.use('/stores', tenantContext, variantRoutes);
+
+// Loyalty routes. Pulled out of the bare-'/stores'-only block above (fixed
+// 2026-09-25): the customer-facing endpoints declare their own
+// '/:storeId/loyalty/...' paths, so they need the '/public' mount — a single
+// '/stores' mount left the storefront calling '/public/:storeId/loyalty/join'
+// etc. against a router that never listened there, 404ing on every live
+// store. See F2, docs/plans/2026-07-02-rls-cutover.md for the RLS wiring.
+//
+// TWO SEPARATE ROUTERS, and the split is load-bearing: `publicLoyaltyRoutes`
+// carries ONLY join/my-points/my-transactions/info. Mounting the whole
+// loyalty router at '/public' (as the dual-mount lines further down still do
+// for affiliate/notification/abandoned-cart/recommendation/shipping-carrier)
+// would republish the ADMIN half at '/public/:storeId/loyalty/...', where
+// BOTH of the path-prefix-keyed global controls in middleware/security.ts
+// stop applying: `csrfProtection` skips anything containing '/public/', and
+// `restrictPlatformOnlyOrigins` only denies '/api/v1/stores'. Since CORS
+// allowlists every merchant-registered custom domain with credentials:true,
+// that combination hands a merchant-controlled page credentialed
+// cross-origin reads of another store's loyalty members + transactions
+// (names, emails, order numbers) and CSRF-free point-award writes whenever a
+// store_admin/super_admin can be lured to it. See the header comment in
+// loyalty.routes.ts; guarded by tests/unit/storefront-loyalty-route-contract.test.ts.
+router.use('/stores', tenantContext, loyaltyRoutes);
+router.use('/public', publicLoyaltyRoutes);
 
 // Pages CMS — admin CRUD under /stores/:storeId/pages and public read
 // under /public/:storeId/pages/:slug. The shared router internally

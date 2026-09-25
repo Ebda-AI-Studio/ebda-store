@@ -7,14 +7,36 @@ import { LoyaltyService } from '../services/loyalty.service';
 import { LoyaltyTransactionType, prisma } from '@force/database';
 import { tenantContext } from '../middleware/tenant-context';
 
+// TWO routers, deliberately. The admin half is mounted ONLY at the bare
+// '/stores' prefix; the customer half is the only thing mounted at '/public'
+// (see routes/index.ts).
+//
+// DO NOT collapse these back into one router mounted at both prefixes. Two
+// global controls in middleware/security.ts are keyed on the PATH PREFIX, not
+// on the route's own middleware chain, and a whole-router dual mount defeats
+// both for every admin route in the file:
+//   - `csrfProtection` returns next() for any path containing '/public/', so
+//     PUT /public/:storeId/loyalty/settings and POST .../award would become
+//     cookie-authenticated writes with no CSRF token check.
+//   - `restrictPlatformOnlyOrigins` denies non-platform origins only under
+//     '/api/v1/stores', and CORS allowlists every merchant-registered custom
+//     domain with credentials:true — so a merchant-controlled page could lure
+//     a signed-in store_admin/super_admin and read the member + transaction
+//     lists (customer names, emails, order numbers) cross-origin.
+// `authenticate`/`authorize`/`requireStoreAccess` do not close either hole:
+// they bound WHICH stores the lured admin reaches, not whether the attacker's
+// page gets to use that admin's cookie.
+//
+// Both routers are mounted at BARE prefixes, so Express does NOT populate
+// req.params.storeId at the mount level — every route below declares its own
+// '/:storeId/...' path. router.param runs AFTER Express resolves :storeId for
+// the matched route, so RLS tenant context is set correctly on either router.
+// See F2, docs/plans/2026-07-02-rls-cutover.md.
 const router = Router();
-
-// Mounted at the bare '/stores' prefix in routes/index.ts, so Express does
-// NOT populate req.params.storeId at the mount level — every route below
-// declares its own '/:storeId/...' path. router.param runs AFTER Express
-// resolves :storeId for the matched route, so RLS tenant context is set
-// correctly here. See F2, docs/plans/2026-07-02-rls-cutover.md.
 router.param('storeId', tenantContext);
+
+const publicRouter = Router();
+publicRouter.param('storeId', tenantContext);
 
 // Validation schemas
 const tierSchema = z.object({
@@ -310,12 +332,14 @@ router.post(
 );
 
 // ==========================================
-// Public/Customer Routes
+// Public/Customer Routes (publicRouter — the ONLY router mounted at '/public')
 // ==========================================
 
 // GET /public/:storeId/loyalty/my-points - Get own points (authenticated customer)
-router.get(
-  '/public/:storeId/loyalty/my-points',
+// (resolves via the '/public' mount in routes/index.ts; the path declared
+// here has no '/public' prefix of its own — see the header comment above)
+publicRouter.get(
+  '/:storeId/loyalty/my-points',
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -346,8 +370,8 @@ router.get(
 );
 
 // GET /public/:storeId/loyalty/my-transactions - Get own transaction history
-router.get(
-  '/public/:storeId/loyalty/my-transactions',
+publicRouter.get(
+  '/:storeId/loyalty/my-transactions',
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -378,8 +402,8 @@ router.get(
 );
 
 // POST /public/:storeId/loyalty/join - Join loyalty program
-router.post(
-  '/public/:storeId/loyalty/join',
+publicRouter.post(
+  '/:storeId/loyalty/join',
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -406,8 +430,8 @@ router.post(
 );
 
 // GET /public/:storeId/loyalty/info - Get loyalty program info (public)
-router.get(
-  '/public/:storeId/loyalty/info',
+publicRouter.get(
+  '/:storeId/loyalty/info',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -439,4 +463,8 @@ router.get(
   }
 );
 
+/** Admin half — mount at the bare '/stores' prefix ONLY. */
 export default router;
+
+/** Customer half — the only loyalty routes safe to mount at '/public'. */
+export { publicRouter as publicLoyaltyRoutes };
