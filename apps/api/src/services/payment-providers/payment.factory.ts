@@ -1174,8 +1174,8 @@ export class PaymentService {
       if (newStatus === 'completed' && !orderAlreadyReversed && refundIsFull && payment.order) {
         // Reject a stale/invalid order state before running ANY reversal
         // side-effects. A provider refund executed out-of-band for an
-        // order some OTHER path already moved to a terminal state (e.g.
-        // `cancelled`) must not regress it — and must not run
+        // order some OTHER path already moved to the terminal `refunded`
+        // state must not regress it (a cancelled order CAN be refunded, PR #770) — and must not run
         // applyRefundEffects first, which would leave the reversal applied
         // but the status write rejected.
         assertValidTransition(payment.order.status, 'refunded');

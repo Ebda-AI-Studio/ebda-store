@@ -1181,6 +1181,33 @@ describe('OrderService', () => {
         ).rejects.toThrow('Cannot transition from cancelled to confirmed');
       });
 
+      it('should allow a PAID cancelled order -> refunded (PR #770)', async () => {
+        vi.mocked(prisma.order.findFirst).mockResolvedValue({
+          ...mockOrder,
+          status: 'cancelled',
+          paymentStatus: 'paid',
+        } as any);
+
+        await expect(
+          OrderService.updateStatus(mockStoreId, 'order-123', 'refunded')
+        ).resolves.toBeDefined();
+      });
+
+      it('should reject marking an UNPAID cancelled or pending order refunded', async () => {
+        for (const status of ['cancelled', 'pending']) {
+          vi.mocked(prisma.order.findFirst).mockResolvedValue({
+            ...mockOrder,
+            status,
+            paymentStatus: 'pending',
+            payments: [],
+          } as any);
+
+          await expect(
+            OrderService.updateStatus(mockStoreId, 'order-123', 'refunded')
+          ).rejects.toThrow('cannot be marked refunded');
+        }
+      });
+
       it('should reject refunded -> any', async () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,

@@ -145,10 +145,27 @@ describe('order-status-changed fanout', () => {
     expect(h.dispatch).not.toHaveBeenCalled();
   });
 
-  it('refunded WITH captured payment → refund email + dispatch(refund_processed)', async () => {
-    await handleOrderStatusChanged('o1', 's1', 'refunded', true, stepStub);
+  it('refunded WITH captured payment → admin bookkeeping email only', async () => {
+    const r = await handleOrderStatusChanged('o1', 's1', 'refunded', true, stepStub);
     expect(h.sendAdminRefund).toHaveBeenCalled();
-    expect(h.dispatch).toHaveBeenCalledWith('s1', 'refund_processed', expect.any(Object));
+    expect(r.ran).toEqual(['email-admin-refund']);
+  });
+
+  // Once-per-order "Refund issued": the customer-facing set (refund email +
+  // refund_processed dispatch + admin push) is produced ONLY by the
+  // order/refunded fanout, under its per-order `refund_notified` claim. This
+  // fanout dispatching the same key was unclaimed, so a paid order cancelled
+  // first (fanout notifies, claim written) and refunded afterwards notified the
+  // customer a SECOND time from here — the claim cannot suppress a producer it
+  // doesn't gate. No status may reintroduce that dispatch.
+  it('never dispatches refund_processed — the claimed order/refunded fanout owns it', async () => {
+    for (const status of ['confirmed', 'shipped', 'delivered', 'cancelled', 'refunded'] as const) {
+      await handleOrderStatusChanged('o1', 's1', status, true, stepStub);
+    }
+    expect(
+      h.dispatch.mock.calls.filter(c => c[1] === 'refund_processed'),
+      'refund_processed must only come from the order/refunded fanout'
+    ).toEqual([]);
   });
 
   it('re-throws when a side-effect step fails (so the run dead-letters)', async () => {

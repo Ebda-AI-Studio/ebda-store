@@ -8,6 +8,40 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25
+
+Context: the pre-clone finish program (Ahmad, 2026-09-25): every unfinished
+FWB item is finished before the repo is cloned into Ebda (Whisky 11, Egypt).
+Branch `fix/pre-clone-batch-a`.
+
+**Ruling PC-1 — the Force Media (`forcemediakw.com`) allowlist entries stay.**
+The 2026-06-27 rebrand sweep never landed on main, and ~70 references remain.
+Almost all of them are CORS/CSP/platform-host allowlists and comments, and the
+legacy hosts are still live: on 2026-09-25 `store.forcemediakw.com` 301'd to
+`store.force-ai.co`, `app.forcemediakw.com` 301'd to `admin.force-ai.co`, and
+`store-api.forcemediakw.com` still CNAMEs to the Railway API. Removing them
+would break every old link and bookmark that still reaches the platform. Only
+the user-facing stale values changed: the Swagger contact/terms/server URLs,
+the `INNGEST_SERVE_HOST` example in `apps/api/.env.example` and
+`docs/ENVIRONMENT.md`, and the boot warning's example. Cost if wrong: the old
+hosts stay reachable as an attack surface; revisit when their DNS is retired.
+
+**Ruling PC-2 — non-KWD money (closed PR #1689) is built in Ebda, not FWB.**
+FWB stays KWD-only, which is why #1689 was closed, and its fix was incomplete
+(the write path still stores `price * 1000` for every currency). Ebda prices
+in EGP (2 decimals), so the currency-aware money layer is Ebda's first task
+after the clone. Cost if wrong: FWB becomes 10× wrong the day it takes a
+non-KWD store; the currency default is KWD everywhere, so that needs a code
+change first, not an accident.
+
+**Ruling PC-3 — the storefront shimmer/stagger (design batch item 3) stays removed.**
+The audit flagged `.shimmer` and the empty stagger class as unfinished work.
+They are not: Ahmad had them reverted as a P0 on 2026-07-13 (PR #726) after
+the always-on shimmer made every image slot on wadyaljuz flicker and sweep
+rightward, even in RTL. PR #726 kept the keyframes on purpose for a future
+skeleton wired to real image-load state. Cost if wrong: none today; building
+that skeleton is new work, not unfinished work.
+
 ## 2026-09-16
 
 Context: `docs/plans/2026-09-16-store-resolve-transient-not-404.md` — a transient

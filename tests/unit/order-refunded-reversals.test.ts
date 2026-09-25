@@ -38,6 +38,7 @@ const h = vi.hoisted(() => ({
   // so this file stays a pure-unit, no-DB test of the fanout's own control
   // flow.
   reconcileWarehouseStockToAggregate: vi.fn().mockResolvedValue({ reconciled: false, diff: 0 }),
+  invalidateStoreProductCaches: vi.fn().mockResolvedValue(undefined),
   loggerError: vi.fn(),
   sendOrderRefunded: vi.fn(),
   dispatch: vi.fn(),
@@ -91,6 +92,9 @@ vi.mock('@api/services/loyalty.service', () => ({
     reverseEarnedPointsFromOrder: h.reverseEarnedPointsFromOrder,
     reverseRedeemedPointsFromOrder: h.reverseRedeemedPointsFromOrder,
   },
+}));
+vi.mock('@api/lib/public-cache', () => ({
+  invalidateStoreProductCaches: h.invalidateStoreProductCaches,
 }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { createFunction: vi.fn(() => ({})) } }));
 vi.mock('@api/lib/logger', () => ({
@@ -279,7 +283,10 @@ describe('order-refunded fanout — reverse-coupon step', () => {
     await handleOrderRefunded('o1', 's1', true, true, stepStub);
 
     expect(h.couponUpdateMany).toHaveBeenCalledTimes(1); // still 1 — no double-decrement
-    expect(h.orderEventCreate).toHaveBeenCalledTimes(1); // marker written once
+    const couponMarkers = h.orderEventCreate.mock.calls.filter(
+      ([arg]: [{ data: { toStatus: string } }]) => arg.data.toStatus === 'coupon_reversed'
+    );
+    expect(couponMarkers).toHaveLength(1); // marker written once
   });
 
   it('skips coupon reversal entirely when the order has no couponCode', async () => {
@@ -288,7 +295,9 @@ describe('order-refunded fanout — reverse-coupon step', () => {
     await handleOrderRefunded('o1', 's1', true, true, stepStub);
 
     expect(h.couponUpdateMany).not.toHaveBeenCalled();
-    expect(h.orderEventCreate).not.toHaveBeenCalled();
+    expect(h.orderEventCreate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ toStatus: 'coupon_reversed' }) })
+    );
   });
 });
 
@@ -377,19 +386,22 @@ describe('order-refunded fanout — order-level FOR UPDATE lock ordering', () =>
       }
       return Promise.resolve([{ id: args[0] }]);
     });
-    h.orderEventFindFirst.mockImplementation(() => {
-      callOrder.push('coupon-marker-read');
+    h.orderEventFindFirst.mockImplementation((args: { where: { toStatus?: string } }) => {
+      callOrder.push(`${args?.where?.toStatus}-read`);
       return Promise.resolve(null);
     });
 
     await handleOrderRefunded('o1', 's1', true, true, stepStub);
 
-    // One order-lock per withMoneyTx (restore-inventory + reverse-coupon) = 2.
-    expect(callOrder.filter(c => c === 'order-lock').length).toBe(2);
-    // The LAST order-lock belongs to reverse-coupon's tx and must precede
-    // its own marker read.
-    const lastOrderLockIdx = callOrder.lastIndexOf('order-lock');
-    expect(lastOrderLockIdx).toBeLessThan(callOrder.indexOf('coupon-marker-read'));
+    // One order-lock per withMoneyTx: restore-inventory, reverse-coupon and
+    // the refund-notification claim = 3.
+    expect(callOrder.filter(c => c === 'order-lock').length).toBe(3);
+    // Each marker read is immediately preceded by its own tx's order lock.
+    for (const read of ['coupon_reversed-read', 'refund_notified-read']) {
+      const idx = callOrder.indexOf(read);
+      expect(idx, read).toBeGreaterThan(0);
+      expect(callOrder[idx - 1], read).toBe('order-lock');
+    }
   });
 });
 
@@ -613,6 +625,55 @@ describe('order-refunded fanout — claim-reversed step', () => {
       expect.objectContaining({
         where: expect.objectContaining({ refundReversedAt: null }),
       })
+    );
+  });
+});
+
+describe('order-refunded fanout — product cache invalidation (bundles decisions doc)', () => {
+  it('busts the store product caches after restoring stock, so availability is not stale', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.invalidateStoreProductCaches).toHaveBeenCalledWith('s1');
+  });
+
+  it('does not bust caches when no stock was restored (restoreInventory false)', async () => {
+    await handleOrderRefunded('o1', 's1', false, true, stepStub);
+    expect(h.invalidateStoreProductCaches).not.toHaveBeenCalled();
+  });
+
+  it('a cache failure is swallowed — the refund still resolves', async () => {
+    h.invalidateStoreProductCaches.mockRejectedValueOnce(new Error('redis down'));
+    await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).resolves.not.toThrow();
+  });
+});
+
+describe('order-refunded fanout — "Refund issued" goes out once per order (PR #770)', () => {
+  const markerFor = (toStatus: string, present: boolean) =>
+    h.orderEventFindFirst.mockImplementation((args: { where: { toStatus?: string } }) =>
+      Promise.resolve(args?.where?.toStatus === toStatus && present ? { id: 'm' } : null)
+    );
+
+  it('sends the refund email and claims refund_notified when nobody was told yet', async () => {
+    markerFor('refund_notified', false);
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.sendOrderRefunded).toHaveBeenCalledTimes(1);
+    expect(h.orderEventCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ toStatus: 'refund_notified' }) })
+    );
+  });
+
+  it('stays silent when the order was already told (cancelled while paid, then refunded)', async () => {
+    markerFor('refund_notified', true);
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+    expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
+  });
+
+  it('never claims or sends when notify is false (an unpaid cancel)', async () => {
+    markerFor('refund_notified', false);
+    await handleOrderRefunded('o1', 's1', true, false, stepStub);
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+    expect(h.orderEventCreate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ toStatus: 'refund_notified' }) })
     );
   });
 });

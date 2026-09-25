@@ -1401,11 +1401,25 @@ export class OrderService {
           previousStock = product.inventory;
         }
 
+        //    The type is `return_stock` — NOT `adjustment` — because this row
+        //    is the CANONICAL IDEMPOTENCY MARKER the `order/refunded` fanout
+        //    reads (`order-refunded.ts` restore-inventory:
+        //    `reference: orderId, type: 'return_stock'`). This rollback has
+        //    already returned the stock, so any later `order/refunded` for
+        //    this order MUST skip its restore. `refundReversedAt` alone is not
+        //    enough: it only hides the order from `refund-reversal-stuck-sweep`,
+        //    and the sweep is no longer the only way the fanout can be reached
+        //    for a cancelled order — `cancelled → refunded` is a legal
+        //    transition (PR #770), so a real provider refund on a
+        //    rolled-back-then-paid order calls applyRefundEffects directly.
+        //    With an 'adjustment' row the marker check missed and every line
+        //    was incremented a SECOND time (invented stock). The `reason`
+        //    below keeps this distinguishable from a customer return.
         await tx.inventoryHistory.create({
           data: {
             productId: item.productId,
             storeId,
-            type: 'adjustment',
+            type: 'return_stock',
             quantity: item.quantity,
             previousStock,
             newStock: previousStock + item.quantity,
@@ -1420,6 +1434,24 @@ export class OrderService {
         await tx.coupon.updateMany({
           where: { storeId, code: order.couponCode },
           data: { usageCount: { decrement: 1 } },
+        });
+
+        // The coupon's canonical marker, written in the SAME tx as the
+        // decrement — the fanout's reverse-coupon step guards on its OWN
+        // `coupon_reversed` orderEvent, not on the inventory marker above
+        // (an order with no tracked inventory writes no InventoryHistory row
+        // at all, yet still consumed its coupon). Without this, the refund of
+        // a rolled-back-then-paid order decremented usageCount twice and
+        // handed a redemption back to the merchant's limit.
+        await tx.orderEvent.create({
+          data: {
+            storeId,
+            orderId: order.id,
+            fromStatus: null,
+            toStatus: 'coupon_reversed',
+            actorId: null,
+            metadata: { source: 'rollbackForPaymentFailure' },
+          },
         });
       }
 
@@ -1481,13 +1513,19 @@ export class OrderService {
       // reversal, because this rollback IS the reversal: steps 1-2 above
       // already restored inventory and released the coupon. It is the
       // predicate `refund-reversal-stuck-sweep` uses to find orders that still
-      // need reversing, and the sweep cannot infer it from our markers — we
-      // write InventoryHistory.type='adjustment' while the order/refunded
-      // fanout's idempotency check looks for 'return_stock'. Leaving it null
-      // let the sweep re-send order/refunded, and the fanout — finding no
-      // 'return_stock' row — restored the stock a SECOND time and decremented
-      // the coupon again. That made stock inventable on a loop, and it also
-      // fired organically on every legitimate failed payment-create.
+      // need reversing; leaving it null let the sweep re-send order/refunded.
+      //
+      // The stamp is the sweep's guard and the markers written in steps 1-2
+      // are the FANOUT's guard — both are required, and neither substitutes
+      // for the other. The stamp only stops this order being SELECTED by the
+      // sweep; it does nothing about the other ways `order/refunded` is
+      // reached (a provider refund on a cancelled order goes straight to
+      // applyRefundEffects). The markers only stop a fanout that DOES run
+      // from re-applying the reversal. When step 1 wrote 'adjustment' instead
+      // of the canonical 'return_stock', the sweep-driven re-send restored
+      // stock a SECOND time and decremented the coupon again — stock
+      // inventable on a loop, firing organically on every legitimate failed
+      // payment-create.
       await tx.order.update({
         where: { id: order.id },
         data: {
@@ -1528,6 +1566,20 @@ export class OrderService {
     // direct writers via `assertValidTransition` (see its doc comment for
     // the allowed-list rationale).
     assertValidTransition(order.status, status);
+    // pending/cancelled → refunded exists for orders that captured a payment
+    // (PR #770). A manual status change must not mark an order that never took
+    // money as refunded.
+    if (
+      status === 'refunded' &&
+      (order.status === 'pending' || order.status === 'cancelled') &&
+      !hasCapturedPayment(order)
+    ) {
+      throw new AppError(
+        400,
+        'ORDER_NOT_PAID',
+        'This order has no captured payment, so it cannot be marked refunded'
+      );
+    }
 
     // Set deliveredAt when transitioning to delivered so the review-request
     // Inngest function has an accurate timestamp for the 90-day token expiry.

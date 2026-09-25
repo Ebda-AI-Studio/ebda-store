@@ -56,6 +56,10 @@ export function hasCapturedPayment(order: CapturedPaymentInput): boolean {
  */
 export function shouldApplyRefundEffects(status: string, order: CapturedPaymentInput): boolean {
   const wasAlreadyRefunded = order.status === 'refunded';
+  // A paid order that is cancelled and later refunded (PR #770) would reach
+  // this twice. The second "Refund issued" is suppressed by the per-order
+  // `refund_notified` claim in the order/refunded fanout, not here: status
+  // can't tell whether the cancel happened while the order was paid.
   return (
     (status === 'cancelled' || status === 'refunded') &&
     hasCapturedPayment(order) &&

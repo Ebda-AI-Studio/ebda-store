@@ -8,7 +8,7 @@ import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { EmptyOrdersState } from './EmptyOrdersState';
-import { VALID_TRANSITIONS, type Order, type OrderLineItem } from './types';
+import { statusOptionsFor, type Order, type OrderLineItem } from './types';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -166,7 +166,7 @@ export function OrdersTable({
       header: t('table.status'),
       mobileBadge: true,
       cell: order => {
-        const transitions = VALID_TRANSITIONS[order.status] ?? [];
+        const transitions = statusOptionsFor(order);
         const isUpdating = updatingId === order.id;
         // Reuses OrderStatusBadge's colorMap override (same pattern the
         // returns/shipments/notifications surfaces use) instead of a new

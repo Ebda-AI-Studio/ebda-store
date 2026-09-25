@@ -252,9 +252,8 @@ router.post(
 // draft → pending. Approval status will arrive later via the WBS bridge
 // callback at POST /api/v1/wa-bridge/templates/status.
 //
-// Idempotent: rejected rows that the admin wants to retry can be flipped
-// back to 'draft' via a separate retry endpoint (TODO v2). For now, sync
-// only picks up 'draft'.
+// Idempotent: sync only picks up 'draft'. Rejected rows the admin wants to
+// retry are flipped back to 'draft' by POST /reset-rejected (above).
 const syncBodySchema = z.object({
   // Optional subset filter — sync only these source keys. Omit to sync all drafts.
   sourceKeys: z.array(z.string()).optional(),

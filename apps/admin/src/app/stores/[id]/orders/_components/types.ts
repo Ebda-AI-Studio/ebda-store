@@ -75,13 +75,33 @@ export interface Pagination {
 // list with the payment-gateway refund flow, which could already refund an
 // order before it shipped.
 export const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
   // Mirrors the API machine: shipment cancellation returns shipped -> processing.
   shipped: ['delivered', 'refunded', 'processing'],
   delivered: ['refunded'],
+  // A paid order cancelled by staff can still be refunded (PR #770).
+  cancelled: ['refunded'],
+  refunded: [],
 };
+
+/**
+ * Status options to offer for an order. `refunded` from pending/cancelled only
+ * applies to an order that captured a payment; the API rejects it otherwise
+ * (ORDER_NOT_PAID), so don't offer it.
+ */
+export function statusOptionsFor(order: {
+  status: string;
+  paymentStatus?: string | null;
+}): string[] {
+  const all = VALID_TRANSITIONS[order.status] ?? [];
+  const unpaid = order.paymentStatus !== 'paid';
+  if (unpaid && (order.status === 'pending' || order.status === 'cancelled')) {
+    return all.filter(s => s !== 'refunded');
+  }
+  return all;
+}
 
 export const STATUS_FILTERS = [
   'all',

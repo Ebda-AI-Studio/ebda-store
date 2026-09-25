@@ -193,21 +193,37 @@ export async function handleOrderStatusChanged(
     // Only notify a refund when money was actually captured (same gate as the
     // inline path — a `refunded` status on a never-paid order must not claim a
     // refund happened).
+    //
+    // CUSTOMER-FACING refund notifications are deliberately NOT sent here.
+    // `order-refunded.ts` is the single producer of the "Refund issued" set
+    // (customer email + `refund_processed` dispatch + admin push), gated by
+    // the per-order `refund_notified` claim it writes under the order lock.
+    // This branch used to `dispatch(storeId, 'refund_processed', …)` as well —
+    // the same event key, with no claim — so a paid order cancelled first and
+    // refunded afterwards told the customer TWICE: once from the fanout at the
+    // cancel (which wrote the claim) and again from here at the refund, which
+    // the claim cannot suppress because it doesn't gate this file.
+    //
+    // Removing the producer rather than making it read the claim is deliberate:
+    // both events are in flight at once on a plain refund, so a claim-gated
+    // branch here is a coin flip over WHICH one notifies — and this one cannot
+    // send the refund EMAIL or the true refunded amount (it has no Payment
+    // rows, only `order.total`). No notification is lost: `updateStatus` fires
+    // `order/refunded` for EVERY cancel/refund transition before it sends this
+    // event, and `shouldApplyRefundEffects` sets its `notify` flag true for
+    // exactly the orders this branch is gated on (captured payment, not already
+    // refunded). Gateway refunds bypass `updateStatus` entirely and are covered
+    // by the same fanout.
+    //
+    // The admin bookkeeping email stays: it is admin-facing (not part of the
+    // claimed customer set), has no counterpart in the fanout, and fires at most
+    // once per order because `refunded` is terminal in the status machine
+    // (`order-status-machine.ts`), so no order can re-enter this branch.
     add('email-admin-refund', () =>
       EmailService.sendAdminRefund({
         orderNumber: order.orderNumber,
         amount: order.total,
         reason: 'Order refunded',
-      })
-    );
-    add('dispatch-refunded', () =>
-      notificationDispatcher.dispatch(storeId, 'refund_processed', {
-        customerName,
-        customerPhone,
-        orderNumber: order.orderNumber,
-        amount: order.total,
-        storeId,
-        storeName,
       })
     );
   }

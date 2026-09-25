@@ -253,14 +253,15 @@ export default function OrdersClient() {
               </div>
 
               <div className="flex justify-end gap-2 border-t bg-muted p-4">
+                {/* Tracking lives on the detail page (carrier link or tracking
+                    number), so this opens it instead of being a dead button. */}
                 {order.status === 'shipped' || order.status === 'delivered' ? (
-                  <button
+                  <Link
+                    href={storeUrl(`/account/orders/${order.id}`)}
                     className="rounded-lg border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-                    title="Tracking info not available yet"
-                    disabled
                   >
                     {t('Track Order', '\u062a\u062a\u0628\u0639 \u0627\u0644\u0637\u0644\u0628')}
-                  </button>
+                  </Link>
                 ) : null}
                 <Link
                   href={storeUrl(`/account/orders/${order.id}`)}

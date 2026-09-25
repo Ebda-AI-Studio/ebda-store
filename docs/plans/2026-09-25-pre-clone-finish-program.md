@@ -1,0 +1,61 @@
+# Pre-clone finish program
+
+**Goal (Ahmad, 2026-09-25):** finish every unfinished FWB item before the repo is
+cloned into Ebda (Whisky 11's self-serve store builder for Egypt, `ebda.app`).
+After the clone, a fix to shared code must land in both repos (twin rule).
+
+**Hard constraint (Ahmad):** production must not break. Every storefront-visible
+change on the 3 live stores (pecannbee, palora, wady-aljuz) is opt-in per store,
+off by default, unless it fixes a bug.
+
+Source: the 2026-09-25 audit of all 82 plans against `origin/main`. About 63 had
+shipped. The rest are below.
+
+## Batch A: small fixes (PR #1897)
+
+Refund of a paid cancelled order (#770 re-land), store credentials in the Prisma
+global omit, the Track Order link, the manual-order variant picker, the product
+cache bust after a refund, and housekeeping. Rulings PC-1 to PC-3.
+
+## Batch B: product gaps (one PR per item, each in its own worktree)
+
+| Id  | Item                      | Scope (measured 2026-09-25)                                                                                                                                                                                         |
+| --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1  | Admin mobile, waves 2 + 3 | ~13 tables still overflow at 375px, and touch targets are under 44px (`docs/plans/2026-06-11-admin-mobile-ux-sprint.md`)                                                                                            |
+| B2  | Admin i18n coverage       | 101/118 pages already translate; about 640 hardcoded English strings remain in 81 files, 236 of them in `page-builder/page.tsx`                                                                                     |
+| B3  | Branding v2 finish        | Remove `SmartPaletteModal` from the Branding ThemeTab. Add a footer Branches column **behind a per-store toggle, default off**: pecannbee has 8 locations, and an unconditional column would change its live footer |
+| B4  | Test infrastructure       | A jsdom + Testing Library render layer for admin components (none exists), and the parametrised mass-assignment test (prohibited fields rejected on every store/product/order write route)                          |
+| B5  | PWA full icon set         | `docs/superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md`, tasks 1–7                                                                                                                               |
+
+Order: B4 goes first, because it gives B1 and B3 a way to prove a render. B5 is
+independent. B2 goes last, because it touches the most files and every other
+item's new strings go into it.
+
+## Batch C: production switches (approved by Ahmad 2026-09-25)
+
+- **C1 — RLS phase 3.** Production `DATABASE_URL` moves to the `force_app` role
+  (non-bypass). As of 2026-09-25 production connects as `neondb_owner`, which has
+  `rolbypassrls = true`. Needs: the `force_app` role verified in prod, CI's
+  `rls-force-app` suite green, a staged cutover with instant rollback (keep the old
+  URL as a Railway variable), and live checks straight after.
+- **C2 — cached tenant routing.** Turn on `STOREFRONT_TENANT_ROUTING` in
+  `apps/web/wrangler.jsonc`, then verify all 3 storefronts live (page render,
+  cart, checkout start, locale switch).
+
+Not approved: Railway replicas (measure CPU/p95 first) and CodeQL (paid add-on;
+Semgrep, ZAP and AI review already run).
+
+## Batch D: features and backlog
+
+- **D1 — customer wallet** (store-credit balance) and **D2 — email campaigns**:
+  both flags are hidden in `packages/shared/src/features.ts` with no model behind
+  them. Build both (Ahmad, 2026-09-25). Each gets its own spec and plan first.
+- **D3 — the 520 open P2 issues.** Triage them all. Fix every issue on a money,
+  security or data path. Close duplicates and stale issues with a written reason.
+  Production must not break.
+
+## Then
+
+Clone to `whisky-11/ebda` (full history, FWB as `upstream`), with twin-sync
+tooling: a shared-paths list, a PR checkbox for "touches shared code", and a
+daily sync report.

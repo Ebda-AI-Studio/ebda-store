@@ -22,16 +22,23 @@ const prismaOptions = {
   // and greppable. A query-level `select` also still returns the field (naming
   // it IS asking for it); `select` and `omit` cannot be combined in one query.
   //
-  // Scope is deliberately User-only. PaymentConfig.{apiKey,secretKey,
-  // webhookSecret} and Store.{wbsApiKey,metaAccessToken} are the same class of
-  // problem, but their call sites guard like `if (!store.wbsApiKey) return;` —
-  // under a global omit those become SILENT no-ops (WhatsApp sends just stop)
-  // instead of a loud failure. They need per-site opt-ins first.
+  // Store credentials (wbsApiKey, metaAccessToken, agentApiKey) joined the
+  // omit on 2026-09-25. The earlier worry was that guards like
+  // `if (!store.wbsApiKey) return;` would turn into SILENT no-ops. They can't:
+  // the generated types follow the global omit, so reading an omitted field
+  // off a query that didn't select it is a TYPE ERROR, and every reader now
+  // names the field in its `select`. PaymentConfig.{apiKey,secretKey,
+  // webhookSecret} still needs the same pass.
   omit: {
     user: {
       passwordHash: true,
       mfaSecret: true,
       mfaBackupCodes: true,
+    },
+    store: {
+      wbsApiKey: true,
+      metaAccessToken: true,
+      agentApiKey: true,
     },
   },
 } satisfies Prisma.PrismaClientOptions;

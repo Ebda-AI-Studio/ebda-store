@@ -225,3 +225,30 @@ describe('OrderService.applyRefundEffects — fires order/refunded with reversal
     expect(inngest.send).not.toHaveBeenCalled();
   });
 });
+
+// PR #770: a paid order can now go cancelled → refunded. The status-level
+// predicate must still say "notify" there: whether the customer was already
+// told is decided by the per-order `refund_notified` claim in the fanout
+// (see tests/unit/order-refunded-reversals.test.ts), because an order
+// cancelled while UNPAID and paid afterwards was never told.
+describe('refund notification after a cancel (PR #770)', () => {
+  it('a paid, cancelled order being refunded still asks to notify', () => {
+    expect(
+      shouldApplyRefundEffects('refunded', {
+        status: 'cancelled',
+        paymentStatus: 'paid',
+        payments: [],
+      })
+    ).toBe(true);
+  });
+
+  it('an already-refunded order never notifies again', () => {
+    expect(
+      shouldApplyRefundEffects('cancelled', {
+        status: 'refunded',
+        paymentStatus: 'paid',
+        payments: [],
+      })
+    ).toBe(false);
+  });
+});

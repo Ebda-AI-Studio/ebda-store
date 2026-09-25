@@ -216,6 +216,28 @@ describe('agent key admin API — the merchant lifecycle', () => {
     expect(JSON.stringify(listBody)).not.toContain('"agentApiKey"');
   });
 
+  it('no store read returns ANY stored credential — the global omit covers all three (2026-09-25)', async () => {
+    // GET /admin/stores/:id ran a bare findUnique + include and shipped every
+    // ciphertext column to the admin client (Ruling M5 residual). Set all
+    // three so the leak is possible, then read every wide store endpoint.
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+    });
+    for (const path of [`/admin/stores/${storeId}`, `/stores/${storeId}`, '/stores']) {
+      const res = await fetch(`${API}${path}`, { headers: auth() });
+      expect(res.status, path).toBe(200);
+      const raw = JSON.stringify(await res.json());
+      for (const field of ['"agentApiKey"', '"wbsApiKey"', '"metaAccessToken"']) {
+        expect(raw, `${path} must not return ${field}`).not.toContain(field);
+      }
+    }
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { wbsApiKey: null, metaAccessToken: null },
+    });
+  });
+
   it('a minted key authorises an MCP write; revoking it refuses the very next one', async () => {
     // Fresh mint so this test owns its own key regardless of order.
     const minted = await fetch(keyEndpoint(), { method: 'POST', headers: auth() });

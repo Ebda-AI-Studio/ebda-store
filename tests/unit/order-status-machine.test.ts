@@ -97,10 +97,12 @@ describe('assertValidTransition', () => {
     );
   });
 
-  it('rejects any transition out of a terminal cancelled order', () => {
+  it('rejects reviving a cancelled order (cancelled → confirmed) but allows refunding it', () => {
     expect(() => assertValidTransition('cancelled', 'confirmed')).toThrow(
       'Cannot transition from cancelled to confirmed'
     );
+    // A paid order that was cancelled can still be refunded; only `refunded` is terminal.
+    expect(() => assertValidTransition('cancelled', 'refunded')).not.toThrow();
   });
 
   it('rejects a stale "payment failed" webhook regressing a shipped order to pending', () => {
@@ -117,7 +119,10 @@ describe('assertValidTransition', () => {
     expect(() => assertValidTransition('pending', 'delivered')).not.toThrow();
   });
 
-  it('allows refunded from confirmed/processing/shipped/delivered — the gateway refund flow can refund before shipping', () => {
+  it('allows refunded from every non-terminal state — a refund can follow a completed payment in any state', () => {
+    expect(() => assertValidTransition('pending', 'refunded')).not.toThrow();
+    // The reported prod bug (#770): a paid order cancelled by staff must be refundable.
+    expect(() => assertValidTransition('cancelled', 'refunded')).not.toThrow();
     expect(() => assertValidTransition('confirmed', 'refunded')).not.toThrow();
     expect(() => assertValidTransition('processing', 'refunded')).not.toThrow();
     expect(() => assertValidTransition('shipped', 'refunded')).not.toThrow();

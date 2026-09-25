@@ -1,7 +1,8 @@
 /**
- * rollbackForPaymentFailure must stamp `refundReversedAt` (integration)
+ * rollbackForPaymentFailure must record its reversal as DONE (integration)
  *
- * Regression test for the 2026-09-02 adversarial audit P0-4.
+ * Regression test for the 2026-09-02 adversarial audit P0-4, extended after
+ * `cancelled → refunded` was opened up in the status machine.
  *
  * `rollbackForPaymentFailure` IS a reversal: it restores inventory and releases
  * the coupon inline, then cancels the order. But it wrote its inventory marker
@@ -16,9 +17,20 @@
  * route's catch runs this rollback), wait one 15-minute cron cycle, repeat. It
  * also fired organically on every legitimate failed payment-create.
  *
- * The fix stamps `refundReversedAt` inside the same transaction as the
- * reversal. This test pins the invariant the sweep depends on: after a
- * rollback, the order must NOT match the sweep's selection predicate.
+ * The reversal is therefore recorded TWICE OVER, and this test pins both halves
+ * because they guard different doors:
+ *
+ *   - `refundReversedAt` hides the order from `refund-reversal-stuck-sweep`,
+ *     so the sweep never re-sends `order/refunded`.
+ *   - the canonical `return_stock` / `coupon_reversed` markers make the FANOUT
+ *     itself idempotent, for the deliveries the sweep has no say over.
+ *
+ * The second half became load-bearing when the machine started allowing
+ * `cancelled → refunded`: an auto-cancelled order whose customer then pays the
+ * still-live provider invoice can be refunded by finance, and that refund
+ * webhook calls `applyRefundEffects` DIRECTLY (payment.factory) with
+ * `restoreInventory: true`. No sweep is involved, so the timestamp never gets
+ * a vote — only the markers stop the second reversal.
  *
  * Mirrors order-created-idempotency.test.ts: DB-direct, seeds its own store,
  * cleans up, and only runs when a real DATABASE_URL is present.
@@ -49,8 +61,10 @@ async function sweepWouldSelect(orderId: string): Promise<boolean> {
 describe.skipIf(!hasDb)('rollbackForPaymentFailure marks the reversal as done', () => {
   const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).substring(7)}`;
   const sessionId = `rr-sess-${suffix}`;
+  const couponCode = `RR-COUPON-${suffix}`;
   const START_INVENTORY = 10;
   const ORDER_QTY = 3;
+  const START_COUPON_USES = 4;
 
   let storeId: string;
   let orderId: string;
@@ -91,6 +105,19 @@ describe.skipIf(!hasDb)('rollbackForPaymentFailure marks the reversal as done', 
       });
       productId = product.id;
 
+      // A coupon the order consumed at checkout, so the rollback's coupon
+      // release (and its marker) is observable.
+      await tx.coupon.create({
+        data: {
+          storeId,
+          code: couponCode,
+          name: 'RR Test Coupon',
+          type: 'percentage',
+          value: 10,
+          usageCount: START_COUPON_USES,
+        },
+      });
+
       // A pending, unpaid order with no Payment rows — the exact shape the
       // rollback accepts (it returns early for cancelled / paid / progressed
       // orders).
@@ -100,6 +127,7 @@ describe.skipIf(!hasDb)('rollbackForPaymentFailure marks the reversal as done', 
           orderNumber: `RR-TEST-${suffix}`,
           status: 'pending',
           paymentStatus: 'unpaid',
+          couponCode,
           subtotal: 1000 * ORDER_QTY,
           total: 1000 * ORDER_QTY,
           shippingAddress: {},
@@ -167,17 +195,63 @@ describe.skipIf(!hasDb)('rollbackForPaymentFailure marks the reversal as done', 
     expect(await sweepWouldSelect(orderId)).toBe(false);
   });
 
-  it('leaves no return_stock marker — the sweep must rely on refundReversedAt, not the marker type', async () => {
-    // Documents WHY the fix is the timestamp and not a marker-type change:
-    // the rollback deliberately records an 'adjustment', so a marker-based
-    // sweep would still mis-read this order as un-reversed.
+  it('writes the canonical return_stock marker the order/refunded fanout guards on', async () => {
+    // The stamp is the SWEEP's guard; this marker is the FANOUT's guard.
+    // Both are required — see the header. The rollback used to record an
+    // 'adjustment', which the fanout's `type: 'return_stock'` idempotency
+    // check never matched.
     const markers = await withRlsBypass(tx =>
       tx.inventoryHistory.findMany({
         where: { reference: orderId },
-        select: { type: true },
+        select: { type: true, reason: true },
       })
     );
     expect(markers.length).toBeGreaterThan(0);
-    expect(markers.every(m => m.type === 'adjustment')).toBe(true);
+    expect(markers.every(m => m.type === 'return_stock')).toBe(true);
+    // The reason keeps a payment-failure rollback distinguishable from a
+    // genuine customer return despite sharing the type.
+    expect(markers.every(m => m.reason === 'Order rollback — payment step failed')).toBe(true);
+  });
+
+  it('writes the canonical coupon_reversed marker so the refund cannot re-decrement', async () => {
+    const marker = await withRlsBypass(tx =>
+      tx.orderEvent.findFirst({
+        where: { orderId, toStatus: 'coupon_reversed' },
+        select: { id: true },
+      })
+    );
+    expect(marker).not.toBeNull();
+  });
+
+  it('releases the coupon redemption exactly once', async () => {
+    const coupon = await withRlsBypass(tx =>
+      tx.coupon.findFirstOrThrow({ where: { storeId }, select: { usageCount: true } })
+    );
+    expect(coupon.usageCount).toBe(START_COUPON_USES - 1);
+  });
+
+  /**
+   * The regression this pins: `cancelled → refunded` is a legal transition, so
+   * a rolled-back order that the customer then pays (the still-live provider
+   * invoice) and finance refunds reaches the `order/refunded` fanout directly
+   * — no sweep, so `refundReversedAt` never gets a chance to gate it. Only the
+   * markers stand between that refund and a second reversal. This asserts the
+   * exact two reads the fanout performs both find their marker.
+   */
+  it('is idempotent against a later cancelled→refunded fanout — both guards hit', async () => {
+    const [stockMarker, couponMarker] = await withRlsBypass(async tx => [
+      // order-refunded.ts restore-inventory
+      await tx.inventoryHistory.findFirst({
+        where: { reference: orderId, type: 'return_stock', storeId },
+        select: { id: true },
+      }),
+      // order-refunded.ts reverse-coupon
+      await tx.orderEvent.findFirst({
+        where: { storeId, orderId, toStatus: 'coupon_reversed' },
+        select: { id: true },
+      }),
+    ]);
+    expect(stockMarker).not.toBeNull();
+    expect(couponMarker).not.toBeNull();
   });
 });

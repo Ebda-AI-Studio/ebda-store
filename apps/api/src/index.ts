@@ -612,7 +612,7 @@ const server = httpServer.listen(config.port, () => {
     logger.warn(
       'INNGEST_SERVE_HOST is unset in production — Inngest will register the ' +
         'localhost origin and enqueued jobs will never run. Set it to the public ' +
-        'API origin, e.g. https://store-api.forcemediakw.com'
+        'API origin, e.g. https://api.force-ai.co'
     );
   }
 

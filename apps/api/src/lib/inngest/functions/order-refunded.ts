@@ -6,6 +6,7 @@ import { OneSignalService } from '../../../services/onesignal.service';
 import { affiliateService } from '../../../services/affiliate.service';
 import { LoyaltyService } from '../../../services/loyalty.service';
 import { WarehouseService } from '../../../services/warehouse.service';
+import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -405,7 +406,47 @@ export async function handleOrderRefunded(
   // unpaid cancel (notify:false) still runs every reversal above but never
   // reaches this block, so the customer/merchant never see a spurious
   // "Refund issued" email/WhatsApp/push.
-  if (notify) {
+  // A full refund's "Refund issued" goes out ONCE per order. Cancelling a paid
+  // order already sends it, and a later provider refund of that order must not
+  // send a second one. Status can't tell those apart (an order cancelled while
+  // UNPAID and paid afterwards was never told), so claim a durable per-order
+  // marker instead. Partial returns notify per return, with their own amount.
+  //
+  // The claim is only an honest gate while THIS block is the only producer of
+  // the customer-facing set. It is: `order-status-changed.ts` used to dispatch
+  // the same `refund_processed` key from its `refunded && hadCapturedPayment`
+  // branch, unclaimed, which double-notified the cancel→refund flow; that
+  // dispatch was removed and its branch now carries a comment pointing back
+  // here. Any new customer refund notification belongs inside this block —
+  // adding one elsewhere silently breaks the once-per-order invariant.
+  const shouldNotify =
+    notify &&
+    (isPartial ||
+      (await step.run('claim-refund-notification', () =>
+        runInTenantContext(storeId, () =>
+          withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+            await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+            const sent = await tx.orderEvent.findFirst({
+              where: { storeId, orderId, toStatus: 'refund_notified' },
+              select: { id: true },
+            });
+            if (sent) return false;
+            await tx.orderEvent.create({
+              data: {
+                storeId,
+                orderId,
+                fromStatus: null,
+                toStatus: 'refund_notified',
+                actorId: null,
+                metadata: {},
+              },
+            });
+            return true;
+          })
+        )
+      )));
+
+  if (shouldNotify) {
     const store = await step.run('load-store', () =>
       runInTenantContext(storeId, () =>
         prisma.store
@@ -511,6 +552,24 @@ export async function handleOrderRefunded(
       }
     })
   );
+
+  // Stock just went back on the shelf, and inventory is NEVER-stale: the
+  // storefront, product pages and the AI feed must stop showing the old
+  // availability now, not after the cache TTL (up to 600s). Best-effort for the
+  // same reason as the reconcile above: the reversals are already committed,
+  // and a cache blip must not dead-letter the event.
+  if (restoreInventory) {
+    await step.run('invalidate-product-caches', async () => {
+      try {
+        await invalidateStoreProductCaches(storeId);
+      } catch (err) {
+        logger.error(
+          { err, orderId, storeId },
+          '[order-refunded] product cache invalidation failed'
+        );
+      }
+    });
+  }
 
   // FINAL step, deliberately last. Stamps the completion claim only after every
   // reversal above has succeeded — those steps throw on failure, so a failed

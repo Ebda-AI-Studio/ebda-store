@@ -22,7 +22,10 @@ export const aiAutofillProduct: InngestFunction.Any = inngest.createFunction(
     id: 'ai-autofill-product',
     name: 'AI-first: autofill product fields on create/update',
     concurrency: { key: 'event.data.storeId', limit: 1 },
-    // TODO debounce when inngest supports it
+    // A merchant saving the same product several times in a row fired one AI
+    // autofill per save. Wait for the edits to settle (10s with no new save
+    // for that product) and run once on the latest event.
+    debounce: { key: 'event.data.productId', period: '10s' },
     retries: 2,
     triggers: [{ event: 'product.upserted' as any }],
   },

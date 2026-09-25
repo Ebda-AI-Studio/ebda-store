@@ -208,10 +208,13 @@ export default function NewOrderPage() {
         // Need to fetch variants from the dedicated variant endpoint.
         setLoadingVariants(true);
         try {
+          // The endpoint returns `{ product, options, variants }` with the
+          // variants at the TOP level (same shape the variants page reads).
+          // Reading `product.variants` always gave [] and an empty picker.
           const { data } = await apiGet<{
-            product: { variants: ProductVariant[] };
+            variants: ProductVariant[];
           }>(`/api/v1/stores/${storeId}/products/${p.id}/variants`);
-          const variants = data?.product?.variants ?? [];
+          const variants = data?.variants ?? [];
           setPendingVariantProduct({ ...p, variants });
         } catch {
           // Fallback: add as parent product without variant if fetch fails.

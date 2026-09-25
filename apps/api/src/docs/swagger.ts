@@ -51,13 +51,13 @@ All errors follow this format:
 | RATE_LIMITED | 429 | Too many requests |
       `,
       contact: {
-        name: 'Force Media Kuwait',
-        email: 'support@forcemediakw.com',
-        url: 'https://forcemediakw.com',
+        name: 'Force AI',
+        email: 'info@force-ai.co',
+        url: 'https://force-ai.co',
       },
       license: {
         name: 'Proprietary',
-        url: 'https://forcemediakw.com/terms',
+        url: 'https://force-ai.co/terms',
       },
     },
     servers: [
@@ -66,7 +66,7 @@ All errors follow this format:
         description: 'Development server',
       },
       {
-        url: 'https://api.forcemediakw.com/api/v1',
+        url: 'https://api.force-ai.co/api/v1',
         description: 'Production server',
       },
     ],

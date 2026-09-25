@@ -9,16 +9,31 @@ import { AppError } from '../middleware/error-handler';
  * callback from silently regressing an order. Backwards moves are blocked;
  * admins/gateways can still jump ahead. A same-status write is a safe no-op.
  *
- * `refunded` is reachable from confirmed/processing/shipped/delivered (not
- * just delivered): the payment-gateway refund flow can legitimately refund an
- * order before it ships. Both terminal states have no outgoing transitions.
+ * `refunded` is reachable from EVERY non-terminal state, including `pending`
+ * and `cancelled`. An online payment can complete while the order is still
+ * pending (webhook not yet advanced) or before staff cancel it (a paid order
+ * cancelled by staff still owes the customer a refund), so the gateway refund
+ * flow must reach `refunded` from any state that can hold a completed payment.
+ * Blocking `cancelled → refunded` rejected refunds of paid-then-cancelled
+ * orders with a 502 before any money moved (PR #770, whose fix never reached
+ * main). Stock/coupon/loyalty reversal is safe to reach twice (cancel, then
+ * refund) ONLY because every path that reverses an order writes the canonical
+ * per-order markers the `order/refunded` fanout guards on — the
+ * `return_stock` InventoryHistory row and the `coupon_reversed` orderEvent.
+ * That is load-bearing for this edge, not incidental: `rollbackForPaymentFailure`
+ * reverses inline, and while it wrote `type='adjustment'` instead the markers
+ * never matched, so refunding a rolled-back-then-paid order (auto-cancel →
+ * customer pays the still-live provider invoice → finance refunds it) invented
+ * stock and returned a coupon redemption. Any NEW inline reversal path must
+ * write those markers before it can be allowed to reach `refunded`.
+ * `refunded` is the only terminal state.
  *
  * Lives in its own module (no service/inngest imports) so any status writer
  * can import the guard without pulling in the heavy OrderService dependency
  * graph. Mirror this map in apps/admin/.../orders/_components/types.ts.
  */
 export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
   // 'processing' models SHIPMENT CANCELLATION: cancelling a carrier shipment
@@ -29,7 +44,7 @@ export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   // be applied to every Order.status writer instead of all but four.
   shipped: ['delivered', 'refunded', 'processing'],
   delivered: ['refunded'],
-  cancelled: [],
+  cancelled: ['refunded'],
   refunded: [],
 };
 
