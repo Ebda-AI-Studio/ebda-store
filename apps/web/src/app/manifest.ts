@@ -62,7 +62,11 @@ async function fetchStoreManifest(storeId: string): Promise<ApiManifest | null> 
   if (!storeId || storeId === 'demo') return null;
   try {
     const res = await fetch(`${API_URL}/public/${storeId}/manifest.json`, {
-      next: { revalidate: 300 },
+      // Tagged so an icon/settings write (PWAService.updateSettings) can bust
+      // this immediately via revalidateStorefront({tags:[`pwa:<storeId>`]})
+      // instead of merchants waiting out the 300s TTL — same pattern as the
+      // products/categories tags this fetch's siblings use.
+      next: { revalidate: 300, tags: [`pwa:${storeId}`] },
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;

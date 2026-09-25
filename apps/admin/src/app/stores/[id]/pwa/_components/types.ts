@@ -10,6 +10,14 @@ export interface PWASettings {
   icon192?: string;
   icon512?: string;
   maskableIcon?: string;
+  // Full icon set (B5, 2026-05-04 plan) — generated server-side by
+  // POST /stores/:id/pwa/icons from one merchant-uploaded source image.
+  // Mirrors apps/api/src/services/pwa.service.ts's PWASettings.
+  iconSource?: string;
+  icon384?: string;
+  iconAppleTouch?: string;
+  favicon32?: string;
+  favicon16?: string;
   display: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser';
   orientation: 'any' | 'portrait' | 'landscape';
   startUrl: string;

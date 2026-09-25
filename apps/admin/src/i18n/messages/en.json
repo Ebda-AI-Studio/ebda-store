@@ -2664,6 +2664,13 @@
     },
     "icons": {
       "title": "App Icons",
+      "uploaderHelp": "Upload one square logo and we'll generate every size your customers need — Android home screen, iOS Add to Home Screen, and the browser tab.",
+      "uploaderLabel": "Upload your store icon",
+      "uploaderSizeHint": "Square PNG, JPEG, WebP or SVG, at least 512×512px",
+      "generatedPreview": "Generated sizes",
+      "iconAppleTouchAlt": "iOS home screen icon",
+      "favicon32Alt": "Browser tab icon",
+      "advancedToggle": "Advanced: override individual sizes manually",
       "urlPlaceholder": "https://...",
       "icon192": "Icon 192x192",
       "icon192Alt": "Icon 192",

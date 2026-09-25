@@ -68,6 +68,9 @@ const ALLOWED_TENANT_FOLDERS = new Set<string>([
   // Per-store custom fonts uploaded via the typography admin page.
   // Uses the same key shape as everything else: stores/<storeId>/fonts/...
   'fonts',
+  // Per-store PWA icon set (source upload + generated sizes), B5:
+  // stores/<storeId>/pwa/... — see PWAService.generatePwaIconSet.
+  'pwa',
 ]);
 
 /**

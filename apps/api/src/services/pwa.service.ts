@@ -1,9 +1,13 @@
+import sharp from 'sharp';
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
+import { StorageService } from './storage.service';
+import { revalidateStorefront } from '../lib/revalidate-storefront';
+import logger from '../lib/logger';
 
 // PWA Settings structure
-interface PWASettings {
+export interface PWASettings {
   // App Identity
   appName: string;
   appNameAr?: string;
@@ -16,10 +20,23 @@ interface PWASettings {
   themeColor: string;
   backgroundColor: string;
 
-  // Icons
+  // Icons — full set added in B5 (docs/superpowers/plans/2026-05-04-
+  // storefront-per-store-pwa-full-sizes.md). All optional/nullable-by-
+  // absence; a store that only ever set icon192/icon512/maskableIcon keeps
+  // working exactly as before (see generateManifest's backward-compat path).
   icon192?: string;
   icon512?: string;
   maskableIcon?: string;
+  /** Merchant-uploaded 512x512+ source image the generated set is derived from. */
+  iconSource?: string;
+  /** 384x384 — Android splash/adaptive icon size. */
+  icon384?: string;
+  /** 180x180 — iOS apple-touch-icon. */
+  iconAppleTouch?: string;
+  /** 32x32 — browser-tab favicon. */
+  favicon32?: string;
+  /** 16x16 — browser-tab favicon (small). */
+  favicon16?: string;
 
   // Display
   display: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser';
@@ -34,6 +51,115 @@ interface PWASettings {
   // iOS Specific
   iosStatusBarStyle: 'default' | 'black' | 'black-translucent';
   splashScreenColor: string;
+}
+
+/**
+ * Result of generatePwaIconSet — every field is a public R2 URL.
+ */
+export interface GeneratedPwaIcons {
+  iconSource: string;
+  icon192: string;
+  icon384: string;
+  icon512: string;
+  iconAppleTouch: string;
+  favicon32: string;
+  favicon16: string;
+  maskableIcon: string;
+}
+
+/**
+ * Icon sizes generated from a single merchant-uploaded source image.
+ *
+ * `padded: true` (maskable only) shrinks the source to ~80% inside a
+ * transparent square so Android/iOS adaptive-icon safe zones don't clip the
+ * artwork — the standard maskable-icon safe-zone convention.
+ */
+const ICON_TARGETS: ReadonlyArray<{
+  key: Exclude<keyof GeneratedPwaIcons, 'iconSource'>;
+  size: number;
+  padded: boolean;
+}> = [
+  { key: 'icon192', size: 192, padded: false },
+  { key: 'icon384', size: 384, padded: false },
+  { key: 'icon512', size: 512, padded: false },
+  { key: 'iconAppleTouch', size: 180, padded: false },
+  { key: 'favicon32', size: 32, padded: false },
+  { key: 'favicon16', size: 16, padded: false },
+  { key: 'maskableIcon', size: 512, padded: true },
+];
+
+/**
+ * Generate the full PWA icon size set from one merchant-uploaded source
+ * image and upload every size to R2 under `stores/<storeId>/pwa/`.
+ *
+ * Deviation from the 2026-05-04 plan: the plan's sketch called a
+ * `uploadToR2` helper that doesn't exist in this codebase. This reuses the
+ * repo's actual upload primitive, `StorageService.upload` (same one every
+ * other admin upload surface — logos, hero, fonts — goes through), passing
+ * a fixed `filename` per icon key so re-uploading a new source OVERWRITES
+ * the same R2 object instead of accumulating orphans per upload.
+ *
+ * Fails loud (throws AppError) rather than the fire-and-forget/fail-soft
+ * posture `image-resize.service.ts` uses for cosmetic resizing — a broken
+ * icon set left half-written would leave `Store.pwaSettings` pointing at a
+ * mix of new and stale URLs, which is worse than rejecting the upload.
+ */
+export async function generatePwaIconSet(
+  storeId: string,
+  sourceBuffer: Buffer,
+  background: { r: number; g: number; b: number; alpha: number } = { r: 0, g: 0, b: 0, alpha: 0 }
+): Promise<GeneratedPwaIcons> {
+  try {
+    const results: Partial<GeneratedPwaIcons> = {};
+
+    // Upload the source as-is (normalized to PNG) so the pipeline can be
+    // re-run later against the original artwork without re-asking the
+    // merchant to upload again.
+    const sourcePng = await sharp(sourceBuffer).png({ compressionLevel: 9 }).toBuffer();
+    const sourceUpload = await StorageService.upload(sourcePng, 'source.png', {
+      folder: 'pwa',
+      storeId,
+      filename: 'source',
+      contentType: 'image/png',
+      allowedTypes: ['image/png'],
+    });
+    results.iconSource = sourceUpload.url;
+
+    for (const target of ICON_TARGETS) {
+      const innerSize = target.padded ? Math.floor(target.size * 0.8) : target.size;
+      const pad = target.size - innerSize;
+
+      const buf = await sharp(sourceBuffer, { density: Math.max(384, target.size * 2) })
+        .resize(innerSize, innerSize, { fit: 'contain', background })
+        .extend({
+          top: Math.floor(pad / 2),
+          bottom: Math.ceil(pad / 2),
+          left: Math.floor(pad / 2),
+          right: Math.ceil(pad / 2),
+          background,
+        })
+        .png({ compressionLevel: 9 })
+        .toBuffer();
+
+      const uploaded = await StorageService.upload(buf, `${target.key}.png`, {
+        folder: 'pwa',
+        storeId,
+        filename: target.key,
+        contentType: 'image/png',
+        allowedTypes: ['image/png'],
+      });
+      results[target.key] = uploaded.url;
+    }
+
+    return results as GeneratedPwaIcons;
+  } catch (err) {
+    logger.error({ err, storeId }, 'pwa: icon set generation failed');
+    throw new AppError(
+      400,
+      'ICON_GENERATION_FAILED',
+      'Could not process the uploaded icon. Use a valid square PNG, JPEG, WebP or SVG image.'
+    );
+  }
 }
 
 const DEFAULT_PWA_SETTINGS: PWASettings = {
@@ -132,6 +258,17 @@ export class PWAService {
       },
     });
 
+    // Every write here can change what /public/:storeId/manifest.json and
+    // the storefront's home-screen icon look like. The manifest route itself
+    // has no Redis cache today (see generateManifest below — not behind
+    // getCached), so the only stale-read surface is the Next.js storefront's
+    // own data-cache fetch (apps/web/src/app/manifest.ts, `next: { tags:
+    // ['pwa:<storeId>'] }`). Bust that tag on every settings/icon write —
+    // same pattern as invalidateStoreProductCaches's revalidateStorefront
+    // call — so a merchant doesn't have to wait out the 300s TTL to see a
+    // new icon or app name.
+    revalidateStorefront({ tags: [`pwa:${storeId}`] });
+
     return {
       pwaEnabled: store.pwaEnabled,
       settings: store.pwaSettings as unknown as PWASettings,
@@ -178,23 +315,36 @@ export class PWAService {
       icons: [],
     };
 
-    // Add icons if available
+    // Add icons if available.
+    //
+    // BACKWARD COMPATIBILITY (binding — see the B5 plan + PR): a store that
+    // has only ever set icon192/icon512 (the pre-B5 fields) MUST get back
+    // EXACTLY today's two-entry array, in the same order, with no `purpose`
+    // key on either entry. That's why icon192/icon512/icon384/iconAppleTouch/
+    // favicon32/favicon16 are pushed with no `purpose` field at all (omitted,
+    // not `purpose: 'any'` — adding that key would itself be a manifest
+    // change for existing stores). The new B5 sizes just slot into the same
+    // array shape; a store that hasn't uploaded them yet skips those entries
+    // and the array collapses to exactly the legacy set.
     const icons: Array<{ src: string; sizes: string; type: string; purpose?: string }> = [];
 
-    if (settings.icon192) {
-      icons.push({
-        src: settings.icon192,
-        sizes: '192x192',
-        type: 'image/png',
-      });
-    }
-
-    if (settings.icon512) {
-      icons.push({
-        src: settings.icon512,
-        sizes: '512x512',
-        type: 'image/png',
-      });
+    // Order follows the plan: favicons, apple-touch, then the Android sizes
+    // smallest-to-largest. A legacy store (only icon192 + icon512 set, every
+    // other field absent) collapses this to exactly [icon192, icon512] —
+    // the same two entries in the same order the pre-B5 code produced.
+    const sizedIconFields: Array<[keyof PWASettings, string]> = [
+      ['favicon16', '16x16'],
+      ['favicon32', '32x32'],
+      ['iconAppleTouch', '180x180'],
+      ['icon192', '192x192'],
+      ['icon384', '384x384'],
+      ['icon512', '512x512'],
+    ];
+    for (const [field, sizes] of sizedIconFields) {
+      const src = settings[field];
+      if (typeof src === 'string' && src) {
+        icons.push({ src, sizes, type: 'image/png' });
+      }
     }
 
     if (settings.maskableIcon) {

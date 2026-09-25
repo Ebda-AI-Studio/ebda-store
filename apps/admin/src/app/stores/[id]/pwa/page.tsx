@@ -92,7 +92,12 @@ export default function PWASettingsPage() {
             theme={storeInfo?.theme as StoreTheme | undefined}
           />
 
-          <PwaIconUploader settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
+          <PwaIconUploader
+            storeId={storeId}
+            settings={settings}
+            pwaEnabled={pwaEnabled}
+            onChange={setSettings}
+          />
 
           <PwaInstallBanner settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
 

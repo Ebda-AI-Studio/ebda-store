@@ -74,14 +74,32 @@ export function buildStorefrontMetadata(store: ResolvedStore, isOnCustomDomain: 
     typeof pwa?.iosStatusBarStyle === 'string'
       ? (pwa.iosStatusBarStyle as 'default' | 'black' | 'black-translucent')
       : undefined;
+  // B5 (2026-05-04 plan, task 5): a real 180x180 apple-touch-icon, generated
+  // server-side alongside the rest of the icon set, beats every fallback
+  // below — but ONLY when the merchant has actually uploaded one. Every
+  // store that hasn't (all 3 live storefronts today) falls through the
+  // EXACT SAME chain this already was, byte-for-byte, so nothing changes
+  // for them until they upload a new icon via the admin.
+  const pwaAppleTouchIcon =
+    typeof pwa?.iconAppleTouch === 'string' && pwa.iconAppleTouch
+      ? (pwa.iconAppleTouch as string)
+      : undefined;
   const pwaTouchIcon =
-    typeof pwa?.maskableIcon === 'string' && pwa.maskableIcon
+    pwaAppleTouchIcon ||
+    (typeof pwa?.maskableIcon === 'string' && pwa.maskableIcon
       ? (pwa.maskableIcon as string)
       : typeof pwa?.icon512 === 'string' && pwa.icon512
         ? (pwa.icon512 as string)
         : typeof pwa?.icon192 === 'string' && pwa.icon192
           ? (pwa.icon192 as string)
-          : store.favicon || undefined;
+          : store.favicon || undefined);
+  // Same B5 task: real 32x32 / 16x16 browser-tab favicons, generated from
+  // the same source upload. Falls back to the pre-existing favicon/logo
+  // chain (single entry, no `sizes`) when neither is set — see iconsBlock.
+  const pwaFavicon32 =
+    typeof pwa?.favicon32 === 'string' && pwa.favicon32 ? (pwa.favicon32 as string) : undefined;
+  const pwaFavicon16 =
+    typeof pwa?.favicon16 === 'string' && pwa.favicon16 ? (pwa.favicon16 as string) : undefined;
   const pwaAppTitle =
     typeof pwa?.shortName === 'string' && pwa.shortName
       ? (pwa.shortName as string)
@@ -100,11 +118,21 @@ export function buildStorefrontMetadata(store: ResolvedStore, isOnCustomDomain: 
   // a screenshot of the page chrome.
   const iconsBlock: NonNullable<Metadata['icons']> | undefined = (() => {
     const icons: NonNullable<Metadata['icons']> = {};
-    // Favicon: the merchant's custom favicon, else fall back to the store's own
-    // logo so browser tabs + link-preview (WhatsApp) show the STORE's brand —
-    // not the platform's default Force AI icon when no favicon was uploaded.
+    // Favicon: prefer the generated 32x32/16x16 pair (real browser-tab
+    // favicons) when the merchant has uploaded a PWA icon set; otherwise
+    // fall back to the merchant's custom favicon, else the store's own logo
+    // so browser tabs + link-preview (WhatsApp) show the STORE's brand — not
+    // the platform's default Force AI icon when no favicon was uploaded.
+    // This is the EXACT pre-B5 fallback for any store without favicon32/16.
     const faviconSrc = store.favicon || store.logo || undefined;
-    if (faviconSrc) icons.icon = faviconSrc;
+    if (pwaActive && (pwaFavicon32 || pwaFavicon16)) {
+      icons.icon = [
+        ...(pwaFavicon32 ? [{ url: pwaFavicon32, sizes: '32x32', type: 'image/png' }] : []),
+        ...(pwaFavicon16 ? [{ url: pwaFavicon16, sizes: '16x16', type: 'image/png' }] : []),
+      ];
+    } else if (faviconSrc) {
+      icons.icon = faviconSrc;
+    }
     if (pwaActive && pwaTouchIcon) icons.apple = pwaTouchIcon;
     return icons.icon || icons.apple ? icons : undefined;
   })();

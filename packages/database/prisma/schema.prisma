@@ -271,7 +271,16 @@ model Store {
 
   // PWA Settings
   pwaEnabled  Boolean @default(false) @map("pwa_enabled")
-  pwaSettings Json    @default("{}") @map("pwa_settings") // PWASettings JSON
+  // PWASettings JSON. Icon fields (all optional, all nullable-by-absence):
+  // icon192/icon512/maskableIcon (original set) plus, since B5
+  // (docs/superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md):
+  // iconSource (merchant-uploaded 512x512+ original), icon384, iconAppleTouch
+  // (180x180), favicon32, favicon16 — all generated server-side by
+  // PWAService.generatePwaIconSet and additive to this JSONB blob, no column
+  // migration needed. See packages/database/prisma/migrations/
+  // 20260925120000_store_pwa_settings_gin for the (JSON-shape-agnostic) index
+  // this feature added instead.
+  pwaSettings Json @default("{}") @map("pwa_settings")
 
   // Blog (Bucket E1, 2026-05-17) — opt-in per store. When false the
   // /blog routes return 404 and BlogCarousel hides on the homepage.
