@@ -30,6 +30,7 @@ import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
 import { listPurchasableBundles, describeBundleContents } from '../services/bundle.service';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
+import { publicStoreSettings } from '../lib/public-store-settings';
 import { verifyReviewToken } from '../lib/review-token';
 import { inngest } from '../lib/inngest/client';
 import { PaymentService } from '../services/payment-providers/payment.factory';
@@ -1322,7 +1323,7 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
     setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
     res.json({
       success: true,
-      data: stores,
+      data: stores.map(store => ({ ...store, settings: publicStoreSettings(store.settings) })),
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -1511,6 +1512,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       const publicStore = {
         ...store,
         marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+        settings: publicStoreSettings(store.settings),
         ...(await fetchStoreFaqsAndHowtos(store.id)),
       };
 
@@ -1571,7 +1573,10 @@ router.get('/store', async (_req: Request, res: Response, next: NextFunction) =>
       if (!s) {
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
-      return s;
+      // Redacted before it enters the cache, not just before the response —
+      // this key is Redis-cached for 300s, and the raw settings blob (which
+      // can carry orderInvoiceEmail, owner PII) must never sit there either.
+      return { ...s, settings: publicStoreSettings(s.settings) };
     });
 
     setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
@@ -1698,6 +1703,7 @@ router.get(
         const publicStore = {
           ...store,
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+          settings: publicStoreSettings(store.settings),
           ...(await fetchStoreFaqsAndHowtos(store.id)),
         };
 

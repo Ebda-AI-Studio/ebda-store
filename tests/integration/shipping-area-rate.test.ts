@@ -23,7 +23,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { prisma, withRlsBypass } from '@force/database';
-import { API_BASE } from '../helpers/api-base';
+import { API_BASE, API_ORIGIN } from '../helpers/api-base';
 
 // One knob (TEST_API_URL) points the whole suite at one API, so a run cannot
 // silently talk to whatever holds port 4000 — which on this machine was a
@@ -80,12 +80,27 @@ async function createStoreAndLogin(label: string): Promise<{ storeId: string; to
   const loginJson = (await loginRes.json()) as { data?: { accessToken?: string } };
   const token = loginJson.data?.accessToken ?? '';
 
+  // Without this, a broken login (wrong API_URL, a route 404, a bad
+  // password hash) silently returns '', and every downstream request made
+  // with an empty Authorization Bearer token gets a 401/403 that the
+  // cross-tenant assertions below (`[403, 404]`) could not distinguish from
+  // "the guard correctly rejected a cross-store admin" — the exact ambiguity
+  // #1625/#1628 already found once against this suite's API_URL.
+  expect(loginRes.status, `login for ${label} failed: ${JSON.stringify(loginJson)}`).toBe(200);
+  expect(token, `login for ${label} returned no accessToken`).not.toBe('');
+
   return { storeId: store.id, token };
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  // Preflight: fail with a clear message if the API this suite targets isn't
+  // actually up, rather than letting every request below fail individually
+  // with a connection-refused error that looks like a test-by-test failure.
+  const health = await fetch(`${API_ORIGIN}/health`);
+  expect(health.status, `API at ${API_ORIGIN} is not healthy — is it running?`).toBe(200);
+
   // Truncate area-rates so prior CI runs don't leave conflicting unique rows.
   // TRUNCATE is not subject to RLS and reliably clears stale data; the prod-guard
   // in setup-e2e.ts refuses to run this file against the production database.
@@ -267,15 +282,20 @@ describe('POST /stores/public/:storeId/shipping/calculate', () => {
 });
 
 describe('RLS tenant isolation — store B cannot access store A area-rates', () => {
-  it('store B admin token gets 403/404 on GET store A area-rates', async () => {
+  it('store B admin token gets 403 on GET store A area-rates', async () => {
     const res = await fetch(`${API_URL}/stores/${storeAId}/shipping/area-rates`, {
       headers: { Authorization: `Bearer ${storeBToken}` },
     });
-    // requireStoreAccess middleware must reject cross-store access
-    expect([403, 404]).toContain(res.status);
+    // requireStoreAccess (middleware/store-access.ts) 404s only when the
+    // store row itself doesn't exist; storeA is real, so a store_admin who
+    // doesn't own it always gets exactly 403 (AppError(403, 'FORBIDDEN', …)).
+    // The old [403, 404] pair could not tell "the guard correctly rejected
+    // me" from "there is no such route/store" — the same ambiguity the
+    // login assertion above closes for the token itself.
+    expect(res.status).toBe(403);
   });
 
-  it('store B admin token gets 403/404 on PUT bulk for store A', async () => {
+  it('store B admin token gets 403 on PUT bulk for store A', async () => {
     const res = await fetch(`${API_URL}/stores/${storeAId}/shipping/area-rates/bulk`, {
       method: 'PUT',
       headers: {
@@ -294,7 +314,7 @@ describe('RLS tenant isolation — store B cannot access store A area-rates', ()
         ],
       }),
     });
-    expect([403, 404]).toContain(res.status);
+    expect(res.status).toBe(403);
   });
 
   it('store A rates do not appear in store B GET (no cross-store leakage)', async () => {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { FeatureKey } from '@force/shared';
 import { featureService } from '../services/feature.service';
+import { resolvePublicStoreId } from '../utils/store-helpers';
 import logger from '../lib/logger';
 
 /**
@@ -26,12 +27,23 @@ export function requireFeature(featureKey: FeatureKey) {
       return next();
     }
 
-    // Resolve storeId from multiple possible locations
+    // Resolve storeId from multiple possible locations. Route params and an
+    // already-attached req.store (set by requireStoreAccess upstream) come
+    // first — both are already trustworthy. Only when neither is present
+    // (a public route with no :storeId/:id param, e.g. POST
+    // /public/cart/bundles) does this fall through to
+    // resolvePublicStoreId — the SAME validated X-Store-ID/x-store-domain
+    // resolution the route handler itself uses via getStoreIdFromRequest, so
+    // the gate and the handler it guards can never disagree about which
+    // store this request is for. A raw, unvalidated header read here used to
+    // diverge from that: it had no x-store-domain fallback at all, so a
+    // client sending only that header got FEATURE_DISABLED even when the
+    // domain-resolved store had the feature enabled.
     const storeId =
       req.params.storeId ||
       req.params.id ||
       (req as any).store?.id ||
-      (req.headers['x-store-id'] as string | undefined);
+      (await resolvePublicStoreId(req));
 
     // Fail closed — no storeId means we cannot check the feature
     if (!storeId) {

@@ -16,17 +16,21 @@ export function getAuthUser(req: Request): AuthPayload {
 }
 
 /**
- * Get store ID from request context.
+ * Resolve a store ID from the X-Store-ID / x-store-domain headers, validated
+ * against the DB (must be an active store). Returns `undefined` rather than
+ * throwing — the shared, non-throwing half that both `getStoreIdFromRequest`
+ * (below) and `requireFeature` (middleware/feature-gate.ts) build on.
  *
- * Resolution order (any step that fails is a hard 400 — we do NOT silently
- * fall back to the first-created store, which used to leak Palora's
- * catalogue into every other storefront's SSR requests):
- *   1. X-Store-ID header — validated against the DB.
- *   2. x-store-domain header — looked up by domain (normalized: stripped
- *      `www.`, lowercased).
- *   3. Otherwise throw AppError 400.
+ * Before this was shared, `requireFeature` had its OWN inline resolution —
+ * `req.headers['x-store-id']` read raw, with no DB check and no
+ * x-store-domain fallback — on routes with no `:storeId`/`:id` route param
+ * (e.g. POST /public/cart/bundles). That let the feature gate and the
+ * handler it guards resolve to two DIFFERENT stores for the same request: a
+ * client sending only `x-store-domain` (no `x-store-id`) got FEATURE_DISABLED
+ * from the gate even when the domain-resolved store had the feature on,
+ * because the gate could not see the domain header at all.
  */
-export async function getStoreIdFromRequest(req: Request): Promise<string> {
+export async function resolvePublicStoreId(req: Request): Promise<string | undefined> {
   const headerStoreId = req.headers['x-store-id'] as string | undefined;
   if (headerStoreId) {
     const store = await prisma.store.findFirst({
@@ -45,6 +49,24 @@ export async function getStoreIdFromRequest(req: Request): Promise<string> {
     });
     if (store) return store.id;
   }
+
+  return undefined;
+}
+
+/**
+ * Get store ID from request context.
+ *
+ * Resolution order (any step that fails is a hard 400 — we do NOT silently
+ * fall back to the first-created store, which used to leak Palora's
+ * catalogue into every other storefront's SSR requests):
+ *   1. X-Store-ID header — validated against the DB.
+ *   2. x-store-domain header — looked up by domain (normalized: stripped
+ *      `www.`, lowercased).
+ *   3. Otherwise throw AppError 400.
+ */
+export async function getStoreIdFromRequest(req: Request): Promise<string> {
+  const storeId = await resolvePublicStoreId(req);
+  if (storeId) return storeId;
 
   throw new AppError(
     400,

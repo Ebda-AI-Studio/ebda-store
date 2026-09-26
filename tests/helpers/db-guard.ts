@@ -106,3 +106,34 @@ export function isIntegrationTestPath(testPath: string | undefined): boolean {
   if (!testPath) return false;
   return /[\\/]tests[\\/](integration|e2e)[\\/]/.test(testPath);
 }
+
+/**
+ * Refuses to silently skip the DB guard when the test file itself is unknown.
+ *
+ * `isIntegrationTestPath` returns `false` for both "confirmed unit test" and
+ * "path unknown" — by design, so it never guesses a match (see its own test
+ * "returns false when the path is unknown rather than guessing"). But
+ * `tests/setup-e2e.ts` treats both cases identically: bail out of the whole
+ * guard, including `resolveTestDatabaseUrl()`'s `assertNotProd` calls. That
+ * fails OPEN if Vitest ever fails to populate `expect.getState().testPath`
+ * for an actual integration/e2e file — the host validation never runs and
+ * whatever `DATABASE_URL`/`TEST_DATABASE_URL` is already in the environment
+ * is used unchecked.
+ *
+ * Only throws when a database URL candidate is actually configured, so a
+ * plain unit-test run with no DB env set is unaffected even if `testPath`
+ * were ever undefined for it.
+ */
+export function assertTestPathKnown(
+  testPath: string | undefined,
+  hasDbUrlCandidate: boolean
+): void {
+  if (testPath !== undefined) return;
+  if (!hasDbUrlCandidate) return;
+  throw new Error(
+    '\n\n🚨  DB GUARD — expect.getState().testPath was undefined while a database URL ' +
+      'is configured (TEST_DATABASE_URL or DATABASE_URL).\n' +
+      '    Refusing to run rather than silently skipping host validation: this file ' +
+      'cannot tell whether the current test is an integration/e2e file.\n'
+  );
+}

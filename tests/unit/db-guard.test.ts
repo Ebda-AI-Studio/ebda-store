@@ -14,10 +14,13 @@ import {
   isAllowedTestHost,
   assertNotProd,
   isIntegrationTestPath,
+  assertTestPathKnown,
   ALLOWED_HOST_PATTERNS,
 } from '../helpers/db-guard';
 
+// secretlint-disable-next-line -- local/CI test fixture, not a real credential
 const CI_SERVICE = 'postgresql://test:test@localhost:5432/force_test';
+// secretlint-disable-next-line -- local/CI test fixture, not a real credential
 const LOCAL = 'postgresql://test:test@127.0.0.1:5432/test_db';
 const STAGING = 'postgresql://u:p@ep-spring-dew-a1nn6819.eu-central-1.aws.neon.tech/neondb';
 // The endpoint the repo's own .env points at, i.e. real production.
@@ -97,6 +100,25 @@ describe('isIntegrationTestPath', () => {
   it('returns false when the path is unknown rather than guessing', () => {
     expect(isIntegrationTestPath(undefined)).toBe(false);
     expect(isIntegrationTestPath('')).toBe(false);
+  });
+});
+
+describe('assertTestPathKnown — fails closed instead of silently skipping the guard', () => {
+  it('is silent when the path is known, regardless of a DB URL being configured', () => {
+    expect(() => assertTestPathKnown('/repo/tests/unit/cart.test.ts', true)).not.toThrow();
+    expect(() => assertTestPathKnown('/repo/tests/integration/po.test.ts', true)).not.toThrow();
+  });
+
+  it('is silent when the path is unknown but no DB URL is configured — the ordinary unit-test case', () => {
+    expect(() => assertTestPathKnown(undefined, false)).not.toThrow();
+  });
+
+  it('THROWS when the path is unknown AND a database URL is configured', () => {
+    // This is the exact combination `setup-e2e.ts`'s old `if (!isIntegrationTestPath(...)) return;`
+    // treated as "definitely not integration — skip the guard", which fails
+    // open for a genuine integration file if Vitest ever fails to report
+    // its testPath.
+    expect(() => assertTestPathKnown(undefined, true)).toThrow(/DB GUARD/);
   });
 });
 

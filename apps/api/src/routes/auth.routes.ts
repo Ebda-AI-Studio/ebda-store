@@ -711,6 +711,14 @@ router.post(
 // applicable GCC data-protection law — see docs/legal/gcc-data-protection.md).
 // Returns a JSON bundle of every row tied to this
 // user. Marked as an attachment so browsers download it as a file.
+//
+// NOT guarded by rejectImpersonated (Ruling IMP-1, docs/RULINGS.md): an
+// impersonating admin downloading the victim's full PII bundle is read-only
+// and was deliberately left unguarded pending a separate decision on whether
+// to block it outright. What ships here is the minimum that doesn't require
+// that decision: `impersonatedBy` is written into the audit row whenever the
+// session is impersonated, so the download is at least ATTRIBUTABLE rather
+// than indistinguishable from the account owner's own export.
 router.get('/me/export', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
@@ -721,6 +729,7 @@ router.get('/me/export', authenticate, async (req: Request, res: Response, next:
       userId,
       resourceType: 'user',
       resourceId: userId,
+      details: req.user!.impersonatedBy ? { impersonatedBy: req.user!.impersonatedBy } : undefined,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });

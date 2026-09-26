@@ -15,6 +15,16 @@
  * (`scripts/backfill-slug-redirects.ts` does the same). Run with `tsx`
  * exactly as the plan says, just a `.ts` extension.
  *
+ * NOT wrapped in runInTenantContext/withRlsBypass: `stores` (unlike its
+ * tenant-scoped children) carries no RLS policy — verified against
+ * packages/database/prisma/migrations/**\/migration.sql, no
+ * `ENABLE ROW LEVEL SECURITY` targets it — and the sibling one-off script
+ * this file's header points to (backfill-slug-redirects.ts) reads/writes
+ * `prisma.store`/`prisma.product` the same unwrapped way, run via the full
+ * DATABASE_URL exactly as this one is. Wrapping would add the request-path
+ * transaction machinery to a one-off script with no access-control gap to
+ * close.
+ *
  * SAFETY (per the B5 task instructions — do NOT run this against a real
  * database from an agent session):
  *   - Defaults to DRY RUN. Nothing is written unless `--apply` is passed.
@@ -39,6 +49,7 @@
  * Or from the repo root against a local/staging DATABASE_URL:
  *   npx tsx scripts/backfill-store-pwa-icons.ts [--store <id|slug>] [--apply]
  */
+import { fileURLToPath } from 'url';
 import { prisma } from '@force/database';
 import {
   generatePwaIconSet,
@@ -49,6 +60,19 @@ import {
 const APPLY = process.argv.includes('--apply');
 const storeArgIdx = process.argv.indexOf('--store');
 const STORE_FILTER = storeArgIdx !== -1 ? process.argv[storeArgIdx + 1] : undefined;
+
+/**
+ * Whether `updateSettings`'s own return value (the row Prisma's
+ * `UPDATE ... RETURNING` produced, not a second query) shows the icon set we
+ * asked it to write. Exported and pure so it can be unit-tested without
+ * running the script or touching a database.
+ */
+export function iconWriteLanded(
+  returned: Partial<PWASettings>,
+  expected: Pick<PWASettings, 'iconAppleTouch'>
+): boolean {
+  return returned.iconAppleTouch === expected.iconAppleTouch;
+}
 
 async function fetchImageBuffer(url: string): Promise<Buffer> {
   const res = await fetch(url);
@@ -103,7 +127,19 @@ async function main() {
       }
       const buffer = await fetchImageBuffer(source);
       const icons = await generatePwaIconSet(store.id, buffer);
-      await PWAService.updateSettings(store.id, { settings: icons });
+      const result = await PWAService.updateSettings(store.id, { settings: icons });
+
+      // Confirm the write actually landed rather than trusting that
+      // updateSettings() not throwing means it did. Checked against the row
+      // updateSettings() itself returned from the UPDATE ... RETURNING (not
+      // a second query), so this cannot pass on a stale read.
+      if (!iconWriteLanded(result.settings, icons)) {
+        throw new Error(
+          `updateSettings returned iconAppleTouch=${result.settings.iconAppleTouch ?? '(unset)'}, ` +
+            `expected ${icons.iconAppleTouch} — the write did not land as generated`
+        );
+      }
+
       console.log(
         `           -> icon384=${icons.icon384}\n           -> iconAppleTouch=${icons.iconAppleTouch}\n           -> favicon32=${icons.favicon32}\n           -> favicon16=${icons.favicon16}`
       );
@@ -120,11 +156,16 @@ async function main() {
   if (!APPLY) console.log('\nDRY RUN — pass --apply to write.');
 }
 
-main()
-  .catch(err => {
-    console.error(err);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Only run when this file is executed directly as a CLI (`npx tsx
+// scripts/backfill-store-pwa-icons.ts`) — never as a side effect of a test
+// file importing `iconWriteLanded` from this module.
+if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
+  main()
+    .catch(err => {
+      console.error(err);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

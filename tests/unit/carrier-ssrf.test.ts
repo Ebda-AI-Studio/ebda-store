@@ -410,6 +410,25 @@ import { join } from 'path';
 const CARRIER_DIR = join(__dirname, '../../apps/api/src/services/carriers');
 
 /**
+ * Every `.ts` source under `services/carriers/`, recursively — a future
+ * vendor subdirectory (e.g. `carriers/vendor-x/client.ts`) must not be
+ * invisible to this gate just because `readdirSync` used to be non-recursive
+ * and no subdirectory existed yet to expose that.
+ */
+function listCarrierFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const rel = entry.name;
+    if (entry.isDirectory()) {
+      out.push(...listCarrierFiles(join(dir, rel)).map(f => join(rel, f)));
+    } else if (rel.endsWith('.ts') && !rel.endsWith('.test.ts')) {
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
+/**
  * Any credentials field whose NAME suggests it carries a URL. The write-side
  * schema is `z.record(z.string(), z.string())` (shipping-carrier.routes.ts),
  * so a carrier may name its endpoint field anything — `apiUrl`, `endpoint`,
@@ -422,11 +441,7 @@ describe('carrier registry — every fetching carrier routes through the guard',
   // `types.ts` is scanned too: several provider families declare their
   // credentials interface in a sibling types file, which would leave the
   // carrier's own source with no URL field to match and skip it silently.
-  const carrierFiles = readdirSync(CARRIER_DIR).filter(
-    f => f.endsWith('.ts') && !f.endsWith('.test.ts')
-  );
-  const dirSources = carrierFiles.map(f => readFileSync(join(CARRIER_DIR, f), 'utf8')).join('\n');
-  const dirDeclaresMerchantUrl = URL_FIELD.test(dirSources);
+  const carrierFiles = listCarrierFiles(CARRIER_DIR);
 
   it('finds the carrier sources (guards against an empty-set pass)', () => {
     expect(carrierFiles.length).toBeGreaterThanOrEqual(2);
@@ -448,37 +463,88 @@ describe('carrier registry — every fetching carrier routes through the guard',
       .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
       .replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
 
-  it.each(carrierFiles)('%s has no bare fetch(', file => {
+  /**
+   * Other ways to make an outbound HTTP request that a carrier could reach
+   * for instead of bare `fetch(` — undici's low-level `request()`, Node's
+   * `http(s).request()`, and axios. Qualified forms (`https.request(`,
+   * `undici.request(`, `axios.get(`, …) are unambiguous by shape. A BARE
+   * call (`request(...)`, `axios(...)`) only counts when the file itself
+   * imported that name from one of those modules — `request` alone is too
+   * common an identifier to flag unconditionally.
+   */
+  function outboundCallSites(src: string): RegExpMatchArray[] {
+    const sites: RegExpMatchArray[] = [
+      ...src.matchAll(
+        /\b(?:https?|undici)\.request\(|\baxios\.(?:request|get|post|put|patch|delete)\(/g
+      ),
+    ];
+
+    const namedImports = [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]undici['"]/g)].flatMap(
+      m =>
+        m[1].split(',').map(
+          s =>
+            s
+              .trim()
+              .split(/\s+as\s+/)
+              .pop()
+              ?.trim() ?? ''
+        )
+    );
+    const defaultImports = [
+      ...src.matchAll(/import\s+(\w+)\s*(?:,[^;]*)?from\s*['"](?:undici|axios)['"]/g),
+    ].map(m => m[1]);
+
+    for (const name of [...namedImports, ...defaultImports].filter(Boolean)) {
+      sites.push(...src.matchAll(new RegExp(`(?<![.\\w])${name}\\(`, 'g')));
+    }
+    return sites;
+  }
+
+  it.each(carrierFiles)('%s has no bare fetch/request/axios call', file => {
     const src = stripNonCode(readFileSync(join(CARRIER_DIR, file), 'utf8'));
-    if (!src.includes('fetch(')) return; // a non-fetching file is fine
 
     // Asserting on CALL SITES, not on import presence. An unused import — or
     // one used on three of four fetch paths — satisfies "does it import the
     // guard" while leaving the class open. That is the same "defence present
     // but not on the path" shape the sibling reject-impersonated test exists
     // to catch, and the audit found it here first.
-    const bare = [...src.matchAll(/(?<![a-zA-Z])fetch\(/g)].filter((m: any) => {
-      const before = src.slice(Math.max(0, m.index - 12), m.index);
-      return !/safeFetch|safeFetchImage/.test(before);
-    });
+    const bareFetch = src.includes('fetch(')
+      ? [...src.matchAll(/(?<![a-zA-Z])fetch\(/g)].filter((m: any) => {
+          const before = src.slice(Math.max(0, m.index - 12), m.index);
+          return !/safeFetch|safeFetchImage/.test(before);
+        })
+      : [];
+    const bareOther = outboundCallSites(src);
+    const bare = [...bareFetch, ...bareOther];
+    if (bare.length === 0) return; // a non-fetching file is fine
 
     expect(
       bare.length,
-      `${file} calls fetch() directly ${bare.length} time(s). Merchant-influenced ` +
-        `URLs must go through safeFetch from lib/safe-fetch — a pre-flight ` +
-        `assertPublicHttpUrl does not stop a 302 to 169.254.169.254.`
+      `${file} makes ${bare.length} direct outbound HTTP call(s) (fetch/request/axios). ` +
+        `Merchant-influenced URLs must go through safeFetch from lib/safe-fetch — a ` +
+        `pre-flight assertPublicHttpUrl does not stop a 302 to 169.254.169.254.`
     ).toBe(0);
   });
 
-  it('a carrier directory declaring a URL credential imports the redirect-safe helper', () => {
-    if (!dirDeclaresMerchantUrl) return;
-    const importers = carrierFiles.filter(f =>
-      /safeFetch\b/.test(readFileSync(join(CARRIER_DIR, f), 'utf8'))
-    );
-    expect(
-      importers.length,
-      'a carrier declares a merchant-supplied URL credential but nothing in ' +
-        'services/carriers/ imports safeFetch'
-    ).toBeGreaterThan(0);
-  });
+  it.each(carrierFiles)(
+    '%s: a URL credential + an outbound call means THIS file imports the redirect-safe helper',
+    file => {
+      const src = readFileSync(join(CARRIER_DIR, file), 'utf8');
+      const stripped = stripNonCode(src);
+      const declaresUrlField = URL_FIELD.test(src);
+      const makesOutboundCall =
+        stripped.includes('fetch(') || outboundCallSites(stripped).length > 0;
+      if (!declaresUrlField || !makesOutboundCall) return;
+
+      // Per-file, not per-directory: a sibling file importing safeFetch does
+      // not prove THIS file's merchant-influenced URL is guarded — the same
+      // "defence present somewhere, not on the path" gap the bare-call check
+      // above exists to catch.
+      expect(
+        /safeFetch\b/.test(src),
+        `${file} declares a URL-shaped credential field and makes an outbound call, ` +
+          `but does not import safeFetch itself`
+      ).toBe(true);
+    }
+  );
 });

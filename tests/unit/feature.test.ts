@@ -20,6 +20,25 @@ vi.mock('../../apps/api/src/services/feature.service', () => ({
   },
 }));
 
+// requireFeature falls back to resolvePublicStoreId (store-helpers.ts) for
+// routes with no :storeId/:id param — it queries prisma.store.findFirst.
+// `mockStore` (imported from '../setup') cannot be referenced here — vi.mock
+// factories are hoisted above every import statement in the file — so its
+// id is duplicated as a literal instead.
+vi.mock('@force/database', () => ({
+  prisma: {
+    store: {
+      findFirst: vi.fn(({ where }: { where: { id?: string; domain?: string } }) =>
+        Promise.resolve(
+          where.id === 'test-store-id-789' || where.domain
+            ? { id: 'test-store-id-789', status: 'active' }
+            : null
+        )
+      ),
+    },
+  },
+}));
+
 // Mock logger to suppress output during tests
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: {

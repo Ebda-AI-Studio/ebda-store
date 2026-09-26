@@ -612,6 +612,16 @@
       "test": "tests/unit/reject-impersonated.test.ts"
     },
     {
+      "id": "impersonation-customer-erase",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "an impersonation session erases a SHOPPER's account via the merchant-initiated customer erase route",
+      "source": "apps/api/src/routes/customers.routes.ts",
+      "find": "const privacyMiddleware = [\n  authenticate,\n  authorize('store_admin', 'super_admin'),\n  requireStoreAccess,\n  rejectImpersonated,\n  writeLimiter,\n];",
+      "replace": "const privacyMiddleware = [\n  authenticate,\n  authorize('store_admin', 'super_admin'),\n  requireStoreAccess,\n  writeLimiter,\n];",
+      "test": "tests/unit/customers-privacy-routes-http.test.ts"
+    },
+    {
       "id": "merchant-mcp-cross-store-key",
       "domain": "tenant / RLS",
       "tier": "unit",

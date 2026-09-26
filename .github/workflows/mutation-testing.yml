@@ -43,6 +43,10 @@ on:
       # rollout walked only auth.routes.ts and so never saw it — an audit found
       # the hole, not the gate. Listing it here is what lets the gate see it.
       - 'apps/api/src/routes/mfa.routes.ts'
+      # A THIRD router owning an account-level mutation (Ruling IMP-1):
+      # merchant-initiated customer erase/export. Same rule as mfa.routes.ts
+      # above — invisible to the gate until listed here.
+      - 'apps/api/src/routes/customers.routes.ts'
       # safe-fetch.ts holds the redirect re-validation loop: `assertPublicHttpUrl`
       # alone proves only the URL you ASKED for is public.
       - 'apps/api/src/lib/safe-fetch.ts'

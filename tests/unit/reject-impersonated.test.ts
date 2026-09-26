@@ -53,6 +53,8 @@ vi.mock('@api/middleware/security', () => ({
   refreshIpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   // S5-3, 2026-09-22 security audit: auth.routes.ts now imports this too.
   resetEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  // customers.routes.ts (#1873) imports this too.
+  writeLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   auditLog: vi.fn(),
   generateCsrfToken: vi.fn(() => 'csrf'),
 }));
@@ -65,6 +67,7 @@ vi.mock('@api/lib/cors-cache', () => ({ isPlatformOrigin: vi.fn(() => true) }));
 import { rejectImpersonated } from '@api/middleware/auth';
 import authRoutes from '@api/routes/auth.routes';
 import mfaRoutes from '@api/routes/mfa.routes';
+import customersRoutes from '@api/routes/customers.routes';
 
 function makeRes() {
   const recorded: { status: number; body: unknown } = { status: 200, body: undefined };
@@ -150,6 +153,14 @@ const ROUTERS: Record<string, Router> = {
   // this test. Qualifying each entry by router is what fixes that class, not
   // just the one route.
   mfa: mfaRoutes as unknown as Router,
+  // `/stores/:storeId/customers/*` — a THIRD, separate router (routes/index.ts
+  // mounts it at `/stores/:storeId`). Ruling IMP-1 named this exact gap:
+  // "a third router owning an account-level mutation is still invisible
+  // until someone adds it to ROUTERS." The merchant-initiated erase route
+  // erases a CUSTOMER's account (irreversible from the outside — the same
+  // anonymization DELETE /auth/me uses), so it belongs in DESTRUCTIVE_ROUTES
+  // below exactly like that route does (#1873).
+  customers: customersRoutes as unknown as Router,
 };
 
 function middlewareOn(
@@ -180,6 +191,10 @@ const DESTRUCTIVE_ROUTES: Array<[string, string, string]> = [
   ['mfa', 'post', '/enroll/begin'],
   ['mfa', 'post', '/enroll/verify'],
   ['mfa', 'post', '/disable'],
+  // Merchant-initiated erasure of a SHOPPER's account (#1873) — an
+  // impersonation session must not be able to trigger this any more than it
+  // can erase the impersonated person's own account via `/auth/me/erase`.
+  ['customers', 'post', '/customers/:customerId/erase'],
 ];
 
 describe('rejectImpersonated — mounted on every account-destructive route', () => {

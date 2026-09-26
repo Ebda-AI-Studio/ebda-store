@@ -26,7 +26,7 @@
 import fs from 'fs';
 import path from 'path';
 import { beforeAll, expect } from 'vitest';
-import { assertNotProd, isIntegrationTestPath } from './helpers/db-guard';
+import { assertNotProd, assertTestPathKnown, isIntegrationTestPath } from './helpers/db-guard';
 
 /** Resolve DATABASE_URL for this suite, guarding every candidate. */
 function resolveTestDatabaseUrl(): void {
@@ -111,7 +111,13 @@ async function resetPrismaSingleton(): Promise<void> {
  * runs ONCE per run, not in a per-file hook.
  */
 beforeAll(async () => {
-  if (!isIntegrationTestPath(expect.getState().testPath)) return;
+  const testPath = expect.getState().testPath;
+  // Fails closed rather than silently skipping the guard below if Vitest
+  // ever fails to report which file is running while a DB URL is configured
+  // — see assertTestPathKnown's header for why "unknown" must not collapse
+  // into "definitely not integration".
+  assertTestPathKnown(testPath, Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL));
+  if (!isIntegrationTestPath(testPath)) return;
   resolveTestDatabaseUrl();
   await resetPrismaSingleton();
 });
