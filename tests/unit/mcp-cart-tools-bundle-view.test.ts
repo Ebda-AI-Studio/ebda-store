@@ -118,4 +118,32 @@ describe('cartView', () => {
     const view = cartView('cart-3', cart, 'KWD');
     expect(view.bundles).toEqual([]);
   });
+
+  it('#1766 — flags a deleted-product line so the gap to subtotal is explained', () => {
+    const cart = {
+      items: [
+        {
+          id: 'ci-1',
+          productId: 'p-live',
+          quantity: 1,
+          product: { name: 'Live', price: 3000 },
+          variant: null,
+          unavailable: false,
+        },
+        {
+          id: 'ci-2',
+          productId: 'p-gone',
+          quantity: 1,
+          product: { name: 'Gone', price: 9000 },
+          variant: null,
+          unavailable: true,
+        },
+      ],
+      bundles: [],
+      subtotal: 3000,
+    };
+    const view = cartView('cart-1', cart, 'KWD');
+    expect(view.items[0]).not.toHaveProperty('unavailable');
+    expect(view.items[1]).toMatchObject({ productId: 'p-gone', unavailable: true });
+  });
 });

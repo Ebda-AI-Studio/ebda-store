@@ -842,6 +842,11 @@ export interface CartTableItem {
   /** Resolved variant label (e.g. "Red / Large") for display on the cart row. */
   variantTitle?: string;
   variantTitleAr?: string;
+  /**
+   * #1766 — the product was deleted. Render `CartLineUnavailableNotice`, keep
+   * remove enabled, disable the quantity steppers; the line is not in the total.
+   */
+  unavailable?: boolean;
 }
 
 /**

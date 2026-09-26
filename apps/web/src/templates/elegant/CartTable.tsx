@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
+import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
@@ -61,6 +62,7 @@ export default function ElegantCartTable({
                       {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
                     </p>
                   )}
+                  {item.unavailable && <CartLineUnavailableNotice />}
                   <p
                     className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums"
                     style={typography?.price}
@@ -82,7 +84,7 @@ export default function ElegantCartTable({
                 <div className="flex items-center gap-4 text-sm">
                   <button
                     type="button"
-                    disabled={item.quantity <= 1}
+                    disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
@@ -97,8 +99,9 @@ export default function ElegantCartTable({
                   </span>
                   <button
                     type="button"
+                    disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer"
+                    className="inline-flex h-11 w-11 items-center justify-center text-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                   >
                     +
@@ -108,7 +111,11 @@ export default function ElegantCartTable({
                   className="text-sm font-light tracking-wide text-foreground tabular-nums"
                   style={typography?.price}
                 >
-                  {format(item.price * item.quantity)}
+                  {item.unavailable ? (
+                    <s>{format(item.price * item.quantity)}</s>
+                  ) : (
+                    format(item.price * item.quantity)
+                  )}
                 </p>
               </div>
             </div>

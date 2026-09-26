@@ -17,10 +17,14 @@
  * a change that silently moves a route from the buffered lane to the streaming
  * lane (or back) reddens a test rather than shipping quietly.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import express, { Request, Response, NextFunction } from 'express';
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
+
+const { sendAlert } = vi.hoisted(() => ({ sendAlert: vi.fn(async () => 'sent' as const) }));
+vi.mock('../../services/alerts.service', () => ({ sendAlert }));
+
 import { runRequestInTransaction } from '../request-transaction';
 
 /** Ordered log of tx + socket events for one request. */
@@ -75,9 +79,13 @@ function buildApp(
     runRequestInTransaction(res, next, opts.open ?? fakeTx(opts.failCommit), { test: true });
   });
   app.get('/probe', handler);
-  // Mirrors the real app's terminal error handler.
+  // Mirrors the real app's terminal error handler (an AppError keeps its
+  // status + code; anything else is a 500).
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    res.status(500).json({ success: false, error: { code: 'INTERNAL', message: err.message } });
+    const e = err as Error & { statusCode?: number; code?: string };
+    res
+      .status(e.statusCode ?? 500)
+      .json({ success: false, error: { code: e.code ?? 'INTERNAL', message: err.message } });
   });
   return app;
 }
@@ -392,5 +400,101 @@ describe('client disconnect', () => {
     });
     expect(events).toContain('commit');
     expect(events).not.toContain('rollback');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Settle deadline (#1608) — a COMMIT that is merely SLOW
+// ---------------------------------------------------------------------------
+
+/** A tx whose COMMIT (or ROLLBACK) takes `settleMs` to be answered. */
+function slowTx(settleMs: number) {
+  return async (body: () => Promise<void>): Promise<void> => {
+    try {
+      await body();
+    } catch (err) {
+      await new Promise(r => setTimeout(r, settleMs));
+      events.push('rollback');
+      throw err;
+    }
+    await new Promise(r => setTimeout(r, settleMs));
+    events.push('commit');
+  };
+}
+
+describe('settle deadline: a slow COMMIT is bounded, never an unbounded wait', () => {
+  beforeEach(() => {
+    process.env.REQUEST_COMMIT_TIMEOUT_MS = '80';
+    sendAlert.mockClear();
+  });
+  afterEach(() => {
+    delete process.env.REQUEST_COMMIT_TIMEOUT_MS;
+  });
+
+  it('a COMMIT slower than the deadline answers 503 COMMIT_TIMEOUT (never the 2xx) and alerts', async () => {
+    const app = buildApp(
+      (_req, res) => {
+        res.setHeader('Content-Disposition', 'attachment; filename="orders.csv"');
+        res.status(201).json({ ok: true });
+      },
+      { open: slowTx(400) }
+    );
+    const { status, body, disposition, elapsed } = await withServer(app, async base => {
+      const t0 = Date.now();
+      const r = await fetch(`${base}/probe`);
+      return {
+        status: r.status,
+        body: (await r.json()) as { error: { code: string } },
+        disposition: r.headers.get('content-disposition'),
+        elapsed: Date.now() - t0,
+      };
+    });
+    expect(status).toBe(503);
+    expect(body.error.code).toBe('COMMIT_TIMEOUT');
+    expect(disposition).toBeNull();
+    // Answered at the deadline, not when the COMMIT finally landed.
+    expect(elapsed).toBeLessThan(350);
+    expect(events[0]).toBe('flush');
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'request-transaction.commit_timeout', level: 'p1' })
+    );
+    // Let the late COMMIT land: it must not try to send a second response.
+    await new Promise(r => setTimeout(r, 450));
+    expect(events).toEqual(['flush', 'commit']);
+  });
+
+  it('a slow ROLLBACK sends the handler’s own 5xx at the deadline', async () => {
+    const app = buildApp(
+      (_req, res) => {
+        res.status(500).json({ mine: true });
+      },
+      { open: slowTx(400) }
+    );
+    const { status, body } = await withServer(app, async base => {
+      const r = await fetch(`${base}/probe`);
+      return { status: r.status, body: await r.json() };
+    });
+    expect(status).toBe(500);
+    expect(body).toEqual({ mine: true });
+    await new Promise(r => setTimeout(r, 450));
+    expect(events).toEqual(['flush', 'rollback']);
+  });
+
+  it('a COMMIT inside the deadline is unaffected and reports its duration in Server-Timing', async () => {
+    const app = buildApp(
+      (_req, res) => {
+        res.status(201).json({ ok: true });
+      },
+      { open: slowTx(10) }
+    );
+    const { status, timing } = await withServer(app, async base => {
+      const r = await fetch(`${base}/probe`);
+      await r.json();
+      return { status: r.status, timing: r.headers.get('server-timing') };
+    });
+    expect(status).toBe(201);
+    expect(timing).toMatch(/^request-tx;desc="commit";dur=\d+(\.\d+)?$/);
+    expect(events).toEqual(['commit', 'flush']);
+    expect(sendAlert).not.toHaveBeenCalled();
   });
 });

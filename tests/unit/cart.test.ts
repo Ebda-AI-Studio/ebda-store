@@ -188,6 +188,46 @@ describe('CartService', () => {
       // (2 * 5000) + (3 * 3000) = 10000 + 9000 = 19000
       expect(result.subtotal).toBe(19000);
     });
+
+    it('#1766 — a soft-deleted product line is flagged unavailable, priced OUT of the subtotal, and its deletedAt never leaves the service', async () => {
+      const cartWithDeletedLine = {
+        ...mockCart,
+        items: [
+          {
+            id: 'item-1',
+            productId: 'prod-1',
+            quantity: 2,
+            product: { price: 5000, deletedAt: null },
+          },
+          {
+            id: 'item-2',
+            productId: 'prod-gone',
+            quantity: 3,
+            product: { price: 3000, deletedAt: new Date('2026-09-20T00:00:00Z') },
+          },
+        ],
+      };
+      vi.mocked(prisma.cart.findFirst).mockResolvedValue(cartWithDeletedLine as any);
+
+      const result = await CartService.getOrCreate(mockStoreId, mockSessionId);
+
+      // Only the live line: 2 * 5000. The deleted line (3 * 3000) is excluded.
+      expect(result.subtotal).toBe(10000);
+      expect(result.items.map(i => [i.productId, i.unavailable])).toEqual([
+        ['prod-1', false],
+        ['prod-gone', true],
+      ]);
+      for (const item of result.items) expect(item.product).not.toHaveProperty('deletedAt');
+      // The line is still listed — the customer has to be able to remove it.
+      expect(result.items).toHaveLength(2);
+    });
+
+    it('#1766 — the cart read selects deletedAt so the flag can be derived', async () => {
+      vi.mocked(prisma.cart.findFirst).mockResolvedValue(mockCart as any);
+      await CartService.getOrCreate(mockStoreId, mockSessionId);
+      const args = vi.mocked(prisma.cart.findFirst).mock.calls[0][0] as any;
+      expect(args.include.items.include.product.select.deletedAt).toBe(true);
+    });
   });
 
   describe('view (#1661 — read-only, no write on a miss)', () => {

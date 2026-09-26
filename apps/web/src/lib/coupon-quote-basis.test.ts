@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { couponQuoteBasis } from './coupon-quote-basis';
+import { couponQuoteBasis, couponQuoteCartItems } from './coupon-quote-basis';
 
 /**
  * P0-1 (final review) — the storefront half of "quote must equal charge".
@@ -118,5 +118,26 @@ describe('coupon quote basis call sites (P0-1 / P2-c)', () => {
     // Shown on both summaries, and only when a bundle AND a coupon are present.
     expect(read('app/checkout/OrderSummary.tsx')).toContain('appliedCoupon && bundles.length > 0');
     expect(cart).toContain('promoApplied && cartBundles.length > 0');
+  });
+});
+
+describe('#1766 — an unavailable (deleted-product) line is not part of the coupon basis', () => {
+  it('couponQuoteBasis skips it', () => {
+    expect(
+      couponQuoteBasis([
+        { price: 1000, quantity: 2 },
+        { price: 5000, quantity: 1, unavailable: true },
+      ])
+    ).toBe(2000);
+  });
+
+  it('couponQuoteCartItems skips it, so Σ lineTotal still equals the basis', () => {
+    const items = [
+      { productId: 'a', price: 1000, quantity: 2 },
+      { productId: 'gone', price: 5000, quantity: 1, unavailable: true },
+    ];
+    const lines = couponQuoteCartItems(items);
+    expect(lines.map(l => l.productId)).toEqual(['a']);
+    expect(lines.reduce((s, l) => s + l.lineTotal, 0)).toBe(couponQuoteBasis(items));
   });
 });

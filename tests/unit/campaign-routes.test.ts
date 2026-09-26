@@ -8,6 +8,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
+import { readFileSync } from 'fs';
+import path from 'path';
 import {
   createFakePrisma,
   storeRow,
@@ -20,7 +22,7 @@ import {
 const { holder, mocks } = vi.hoisted(() => {
   process.env.CAMPAIGN_UNSUBSCRIBE_SECRET = 'route-test-secret';
   return {
-    holder: { prisma: null as any, role: 'store_admin' },
+    holder: { prisma: null as any, role: 'store_admin', txDepth: 0, denyStore: false },
     mocks: {
       isFeatureEnabled: vi.fn(),
       inngestSend: vi.fn(),
@@ -44,8 +46,20 @@ vi.mock('@force/database', () => ({
     PrismaClientInitializationError: class PrismaInit {},
     PrismaClientRustPanicError: class PrismaPanic {},
   },
-  runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+  // Tracks how many tenant transactions are open, so a test can assert an
+  // external call happened with NONE open (#1954). The real `tenantContext`
+  // middleware is mounted below, so a route inside it runs at depth 1.
+  runInTenantContext: async (_s: string, fn: () => unknown) => {
+    holder.txDepth++;
+    try {
+      return await fn();
+    } finally {
+      holder.txDepth--;
+    }
+  },
+  onClosedTenantTxAccess: () => undefined,
 }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
 
 // Load @force/shared from SOURCE so its schemas and the API's errorHandler
 // share one `zod` instance. The package's CJS dist would `require('zod')` and
@@ -64,7 +78,10 @@ vi.mock('@api/middleware/auth', () => ({
   },
 }));
 vi.mock('@api/middleware/store-access', () => ({
-  requireStoreAccess: (_req: any, _res: any, next: any) => next(),
+  requireStoreAccess: (_req: any, res: any, next: any) =>
+    holder.denyStore
+      ? res.status(403).json({ success: false, code: 'STORE_ACCESS_DENIED' })
+      : next(),
 }));
 vi.mock('@api/middleware/security', () => ({
   auditLog: mocks.auditLog,
@@ -93,13 +110,18 @@ let db: FakeDb;
 const BASE = `/api/v1/stores/${STORE_A}/campaigns`;
 
 beforeAll(async () => {
-  const { default: campaignRoutes } = await import('@api/routes/campaign.routes');
+  const { default: campaignRoutes, campaignTestSendRouter } =
+    await import('@api/routes/campaign.routes');
+  const { tenantContext } = await import('@api/middleware/tenant-context');
   const { default: publicRoutes } = await import('@api/routes/campaign-public.routes');
   const { errorHandler } = await import('@api/middleware/error-handler');
   const server = express();
   server.use(express.json());
   server.use(express.urlencoded({ extended: true }));
-  server.use('/api/v1/stores/:storeId/campaigns', campaignRoutes);
+  // Mirrors routes/index.ts: the test send is mounted BEFORE, and WITHOUT,
+  // the tenant transaction every other campaign route runs in.
+  server.use('/api/v1/stores/:storeId/campaigns', campaignTestSendRouter);
+  server.use('/api/v1/stores/:storeId/campaigns', tenantContext, campaignRoutes);
   server.use('/api/v1/public/campaigns', publicRoutes);
   server.use(errorHandler);
   app = server;
@@ -142,6 +164,7 @@ beforeEach(() => {
   };
   holder.prisma = createFakePrisma(db);
   holder.role = 'store_admin';
+  holder.denyStore = false;
   mocks.isFeatureEnabled.mockReset().mockResolvedValue(true);
   mocks.inngestSend.mockReset().mockResolvedValue({ ids: ['evt'] });
   mocks.sendMarketingEmail.mockReset().mockResolvedValue({ id: 'msg-1' });
@@ -268,6 +291,52 @@ describe('feature ON', () => {
     const recipients = mocks.sendMarketingEmail.mock.calls.map(call => call[1].to);
     expect(recipients).toEqual(['merchant@shop.test', 'merchant@shop.test']);
     expect(db.recipients).toHaveLength(0);
+  });
+
+  it('#1954 — test send calls Resend with NO tenant transaction open, and reports what was sent', async () => {
+    const c = draft({ subjectAr: 'عرض', bodyHtmlAr: '<p>مرحبا</p>' });
+    const depthAtSend: number[] = [];
+    mocks.sendMarketingEmail.mockImplementation(async () => {
+      depthAtSend.push(holder.txDepth);
+      return { id: 'msg-1' };
+    });
+    const res = await request(app).post(`${BASE}/${c.id}/test`).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ sentTo: 'merchant@shop.test', locales: ['en', 'ar'] });
+    expect(depthAtSend).toEqual([0, 0]);
+  });
+
+  it('#1954 — the context-less test send still refuses an admin without access to this store', async () => {
+    const c = draft();
+    holder.denyStore = true;
+    const res = await request(app).post(`${BASE}/${c.id}/test`).send({});
+    expect(res.status).toBe(403);
+    expect(mocks.sendMarketingEmail).not.toHaveBeenCalled();
+  });
+
+  it('#1954 — a failed test send is reported as an error, never a 200', async () => {
+    const c = draft();
+    mocks.sendMarketingEmail.mockRejectedValue(new Error('resend down'));
+    const res = await request(app).post(`${BASE}/${c.id}/test`).send({});
+    expect(res.status).toBeGreaterThanOrEqual(500);
+  });
+
+  it('#1954 — routes/index.ts mounts the test-send router without tenantContext, before the tenant-scoped mount', () => {
+    const src = readFileSync(path.resolve(__dirname, '../../apps/api/src/routes/index.ts'), 'utf8');
+    const bare = src.indexOf("router.use('/stores/:storeId/campaigns', campaignTestSendRouter);");
+    const scoped = src.indexOf(
+      "router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);"
+    );
+    expect(bare).toBeGreaterThan(-1);
+    expect(scoped).toBeGreaterThan(bare);
+  });
+
+  it('#1954 — the context-less test-send router still enforces the full auth chain', () => {
+    // authorize('store_admin','super_admin') is registered once by the main
+    // router and once by the test-send route.
+    expect(
+      mocks.authorizeArgs.filter(r => r.join() === 'store_admin,super_admin').length
+    ).toBeGreaterThanOrEqual(2);
   });
 
   it('edits are refused once a campaign left draft', async () => {

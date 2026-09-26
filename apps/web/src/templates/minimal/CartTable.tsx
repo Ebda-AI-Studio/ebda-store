@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
+import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
@@ -60,6 +61,7 @@ export default function MinimalCartTable({
                     {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
                   </p>
                 )}
+                {item.unavailable && <CartLineUnavailableNotice />}
                 <p
                   className="mt-1 text-sm text-muted-foreground tabular-nums"
                   style={typography?.price}
@@ -71,7 +73,7 @@ export default function MinimalCartTable({
                 <div className="flex items-center gap-3 text-muted-foreground">
                   <button
                     type="button"
-                    disabled={item.quantity <= 1}
+                    disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer transition-colors duration-200"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
@@ -87,8 +89,9 @@ export default function MinimalCartTable({
                   </span>
                   <button
                     type="button"
+                    disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer transition-colors duration-200"
+                    className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer transition-colors duration-200 disabled:opacity-40"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                     style={typography?.cta}
                   >
@@ -105,7 +108,11 @@ export default function MinimalCartTable({
                   </button>
                 </div>
                 <p className="text-sm text-foreground tabular-nums" style={typography?.price}>
-                  {format(item.price * item.quantity)}
+                  {item.unavailable ? (
+                    <s>{format(item.price * item.quantity)}</s>
+                  ) : (
+                    format(item.price * item.quantity)
+                  )}
                 </p>
               </div>
             </div>

@@ -128,6 +128,9 @@ const CART_INCLUDE = {
         select: {
           ...STOREFRONT_PRODUCT_SELECT,
           images: { take: 1, orderBy: { position: 'asc' } },
+          // Read ONLY to derive the line's `unavailable` flag (#1766) and
+          // stripped before the cart leaves this service — see computeTotals.
+          deletedAt: true,
         },
       },
       variant: { select: { id: true, title: true, titleAr: true, price: true } },
@@ -149,12 +152,24 @@ export class CartService {
    * already-fetched cart identically instead of re-deriving the math.
    */
   private static async computeTotals(storeId: string, cart: CartWithIncludes) {
+    // #1766 — a line whose product the merchant soft-deleted is flagged
+    // `unavailable` and priced OUT of the subtotal. `OrderService.create`
+    // refuses the whole order while any such line remains
+    // (PRODUCT_NO_LONGER_AVAILABLE, the same `deletedAt: null` test), so the
+    // cart must neither show it as a normal line nor promise a total that
+    // includes something that can never be bought. The raw `deletedAt` stays
+    // inside this service; the public payload carries only the boolean.
+    const items = cart.items.map(item => {
+      const { deletedAt, ...product } = item.product;
+      return { ...item, product, unavailable: deletedAt != null };
+    });
+
     // Calculate totals — a line is priced at its chosen VARIANT's price when
     // one is selected (variant products), falling back to the parent product's
     // price for variant-less products. Using product.price for a variant line
     // charged every variant at the parent's (lowest) price — a real undercharge.
-    const itemsSubtotal = cart.items.reduce(
-      (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
+    const itemsSubtotal = items.reduce(
+      (sum, item) => (item.unavailable ? sum : sum + cartLineUnitPrice(item) * item.quantity),
       0
     );
 
@@ -190,7 +205,7 @@ export class CartService {
     const bundles = resolvedBundles.filter((b): b is CartBundleView => b !== null);
     const bundlesSubtotal = bundles.reduce((sum, b) => sum + b.total, 0);
 
-    return { ...cart, bundles, subtotal: itemsSubtotal + bundlesSubtotal };
+    return { ...cart, items, bundles, subtotal: itemsSubtotal + bundlesSubtotal };
   }
 
   /**
@@ -211,7 +226,7 @@ export class CartService {
 
     if (!cart) {
       return {
-        items: [] as CartWithIncludes['items'],
+        items: [] as Awaited<ReturnType<typeof CartService.computeTotals>>['items'],
         bundles: [] as CartBundleView[],
         subtotal: 0,
       };

@@ -8,6 +8,7 @@ import { useLanguage } from './LanguageContext';
 import { useStore } from './StoreContext';
 
 import { readLocalCart, toSyncPayload } from './cart-hydration';
+import { cartTotals, mapServerItem, type ServerCartItem } from './cart-lines';
 
 export interface CartItem {
   // Server cart_item row id once the item is synced. Before the first
@@ -26,24 +27,12 @@ export interface CartItem {
   /** Resolved variant label (e.g. "Red / Large") for display on the cart page. */
   variantTitle?: string;
   variantTitleAr?: string;
-}
-
-// Shape returned by GET /public/cart
-interface ServerCartItem {
-  id: string;
-  productId: string;
-  quantity: number;
-  variantId?: string | null;
-  product: {
-    id: string;
-    name: string;
-    nameAr?: string | null;
-    slug: string;
-    price: number;
-    images?: Array<{ id: string; url: string; alt?: string | null }>;
-    categories?: Array<{ category: { name?: string; nameAr?: string } }>;
-  };
-  variant?: { id: string; title: string; titleAr?: string | null; price?: number } | null;
+  /**
+   * #1766 — the merchant deleted this product. The line is shown as "no
+   * longer available", excluded from `total`/`itemCount`, and must be removed
+   * before checkout (the server refuses the order while it remains).
+   */
+  unavailable?: boolean;
 }
 
 /**
@@ -110,25 +99,6 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const LEGACY_CART_STORAGE_KEY = 'force-store-cart';
 function cartStorageKeyFor(storeId: string | undefined): string {
   return storeId && storeId !== 'demo' ? `force-store-cart:${storeId}` : LEGACY_CART_STORAGE_KEY;
-}
-
-function mapServerItem(item: ServerCartItem): CartItem {
-  return {
-    id: item.id,
-    productId: item.productId,
-    name: item.product.name,
-    nameAr: item.product.nameAr ?? undefined,
-    // Show the chosen variant's price (fall back to the parent product for
-    // variant-less products) — matches what the server charges.
-    price: item.variant?.price ?? item.product.price,
-    quantity: item.quantity,
-    image: item.product.images?.[0]?.url,
-    slug: item.product.slug,
-    category: item.product.categories?.[0]?.category?.name,
-    variantId: item.variantId ?? undefined,
-    variantTitle: item.variant?.title ?? undefined,
-    variantTitleAr: item.variant?.titleAr ?? undefined,
-  };
 }
 
 function mapServerBundle(bundle: ServerCartBundle): CartBundle {
@@ -474,12 +444,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     await refetchCart().catch(() => {});
   }, [refetchCart]);
 
-  const itemCount =
-    items.reduce((sum, item) => sum + item.quantity, 0) +
-    bundles.reduce((sum, b) => sum + b.quantity, 0);
-  const total =
-    items.reduce((sum, item) => sum + item.price * item.quantity, 0) +
-    bundles.reduce((sum, b) => sum + b.total, 0);
+  const { itemCount, total } = cartTotals(items, bundles);
 
   return (
     <CartContext.Provider

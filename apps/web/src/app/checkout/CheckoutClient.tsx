@@ -152,6 +152,7 @@ export default function CheckoutClient() {
     bundles: cartContextBundles,
     total: cartContextTotal,
     isReady: cartIsReady,
+    refetchCart,
   } = useCart();
   const { language, t } = useLanguage();
   // Passed down to PaymentStep as the `formatPrice` prop too.
@@ -221,25 +222,31 @@ export default function CheckoutClient() {
     if (cartContextItems.length === 0 && cartContextBundles.length === 0) return null;
     return {
       id: 'cart',
-      items: cartContextItems.map(item => ({
-        id: item.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.price,
-        product: {
-          id: item.productId,
-          name: item.name,
-          // Forward the Arabic name so OrderSummary's productLabel
-          // picks it on Arabic locale. The CartContext already loads
-          // nameAr off `Product.nameAr`; this map was previously
-          // dropping it on the floor, leaving the checkout / payment
-          // review pages stuck on the English name even when the rest
-          // of the storefront localised correctly.
-          nameAr: item.nameAr,
-          slug: item.slug,
-          images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
-        },
-      })),
+      // #1766: a line whose product was deleted is not in `cartContextTotal`
+      // and can never be ordered, so it is not listed in the summary either
+      // (the summary's lines must add up to its total). The PRODUCT_NO_LONGER
+      // _AVAILABLE refusal below still names it, off `cartContextItems`.
+      items: cartContextItems
+        .filter(item => !item.unavailable)
+        .map(item => ({
+          id: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price,
+          product: {
+            id: item.productId,
+            name: item.name,
+            // Forward the Arabic name so OrderSummary's productLabel
+            // picks it on Arabic locale. The CartContext already loads
+            // nameAr off `Product.nameAr`; this map was previously
+            // dropping it on the floor, leaving the checkout / payment
+            // review pages stuck on the English name even when the rest
+            // of the storefront localised correctly.
+            nameAr: item.nameAr,
+            slug: item.slug,
+            images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
+          },
+        })),
       bundles: cartContextBundles.map(b => ({
         id: b.id,
         bundleId: b.bundleId,
@@ -1368,10 +1375,13 @@ export default function CheckoutClient() {
           // rather than "Remove" when the list is partial, so a name we cannot
           // resolve never turns the sentence into a false promise.
           const goneNames = goneIds
-            .map(id => cart?.items.find(item => item.productId === id)?.product)
-            .filter((prod): prod is NonNullable<typeof prod> => Boolean(prod))
-            .map(prod => (language === 'ar' ? (prod.nameAr ?? prod.name) : prod.name));
+            .map(id => cartContextItems.find(item => item.productId === id))
+            .filter((line): line is NonNullable<typeof line> => Boolean(line))
+            .map(line => (language === 'ar' ? (line.nameAr ?? line.name) : line.name));
           friendly = productUnavailableCopy(t, goneIds.length, goneNames);
+          // #1766: pull the server cart so the lines are marked "no longer
+          // available" (and out of the total) when the shopper opens the cart.
+          void refetchCart().catch(() => undefined);
           // Safe now: <CheckoutErrorAlert> renders above BOTH steps, so this
           // message survives the unmount of PaymentStep. Before that it did not.
           setStep(1);

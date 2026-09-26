@@ -1,5 +1,7 @@
 import { Response, NextFunction } from 'express';
 import logger from '../lib/logger';
+import { sendAlert } from '../services/alerts.service';
+import { AppError } from './error-handler';
 
 /**
  * Request-transaction lifecycle: COMMIT BEFORE RESPOND.
@@ -141,6 +143,42 @@ import logger from '../lib/logger';
  */
 
 /**
+ * ## The settle deadline (#1608)
+ *
+ * On the buffered lane the client's bytes wait for Postgres to answer the
+ * COMMIT (or the intended ROLLBACK). Prisma's interactive-transaction
+ * `timeout` bounds BEGIN → callback-resolved; the COMMIT it issues afterwards
+ * is outside it, and `server.requestTimeout` bounds request RECEIPT, not the
+ * response. So nothing bounded this wait: a COMMIT stalled by a Neon failover
+ * or a lost pooler slot left the client on an open socket with no status line.
+ *
+ * The wait is now bounded by `REQUEST_COMMIT_TIMEOUT_MS` (default 10000ms),
+ * armed the moment the handler's response is captured:
+ *
+ *   - COMMIT not answered in time → the captured response is DISCARDED and the
+ *     client gets a 503 `COMMIT_TIMEOUT` ("could not be confirmed — check
+ *     before retrying"), logged with the request's `logContext` and raised as
+ *     a P1 alert (Telegram, throttled by alerts.service). Never the 2xx: the
+ *     outcome is unknown, and a 2xx over a write that may still roll back is
+ *     exactly the lost write this module exists to prevent. If the COMMIT
+ *     later lands, that is logged too, so the unknown outcome is resolvable.
+ *   - ROLLBACK not answered in time → the handler's own 5xx goes out (it is
+ *     already an error; nothing about it depends on the rollback finishing).
+ *
+ * Every settled buffered response also carries `Server-Timing:
+ * request-tx;desc="commit";dur=<ms>` (visible in browser devtools and in edge
+ * logs), and a settle slower than 1s logs a warning — the COMMIT round-trip
+ * this lane adds to every store-scoped response is measured, not assumed.
+ */
+export function requestCommitTimeoutMs(): number {
+  const n = parseInt(process.env.REQUEST_COMMIT_TIMEOUT_MS ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 10000;
+}
+
+/** A settle slower than this logs a warning even when it makes the deadline. */
+const SLOW_SETTLE_LOG_MS = 1000;
+
+/**
  * Sentinel: the handler produced a 5xx, so the transaction must ROLL BACK.
  * Thrown INTO the interactive transaction to make Prisma roll it back, then
  * recognised on the way out so the handler's own 5xx response is still the
@@ -208,6 +246,18 @@ export function runRequestInTransaction(
   let commit: (() => void) | undefined;
   let rollback: ((err: Error) => void) | undefined;
 
+  // Settle-deadline bookkeeping (#1608) — see the section above the sentinel.
+  let settleKind: 'commit' | 'rollback' | null = null;
+  let settleStartedAt = 0;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  /** The deadline fired and the client has been answered without Postgres. */
+  let timedOut = false;
+  const clearDeadline = (): void => {
+    if (deadline) clearTimeout(deadline);
+    deadline = undefined;
+  };
+  const settleMs = (): number => Math.round((performance.now() - settleStartedAt) * 10) / 10;
+
   /**
    * Move this response out of the buffered lane. Called by every streaming
    * primitive. A no-op once the gate has settled — at that point we are
@@ -271,6 +321,10 @@ export function runRequestInTransaction(
 
     captured = args;
     settled = true;
+    settleKind = res.statusCode >= 500 ? 'rollback' : 'commit';
+    settleStartedAt = performance.now();
+    deadline = setTimeout(onSettleDeadline, requestCommitTimeoutMs());
+    deadline.unref?.();
     if (res.statusCode >= 500) {
       // 5xx must ROLL BACK — unchanged, load-bearing behaviour. The captured
       // 5xx response is still what the client gets, once the rollback lands.
@@ -286,8 +340,62 @@ export function runRequestInTransaction(
     if (lane === 'flushing' || !captured) return;
     const args = captured;
     lane = 'flushing';
+    if (settleKind) {
+      clearDeadline();
+      const ms = settleMs();
+      if (!res.headersSent) {
+        const prior = res.getHeader('Server-Timing');
+        const entry = `request-tx;desc="${settleKind}";dur=${ms}`;
+        res.setHeader('Server-Timing', prior ? `${String(prior)}, ${entry}` : entry);
+      }
+      if (ms > SLOW_SETTLE_LOG_MS) {
+        logger.warn({ ...logContext, settleKind, settleMs: ms }, 'Slow request-transaction settle');
+      }
+    }
     originalEnd(...args);
   };
+
+  /**
+   * The settle deadline fired: Postgres has not answered the COMMIT/ROLLBACK.
+   * Answer the client now instead of holding its socket open indefinitely.
+   */
+  function onSettleDeadline(): void {
+    deadline = undefined;
+    if (lane !== 'buffered' || !captured || res.headersSent) return;
+    timedOut = true;
+    const waitedMs = settleMs();
+    logger.error(
+      { ...logContext, settleKind, waitedMs, discardedStatus: res.statusCode },
+      'Request transaction did not settle before the commit deadline — answering without it'
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'request-transaction.commit_timeout',
+      title: 'Request transaction COMMIT exceeded its deadline',
+      body:
+        `A ${settleKind} was still unanswered after ${waitedMs}ms. ` +
+        (settleKind === 'commit'
+          ? 'The client was answered 503 COMMIT_TIMEOUT; whether the write landed is logged when Postgres answers.'
+          : "The handler's own 5xx was sent without waiting for the rollback."),
+      context: { ...logContext, settleKind, waitedMs },
+    }).catch(() => undefined);
+
+    if (settleKind === 'rollback') {
+      flushCaptured();
+      return;
+    }
+    captured = null;
+    lane = 'flushing';
+    for (const header of BODY_DESCRIBING_HEADERS) res.removeHeader(header);
+    next(
+      new AppError(
+        503,
+        'COMMIT_TIMEOUT',
+        'The request could not be confirmed in time. Check whether it took effect before retrying.'
+      )
+    );
+  }
 
   /**
    * Handed to `open` as its second argument — see the "Post-commit work"
@@ -342,12 +450,37 @@ export function runRequestInTransaction(
     releaseResponse
   )
     .then(() => {
+      clearDeadline();
+      if (timedOut) {
+        // The client already got the 503; record that the write DID land so
+        // the unknown outcome can be resolved from the logs.
+        logger.warn(
+          { ...logContext, settleKind, settleMs: settleMs() },
+          'Request transaction committed AFTER the commit deadline (client was answered 503)'
+        );
+        return;
+      }
       // COMMITTED (and, for a caller with post-commit work, that work has now
       // drained too). Only now may the bytes go out — a no-op when `open`
       // already released them via `releaseResponse`.
       flushCaptured();
     })
     .catch(err => {
+      clearDeadline();
+      if (timedOut) {
+        if (err instanceof IntendedRollback) {
+          logger.warn(
+            { ...logContext, settleKind, settleMs: settleMs() },
+            'Request transaction rolled back AFTER the commit deadline (its 5xx was already sent)'
+          );
+          return;
+        }
+        logger.error(
+          { err, ...logContext, settleKind, settleMs: settleMs() },
+          'Request transaction settled with an error AFTER the commit deadline (client was already answered)'
+        );
+        return;
+      }
       if (err instanceof IntendedRollback) {
         // Rollback we asked for. The handler's own 5xx is the correct
         // response and is now safe to send.

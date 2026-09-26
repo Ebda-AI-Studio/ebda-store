@@ -34,6 +34,8 @@ export function campaignDailyCap(): number {
  * not retry-on-429). Resend's default limit is 2 requests/second per API key
  * and that key is shared with every transactional email on the platform, so
  * the default (1000ms → ~60/min) leaves half the budget to order emails.
+ * This is PER STORE; the combined rate across stores sending at once is
+ * bounded by `lib/campaign-send-pacer.ts` (#1955).
  */
 export function campaignThrottleMs(): number {
   const n = parseInt(process.env.CAMPAIGN_SEND_THROTTLE_MS ?? '', 10);

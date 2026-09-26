@@ -5,6 +5,7 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk } from '../batch-utils';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
+import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
 import { ResendService, ResendSendError } from '../../../services/resend.service';
 import {
   CAMPAIGN_STORE_SELECT,
@@ -36,7 +37,10 @@ import {
  *    `queued`; the Resend call carries `idempotencyKey = campaign-recipient/<id>`
  *    for the crash-between-send-and-mark window.
  *  - Throttled by sleeping CAMPAIGN_SEND_THROTTLE_MS after each SUCCESSFUL
- *    send. A 429 is not the throttle — it throws, and the step retries.
+ *    send (per store), and by waiting for a platform-wide send slot before
+ *    every send (lib/campaign-send-pacer.ts, #1955) so concurrent stores'
+ *    campaigns together stay under the shared Resend budget. A 429 is not the
+ *    throttle — it throws, and the step retries.
  *  - Capped: a campaign whose audience exceeds the store's remaining rolling
  *    24h allowance fails as DAILY_CAP_EXCEEDED before any recipient exists.
  *  - No orphaned `queued` row: a failed send marks the recipient `failed`, a
@@ -132,10 +136,12 @@ const campaignSendFn = inngest.createFunction(
   {
     id: 'campaign-send',
     name: 'Email campaign: send to consented newsletter subscribers',
-    // One campaign sends at a time, platform-wide: every store shares one
-    // Resend API key (2 req/s default, also carrying all transactional mail)
-    // and, on the fallback sender, one sending domain's reputation.
-    concurrency: { limit: 1 },
+    // One campaign at a time PER STORE (#1955) — a store's second campaign
+    // queues behind its first, but never behind another store's. The shared
+    // Resend key (2 req/s, also carrying all transactional mail) is protected
+    // by the platform-wide send pacer (lib/campaign-send-pacer.ts), which
+    // every send below waits on, not by serializing every store.
+    concurrency: { limit: 1, key: 'event.data.storeId' },
     retries: 4,
     triggers: [{ event: 'campaign/send-requested' }],
     onFailure: async ({ event }) => {
@@ -343,6 +349,8 @@ const campaignSendFn = inngest.createFunction(
             unsubscribeUrl: `${base}/unsubscribe?token=${encodeURIComponent(token)}`,
           });
 
+          // Platform-wide rate bound across every store's running campaign.
+          await awaitCampaignSendSlot();
           let messageId: string;
           try {
             ({ id: messageId } = await ResendService.sendMarketingEmail(store, {

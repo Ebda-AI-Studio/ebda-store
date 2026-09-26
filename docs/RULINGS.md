@@ -365,7 +365,8 @@ reserved so a later webhook needs no enum migration, and the admin renders it. C
 hard-bouncing address stays `sent` and keeps being mailed by later campaigns, which slowly costs
 sender reputation — the next piece of work for this feature.
 
-**Ruling EC-8 — the test send and the AI draft run inline in the request.** Both are one external
+**Ruling EC-8 — the test send and the AI draft run inline in the request.** _(Test-send half
+SUPERSEDED by Ruling R3-2, #1954 — the AI-draft half stands.)_ Both are one external
 call made by a merchant who is waiting for the result (one Resend send to their own address; one
 Gemini call, quota-capped, the same shape as every other `/stores/:id/ai/*` suggestion route).
 Neither fans out. Cost if wrong: a slow Gemini response holds one tenant transaction open for its
@@ -891,7 +892,8 @@ strictly reduces how long the losing side holds its own locks. It is recorded
 here so the remaining half does not read as fixed.
 
 **Ruling P2-B3-2 — #1766 (soft-deleted cart lines) is split into its own PR
-because its durable half moves an amount expression.**
+because its durable half moves an amount expression.** _(SUPERSEDED by Ruling R3-4 — #1766 is
+fixed in `fix/p2-r3-residuals`.)_
 
 The finding is real and verified: `STOREFRONT_PRODUCT_SELECT` carries no
 `deletedAt`, so a soft-deleted line renders exactly like a live one on `/cart`,
@@ -1426,3 +1428,65 @@ P2002 backstop into a 25P02 abort of the whole step, so it was not done. The RLS
 `loyalty_points`/`loyalty_transactions` admit a connection with no store GUC, which is why both the
 old and the new form see the row. Cost if wrong: none beyond the pre-existing posture, which this
 change neither widens nor narrows.
+
+---
+
+Context: branch `fix/p2-r3-residuals` — four items previously parked as needs-owner or accepted
+residuals, decided by the owner rule "fix everything" (Ahmad, 2026-09-25): #1955, #1608, #1766,
+#1954.
+
+**Ruling R3-1 — #1955: campaign concurrency is per store, and the platform-wide bound is a
+Redis-coordinated send pacer, not an Inngest `throttle`.** The decision asked for a per-store
+concurrency key plus "a platform-wide Inngest `throttle` (or equivalent)". Inngest's `throttle`
+limits how often a function RUN starts; one `campaign-send` run sends up to
+`CAMPAIGN_DAILY_SEND_CAP` emails, so a run-start throttle cannot bound the per-email rate at all.
+The equivalent that does is `lib/campaign-send-pacer.ts`: every send reserves the next slot on one
+Redis key (atomic Lua, Redis clock), `CAMPAIGN_PLATFORM_SEND_INTERVAL_MS` apart. The default is 1000ms (≤1 campaign email/s across all
+stores), not the 1.5/s the decision allowed: 1/s is exactly the ceiling today's platform-wide limit
+gives, so transactional mail keeps the ≥1 req/s of Resend's 2 req/s it has now — and transactional
+sends outside the order-email queue are not retried on a 429. Stores now interleave on that budget
+instead of queueing behind each other's whole campaign. Without Redis it falls back to an in-process slot, which is still global on one replica and
+never blocks sending. Cost if wrong: with Redis down AND more than one API replica, the combined
+campaign rate could reach 1/s × replicas and Resend would 429 — which the job already treats as
+transient (the step retries, nothing is lost or double-sent).
+
+**Ruling R3-2 — #1954: the test send runs its reads in a short tenant transaction and calls Resend
+after that commits, on a router mounted without `tenantContext`. Supersedes the test-send half of
+EC-8.** `deferAfterTenantCommit` was rejected because it runs after the response, so the route
+could no longer report what Resend accepted; the decision required an honest result. The route
+keeps the full chain (authenticate → authorize → requireStoreAccess → requireFeature) on itself and
+is mounted before the tenant-scoped campaign router; `tests/unit/campaign-routes.test.ts` asserts
+both the mount order and that no transaction is open at either send (mutation-checked). The
+AI-draft half of EC-8 is NOT changed: every `/stores/:storeId/ai/*` route makes its Gemini call
+inside the tenant transaction the same way, so moving one of them alone fixes nothing class-wide.
+Cost if wrong: a slow Gemini response still holds one tenant transaction open (bounded by the 30s
+transaction timeout) until the AI routes are moved as a class.
+
+**Ruling R3-3 — #1608: the COMMIT wait is bounded at 10s by default, and on expiry a would-be 2xx
+becomes a 503 `COMMIT_TIMEOUT`, not a 500 and not the 2xx.** The issue suggested "a few seconds";
+10s was chosen because a false timeout on checkout is worse than a slow one: it tells a shopper an
+order failed that may have committed, and that request then commits anyway. A healthy COMMIT is
+milliseconds, so 10s only fires on a genuinely stalled connection (failover, lost pooler slot),
+which previously held the socket until Cloudflare's 100s edge timeout answered 524. 503 (not 500)
+because the outcome is UNKNOWN rather than failed, and the message tells the client to check before
+retrying; a late COMMIT/ROLLBACK is logged so the outcome can be resolved. The deadline is not
+`server.requestTimeout`, which bounds request receipt and never fires on a response wait. Measurement
+is the `Server-Timing: request-tx` header on every buffered response plus a warn log over 1s; no
+p99 load-test assertion was added (the existing `loadtests/` are run by hand, not in CI). Cost if
+wrong: a COMMIT that takes 10-100s now yields a 503 over a write that may have landed — the same
+unknown outcome the 524 already gave, now alerted and logged instead of silent.
+
+**Ruling R3-4 — #1766: a deleted-product cart line is flagged `unavailable`, priced OUT of the cart
+subtotal, marked on /cart in all five themes and the default list, and left in the cart for the
+shopper to remove. Supersedes P2-B3-2.** "Unavailable" means exactly what the checkout refusal
+tests — `products.deleted_at IS NOT NULL` — so the cart and `OrderService.create` cannot disagree
+about which lines block an order. The amount expression that moved is the cart's DISPLAY subtotal
+(`CartService.computeTotals`, CartContext `total`/`itemCount`, the coupon quote basis, the checkout
+summary). No order total moved: `OrderService.create` still refuses the whole order while any such
+line remains, so every order that is placed has no unavailable line and its subtotal is
+byte-identical to before. Checkout therefore still never charges a deleted line; it refuses, now
+naming the product and refetching the cart so /cart shows the mark. A line whose product is merely
+`draft`/`archived` is NOT flagged — checkout does not refuse those either, and changing that is a
+separate product decision. Cost if wrong: a cart whose every loose line is deleted shows checkout's
+"Your cart is empty" screen rather than the refusal copy, because the summary no longer lists
+unorderable lines.

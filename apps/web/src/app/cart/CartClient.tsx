@@ -14,8 +14,10 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { BundleLine } from '../../components/BundleLine';
+import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
+import { productUnavailableCopy } from '@/lib/product-cart-errors';
 import {
   resolveSectionZone,
   zoneStyle,
@@ -47,6 +49,9 @@ export default function CartClient() {
   // promised a discount the order would never receive. Identical to
   // `cartTotal` for a cart with no bundle.
   const couponBasis = useMemo(() => couponQuoteBasis(cartItems), [cartItems]);
+  // #1766: lines whose product the merchant deleted — listed (so they can be
+  // removed), marked, and already excluded from `cartTotal` by CartContext.
+  const unavailableItems = useMemo(() => cartItems.filter(i => i.unavailable), [cartItems]);
   // Standalone Cart-page typography (page-builder → Cart page). Resolved to
   // inline styles below so they beat the cart's Tailwind size classes.
   //   heading     → page title + "Order summary" heading
@@ -406,6 +411,19 @@ export default function CartClient() {
               {t('in your cart', '\u0641\u064a \u0633\u0644\u062a\u0643')}
             </p>
           )}
+          {unavailableItems.length > 0 && (
+            <p
+              role="alert"
+              data-cart-unavailable-banner=""
+              className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive"
+            >
+              {productUnavailableCopy(
+                t,
+                unavailableItems.length,
+                unavailableItems.map(i => (language === 'ar' && i.nameAr ? i.nameAr : i.name))
+              )}
+            </p>
+          )}
 
           {cartItems.length === 0 && cartBundles.length === 0 ? (
             T?.EmptyState ? (
@@ -515,6 +533,7 @@ export default function CartClient() {
                         image: item.image,
                         variantTitle: item.variantTitle,
                         variantTitleAr: item.variantTitleAr,
+                        unavailable: item.unavailable,
                       }))}
                       isRtl={language === 'ar'}
                       currency={store.currency}
@@ -586,6 +605,7 @@ export default function CartClient() {
                                       : item.variantTitle}
                                   </p>
                                 )}
+                                {item.unavailable && <CartLineUnavailableNotice />}
                                 <p
                                   className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
                                   data-zone="productPrice"
@@ -621,9 +641,9 @@ export default function CartClient() {
                               <div className="inline-flex items-center overflow-hidden rounded-md border border-border">
                                 <button
                                   onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                                  disabled={item.quantity <= 1}
+                                  disabled={item.unavailable || item.quantity <= 1}
                                   className={`flex h-11 w-11 items-center justify-center transition-colors ${
-                                    item.quantity <= 1
+                                    item.unavailable || item.quantity <= 1
                                       ? 'cursor-not-allowed text-muted-foreground/40'
                                       : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
                                   }`}
@@ -648,9 +668,9 @@ export default function CartClient() {
                                 </span>
                                 <button
                                   onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                                  disabled={item.quantity >= 10}
+                                  disabled={item.unavailable || item.quantity >= 10}
                                   className={`flex h-11 w-11 items-center justify-center transition-colors ${
-                                    item.quantity >= 10
+                                    item.unavailable || item.quantity >= 10
                                       ? 'cursor-not-allowed text-muted-foreground/40'
                                       : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
                                   }`}
@@ -678,7 +698,11 @@ export default function CartClient() {
                                 data-zone="productPrice"
                                 style={cartZoneStyle(cartPriceZone)}
                               >
-                                {formatPrice(item.price * item.quantity)}
+                                {item.unavailable ? (
+                                  <s>{formatPrice(item.price * item.quantity)}</s>
+                                ) : (
+                                  formatPrice(item.price * item.quantity)
+                                )}
                               </p>
                             </div>
                           </div>

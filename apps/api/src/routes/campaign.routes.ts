@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, runInTenantContext } from '@force/database';
 import {
   CAMPAIGN_MAX_SCHEDULE_DAYS,
   CAMPAIGN_RECIPIENT_STATUSES,
@@ -353,57 +353,10 @@ router.delete(
   }
 );
 
-// POST /stores/:storeId/campaigns/:campaignId/test — send the campaign to the
-// signed-in admin's OWN email (both languages when both are complete). The
-// recipient address comes from the session user, never from the request body.
-router.post(
-  '/:campaignId/test',
-  writeLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
-      const { campaignId } = idParam.parse(req.params);
-      const campaign = await findCampaignOr404(storeId, campaignId);
-      if (!isCampaignSendable(campaign)) {
-        throw new AppError(
-          422,
-          'CAMPAIGN_INCOMPLETE',
-          'Add a subject and a body in at least one language first'
-        );
-      }
-      const [user, store] = await Promise.all([
-        prisma.user.findUnique({ where: { id: req.user!.userId }, select: { email: true } }),
-        prisma.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT }),
-      ]);
-      if (!user?.email) throw new AppError(422, 'NO_ADMIN_EMAIL', 'Your account has no email');
-      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+// POST /stores/:storeId/campaigns/:campaignId/test — moved to
+// `campaignTestSendRouter` below (#1954): it makes external Resend calls and
+// must not hold the request transaction open while it does.
 
-      const locales = (['en', 'ar'] as const).filter(l => isCampaignContentComplete(campaign, l));
-      for (const locale of locales) {
-        const content = pickCampaignContent(campaign, locale);
-        const { subject, html } = renderCampaignEmail({
-          store: store as CampaignStoreContext,
-          locale: content.locale,
-          subject: `[TEST] ${content.subject}`,
-          bodyHtml: content.bodyHtml,
-          unsubscribeUrl: null,
-        });
-        await ResendService.sendMarketingEmail(store as CampaignStoreContext, {
-          to: user.email,
-          subject,
-          html,
-        });
-      }
-      res.json({ success: true, data: { sentTo: user.email, locales } });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// POST /stores/:storeId/campaigns/:campaignId/send — THE merchant action that
-// sends. `scheduledAt` absent = now. Flips draft → scheduled and enqueues the
-// Inngest job; the job does all sending.
 router.post(
   '/:campaignId/send',
   writeLimiter,
@@ -546,3 +499,83 @@ router.post(
 );
 
 export default router;
+
+/**
+ * POST /stores/:storeId/campaigns/:campaignId/test — send the campaign to the
+ * signed-in admin's OWN email (both languages when both are complete). The
+ * recipient address comes from the session user, never from the request body.
+ *
+ * This router is mounted WITHOUT `tenantContext` (routes/index.ts, #1954): the
+ * route awaits up to two Resend HTTP calls, and inside the per-request
+ * interactive transaction those held a pooled Postgres connection open across
+ * a third-party round-trip (a hung Resend → a 30s transaction timeout 500).
+ * So the three reads run in their own short `runInTenantContext` transaction,
+ * which COMMITS before the first send; the sends then run with no
+ * transaction open. The response is still only sent after every send
+ * returned, so `{ sentTo, locales }` remains an honest report of what Resend
+ * accepted, and a failed send still surfaces as the error the merchant sees.
+ *
+ * It carries the SAME chain every campaign route has (authenticate →
+ * authorize → requireStoreAccess → requireFeature('email_campaigns')) on the
+ * route itself, so it adds nothing to any other `/campaigns` request that
+ * passes through this router on its way to the tenant-scoped one.
+ */
+export const campaignTestSendRouter = Router({ mergeParams: true });
+
+campaignTestSendRouter.post(
+  '/:campaignId/test',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('email_campaigns'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { campaignId } = idParam.parse(req.params);
+      const userId = req.user!.userId;
+      const { campaign, user, store } = await runInTenantContext(
+        storeId,
+        async () => {
+          const found = await findCampaignOr404(storeId, campaignId);
+          const [u, s] = await Promise.all([
+            prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+            prisma.store.findUnique({ where: { id: storeId }, select: CAMPAIGN_STORE_SELECT }),
+          ]);
+          return { campaign: found, user: u, store: s };
+        },
+        userId
+      );
+      if (!isCampaignSendable(campaign)) {
+        throw new AppError(
+          422,
+          'CAMPAIGN_INCOMPLETE',
+          'Add a subject and a body in at least one language first'
+        );
+      }
+      if (!user?.email) throw new AppError(422, 'NO_ADMIN_EMAIL', 'Your account has no email');
+      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+
+      // No transaction is open past this point.
+      const locales = (['en', 'ar'] as const).filter(l => isCampaignContentComplete(campaign, l));
+      for (const locale of locales) {
+        const content = pickCampaignContent(campaign, locale);
+        const { subject, html } = renderCampaignEmail({
+          store: store as CampaignStoreContext,
+          locale: content.locale,
+          subject: `[TEST] ${content.subject}`,
+          bodyHtml: content.bodyHtml,
+          unsubscribeUrl: null,
+        });
+        await ResendService.sendMarketingEmail(store as CampaignStoreContext, {
+          to: user.email,
+          subject,
+          html,
+        });
+      }
+      res.json({ success: true, data: { sentTo: user.email, locales } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
+import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
@@ -61,6 +62,7 @@ export default function BoldCartTable({
                       {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
                     </p>
                   )}
+                  {item.unavailable && <CartLineUnavailableNotice />}
                   <p
                     className="mt-1 text-sm font-bold uppercase tracking-wider text-primary tabular-nums"
                     style={typography?.price}
@@ -82,7 +84,7 @@ export default function BoldCartTable({
                 <div className="flex items-center border-2 border-foreground">
                   <button
                     type="button"
-                    disabled={item.quantity <= 1}
+                    disabled={item.unavailable || item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
@@ -98,8 +100,9 @@ export default function BoldCartTable({
                   </span>
                   <button
                     type="button"
+                    disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
+                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer disabled:opacity-40"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                     style={typography?.cta}
                   >
@@ -110,7 +113,11 @@ export default function BoldCartTable({
                   className="text-base font-black uppercase tracking-tight text-foreground tabular-nums"
                   style={typography?.price}
                 >
-                  {format(item.price * item.quantity)}
+                  {item.unavailable ? (
+                    <s>{format(item.price * item.quantity)}</s>
+                  ) : (
+                    format(item.price * item.quantity)
+                  )}
                 </p>
               </div>
             </div>

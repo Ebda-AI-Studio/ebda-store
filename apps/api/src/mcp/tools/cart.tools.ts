@@ -59,6 +59,9 @@ export function cartView(cartId: string, cart: any, currency: string) {
       title_ar: item.product?.nameAr ?? undefined,
       quantity: item.quantity,
       unitPrice: cartLineUnitPrice(item),
+      // #1766: the product was deleted — this line is excluded from
+      // `subtotal` and blocks checkout until it is removed.
+      ...(item.unavailable ? { unavailable: true } : {}),
     })),
     bundles: (cart.bundles ?? []).map((b: CartBundleView) => ({
       cartBundleId: b.id,

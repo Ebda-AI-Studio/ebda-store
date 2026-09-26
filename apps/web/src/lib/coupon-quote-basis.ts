@@ -18,9 +18,14 @@
  * implementation, tested on real arithmetic, removes that hole.
  */
 export function couponQuoteBasis(
-  items: ReadonlyArray<{ price: number; quantity: number }>
+  items: ReadonlyArray<{ price: number; quantity: number; unavailable?: boolean }>
 ): number {
-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // #1766: a line whose product was deleted is not in the cart total and can
+  // never be ordered, so it is not part of what a coupon is quoted against.
+  return items.reduce(
+    (sum, item) => (item.unavailable ? sum : sum + item.price * item.quantity),
+    0
+  );
 }
 
 /**
@@ -34,11 +39,18 @@ export function couponQuoteBasis(
  * them. `Σ lineTotal === couponQuoteBasis(items)` by construction.
  */
 export function couponQuoteCartItems(
-  items: ReadonlyArray<{ productId: string; price: number; quantity: number }>
+  items: ReadonlyArray<{
+    productId: string;
+    price: number;
+    quantity: number;
+    unavailable?: boolean;
+  }>
 ): Array<{ productId: string; quantity: number; lineTotal: number }> {
-  return items.map(item => ({
-    productId: item.productId,
-    quantity: item.quantity,
-    lineTotal: item.price * item.quantity,
-  }));
+  return items
+    .filter(item => !item.unavailable)
+    .map(item => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      lineTotal: item.price * item.quantity,
+    }));
 }

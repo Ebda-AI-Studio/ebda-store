@@ -21,15 +21,18 @@ import {
   type FakeDb,
 } from '../helpers/campaign-fake-db';
 
-const { holder, sendMarketingEmail, captured } = vi.hoisted(() => {
+const { holder, sendMarketingEmail, captured, awaitCampaignSendSlot } = vi.hoisted(() => {
   process.env.API_URL = 'https://api.test';
   process.env.CAMPAIGN_UNSUBSCRIBE_SECRET = 'unit-test-secret';
   return {
     holder: { prisma: null as any },
     sendMarketingEmail: vi.fn(),
     captured: { config: null as any, handler: null as any },
+    awaitCampaignSendSlot: vi.fn(async () => undefined),
   };
 });
+
+vi.mock('@api/lib/campaign-send-pacer', () => ({ awaitCampaignSendSlot }));
 
 vi.mock('@force/database', () => ({
   get prisma() {
@@ -140,6 +143,7 @@ beforeEach(() => {
   db = { stores: [], campaigns: [], recipients: [], subscribers: [], customers: [] };
   holder.prisma = createFakePrisma(db);
   sendMarketingEmail.mockReset();
+  awaitCampaignSendSlot.mockClear();
   let n = 0;
   sendMarketingEmail.mockImplementation(async () => ({ id: `msg-${++n}` }));
   process.env.CAMPAIGN_SEND_THROTTLE_MS = String(THROTTLE);
@@ -151,10 +155,30 @@ afterEach(() => {
 });
 
 describe('campaign-send', () => {
-  it('is triggered only by campaign/send-requested and runs one campaign at a time', () => {
+  it('is triggered only by campaign/send-requested and runs one campaign at a time PER STORE', () => {
     expect(captured.config.triggers).toEqual([{ event: 'campaign/send-requested' }]);
-    expect(captured.config.concurrency).toEqual({ limit: 1 });
+    // #1955: keyed per store — one store's campaign never queues behind another's.
+    expect(captured.config.concurrency).toEqual({ limit: 1, key: 'event.data.storeId' });
     expect(captured.config).not.toHaveProperty('cron');
+  });
+
+  it('#1955 — waits for a platform-wide send slot before EVERY send', async () => {
+    seed(['a@x.test', 'b@x.test', 'c@x.test']);
+    const order: string[] = [];
+    awaitCampaignSendSlot.mockImplementation(async () => {
+      order.push('slot');
+    });
+    sendMarketingEmail.mockImplementation(async (_s: unknown, o: { to: string }) => {
+      order.push(`send:${o.to}`);
+      return { id: `msg-${o.to}` };
+    });
+
+    await runJob();
+
+    expect(awaitCampaignSendSlot).toHaveBeenCalledTimes(3);
+    for (let i = 0; i < order.length; i++) {
+      if (order[i].startsWith('send:')) expect(order[i - 1]).toBe('slot');
+    }
   });
 
   it('sends ONE email per consented subscriber, to one address each, then marks the campaign sent', async () => {

@@ -66,7 +66,7 @@ linked when a customer of the same store has that email, for display only.
    try/catch. If the enqueue throws, the handler answers 503, so the request transaction rolls
    back and the campaign stays `draft` — nothing is left `scheduled` with no job behind it
    (Ruling EC-3).
-2. Inngest `campaign-send` (global concurrency 1, retries 4):
+2. Inngest `campaign-send` (concurrency 1 per store — keyed on `event.data.storeId` since #1955 — retries 4):
    - `load` — `draft` means the request has not committed yet → throw (retried). Anything other
      than `scheduled`/`sending` → stop.
    - `step.sleepUntil(scheduledAt)` when scheduled in the future, then re-check (a cancel wins).
@@ -76,7 +76,9 @@ linked when a customer of the same store has that email, for display only.
    - `batch-i` (20 recipients each) — stop if the campaign was cancelled; per recipient
      re-read, skip unless `queued`, send ONE email to ONE address with
      `idempotencyKey = campaign-recipient/<id>`, mark `sent` + provider id, or `failed` + error;
-     sleep `CAMPAIGN_SEND_THROTTLE_MS` (default 1000) after each success.
+     wait for a platform-wide send slot before each send (`CAMPAIGN_PLATFORM_SEND_INTERVAL_MS`,
+     default 1000 → ≤1/s across all stores, #1955), and sleep `CAMPAIGN_SEND_THROTTLE_MS`
+     (default 1000) after each success.
    - `finalize` — counts; `sent`, or `failed` when nothing was delivered.
    - `onFailure` — campaign `failed` (only from scheduled/sending) and every still-`queued`
      recipient → `failed`, so no orphaned `queued` row survives a dead job.

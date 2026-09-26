@@ -47,6 +47,9 @@ on:
       # merchant-initiated customer erase/export. Same rule as mfa.routes.ts
       # above — invisible to the gate until listed here.
       - 'apps/api/src/routes/customers.routes.ts'
+      # campaign-test-send-*: the test-send route runs WITHOUT tenantContext
+      # (#1954), so its own authenticate + requireStoreAccess are the guards.
+      - 'apps/api/src/routes/campaign.routes.ts'
       # safe-fetch.ts holds the redirect re-validation loop: `assertPublicHttpUrl`
       # alone proves only the URL you ASKED for is public.
       - 'apps/api/src/lib/safe-fetch.ts'

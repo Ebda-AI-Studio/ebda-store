@@ -41,7 +41,7 @@ import recommendationRoutes from './recommendation.routes';
 import shippingCarrierRoutes from './shipping-carrier.routes';
 import affiliateRoutes from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
-import campaignRoutes from './campaign.routes';
+import campaignRoutes, { campaignTestSendRouter } from './campaign.routes';
 import campaignPublicRoutes from './campaign-public.routes';
 import onesignalRoutes from './onesignal.routes';
 import storeLayoutRoutes from './store-layout.routes';
@@ -313,6 +313,11 @@ router.use('/stores', tenantContext, newsletterRoutes);
 // really sets the RLS GUCs (unlike the bare '/stores' mounts above); every
 // route inside also requires the `email_campaigns` feature. The public router
 // is the login-free unsubscribe endpoint (store comes from the signed token).
+// The test send (#1954) is the one campaign route mounted WITHOUT
+// tenantContext, and BEFORE it: it awaits Resend, so it reads in its own short
+// tenant transaction and sends after that commits. It carries the full auth +
+// feature chain on the route; every other path falls through to the next mount.
+router.use('/stores/:storeId/campaigns', campaignTestSendRouter);
 router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);
 router.use('/public/campaigns', campaignPublicRoutes);
 

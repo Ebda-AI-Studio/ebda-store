@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
+import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
@@ -77,6 +78,7 @@ export default function ModernCartTable({
                     {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
                   </p>
                 )}
+                {item.unavailable && <CartLineUnavailableNotice />}
                 <p
                   className="mt-1 text-sm font-medium text-primary tabular-nums"
                   style={typography?.price}
@@ -91,7 +93,7 @@ export default function ModernCartTable({
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
-                    disabled={item.quantity <= 1}
+                    disabled={item.unavailable || item.quantity <= 1}
                     aria-label={isRtl ? 'تقليل الكمية' : 'Decrease quantity'}
                     style={typography?.cta}
                   >
@@ -112,8 +114,9 @@ export default function ModernCartTable({
                   </span>
                   <button
                     type="button"
+                    disabled={item.unavailable}
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-40"
                     aria-label={isRtl ? 'زيادة الكمية' : 'Increase quantity'}
                     style={typography?.cta}
                   >
@@ -133,7 +136,7 @@ export default function ModernCartTable({
                     className="text-sm font-bold text-foreground sm:text-base tabular-nums"
                     style={typography?.price}
                   >
-                    {format(lineTotal)}
+                    {item.unavailable ? <s>{format(lineTotal)}</s> : format(lineTotal)}
                   </p>
                   <button
                     type="button"

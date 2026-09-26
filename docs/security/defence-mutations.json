@@ -1040,6 +1040,26 @@
       "find": "        await lockLoyaltyRow(tx, storeId, redeem.customerId);\n",
       "replace": "",
       "test": "tests/unit/loyalty-reversal-concurrency.test.ts"
+    },
+    {
+      "id": "campaign-test-send-store-access",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the campaign test-send route is mounted WITHOUT tenantContext (#1954), so its own requireStoreAccess is the only thing stopping an admin of store A from reading and mailing themselves store B's campaign",
+      "source": "apps/api/src/routes/campaign.routes.ts",
+      "find": "  requireStoreAccess,\n  requireFeature('email_campaigns'),\n  writeLimiter,\n",
+      "replace": "  requireFeature('email_campaigns'),\n  writeLimiter,\n",
+      "test": "tests/unit/campaign-routes.test.ts"
+    },
+    {
+      "id": "campaign-test-send-authenticated",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the context-less campaign test-send router carries its own auth chain; without authenticate an anonymous caller reaches the handler and the send runs against whatever identity the request carries",
+      "source": "apps/api/src/routes/campaign.routes.ts",
+      "find": "  '/:campaignId/test',\n  authenticate,\n",
+      "replace": "  '/:campaignId/test',\n",
+      "test": "tests/unit/campaign-routes.test.ts"
     }
   ]
 }
