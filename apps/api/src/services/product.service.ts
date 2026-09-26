@@ -597,9 +597,14 @@ export class ProductService {
         categories: { include: { category: true } },
         tags: { include: { tag: true } },
         store: { select: { id: true, name: true, slug: true } },
-        // Stock only — the admin detail page needs the variant-aware total,
-        // not the variant rows (it has a dedicated /variants page for those).
-        variants: { select: { inventory: true } },
+        // The admin detail page only needs the variant-aware total (it has a
+        // dedicated /variants page for the rows), but admin_get_product (MCP)
+        // maps id/name/sku/price off these same rows — select them too so
+        // that mapping isn't silently undefined. Additive, so it doesn't
+        // change what the admin detail page renders. `title` is the actual
+        // Prisma field (ProductVariant has no `name` column) — the MCP tool
+        // maps it to the response's `name` key.
+        variants: { select: { id: true, title: true, sku: true, price: true, inventory: true } },
       },
     });
 

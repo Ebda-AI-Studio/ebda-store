@@ -613,6 +613,29 @@ export class CartService {
     const lineKey = (productId: string, variantId?: string | null) =>
       `${productId}::${variantId ?? ''}`;
 
+    // #1790: aggregate the payload by lineKey BEFORE the write loop. Without
+    // this, two lines in the SAME sync payload for a product/variant with no
+    // existing cart row both read "no existing" off the map below (which is
+    // only populated from the DB, once, before the loop starts) and both
+    // reach `tx.cartItem.create`, colliding on the cart's unique index. This
+    // way the loop below sees each product/variant line at most once, with
+    // its quantities already summed — matching the "one line per
+    // product+variant" invariant the cart's own unique index enforces.
+    const aggregatedItems = Array.from(
+      items
+        .reduce((acc, item) => {
+          const key = lineKey(item.productId, item.variantId);
+          const merged = acc.get(key);
+          if (merged) {
+            merged.quantity += item.quantity;
+          } else {
+            acc.set(key, { ...item });
+          }
+          return acc;
+        }, new Map<string, { productId: string; quantity: number; variantId?: string }>())
+        .values()
+    );
+
     // Extracted so BOTH paths run the same body — the ambient one inline on the
     // request transaction, the standalone one inside its own. Leaving this
     // inline is what let `addItems` keep the defect `addItem` and `addBundle`
@@ -625,7 +648,7 @@ export class CartService {
         existingItems.map(i => [lineKey(i.productId, i.variantId), i])
       );
 
-      for (const item of items) {
+      for (const item of aggregatedItems) {
         const product = productById.get(item.productId);
         if (!product) continue;
         // A chosen-but-invalid variant is skipped, not silently dropped to

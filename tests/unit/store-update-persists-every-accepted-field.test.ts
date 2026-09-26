@@ -35,9 +35,23 @@ vi.mock('@force/database', () => ({
   Prisma: {},
   withMoneyTx: vi.fn(),
 }));
-vi.mock('@force/shared', () => ({ slugify: (s: string) => s }));
+vi.mock('@force/shared', () => ({
+  slugify: (s: string) => s,
+  // #1518: pulled in transitively by importing `updateStoreSchema`
+  // (store.routes.ts's heroCtaLink/settings.contact.addressUrl validators
+  // call the real `isSafeUrl`). A permissive stub is fine — this file tests
+  // the write whitelist, not URL-safety validation (that has its own
+  // coverage elsewhere).
+  isSafeUrl: (_url: unknown): _url is string => true,
+}));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
-  redis: { delete: vi.fn(), get: vi.fn(), set: vi.fn() },
+  // #1518: `getClient` was added when importing `updateStoreSchema` pulled in
+  // the full store.routes.ts -> store-access.ts -> security.ts import chain,
+  // which calls `redis.getClient()` at MODULE LOAD to build its rate
+  // limiters. `makeRateLimitStore` treats a null client as "no Redis store" —
+  // the same fallback it uses outside tests — so this is a safe stub, not a
+  // behavior change.
+  redis: { delete: vi.fn(), get: vi.fn(), set: vi.fn(), getClient: vi.fn(() => null) },
 }));
 vi.mock('../../apps/api/src/lib/public-cache', () => ({
   invalidateCached: vi.fn(),
@@ -56,8 +70,24 @@ vi.mock('../../apps/api/src/services/accounting/account.service', () => ({
 }));
 
 import { StoreService } from '../../apps/api/src/services/store.service';
+// #1518: the schema itself, so this file's field list can be checked against
+// it instead of drifting from it unnoticed — same pattern as
+// `tests/unit/layout-schema-parity.test.ts` / `store-layout.routes.ts`'s
+// exported `layoutSchema`.
+import { updateStoreSchema } from '../../apps/api/src/routes/store.routes';
 
 const STORE_ID = '11111111-1111-1111-1111-111111111111';
+
+// Accepted by updateStoreSchema but unconditionally written by
+// StoreService.update (top of its `data` object, no `!== undefined` guard —
+// see store.service.ts:347-353) rather than through the
+// `...(data.X !== undefined && { X: data.X })` whitelist spread this test
+// class guards. `slug`/`domain` also drive their own collision-check
+// branches (extra `prisma.store.findUnique` calls) that would need separate
+// mock plumbing from the shared `it.each` below. Not exempt from the BUG —
+// exempt from THIS test's mechanism, because they cannot silently fall
+// through the whitelist spread the way returnWindowDays/locationsEnabled did.
+const FIELDS_WRITTEN_UNCONDITIONALLY = new Set(['slug', 'domain', 'settings']);
 
 /** Everything `updateStoreSchema` accepts, with a distinguishable value each. */
 const EVERY_ACCEPTED_FIELD = {
@@ -142,5 +172,43 @@ describe('a field the caller did not send is left alone', () => {
     expect(data).not.toHaveProperty('returnWindowDays');
     expect(data).not.toHaveProperty('locationsEnabled');
     expect(data).not.toHaveProperty('heroTitle');
+  });
+});
+
+// #1518: EVERY_ACCEPTED_FIELD above was a hand-maintained object that never
+// imported the schema — a field added to updateStoreSchema and forgotten
+// here passed silently, exactly the returnWindowDays/locationsEnabled class
+// this file exists to catch. This derives the required key set from the
+// schema itself, so a new schema field fails THIS test immediately instead
+// of shipping an untested write path.
+describe('EVERY_ACCEPTED_FIELD stays in sync with updateStoreSchema', () => {
+  it('every schema field (minus the unconditionally-written ones) has a test value', () => {
+    const schemaKeys = Object.keys(updateStoreSchema.shape);
+    const testedKeys = new Set(Object.keys(EVERY_ACCEPTED_FIELD));
+
+    const missing = schemaKeys.filter(
+      key => !FIELDS_WRITTEN_UNCONDITIONALLY.has(key) && !testedKeys.has(key)
+    );
+
+    expect(
+      missing,
+      'updateStoreSchema accepts these fields but EVERY_ACCEPTED_FIELD has no test value for ' +
+        'them — add one (or, if the field is written unconditionally like slug/domain/settings, ' +
+        'add it to FIELDS_WRITTEN_UNCONDITIONALLY with why)'
+    ).toEqual([]);
+  });
+
+  it('does not test a field the schema no longer accepts (a stale entry hides nothing)', () => {
+    const schemaKeys = new Set(Object.keys(updateStoreSchema.shape));
+    const stale = Object.keys(EVERY_ACCEPTED_FIELD).filter(key => !schemaKeys.has(key));
+    expect(
+      stale,
+      'these EVERY_ACCEPTED_FIELD keys are not in updateStoreSchema — remove them'
+    ).toEqual([]);
+  });
+
+  it('has a .shape property (confirming it is a ZodObject — otherwise the checks above are vacuous)', () => {
+    expect(updateStoreSchema.shape).toBeDefined();
+    expect(Object.keys(updateStoreSchema.shape).length).toBeGreaterThan(0);
   });
 });

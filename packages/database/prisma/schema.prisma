@@ -3851,11 +3851,15 @@ model StoreUsageSnapshot {
   categories     Int @default(0)
 
   // ── Commerce (drives value, and support load) ─────────────────────────
-  orders      Int @default(0)
+  orders      Int    @default(0)
   /// NET revenue in fils: paid AND not cancelled/refunded. Gross 'paid' alone
   /// over-counts — production has paid+refunded and paid+cancelled orders.
-  revenueFils Int @default(0) @map("revenue_fils")
-  customers   Int @default(0)
+  /// BigInt (#1057, migration 20260925120000): a monthly SUM(orders.total) can
+  /// exceed the 2^31-1 ceiling of Int for a high-volume store; the writer
+  /// (store-usage-snapshot.ts) already computes this as a SQL bigint via
+  /// $queryRaw and was silently truncating it down to Number before this.
+  revenueFils BigInt @default(0) @map("revenue_fils")
+  customers   Int    @default(0)
 
   // ── Traffic ───────────────────────────────────────────────────────────
   /// Carts with NO items. A cart is created per storefront session, so on a
@@ -3864,21 +3868,26 @@ model StoreUsageSnapshot {
   /// 2026-08: pecannbee 2687 empty / 135 with items (classic browsing), while
   /// wady-aljuz was 93 / 1111 (carts arrive pre-filled via a different flow).
   /// A single "carts" number would have meant two different things.
-  sessionsProxy  Int @default(0) @map("sessions_proxy")
-  cartsWithItems Int @default(0) @map("carts_with_items")
+  sessionsProxy  Int    @default(0) @map("sessions_proxy")
+  cartsWithItems Int    @default(0) @map("carts_with_items")
   /// Summed product-detail views for the month (product_daily_views).
-  productViews   Int @default(0) @map("product_views")
+  /// BigInt (#1057/#1062) — same overflow reasoning as revenueFils below.
+  productViews   BigInt @default(0) @map("product_views")
 
   // ── AI (the one cost that is already attributed per store) ────────────
-  aiCalls         Int @default(0) @map("ai_calls")
+  aiCalls         Int    @default(0) @map("ai_calls")
   /// Calls that actually hit the provider (cached_hit = false).
-  aiBillableCalls Int @default(0) @map("ai_billable_calls")
-  aiTokensIn      Int @default(0) @map("ai_tokens_in")
-  aiTokensOut     Int @default(0) @map("ai_tokens_out")
+  aiBillableCalls Int    @default(0) @map("ai_billable_calls")
+  /// BigInt (#1057) — a busy store's monthly token SUM can exceed Int32.
+  aiTokensIn      BigInt @default(0) @map("ai_tokens_in")
+  aiTokensOut     BigInt @default(0) @map("ai_tokens_out")
   /// Spend in micros. NULL-costed rows contribute 0 here, so aiUnpricedCalls
-  /// must be read alongside it — see lib/ai-pricing.ts.
-  aiCostMicros    Int @default(0) @map("ai_cost_micros")
-  aiUnpricedCalls Int @default(0) @map("ai_unpriced_calls")
+  /// must be read alongside it — see lib/ai-pricing.ts. BigInt (#1057): micros
+  /// inflate the numeric range fast (1 KWD = 1000 micros of a currency unit
+  /// already multiplied up), so this is the first of these five likely to
+  /// overflow Int in practice.
+  aiCostMicros    BigInt @default(0) @map("ai_cost_micros")
+  aiUnpricedCalls Int    @default(0) @map("ai_unpriced_calls")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

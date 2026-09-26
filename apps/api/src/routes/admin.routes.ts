@@ -1422,14 +1422,20 @@ router.get(
           images: r.images,
           categories: r.categories,
           orders: r.orders,
-          revenueFils: r.revenueFils,
+          // #1057: revenueFils/productViews/aiCostMicros are now BigInt —
+          // `res.json` (JSON.stringify) throws on a raw bigint ("Do not know
+          // how to serialize a BigInt"), so these serialize as strings, the
+          // standard BigInt-at-a-JSON-boundary convention. No admin UI reads
+          // this endpoint yet (grepped apps/admin — none found), so there is
+          // no existing consumer type to keep in sync.
+          revenueFils: r.revenueFils.toString(),
           customers: r.customers,
           sessionsProxy: r.sessionsProxy,
           cartsWithItems: r.cartsWithItems,
-          productViews: r.productViews,
+          productViews: r.productViews.toString(),
           aiCalls: r.aiCalls,
           aiBillableCalls: r.aiBillableCalls,
-          aiCostMicros: r.aiCostMicros,
+          aiCostMicros: r.aiCostMicros.toString(),
           aiUnpricedCalls: r.aiUnpricedCalls,
         });
       }

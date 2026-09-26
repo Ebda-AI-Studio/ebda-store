@@ -1991,19 +1991,23 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
 
     const data = contactSchema.parse(req.body);
 
-    // Fire-and-forget notification email to admin — don't await so a slow /
-    // misconfigured SMTP server doesn't keep the visitor staring at a
-    // spinner (matches the newsletter-signup handler above).
-    EmailService.sendContactForm({
-      name: data.name,
-      email: data.email,
-      subject: data.subject,
-      message: data.message,
-    }).catch(err => {
-      logger.warn(
-        { err: err instanceof Error ? err.message : 'unknown' },
-        '[CONTACT] notification email failed'
-      );
+    // #645: queued on Inngest instead of a fire-and-forget
+    // `EmailService.sendContactForm(...).catch(...)` — that pattern had ZERO
+    // durable record of the submission, so an SMTP failure lost it
+    // permanently and silently while the visitor still saw "sent". Inngest
+    // retries the send 3x and dead-letter-alerts (alerts-failure-watch) past
+    // the final retry. The enqueue itself IS awaited — an enqueue failure
+    // must fail this request, not report success for a message nothing will
+    // ever act on (matches the "mark failed on enqueue error" rule for every
+    // other >300ms/3rd-party path in this codebase).
+    await inngest.send({
+      name: 'contact/form.submitted',
+      data: {
+        name: data.name,
+        email: data.email,
+        subject: data.subject,
+        message: data.message,
+      },
     });
 
     res.json({

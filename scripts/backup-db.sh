@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Local Neon backup for Force Website Builder.
-# Dumps the production DB to ~/Desktop/projects/_backups/<project>/<ts>-<sha>.sql.gz.
-# Keeps the 30 most recent backups; prunes older.
+# Local Neon backup for Force Website Builder — runs from the PRE-PUSH hook.
+# Dumps the production DB to
+# ~/Desktop/projects/_backups/<project>/pre-push/<ts>-<sha>.sql.gz — its own
+# subdirectory, separate from the nightly `backup-all-neon.sh`'s 30-day
+# rotation (see the #1846 note below `PRE_PUSH_KEEP`). Keeps the 10 most
+# recent pre-push dumps; prunes older.
 #
 # ## 2026-09-17 — why this script grew pre-flight checks and a verifier
 #
@@ -54,8 +57,19 @@ for arg in "$@"; do
 done
 
 PROJECT_NAME="$(basename "$(pwd)")"
-BACKUP_DIR="${HOME}/Desktop/projects/_backups/${PROJECT_NAME}"
+# #1846: a SEPARATE subdirectory from the nightly `backup-all-neon.sh`'s
+# `_backups/<project>/` — that script's docs claim "30 rotations = 30-day
+# window", which is only true if it owns its own 30-slot rotation. Pre-push
+# runs on every push (can be many times a day); sharing one directory and one
+# unscoped `ls -t *.sql.gz | tail -n +31` prune meant a high-push day evicted
+# nightly backups early, silently shrinking the documented recovery window.
+# Pre-push dumps are a same-day supplementary safety net, not part of that
+# 30-day guarantee — see docs/DB-BACKUP-RESTORE.md.
+BACKUP_DIR="${HOME}/Desktop/projects/_backups/${PROJECT_NAME}/pre-push"
 mkdir -p "$BACKUP_DIR"
+# How many pre-push dumps to keep. Small on purpose — these exist to cover
+# "the last few pushes today", not the month-long window the nightly owns.
+PRE_PUSH_KEEP=10
 
 SHA="$(git rev-parse --short HEAD)"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -139,7 +153,7 @@ fi
 mv "$TMP_GZ" "$OUT"
 
 if $PRUNE; then
-  ls -t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | tail -n +31 | xargs -r rm -f
+  ls -t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | tail -n +$((PRE_PUSH_KEEP + 1)) | xargs -r rm -f
 fi
 
 if ! $QUIET; then

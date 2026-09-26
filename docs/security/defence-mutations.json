@@ -2,6 +2,16 @@
   "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` — the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
   "defences": [
     {
+      "id": "r2-cleanup-isstillreferenced-rls-bypass",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "isStillReferenced's 11-probe global orphan-existence check runs on the ambient tenant-scoped client instead of an explicit RLS-bypass one — latent only because production's role already has BYPASSRLS, but at the documented RLS cutover this silently narrows to one store, so a still-referenced cross-tenant row reads as orphaned and its R2 object is irreversibly deleted",
+      "source": "apps/api/src/services/r2-cleanup.service.ts",
+      "find": "import { withRlsBypass } from '@force/database';",
+      "replace": "import { prisma as withRlsBypassScopeEscapeHatch } from '@force/database';\nconst withRlsBypass = (fn: (tx: any) => any) => fn(withRlsBypassScopeEscapeHatch);",
+      "test": "tests/unit/r2-cleanup-rls-bypass.test.ts"
+    },
+    {
       "id": "tenant-deadstock-clearance-coupon",
       "domain": "tenant / RLS",
       "tier": "unit",

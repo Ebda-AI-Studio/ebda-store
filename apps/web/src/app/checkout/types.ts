@@ -29,6 +29,13 @@ export interface CheckoutCartBundle {
   image?: string;
   quantity: number;
   total: number;
+  /**
+   * Units of this bundle's limiting component still purchasable — mirrors
+   * `CartContext`'s `CartBundle.available` (#1555: this was dropped when
+   * `CheckoutClient` built its bundle list off the cart context, so the
+   * stock state the API already returns never reached checkout).
+   */
+  available: number;
 }
 
 export interface Coupon {

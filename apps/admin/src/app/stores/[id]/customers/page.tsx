@@ -33,7 +33,8 @@ interface CustomerRow {
    * is the payment per order'.
    */
   lastOrderTotal: number;
-  lastOrderDate: string;
+  // Null for a registered shopper with zero orders (#1882).
+  lastOrderDate: string | null;
   /** Status of the latest order so a 'cancelled' chip can show inline. */
   lastOrderStatus?: string;
   /** Payment status of the latest order. */

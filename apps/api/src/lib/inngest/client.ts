@@ -272,6 +272,19 @@ type GscIngestRequestedEvent = EventPayload & {
   };
 };
 
+// #645: the platform "contact us" notification email — see
+// functions/contact-form-send.ts for why this is queued instead of a
+// fire-and-forget send.
+type ContactFormSubmittedEvent = EventPayload & {
+  name: 'contact/form.submitted';
+  data: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  };
+};
+
 // D2 email campaigns: emitted ONLY by POST /stores/:storeId/campaigns/:id/send
 // (a merchant pressing send). `scheduledAt` (ISO) doubles as the per-request
 // nonce — see functions/campaign-send.ts.
@@ -313,6 +326,7 @@ export type AppEvent =
   | AccountErasedEvent
   | AnswerEngineScanRequestedEvent
   | GscIngestRequestedEvent
+  | ContactFormSubmittedEvent
   | CampaignSendRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a

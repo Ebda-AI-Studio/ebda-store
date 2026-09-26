@@ -8,6 +8,8 @@ import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { getCached, customersCacheKey, invalidateCustomersCache } from '../lib/public-cache';
 import { AuthService } from '../services/auth.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
 
@@ -57,12 +59,14 @@ interface AggregatedCustomer {
   /** Average order value = totalSpent / totalOrders, in fils. */
   avgOrderValue: number;
   lastOrderTotal: number;
-  lastOrderDate: Date;
+  // Null for a registered shopper with zero orders (#1882) — everything
+  // else in this shape is order-derived, so there is no order to date.
+  lastOrderDate: Date | null;
   lastOrderNumber: string;
   lastOrderStatus: string;
   lastOrderPaymentStatus: string;
-  /** Oldest order's createdAt — "customer since" date. */
-  firstOrderDate: Date;
+  /** Oldest order's createdAt — "customer since" date. Null, see lastOrderDate. */
+  firstOrderDate: Date | null;
   /** Comma-joined list of order statuses the customer has touched. */
   statuses: string;
   /** Counts: paid + pending + cancelled + failed. */
@@ -251,8 +255,16 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
     if (existing) {
       existing.totalOrders += 1;
       existing.totalSpent += order.total;
+      // `existing.firstOrderDate` is `Date | null` on the type (#1882's
+      // zero-order-customer rows have no order to date), but every row this
+      // order-aggregation loop ever creates or touches sets a real Date —
+      // the null case is only ever added AFTER this loop finishes. Guard
+      // anyway rather than a non-null assertion, so a future change to that
+      // invariant fails loudly here instead of miscomparing against null.
       existing.firstOrderDate =
-        order.createdAt < existing.firstOrderDate ? order.createdAt : existing.firstOrderDate;
+        !existing.firstOrderDate || order.createdAt < existing.firstOrderDate
+          ? order.createdAt
+          : existing.firstOrderDate;
       // findMany is ordered by createdAt desc, so the first row we see
       // for this key is the most recent. Subsequent rows are older —
       // only top up missing fields, never overwrite the newest snapshot.
@@ -308,6 +320,55 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
     }
   }
 
+  // #1882: the aggregation above is entirely order-derived, so a registered
+  // shopper who has never placed an order has no row and is invisible to
+  // both this list and the detail route — which makes the erase/export
+  // routes (PR #1852) unreachable through the admin UI for that population.
+  // Union in customer-role Users this store has that own no order yet.
+  // `deletedAt: null` also excludes erased accounts (eraseAccount sets it).
+  const registeredIds = Array.from(map.keys());
+  const zeroOrderUsers = await prisma.user.findMany({
+    where: {
+      storeId,
+      role: 'customer',
+      deletedAt: null,
+      ...(registeredIds.length > 0 ? { id: { notIn: registeredIds } } : {}),
+    },
+    select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+  });
+  for (const user of zeroOrderUsers) {
+    map.set(user.id, {
+      id: user.id,
+      firstName: user.firstName ?? '',
+      lastName: user.lastName ?? '',
+      email: user.email ?? '',
+      phone: user.phone ?? '',
+      address: '',
+      address1: '',
+      address2: '',
+      city: '',
+      area: '',
+      country: '',
+      postalCode: '',
+      totalOrders: 0,
+      totalSpent: 0,
+      avgOrderValue: 0,
+      lastOrderTotal: 0,
+      lastOrderDate: null,
+      lastOrderNumber: '',
+      lastOrderStatus: '',
+      lastOrderPaymentStatus: '',
+      firstOrderDate: null,
+      statuses: '',
+      paidCount: 0,
+      pendingCount: 0,
+      cancelledCount: 0,
+      failedCount: 0,
+      paymentMethods: '',
+      isGuest: false,
+    });
+  }
+
   // Materialize comma-joined sets + recompute avgOrderValue after the
   // full aggregation pass.
   for (const [key, row] of map.entries()) {
@@ -350,8 +411,10 @@ async function aggregateCustomers(storeId: string): Promise<{
   // which needs real Date objects for ExcelJS's `numFmt` date formatting —
   // sees identical types whether this was a cache hit or a fresh computation.
   for (const c of result.customers) {
-    c.lastOrderDate = new Date(c.lastOrderDate);
-    c.firstOrderDate = new Date(c.firstOrderDate);
+    // #1882: a zero-order customer's dates are `null`, not a JSON-string
+    // timestamp — `new Date(null)` would silently coerce to the 1970 epoch.
+    c.lastOrderDate = c.lastOrderDate ? new Date(c.lastOrderDate) : null;
+    c.firstOrderDate = c.firstOrderDate ? new Date(c.firstOrderDate) : null;
   }
   for (const o of result.orders) {
     o.createdAt = new Date(o.createdAt);
@@ -1008,6 +1071,67 @@ router.get(
       });
 
       if (fetchedOrders.length === 0) {
+        // No orders at all — could still be a registered shopper who has
+        // never checked out. Guest keys (email/phone) have no order-less
+        // identity to resolve to, so only a UUID key gets this fallback.
+        // #1882: without it, a zero-order customer-role User is invisible
+        // to both this route and the list aggregation below, which makes
+        // the erase/export routes (PR #1852) unreachable through the admin
+        // UI for that population even though the routes themselves work.
+        if (isUuid) {
+          const zeroOrderUser = await prisma.user.findFirst({
+            where: { id: decodedKey, storeId, role: 'customer', deletedAt: null },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              createdAt: true,
+            },
+          });
+          if (zeroOrderUser) {
+            res.json({
+              success: true,
+              data: {
+                customer: {
+                  id: zeroOrderUser.id,
+                  isGuest: false,
+                  firstName: zeroOrderUser.firstName ?? '',
+                  lastName: zeroOrderUser.lastName ?? '',
+                  email: zeroOrderUser.email ?? '',
+                  phone: zeroOrderUser.phone ?? '',
+                  address: '',
+                  address1: '',
+                  address2: '',
+                  city: '',
+                  area: '',
+                  country: '',
+                  postalCode: '',
+                  accountCreatedAt: zeroOrderUser.createdAt,
+                  firstOrderDate: null,
+                  lastOrderDate: null,
+                  totalOrders: 0,
+                  totalSpent: 0,
+                  avgOrderValue: 0,
+                  paidCount: 0,
+                  pendingCount: 0,
+                  cancelledCount: 0,
+                  failedCount: 0,
+                  refundedCount: 0,
+                  totalRefunded: 0,
+                  paymentMethods: [],
+                  statuses: [],
+                  groupId: null,
+                  group: null,
+                },
+                orders: [],
+                truncated: false,
+              },
+            });
+            return;
+          }
+        }
         throw new AppError(404, 'NOT_FOUND', 'Customer not found');
       }
 
@@ -1187,7 +1311,18 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
 
-      invalidateCustomersCache(storeId);
+      // Deferred (not a bare `invalidateCustomersCache(storeId)`): this route
+      // runs inside the request's tenant transaction, which commits AFTER the
+      // handler returns (request-transaction.ts). Busting the cache here would
+      // let a GET /customers racing the still-open transaction re-cache the
+      // pre-erasure PII for the full 300s TTL. `deferAfterTenantCommit` fires
+      // it after COMMIT instead — same mechanism AuthService.eraseAccount
+      // already uses for its Inngest send.
+      void deferAfterTenantCommit('customers.erase.invalidateCache', () =>
+        invalidateCustomersCache(storeId)
+      ).catch(err =>
+        logger.warn({ err, storeId, customerId }, '[customers.erase] cache invalidation failed')
+      );
 
       res.json({ success: true, data: { message: 'Customer data erased' } });
     } catch (error) {

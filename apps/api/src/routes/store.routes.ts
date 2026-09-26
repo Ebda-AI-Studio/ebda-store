@@ -59,7 +59,12 @@ const heroCtaLinkSchema = z.preprocess(
     .optional()
 );
 
-const updateStoreSchema = createStoreSchema.partial().extend({
+// #1518: exported so `tests/unit/store-update-persists-every-accepted-field.test.ts`
+// can derive its field-coverage check from the schema itself instead of a
+// hand-maintained field list that can silently drift from it — which is
+// exactly how returnWindowDays/locationsEnabled shipped un-persisted the
+// first time (see that test's header comment).
+export const updateStoreSchema = createStoreSchema.partial().extend({
   heroTitle: heroNullableStr(200),
   heroTitleAr: heroNullableStr(200),
   heroSubtitle: heroNullableStr(500),

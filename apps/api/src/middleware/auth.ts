@@ -4,6 +4,7 @@ import { config } from '../config';
 import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
 import { prisma } from '@force/database';
+import logger from '../lib/logger';
 
 export interface AuthPayload {
   userId: string;
@@ -205,18 +206,35 @@ export async function optionalAuthenticate(
     return;
   }
 
+  // #1255: crypto verification and the I/O revocation checks used to share
+  // ONE bare try/catch, so a Redis/Postgres blip in
+  // resolveTokenVersionAndStatus/isJtiDenied was indistinguishable from a bad
+  // signature — both silently degraded to guest with zero log signal. A
+  // widespread Redis/Postgres degradation could therefore make every
+  // logged-in visitor intermittently appear logged out across the whole
+  // storefront with nothing to alert on. Split so the two failure classes
+  // are observable separately; the I/O branch still fails toward guest (the
+  // safe default — we do not want to grant an identity we could not confirm
+  // is unrevoked), but now logs loudly instead of silently.
+  let payload: (AuthPayload & { type?: string; purpose?: string }) | null = null;
   try {
-    const payload = jwt.verify(token, config.jwtSecret, {
+    payload = jwt.verify(token, config.jwtSecret, {
       algorithms: ['HS256'],
       issuer: 'force-api',
       audience: 'force-app',
     }) as AuthPayload & { type?: string; purpose?: string };
+  } catch {
+    // Invalid/expired/malformed token — routine, unauthenticated traffic on
+    // a public route. Continue as guest, no log.
+    return next();
+  }
 
-    // Same rejections as `authenticate` — a refresh token or any non-access
-    // purpose claim must never establish an identity.
-    if (payload.type === 'refresh') return next();
-    if (payload.purpose && payload.purpose !== 'access') return next();
+  // Same rejections as `authenticate` — a refresh token or any non-access
+  // purpose claim must never establish an identity.
+  if (payload.type === 'refresh') return next();
+  if (payload.purpose && payload.purpose !== 'access') return next();
 
+  try {
     const decoded = jwt.decode(token) as { jti?: string } | null;
     if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) return next();
 
@@ -228,8 +246,15 @@ export async function optionalAuthenticate(
     if (blocked) return next();
 
     req.user = payload;
-  } catch {
-    // Invalid token, continue without user
+  } catch (err) {
+    // A validly-signed token whose REVOCATION status we could not confirm
+    // (Redis/Postgres error) — distinct from, and logged unlike, a bad
+    // signature above. Still degrades to guest (never grant an identity this
+    // request couldn't confirm is unrevoked), but loudly instead of silently.
+    logger.error(
+      { err, userId: payload.userId },
+      '[auth] optionalAuthenticate revocation check failed — degrading to guest'
+    );
   }
 
   next();

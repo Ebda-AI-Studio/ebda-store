@@ -14,6 +14,7 @@
  */
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { withSavepoint } from '../lib/savepoint';
 
 export interface CustomerGroupInput {
   name: string;
@@ -230,17 +231,25 @@ export const CustomerGroupService = {
     }
 
     try {
-      return await prisma.customer.create({
-        data: {
-          storeId,
-          phone,
-          email,
-          firstName: identity.firstName?.trim() || '',
-          lastName: identity.lastName?.trim() || '',
-          groupId,
-        },
-        select: assignReturnSelect,
-      });
+      // #1582: this runs inside the request's ambient tenant transaction
+      // (assignByIdentity is reachable from POST under tenantContext). A
+      // failed INSERT aborts that whole transaction (Postgres 25P02) — the
+      // P2002 recovery below would then itself throw 25P02 instead of
+      // recovering, and the request 500s. `withSavepoint` scopes the abort
+      // to just this statement so the recovery can actually run.
+      return await withSavepoint(() =>
+        prisma.customer.create({
+          data: {
+            storeId,
+            phone,
+            email,
+            firstName: identity.firstName?.trim() || '',
+            lastName: identity.lastName?.trim() || '',
+            groupId,
+          },
+          select: assignReturnSelect,
+        })
+      );
     } catch (err) {
       // Lost a concurrent upsert race against the (store, phone)/(store, email)
       // unique index — re-find and update instead of surfacing a 500.

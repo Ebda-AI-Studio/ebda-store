@@ -481,6 +481,7 @@ export default function CartClient() {
                           image={bundle.image}
                           quantity={bundle.quantity}
                           total={bundle.total}
+                          available={bundle.available}
                           isRtl={language === 'ar'}
                           onRemove={() =>
                             handleRemoveBundle(

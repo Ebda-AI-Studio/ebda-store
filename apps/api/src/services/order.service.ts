@@ -27,6 +27,7 @@ import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
 import { invalidateStoreProductCaches, invalidateCustomersCache } from '../lib/public-cache';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -1662,8 +1663,17 @@ export class OrderService {
     // Bust the admin aggregated-customers snapshot — a status change can move
     // an order in/out of the totals it aggregates (total-spent, order-count,
     // last-order-date), so the cache must not serve a stale snapshot for up
-    // to its 300s TTL after a mutation like this.
-    await invalidateCustomersCache(storeId);
+    // to its 300s TTL after a mutation like this. Deferred (same class as
+    // customers.routes.ts's erase route, #1876): this update runs inside
+    // orderRoutes' request tenant transaction, which commits AFTER the
+    // handler returns — invalidating inline here lets a GET /customers
+    // racing the still-open transaction re-cache the pre-update snapshot for
+    // the full TTL. `deferAfterTenantCommit` fires it after COMMIT instead.
+    void deferAfterTenantCommit('order.updateStatus.invalidateCustomersCache', () =>
+      invalidateCustomersCache(storeId)
+    ).catch(err =>
+      logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
+    );
 
     // Append-only status audit trail. `order.status` was read (via getById)
     // BEFORE the update above, so it is the true prior status. Best-effort:

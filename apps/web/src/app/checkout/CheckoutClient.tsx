@@ -182,7 +182,6 @@ export default function CheckoutClient() {
         : { day: 'today' as const, windows: [] },
     [checkoutDelivery, nowMinutes]
   );
-  const anyDeliveryWindowAvailable = deliverySelection.windows.some(w => w.available);
 
   // Fire InitiateCheckout pixel event once the cart has hydrated from the
   // server and we know it isn't empty. Firing on mount (before hydration)
@@ -244,6 +243,9 @@ export default function CheckoutClient() {
         image: b.image,
         quantity: b.quantity,
         total: b.total,
+        // #1555: was dropped here — CartContext already carries it off
+        // GET /public/cart's CartBundleView.available.
+        available: b.available,
       })),
       subtotal: cartContextTotal,
       total: cartContextTotal,
@@ -973,15 +975,33 @@ export default function CheckoutClient() {
       return;
     }
 
+    // #776: `nowMinutes`/`deliverySelection` above are memoized once per
+    // mount/timezone change — not a ticking clock. A customer who sits on
+    // step 2 past a window's order-by cutoff (or past midnight, rolling the
+    // day) would otherwise submit a selection the render-time picker itself
+    // would no longer offer. Recompute fresh right before validating/using
+    // it, so submission always checks the window against "now", not
+    // "whenever this component last re-rendered".
+    const submitNowMinutes = getNowMinutesInTimezone(store?.timezone || 'Asia/Kuwait');
+    const freshDeliverySelection = checkoutDelivery?.windows?.enabled
+      ? resolveDeliverySelection(checkoutDelivery.windows.items, submitNowMinutes)
+      : { day: 'today' as const, windows: [] };
+    const freshAnyWindowAvailable = freshDeliverySelection.windows.some(w => w.available);
+    const freshSelectedWindow = freshDeliverySelection.windows.find(
+      w => w.id === selectedDeliveryWindowId && w.available
+    );
+    // The picked window lapsed (or a day-rollover happened) between mount and
+    // submit — treat it the same as never having picked one, not as a stale
+    // choice that silently ships.
+    if (selectedDeliveryWindowId && !freshSelectedWindow) {
+      setSelectedDeliveryWindowId(null);
+    }
+
     // Delivery window is required only when the store enabled windows AND at
-    // least one is actually available today — when none are available the
+    // least one is actually available NOW — when none are available the
     // "no windows today" message shows and the order proceeds unselected
     // (per the platform rule: never hard-block checkout on this).
-    if (
-      checkoutDelivery?.windows?.enabled &&
-      anyDeliveryWindowAvailable &&
-      !selectedDeliveryWindowId
-    ) {
+    if (checkoutDelivery?.windows?.enabled && freshAnyWindowAvailable && !freshSelectedWindow) {
       setDeliveryWindowError(t('Please select a delivery window', 'يرجى اختيار موعد التوصيل'));
       const firstError = document.querySelector('[data-error="true"]');
       firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1053,11 +1073,13 @@ export default function CheckoutClient() {
       // actually picked from (not necessarily their current UI language at
       // read time). The day matters once rollover is in play: a window
       // picked after today's cutoff is for TOMORROW, not today.
-      const selectedDeliveryWindow = deliverySelection.windows.find(
-        w => w.id === selectedDeliveryWindowId
-      );
+      //
+      // Uses `freshSelectedWindow`/`freshDeliverySelection` (computed above
+      // against submit-time "now"), not the mount-time memoized
+      // `deliverySelection` — see the #776 comment above.
+      const selectedDeliveryWindow = freshSelectedWindow;
       const deliveryDayLabel =
-        deliverySelection.day === 'tomorrow' ? t('Tomorrow', 'غدًا') : t('Today', 'اليوم');
+        freshDeliverySelection.day === 'tomorrow' ? t('Tomorrow', 'غدًا') : t('Today', 'اليوم');
       const notesWithDelivery = selectedDeliveryWindow
         ? `${t('Delivery', 'التوصيل')}: ${deliveryDayLabel}, ${
             language === 'ar' ? selectedDeliveryWindow.labelAr : selectedDeliveryWindow.label

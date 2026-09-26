@@ -52,7 +52,18 @@ const SERVICES = path.resolve(__dirname, '../../apps/api/src/services');
  * reason — use the unreviewed list below for that, which is deliberately
  * uncomfortable to leave entries in.
  */
-const REVIEWED_OWN_TRANSACTION: Record<string, string> = {};
+const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
+  // AuthService.verifyEmail's `prisma.$transaction([...])` — reachable only
+  // via `/auth/*` routes, mounted at `router.use('/auth', authRoutes)` with
+  // NO `tenantContext` (unlike every `/stores/:storeId/...` mount). There is
+  // never an ambient tenant transaction on this path, so this always opens
+  // its own real transaction — the nested-connection hazard this registry
+  // guards against cannot occur here. Surfaced by #1791's per-occurrence
+  // proximity check (the file's OTHER `hasTenantContext()` branch, in a
+  // different method ~1200 lines away, used to clear this one too under the
+  // old whole-file check).
+  'auth.service.ts': 'verifyEmail — /auth routes carry no ambient tenant transaction',
+};
 
 /**
  * Call sites that predate this registry and have NOT been checked for the
@@ -93,13 +104,42 @@ function callers(): string[] {
   );
 }
 
+/**
+ * #1791: a whole-FILE `src.includes('hasTenantContext')` cleared EVERY
+ * `prisma.$transaction` call in that file the moment the string appeared
+ * anywhere — a comment, an unrelated function, a different branch entirely —
+ * reproducing the exact defect (cart.service.ts) this registry exists to
+ * catch. This checks PER OCCURRENCE instead: a `hasTenantContext` mention has
+ * to appear near the specific `$transaction` call, not merely somewhere in
+ * the file. Line-proximity, not AST — same "weak evidence about behaviour"
+ * caveat as the rest of this file; the behavioural gates are the integration
+ * tests named in the header comment. `cart.service.ts`'s real shape (guard
+ * check, then the `$transaction` call ~30 lines later inside the branch that
+ * runs only when `hasTenantContext()` is false) sits comfortably inside this
+ * window; a `hasTenantContext()` in a distant, unrelated function does not.
+ */
+const OCCURRENCE_PROXIMITY_LINES = 50;
+
+/** `prisma.$transaction` occurrences in `file` with no nearby `hasTenantContext`. */
+function unguardedTransactionLines(file: string): number[] {
+  const lines = fs.readFileSync(path.join(SERVICES, file), 'utf-8').split('\n');
+  const unguarded: number[] = [];
+  lines.forEach((line, i) => {
+    if (!line.includes('prisma.$transaction')) return;
+    const start = Math.max(0, i - OCCURRENCE_PROXIMITY_LINES);
+    const end = Math.min(lines.length, i + OCCURRENCE_PROXIMITY_LINES + 1);
+    const nearby = lines.slice(start, end).join('\n');
+    if (!nearby.includes('hasTenantContext')) unguarded.push(i + 1); // 1-based for the error message
+  });
+  return unguarded;
+}
+
 describe('nested-transaction registry', () => {
   it('accounts for every service that opens its own transaction', () => {
     const unaccounted = callers().filter(f => {
-      const src = fs.readFileSync(path.join(SERVICES, f), 'utf-8');
-      if (src.includes('hasTenantContext')) return false;
       if (f in REVIEWED_OWN_TRANSACTION) return false;
-      return !UNREVIEWED_PREDATING_THIS_REGISTRY.has(f);
+      if (UNREVIEWED_PREDATING_THIS_REGISTRY.has(f)) return false;
+      return unguardedTransactionLines(f).length > 0;
     });
 
     expect(

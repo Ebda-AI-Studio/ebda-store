@@ -53,6 +53,13 @@ vi.mock('@force/database', () => ({
   prisma: prismaMock,
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),
+  // #1599: isStillReferenced now runs its 11 probes through `withRlsBypass`,
+  // not the bare `prisma` export — this file's concern is COMMIT-TIMING (the
+  // header docstring), not RLS routing (that has its own dedicated coverage
+  // in tests/unit/r2-cleanup-rls-bypass.test.ts), so this just runs the
+  // callback against the SAME mocks the rest of this file already asserts
+  // against.
+  withRlsBypass: (fn: (tx: typeof prismaMock) => unknown) => fn(prismaMock),
 }));
 
 vi.mock('@api/services/storage.service', () => ({ StorageService: storageMock }));

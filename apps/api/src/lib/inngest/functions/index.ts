@@ -68,6 +68,7 @@ import {
   answerEngineScanOnDemand,
 } from './answer-engine-citation-scan';
 import { gscIngestCron, gscIngestOnDemand } from './gsc-ingest';
+import { contactFormSend } from './contact-form-send';
 import { campaignSend } from './campaign-send';
 
 /**
@@ -193,6 +194,10 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // its on-demand twin.
   gscIngestCron,
   gscIngestOnDemand,
+  // Platform "contact us" notification email (#645) — queued instead of
+  // fire-and-forget so an SMTP failure retries + dead-letter-alerts instead
+  // of silently losing the submission.
+  contactFormSend,
   // D2 email campaigns: event-triggered only (a merchant pressing send) —
   // no cron, so registering it sends nothing on its own.
   campaignSend,

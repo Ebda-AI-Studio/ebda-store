@@ -36,8 +36,10 @@ interface CustomerDetail {
   country: string;
   postalCode: string;
   accountCreatedAt: string | null;
-  firstOrderDate: string;
-  lastOrderDate: string;
+  // Null for a registered shopper who has never placed an order (#1882) —
+  // the aggregation is otherwise entirely order-derived.
+  firstOrderDate: string | null;
+  lastOrderDate: string | null;
   totalOrders: number;
   totalSpent: number;
   avgOrderValue: number;

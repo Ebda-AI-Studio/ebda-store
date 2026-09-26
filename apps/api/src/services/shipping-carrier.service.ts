@@ -151,9 +151,15 @@ class ShippingCarrierService {
   /**
    * Merge incoming carrier credentials over the currently-stored (decrypted)
    * values, preserving any field whose incoming value is still a mask. The
-   * route's `maskCredentials` emits `<prefix>****` / `****`, so any value
-   * containing `*` is treated as the masked-unchanged sentinel — credentials
-   * (API keys, passwords) never legitimately contain `*`.
+   * route's `maskCredentials` always emits AT LEAST 4 consecutive asterisks
+   * (`<prefix>****` for a value longer than 4 chars, bare `****` otherwise —
+   * see `shipping-carrier.routes.ts`'s `maskCredentials`), so the sentinel
+   * check requires that exact shape (`****`), not a bare `includes('*')`.
+   * #1866: a real credential legitimately containing a single `*` (a
+   * password with a special char) used to match the old bare check, throw
+   * CARRIER_CREDENTIALS_UNRESOLVED, and block the save with no stored
+   * fallback — mirrors notification-config.service.ts's identical fix for
+   * the same class of bug.
    */
   private async preserveMaskedCredentials(
     storeId: string,
@@ -164,7 +170,7 @@ class ShippingCarrierService {
     const out: Record<string, string> = {};
 
     for (const [key, value] of Object.entries(incoming)) {
-      if (typeof value === 'string' && value.includes('*')) {
+      if (typeof value === 'string' && value.includes('****')) {
         if (stored === null) {
           // Straight from Prisma, NEVER through getCarrierConfig's 300s cache.
           // This read is the merge base for a secret we are about to

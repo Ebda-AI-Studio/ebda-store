@@ -103,8 +103,13 @@ Per existing project memory, the project uses `force_app` role for prod (RLS enf
 Backups are stored at `~/Desktop/projects/_backups/force-website-builder/` on the developer Mac, one dump per day, 30-day rotation. Find the dump from before the bad commit:
 
 ```bash
-ls -lt ~/Desktop/projects/_backups/force-website-builder/
-# pick the dump timestamped before the bad deploy
+# GLOBBED to *.sql.gz — an unglobbed `ls` also lists `.sql.gz.SUSPECT` files
+# (a dump that failed verify-dump.sh, parked by scripts/backup-db.sh), and a
+# fresh one sorts to the top as if it were the most recent good backup.
+ls -lt ~/Desktop/projects/_backups/force-website-builder/*.sql.gz
+# pick the dump timestamped before the bad deploy, then verify it BEFORE
+# trusting it — present + correctly-named is not the same as restorable:
+bash scripts/verify-dump.sh <chosen>.sql.gz
 ```
 
 #### Restore from local pg_dump

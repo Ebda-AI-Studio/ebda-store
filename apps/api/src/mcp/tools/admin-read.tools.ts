@@ -37,6 +37,30 @@ import { ok } from './tool-result';
  * distinction is worthless if read tools skip the check.
  */
 
+/**
+ * Order has no `customerName` column and OrderService.list's `customer`
+ * select carries firstName/lastName/email (no `name`) — so derive it the
+ * same way OrderService.createOrder's socket notification does. Guest
+ * orders (customerId null) fall back to the shippingAddress JSON snapshot
+ * (firstName/lastName/email), which OrderService.createAdminOrder already
+ * treats as the guest-contact source of truth.
+ */
+function deriveCustomerName(o: {
+  customer?: { firstName?: string | null; lastName?: string | null; email?: string | null } | null;
+  shippingAddress?: unknown;
+}): string | undefined {
+  const fromUser =
+    `${o.customer?.firstName ?? ''} ${o.customer?.lastName ?? ''}`.trim() || o.customer?.email;
+  if (fromUser) return fromUser;
+
+  const addr = (o.shippingAddress ?? {}) as Record<string, unknown>;
+  const fromAddress =
+    `${typeof addr.firstName === 'string' ? addr.firstName : ''} ${
+      typeof addr.lastName === 'string' ? addr.lastName : ''
+    }`.trim() || (typeof addr.email === 'string' ? addr.email : undefined);
+  return fromAddress || undefined;
+}
+
 /** Shared shape so a product looks the same from every admin tool. */
 function productSummary(p: any) {
   return {
@@ -150,7 +174,12 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
         weight: p.weight ?? undefined,
         variants: (p.variants ?? []).map((v: any) => ({
           id: v.id,
-          name: v.name,
+          // ProductVariant's Prisma field is `title`, not `name` — mapped to
+          // this response's `name` key (#1735: this mapping already existed
+          // and read v.name, which the widened select above never
+          // populated, so the fix corrects the select-vs-field mismatch,
+          // not just the missing select).
+          name: v.title,
           sku: v.sku ?? undefined,
           price: v.price,
           inventory: v.inventory,
@@ -204,7 +233,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
           paymentStatus: o.paymentStatus,
           total: o.total,
           currency: store.currency,
-          customerName: o.customerName ?? o.customer?.name ?? undefined,
+          customerName: deriveCustomerName(o),
           itemCount: o.items?.length ?? undefined,
           createdAt: o.createdAt,
         })),

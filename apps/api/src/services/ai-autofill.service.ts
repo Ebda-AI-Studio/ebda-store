@@ -401,6 +401,15 @@ export async function balanceProductLanguages(
 
     if (!arabicText && !englishText) return false; // nothing to work with
 
+    // #1572: a field stamped 'human' was explicitly set (or explicitly
+    // cleared — stampHumanEdits stamps a clear too) by the merchant and
+    // must never be silently re-filled by the daily sweep (force:false).
+    // Checked BEFORE calling AIService.translate, not only at the write
+    // step below — otherwise a human-cleared field still burns Gemini
+    // quota on every sweep even though its translation is discarded.
+    const humanEn = sources[enField] === 'human' && !opts.force;
+    const humanAr = sources[arField] === 'human' && !opts.force;
+
     // Compute target values
     let newEn: string | null;
     let newAr: string | null;
@@ -408,9 +417,12 @@ export async function balanceProductLanguages(
     if (arabicText) {
       // Arabic is authoritative
       newAr = arabicText;
-      if (englishText && !opts.force) {
-        // English already present and no force → keep it (no translation needed)
-        newEn = englishText;
+      if ((englishText && !opts.force) || humanEn) {
+        // English already present and no force → keep it (no translation
+        // needed). Also keep it as-is when the merchant explicitly owns
+        // (or explicitly cleared) the English slot — that is not a gap
+        // for AI to fill.
+        newEn = englishText ?? (enVal?.trim() || null);
       } else {
         // Either English is missing, OR force:true requests a fresh translation
         const { translation } = await AIService.translate({
@@ -423,6 +435,11 @@ export async function balanceProductLanguages(
         if (!translation?.trim()) return false;
         newEn = translation;
       }
+    } else if (humanAr) {
+      // Only English exists, but the Arabic slot is merchant-owned (or an
+      // explicit clear) — same reasoning as humanEn above, mirrored.
+      newEn = englishText!;
+      newAr = arVal?.trim() || null;
     } else {
       // Only English exists
       newEn = englishText!;
@@ -442,14 +459,18 @@ export async function balanceProductLanguages(
     const arUnchanged = (newAr ?? '') === (arVal ?? '');
     if (!opts.force && enUnchanged && arUnchanged) return false;
 
-    // Write only the fields that actually changed (or all when force:true)
-    if (!enUnchanged || opts.force) {
+    // Write only the fields that actually changed (or all when force:true).
+    // The `!human*` checks are a second guard on top of the branch logic
+    // above — belt-and-suspenders against ever stamping a human-owned slot
+    // 'ai' or overwriting it, even if a future edit adds another code path
+    // into `newEn`/`newAr`.
+    if ((!enUnchanged || opts.force) && !humanEn) {
       writes[enField] = newEn ?? null;
       newSources[enField] = 'ai';
       // Mark the translation direction hint
       if (arabicText) sides[enField === 'name' ? 'name' : 'description'] = 'ar';
     }
-    if (!arUnchanged || opts.force) {
+    if ((!arUnchanged || opts.force) && !humanAr) {
       writes[arField] = newAr ?? null;
       newSources[arField] = 'ai';
       if (!arabicText) sides[enField === 'name' ? 'name' : 'description'] = 'en';

@@ -32,6 +32,24 @@ import { sendAlert } from '../../../services/alerts.service';
  * Cross-tenant by nature (it reports on every store), so it runs inside
  * withRlsBypass — there is no HTTP tenant GUC on a cron.
  */
+/**
+ * A step's return value is memoized as JSON and replayed from JSON, and JSON
+ * has no bigint. Every int8 column therefore crosses the `collect` step
+ * boundary as an exact decimal string; the upsert turns it back into the type
+ * its column needs (BigInt() for the BigInt columns, Number() for the Int
+ * counts).
+ */
+export function toJsonSafeRows<T extends Record<string, unknown>>(
+  rows: T[]
+): Array<Record<keyof T, string>> {
+  return rows.map(
+    r =>
+      Object.fromEntries(
+        Object.entries(r).map(([k, v]) => [k, typeof v === 'bigint' ? v.toString() : String(v)])
+      ) as Record<keyof T, string>
+  );
+}
+
 export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
   {
     id: 'store-usage-snapshot',
@@ -150,7 +168,7 @@ export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
           FROM stores s
           WHERE s.deleted_at IS NULL
         `;
-      })
+      }).then(toJsonSafeRows)
     );
 
     let written = 0;
@@ -164,16 +182,21 @@ export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
             images: Number(r.images),
             categories: Number(r.categories),
             orders: Number(r.orders),
-            revenueFils: Number(r.revenue_fils),
+            // #1057: revenue_fils/product_views/ai_tokens_in/ai_tokens_out/
+            // ai_cost_micros are BigInt columns — rebuilt with BigInt() from
+            // the exact decimal string the collect step returned, never
+            // through Number(), which is the truncation that migration exists
+            // to stop.
+            revenueFils: BigInt(r.revenue_fils),
             customers: Number(r.customers),
             sessionsProxy: Number(r.sessions_proxy),
             cartsWithItems: Number(r.carts_with_items),
-            productViews: Number(r.product_views),
+            productViews: BigInt(r.product_views),
             aiCalls: Number(r.ai_calls),
             aiBillableCalls: Number(r.ai_billable_calls),
-            aiTokensIn: Number(r.ai_tokens_in),
-            aiTokensOut: Number(r.ai_tokens_out),
-            aiCostMicros: Number(r.ai_cost_micros),
+            aiTokensIn: BigInt(r.ai_tokens_in),
+            aiTokensOut: BigInt(r.ai_tokens_out),
+            aiCostMicros: BigInt(r.ai_cost_micros),
             aiUnpricedCalls: Number(r.ai_unpriced_calls),
             capturedAt: new Date(),
           };

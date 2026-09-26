@@ -70,6 +70,17 @@ export interface BundleLineProps {
    * used in the checkout order summary. Defaults to `row`.
    */
   variant?: 'card' | 'row';
+  /**
+   * Units of this bundle's LIMITING component still purchasable — `CartBundle.available`
+   * / `CheckoutCartBundle.available`, both sourced from the same `CartBundleView.available`
+   * the API computes. Omit when unknown (older callers / not yet threaded through); no
+   * indicator renders, matching the behaviour before this prop existed. When present and
+   * lower than `quantity`, an inline "out of stock" note renders — the bundle equivalent
+   * of the product-card OOS ribbon, sized for this compact row rather than reusing the
+   * full merchant-configurable ribbon system (that one is styled for a product image, not
+   * a 64px cart/checkout thumbnail).
+   */
+  available?: number;
   /** Cart-only — omit on read-only surfaces (checkout summary). */
   onRemove?: () => void;
   isRtl?: boolean;
@@ -107,6 +118,7 @@ export function BundleLine({
   onRemove,
   isRtl: isRtlProp,
   testId = 'cart-line',
+  available,
 }: BundleLineProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { localize } = useNumerals();
@@ -114,12 +126,17 @@ export function BundleLine({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && nameAr ? nameAr : name;
   const savings = componentSum && componentSum > total ? componentSum - total : 0;
+  const isOutOfStock = available !== undefined && available < quantity;
 
   const badge = (
     <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
       {t('Bundle', 'باقة')}
     </span>
   );
+
+  const outOfStockNote = isOutOfStock ? (
+    <p className="mt-1 text-xs font-semibold text-destructive">{t('Out of stock', 'غير متوفر')}</p>
+  ) : null;
 
   if (variant === 'card') {
     return (
@@ -148,6 +165,7 @@ export function BundleLine({
             <div>
               {badge}
               <h3 className="mt-0.5 text-lg font-bold text-foreground sm:text-xl">{displayName}</h3>
+              {outOfStockNote}
             </div>
             {onRemove && (
               <button
@@ -202,6 +220,7 @@ export function BundleLine({
       <div className="flex flex-1 flex-col">
         {badge}
         <h3 className="mt-0.5 text-base font-semibold text-foreground">{displayName}</h3>
+        {outOfStockNote}
         {savings > 0 && (
           <p className="text-xs font-medium text-[hsl(var(--success))]">
             {t('Save', 'وفّر')} {formatPrice(savings)}

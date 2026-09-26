@@ -611,6 +611,14 @@ export class BulkService {
     const newCategoryNames = new Set<string>();
     const newTagNames = new Set<string>();
 
+    // #1029: mirrors `existingSlugs` below, but for SKU. `productBySku` is
+    // preloaded from the DB ONCE, before this loop — it never sees a sibling
+    // row this same import is about to create. Without tracking SKUs seen
+    // so far in THIS import, two rows sharing the same NEW sku both read
+    // `existing: null` and both reach the Phase 4 batch insert, which fails
+    // the whole batch on the (storeId, sku) unique index (P2002).
+    const seenSkus = new Set<string>();
+
     // Parsed row data for Phase 3
     interface ParsedRow {
       rowIndex: number;
@@ -708,6 +716,23 @@ export class BulkService {
           continue;
         }
 
+        // #1029: a second row creating a brand-new product with a SKU
+        // already claimed by an earlier row in this same import — fail this
+        // row instead of letting both reach the batch insert. Only applies
+        // to CREATEs: two rows updating the same already-existing product to
+        // the same SKU aren't a unique-index collision.
+        if (row.sku && !existing) {
+          if (seenSkus.has(row.sku)) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: `Duplicate SKU "${row.sku}" within this import`,
+            });
+            continue;
+          }
+          seenSkus.add(row.sku);
+        }
+
         // Ensure unique slug using the in-memory Set (avoid DB round-trip)
         let uniqueSlug = baseSlug;
         if (!existing || existing.slug !== baseSlug) {
@@ -768,6 +793,19 @@ export class BulkService {
     for (const parentSku of variantsByParent.keys()) {
       const existingParent = productBySku.get(parentSku);
       if (existingParent) parentIdBySku.set(parentSku, existingParent.id);
+    }
+    // #1560: `productBySku` is keyed by the DB's CURRENT sku for each
+    // existing product — it misses a parent row that Phase 2 matched via
+    // SLUG instead (existing product, sku changing/being added in this same
+    // import). `validRows` already resolved SKU-or-slug per row, so trust
+    // that resolution too: any row whose own sku is a parentSku this file's
+    // variant rows reference, and that Phase 2 matched to a real existing
+    // product, is a parent this bundle-pinned-variant check must not miss.
+    for (const parsed of validRows) {
+      const rowSku = parsed.row.sku?.toString().trim();
+      if (rowSku && parsed.existing && variantsByParent.has(rowSku)) {
+        parentIdBySku.set(rowSku, parsed.existing.id);
+      }
     }
     if (parentIdBySku.size > 0) {
       const pinned = await prisma.bundleItem.findMany({

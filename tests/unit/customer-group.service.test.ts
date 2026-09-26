@@ -34,6 +34,13 @@ vi.mock('@force/database', () => ({
     $transaction: (fn: (tx: unknown) => unknown) =>
       fn({ customerGroup: mockGroup, customer: mockCustomer }),
   },
+  // #1582: assignByIdentity's create now goes through `withSavepoint`, which
+  // reads `hasTenantContext` to decide whether a SAVEPOINT is needed. This
+  // suite has no ambient tenant transaction (same as production outside a
+  // request), so `withSavepoint` must take its pass-through branch —
+  // matching `withSavepoint`'s own doc comment ("OUTSIDE a tenant context
+  // this is a straight pass-through").
+  hasTenantContext: () => false,
 }));
 
 import { CustomerGroupService } from '../../apps/api/src/services/customer-group.service';

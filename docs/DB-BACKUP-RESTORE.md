@@ -125,13 +125,21 @@ ORG=org-lingering-river-25973882
 PID=crimson-king-40424588
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 
-# 1. Pick the dump. Local plaintext:
-ls -lt ~/Desktop/projects/_backups/force-website-builder/
+# 1. Pick the dump. Local plaintext — GLOBBED to *.sql.gz, not a bare `ls`:
+#    an unglobbed listing also shows `.sql.gz.SUSPECT` files (a dump that
+#    FAILED verify-dump.sh, parked by scripts/backup-db.sh — see below), and
+#    a fresh one sorts to the top of `ls -lt` as if it were the most recent
+#    good backup.
+ls -lt ~/Desktop/projects/_backups/force-website-builder/*.sql.gz
 DUMP=~/Desktop/projects/_backups/force-website-builder/<chosen>.sql.gz
 #    …or fetch + decrypt an R2 copy:
 #    KEY=$(cat ~/.claude/.force-website-builder-backup-key)
 #    openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$KEY" \
 #      -in <chosen>.sql.gz.enc -out <chosen>.sql.gz
+
+# 1a. Verify BEFORE trusting it — a dump can be present, correctly named, and
+#     still restore nothing (see the "Verify a dump is valid" note below).
+bash scripts/verify-dump.sh "$DUMP"
 
 # 2. Create an isolated restore-target branch off production.
 neonctl branches create --project-id "$PID" --org-id "$ORG" --name restore-candidate --parent main
