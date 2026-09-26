@@ -41,7 +41,11 @@ import {
  *    24h allowance fails as DAILY_CAP_EXCEEDED before any recipient exists.
  *  - No orphaned `queued` row: a failed send marks the recipient `failed`, a
  *    cancel marks the rest `failed`, and `onFailure` marks the rest `failed`
- *    if the whole job dies.
+ *    if the whole job dies. `onFailure` also recomputes and persists
+ *    recipientCount/sentCount/failedCount (#1952) — without it, a
+ *    permanently failed job left those three columns at their pre-run value
+ *    (often 0) while the recipients tab's own live groupBy already showed
+ *    what actually happened, so the two admin surfaces disagreed.
  *
  * `scheduledAt` in the event is the per-request nonce: the claim and the
  * failure handler only act on a campaign whose `scheduled_at` still equals
@@ -99,6 +103,24 @@ async function failQueuedRecipients(storeId: string, campaignId: string, reason:
   );
 }
 
+/**
+ * Recompute recipientCount/sentCount/failedCount from the recipient rows.
+ * Read-only — the caller persists the result inside whichever tenant context
+ * it is already scoped to, so `finalize` can fold it into its existing atomic
+ * status write and `onFailure` (#1952) can persist it on its own.
+ */
+async function computeRecipientCounts(
+  storeId: string,
+  campaignId: string
+): Promise<{ recipientCount: number; sentCount: number; failedCount: number }> {
+  const [recipientCount, sentCount, failedCount] = await Promise.all([
+    prisma.campaignRecipient.count({ where: { campaignId, storeId } }),
+    prisma.campaignRecipient.count({ where: { campaignId, storeId, sentAt: { not: null } } }),
+    prisma.campaignRecipient.count({ where: { campaignId, storeId, status: 'failed' } }),
+  ]);
+  return { recipientCount, sentCount, failedCount };
+}
+
 interface BatchResult {
   sent: number;
   failed: number;
@@ -133,6 +155,14 @@ const campaignSendFn = inngest.createFunction(
       );
       if (updated.count > 0) {
         await failQueuedRecipients(storeId, campaignId, 'SEND_JOB_FAILED');
+        // #1952: without this, a permanently failed send job left
+        // recipientCount/sentCount/failedCount stuck at their pre-run value
+        // (often 0) while the admin's recipients tab already showed the true
+        // counts via its own live groupBy — the two admin surfaces disagreed.
+        await runInTenantContext(storeId, async () => {
+          const counts = await computeRecipientCounts(storeId, campaignId);
+          await prisma.campaign.updateMany({ where: { id: campaignId, storeId }, data: counts });
+        });
       }
       logger.error({ campaignId, storeId, marked: updated.count }, '[CAMPAIGN] send job failed');
     },
@@ -375,19 +405,14 @@ const campaignSendFn = inngest.createFunction(
     // 6. Finalize counts + status.
     return step.run('finalize', () =>
       runInTenantContext(storeId, async () => {
-        const [total, sentCount, failedCount] = await Promise.all([
-          prisma.campaignRecipient.count({ where: { campaignId, storeId } }),
-          prisma.campaignRecipient.count({ where: { campaignId, storeId, sentAt: { not: null } } }),
-          prisma.campaignRecipient.count({ where: { campaignId, storeId, status: 'failed' } }),
-        ]);
-        const counts = { recipientCount: total, sentCount, failedCount };
+        const counts = await computeRecipientCounts(storeId, campaignId);
         const done = await prisma.campaign.updateMany({
           where: { id: campaignId, storeId, status: 'sending' },
           data: {
             ...counts,
-            status: sentCount > 0 ? 'sent' : 'failed',
+            status: counts.sentCount > 0 ? 'sent' : 'failed',
             sentAt: new Date(),
-            lastError: sentCount > 0 ? null : 'ALL_RECIPIENTS_FAILED',
+            lastError: counts.sentCount > 0 ? null : 'ALL_RECIPIENTS_FAILED',
           },
         });
         if (done.count === 0) {

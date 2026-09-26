@@ -346,4 +346,58 @@ describe('campaign-send', () => {
     expect(campaign()).toMatchObject({ status: 'failed', lastError: 'SEND_JOB_FAILED' });
     expect(db.recipients[0]).toMatchObject({ status: 'failed', error: 'SEND_JOB_FAILED' });
   });
+
+  it('#1952 — onFailure reconciles recipientCount/sentCount/failedCount instead of leaving them at their pre-run value', async () => {
+    seed(['sent@x.test', 'queued@x.test', 'failed@x.test'], {
+      status: 'sending',
+      recipientCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+    });
+    db.recipients.push(
+      {
+        id: uuid(),
+        campaignId,
+        storeId: STORE_A,
+        email: 'sent@x.test',
+        status: 'sent',
+        sentAt: new Date(),
+      },
+      {
+        id: uuid(),
+        campaignId,
+        storeId: STORE_A,
+        email: 'queued@x.test',
+        status: 'queued',
+        sentAt: null,
+      },
+      {
+        id: uuid(),
+        campaignId,
+        storeId: STORE_A,
+        email: 'failed@x.test',
+        status: 'failed',
+        sentAt: null,
+      }
+    );
+
+    await captured.config.onFailure({
+      event: {
+        data: {
+          event: { data: { campaignId, storeId: STORE_A, scheduledAt: scheduledAt.toISOString() } },
+        },
+      },
+      error: new Error('boom'),
+    });
+
+    // The still-queued recipient is now failed too, so the true breakdown is
+    // 1 sent, 2 failed, 3 total — not the 0/0/0 the campaign started this run
+    // with. Without the fix these three columns stayed untouched.
+    expect(campaign()).toMatchObject({
+      status: 'failed',
+      recipientCount: 3,
+      sentCount: 1,
+      failedCount: 2,
+    });
+  });
 });

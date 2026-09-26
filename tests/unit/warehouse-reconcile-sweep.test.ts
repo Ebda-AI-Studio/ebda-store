@@ -1,8 +1,14 @@
 /**
  * warehouse-reconcile-sweep — daily completeness sweep (Task 4, item 5
  * data-integrity). Verifies: (1) stores are enumerated via withRlsBypass
- * (FORCE RLS, no tenant GUC in a cron), (2) each store's reconcile runs
- * under runInTenantContext, and (3) the sweep is FAIL-SOFT — one store's
+ * (FORCE RLS, no tenant GUC in a cron), (2) each store's reconcile is NOT
+ * wrapped in a whole-store `runInTenantContext` (fix wave 2, #936 — that
+ * wrapper opened ONE 30s Prisma transaction across an unbounded SKU count,
+ * relocating rather than removing the same ceiling `warehouse.routes.ts`
+ * already hit once in the request path; `backfillReconcileAll` and
+ * `reconcileWarehouseStockToAggregate` already filter every query explicitly
+ * by storeId and RLS permits an unset GUC, so the wrapper bought no
+ * additional tenant isolation), and (3) the sweep is FAIL-SOFT — one store's
  * rejection is logged/counted and does NOT abort the loop, unlike the
  * order-refunded fanout's reconcile step which deliberately throws.
  */
@@ -42,7 +48,7 @@ beforeEach(() => {
 });
 
 describe('sweepAllWarehouseStores', () => {
-  it('enumerates stores with warehouses via withRlsBypass and reconciles each under runInTenantContext', async () => {
+  it('enumerates stores with warehouses via withRlsBypass and reconciles each WITHOUT a whole-store runInTenantContext wrapper', async () => {
     h.warehouseFindMany.mockResolvedValue([{ storeId: 's1' }, { storeId: 's2' }]);
     h.backfillReconcileAll.mockResolvedValue({ skusReconciled: 2, skusFailed: 0 });
 
@@ -53,8 +59,10 @@ describe('sweepAllWarehouseStores', () => {
     );
     expect(h.backfillReconcileAll).toHaveBeenCalledWith('s1');
     expect(h.backfillReconcileAll).toHaveBeenCalledWith('s2');
-    expect(h.runInTenant).toHaveBeenCalledWith('s1', expect.any(Function));
-    expect(h.runInTenant).toHaveBeenCalledWith('s2', expect.any(Function));
+    // #936: no whole-store 30s transaction ceiling — backfillReconcileAll
+    // (and reconcileWarehouseStockToAggregate underneath it) scope RLS
+    // per-query/per-SKU themselves.
+    expect(h.runInTenant).not.toHaveBeenCalled();
 
     expect(result).toEqual({
       storesTotal: 2,
@@ -99,12 +107,12 @@ describe('sweepAllWarehouseStores', () => {
 });
 
 describe('reconcileOneStoreOnDemand', () => {
-  it('reconciles the single requested store under runInTenantContext', async () => {
+  it('reconciles the single requested store WITHOUT a whole-store runInTenantContext wrapper', async () => {
     h.backfillReconcileAll.mockResolvedValue({ skusReconciled: 5, skusFailed: 1 });
 
     const result = await reconcileOneStoreOnDemand('s1', 'admin-1', stepStub);
 
-    expect(h.runInTenant).toHaveBeenCalledWith('s1', expect.any(Function));
+    expect(h.runInTenant).not.toHaveBeenCalled();
     expect(h.backfillReconcileAll).toHaveBeenCalledWith('s1');
     expect(result).toEqual({ skusReconciled: 5, skusFailed: 1 });
   });

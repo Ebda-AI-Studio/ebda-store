@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass, runInTenantContext } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
@@ -55,6 +55,24 @@ export interface WarehouseSweepResult {
  * aggregate) and already isolates per-SKU failures internally — this sweep
  * only adds the per-STORE isolation layer on top.
  *
+ * NOT wrapped in `runInTenantContext` (fix wave 2, #936): a store's SKU count
+ * is unbounded, and `runInTenantContext` opens ONE Prisma interactive
+ * transaction with a 30s `timeout` for whatever runs inside it —
+ * `warehouse.routes.ts`'s `POST /warehouses/reconcile-all` hit exactly this
+ * ceiling synchronously in the request path (2026-07-23) and was moved here,
+ * onto an Inngest step, which only relocated the same 30s ceiling rather than
+ * removing it: a large Enterprise multi-warehouse catalog can still exceed it
+ * mid-backfill, aborting the whole store's sweep with a P2028 that then
+ * cascades into every remaining SKU failing on a dead transaction. Every read
+ * and write inside `backfillReconcileAll` / `reconcileWarehouseStockToAggregate`
+ * already filters explicitly by `storeId` (and `warehouses` /
+ * `warehouse_stock`'s RLS policies permit an unset `app.current_store_id`
+ * GUC, so this is not a coverage gap — see the migration's policy `USING
+ * (current_store_id() IS NULL OR …)`), and `reconcileWarehouseStockToAggregate`
+ * already opens its OWN short `withMoneyTx` per SKU, so calling
+ * `backfillReconcileAll` unwrapped removes only the redundant whole-store
+ * ceiling, not any tenant isolation.
+ *
  * INNGEST_DEPLOY_ID note: like every other cron in this registry, this new
  * function is invisible to the Inngest platform until a deploy bumps
  * `INNGEST_DEPLOY_ID` (see the trap explained in `client.ts` and
@@ -82,7 +100,7 @@ export async function sweepAllWarehouseStores(step: FanoutStep): Promise<Warehou
   for (const { storeId } of stores) {
     try {
       const result = await step.run(`sweep-${storeId}`, () =>
-        runInTenantContext(storeId, () => WarehouseService.backfillReconcileAll(storeId))
+        WarehouseService.backfillReconcileAll(storeId)
       );
       storesSwept++;
       totalSkusReconciled += result.skusReconciled;
@@ -135,7 +153,7 @@ export async function reconcileOneStoreOnDemand(
   logger.info({ storeId, requestedBy }, '[warehouse-reconcile-on-demand] starting');
 
   const result = await step.run(`sweep-${storeId}`, () =>
-    runInTenantContext(storeId, () => WarehouseService.backfillReconcileAll(storeId))
+    WarehouseService.backfillReconcileAll(storeId)
   );
 
   logger.info({ storeId, requestedBy, ...result }, '[warehouse-reconcile-on-demand] complete');

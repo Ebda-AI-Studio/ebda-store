@@ -276,6 +276,67 @@ describe('feature ON', () => {
     expect(res.status).toBe(409);
   });
 
+  it('deletes a draft campaign with no recipients', async () => {
+    const c = draft();
+    const res = await request(app).delete(`${BASE}/${c.id}`);
+    expect(res.status).toBe(200);
+    expect(db.campaigns).toHaveLength(0);
+  });
+
+  it('#1951 — refuses to delete a cancelled/failed campaign that already sent mail, and keeps its send-history rows', async () => {
+    const c = draft({ status: 'cancelled', sentCount: 1 });
+    db.recipients.push({
+      id: uuid(),
+      campaignId: c.id,
+      storeId: STORE_A,
+      email: 'a@x.test',
+      subscriberId: null,
+      customerId: null,
+      locale: 'en',
+      status: 'sent',
+      providerMessageId: 'resend-1',
+      error: null,
+      sentAt: new Date(),
+      unsubscribedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app).delete(`${BASE}/${c.id}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CAMPAIGN_NOT_DELETABLE');
+    // The campaign AND the sent-history recipient row both survive — deleting
+    // the campaign would cascade-delete the recipient too (schema FK).
+    expect(db.campaigns).toHaveLength(1);
+    expect(db.recipients).toHaveLength(1);
+  });
+
+  it('still allows deleting a cancelled/failed campaign whose recipients never actually sent', async () => {
+    const c = draft({ status: 'failed' });
+    db.recipients.push({
+      id: uuid(),
+      campaignId: c.id,
+      storeId: STORE_A,
+      email: 'a@x.test',
+      subscriberId: null,
+      customerId: null,
+      locale: 'en',
+      status: 'failed',
+      providerMessageId: null,
+      error: 'DAILY_CAP_EXCEEDED',
+      sentAt: null,
+      unsubscribedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app).delete(`${BASE}/${c.id}`);
+
+    expect(res.status).toBe(200);
+    expect(db.campaigns).toHaveLength(0);
+  });
+
   it('a campaign of another store is a 404', async () => {
     const c = draft({ storeId: '99999999-9999-4999-8999-999999999999' });
     const res = await request(app).get(`${BASE}/${c.id}/recipients`);

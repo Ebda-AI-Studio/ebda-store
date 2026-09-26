@@ -39,12 +39,31 @@ function matchValue(actual: unknown, cond: unknown): boolean {
   return actual === cond;
 }
 
-export function matches(row: Row, where: Row | undefined): boolean {
+/** Resolves a to-many relation field name to its related rows for one parent row. */
+export type RelationResolvers = Record<string, (row: Row) => Row[]>;
+
+export function matches(row: Row, where: Row | undefined, relations?: RelationResolvers): boolean {
   if (!where) return true;
   for (const [key, cond] of Object.entries(where)) {
     if (key === 'OR') {
-      if (!(cond as Row[]).some(w => matches(row, w))) return false;
+      if (!(cond as Row[]).some(w => matches(row, w, relations))) return false;
       continue;
+    }
+    if (relations && key in relations && typeof cond === 'object' && cond !== null) {
+      const related = relations[key](row);
+      const c = cond as Row;
+      if ('none' in c) {
+        if (related.some(r => matches(r, c.none, relations))) return false;
+        continue;
+      }
+      if ('some' in c) {
+        if (!related.some(r => matches(r, c.some, relations))) return false;
+        continue;
+      }
+      if ('every' in c) {
+        if (!related.every(r => matches(r, c.every, relations))) return false;
+        continue;
+      }
     }
     if (!matchValue(row[key], cond)) return false;
   }
@@ -79,27 +98,32 @@ export function createFakePrisma(db: FakeDb) {
     return out;
   };
 
-  const table = (rows: () => Row[], unique?: (a: Row, b: Row) => boolean) => ({
+  const table = (
+    rows: () => Row[],
+    unique?: (a: Row, b: Row) => boolean,
+    relations?: RelationResolvers
+  ) => ({
     findFirst: async ({ where, select }: { where?: Row; select?: Row } = {}) => {
-      const r = rows().find(x => matches(x, where));
+      const r = rows().find(x => matches(x, where, relations));
       return r ? pick(r, select) : null;
     },
     findUnique: async ({ where, select }: { where: Row; select?: Row }) => {
-      const r = rows().find(x => matches(x, where));
+      const r = rows().find(x => matches(x, where, relations));
       return r ? pick(r, select) : null;
     },
     findMany: async ({ where, select }: { where?: Row; select?: Row } = {}) =>
       rows()
-        .filter(x => matches(x, where))
+        .filter(x => matches(x, where, relations))
         .map(x => pick(x, select)),
-    count: async ({ where }: { where?: Row } = {}) => rows().filter(x => matches(x, where)).length,
+    count: async ({ where }: { where?: Row } = {}) =>
+      rows().filter(x => matches(x, where, relations)).length,
     updateMany: async ({ where, data }: { where?: Row; data: Row }) => {
-      const hit = rows().filter(x => matches(x, where));
+      const hit = rows().filter(x => matches(x, where, relations));
       hit.forEach(x => Object.assign(x, data, { updatedAt: new Date() }));
       return { count: hit.length };
     },
     update: async ({ where, data }: { where: Row; data: Row }) => {
-      const r = rows().find(x => matches(x, where));
+      const r = rows().find(x => matches(x, where, relations));
       if (!r) throw new Error('P2025: record not found');
       Object.assign(r, data);
       return { ...r };
@@ -131,7 +155,7 @@ export function createFakePrisma(db: FakeDb) {
       return pick(row, select);
     },
     deleteMany: async ({ where }: { where?: Row }) => {
-      const keep = rows().filter(x => !matches(x, where));
+      const keep = rows().filter(x => !matches(x, where, relations));
       const n = rows().length - keep.length;
       rows().splice(0, rows().length, ...keep);
       return { count: n };
@@ -140,7 +164,9 @@ export function createFakePrisma(db: FakeDb) {
 
   return {
     store: table(() => db.stores),
-    campaign: table(() => db.campaigns),
+    campaign: table(() => db.campaigns, undefined, {
+      recipients: row => db.recipients.filter(r => r.campaignId === row.id),
+    }),
     campaignRecipient: table(
       () => db.recipients,
       (a, b) => a.campaignId === b.campaignId && a.email === b.email

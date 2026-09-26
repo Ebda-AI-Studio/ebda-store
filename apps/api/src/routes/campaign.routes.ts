@@ -297,7 +297,16 @@ router.put(
 );
 
 // DELETE /stores/:storeId/campaigns/:campaignId — draft, cancelled or failed
-// only. A sent or in-flight campaign is send history and stays.
+// only, AND only when it never actually sent any mail. A cancelled or failed
+// campaign can still have `sent` recipient rows from before it stopped
+// (#1951): `campaign_recipients.campaign_id` cascades on delete, so deleting
+// such a campaign would destroy the only record that mail went out AND
+// silently shrink `sentInLast24h` (campaign.service.ts), the platform-wide
+// rolling send-reputation cap — letting a merchant re-open cap headroom by
+// deleting, rather than waiting out, a campaign that already spent it. The
+// `recipients: { none: { sentAt: { not: null } } }` clause makes this atomic
+// (a single DELETE ... WHERE ... NOT EXISTS) rather than a check-then-delete
+// that could race a still-draining send.
 router.delete(
   '/:campaignId',
   writeLimiter,
@@ -306,14 +315,26 @@ router.delete(
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
       const deleted = await prisma.campaign.deleteMany({
-        where: { id: campaignId, storeId, status: { in: ['draft', 'cancelled', 'failed'] } },
+        where: {
+          id: campaignId,
+          storeId,
+          status: { in: ['draft', 'cancelled', 'failed'] },
+          recipients: { none: { sentAt: { not: null } } },
+        },
       });
       if (deleted.count === 0) {
-        await findCampaignOr404(storeId, campaignId);
+        const campaign = await findCampaignOr404(storeId, campaignId);
+        if (!(['draft', 'cancelled', 'failed'] as string[]).includes(campaign.status)) {
+          throw new AppError(
+            409,
+            'CAMPAIGN_NOT_DELETABLE',
+            'Only a draft, cancelled or failed campaign can be deleted'
+          );
+        }
         throw new AppError(
           409,
           'CAMPAIGN_NOT_DELETABLE',
-          'Only a draft, cancelled or failed campaign can be deleted'
+          'A campaign that already sent mail is send history and cannot be deleted'
         );
       }
       await auditLog({
