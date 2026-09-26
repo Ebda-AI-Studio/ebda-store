@@ -45,7 +45,7 @@ export function textFieldValue(
  * input backed by a string form field (money in fils, integer counts).
  *
  * `parse` runs ONLY when the field is non-empty, so a field-specific
- * transform (e.g. dinar → fils `v => parseInt(v) * 1000`) never has to
+ * transform (e.g. dinar → fils `v => Math.round(parseFloat(v) * 1000)`) never has to
  * reimplement the null/undefined ternary at the call site — a coupon's
  * `minOrderAmount` sending `undefined` on an emptied field made the merchant
  * unable to remove an already-set minimum, the numeric sibling of the text

@@ -22,3 +22,23 @@ export function couponQuoteBasis(
 ): number {
   return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 }
+
+/**
+ * The same loose lines, as the `cartItems` the validate route evaluates
+ * targeting against (product/category scope, minimum quantity, customer group,
+ * first order). Without them the route fell back to the whole-cart
+ * `orderTotal` math and evaluated no targeting at all, so a scoped or
+ * first-order-only code — free-shipping ones included — was shown as applied
+ * and then refused at order creation with COUPON_NOT_ELIGIBLE (#1368, #1379).
+ * Category ids are resolved server-side; the storefront cart does not carry
+ * them. `Σ lineTotal === couponQuoteBasis(items)` by construction.
+ */
+export function couponQuoteCartItems(
+  items: ReadonlyArray<{ productId: string; price: number; quantity: number }>
+): Array<{ productId: string; quantity: number; lineTotal: number }> {
+  return items.map(item => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    lineTotal: item.price * item.quantity,
+  }));
+}

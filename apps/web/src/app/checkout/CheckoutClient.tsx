@@ -37,7 +37,7 @@ import {
   formatWindowTime,
 } from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { couponQuoteBasis } from '@/lib/coupon-quote-basis';
+import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
 import {
   resolveSectionZone,
   zoneStyle,
@@ -45,6 +45,8 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
+import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
+import { repriceAfterCouponRemoval } from './_lib/repriceAfterCouponRemoval';
 import { useLastListing } from '../../hooks/useLastListing';
 import { useWallet } from '../../hooks/useWallet';
 
@@ -156,6 +158,9 @@ export default function CheckoutClient() {
   const formatPrice = useLocalePrice();
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  // True while shipping is being recomputed after a coupon was removed; holds
+  // Place Order closed so the charge can never run ahead of the summary.
+  const [repricingShipping, setRepricingShipping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Per-store opt-in checkout delivery block (info note + window picker).
@@ -714,7 +719,16 @@ export default function CheckoutClient() {
           // server applies the coupon to loose items only, so quoting
           // against the bundle-inclusive total displayed a discount the
           // order would never receive.
-          { code, orderTotal: couponBasis }
+          {
+            code,
+            orderTotal: couponBasis,
+            // The lines + typed identity let the route evaluate targeting the
+            // way OrderService.create will, instead of accepting a code the
+            // order then refuses.
+            cartItems: couponQuoteCartItems(cartContextItems),
+            phone: formData.phone.trim() || undefined,
+            email: formData.email.trim() || undefined,
+          }
         );
         if (result.success && result.data) {
           setCouponCode(result.data.coupon.code);
@@ -733,7 +747,14 @@ export default function CheckoutClient() {
             }
           }
         } else {
-          setCouponError(result.error?.message || t('Invalid coupon', 'كوبون غير صالح'));
+          setCouponError(
+            result.error?.code === 'COUPON_NOT_ELIGIBLE'
+              ? t(
+                  'This coupon does not apply to the items in your cart.',
+                  'هذا الكوبون لا ينطبق على المنتجات في سلتك.'
+                )
+              : result.error?.message || t('Invalid coupon', 'كوبون غير صالح')
+          );
           // Stored code is no longer valid -- drop it so we don't auto-apply again.
           if (codeOverride && promoStorageKey && typeof window !== 'undefined') {
             try {
@@ -747,7 +768,17 @@ export default function CheckoutClient() {
         setCouponError(t('Failed to apply coupon', 'فشل تطبيق الكوبون'));
       }
     },
-    [couponCode, store?.id, cart, couponBasis, promoStorageKey, t]
+    [
+      couponCode,
+      store?.id,
+      cart,
+      couponBasis,
+      cartContextItems,
+      formData.phone,
+      formData.email,
+      promoStorageKey,
+      t,
+    ]
   );
 
   const handleApplyCoupon = () => applyCouponCode();
@@ -775,7 +806,7 @@ export default function CheckoutClient() {
     setSelectedArea('');
   };
 
-  const removeCoupon = () => {
+  const removeCoupon = async () => {
     setAppliedCoupon(null);
     setCouponDiscount(0);
     setCouponCode('');
@@ -786,7 +817,13 @@ export default function CheckoutClient() {
         // Non-fatal.
       }
     }
-    calculateShipping();
+    // Free-shipping off at once, Place Order held until the real fee lands —
+    // see repriceAfterCouponRemoval (#1807).
+    await repriceAfterCouponRemoval({
+      setFreeShipping,
+      setRepricing: setRepricingShipping,
+      calculateShipping,
+    });
   };
 
   // Auto-apply a promo that the user entered on /cart. Runs once after the
@@ -822,6 +859,7 @@ export default function CheckoutClient() {
             enabled: boolean;
             pointsValue?: number;
             minRedeemPoints?: number;
+            maxRedeemPercentage?: number;
           }>(`/public/${store.id}/loyalty/info`),
         ]);
         if (cancelled) return;
@@ -835,10 +873,10 @@ export default function CheckoutClient() {
           points: pts.points,
           pointsValue: info.pointsValue ?? pts.pointsValue ?? 1,
           minRedeemPoints: info.minRedeemPoints ?? 0,
-          // maxRedeemPercentage isn't exposed publicly; the server enforces
-          // it authoritatively. Use 100 here so the UI estimate never blocks a
-          // valid redemption — the server caps the real discount.
-          maxRedeemPercentage: 100,
+          // The same cap the server's computeRedemption applies (#181). 100
+          // only when an older API does not report it — the server still caps
+          // the real discount either way.
+          maxRedeemPercentage: info.maxRedeemPercentage ?? 100,
         });
       } catch {
         if (!cancelled) setLoyalty(null);
@@ -899,26 +937,16 @@ export default function CheckoutClient() {
   const primaryDiscount = Math.max(couponDiscount, promotionDiscount);
   const promotionAppliedDiscount = promotionDiscount >= couponDiscount ? promotionDiscount : 0;
 
-  // Loyalty discount estimate. Mirrors the server's computeRedemption so the
-  // order summary matches what the API will actually apply: clamp points to
-  // balance, gate at the minimum, cap the discount at the goods value
-  // remaining after the primary (coupon-or-promotion) discount. The server
-  // re-validates; this is display-only.
+  // Loyalty discount estimate — the server's computeRedemption, mirrored in
+  // estimateLoyaltyRedemption so the summary matches what the API will apply:
+  // clamp to balance, gate at the minimum, cap at maxRedeemPercentage% of the
+  // goods value remaining after the primary (coupon-or-promotion) discount.
+  // The server re-validates; this is display-only.
   const redeemableAfterCoupon = Math.max(0, subtotal - primaryDiscount);
-  const effectiveRedeemPoints =
+  const { loyaltyDiscount, pointsToSend } =
     redeemEnabled && loyalty
-      ? Math.min(Math.max(0, Math.floor(pointsToRedeem)), loyalty.points)
-      : 0;
-  const loyaltyDiscount =
-    loyalty && effectiveRedeemPoints >= loyalty.minRedeemPoints && effectiveRedeemPoints > 0
-      ? Math.min(effectiveRedeemPoints * loyalty.pointsValue, redeemableAfterCoupon)
-      : 0;
-  // The point count we actually send: when the subtotal cap binds, reduce
-  // points so we never request to burn more than the discount represents.
-  const pointsToSend =
-    loyalty && loyaltyDiscount > 0
-      ? Math.min(effectiveRedeemPoints, Math.floor(loyaltyDiscount / loyalty.pointsValue))
-      : 0;
+      ? estimateLoyaltyRedemption(loyalty, pointsToRedeem, redeemableAfterCoupon, loyalty.points)
+      : { loyaltyDiscount: 0, pointsToSend: 0 };
 
   const discount = primaryDiscount + loyaltyDiscount;
   const shipping = freeShipping ? 0 : shippingCost;
@@ -1378,7 +1406,13 @@ export default function CheckoutClient() {
           // sessionStorage key is the load-bearing half — without dropping it,
           // the promo re-applies on the next mount and the next submit fails
           // the same way.
-          removeCoupon();
+          //
+          // AWAITED, and the customer is sent back to review: the removal
+          // changes the total (a free-shipping coupon's delivery fee comes
+          // back), so re-enabling Place Order before the recomputed fee lands
+          // let a fast retry charge a fee the summary still showed as free.
+          await removeCoupon();
+          setStep(1);
           friendly = t(
             'This coupon does not apply to the items in your cart, so it has been removed. Please try again.',
             'هذا الكوبون لا ينطبق على المنتجات في سلتك، لذلك تمت إزالته. يرجى المحاولة مرة أخرى.'
@@ -1978,7 +2012,7 @@ export default function CheckoutClient() {
                     onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}
                     onSelectProvider={setSelectedProvider}
-                    isProcessing={isProcessing}
+                    isProcessing={isProcessing || repricingShipping}
                     total={total}
                     formatPrice={formatPrice}
                     belowMinimumOrder={belowMinimumOrder}

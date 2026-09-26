@@ -454,6 +454,10 @@ publicRouter.get(
           signupBonus: result.settings.signupBonus,
           pointsValue: result.settings.pointsValue,
           minRedeemPoints: result.settings.minRedeemPoints,
+          // The checkout's redemption estimate needs the same cap the server's
+          // computeRedemption applies; without it the summary showed a lower
+          // total than the order was created and charged at (#181).
+          maxRedeemPercentage: result.settings.maxRedeemPercentage,
           tiers: result.settings.tiers,
         },
       });

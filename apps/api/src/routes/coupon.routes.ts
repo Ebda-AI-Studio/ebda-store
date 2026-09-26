@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -78,7 +79,10 @@ const updateCouponSchema = createCouponSchema.partial();
 // .routes.ts's createSchema).
 const cartItemSchema = z.object({
   productId: z.string(),
-  categoryIds: z.array(z.string()),
+  // Optional: the storefront cart only knows productId/quantity/price, never
+  // category ids, so when they are absent the route resolves them from the
+  // store's own products (see below) — the same way OrderService.create does.
+  categoryIds: z.array(z.string()).optional(),
   quantity: z.number().int().min(0),
   lineTotal: z.number().int().min(0),
 });
@@ -94,6 +98,30 @@ const validateTargetingSchema = z.object({
   phone: z.string().nullish(),
   email: z.string().nullish(),
 });
+
+/**
+ * Fill in category ids for quote lines that did not carry them, from this
+ * store's own products — the same source OrderService.create builds its
+ * targeting snapshot from, so a category-scoped coupon is judged here exactly
+ * as it will be at checkout. A line whose product is not in this store keeps
+ * an empty list (it can still count toward an unscoped coupon, as it would in
+ * the order), never another store's categories.
+ */
+async function withCategoryIds(
+  storeId: string,
+  items: z.infer<typeof cartItemsSchema>
+): Promise<Array<z.infer<typeof cartItemSchema> & { categoryIds: string[] }>> {
+  const missing = items.filter(i => !i.categoryIds).map(i => i.productId);
+  if (missing.length === 0) {
+    return items.map(i => ({ ...i, categoryIds: i.categoryIds ?? [] }));
+  }
+  const products = await prisma.product.findMany({
+    where: { id: { in: [...new Set(missing)] }, storeId },
+    select: { id: true, categories: { select: { categoryId: true } } },
+  });
+  const byId = new Map(products.map(p => [p.id, p.categories.map(c => c.categoryId)]));
+  return items.map(i => ({ ...i, categoryIds: i.categoryIds ?? byId.get(i.productId) ?? [] }));
+}
 
 // GET /stores/:storeId/coupons - List all coupons
 router.get(
@@ -330,9 +358,17 @@ router.post(
         // Accepting a body customerId here would let an attacker probe any
         // other customer's segment/first-order status without proving they
         // are that customer.
+        const custCtx = await resolveCustomerContext(storeId, { phone, email });
         const ctx = {
-          ...(await resolveCustomerContext(storeId, { phone, email })),
-          cartItems,
+          ...custCtx,
+          // Unknown is not ineligible. The cart page quotes before the shopper
+          // has typed any identity, and resolveCustomerContext answers "no
+          // group" for that — which would refuse a customer-group code to the
+          // very members it was made for. Checkout sends the typed phone/email,
+          // and OrderService.create re-evaluates against the real identity.
+          // (First-order already resolves permissively with no identity.)
+          customerGroupId: phone || email ? custCtx.customerGroupId : coupon.customerGroupId,
+          cartItems: await withCategoryIds(storeId, cartItems),
         };
         const evalResult = CouponService.evaluateForCart(coupon, ctx);
         if (!evalResult.eligible) {

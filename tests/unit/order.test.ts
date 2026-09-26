@@ -965,6 +965,45 @@ describe('OrderService', () => {
       expect(txOrderCount).not.toHaveBeenCalled();
     });
 
+    // #193 (owner decision): the manual-order path levies VAT after the coupon
+    // discount too. 5000 goods − 10% coupon (500) = 4500 × 5% = 225, not 250.
+    it('levies VAT on the subtotal net of the coupon discount', async () => {
+      vi.mocked(prisma.taxRate.findMany).mockResolvedValue([{ rate: 5 }] as any);
+      vi.mocked(prisma.coupon.findFirst).mockResolvedValue({
+        id: 'coupon-vat',
+        storeId: mockStoreId,
+        code: 'SAVE10',
+        type: 'percentage',
+        value: 10,
+        minOrderAmount: null,
+        maxDiscount: null,
+        usageLimit: null,
+        usageCount: 0,
+        usageLimitPerUser: null,
+        isActive: true,
+        startsAt: null,
+        expiresAt: null,
+      } as any);
+      const create = vi.fn().mockResolvedValue(mockOrder);
+      vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: any) =>
+        fn({
+          order: { create, count: txOrderCount },
+          coupon: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+          $queryRaw: vi.fn().mockResolvedValue([]),
+        } as any)
+      );
+
+      await OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
+        ...baseAdminOrderData,
+        couponCode: 'SAVE10',
+      });
+
+      const data = create.mock.calls[0][0].data;
+      expect(data.subtotal).toBe(5000);
+      expect(data.tax).toBe(225);
+      expect(data.total).toBe(5000 - 500 + 225 + data.shipping);
+    });
+
     // Money-integrity audit gap (2026-07-02, #498 follow-up): createAdminOrder
     // resolved coupons via CouponService.getByCode (store-wide usageLimit
     // only) and never ran the per-customer usageLimitPerUser gate that

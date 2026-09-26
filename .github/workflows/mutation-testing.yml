@@ -57,6 +57,9 @@ on:
       # absence is a P2003 on the first cart write of a session, and a
       # deterministic unique violation in the guest-cart merge.
       - 'apps/api/src/services/cart.service.ts'
+      # Loyalty refund reversals: the row lock and the P2002 duplicate
+      # backstops (P2 batch M3, #1426/#1427).
+      - 'apps/api/src/services/loyalty.service.ts'
       - 'apps/api/src/services/payment-providers/**'
       # ReturnService.complete drives the gateway refund: the order-level returns
       # lock, the per-return refund key, and following PaymentService's own

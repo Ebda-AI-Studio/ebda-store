@@ -1,4 +1,4 @@
-import { prisma, Prisma, LoyaltyTransactionType } from '@force/database';
+import { prisma, Prisma, LoyaltyTransactionType, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { featureService } from './feature.service';
@@ -135,6 +135,22 @@ interface CustomerPointsInfo {
   nextTier: string | null;
   pointsToNextTier: number;
   pointsValue: number; // Value in fils
+}
+
+/**
+ * Take the customer's `loyalty_points` row lock for the rest of `tx`. Every
+ * read-compute-write of the balance must run after this, so a concurrent
+ * writer on the same customer queues instead of being overwritten.
+ */
+async function lockLoyaltyRow(
+  tx: Prisma.TransactionClient,
+  storeId: string,
+  customerId: string
+): Promise<void> {
+  await tx.$queryRaw`
+    SELECT id FROM public.loyalty_points
+    WHERE store_id = ${storeId} AND customer_id = ${customerId}
+    FOR UPDATE`;
 }
 
 export class LoyaltyService {
@@ -554,68 +570,77 @@ export class LoyaltyService {
       ...((store.loyaltySettings as Partial<LoyaltySettings>) ?? {}),
     };
 
-    const loyalty = await prisma.loyaltyPoints.findUnique({
-      where: { storeId_customerId: { storeId, customerId: earn.customerId } },
-    });
-    if (!loyalty) return null;
+    // Read-and-write under the customer's loyalty row lock. The balance used
+    // to be read here with a plain findUnique OUTSIDE the transaction and then
+    // written back as ABSOLUTE `points` / `totalEarned` values inside it, so a
+    // concurrent earn or redeem on the same customer landing between the two
+    // was silently overwritten (100 pts, reversal computes 50, another order's
+    // earn lifts it to 130, the reversal stamps 50 — 30 points destroyed, and
+    // `totalEarned` / the tier with them) (#1427). Every writer that changes
+    // this row queues on the lock, so the values computed below are computed
+    // from what the row holds at the moment it is written.
+    let result: { pointsReversed: number; newBalance: number } | null;
+    try {
+      result = await withMoneyTx(prisma, async tx => {
+        await lockLoyaltyRow(tx, storeId, earn.customerId);
 
-    // Floor at zero — a customer who redeemed their points already shouldn't
-    // go into negative balance from the reversal.
-    const pointsToReverse = Math.min(earn.points, loyalty.points);
-    const newPoints = loyalty.points - pointsToReverse;
-    const newTotalEarned = Math.max(0, loyalty.totalEarned - earn.points);
+        // Re-check the idempotency tag UNDER the lock: a concurrent reversal of
+        // this same order that committed while we waited is visible now.
+        const raced = await tx.loyaltyTransaction.findFirst({
+          where: { storeId, orderId, type: 'adjust', description: tag },
+          select: { id: true },
+        });
+        const loyalty = await tx.loyaltyPoints.findUnique({
+          where: { storeId_customerId: { storeId, customerId: earn.customerId } },
+        });
+        if (!loyalty) return null;
+        if (raced) return { pointsReversed: 0, newBalance: loyalty.points };
 
-    const newTier = this.calculateTier(newTotalEarned, settings);
-    const tierFlipped = newTier !== loyalty.tier;
-    const reverseTxs: Prisma.PrismaPromise<unknown>[] = [
-      prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
-        data: {
-          points: newPoints,
-          totalEarned: newTotalEarned,
-          tier: newTier,
-        },
-      }),
-      prisma.loyaltyTransaction.create({
-        data: {
-          storeId,
-          customerId: earn.customerId,
-          orderId,
-          type: 'adjust',
-          points: -pointsToReverse,
-          description: tag,
-        },
-      }),
-    ];
+        // Floor at zero — a customer who redeemed their points already
+        // shouldn't go into negative balance from the reversal.
+        const pointsToReverse = Math.min(earn.points, loyalty.points);
+        const newPoints = loyalty.points - pointsToReverse;
+        const newTotalEarned = Math.max(0, loyalty.totalEarned - earn.points);
 
-    if (tierFlipped) {
-      reverseTxs.push(
-        prisma.loyaltyTransaction.create({
+        const newTier = this.calculateTier(newTotalEarned, settings);
+        const updated = await tx.loyaltyPoints.update({
+          where: { id: loyalty.id },
+          data: {
+            points: newPoints,
+            totalEarned: newTotalEarned,
+            tier: newTier,
+          },
+        });
+        await tx.loyaltyTransaction.create({
           data: {
             storeId,
             customerId: earn.customerId,
             orderId,
-            type: 'tier_changed',
-            points: 0,
-            description: `Tier ${loyalty.tier} → ${newTier} (from refund reverse)`,
+            type: 'adjust',
+            points: -pointsToReverse,
+            description: tag,
           },
-        })
-      );
-    }
-
-    // The findFirst above is a fast path, not the guarantee: the order/refunded
-    // fanout runs concurrency 5 per store with retries, so two events for the
-    // same order can both read no-tag and both commit — double-decrementing the
-    // customer's balance. The partial unique index on
-    // (store_id, order_id, description) for `refund-revoke:%` adjust rows
-    // (migration 20260903130000) makes the loser's insert fail, and Postgres
-    // aborts its whole transaction, so the decrement above is rolled back with
-    // it. Treat that exactly like the fast-path no-op.
-    let updated: { points: number };
-    try {
-      const reverseResults = await prisma.$transaction(reverseTxs);
-      updated = reverseResults[0] as { points: number };
+        });
+        if (newTier !== loyalty.tier) {
+          await tx.loyaltyTransaction.create({
+            data: {
+              storeId,
+              customerId: earn.customerId,
+              orderId,
+              type: 'tier_changed',
+              points: 0,
+              description: `Tier ${loyalty.tier} → ${newTier} (from refund reverse)`,
+            },
+          });
+        }
+        return { pointsReversed: pointsToReverse, newBalance: updated.points };
+      });
     } catch (err) {
+      // Backstop for a writer that bypasses the lock: the partial unique index
+      // on (store_id, order_id, description) for `refund-revoke:%` adjust rows
+      // (migration 20260903130000) makes a duplicate reversal's insert fail,
+      // and Postgres aborts its whole transaction, so the balance write above
+      // is rolled back with it. Treat that exactly like the fast-path no-op.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const current = await prisma.loyaltyPoints.findUnique({
           where: { storeId_customerId: { storeId, customerId: earn.customerId } },
@@ -625,17 +650,18 @@ export class LoyaltyService {
       }
       throw err;
     }
+    if (!result) return null;
 
     // Loyalty disabled at refund time still reverses — the points were
     // earned under the program and should come back out. Logged for clarity.
     if (!loyaltyEnabled) {
       logger.info(
-        { storeId, orderId, pointsReversed: pointsToReverse },
+        { storeId, orderId, pointsReversed: result.pointsReversed },
         '[Loyalty] reversed earned points despite loyalty currently disabled'
       );
     }
 
-    return { pointsReversed: pointsToReverse, newBalance: updated.points };
+    return result;
   }
 
   /**
@@ -820,30 +846,33 @@ export class LoyaltyService {
       return { pointsRecredited: 0, newBalance: current?.points ?? 0 };
     }
 
-    const loyalty = await prisma.loyaltyPoints.findUnique({
-      where: { storeId_customerId: { storeId, customerId: redeem.customerId } },
-    });
-    if (!loyalty) return null;
-
-    const newTotalRedeemed = Math.max(0, loyalty.totalRedeemed - pointsToRecredit);
-
-    // Same race as the earn reversal: the findFirst above is a fast path, and
-    // two concurrent order/refunded events for this order can both reach here
-    // and both commit — double-RECREDITING the customer. The partial unique
-    // index on `redeem-recredit:%` adjust rows (migration 20260903130000) makes
-    // the loser's insert fail, and Postgres aborts its whole transaction, so
-    // the increment above is rolled back with it.
-    let updated: { points: number };
+    // Same lock as the earn reversal (#1427): `totalRedeemed` used to be
+    // written as an absolute value computed from a read outside the
+    // transaction, so a concurrent redeem's increment landing in between was
+    // overwritten. Computed and written under the row lock now.
     try {
-      [updated] = await prisma.$transaction([
-        prisma.loyaltyPoints.update({
+      return await withMoneyTx(prisma, async tx => {
+        await lockLoyaltyRow(tx, storeId, redeem.customerId);
+
+        // Re-check the idempotency tag UNDER the lock (see the earn reversal).
+        const raced = await tx.loyaltyTransaction.findFirst({
+          where: { storeId, orderId, type: 'adjust', description: tag },
+          select: { id: true },
+        });
+        const loyalty = await tx.loyaltyPoints.findUnique({
+          where: { storeId_customerId: { storeId, customerId: redeem.customerId } },
+        });
+        if (!loyalty) return null;
+        if (raced) return { pointsRecredited: 0, newBalance: loyalty.points };
+
+        const updated = await tx.loyaltyPoints.update({
           where: { id: loyalty.id },
           data: {
             points: { increment: pointsToRecredit },
-            totalRedeemed: newTotalRedeemed,
+            totalRedeemed: Math.max(0, loyalty.totalRedeemed - pointsToRecredit),
           },
-        }),
-        prisma.loyaltyTransaction.create({
+        });
+        await tx.loyaltyTransaction.create({
           data: {
             storeId,
             customerId: redeem.customerId,
@@ -852,9 +881,14 @@ export class LoyaltyService {
             points: pointsToRecredit,
             description: tag,
           },
-        }),
-      ]);
+        });
+        return { pointsRecredited: pointsToRecredit, newBalance: updated.points };
+      });
     } catch (err) {
+      // Backstop: the partial unique index on `redeem-recredit:%` adjust rows
+      // (migration 20260903130000) makes a duplicate re-credit's insert fail,
+      // and Postgres aborts its whole transaction, so the increment above is
+      // rolled back with it.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const current = await prisma.loyaltyPoints.findUnique({
           where: { storeId_customerId: { storeId, customerId: redeem.customerId } },
@@ -864,8 +898,6 @@ export class LoyaltyService {
       }
       throw err;
     }
-
-    return { pointsRecredited: pointsToRecredit, newBalance: updated.points };
   }
 
   /**

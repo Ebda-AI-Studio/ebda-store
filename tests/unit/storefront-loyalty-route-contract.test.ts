@@ -237,6 +237,7 @@ describe('public/customer loyalty routes — behavior + tenancy', () => {
         signupBonus: 100,
         pointsValue: 1,
         minRedeemPoints: 50,
+        maxRedeemPercentage: 50,
         tiers: { bronze: { minPoints: 0, multiplier: 1 } },
       },
     });
@@ -246,6 +247,8 @@ describe('public/customer loyalty routes — behavior + tenancy', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.enabled).toBe(true);
     expect(res.body.data.pointsPerDinar).toBe(10);
+    // The checkout estimate needs the redemption cap the server applies (#181).
+    expect(res.body.data.maxRedeemPercentage).toBe(50);
   });
 
   it('GET .../loyalty/my-points rejects a non-customer (e.g. an admin) token with 403', async () => {

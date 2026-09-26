@@ -1375,3 +1375,54 @@ until they retype every masked field, where before the save succeeded and quietl
 dropped them. That is the intended trade: a blocked save is visible, and the
 error names the field to retype. It does mean a key-rotation incident surfaces
 here as failed saves rather than as silent credential loss discovered later.
+
+---
+
+Context: P2 batch M3 (checkout, coupons, loyalty, VAT), 2026-09-25 — issues #181, #193, #1368,
+#1379, #1426, #1427, #1444, #1526, #1528, #1569, #1807.
+
+**Ruling M3-1 — at the public coupon validate route, an unknown identity does not veto a
+customer-group coupon.** With `cartItems` now sent by the storefront (#1368/#1379), the route
+evaluates targeting for real. The cart page has no phone or email to send, and
+`resolveCustomerContext` answers "no group" for that, which would refuse a group code to the very
+members it was made for, on the page where most codes are typed. So with no identity the route
+substitutes the coupon's own group (first-order already resolves permissively with no identity).
+Checkout sends the typed phone and email, and `OrderService.create` re-evaluates against the real
+identity, which stays the authority. Cost if wrong: a shopper outside the group sees the code
+accepted on the cart page and refused at checkout. That is the behaviour every targeted code had
+before this batch, now confined to the one criterion the cart page cannot know.
+
+**Ruling M3-2 — `tests/` is not added to `npm run typecheck` in this batch (#1444).** The swapped
+arguments are fixed and the test now asserts the credited amount. Type-checking `tests/unit` as one
+project was measured at 257 errors (most from resolving app sources under a config that is not
+theirs: `apps/web/src/lib/api.ts` alone 37, `apps/admin/src/lib/api.ts` 32). Closing that is a
+per-app test-project change across all four apps, not a P2 loyalty fix. Cost if wrong: another
+test can pass wrongly typed arguments to a service and CI will not notice. What would settle it: a
+`tsconfig.tests.json` per app that includes only the tests importing that app.
+
+**Ruling M3-3 — the storefront checkout shows no tax line and its total excludes tax. Reported,
+not fixed (#193).** VAT is now levied after discount everywhere the tax is persisted and read
+(charge, invoice, confirmation email, 2100 posting, report). But the checkout summary never
+displayed tax: `total = subtotal − discount + shipping`, and the public store payload carries
+`taxEnabled`/`taxIncludedInPrice` but not a rate. On a store with tax-exclusive VAT the customer is
+shown a total lower than the charge. Adding the line means exposing a rate publicly and changing
+every store's checkout render, which the owner rule for this batch does not cover. Cost if wrong:
+the first store to enable exclusive VAT has a display-versus-charge gap at checkout until a
+follow-up lands; no live store has tax on (per the owner, 2026-09-25; not re-measured here).
+
+**Ruling M3-4 — #1807's component wiring is pinned by source, not by render.** The ordering
+(free shipping off at once, submit gate closed until the recomputed fee lands) lives in
+`repriceAfterCouponRemoval` and is driven with fakes. The three lines that connect it to
+`CheckoutClient` (the awaited removal in the refusal handler, `setStep(1)`, and the PaymentStep
+gate) are asserted on the source, for the reason recorded in P2-B2-2: no DOM environment exists in
+this repo. Each assertion was mutation-checked against the pre-fix file. Cost if wrong: a refactor
+that keeps the strings but breaks the behaviour passes.
+
+**Ruling M3-5 — the loyalty reversals lock inside a separate `withMoneyTx`, as the array batch they
+replace already ran.** Inside the Inngest step's `runInTenantContext`, `$transaction` is not proxied
+to the ambient tenant transaction, so the old `prisma.$transaction([...])` already ran on its own
+connection, and so does the new interactive one. Moving onto the ambient transaction would turn the
+P2002 backstop into a 25P02 abort of the whole step, so it was not done. The RLS policies on
+`loyalty_points`/`loyalty_transactions` admit a connection with no store GUC, which is why both the
+old and the new form see the row. Cost if wrong: none beyond the pre-existing posture, which this
+change neither widens nor narrows.

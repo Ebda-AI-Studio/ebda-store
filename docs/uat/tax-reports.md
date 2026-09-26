@@ -100,6 +100,11 @@
 
 1. Place a paid taxable order with `discount > 0` (e.g. subtotal=20 KWD, discount=5 KWD, tax = 5% of 15 KWD = 750 fils)
 2. **Expect:** The Taxable Base column shows `15.000 KWD` (not 20.000), and Tax Collected = `0.750 KWD`
+3. **Expect:** the Tax Rate column reads `5.00%`, and a single-rate store with discounted and
+   undiscounted orders shows ONE row in Breakdown by Rate. Checkout levies VAT after discount
+   (`computeOrderTax`, `apps/api/src/lib/order-tax.ts`; owner decision on #193), so the report's
+   `subtotal − discount` base is the base the tax was actually charged on. Orders placed before
+   that change were taxed on the full subtotal and will still show an inflated derived rate.
 
 ### E7 — Tenant isolation
 

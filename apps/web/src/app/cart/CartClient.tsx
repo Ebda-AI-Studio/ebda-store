@@ -15,7 +15,7 @@ import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { BundleLine } from '../../components/BundleLine';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { couponQuoteBasis } from '@/lib/coupon-quote-basis';
+import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
 import {
   resolveSectionZone,
   zoneStyle,
@@ -218,6 +218,9 @@ export default function CartClient() {
         // `couponBasis`, NOT `cartTotal` — the server applies a coupon to
         // loose items only (see its definition above).
         orderTotal: couponBasis,
+        // The loose lines themselves, so the route evaluates the coupon's
+        // targeting now rather than accepting a code checkout will refuse.
+        cartItems: couponQuoteCartItems(cartItems),
       });
       if (result.success && result.data) {
         setPromoApplied(true);
@@ -244,7 +247,12 @@ export default function CartClient() {
         );
       } else {
         const message =
-          result.error?.message || t('The promo code is not valid', 'كود الخصم غير صالح');
+          result.error?.code === 'COUPON_NOT_ELIGIBLE'
+            ? t(
+                'This coupon does not apply to the items in your cart.',
+                'هذا الكوبون لا ينطبق على المنتجات في سلتك.'
+              )
+            : result.error?.message || t('The promo code is not valid', 'كود الخصم غير صالح');
         info(t('Invalid code', 'كود غير صالح'), message);
       }
     } catch {
@@ -258,7 +266,7 @@ export default function CartClient() {
     } finally {
       setIsValidating(false);
     }
-  }, [promoCode, isValidating, store.id, couponBasis, success, info, errorToast, t]);
+  }, [promoCode, isValidating, store.id, couponBasis, cartItems, success, info, errorToast, t]);
 
   // Re-apply a previously validated promo code once the cart has hydrated.
   // The server is still the source of truth for the discount amount; if the
@@ -280,6 +288,7 @@ export default function CartClient() {
           code: stored,
           // Same loose-items-only basis as the manual apply above.
           orderTotal: couponBasis,
+          cartItems: couponQuoteCartItems(cartItems),
         });
         if (result.success && result.data) {
           setPromoCode(result.data.coupon.code);
@@ -295,7 +304,7 @@ export default function CartClient() {
         // Silent -- user can re-enter the code manually.
       }
     })();
-  }, [cartIsReady, cartTotal, couponBasis, store.id]);
+  }, [cartIsReady, cartTotal, couponBasis, cartItems, store.id]);
 
   // Fetch shipping zones on mount
   useEffect(() => {

@@ -22,6 +22,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     customer: { findFirst: vi.fn() },
     order: { count: vi.fn() },
     user: { findUnique: vi.fn() },
+    product: { findMany: vi.fn() },
   },
 }));
 
@@ -115,11 +116,15 @@ describe('POST /public/:storeId/coupons/validate — targeting', () => {
   });
 
   it('returns 400 COUPON_NOT_ELIGIBLE when cartItems do not match the coupon targeting', async () => {
+    // A KNOWN identity that is not in the group. (With no identity at all the
+    // group is unknown, not a veto — see the #1368 cases below.)
     mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
+    mockPrisma.order.count.mockResolvedValue(0);
+    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'regulars' });
 
     const res = await request(app)
       .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
-      .send({ code: 'SAVE10', cartItems: CART_ITEMS });
+      .send({ code: 'SAVE10', cartItems: CART_ITEMS, phone: '+96550000001' });
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -233,5 +238,98 @@ describe('POST /public/:storeId/coupons/validate — targeting', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('POST /public/:storeId/coupons/validate — storefront cart lines (#1368, #1379)', () => {
+  // What the storefront now sends: loose lines WITHOUT category ids (the
+  // cart never carries them). The route must resolve them itself.
+  const STOREFRONT_ITEMS = [{ productId: 'p1', quantity: 2, lineTotal: 10000 }];
+
+  beforeAll(async () => {
+    app = await buildApp();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('resolves category ids from the store and refuses a category-scoped code the cart does not match', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(
+      couponRow({ type: 'free_shipping', value: 0, scopeCategoryIds: ['shoes'] })
+    );
+    mockPrisma.product.findMany.mockResolvedValue([
+      { id: 'p1', categories: [{ categoryId: 'bags' }] },
+    ]);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'FREESHIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
+    // Scoped to THIS store's products — never another tenant's categories.
+    expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['p1'] }, storeId: STORE_ID } })
+    );
+  });
+
+  it('accepts the same code when the resolved categories match', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(
+      couponRow({ type: 'free_shipping', value: 0, scopeCategoryIds: ['shoes'] })
+    );
+    mockPrisma.product.findMany.mockResolvedValue([
+      { id: 'p1', categories: [{ categoryId: 'shoes' }] },
+    ]);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'FREESHIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.coupon.type).toBe('free_shipping');
+  });
+
+  it('refuses a first-order-only code to a typed identity that has ordered before', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ firstOrderOnly: true }));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
+    mockPrisma.order.count.mockResolvedValue(3);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'WELCOME', cartItems: STOREFRONT_ITEMS, phone: '+96550000002' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
+  });
+
+  it('does not refuse a customer-group code when no identity has been typed yet (cart page)', async () => {
+    // Unknown is not ineligible: a VIP on the cart page must be able to apply
+    // their code; checkout re-evaluates with the typed phone/email.
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'VIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS });
+
+    expect(res.status).toBe(200);
+    // 10% of the 10000 fils line.
+    expect(res.body.data.discount).toBe(1000);
+  });
+
+  it('an unscoped code quotes the same discount as the whole-cart orderTotal path', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ value: 15, maxDiscount: 1200 }));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
+
+    const withLines = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE', orderTotal: 10000, cartItems: STOREFRONT_ITEMS });
+    const totalOnly = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE', orderTotal: 10000 });
+
+    expect(withLines.body.data.discount).toBe(1200);
+    expect(withLines.body.data.discount).toBe(totalOnly.body.data.discount);
   });
 });

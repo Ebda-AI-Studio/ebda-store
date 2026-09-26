@@ -98,7 +98,7 @@ describe('a revoked earn stays revoked', () => {
       )
     );
 
-    const res = await LoyaltyService.earnPointsFromPurchase(STORE, CUSTOMER, 5000, ORDER);
+    const res = await LoyaltyService.earnPointsFromPurchase(STORE, CUSTOMER, ORDER, 5000);
 
     expect(res.pointsEarned, 'a re-emitted delivered event must not re-credit').toBe(0);
     expect(pointsUpdate, 'no balance write at all').not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe('a revoked earn stays revoked', () => {
     );
     txFindMany.mockResolvedValue([{ id: 'adj-1', description: 'refund-revoke:earn-1' }]);
 
-    const res = await LoyaltyService.earnPointsFromPurchase(STORE, CUSTOMER, 5000, ORDER);
+    const res = await LoyaltyService.earnPointsFromPurchase(STORE, CUSTOMER, ORDER, 5000);
 
     expect(
       res.pointsEarned,
@@ -132,10 +132,23 @@ describe('a revoked earn stays revoked', () => {
     txFindFirst.mockResolvedValue(null);
     pointsFindUnique.mockResolvedValue({ points: 0, tier: 'bronze', totalEarned: 0 });
 
-    await LoyaltyService.earnPointsFromPurchase(STORE, CUSTOMER, 5000, ORDER);
+    const res = await LoyaltyService.earnPointsFromPurchase(STORE, CUSTOMER, ORDER, 5000);
 
-    // Reaching the transaction at all is the signal: no earn row existed, so
-    // the credit path ran.
+    // The credit path ran AND credited the right amount. Reaching the
+    // transaction alone is not enough: with orderId/orderTotalFils swapped
+    // (#1444) this test used to credit NaN points and still pass.
+    // 5000 fils = 5 KWD × 10 points/KWD (default) × 1.0 bronze multiplier = 50.
     expect(transaction).toHaveBeenCalled();
+    expect(res.pointsEarned).toBe(50);
+    expect(pointsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ points: { increment: 50 } }),
+      })
+    );
+    expect(txCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ orderId: ORDER, type: 'earn_purchase', points: 50 }),
+      })
+    );
   });
 });

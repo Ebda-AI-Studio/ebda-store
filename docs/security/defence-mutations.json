@@ -990,6 +990,46 @@
       "find": "        WHERE store_id = ${storeId} AND customer_id = ${customerId}\n        FOR UPDATE`;",
       "replace": "        WHERE store_id = ${storeId} AND customer_id = ${customerId}`;",
       "test": "tests/integration/customer-wallet.test.ts"
+    },
+    {
+      "id": "money-loyalty-earn-reversal-duplicate-noop",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a duplicate order/refunded delivery that loses the unique-index race on its refund-revoke adjust row surfaces as a failed step instead of a no-op, so the fanout retries and alerts on a reversal that already happened",
+      "source": "apps/api/src/services/loyalty.service.ts",
+      "find": "      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {\n        const current = await prisma.loyaltyPoints.findUnique({\n          where: { storeId_customerId: { storeId, customerId: earn.customerId } },",
+      "replace": "      if (false) {\n        const current = await prisma.loyaltyPoints.findUnique({\n          where: { storeId_customerId: { storeId, customerId: earn.customerId } },",
+      "test": "tests/unit/loyalty-reversal-concurrency.test.ts"
+    },
+    {
+      "id": "money-loyalty-redeem-recredit-duplicate-noop",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a duplicate order/refunded delivery that loses the unique-index race on its redeem-recredit adjust row surfaces as a failed step instead of a no-op, so the fanout retries and alerts on a re-credit that already happened",
+      "source": "apps/api/src/services/loyalty.service.ts",
+      "find": "      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {\n        const current = await prisma.loyaltyPoints.findUnique({\n          where: { storeId_customerId: { storeId, customerId: redeem.customerId } },",
+      "replace": "      if (false) {\n        const current = await prisma.loyaltyPoints.findUnique({\n          where: { storeId_customerId: { storeId, customerId: redeem.customerId } },",
+      "test": "tests/unit/loyalty-reversal-concurrency.test.ts"
+    },
+    {
+      "id": "money-loyalty-earn-reversal-row-lock",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "the earn reversal reads the loyalty row without FOR UPDATE and writes absolute points/totalEarned back, so a concurrent earn on the same customer is overwritten and the customer loses points (#1427)",
+      "source": "apps/api/src/services/loyalty.service.ts",
+      "find": "        await lockLoyaltyRow(tx, storeId, earn.customerId);\n",
+      "replace": "",
+      "test": "tests/unit/loyalty-reversal-concurrency.test.ts"
+    },
+    {
+      "id": "money-loyalty-redeem-recredit-row-lock",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "the redeem re-credit reads the loyalty row without FOR UPDATE and writes an absolute totalRedeemed back, so a concurrent redemption is dropped from the lifetime total (#1427)",
+      "source": "apps/api/src/services/loyalty.service.ts",
+      "find": "        await lockLoyaltyRow(tx, storeId, redeem.customerId);\n",
+      "replace": "",
+      "test": "tests/unit/loyalty-reversal-concurrency.test.ts"
     }
   ]
 }

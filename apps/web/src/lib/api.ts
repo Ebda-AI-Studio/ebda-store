@@ -368,6 +368,16 @@ interface CreateOrderData {
 const COOKIE_ROTATED = 'cookie-rotated';
 
 /**
+ * Returned by refreshAccessToken() when the server REJECTED the refresh (401).
+ * NOT a token and NOT a success. The server clears both auth cookies on that
+ * answer (auth.routes.ts POST /auth/refresh), so the browser is now genuinely
+ * cookieless — the state in which csrfProtection's no-cookie branch lets a
+ * guest-reachable write (POST /payments/create) through. A CSRF-403 is
+ * therefore worth retrying ONCE after it; a plain 401 is not.
+ */
+const SESSION_ENDED = 'session-ended';
+
+/**
  * A refresh the server THROTTLED, as opposed to one it rejected.
  *
  * 429 and 401 are opposite facts about a session — "slow down" versus "you
@@ -418,16 +428,19 @@ class ApiClient {
     if (this.refreshPromise) return this.refreshPromise;
 
     this.refreshPromise = (async (): Promise<string | null> => {
-      // On iOS/iPadOS the refresh token lives in localStorage (the httpOnly
-      // cookie is unreliable for installed PWAs). On every other browser the
-      // refresh token rides in the refresh_token httpOnly cookie, sent
-      // automatically via credentials:'include' — so we send an empty body
-      // and let the server read it from the cookie. The /auth/refresh route
-      // accepts either. Only bail early when iOS has no stored token.
+      // On iOS/iPadOS the refresh token is mirrored to localStorage (the
+      // httpOnly cookie is unreliable for installed PWAs). On every other
+      // browser it rides in the refresh_token httpOnly cookie, sent
+      // automatically via credentials:'include'. With no stored token we send
+      // an empty body and let the server read the cookie — on iOS too: Safari
+      // ITP evicts localStorage while the server-set cookie survives, and
+      // bailing out here left that shopper with no way to re-mint a CSRF token
+      // (every checkout write 403'd until a manual re-login). The
+      // /auth/refresh route accepts either and answers 400 when neither is
+      // present, which lands on the same `null` the old bail returned.
       const ios = isIosWebkit();
       const storedRefreshToken =
         typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-      if (ios && !storedRefreshToken) return null;
 
       try {
         const res = await fetch(`${this.baseUrl}/auth/refresh`, {
@@ -441,6 +454,7 @@ class ApiClient {
           body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
         });
         if (res.status === 429) throw new RefreshThrottledError();
+        if (res.status === 401) return SESSION_ENDED;
         if (!res.ok) return null;
         const json = await res.json();
         if (json.success && json.data) {
@@ -531,11 +545,13 @@ class ApiClient {
       // customer's writes fail until the 30-minute access token expires and a
       // 401 happens to trigger the same path.
       let shouldRefreshRetry = response.status === 401;
+      let csrfRejected = false;
       if (response.status === 403) {
         try {
           const peek = await response.clone().json();
           if (typeof peek?.error?.code === 'string' && peek.error.code.startsWith('CSRF_')) {
             shouldRefreshRetry = true;
+            csrfRejected = true;
           }
         } catch {
           // Non-JSON 403 — treat as a normal failure, not a CSRF problem.
@@ -557,7 +573,14 @@ class ApiClient {
             error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again.' },
           } as ApiResponse<T>;
         }
-        if (newToken) {
+        // A rejected refresh (401) cleared the dead session's cookies, so a
+        // CSRF-403 is retried once as the cookieless request it now is —
+        // otherwise the shopper's "Place order" fails on the very attempt
+        // that healed it. A 401 is NOT retried on that answer: the session is
+        // gone and the same request would only 401 again. Still one retry at
+        // most, so a genuinely broken session cannot loop.
+        const refreshed = newToken !== null && newToken !== SESSION_ENDED;
+        if (refreshed || (csrfRejected && newToken === SESSION_ENDED)) {
           // Rebuild headers to pick up any new CSRF token set during refresh
           const retryHeaders = this.buildHeaders(options);
           const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {

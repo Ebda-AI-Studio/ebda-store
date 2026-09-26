@@ -405,6 +405,35 @@ describe('coupon on a cart containing a bundle — quote must equal charge', () 
 
     expect(await chargedDiscount()).toBe(1000);
   });
+
+  // #193 (owner decision): VAT is levied AFTER discount. The mixed cart is
+  // 22000 fils of goods (10000 loose + 12000 box) with a 1000-fils coupon, so
+  // at 5% the tax is 5% of 21000 = 1050 — not 5% of 22000 = 1100 as before.
+  it('a VAT store charges tax on the subtotal net of the discount', async () => {
+    mockPrisma.taxRate.findMany.mockResolvedValue([{ rate: 5 }]);
+    setCart([LOOSE_LINE], 1);
+
+    capturedOrderCreate.mockClear();
+    await OrderService.create(STORE_ID, undefined, 'sess-1', ORDER_DATA);
+    const { data } = capturedOrderCreate.mock.calls.at(-1)?.[0] as {
+      data: { subtotal: number; discount: number; tax: number; total: number; shipping: number };
+    };
+
+    expect(data.subtotal).toBe(22000);
+    expect(data.discount).toBe(1000);
+    expect(data.tax).toBe(1050);
+    expect(data.total).toBe(22000 - 1000 + 1050 + data.shipping);
+  });
+
+  it('a store with tax off is unchanged: no tax, with or without a discount', async () => {
+    setCart([LOOSE_LINE], 1);
+
+    capturedOrderCreate.mockClear();
+    await OrderService.create(STORE_ID, undefined, 'sess-1', ORDER_DATA);
+    const { data } = capturedOrderCreate.mock.calls.at(-1)?.[0] as { data: { tax: number } };
+
+    expect(data.tax).toBe(0);
+  });
 });
 
 /**

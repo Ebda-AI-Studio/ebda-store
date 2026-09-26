@@ -26,6 +26,7 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
+import { computeOrderTax } from '../lib/order-tax';
 import { invalidateStoreProductCaches, invalidateCustomersCache } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 
@@ -551,10 +552,10 @@ export class OrderService {
       );
     }
 
-    // Calculate tax using store's configured tax rates
+    // Resolve the store's configured tax rate. The tax itself is computed
+    // below, once the discount is known — VAT is levied after discount (#193).
     const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
     const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
-    const tax = Math.round(subtotal * taxRate);
 
     // Resolve shipping for the order's delivery area. Until now this was
     // hardcoded to 0 — the storefront cart/checkout calls
@@ -742,6 +743,7 @@ export class OrderService {
     }
 
     const discount = primaryDiscount + loyaltyDiscount;
+    const tax = computeOrderTax(subtotal, discount, taxRate);
     const total = Math.max(0, subtotal + tax + shipping - discount);
 
     // Customer wallet (D1). Resolved on the SERVER from the real balance; the
@@ -2049,10 +2051,10 @@ export class OrderService {
 
     const subtotal = resolved.reduce((sum, r) => sum + r.lineTotal, 0);
 
-    // Tax: same store-level resolution as the public checkout path.
+    // Tax: same store-level resolution as the public checkout path, levied
+    // after the coupon discount below (#193).
     const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
     const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
-    const tax = Math.round(subtotal * taxRate);
 
     // Shipping: try to resolve via ShippingService; fall back to 0 on
     // error (same defensive posture as public checkout).
@@ -2132,6 +2134,7 @@ export class OrderService {
       couponCode = appliedCoupon.code;
     }
 
+    const tax = computeOrderTax(subtotal, couponDiscount, taxRate);
     const total = Math.max(0, subtotal + tax + shipping - couponDiscount);
     const orderNumber = generateOrderNumber();
 
