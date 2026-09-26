@@ -90,7 +90,8 @@ function git(args, opts = {}) {
     ...opts,
   }).trim();
 }
-const coreBare = () => git(['config', '--get', 'core.bare']);
+// `--default ''`: an unset core.bare is normal (git exits 1 for a missing key), not an error.
+const coreBare = () => git(['config', '--default', '', '--get', 'core.bare']);
 
 // ---------------------------------------------------------------- infra
 const CONTAINER_PG = 'fwb-buyflow-pg';
