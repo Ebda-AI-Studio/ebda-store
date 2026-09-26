@@ -387,6 +387,18 @@ const SESSION_ENDED = 'session-ended';
  * stored refresh token. Surfacing the distinction lets a caller wait instead
  * of tearing down.
  */
+/**
+ * The refresh token lives in localStorage ONLY on iOS/iPadOS WebKit (every
+ * write is iOS-gated). Elsewhere it rides the httpOnly cookie, so any
+ * localStorage copy is legacy residue: it is removed, never sent.
+ */
+function readStoredRefreshToken(ios: boolean): string | null {
+  if (typeof window === 'undefined') return null;
+  if (ios) return localStorage.getItem('refreshToken');
+  localStorage.removeItem('refreshToken');
+  return null;
+}
+
 export class RefreshThrottledError extends Error {
   constructor() {
     super('Refresh was rate-limited');
@@ -438,9 +450,14 @@ class ApiClient {
       // (every checkout write 403'd until a manual re-login). The
       // /auth/refresh route accepts either and answers 400 when neither is
       // present, which lands on the same `null` the old bail returned.
+      //
+      // The READ is iOS-gated (#1945), mirroring admin/orders: a non-iOS
+      // browser carrying a leftover entry (written before the writes were
+      // iOS-gated) would otherwise take the body-token branch forever, ship a
+      // 365-day token in a JS-visible body, and never refresh from its cookie.
+      // That residue is cleared here so it is not carried forward.
       const ios = isIosWebkit();
-      const storedRefreshToken =
-        typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+      const storedRefreshToken = readStoredRefreshToken(ios);
 
       try {
         const res = await fetch(`${this.baseUrl}/auth/refresh`, {
@@ -666,20 +683,14 @@ class ApiClient {
      */
     storeId?: string;
   }) {
-    const result = await this.request<{
-      user: User;
-      accessToken: string;
-      refreshToken: string;
-      csrfToken?: string;
-    }>('/auth/register', { method: 'POST', body: JSON.stringify(data) });
-
-    // Same as login: a session established here needs its CSRF token stored or
-    // the customer's first write 403s.
-    if (typeof window !== 'undefined' && result.success && result.data?.csrfToken) {
-      localStorage.setItem('csrfToken', result.data.csrfToken);
-    }
-
-    return result;
+    // T1-4: register issues NO session — no user, tokens, cookies or
+    // csrfToken — and answers identically for new and existing emails. The
+    // session (and its CSRF token) starts at login() after the customer
+    // verifies their address (#1256: the type used to promise a token pair).
+    return this.request<{ emailVerificationSent: true }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async login(email: string, password: string, storeId?: string) {
@@ -716,8 +727,11 @@ class ApiClient {
   }
 
   async logout() {
-    const refreshToken =
-      typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+    // Same iOS gate as refreshAccessToken (#1945): on every other browser the
+    // server revokes the refresh_token COOKIE when the body carries none — a
+    // leftover localStorage value would make it revoke that stale token and
+    // leave the live cookie session standing.
+    const refreshToken = readStoredRefreshToken(isIosWebkit());
     await this.request('/auth/logout', {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),

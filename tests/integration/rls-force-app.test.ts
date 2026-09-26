@@ -49,7 +49,9 @@ import {
   runInStoreScope,
   withMoneyTx,
   setTenantGucs,
+  type Prisma,
 } from '@force/database';
+import { WalletService } from '../../apps/api/src/services/wallet.service';
 
 const TEST_PREFIX = 'fatest-';
 
@@ -111,6 +113,17 @@ async function cleanup(): Promise<void> {
       `DELETE FROM public.wishlist_items WHERE wishlist_id IN (SELECT id FROM public.wishlists WHERE name LIKE '${TEST_PREFIX}%')`
     );
     await tx.$executeRawUnsafe(`DELETE FROM public.wishlists WHERE name LIKE '${TEST_PREFIX}%'`);
+    // Wallet rows are NO ACTION to users (a money ledger never cascades away),
+    // so they go before the store/user deletes below.
+    await tx.$executeRawUnsafe(
+      `DELETE FROM public.audit_logs WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%')`
+    );
+    await tx.$executeRawUnsafe(
+      `DELETE FROM public.wallet_transactions WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%')`
+    );
+    await tx.$executeRawUnsafe(
+      `DELETE FROM public.customer_wallets WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%')`
+    );
     await tx.$executeRawUnsafe(`DELETE FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%'`);
     await tx.$executeRawUnsafe(`DELETE FROM public.users WHERE email LIKE '${TEST_PREFIX}%'`);
   });
@@ -427,6 +440,123 @@ describe('RLS-3: userContext middleware call surface — wishlist (header-derive
     // as here, not opening a tenant context at all.
     const row = await prisma.wishlistItem.findUnique({ where: { id: wishlistItemB } });
     expect(row?.id).toBe(wishlistItemB);
+  });
+});
+
+describe('force_app real-login: wallet forfeit on erasure — scope (#1957, Ruling W-7)', () => {
+  // A legacy `users.store_id = NULL` shopper counts as a customer of every
+  // store they ordered in (`storeCustomerWhere`), so they can hold a wallet in
+  // BOTH stores. Owner decision 2026-09-26: a store deletes ONLY its own data.
+  // A merchant-scoped erasure touches its own store's wallet and nothing else;
+  // the shopper's own erasure / the retention cron span every store, write one
+  // audit row per affected store, and name the actor on the ledger entry.
+  async function seedLegacyShopperWithTwoWallets(): Promise<string> {
+    return withRlsBypass(async tx => {
+      const shopper = await tx.user.create({
+        data: {
+          email: `${TEST_PREFIX}wallet-legacy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.com`,
+          passwordHash: 'hashed',
+          firstName: 'Legacy',
+          lastName: 'Shopper',
+          role: 'customer',
+          storeId: null,
+        },
+      });
+      for (const [storeId, balance] of [
+        [storeA, 1500],
+        [storeB, 2500],
+      ] as const) {
+        const wallet = await tx.customerWallet.create({
+          data: { storeId, customerId: shopper.id, balance },
+        });
+        await tx.walletTransaction.create({
+          data: {
+            storeId,
+            walletId: wallet.id,
+            customerId: shopper.id,
+            amount: balance,
+            balanceAfter: balance,
+            type: 'admin_adjust',
+            idempotencyKey: `${TEST_PREFIX}seed-${wallet.id}`,
+            note: 'goodwill for Legacy Shopper, +965 5555 0000',
+          },
+        });
+      }
+      return shopper.id;
+    });
+  }
+
+  async function readBack(customerId: string) {
+    return withRlsBypass(async tx => ({
+      wallets: await tx.customerWallet.findMany({
+        where: { customerId },
+        select: { storeId: true, balance: true },
+      }),
+      seedNotes: await tx.walletTransaction.findMany({
+        where: { customerId, type: 'admin_adjust', note: { not: null } },
+        select: { storeId: true },
+      }),
+      forfeits: await tx.walletTransaction.findMany({
+        where: { customerId, type: 'expire' },
+        select: { storeId: true, amount: true, actorId: true },
+      }),
+      audits: await tx.auditLog.findMany({
+        where: { resourceId: customerId, action: 'customer.wallet.erased' },
+        select: { storeId: true, userId: true, details: true },
+      }),
+    }));
+  }
+
+  it("a store-A merchant erasure forfeits store A only and never touches store B's wallet", async () => {
+    const customerId = await seedLegacyShopperWithTwoWallets();
+
+    await runInTenantContext(
+      storeA,
+      () =>
+        WalletService.forfeitOnErasure(customerId, prisma as unknown as Prisma.TransactionClient, {
+          storeId: storeA,
+          actorId: userA,
+        }),
+      userA
+    );
+
+    const after = await readBack(customerId);
+    expect(after.wallets.find(w => w.storeId === storeA)?.balance, 'store A balance').toBe(0);
+    expect(after.wallets.find(w => w.storeId === storeB)?.balance, 'store B balance').toBe(2500);
+    expect(after.seedNotes.map(n => n.storeId)).toEqual([storeB]);
+    expect(after.forfeits).toEqual([{ storeId: storeA, amount: -1500, actorId: userA }]);
+    expect(after.audits).toEqual([]);
+  });
+
+  it("the shopper's own erasure forfeits every store, audits each store, and names the actor", async () => {
+    const customerId = await seedLegacyShopperWithTwoWallets();
+
+    // No tenant context — the self-service / retention-cron shape
+    // (AuthService.eraseAccount → withMoneyTx), under a real force_app login.
+    await prisma.$transaction(tx =>
+      WalletService.forfeitOnErasure(customerId, tx as unknown as Prisma.TransactionClient, {
+        storeId: null,
+        actorId: customerId,
+      })
+    );
+
+    const after = await readBack(customerId);
+    expect(
+      after.wallets.every(w => w.balance === 0),
+      'every balance zeroed'
+    ).toBe(true);
+    expect(after.seedNotes).toEqual([]);
+    expect(after.forfeits).toEqual(
+      expect.arrayContaining([
+        { storeId: storeA, amount: -1500, actorId: customerId },
+        { storeId: storeB, amount: -2500, actorId: customerId },
+      ])
+    );
+    expect(after.audits.map(a => a.storeId).sort()).toEqual([storeA, storeB].sort());
+    for (const a of after.audits) {
+      expect(a.userId).toBe(customerId);
+      expect((a.details as { actor: string }).actor).toBe(customerId);
+    }
   });
 });
 

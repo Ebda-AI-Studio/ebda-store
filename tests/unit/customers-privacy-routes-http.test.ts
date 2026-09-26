@@ -137,7 +137,11 @@ describe('POST /stores/:storeId/customers/:customerId/erase — HTTP surface', (
   it('owning admin: 200, erases, audits', async () => {
     const res = await erase(STORE_A, CUSTOMER_OF_A);
     expect(res.status).toBe(200);
-    expect(h.eraseAccount).toHaveBeenCalledWith(CUSTOMER_OF_A);
+    // Ruling W-7: a merchant erasure is scoped to its own store and names the actor.
+    expect(h.eraseAccount).toHaveBeenCalledWith(CUSTOMER_OF_A, {
+      scopeStoreId: STORE_A,
+      actorId: 'admin-a',
+    });
     expect(h.auditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'customer.account.erased_by_merchant' })
     );

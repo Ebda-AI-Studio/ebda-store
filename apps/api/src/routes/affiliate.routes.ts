@@ -8,15 +8,25 @@ import { listAffiliateEvents } from '../services/affiliate-event.service';
 import { prisma } from '@force/database';
 import { tenantContext } from '../middleware/tenant-context';
 
+// TWO routers, deliberately (#1993): the admin half is mounted ONLY at the
+// bare '/stores' prefix; `publicRouter` is the only thing mounted at
+// '/public'. Do NOT collapse them back into one router mounted at both —
+// `csrfProtection` skips '/public/' paths and `restrictPlatformOnlyOrigins`
+// only covers '/api/v1/stores', so an admin route republished under '/public'
+// becomes a CSRF-free, credentialed cross-origin target for any
+// merchant-registered custom domain. Full reasoning: loyalty.routes.ts header.
+// Guarded by tests/unit/public-mount-admin-route-guard.test.ts.
+//
+// Both routers are mounted at bare prefixes in routes/index.ts, so Express
+// does NOT populate req.params.storeId at the mount level — every route below
+// declares its own '/:storeId/...' path. router.param runs AFTER Express
+// resolves :storeId for the matched route, so RLS tenant context is set
+// correctly on either router. See F2, docs/plans/2026-07-02-rls-cutover.md.
 const router = Router();
-
-// Mounted at the bare '/stores' and '/public' prefixes in routes/index.ts,
-// so Express does NOT populate req.params.storeId at the mount level —
-// every route below declares its own '/:storeId/...' path. router.param
-// runs AFTER Express resolves :storeId for the matched route, so RLS
-// tenant context is set correctly here regardless of which mount reached
-// it. See F2, docs/plans/2026-07-02-rls-cutover.md.
 router.param('storeId', tenantContext);
+
+const publicRouter = Router();
+publicRouter.param('storeId', tenantContext);
 
 // ==========================================
 // Validation Schemas
@@ -446,11 +456,11 @@ router.get(
 );
 
 // ==========================================
-// Public routes
+// Public routes (publicRouter — the ONLY router mounted at '/public')
 // ==========================================
 
 // POST /public/:storeId/affiliates/apply
-router.post(
+publicRouter.post(
   '/:storeId/affiliates/apply',
   // affiliate is an Enterprise-only feature. Without this gate the public
   // signup accepted applications for ANY-tier store (affiliateService.getConfig
@@ -469,7 +479,10 @@ router.post(
 );
 
 // GET /public/:storeId/affiliates/track?ref=CODE
-router.get(
+// (Before the #1993 split this was shadowed on '/public' by the admin
+// GET '/:storeId/affiliates/:id' declared earlier in the same router, so
+// every storefront click-track call 401'd.)
+publicRouter.get(
   '/:storeId/affiliates/track',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -506,3 +519,6 @@ router.get(
 );
 
 export default router;
+
+// Storefront-only router, mounted at '/public' in routes/index.ts.
+export { publicRouter as publicAffiliateRoutes };

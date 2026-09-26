@@ -134,7 +134,8 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
       // independently per the function-level `retries: 2`.
       try {
         await step.run(`anonymize-${id}`, async () => {
-          await AuthService.eraseAccount(id);
+          // Retention erasure spans every store (Ruling W-7); actor is 'system'.
+          await AuthService.eraseAccount(id, { actorId: 'system' });
           await auditLog({
             action: 'user.account.anonymized_by_retention_cron',
             userId: id,

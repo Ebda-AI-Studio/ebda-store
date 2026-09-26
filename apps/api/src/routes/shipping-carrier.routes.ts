@@ -402,8 +402,12 @@ router.post(
 );
 
 // ==========================================
-// Public route: GET /public/:storeId/orders/:orderId/tracking
-// Returns tracking info for an order (ownership check via session/auth)
+// Public route: GET /stores/public/:storeId/orders/:orderId/tracking
+// Returns tracking info for an order (ownership check via session/auth).
+// This router is mounted ONLY at '/stores' (#1993 removed the '/public'
+// dual mount, which republished every admin route above under a prefix
+// csrfProtection skips); the literal '/public' segment gives the same
+// '/stores/public/...' storefront shape as shipping/coupons/wallet.
 // ==========================================
 
 router.get(

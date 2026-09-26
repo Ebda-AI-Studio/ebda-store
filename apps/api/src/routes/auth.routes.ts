@@ -175,8 +175,11 @@ const emailLookupSchema = z.object({
  *                 type: string
  *                 example: Doe
  *     responses:
- *       201:
- *         description: User registered successfully
+ *       200:
+ *         description: >-
+ *           Verification email sent. Identical for new and existing emails
+ *           (T1-4 enumeration close) — no user, tokens, cookies or csrfToken
+ *           are issued; the session starts at /auth/login after verification.
  *         content:
  *           application/json:
  *             schema:
@@ -188,16 +191,11 @@ const emailLookupSchema = z.object({
  *                 data:
  *                   type: object
  *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/User'
- *                     accessToken:
- *                       type: string
- *                     refreshToken:
- *                       type: string
+ *                     emailVerificationSent:
+ *                       type: boolean
+ *                       example: true
  *       400:
  *         $ref: '#/components/responses/ValidationError'
- *       409:
- *         description: Email already exists
  */
 router.post('/register', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -680,7 +678,8 @@ router.post(
     try {
       const userId = req.user!.userId;
 
-      await AuthService.eraseAccount(userId);
+      // The shopper's OWN erasure spans every store (Ruling W-7).
+      await AuthService.eraseAccount(userId, { actorId: userId });
 
       await auditLog({
         action: 'user.account.erased',

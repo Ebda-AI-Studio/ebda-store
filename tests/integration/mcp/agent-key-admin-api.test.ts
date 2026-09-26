@@ -238,6 +238,72 @@ describe('agent key admin API — the merchant lifecycle', () => {
     });
   });
 
+  it('a store UPDATE response does not echo any stored credential either (#1651)', async () => {
+    // The PUT writers (theme/branding/social/contact/announcement/...) return
+    // the raw `prisma.store.update` row, which store.routes.ts serialises
+    // verbatim. Only the global omit keeps the ciphertexts out of it.
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+    });
+    const minted = await fetch(keyEndpoint(), { method: 'POST', headers: auth() });
+    expect(minted.status).toBe(201);
+
+    const res = await fetch(`${API}/stores/${storeId}/announcement`, {
+      method: 'PUT',
+      headers: auth(),
+      body: JSON.stringify({ enabled: false, text: 'hello', textAr: 'مرحبا' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.store.id, 'the update must return the store row').toBe(storeId);
+    const raw = JSON.stringify(body);
+    for (const field of ['"agentApiKey"', '"wbsApiKey"', '"metaAccessToken"']) {
+      expect(raw, `PUT /announcement must not return ${field}`).not.toContain(field);
+    }
+
+    await fetch(keyEndpoint(), { method: 'DELETE', headers: auth() });
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { wbsApiKey: null, metaAccessToken: null },
+    });
+  });
+
+  it('an explicit select still reads every omitted credential back (#1938)', async () => {
+    // The global omit is only safe because a query-level `select` overrides
+    // it: wbsApiKey feeds `if (!store.wbsApiKey) return;` guards
+    // (abandoned-cart, order-whatsapp-notify, wa-bridge-auth) that would turn
+    // into SILENT no-ops if it did not. Pin the positive read-back for all
+    // three, not just agentApiKey.
+    await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        wbsApiKey: 'ciphertext-wbs',
+        metaAccessToken: 'ciphertext-meta',
+        agentApiKey: 'ciphertext-agent',
+      },
+    });
+    const row = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { wbsApiKey: true, metaAccessToken: true, agentApiKey: true },
+    });
+    expect(row).toEqual({
+      wbsApiKey: 'ciphertext-wbs',
+      metaAccessToken: 'ciphertext-meta',
+      agentApiKey: 'ciphertext-agent',
+    });
+    // Negative control: without the select the same row carries none of them.
+    const bare = await prisma.store.findUnique({ where: { id: storeId } });
+    expect(bare).not.toHaveProperty('wbsApiKey');
+    expect(bare).not.toHaveProperty('metaAccessToken');
+    expect(bare).not.toHaveProperty('agentApiKey');
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { wbsApiKey: null, metaAccessToken: null, agentApiKey: null },
+    });
+  });
+
   it('a minted key authorises an MCP write; revoking it refuses the very next one', async () => {
     // Fresh mint so this test owns its own key regardless of order.
     const minted = await fetch(keyEndpoint(), { method: 'POST', headers: auth() });

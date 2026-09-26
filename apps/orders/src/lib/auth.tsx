@@ -244,8 +244,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    // iOS-gated like every other refresh-token read (#1945): elsewhere the
+    // token rides the httpOnly cookie, which the server revokes when the body
+    // carries none — a leftover localStorage value would be revoked instead.
     const refreshTokenValue =
-      typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+      typeof window !== 'undefined' && isIosWebkit() ? localStorage.getItem('refreshToken') : null;
     await fetch(`${API_URL}/auth/logout`, {
       method: 'POST',
       credentials: 'include',

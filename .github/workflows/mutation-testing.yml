@@ -95,6 +95,12 @@ on:
       - 'apps/api/src/services/wallet.service.ts'
       - 'apps/web/src/lib/consent-cookie.ts'
       - 'apps/web/src/lib/store-resolver.ts'
+      # #1993: the mount table — no admin router may be mounted at '/public'.
+      - 'apps/api/src/routes/index.ts'
+      # #1959: agent/feed documents never resolve the store from the cookie.
+      - 'apps/web/middleware.ts'
+      # #2037: the exception-safe scoped RLS bypass used by erasure.
+      - 'apps/api/src/lib/scoped-rls-bypass.ts'
       - 'tests/unit/**'
       # The artifact itself: a PR that hand-edits the record must re-run the
       # gate, or the staleness check it exists to enforce never fires.

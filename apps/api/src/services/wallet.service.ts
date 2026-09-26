@@ -9,6 +9,7 @@ import {
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
+import { withScopedRlsBypass } from '../lib/scoped-rls-bypass';
 
 /**
  * Customer wallet (store credit) — the ONLY writer of `customer_wallets` and
@@ -433,43 +434,95 @@ export class WalletService {
    * written off with an `expire` entry — the account can no longer sign in to
    * spend it, and leaving it would overstate the merchant's liability forever.
    * Runs on the erasure transaction so it commits or rolls back with it.
+   *
+   * SCOPE (owner decision 2026-09-26, Ruling W-7): a store deletes ONLY its
+   * own data.
+   *   - `scope.storeId` set (merchant-initiated erase): only THAT store's
+   *     wallet and ledger rows are touched. No RLS bypass — the ambient tenant
+   *     GUC already names that store, and the explicit `storeId` filter keeps
+   *     it true under a BYPASSRLS connection too.
+   *   - `scope.storeId` null (the shopper's own account erasure, the retention
+   *     cron): every store the customer holds a wallet in. Wallets are
+   *     store-scoped under RLS, so this runs inside `withScopedRlsBypass`
+   *     (#1957/#2037), and each affected store gets its OWN `audit_logs` row
+   *     naming the actor, so a store whose liability changed without any
+   *     action of its own can see why.
+   * The `expire` entries carry `scope.actorId` (a user id, or 'system').
    */
-  static async forfeitOnErasure(customerId: string, client: WalletClient): Promise<void> {
-    await client.walletTransaction.updateMany({
-      where: { customerId, note: { not: null } },
-      data: { note: null },
-    });
-    const wallets = await client.customerWallet.findMany({
-      where: { customerId, balance: { gt: 0 } },
-      select: { id: true, storeId: true, balance: true },
-    });
-    for (const w of wallets) {
-      // Keyed to the ledger position being zeroed, not just the wallet: a
-      // re-run of an erasure (it is documented as idempotent) that finds a
-      // balance again — e.g. an order reversal credited after the first run —
-      // must write a NEW forfeit, not trip IDEMPOTENCY_KEY_REUSED on the old
-      // key and fail the whole erasure. A plain re-run finds balance 0 and
-      // never reaches here.
-      const latest = await client.walletTransaction.findFirst({
-        where: { walletId: w.id },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        select: { id: true },
+  static async forfeitOnErasure(
+    customerId: string,
+    client: WalletClient,
+    scope: { storeId: string | null; actorId: string }
+  ): Promise<void> {
+    const storeFilter = scope.storeId ? { storeId: scope.storeId } : {};
+    const run = async () => {
+      await client.walletTransaction.updateMany({
+        where: { customerId, ...storeFilter, note: { not: null } },
+        data: { note: null },
       });
-      const result = await this.applyEntry(
-        {
-          storeId: w.storeId,
-          customerId,
-          amount: -w.balance,
-          type: 'expire',
-          idempotencyKey: `erasure-forfeit:${w.id}:${latest?.id ?? 'none'}`,
-          note: 'Forfeited on account erasure',
-        },
-        client
-      );
-      logger.info(
-        { storeId: w.storeId, walletId: w.id, forfeited: w.balance, replayed: result.replayed },
-        '[WalletService] balance forfeited on account erasure'
-      );
+      const wallets = await client.customerWallet.findMany({
+        where: { customerId, ...storeFilter },
+        select: { id: true, storeId: true, balance: true },
+      });
+      const forfeited = new Map<string, number>();
+      for (const w of wallets.filter(x => x.balance > 0)) {
+        // Keyed to the ledger position being zeroed, not just the wallet: a
+        // re-run of an erasure (it is documented as idempotent) that finds a
+        // balance again — e.g. an order reversal credited after the first run —
+        // must write a NEW forfeit, not trip IDEMPOTENCY_KEY_REUSED on the old
+        // key and fail the whole erasure. A plain re-run finds balance 0 and
+        // never reaches here.
+        const latest = await client.walletTransaction.findFirst({
+          where: { walletId: w.id },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          select: { id: true },
+        });
+        const result = await this.applyEntry(
+          {
+            storeId: w.storeId,
+            customerId,
+            amount: -w.balance,
+            type: 'expire',
+            idempotencyKey: `erasure-forfeit:${w.id}:${latest?.id ?? 'none'}`,
+            note: 'Forfeited on account erasure',
+            actorId: scope.actorId,
+          },
+          client
+        );
+        forfeited.set(w.storeId, w.balance);
+        logger.info(
+          { storeId: w.storeId, walletId: w.id, forfeited: w.balance, replayed: result.replayed },
+          '[WalletService] balance forfeited on account erasure'
+        );
+      }
+      return { wallets, forfeited };
+    };
+
+    if (scope.storeId) {
+      await run();
+      return;
     }
+
+    await withScopedRlsBypass(client, async () => {
+      const { wallets, forfeited } = await run();
+      // One row per affected store, written with THAT store's id.
+      const actorIsUser = scope.actorId !== 'system';
+      for (const storeId of new Set(wallets.map(w => w.storeId))) {
+        await client.auditLog.create({
+          data: {
+            action: 'customer.wallet.erased',
+            userId: actorIsUser ? scope.actorId : null,
+            storeId,
+            resourceType: 'user',
+            resourceId: customerId,
+            details: {
+              actor: scope.actorId,
+              reason: 'account_erasure',
+              forfeitedFils: forfeited.get(storeId) ?? 0,
+            },
+          },
+        });
+      }
+    });
   }
 }

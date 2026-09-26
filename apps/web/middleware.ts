@@ -367,8 +367,15 @@ function handlePlatformDomain(
   }
 
   // Subroute with no slug in the URL — carry store context from the cookie
-  // (e.g. /products or /cart after /palora).
-  const cookieSlug = request.cookies.get('x-store-slug')?.value;
+  // (e.g. /products or /cart after /palora). NOT for the agent/feed documents
+  // (#1959): they answer `public, s-maxage=…`, and Cloudflare's cache key
+  // ignores Vary/Cookie, so a cookie-resolved store's document would be cached
+  // under the bare platform URL and served to every other visitor. Those paths
+  // resolve ONLY from the URL slug (`/<slug>/llms.txt`) or the custom-domain
+  // Host — the platform root answers as the platform (404 for ACP/UCP/feed).
+  const cookieSlug = isUrlKeyedPublicPath(request.nextUrl.pathname)
+    ? undefined
+    : request.cookies.get('x-store-slug')?.value;
   if (cookieSlug) {
     requestHeaders.set('x-store-slug', cookieSlug);
 
@@ -383,6 +390,23 @@ function handlePlatformDomain(
   }
 
   return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
+/**
+ * Store-specific documents that are SHARED-cacheable (`public, s-maxage`) and
+ * therefore must be keyed by URL/Host alone — never by the sticky
+ * `x-store-slug` cookie, which no cache in front of us keys on (#1959).
+ */
+const URL_KEYED_PUBLIC_PATHS = [
+  '/llms.txt',
+  '/.well-known/acp.json',
+  '/.well-known/ucp',
+  '/feeds/products.json',
+];
+
+/** Exact match OR anything beneath it (`/.well-known/ucp/<doc>`). */
+function isUrlKeyedPublicPath(pathname: string): boolean {
+  return URL_KEYED_PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export function middleware(request: NextRequest) {

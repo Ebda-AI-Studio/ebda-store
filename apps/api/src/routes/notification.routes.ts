@@ -10,7 +10,16 @@ import { notificationConfigService } from '../services/notification-config.servi
 import { pushService } from '../services/push.service';
 import logger from '../lib/logger';
 
+// TWO routers, deliberately (#1993): the admin half is mounted ONLY at the
+// bare '/stores' prefix; `publicRouter` is the only thing mounted at
+// '/public'. Do NOT collapse them back into one router mounted at both —
+// `csrfProtection` skips '/public/' paths and `restrictPlatformOnlyOrigins`
+// only covers '/api/v1/stores', so an admin route republished under '/public'
+// becomes a CSRF-free, credentialed cross-origin target for any
+// merchant-registered custom domain. Full reasoning: loyalty.routes.ts header.
+// Guarded by tests/unit/public-mount-admin-route-guard.test.ts.
 const router = Router();
+const publicRouter = Router();
 
 // The generic `:channel` param route can't take a single `requireFeature(key)`
 // at the middleware layer (channel isn't known until the request lands), so
@@ -412,18 +421,15 @@ router.get(
 );
 
 // ==========================================
-// Public Routes — NO auth required
+// Public Routes — NO auth required (publicRouter, mounted ONLY at '/public')
 // ==========================================
 
-// POST /:storeId/push/subscribe
+// POST /public/:storeId/push/subscribe
 // Register a push subscription (anonymous users can subscribe).
-//
-// This router is mounted at BOTH /stores (admin) and /public (public).
-// The admin routes above use paths like /:storeId/notifications/…
-// The public push routes below use /:storeId/push/… (no extra /public
-// prefix) so that when mounted at /public, the full URL resolves to
-// /public/:storeId/push/subscribe — matching what the storefront sends.
-router.post(
+// Paths carry no extra '/public' prefix: publicRouter is mounted at '/public',
+// so the full URL resolves to /public/:storeId/push/subscribe — matching what
+// the storefront sends.
+publicRouter.post(
   '/:storeId/push/subscribe',
   requireFeature('push_notifications'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -454,9 +460,9 @@ router.post(
   }
 );
 
-// POST /:storeId/push/unsubscribe
+// POST /public/:storeId/push/unsubscribe
 // Remove a push subscription
-router.post(
+publicRouter.post(
   '/:storeId/push/unsubscribe',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -534,3 +540,6 @@ router.post(
 );
 
 export default router;
+
+// Storefront-only router, mounted at '/public' in routes/index.ts.
+export { publicRouter as publicNotificationRoutes };

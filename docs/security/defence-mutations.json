@@ -957,7 +957,7 @@
       "tier": "unit",
       "why": "addresses carries a USER-scoped RLS policy and the merchant-initiated erase runs under the MERCHANT's current_user_id, so without the bypass the delete matches zero rows and the shopper's name/phone/street survive an erased account with no error",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;\n      await tx.address.deleteMany({ where: { userId } });\n      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'false'`;",
+      "find": "      await withScopedRlsBypass(tx, () => tx.address.deleteMany({ where: { userId } }));",
       "replace": "      await tx.address.deleteMany({ where: { userId } });",
       "test": "tests/unit/auth-erase-propagation.test.ts"
     },
@@ -1000,6 +1000,66 @@
       "find": "        WHERE store_id = ${storeId} AND customer_id = ${customerId}\n        FOR UPDATE`;",
       "replace": "        WHERE store_id = ${storeId} AND customer_id = ${customerId}`;",
       "test": "tests/integration/customer-wallet.test.ts"
+    },
+    {
+      "id": "csrf-admin-router-not-mounted-at-public",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "affiliate admin router (incl. POST .../affiliates/:id/payouts) republished under /public, where csrfProtection skips and restrictPlatformOnlyOrigins does not apply (#1993)",
+      "source": "apps/api/src/routes/index.ts",
+      "find": "router.use('/public', publicAffiliateRoutes);",
+      "replace": "router.use('/public', affiliateRoutes);",
+      "test": "tests/unit/public-mount-admin-route-guard.test.ts"
+    },
+    {
+      "id": "erasure-wallet-forfeit-spans-stores",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "a shopper's own / retention-cron erasure scrubs wallet notes and forfeits balances only in the store whose GUC is set, not every store (#1957)",
+      "source": "apps/api/src/services/wallet.service.ts",
+      "find": "    await withScopedRlsBypass(client, async () => {\n      const { wallets, forfeited } = await run();",
+      "replace": "    await (async (f: () => Promise<void>) => f())(async () => {\n      const { wallets, forfeited } = await run();",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "cache-agent-docs-not-cookie-resolved",
+      "domain": "cache poisoning",
+      "tier": "unit",
+      "why": "platform-host llms.txt / ACP / UCP / product feed resolved from the sticky x-store-slug cookie while shared-cacheable — one store's document cached under the platform URL for every visitor (#1959)",
+      "source": "apps/web/middleware.ts",
+      "find": "  const cookieSlug = isUrlKeyedPublicPath(request.nextUrl.pathname)\n    ? undefined\n    : request.cookies.get('x-store-slug')?.value;",
+      "replace": "  const cookieSlug = request.cookies.get('x-store-slug')?.value;",
+      "test": "tests/unit/web-middleware-characterization.test.ts"
+    },
+    {
+      "id": "csrf-router-level-admin-auth-not-at-public",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "an admin router whose auth is all router-level (router.use(authenticate, authorize, requireStoreAccess) — ai.routes.ts) mounted at /public must still be caught by the mount guard (#2036)",
+      "source": "apps/api/src/routes/index.ts",
+      "find": "router.use('/public', publicAffiliateRoutes);",
+      "replace": "router.use('/public', publicAffiliateRoutes);\nrouter.use('/public', aiRoutes);",
+      "test": "tests/unit/public-mount-admin-route-guard.test.ts"
+    },
+    {
+      "id": "erasure-merchant-scope-own-store-only",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "a merchant-initiated erasure forfeits and scrubs wallets in OTHER stores (owner decision 2026-09-26, Ruling W-7: a store deletes only its own data)",
+      "source": "apps/api/src/services/wallet.service.ts",
+      "find": "const storeFilter = scope.storeId ? { storeId: scope.storeId } : {};",
+      "replace": "const storeFilter = {};",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "rls-scoped-bypass-restored-on-throw",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a throw inside a scoped RLS bypass leaves app.bypass_rls on for the rest of the caller's transaction (#2037)",
+      "source": "apps/api/src/lib/scoped-rls-bypass.ts",
+      "find": "  } finally {",
+      "replace": "  }\n  {",
+      "test": "tests/unit/scoped-rls-bypass.test.ts"
     },
     {
       "id": "money-loyalty-earn-reversal-duplicate-noop",

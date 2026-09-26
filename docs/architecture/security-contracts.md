@@ -57,6 +57,29 @@ must still send the CSRF token explicitly.
   of truth shared with the CORS handler)
 - `apps/api/src/index.ts` — CORS handler, `isPlatformOrigin` import
 
+### Corollary: never mount an admin router at `/public` (#1993)
+
+`csrfProtection` skips every path containing `/public/`, and
+`restrictPlatformOnlyOrigins` only denies non-platform origins under
+`/api/v1/stores`. Both are keyed on the PATH PREFIX, not on the
+route's own middleware chain — so an admin route
+(`authorize('store_admin','super_admin')` / `requireStoreAccess`)
+reachable under `/api/v1/public/...` is a CSRF-free, credentialed
+cross-origin target for any merchant custom domain.
+`authenticate`/`authorize` do not close that: they bound which stores
+the lured admin reaches, not whether the attacker's page may use the
+admin's cookie. Routers that serve both surfaces export a separate
+storefront-only router (`publicLoyaltyRoutes`, `publicAffiliateRoutes`,
+`publicNotificationRoutes`, `publicRecommendationRoutes`) and only that
+one is mounted at `/public`. Enforced for every mount by
+`tests/unit/public-mount-admin-route-guard.test.ts`, which walks the
+real router table — per-route middleware AND router-level `router.use(...)`
+middleware, threaded down to every later route under its mount path (#2036).
+It also holds the explicit, reasoned list of `authenticate`d `/public` routes
+(customer reads + loyalty join): a credentialed `/public` route is CSRF-free
+whatever its role check, so any new one must be added there with its reason.
+It cannot see authorization done inside a handler body.
+
 ---
 
 ## JWT lifetime contract

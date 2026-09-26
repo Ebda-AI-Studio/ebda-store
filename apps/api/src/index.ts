@@ -542,10 +542,21 @@ const server = httpServer.listen(config.port, () => {
   // Wrapped in try/catch so a transient query failure doesn't kill the boot.
   (async () => {
     try {
-      const rows = await prisma.$queryRaw<Array<{ rolbypassrls: boolean }>>`
-        SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user
+      const rows = await prisma.$queryRaw<Array<{ currentUser: string; rolbypassrls: boolean }>>`
+        SELECT current_user AS "currentUser", rolbypassrls FROM pg_roles WHERE rolname = current_user
       `;
       const bypassRls = rows[0]?.rolbypassrls === true;
+      // Positive, always-on record of the role the API actually connected as
+      // (#1940). CI greps this exact line after /health is up and fails the
+      // integration job unless it reads `current_user=force_app
+      // rolbypassrls=false` — a liveness probe alone passes identically as a
+      // superuser, so a silent relapse to a bypass role would stay green.
+      // Values are in the message (not only the object) so the grep works
+      // under pino-pretty too. A role name is not a secret.
+      logger.info(
+        { currentUser: rows[0]?.currentUser, rolbypassrls: bypassRls },
+        `[SECURITY] DB role check: current_user=${rows[0]?.currentUser ?? 'unknown'} rolbypassrls=${bypassRls}`
+      );
       if (bypassRls) {
         // Explicit escape hatch. Production currently connects as `neondb_owner`
         // (a BYPASSRLS role); cutting DATABASE_URL over to the non-owner

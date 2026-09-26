@@ -12,6 +12,7 @@ import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { inngest } from '../lib/inngest/client';
 import { WalletService } from './wallet.service';
+import { withScopedRlsBypass } from '../lib/scoped-rls-bypass';
 
 interface TokenPayload {
   userId: string;
@@ -77,6 +78,20 @@ function authScope(email: string, storeId: string | null) {
  * round-trip and any retry. Seconds, not minutes — the window is a hole in
  * reuse detection, and an attacker who has the token can use it inside the
  * window, so it stays as small as the race allows.
+ *
+ * What the window bounds is WHEN a replay is forgiven, not how long the
+ * result lives (#1671): a forgiven replay mints a refresh row that inherits
+ * the presented token's remaining lifetime (up to the full 365 days) and has
+ * NO lineage link back to the chain it forked from — `replacedById` on the
+ * presented row already points at the first successor. The two chains then
+ * never share a row again, so family-level reuse detection cannot see the
+ * fork. Containment rests on the USER-scoped revocation paths —
+ * `password_changed`, `password_reset`, `revoke_all` (sign out everywhere)
+ * and `reuse_detected`, each an `updateMany({ where: { userId, revokedAt:
+ * null } })` — which kill both chains. A single-session `logout` does NOT:
+ * it revokes only the one presented token, so the forked chain survives it.
+ * The `familyId` column that would restore lineage is deferred by Ruling
+ * P2-B1-2 (docs/RULINGS.md) to its own migration PR.
  */
 const ROTATION_RACE_GRACE_MS = 30_000;
 
@@ -1385,8 +1400,20 @@ export class AuthService {
    *
    * NOT a soft-delete superset — soft-deleted accounts still expose PII
    * and only `eraseAccount` makes the user actually disappear.
+   *
+   * `opts.scopeStoreId` (owner decision 2026-09-26, Ruling W-7): a store
+   * deletes ONLY its own data. The merchant route passes its store id; the
+   * erasure then refuses any account that is not that store's own customer
+   * and limits the wallet forfeit to that store. The shopper's own erasure
+   * and the retention cron pass no scope and may span every store.
+   * `opts.actorId` (a user id, or 'system') is recorded on the wallet ledger
+   * and on the per-store audit rows of a cross-store erasure.
    */
-  static async eraseAccount(userId: string): Promise<void> {
+  static async eraseAccount(
+    userId: string,
+    opts: { scopeStoreId?: string; actorId?: string } = {}
+  ): Promise<void> {
+    const actorId = opts.actorId ?? 'system';
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1410,6 +1437,12 @@ export class AuthService {
     // the manual super_admin offboarding path.
     if (user.role !== 'customer') {
       throw new AppError(403, 'FORBIDDEN', 'Admin accounts cannot be erased via this endpoint');
+    }
+    // A store-scoped erasure may only erase that store's own customer: every
+    // row it then clears belongs to that store. (A legacy store_id = NULL
+    // account spans stores and is erased only by the shopper or the cron.)
+    if (opts.scopeStoreId !== undefined && user.storeId !== opts.scopeStoreId) {
+      throw new AppError(404, 'NOT_FOUND', 'Customer not found');
     }
 
     const anonymizedEmail = `erased-${user.id}@anonymized.local`;
@@ -1480,12 +1513,11 @@ export class AuthService {
       // which is `basePrisma.$transaction`: a SECOND connection that commits
       // independently of this request. That is precisely the hazard eraseAccount
       // was just moved off, and using it here would make the address delete
-      // non-atomic with the rest of the erasure. SET LOCAL reverts at COMMIT,
-      // and is switched back immediately below so every remaining delete still
-      // runs under normal RLS rather than silently widening the whole erase.
-      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
-      await tx.address.deleteMany({ where: { userId } });
-      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'false'`;
+      // non-atomic with the rest of the erasure. `withScopedRlsBypass` sets it
+      // on THIS transaction and restores the prior value in a `finally`
+      // (#2037), so every remaining delete still runs under normal RLS — even
+      // if the delete throws and a caller catches it.
+      await withScopedRlsBypass(tx, () => tx.address.deleteMany({ where: { userId } }));
 
       await tx.abandonedCart.deleteMany({ where: { customerId: userId } });
       await tx.cart.deleteMany({ where: { customerId: userId } });
@@ -1504,7 +1536,10 @@ export class AuthService {
       // the anonymized account can no longer sign in to spend it, and leaving
       // it would overstate the merchant's outstanding store-credit liability
       // forever. Runs on this erasure transaction, so it is atomic with it.
-      await WalletService.forfeitOnErasure(userId, tx);
+      await WalletService.forfeitOnErasure(userId, tx, {
+        storeId: opts.scopeStoreId ?? null,
+        actorId,
+      });
 
       // Merchant-CRM copy of the same identity (`customers` +
       // `customer_addresses`). Without this the shopper's name, email,

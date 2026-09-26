@@ -165,3 +165,39 @@ describe('middleware — preview draft isolation', () => {
     expect(res.headers.get('set-cookie') ?? '').not.toContain('force-preview-draft=tok123');
   });
 });
+
+describe('middleware — agent/feed documents never resolve the store from the sticky cookie (#1959)', () => {
+  // These answer `public, s-maxage=…`; Cloudflare's cache key ignores Vary and
+  // cookies, so a cookie-resolved store document cached under the bare
+  // platform URL would be served to every other visitor. They resolve only
+  // from the URL slug or the custom-domain Host.
+  const forwardedSlug = (res: Response) => res.headers.get('x-middleware-request-x-store-slug');
+
+  it.each([
+    '/llms.txt',
+    '/.well-known/acp.json',
+    '/.well-known/ucp',
+    '/.well-known/ucp/profile',
+    '/feeds/products.json',
+  ])('platform-host %s with an x-store-slug cookie carries NO store context', p => {
+    const res = middleware(
+      req(`https://store.force-ai.co${p}`, 'store.force-ai.co', { cookie: 'x-store-slug=palora' })
+    );
+    expect(forwardedSlug(res)).toBeNull();
+    expect(rewriteOf(res)).toBeNull();
+  });
+
+  it('a normal subroute still carries the sticky store (control)', () => {
+    const res = middleware(
+      req('https://store.force-ai.co/products', 'store.force-ai.co', {
+        cookie: 'x-store-slug=palora',
+      })
+    );
+    expect(forwardedSlug(res)).toBe('palora');
+  });
+
+  it('the URL-slug form still resolves the store (/<slug>/llms.txt)', () => {
+    const res = middleware(req('https://store.force-ai.co/palora/llms.txt', 'store.force-ai.co'));
+    expect(forwardedSlug(res)).toBe('palora');
+  });
+});

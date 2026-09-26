@@ -7,7 +7,16 @@ import { featureService } from '../services/feature.service';
 import { recommendationService } from '../services/recommendation.service';
 import logger from '../lib/logger';
 
+// TWO routers, deliberately (#1993): the admin half is mounted ONLY at the
+// bare '/stores' prefix; `publicRouter` is the only thing mounted at
+// '/public'. Do NOT collapse them back into one router mounted at both —
+// `csrfProtection` skips '/public/' paths and `restrictPlatformOnlyOrigins`
+// only covers '/api/v1/stores', so an admin route republished under '/public'
+// becomes a CSRF-free, credentialed cross-origin target for any
+// merchant-registered custom domain. Full reasoning: loyalty.routes.ts header.
+// Guarded by tests/unit/public-mount-admin-route-guard.test.ts.
 const router = Router();
+const publicRouter = Router();
 
 // Matches the shape recommendationService.setProductRelations requires, so a
 // malformed body is rejected at the edge instead of failing deep in the service.
@@ -208,7 +217,7 @@ router.get(
 // service itself layers manual > AI > FBT > same-category, so if a
 // merchant doesn't have manual relations the storefront still gets
 // the AI + category results their plan tier expects.
-router.get(
+publicRouter.get(
   '/:storeId/products/:productId/recommendations',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -226,7 +235,7 @@ router.get(
 
 // GET /public/:storeId/cart/recommendations?products=id1,id2
 // Mounted under '/public' in routes/index.ts.
-router.get(
+publicRouter.get(
   '/:storeId/cart/recommendations',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -258,3 +267,6 @@ router.get(
 );
 
 export default router;
+
+// Storefront-only router, mounted at '/public' in routes/index.ts.
+export { publicRouter as publicRecommendationRoutes };

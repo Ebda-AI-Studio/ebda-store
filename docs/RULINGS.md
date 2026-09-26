@@ -308,6 +308,26 @@ refund of the same order; (e) the storefront account menu labels and "Sign Out"
 are English-only (the new Wallet entry is bilingual). Cost if wrong: each stays
 live until its own PR.
 
+**Ruling W-7 — erasure scope: a store deletes ONLY its own data (owner decision,
+Ahmad, 2026-09-26).** A MERCHANT-initiated customer erasure
+(`POST /stores/:storeId/customers/:customerId/erase`) passes `scopeStoreId` to
+`AuthService.eraseAccount`: the account must be that store's own customer
+(`user.storeId === scopeStoreId`, else 404), and the wallet note scrub + forfeit
+run only on that store's rows, with no RLS bypass. The shopper's OWN account
+erasure (`POST /auth/me/erase`) and the `soft-deleted-user-anonymize` retention
+cron pass no scope and may span every store: the wallet statements run inside
+`withScopedRlsBypass` (restores the prior GUC in a `finally`, #2037), and each
+affected store gets its own `audit_logs` row (`customer.wallet.erased`, that
+store's `storeId`, `details.actor` = the acting user id or `'system'`) so a
+store whose liability changed without any action of its own can see why. Every
+`expire` ledger entry carries the actor in `actorId`. Supersedes the #1957
+design (bypass on every path) in PR #2015. The other erasure statements
+(orders, reviews, carts, loyalty, push) keep their existing shape: after this
+ruling the merchant path can only reach a store-scoped customer, whose rows are
+that store's. Cost if wrong: a legacy `store_id = NULL` shopper who asks a
+MERCHANT to erase them keeps their wallet in other stores until they erase
+their own account (the merchant route cannot reach such an account at all).
+
 ---
 
 Context: `docs/plans/2026-09-25-email-campaigns.md` — D2 email campaigns, shipped behind the

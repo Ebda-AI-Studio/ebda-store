@@ -1298,7 +1298,11 @@ router.post(
       const { storeId, customerId } = req.params;
       await resolveStoreCustomerOrThrow(storeId, customerId);
 
-      await AuthService.eraseAccount(customerId);
+      // A store deletes ONLY its own data (owner decision, Ruling W-7).
+      await AuthService.eraseAccount(customerId, {
+        scopeStoreId: storeId,
+        actorId: req.user!.userId,
+      });
 
       await auditLog({
         action: 'customer.account.erased_by_merchant',

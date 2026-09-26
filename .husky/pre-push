@@ -69,6 +69,9 @@ npm run lint
 # hook honest (a docs-only PR failed CI on formatting the local gate never ran)
 npm run format:check
 
+# Mirrors CI's client-secret-scan job: every `uses:` pinned to a 40-hex SHA (#1517).
+bash scripts/check-action-pins.sh
+
 echo "-> typechecking apps..."
 npx tsc --noEmit -p apps/api/tsconfig.json
 npx tsc --noEmit -p apps/admin/tsconfig.json

@@ -159,6 +159,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Scan client for secret leakage
         run: bash scripts/scan-bundle-secrets.sh
+      - name: Verify every GitHub Action is pinned to a commit SHA
+        # A tag ref (@v4) is mutable and these workflows hold deploy/PAT
+        # secrets (#1517). Pure bash, same no-node job as the scan above.
+        run: bash scripts/check-action-pins.sh
 
   typecheck:
     name: Type Check
@@ -543,6 +547,26 @@ jobs:
           NODE_ENV: test
           INNGEST_DRY_RUN: 'true'
 
+      - name: Assert the API connected as force_app, not a bypass role
+        # /health is a liveness probe: it answers 200 identically as the `test`
+        # superuser (BYPASSRLS) or as force_app, so a relapse of the API's
+        # DATABASE_URL to a bypass role would leave every integration test
+        # green while proving nothing under enforced RLS (#1940). The API logs
+        # the role it actually connected as at boot (apps/api/src/index.ts,
+        # BYPASSRLS guard); this step fails the job unless that line says
+        # force_app without BYPASSRLS. Fails closed: a missing line (guard
+        # query failed, or never ran) is a failure, not a pass.
+        run: |
+          for i in $(seq 1 30); do
+            if grep -q 'DB role check: current_user=' /tmp/api-server.log; then break; fi
+            sleep 1
+          done
+          grep 'DB role check: current_user=' /tmp/api-server.log || { echo "::error::API never logged its DB role"; tail -50 /tmp/api-server.log; exit 1; }
+          if ! grep -q 'DB role check: current_user=force_app rolbypassrls=false' /tmp/api-server.log; then
+            echo "::error::API is not connected as force_app without BYPASSRLS — integration results would not prove RLS"
+            exit 1
+          fi
+
       - name: Run integration tests
         # Also run the colocated regression tests under apps/**/__tests__ — they
         # were never executed by CI before (the unit job globs only tests/unit),
@@ -643,6 +667,11 @@ jobs:
 
       - name: Build database package
         run: npm run build -w packages/database
+
+      - name: Build shared package
+        # the proof now imports WalletService (erasure across stores), which
+        # pulls @force/shared; without its dist the test cannot even load
+        run: npm run build -w packages/shared
 
       - name: Wait for PostgreSQL to be ready
         run: |

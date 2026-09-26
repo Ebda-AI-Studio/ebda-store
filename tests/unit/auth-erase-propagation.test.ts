@@ -74,6 +74,9 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     // `SET LOCAL app.bypass_rls` brackets the addresses delete — see the
     // rls-bypass test below for why removing it silently under-erases.
     $executeRaw: vi.fn().mockResolvedValue(0),
+    // withScopedRlsBypass reads the prior GUC before switching it on.
+    $queryRaw: vi.fn().mockResolvedValue([{ v: null }]),
+    auditLog: { create: vi.fn().mockResolvedValue({}) },
   };
   return { sendMock, mockPrisma };
 });
@@ -226,6 +229,47 @@ describe('AuthService.eraseAccount — addresses delete escapes the user-scoped 
 });
 
 /**
+ * #1957 — the wallet scrub/forfeit is account-wide, but `customer_wallets` and
+ * `wallet_transactions` are store-scoped under RLS. On the merchant-initiated
+ * path the ambient tx carries the ERASING store's GUC, so without its own
+ * scoped bypass a legacy multi-store shopper's other-store note and balance
+ * survive the erasure under force_app. Same pinning shape as the addresses
+ * test above: the wallet statements must run INSIDE a bypass bracket, and the
+ * bracket must be closed before the merchant-CRM scrub that follows.
+ */
+describe('AuthService.eraseAccount — wallet forfeit escapes the store-scoped RLS policy', () => {
+  const rawText = (call: unknown[]) => {
+    const tpl = call[0] as unknown as string[];
+    return Array.isArray(tpl) ? tpl.join('') : String(tpl);
+  };
+  const bypassOrders = (value: 'true' | 'false') => {
+    const re = new RegExp(`app\\.bypass_rls\\s*=\\s*'${value}'`);
+    return mockPrisma.$executeRaw.mock.calls
+      .map((c, i) =>
+        re.test(rawText(c)) ? mockPrisma.$executeRaw.mock.invocationCallOrder[i] : -1
+      )
+      .filter(o => o >= 0);
+  };
+
+  it('runs the ledger note scrub and the wallet lookup with the bypass ON, then turns it OFF', async () => {
+    await AuthService.eraseAccount(CUSTOMER.id);
+
+    const scrub = mockPrisma.walletTransaction.updateMany.mock.invocationCallOrder[0];
+    const lookup = mockPrisma.customerWallet.findMany.mock.invocationCallOrder[0];
+    expect(scrub, 'wallet note scrub never ran').toBeDefined();
+    expect(lookup, 'wallet lookup never ran').toBeDefined();
+
+    const onBefore = bypassOrders('true').filter(o => o < scrub);
+    const offBetween = bypassOrders('false').filter(o => o < scrub && o > Math.max(...onBefore));
+    expect(onBefore.length, 'no bypass ON precedes the wallet scrub').toBeGreaterThan(0);
+    expect(offBetween, 'the bypass was switched OFF again before the wallet scrub').toEqual([]);
+
+    const offAfter = bypassOrders('false').filter(o => o > lookup);
+    expect(offAfter.length, 'the bypass is left ON after the wallet forfeit').toBeGreaterThan(0);
+  });
+});
+
+/**
  * The merchant-CRM scrub resolves a `customers` row with no FK to `users` — it
  * matches on identity fields. The destructive direction of that heuristic is
  * the danger: two shoppers in one store sharing a phone (household mobile, a
@@ -334,5 +378,74 @@ describe('AuthService.eraseAccount — newsletter + campaign copies', () => {
 
     expect(mockPrisma.newsletterSubscriber.deleteMany).not.toHaveBeenCalled();
     expect(mockPrisma.campaignRecipient.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Owner decision 2026-09-26 (Ruling W-7): a store deletes ONLY its own data.
+ * The merchant route passes `scopeStoreId`; the shopper's own erasure and the
+ * retention cron do not.
+ */
+describe('AuthService.eraseAccount — erasure scope (Ruling W-7)', () => {
+  const rawText = (call: unknown[]) => {
+    const tpl = call[0] as unknown as string[];
+    return Array.isArray(tpl) ? tpl.join('') : String(tpl);
+  };
+
+  it('merchant-scoped: wallet statements are filtered to that store and run WITHOUT a bypass', async () => {
+    await AuthService.eraseAccount(CUSTOMER.id, { scopeStoreId: 'store-1', actorId: 'merchant-1' });
+
+    expect(mockPrisma.walletTransaction.updateMany).toHaveBeenCalledWith({
+      where: { customerId: CUSTOMER.id, storeId: 'store-1', note: { not: null } },
+      data: { note: null },
+    });
+    expect(mockPrisma.customerWallet.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { customerId: CUSTOMER.id, storeId: 'store-1' } })
+    );
+    // The only bypass bracket is the addresses delete, closed before the wallet scrub.
+    const scrub = mockPrisma.walletTransaction.updateMany.mock.invocationCallOrder[0];
+    const lastOn = Math.max(
+      ...mockPrisma.$executeRaw.mock.calls
+        .map((c, i) =>
+          /bypass_rls\s*=\s*'true'/.test(rawText(c))
+            ? mockPrisma.$executeRaw.mock.invocationCallOrder[i]
+            : -1
+        )
+        .filter(o => o >= 0)
+    );
+    const offAfterOn = mockPrisma.$executeRaw.mock.calls.some(
+      (c, i) =>
+        /bypass_rls\s*=\s*'false'/.test(rawText(c)) &&
+        mockPrisma.$executeRaw.mock.invocationCallOrder[i] > lastOn &&
+        mockPrisma.$executeRaw.mock.invocationCallOrder[i] < scrub
+    );
+    expect(offAfterOn, 'bypass still ON when the merchant-scoped wallet scrub runs').toBe(true);
+    // No cross-store audit rows on the merchant path (the route writes its own).
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("merchant-scoped: refuses an account that is not that store's own customer", async () => {
+    await expect(
+      AuthService.eraseAccount(CUSTOMER.id, { scopeStoreId: 'store-OTHER', actorId: 'merchant-1' })
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('unscoped (self / cron): one audit row per affected store, and the ledger entry names the actor', async () => {
+    mockPrisma.customerWallet.findMany.mockResolvedValueOnce([
+      { id: 'w-a', storeId: 'store-a', balance: 0 },
+      { id: 'w-b', storeId: 'store-b', balance: 0 },
+    ]);
+
+    await AuthService.eraseAccount(CUSTOMER.id, { actorId: 'system' });
+
+    const rows = mockPrisma.auditLog.create.mock.calls.map(
+      c => (c[0] as { data: { storeId: string; userId: string | null; action: string } }).data
+    );
+    expect(rows.map(r => r.storeId).sort()).toEqual(['store-a', 'store-b']);
+    for (const r of rows) {
+      expect(r.action).toBe('customer.wallet.erased');
+      expect(r.userId).toBeNull(); // 'system' is not a user row
+    }
   });
 });

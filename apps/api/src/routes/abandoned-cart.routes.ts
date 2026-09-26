@@ -11,8 +11,11 @@ import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
 
-// Mounted at the bare '/stores' and '/public' prefixes in routes/index.ts,
-// so Express does NOT populate req.params.storeId at the mount level —
+// Mounted ONLY at the bare '/stores' prefix in routes/index.ts (#1993: it
+// used to be dual-mounted at '/public' too, which republished every admin
+// route below under a prefix csrfProtection skips and
+// restrictPlatformOnlyOrigins does not cover). Express does NOT populate
+// req.params.storeId at the bare mount level —
 // every route below declares its own '/:storeId/...' path. router.param
 // runs AFTER Express resolves :storeId for the matched route, so RLS
 // tenant context is set correctly here regardless of which mount reached
@@ -178,7 +181,9 @@ router.get(
 // Public Route — Cart Recovery
 // ==========================================
 
-// GET /public/:storeId/cart/recover/:abandonedCartId
+// GET /stores/public/:storeId/cart/recover/:abandonedCartId — the literal
+// '/public' segment plus the '/stores' mount gives the same
+// '/stores/public/...' storefront shape as shipping/coupons/wallet.
 router.get(
   '/public/:storeId/cart/recover/:abandonedCartId',
   async (req: Request, res: Response, next: NextFunction) => {

@@ -35,11 +35,11 @@ import aiRoutes from './ai.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
 import featureRoutes from './feature.routes';
-import notificationRoutes from './notification.routes';
+import notificationRoutes, { publicNotificationRoutes } from './notification.routes';
 import abandonedCartRoutes from './abandoned-cart.routes';
-import recommendationRoutes from './recommendation.routes';
+import recommendationRoutes, { publicRecommendationRoutes } from './recommendation.routes';
 import shippingCarrierRoutes from './shipping-carrier.routes';
-import affiliateRoutes from './affiliate.routes';
+import affiliateRoutes, { publicAffiliateRoutes } from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
 import campaignRoutes, { campaignTestSendRouter } from './campaign.routes';
 import campaignPublicRoutes from './campaign-public.routes';
@@ -231,8 +231,8 @@ router.use('/stores', tenantContext, variantRoutes);
 //
 // TWO SEPARATE ROUTERS, and the split is load-bearing: `publicLoyaltyRoutes`
 // carries ONLY join/my-points/my-transactions/info. Mounting the whole
-// loyalty router at '/public' (as the dual-mount lines further down still do
-// for affiliate/notification/abandoned-cart/recommendation/shipping-carrier)
+// loyalty router at '/public' (as affiliate/notification/abandoned-cart/
+// recommendation/shipping-carrier all did until #1993 split them the same way)
 // would republish the ADMIN half at '/public/:storeId/loyalty/...', where
 // BOTH of the path-prefix-keyed global controls in middleware/security.ts
 // stop applying: `csrfProtection` skips anything containing '/public/', and
@@ -275,11 +275,18 @@ router.use('/', tenantContext, locationsRoutes);
 // (double-nesting risk) AND testConnection calls an external SMS provider
 // API in-request — both disqualify the whole-request tx wrap.
 router.use('/stores', tenantContext, notificationRoutes);
-router.use('/public', notificationRoutes);
+router.use('/public', publicNotificationRoutes);
 
-// Abandoned cart routes (admin + public recovery)
+// NO admin router is ever mounted at '/public' (#1993) — the five routers
+// here used to be, which republished their admin routes (incl. the affiliate
+// payout money-write) under a prefix csrfProtection skips. The storefront
+// halves live on separate `public*Routes` routers; abandoned-cart and
+// shipping-carrier have no '/public/:storeId' storefront routes at all (their
+// public endpoints are '/stores/public/...'). Enforced for EVERY mount by
+// tests/unit/public-mount-admin-route-guard.test.ts.
+
+// Abandoned cart routes (admin + public recovery at /stores/public/...)
 router.use('/stores', tenantContext, abandonedCartRoutes);
-router.use('/public', abandonedCartRoutes);
 
 // Recommendation routes (admin + public).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
@@ -288,19 +295,18 @@ router.use('/public', abandonedCartRoutes);
 // wrapping the request would let the outer tx commit while the detached
 // work is still running, then hit "transaction already closed".
 router.use('/stores', tenantContext, recommendationRoutes);
-router.use('/public', recommendationRoutes);
+router.use('/public', publicRecommendationRoutes);
 
-// Shipping carrier routes (admin + public tracking).
+// Shipping carrier routes (admin + public tracking at /stores/public/...).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
 // createShipmentForOrder / cancelShipment / updateShipmentStatus /
 // testConnection all call external courier APIs (Aramex, iCarry) in-request —
 // slow third-party calls have no place inside a 30s RLS transaction.
 router.use('/stores', tenantContext, shippingCarrierRoutes);
-router.use('/public', shippingCarrierRoutes);
 
 // Affiliate routes (admin + public apply/track)
 router.use('/stores', tenantContext, affiliateRoutes);
-router.use('/public', affiliateRoutes);
+router.use('/public', publicAffiliateRoutes);
 
 // Newsletter admin routes (list + CSV export). Public signup is in
 // public.routes.ts so visitors don't need a JWT to subscribe.

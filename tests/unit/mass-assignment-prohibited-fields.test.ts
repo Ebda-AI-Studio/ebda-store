@@ -7,12 +7,25 @@
  *
  *   1. A completeness GUARD (`describe('route inventory coverage')` below)
  *      statically parses store.routes.ts / product.routes.ts / order.routes.ts
- *      for every `router.post/put/patch(...)` registration and asserts each
- *      one is classified in `ROUTE_INVENTORY` — either `tested` (exercised by
- *      the parametrised cases here) or `exempt` with a REASON grounded in
- *      reading that route's actual body-handling code. A new write route that
- *      isn't added to this table fails the guard, so it can't silently ship
- *      unreviewed for mass assignment.
+ *      — THOSE THREE FILES ONLY — for every `router.post/put/patch/delete(...)`
+ *      registration and asserts each one is classified in `ROUTE_INVENTORY` —
+ *      either `tested` (exercised by the parametrised cases here) or `exempt`
+ *      with a REASON grounded in reading that route's actual body-handling
+ *      code. A new write route in one of those three files that isn't added to
+ *      this table fails the guard, and so does a registration whose path is not
+ *      a string literal (it would otherwise be invisible to the parser).
+ *
+ *      WHAT THIS DOES NOT COVER (#1950/#1968 — do not read it as repo-wide):
+ *      the other ~60 route files that register write routes (payment,
+ *      payment-links, return, finance, loyalty, wallet, cart, staff,
+ *      customers, purchase-orders, …) have NO per-route classification here.
+ *      For them the only repo-wide gate is the static one in
+ *      `describe('repo-wide mass-assignment shape gate')` below: no route file
+ *      may `.passthrough()` a schema (outside an allowlisted, reasoned JSON
+ *      blob) or hand `req.body` to a write unparsed. The service layer is
+ *      proven to enumerate its Prisma `data` only for `StoreService.update`
+ *      (tests/unit/mass-assignment-service-data-shape.test.ts); every other
+ *      service rests on the manual read described below.
  *
  *   2. Parametrised HTTP-level cases (`it.each` below, supertest + a mocked
  *      `*Service` layer per router — mirrors `tests/unit/order-refund-route
@@ -36,12 +49,12 @@
  * Prisma `data` field by name rather than spreading the validated object —
  * so a field that never reaches the service call can never reach Prisma
  * either. Mocking the service and asserting on ITS call arguments proves the
- * same thing `order-refund-route.test.ts`'s style proves for its own route,
- * without standing up a live Postgres, and it still fails loudly the moment
- * either layer regresses (a schema gaining `.passthrough()`, or a service
- * spreading `...data` into `prisma.x.update`).
+ * route half without standing up a live Postgres, and fails loudly the moment
+ * a schema gains `.passthrough()`. It does NOT observe a service spreading
+ * `...data` into `prisma.x.update` — the service is mocked here — which is
+ * why that half has its own unmocked test (see above).
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import express, { type Express } from 'express';
@@ -452,7 +465,22 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
     exempt:
       'howtoSchema.partial() narrow allowlist; `updateData` is built field-by-field, never spread',
   },
+  "store.routes.ts DELETE '/:id'": {
+    exempt: 'reads no request body — deletes the store named by the URL param',
+  },
+  "store.routes.ts DELETE '/:id/faqs/:faqId'": {
+    exempt: 'reads no request body — ids come from the URL params',
+  },
+  "store.routes.ts DELETE '/:id/howtos/:howtoId'": {
+    exempt: 'reads no request body — ids come from the URL params',
+  },
   // product.routes.ts
+  "product.routes.ts DELETE '/:id'": {
+    exempt: 'reads no request body — storeId/id come from the URL params',
+  },
+  "product.routes.ts DELETE '/:id/faqs/:faqId'": {
+    exempt: 'reads no request body — ids come from the URL params',
+  },
   "product.routes.ts PUT '/new-arrivals/reorder'": {
     exempt:
       'reorderCarouselSchema is `{ orderedProductIds: string[] }` only — no entity fields at all',
@@ -507,19 +535,31 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
   },
 };
 
+const ROUTES_DIR = path.resolve(__dirname, '../../apps/api/src/routes');
+
 function extractWriteRoutes(fileName: string): Array<{ method: string; routePath: string }> {
-  const filePath = path.resolve(__dirname, '../../apps/api/src/routes', fileName);
-  const source = readFileSync(filePath, 'utf8');
-  const pattern = /router\.(post|put|patch)\(\s*['"]([^'"]*)['"]/g;
+  const source = readFileSync(path.join(ROUTES_DIR, fileName), 'utf8');
+  const pattern = /router\.(post|put|patch|delete)\(\s*['"]([^'"]*)['"]/g;
   const routes: Array<{ method: string; routePath: string }> = [];
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(source)) !== null) {
     routes.push({ method: match[1].toUpperCase(), routePath: match[2] });
   }
+  // A registration whose path is a constant, template literal or
+  // `router.route(...)` chain is invisible to the literal pattern above. Count
+  // EVERY write registration and fail when the two disagree, instead of
+  // silently skipping the one the parser could not read (#1968).
+  const all = source.match(/router\.(post|put|patch|delete)\(|router\.route\(/g) ?? [];
+  if (all.length !== routes.length) {
+    throw new Error(
+      `${fileName}: ${all.length} write registrations but only ${routes.length} have a literal path — ` +
+        'classify the non-literal one(s) by hand and make the path a literal'
+    );
+  }
   return routes;
 }
 
-describe('route inventory coverage — every store/product/order write route is classified', () => {
+describe('route inventory coverage — every store/product/order write route is classified (these 3 files only)', () => {
   const files = ['store.routes.ts', 'product.routes.ts', 'order.routes.ts'];
 
   it.each(files)('every POST/PUT/PATCH route in %s is in ROUTE_INVENTORY', fileName => {
@@ -544,5 +584,58 @@ describe('route inventory coverage — every store/product/order write route is 
     }
     const stale = Object.keys(ROUTE_INVENTORY).filter(k => !liveKeys.has(k));
     expect(stale).toEqual([]);
+  });
+});
+
+/**
+ * The repo-wide half (#1950/#1968). No per-route classification — that exists
+ * only for the three files above — but two shapes are banned in EVERY route
+ * file, because either one makes Zod's default strip mode (the thing the whole
+ * argument above rests on) stop protecting a write:
+ *   - `.passthrough()` on a schema, which forwards unknown keys;
+ *   - `req.body` handed to a write without a parse (`data: req.body`,
+ *     `...req.body`).
+ */
+describe('repo-wide mass-assignment shape gate', () => {
+  // file -> reason. A passthrough here is on a nested JSON config blob stored
+  // in a Json column, never on an object whose keys become Prisma columns.
+  const PASSTHROUGH_ALLOWED: Record<string, string> = {
+    'store-layout.routes.ts':
+      'section entries inside the page-layout JSON column (forward-compat for new section keys); not mapped onto Store columns',
+  };
+
+  const routeFiles = readdirSync(ROUTES_DIR).filter(f => f.endsWith('.routes.ts'));
+  const stripComments = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('sees the route files (positive control)', () => {
+    expect(routeFiles.length).toBeGreaterThan(50);
+  });
+
+  it('no route file uses .passthrough() outside the reasoned allowlist', () => {
+    const offenders = routeFiles.filter(
+      f =>
+        !(f in PASSTHROUGH_ALLOWED) &&
+        /\.passthrough\(\)/.test(stripComments(readFileSync(path.join(ROUTES_DIR, f), 'utf8')))
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('the passthrough allowlist has no stale entries', () => {
+    for (const f of Object.keys(PASSTHROUGH_ALLOWED)) {
+      expect(
+        /\.passthrough\(\)/.test(stripComments(readFileSync(path.join(ROUTES_DIR, f), 'utf8'))),
+        `${f} no longer uses .passthrough() — drop it from the allowlist`
+      ).toBe(true);
+    }
+  });
+
+  it('no route file hands req.body to a write unparsed', () => {
+    const offenders = routeFiles.filter(f =>
+      /data:\s*req\.body\b|\.\.\.req\.body\b/.test(
+        stripComments(readFileSync(path.join(ROUTES_DIR, f), 'utf8'))
+      )
+    );
+    expect(offenders).toEqual([]);
   });
 });
