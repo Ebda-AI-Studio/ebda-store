@@ -290,6 +290,45 @@ describe('platform_fault — our own failure, wearing the caller’s clothes', (
   });
 });
 
+describe('platform_fault — #1653: spread thinly across many stores must still fire', () => {
+  it('does not fire when each store is individually below threshold but no store reaches it alone (pre-fix behaviour)', () => {
+    // Reproduces the exact shape the bug missed: 2 error rows in EACH of 5
+    // stores is 10 platform-wide, but each bucket alone is below
+    // `platformFault` (3). The pre-fix classifier (per-store only) found
+    // nothing here; asserting the fix's actual behaviour below.
+    const below = DENIAL_THRESHOLDS.platformFault - 1;
+    const spread = ['a', 'b', 'c', 'd', 'e'].flatMap(storeId =>
+      rows({ storeId, credential: 'error', count: below, ips: 1 })
+    );
+    const found = classifyAgentDenials(spread);
+    expect(found).toHaveLength(1);
+    expect(found[0].kind).toBe('platform_fault');
+    expect(found[0].level).toBe('p0');
+    expect(found[0].scope).toBe('platform');
+    // Genuinely platform-scoped — no single store's field.
+    expect(found[0].store).toBeUndefined();
+    expect(found[0].storesAffected).toBe(5);
+    expect(found[0].count).toBe(below * 5);
+  });
+
+  it('still fires when the fault is concentrated in one store (no regression)', () => {
+    const found = classifyAgentDenials(
+      rows({ storeId: 'a', credential: 'error', count: DENIAL_THRESHOLDS.platformFault, ips: 1 })
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].kind).toBe('platform_fault');
+    expect(found[0].storesAffected).toBe(1);
+  });
+
+  it('does not fire when the platform-wide total is still below threshold', () => {
+    const found = classifyAgentDenials([
+      ...rows({ storeId: 'a', credential: 'error', count: 1, ips: 1 }),
+      ...rows({ storeId: 'b', credential: 'error', count: 1, ips: 1 }),
+    ]);
+    expect(found.filter(f => f.kind === 'platform_fault')).toEqual([]);
+  });
+});
+
 describe('multi-store windows', () => {
   it('scopes each finding to its own store and reports only the stores over threshold', () => {
     const found = classifyAgentDenials([

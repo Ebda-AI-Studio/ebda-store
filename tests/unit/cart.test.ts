@@ -190,6 +190,35 @@ describe('CartService', () => {
     });
   });
 
+  describe('view (#1661 — read-only, no write on a miss)', () => {
+    it('returns the empty-cart shape on a miss WITHOUT creating a Cart row', async () => {
+      vi.mocked(prisma.cart.findFirst).mockResolvedValue(null);
+
+      const result = await CartService.view(mockStoreId, mockSessionId);
+
+      expect(result).toEqual({ items: [], bundles: [], subtotal: 0 });
+      expect(prisma.cart.create).not.toHaveBeenCalled();
+    });
+
+    it('returns the priced cart when one already exists, same shape as getOrCreate', async () => {
+      vi.mocked(prisma.cart.findFirst).mockResolvedValue(mockCartWithItems as any);
+
+      const result = await CartService.view(mockStoreId, mockSessionId);
+
+      expect(result.subtotal).toBe(10000); // 2 * 5000
+      expect(prisma.cart.create).not.toHaveBeenCalled();
+    });
+
+    it('never calls cart.create at all — mutation-check: a view that falls through to getOrCreate-style creation must fail this', async () => {
+      vi.mocked(prisma.cart.findFirst).mockResolvedValue(null);
+
+      await CartService.view(mockStoreId, mockSessionId);
+      await CartService.view(mockStoreId, mockSessionId, mockCustomerId);
+
+      expect(prisma.cart.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addItem', () => {
     beforeEach(() => {
       vi.mocked(prisma.product.findFirst).mockResolvedValue(mockProduct as any);

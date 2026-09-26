@@ -1,6 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { hashMerchantKey } from '../mcp/merchant-auth';
 import { featureService } from '../services/feature.service';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
@@ -54,19 +54,25 @@ const router = Router();
  * Keyed by key fingerprint where present so two merchants behind one office IP
  * do not share a budget.
  */
+export function merchantMcpLimiterKey(req: Request): string {
+  const presented = req.get(MERCHANT_KEY_HEADER);
+  // Never use the credential itself as a bucket key — hash it. A rate-limit
+  // store is not a secret store, and the plaintext key would otherwise end
+  // up in Redis (and in any dump of it) in clear.
+  if (presented) return `mmcp:${hashMerchantKey(presented).slice(0, 24)}`;
+  // ipKeyGenerator() normalizes IPv6 to its /64 prefix — an unauthenticated
+  // caller cycling the low 64 bits of an IPv6 address would otherwise land in
+  // a fresh bucket on every request, defeating the 120/min cap on this
+  // credential-stuffing surface (matches security.ts's pattern).
+  return `mmcp-ip:${ipKeyGenerator(req.ip ?? '')}`;
+}
+
 const merchantMcpLimiter = rateLimit({
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: Request) => {
-    const presented = req.get(MERCHANT_KEY_HEADER);
-    // Never use the credential itself as a bucket key — hash it. A rate-limit
-    // store is not a secret store, and the plaintext key would otherwise end
-    // up in Redis (and in any dump of it) in clear.
-    if (presented) return `mmcp:${hashMerchantKey(presented).slice(0, 24)}`;
-    return `mmcp-ip:${req.ip}`;
-  },
+  keyGenerator: merchantMcpLimiterKey,
   message: { error: 'Too many requests' },
 });
 router.use(merchantMcpLimiter);

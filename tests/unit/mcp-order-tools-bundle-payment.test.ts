@@ -55,6 +55,7 @@ import { registerOrderTools } from '@api/mcp/tools/order.tools';
 import { authorizedAgentExtra } from '../helpers/mcp-agent-auth';
 import { OrderService } from '@api/services/order.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
+import { runInTenantContext } from '@force/database';
 
 function harness() {
   // `place_order` is a WRITE tool: it now refuses without the `agent:write`
@@ -190,5 +191,70 @@ describe('order.tools place_order (online) — payment-provider line items', () 
       { name: 'Rug', quantity: 2, unitPrice: 3000, sku: 'RUG-1' },
       { name: 'Lamp', quantity: 1, unitPrice: 2000, sku: undefined },
     ]);
+  });
+});
+
+/**
+ * #900 (S5-mcp-agent-write-security, 2026-09-25 security audit).
+ *
+ * The online branch's order-create + `PaymentService.createPayment` (+ its
+ * compensating rollback) used to run OUTSIDE any tenant context — unlike the
+ * COD branch (`withTenantContext`) and unlike the human path
+ * (`payment.routes.ts:230`, `runInTenantContext(order.storeId, …)`). Latent
+ * only because production connects as the BYPASSRLS role today; under RLS
+ * enforcement every SELECT the provider call makes would silently fall
+ * through to the "current_store_id() IS NULL → see all rows" branch instead
+ * of being scoped.
+ */
+describe('order.tools place_order (online) — #900 tenant context', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(PaymentService.getDefaultProvider).mockResolvedValue('tap' as never);
+    vi.mocked(OrderService.create).mockResolvedValue({
+      id: 'order-3',
+      orderNumber: 'ORD-3',
+      total: 5000,
+      currency: 'KWD',
+      items: [{ id: 'oi-1', productName: 'Rug', quantity: 1, price: 5000, sku: null }],
+    } as never);
+  });
+
+  it('wraps order-create + createPayment in runInTenantContext(store.id, …)', async () => {
+    vi.mocked(PaymentService.createPayment).mockResolvedValue({
+      paymentUrl: 'https://pay.example/abc',
+    } as never);
+    const { server, tools } = harness();
+    registerOrderTools(server, store as never);
+
+    await tools.place_order(
+      { cartId: 'cart-3', paymentMethod: 'online', customer },
+      authorizedAgentExtra()
+    );
+
+    expect(vi.mocked(runInTenantContext)).toHaveBeenCalledWith(store.id, expect.any(Function));
+    // OrderService.create must run INSIDE that wrap, not before it — assert
+    // it never ran with the tenant-context mock disarmed.
+    expect(OrderService.create).toHaveBeenCalled();
+  });
+
+  it('runs the compensating rollback for a failed createPayment inside the same tenant context', async () => {
+    vi.mocked(PaymentService.createPayment).mockRejectedValue(new Error('gateway down'));
+    vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);
+    const { server, tools } = harness();
+    registerOrderTools(server, store as never);
+
+    await expect(
+      tools.place_order(
+        { cartId: 'cart-3', paymentMethod: 'online', customer },
+        authorizedAgentExtra()
+      )
+    ).rejects.toThrow('gateway down');
+
+    expect(vi.mocked(runInTenantContext)).toHaveBeenCalledWith(store.id, expect.any(Function));
+    expect(OrderService.rollbackForPaymentFailure).toHaveBeenCalledWith(
+      store.id,
+      'order-3',
+      'cart-3'
+    );
   });
 });

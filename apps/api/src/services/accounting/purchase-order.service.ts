@@ -1,5 +1,5 @@
 import { assertStoreOwns } from './assert-store-owns';
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, withMoneyTx, runInTenantContext } from '@force/database';
 import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';
@@ -27,11 +27,20 @@ export async function createPurchaseOrder(
   // ids here and have receivePurchaseOrder write that tenant's inventory,
   // weighted-average cost, backorders and order items, and read back the
   // foreign supplier row via getPurchaseOrder's `include: { supplier: true }`.
-  await assertStoreOwns(input.storeId, {
-    productIds: input.items.map(i => i.productId),
-    variantIds: input.items.map(i => i.variantId),
-    supplierIds: [input.supplierId],
-  });
+  //
+  // #1241: this router is mounted CONTEXT-LESS (bare `/stores`, see
+  // routes/index.ts) — there is no ambient tenantContext transaction for the
+  // `prisma` proxy to pick up. Under RLS-enforced posture a read with no GUC
+  // set returns zero rows, so the guard itself would 404 every legitimately-
+  // owned id. Wrap it in its own tenant-scoped transaction so it runs in the
+  // same RLS posture as the writes it protects.
+  await runInTenantContext(input.storeId, () =>
+    assertStoreOwns(input.storeId, {
+      productIds: input.items.map(i => i.productId),
+      variantIds: input.items.map(i => i.variantId),
+      supplierIds: [input.supplierId],
+    })
+  );
 
   const subtotal = input.items.reduce((s, i) => s + i.qty * i.unitCost, 0);
   const apAccountId = await getSystemAccountIdByCode(input.storeId, '2000'); // AP

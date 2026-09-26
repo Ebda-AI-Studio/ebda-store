@@ -1,6 +1,6 @@
 import { assertStoreOwns } from './assert-store-owns';
 import { AppError } from '../../middleware/error-handler';
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx, runInTenantContext } from '@force/database';
 import type { StockAdjustment, StockAdjustmentItem, StockAdjustmentType } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
@@ -53,10 +53,19 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
   // store_admin could name a competitor's ids (harvestable from the public
   // storefront) and have postAdjustment write their inventory. Prod runs
   // BYPASSRLS, so there is no database backstop.
-  await assertStoreOwns(input.storeId, {
-    productIds: input.items.map(i => i.productId),
-    variantIds: input.items.map(i => i.variantId),
-  });
+  //
+  // #1241: this router is mounted CONTEXT-LESS (bare `/stores`, see
+  // routes/index.ts) — there is no ambient tenantContext transaction here for
+  // the `prisma` proxy to pick up. Under RLS-enforced posture a read with no
+  // GUC set returns zero rows, so the guard itself would 404 every
+  // legitimately-owned id. Wrap it in its own tenant-scoped transaction so it
+  // runs in the same RLS posture as the writes it protects.
+  await runInTenantContext(input.storeId, () =>
+    assertStoreOwns(input.storeId, {
+      productIds: input.items.map(i => i.productId),
+      variantIds: input.items.map(i => i.variantId),
+    })
+  );
 
   const adjustmentNumber = await nextSequence(input.storeId, 'adjustment');
 

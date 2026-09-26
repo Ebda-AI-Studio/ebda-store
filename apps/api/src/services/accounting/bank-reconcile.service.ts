@@ -124,10 +124,6 @@ export async function importBankStatement(
 ): Promise<ImportStatementResult> {
   const { storeId, glAccountId, fileName, buffer, fileType } = input;
 
-  // glAccountId comes from the request body and is written onto the
-  // BankStatement unchecked, then read back with the account's code and name.
-  await assertStoreOwns(storeId, { accountIds: [glAccountId] });
-
   // ── Parse ──
   const parsed = fileType === 'ofx' ? parseStatementOfx(buffer) : parseStatementCsv(buffer);
 
@@ -143,6 +139,16 @@ export async function importBankStatement(
   let imported = 0;
 
   await withRlsBypass(async tx => {
+    // glAccountId comes from the request body and is written onto the
+    // BankStatement unchecked, then read back with the account's code and
+    // name. #1241: this used to run BEFORE this block, on the bare `prisma`
+    // client with no tenant context at all (this router is mounted
+    // CONTEXT-LESS — see routes/index.ts) — under RLS-enforced posture a read
+    // with no GUC set returns zero rows, so the guard would 404 every
+    // legitimately-owned account. Run it against `tx`, in the same RLS
+    // posture as the writes it protects.
+    await assertStoreOwns(storeId, { accountIds: [glAccountId] }, tx);
+
     // Create statement
     const stmt = await tx.bankStatement.create({
       data: {

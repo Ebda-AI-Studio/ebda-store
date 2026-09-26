@@ -32,6 +32,46 @@
       "test": "tests/unit/purchase-order-service-tenant-scoping.test.ts"
     },
     {
+      "id": "tenant-stock-adjustment-guard-context",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the cross-tenant product/variant ownership guard runs outside any tenant context on a context-less router — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read",
+      "source": "apps/api/src/services/accounting/stock-adjustment.service.ts",
+      "find": "  await runInTenantContext(input.storeId, () =>",
+      "replace": "  await ((_s: string, fn: () => unknown) => fn())(input.storeId, () =>",
+      "test": "tests/unit/accounting-guard-tenant-context.test.ts"
+    },
+    {
+      "id": "tenant-purchase-order-guard-context",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the cross-tenant product/variant/supplier ownership guard runs outside any tenant context on a context-less router — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read",
+      "source": "apps/api/src/services/accounting/purchase-order.service.ts",
+      "find": "  await runInTenantContext(input.storeId, () =>",
+      "replace": "  await ((_s: string, fn: () => unknown) => fn())(input.storeId, () =>",
+      "test": "tests/unit/accounting-guard-tenant-context.test.ts"
+    },
+    {
+      "id": "tenant-expense-guard-context",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the cross-tenant supplier/account ownership guard runs outside any tenant context on a context-less router — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read",
+      "source": "apps/api/src/services/accounting/expense.service.ts",
+      "find": "  await runInTenantContext(input.storeId, () =>",
+      "replace": "  await ((_s: string, fn: () => unknown) => fn())(input.storeId, () =>",
+      "test": "tests/unit/accounting-guard-tenant-context.test.ts"
+    },
+    {
+      "id": "tenant-bank-reconcile-guard-context",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the cross-tenant GL-account ownership guard used to run BEFORE withRlsBypass, on the bare prisma client with no tenant context at all — under RLS enforcement it would 404 every legitimately-owned account",
+      "source": "apps/api/src/services/accounting/bank-reconcile.service.ts",
+      "find": "    await assertStoreOwns(storeId, { accountIds: [glAccountId] }, tx);",
+      "replace": "    await assertStoreOwns(storeId, { accountIds: [glAccountId] });",
+      "test": "tests/unit/accounting-guard-tenant-context.test.ts"
+    },
+    {
       "id": "tenant-product-faq-ownership",
       "domain": "tenant / RLS",
       "tier": "unit",
@@ -292,6 +332,26 @@
       "test": "tests/unit/mcp-agent-write-auth.test.ts"
     },
     {
+      "id": "agent-view-cart-stays-read-only",
+      "domain": "availability",
+      "tier": "unit",
+      "why": "view_cart is an anonymous read reachable at publicLimiter volume — routing it through CartService.getOrCreate instead of the read-only view() mints an unbounded Cart row per probed cartId, a write amplifier on a read path",
+      "source": "apps/api/src/mcp/tools/cart.tools.ts",
+      "find": "      const cart = await CartService.view(store.id, cartId);",
+      "replace": "      const cart = await CartService.getOrCreate(store.id, cartId);",
+      "test": "tests/unit/mcp-agent-write-attribution.test.ts"
+    },
+    {
+      "id": "tenant-mcp-online-order-context",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "place_order online branch (order-create + createPayment + compensating rollback) runs outside any tenant context, unlike the COD branch and unlike the human payment.routes.ts path — under RLS enforcement every SELECT the provider call makes would silently fall through to the current_store_id() IS NULL branch instead of being scoped",
+      "source": "apps/api/src/mcp/tools/order.tools.ts",
+      "find": "        return await runInTenantContext(store.id, async () => {",
+      "replace": "        return await (async (_s: string, fn: () => Promise<unknown>) => fn())(store.id, async () => {",
+      "test": "tests/unit/mcp-order-tools-bundle-payment.test.ts"
+    },
+    {
       "id": "agent-order-attribution",
       "domain": "audit",
       "tier": "unit",
@@ -422,6 +482,16 @@
       "test": "tests/unit/agent-denial-alerts.test.ts"
     },
     {
+      "id": "agent-denial-platform-fault-cross-store",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "a wrong/rotated ENCRYPTION_KEY refuses agent writes on every store, but spread thinly (below threshold in any single store) the platform p0 never fires if the check only looks at one store bucket at a time",
+      "source": "apps/api/src/mcp/agent-denial-alerts.ts",
+      "find": "  if (allFaults.length >= DENIAL_THRESHOLDS.platformFault) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/agent-denial-alerts.test.ts"
+    },
+    {
       "id": "agent-denial-separates-probing-from-broken-integration",
       "domain": "detection",
       "tier": "unit",
@@ -459,6 +529,16 @@
       "source": "apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts",
       "find": "      where: { action: 'agent.write.denied', createdAt: { gte: since } },",
       "replace": "      where: { action: 'agent.write.failed', createdAt: { gte: since } },",
+      "test": "tests/unit/agent-write-denied-watch.test.ts"
+    },
+    {
+      "id": "agent-denial-watch-per-store-scoping",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "one noisy store (reachable by an unauthenticated caller at publicLimiter's 300/min/IP) could fill a single GLOBAL take cap with its own rows, making every other store's denials in the window invisible to the classifier — a starved store reads identically to a quiet one",
+      "source": "apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts",
+      "find": "                where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },",
+      "replace": "                where: { action: 'agent.write.denied', createdAt: { gte: since } },",
       "test": "tests/unit/agent-write-denied-watch.test.ts"
     },
     {
@@ -602,6 +682,16 @@
       "test": "tests/unit/refresh-token-rotation-race.test.ts"
     },
     {
+      "id": "authn-revoke-all-sessions-redis-deferred",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the Redis tokenVersion bump used to run BARE inside the caller ambient tenant transaction (e.g. PUT /admin/users/:id) — a later COMMIT/audit-log failure rolled back Postgres while Redis kept the bumped version, a permanent lockout with no recovery path",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    void deferAfterTenantCommit('auth.revokeAllSessions.setTokenVersion', () =>",
+      "replace": "    void ((_n: string, fn: () => Promise<unknown>) => fn())('auth.revokeAllSessions.setTokenVersion', () =>",
+      "test": "tests/unit/revoke-all-sessions-deferred.test.ts"
+    },
+    {
       "id": "session-rotation-grace-no-clock-renew",
       "domain": "authn / session",
       "tier": "unit",
@@ -700,6 +790,16 @@
       "find": "  return `${ipKeyGenerator(req.ip ?? '')}-refresh-${subject}`;",
       "replace": "  return `${ipKeyGenerator(req.ip ?? '')}-${req.body?.email || 'unknown'}`;",
       "test": "tests/unit/refresh-limiter-bucket.test.ts"
+    },
+    {
+      "id": "authn-mmcp-limiter-ipv6-normalisation",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the unauthenticated bucket for the merchant-admin MCP rate limiter used the raw req.ip, unlike every other custom keyGenerator in the repo — an IPv6 attacker rotating the low 64 bits of their address gets a fresh 120/min bucket per request, defeating the cap on this credential-stuffing surface",
+      "source": "apps/api/src/routes/mcp-admin.routes.ts",
+      "find": "  return `mmcp-ip:${ipKeyGenerator(req.ip ?? '')}`;",
+      "replace": "  return `mmcp-ip:${req.ip}`;",
+      "test": "tests/unit/mcp-admin-limiter-key.test.ts"
     },
     {
       "id": "origin-blog-admin-read-stays-denied",

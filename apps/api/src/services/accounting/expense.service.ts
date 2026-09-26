@@ -1,5 +1,5 @@
 import { assertStoreOwns } from './assert-store-owns';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import type { Expense } from '@prisma/client';
 import {
   isCashOrBankAccount,
@@ -60,10 +60,19 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
   // supplierId and expenseAccountId were written straight from the body — the
   // asymmetry is the bug. A foreign account/supplier id leaks its code and
   // name back through the read path.
-  await assertStoreOwns(input.storeId, {
-    supplierIds: [input.supplierId],
-    accountIds: [input.expenseAccountId],
-  });
+  //
+  // #1241: this router is mounted CONTEXT-LESS (bare `/stores`, see
+  // routes/index.ts) — there is no ambient tenantContext transaction for the
+  // `prisma` proxy to pick up. Under RLS-enforced posture a read with no GUC
+  // set returns zero rows, so the guard itself would 404 every legitimately-
+  // owned id. Wrap it in its own tenant-scoped transaction so it runs in the
+  // same RLS posture as the writes it protects.
+  await runInTenantContext(input.storeId, () =>
+    assertStoreOwns(input.storeId, {
+      supplierIds: [input.supplierId],
+      accountIds: [input.expenseAccountId],
+    })
+  );
 
   // Money guard: the "paid from" account MUST be a cash/bank account so the
   // double-entry is correct (debit expense, credit cash). Paying out of

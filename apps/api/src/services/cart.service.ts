@@ -114,103 +114,41 @@ function ignoreLineGone(err: unknown): void {
 // to `retryOnWriteConflict` so the re-run reads again, sees no line, and takes
 // the create branch.
 
-export class CartService {
-  static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
-    // Shared include fragment to avoid repetition. `product` uses the
-    // storefront-safe select (T-H2) — this is a PUBLIC guest-cart surface
-    // (cart.routes.ts has no `authenticate`), so an `include` here would
-    // leak costPrice/aiFieldSources/barcode/etc. straight into the response.
-    const cartInclude = {
-      items: {
-        include: {
-          product: {
-            select: {
-              ...STOREFRONT_PRODUCT_SELECT,
-              images: { take: 1, orderBy: { position: 'asc' } },
-            },
-          },
-          variant: { select: { id: true, title: true, titleAr: true, price: true } },
+// Shared include fragment to avoid repetition. `product` uses the
+// storefront-safe select (T-H2) — this is a PUBLIC guest-cart surface
+// (cart.routes.ts has no `authenticate`), so an `include` here would
+// leak costPrice/aiFieldSources/barcode/etc. straight into the response.
+// Module-level (not per-call) so `CartService.view`'s read-only lookup uses
+// the EXACT same shape as `getOrCreate`'s — a hand-copied second literal is
+// how the two silently drift.
+const CART_INCLUDE = {
+  items: {
+    include: {
+      product: {
+        select: {
+          ...STOREFRONT_PRODUCT_SELECT,
+          images: { take: 1, orderBy: { position: 'asc' } },
         },
       },
-      // Raw rows only — `bundleId`/`quantity` is all we need. Display fields
-      // (name/image) and every priced field come from `resolveBundle` below,
-      // recomputed live rather than joined from a possibly-stale Bundle row.
-      bundles: true,
-    } as const;
+      variant: { select: { id: true, title: true, titleAr: true, price: true } },
+    },
+  },
+  // Raw rows only — `bundleId`/`quantity` is all we need. Display fields
+  // (name/image) and every priced field come from `resolveBundle` below,
+  // recomputed live rather than joined from a possibly-stale Bundle row.
+  bundles: true,
+} as const;
 
-    // Try to find an existing cart for this session (or customer).
-    //
-    // orderBy: updatedAt desc — when a customer logs in mid-session,
-    // BOTH their fresh session cart AND their older customer cart may
-    // match the OR clause. Without an explicit order, Postgres returns
-    // either at random which can resurrect an empty stale cart and
-    // cause a spurious EMPTY_CART on POST /orders. Returning the
-    // most-recently-touched cart matches the user's mental model
-    // ("my current cart") and prevents the test-order-cancel flakiness.
-    let cart = await prisma.cart.findFirst({
-      where: {
-        storeId,
-        OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
-      },
-      include: cartInclude,
-      orderBy: { updatedAt: 'desc' },
-    });
+type CartWithIncludes = Prisma.CartGetPayload<{ include: typeof CART_INCLUDE }>;
 
-    if (!cart) {
-      try {
-        // Attempt to create — a concurrent request may have already created one,
-        // in which case we catch the unique constraint violation and fall back to
-        // a findFirst so we never return two carts for the same session.
-        //
-        // `withSavepoint` is what makes that fallback REACHABLE. Store-scoped
-        // requests run inside the one interactive transaction
-        // `middleware/tenant-context.ts` opens, and a failed INSERT aborts a
-        // Postgres transaction outright — so without the savepoint the
-        // `findFirst` below died with 25P02 ("current transaction is aborted")
-        // and the request 500'd on the very race this catch block was written
-        // to absorb.
-        //
-        // The race is routine, not exotic. It USED to fire even for a strictly
-        // SEQUENTIAL customer: `tenantContext` committed the ambient
-        // transaction on `res.on('finish')`, i.e. AFTER the response had been
-        // flushed, so the NEXT request could begin before the previous
-        // request's cart row was visible. That half is fixed at the source —
-        // `middleware/request-transaction.ts` now commits before it answers.
-        // What remains, and what this catch block is still for, is genuine
-        // CONCURRENCY: two requests on one session in flight at once, where
-        // the second's `findFirst` sees nothing and its `create` then collides
-        // with the winner on `(store_id, session_id)`. Commit-before-respond
-        // does nothing for that. See tests/integration/cart-session-race.test.ts.
-        cart = await withSavepoint(() =>
-          prisma.cart.create({
-            data: {
-              storeId,
-              sessionId,
-              customerId,
-            },
-            include: cartInclude,
-          })
-        );
-      } catch (err) {
-        // P2002 = Prisma unique constraint violation
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-          const existing = await prisma.cart.findFirst({
-            where: {
-              storeId,
-              OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
-            },
-            include: cartInclude,
-          });
-          if (!existing) {
-            throw err; // Unexpected — re-throw
-          }
-          cart = existing;
-        } else {
-          throw err;
-        }
-      }
-    }
-
+export class CartService {
+  /**
+   * Price a cart's items + bundles into the shape every read/write path
+   * returns. Factored out of `getOrCreate` so `view` (#1661 — a read-only
+   * lookup that must NOT create a Cart row on a miss) prices an
+   * already-fetched cart identically instead of re-deriving the math.
+   */
+  private static async computeTotals(storeId: string, cart: CartWithIncludes) {
     // Calculate totals — a line is priced at its chosen VARIANT's price when
     // one is selected (variant products), falling back to the parent product's
     // price for variant-less products. Using product.price for a variant line
@@ -253,6 +191,110 @@ export class CartService {
     const bundlesSubtotal = bundles.reduce((sum, b) => sum + b.total, 0);
 
     return { ...cart, bundles, subtotal: itemsSubtotal + bundlesSubtotal };
+  }
+
+  /**
+   * Read-only cart lookup (#1661). Unlike `getOrCreate`, a miss returns the
+   * empty-cart shape instead of inserting a Cart row — `view_cart` (MCP) is
+   * an anonymous READ, so it must not be a write amplifier: an unauthenticated
+   * caller could otherwise mint unbounded Cart rows just by probing cartIds.
+   */
+  static async view(storeId: string, sessionId: string, customerId?: string) {
+    const cart = await prisma.cart.findFirst({
+      where: {
+        storeId,
+        OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
+      },
+      include: CART_INCLUDE,
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (!cart) {
+      return {
+        items: [] as CartWithIncludes['items'],
+        bundles: [] as CartBundleView[],
+        subtotal: 0,
+      };
+    }
+
+    return this.computeTotals(storeId, cart);
+  }
+
+  static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
+    // Try to find an existing cart for this session (or customer).
+    //
+    // orderBy: updatedAt desc — when a customer logs in mid-session,
+    // BOTH their fresh session cart AND their older customer cart may
+    // match the OR clause. Without an explicit order, Postgres returns
+    // either at random which can resurrect an empty stale cart and
+    // cause a spurious EMPTY_CART on POST /orders. Returning the
+    // most-recently-touched cart matches the user's mental model
+    // ("my current cart") and prevents the test-order-cancel flakiness.
+    let cart = await prisma.cart.findFirst({
+      where: {
+        storeId,
+        OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
+      },
+      include: CART_INCLUDE,
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (!cart) {
+      try {
+        // Attempt to create — a concurrent request may have already created one,
+        // in which case we catch the unique constraint violation and fall back to
+        // a findFirst so we never return two carts for the same session.
+        //
+        // `withSavepoint` is what makes that fallback REACHABLE. Store-scoped
+        // requests run inside the one interactive transaction
+        // `middleware/tenant-context.ts` opens, and a failed INSERT aborts a
+        // Postgres transaction outright — so without the savepoint the
+        // `findFirst` below died with 25P02 ("current transaction is aborted")
+        // and the request 500'd on the very race this catch block was written
+        // to absorb.
+        //
+        // The race is routine, not exotic. It USED to fire even for a strictly
+        // SEQUENTIAL customer: `tenantContext` committed the ambient
+        // transaction on `res.on('finish')`, i.e. AFTER the response had been
+        // flushed, so the NEXT request could begin before the previous
+        // request's cart row was visible. That half is fixed at the source —
+        // `middleware/request-transaction.ts` now commits before it answers.
+        // What remains, and what this catch block is still for, is genuine
+        // CONCURRENCY: two requests on one session in flight at once, where
+        // the second's `findFirst` sees nothing and its `create` then collides
+        // with the winner on `(store_id, session_id)`. Commit-before-respond
+        // does nothing for that. See tests/integration/cart-session-race.test.ts.
+        cart = await withSavepoint(() =>
+          prisma.cart.create({
+            data: {
+              storeId,
+              sessionId,
+              customerId,
+            },
+            include: CART_INCLUDE,
+          })
+        );
+      } catch (err) {
+        // P2002 = Prisma unique constraint violation
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          const existing = await prisma.cart.findFirst({
+            where: {
+              storeId,
+              OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
+            },
+            include: CART_INCLUDE,
+          });
+          if (!existing) {
+            throw err; // Unexpected — re-throw
+          }
+          cart = existing;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    return this.computeTotals(storeId, cart);
   }
 
   static async addItem(

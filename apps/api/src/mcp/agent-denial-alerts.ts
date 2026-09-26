@@ -201,25 +201,36 @@ export function classifyAgentDenials(rows: AgentDenialRow[]): AgentDenialFinding
 
   const findings: AgentDenialFinding[] = [];
 
+  // #1653 (2026-09-25 security audit): `platform_fault` is OUR bug (a wrong
+  // or rotated ENCRYPTION_KEY refuses every agent write on EVERY store), so
+  // it has to be judged across the whole window, not one store at a time. The
+  // per-store version below used to require `platformFault` (3) faults
+  // inside a SINGLE store's bucket — a decrypt failure spread thinly across
+  // many stores (2 rows each in 5 different stores = 10 total) never reached
+  // 3 in any one bucket and the p0 that exists specifically to catch "this is
+  // us, not them" never fired. Computed once, over every valid row, before
+  // the per-store loop — genuinely platform-scoped, matching the
+  // `credential_probing` cross-store roll-up's shape (no `store` field).
+  const allRows = [...byStore.values()].flat();
+  const allFaults = allRows.filter(r => r.credential === 'error');
+  if (allFaults.length >= DENIAL_THRESHOLDS.platformFault) {
+    findings.push({
+      kind: 'platform_fault',
+      level: 'p0',
+      scope: 'platform',
+      count: allFaults.length,
+      distinctIps: countDistinctIps(allFaults),
+      tools: toolsOf(allFaults),
+      storesAffected: new Set(allFaults.map(r => r.storeId)).size,
+    });
+  }
+
   for (const [storeId, storeRows] of byStore) {
     const store = {
       id: storeId,
       name: storeRows.find(r => r.storeName)?.storeName ?? storeId,
       slug: storeRows.find(r => r.storeSlug)?.storeSlug ?? undefined,
     };
-
-    const faults = storeRows.filter(r => r.credential === 'error');
-    if (faults.length >= DENIAL_THRESHOLDS.platformFault) {
-      findings.push({
-        kind: 'platform_fault',
-        level: 'p0',
-        scope: 'platform',
-        store,
-        count: faults.length,
-        distinctIps: countDistinctIps(faults),
-        tools: toolsOf(faults),
-      });
-    }
 
     // A credential was PRESENTED and did not authorise the write.
     const presented = storeRows.filter(

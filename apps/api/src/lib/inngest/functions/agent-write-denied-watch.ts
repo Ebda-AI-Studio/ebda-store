@@ -48,11 +48,22 @@ import {
  */
 
 /**
- * Hard cap on rows pulled per tick. 5000 refusals in 16 minutes is already far
- * past every threshold, so truncation cannot change WHETHER an alert fires —
- * only the count printed in it, which is reported as a floor when the cap is hit.
+ * Hard cap on rows pulled per STORE per tick (#1656, 2026-09-25 security
+ * audit).
+ *
+ * This used to be one GLOBAL `orderBy: desc, take: 5000` across every store.
+ * `add_to_cart`/`place_order` denials are reachable by a fully unauthenticated
+ * caller (bounded only by `publicLimiter`'s 300/min/IP), so a single noisy
+ * store could fill the entire 5000-row cap with its own rows — at which
+ * point every OTHER store's denials in the window are simply absent from
+ * `denials`, and `classifyAgentDenials` never sees them: a quiet store
+ * looks identical to a store whose alert visibility was starved by someone
+ * else's flood. Querying each store's own bounded, newest-first slice (see
+ * `handleAgentWriteDeniedWatch` below) means one store's volume can no
+ * longer suppress another's. 1000/store in a 16-minute window is already
+ * ~20x every classification threshold (the highest, `anonymousFlood`, is 50).
  */
-const MAX_ROWS = 5000;
+const MAX_ROWS_PER_STORE = 1000;
 
 function bodyFor(finding: AgentDenialFinding, truncated: boolean): string {
   const countPhrase = truncated ? `at least ${finding.count}` : `${finding.count}`;
@@ -61,13 +72,16 @@ function bodyFor(finding: AgentDenialFinding, truncated: boolean): string {
 
   switch (finding.kind) {
     case 'platform_fault':
+      // #1653: computed across EVERY store now (a fault spread thinly no
+      // longer hides below any one store's threshold), so this is genuinely
+      // platform-scoped — no single store to name. `storesAffected` is what
+      // used to be implied by "the store named above is an example".
       return (
-        `${countPhrase} agent write(s) on "${finding.store?.name}" were refused in the last ${window} ` +
-        `because the credential lookup itself FAILED (details.credential="error") — a DB error or an ` +
-        `AES decrypt error, not a caller mistake. This store's agent checkout is down and the rows blame ` +
-        `the caller. Check ENCRYPTION_KEY on the API and the Store.agent_api_key ciphertext. If the ` +
-        `key itself is wrong every store is affected, and sendAlert's throttle collapses them into ` +
-        `this one message — the store named above is an example, not the blast radius. Tools: ${tools}.`
+        `${countPhrase} agent write(s) across ${finding.storesAffected ?? 'multiple'} store(s) were ` +
+        `refused in the last ${window} because the credential lookup itself FAILED ` +
+        `(details.credential="error") — a DB error or an AES decrypt error, not a caller mistake. ` +
+        `Agent checkout is down and the rows blame the caller. Check ENCRYPTION_KEY on the API and the ` +
+        `Store.agent_api_key ciphertext. Tools: ${tools}.`
       );
     case 'integration_broken':
       return (
@@ -144,21 +158,45 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
 }> {
   const since = new Date(Date.now() - DENIAL_WINDOW_MINUTES * 60 * 1000);
 
-  const rows = await withRlsBypass(tx =>
-    tx.auditLog.findMany({
+  // Which stores had ANY denial in the window — cheap, indexed aggregate, not
+  // the rows themselves. See MAX_ROWS_PER_STORE above for why this replaced a
+  // single global `take`.
+  const activeStores = await withRlsBypass(tx =>
+    tx.auditLog.groupBy({
+      by: ['storeId'],
       where: { action: 'agent.write.denied', createdAt: { gte: since } },
-      select: {
-        storeId: true,
-        ipAddress: true,
-        details: true,
-        store: { select: { name: true, slug: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: MAX_ROWS,
     })
   );
+  const storeIds = activeStores
+    .map(g => g.storeId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
-  const truncated = rows.length >= MAX_ROWS;
+  const rowsByStore =
+    storeIds.length > 0
+      ? await withRlsBypass(tx =>
+          Promise.all(
+            storeIds.map(storeId =>
+              tx.auditLog.findMany({
+                where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
+                select: {
+                  storeId: true,
+                  ipAddress: true,
+                  details: true,
+                  store: { select: { name: true, slug: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: MAX_ROWS_PER_STORE,
+              })
+            )
+          )
+        )
+      : [];
+
+  const rows = rowsByStore.flat();
+  // Coarse on purpose (matches the prior single-flag behaviour downstream):
+  // true when ANY one store's own slice hit its cap, so a caller sees "at
+  // least N" rather than a false exact count.
+  const truncated = rowsByStore.some(storeRows => storeRows.length >= MAX_ROWS_PER_STORE);
 
   const denials: AgentDenialRow[] = rows
     .filter((r): r is typeof r & { storeId: string } => typeof r.storeId === 'string')

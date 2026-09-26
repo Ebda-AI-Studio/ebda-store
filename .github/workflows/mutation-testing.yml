@@ -32,6 +32,10 @@ on:
       # the line above: a defended source unreachable from this list means the
       # gate passes every PR having measured nothing about it.
       - 'apps/api/src/routes/agent-credential.routes.ts'
+      # The merchant-admin MCP endpoint's rate limiter (#1737, 2026-09-25):
+      # its unauthenticated-caller keyGenerator is a separate defended source
+      # from `apps/api/src/mcp/**` above (this router lives under `routes/`).
+      - 'apps/api/src/routes/mcp-admin.routes.ts'
       - 'apps/api/src/services/store.service.ts'
       - 'apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts'
       - 'apps/api/src/routes/auth.routes.ts'

@@ -13,23 +13,31 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuditFindMany, mockOrderFindMany, mockSendAlert, mockRlsBypass } = vi.hoisted(() => {
-  const findMany = vi.fn();
-  // The watcher makes a SECOND cross-tenant read: which of the stores in this
-  // window have ever completed an agent order. That flag is what separates a
-  // broken pre-existing integration from crawler noise, so the stub has to
-  // answer it — defaulting to "no prior agent activity", which is what every
-  // pre-existing case in this file assumes.
-  const orderFindMany = vi.fn(async () => []);
-  return {
-    mockAuditFindMany: findMany,
-    mockOrderFindMany: orderFindMany,
-    mockSendAlert: vi.fn(),
-    mockRlsBypass: vi.fn((fn: (tx: unknown) => unknown) =>
-      fn({ auditLog: { findMany }, order: { findMany: orderFindMany } })
-    ),
-  };
-});
+const { mockAuditFindMany, mockAuditGroupBy, mockOrderFindMany, mockSendAlert, mockRlsBypass } =
+  vi.hoisted(() => {
+    const findMany = vi.fn();
+    // #1656: the watcher now discovers WHICH stores had any denial in the
+    // window via a groupBy, then pulls each store's own bounded slice —
+    // rather than one global `take` that a single noisy store could fill.
+    // Defaults to no active stores (empty window); tests that configure rows
+    // via `setDenials` below configure this alongside `findMany`.
+    const groupBy = vi.fn(async () => [] as { storeId: string | null }[]);
+    // The watcher makes a SECOND cross-tenant read: which of the stores in this
+    // window have ever completed an agent order. That flag is what separates a
+    // broken pre-existing integration from crawler noise, so the stub has to
+    // answer it — defaulting to "no prior agent activity", which is what every
+    // pre-existing case in this file assumes.
+    const orderFindMany = vi.fn(async () => []);
+    return {
+      mockAuditFindMany: findMany,
+      mockAuditGroupBy: groupBy,
+      mockOrderFindMany: orderFindMany,
+      mockSendAlert: vi.fn(),
+      mockRlsBypass: vi.fn((fn: (tx: unknown) => unknown) =>
+        fn({ auditLog: { findMany, groupBy }, order: { findMany: orderFindMany } })
+      ),
+    };
+  });
 
 vi.mock('@force/database', () => ({ withRlsBypass: mockRlsBypass }));
 vi.mock('@api/lib/inngest/client', () => ({
@@ -52,20 +60,34 @@ function deniedRow(credential: string, ip: string) {
   };
 }
 
+/**
+ * Configure BOTH reads the watcher now makes: the groupBy that discovers
+ * which stores are active in the window, and the per-store `findMany` slice.
+ * `findMany` ignores its arguments in this stub (it always returns the full
+ * set passed here), which is exactly right for every existing single-store
+ * test — the per-store `where: { storeId }` filter is real in production,
+ * not in this mock.
+ */
+function setDenials(rows: ReturnType<typeof deniedRow>[]) {
+  mockAuditFindMany.mockResolvedValue(rows);
+  const storeIds = [...new Set(rows.map(r => r.storeId).filter(Boolean))];
+  mockAuditGroupBy.mockResolvedValue(storeIds.map(storeId => ({ storeId })));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  mockAuditFindMany.mockResolvedValue([]);
+  setDenials([]);
   mockOrderFindMany.mockReset();
   mockOrderFindMany.mockResolvedValue([]);
   mockSendAlert.mockResolvedValue(undefined);
 });
 
 describe('agent-write-denied-watch — what it reads', () => {
-  it('reads ONLY agent.write.denied rows, within the declared window, past RLS', async () => {
+  it('discovers active stores via a groupBy scoped to the same action + window', async () => {
     await handleAgentWriteDeniedWatch();
 
     expect(mockRlsBypass).toHaveBeenCalled(); // audit_logs is RLS-protected
-    const args = mockAuditFindMany.mock.calls[0][0];
+    const args = mockAuditGroupBy.mock.calls[0][0];
     expect(args.where.action).toBe('agent.write.denied');
 
     const since = args.where.createdAt.gte as Date;
@@ -74,6 +96,27 @@ describe('agent-write-denied-watch — what it reads', () => {
     // Allow a second of execution slack around the declared window.
     expect(windowMs).toBeGreaterThan((DENIAL_WINDOW_MINUTES - 1) * 60_000);
     expect(windowMs).toBeLessThan((DENIAL_WINDOW_MINUTES + 1) * 60_000);
+  });
+
+  it('reads ONLY agent.write.denied rows for an active store, within the declared window, past RLS', async () => {
+    setDenials([deniedRow('none', '1.1.1.1')]);
+
+    await handleAgentWriteDeniedWatch();
+
+    const args = mockAuditFindMany.mock.calls[0][0];
+    expect(args.where.action).toBe('agent.write.denied');
+    expect(args.where.storeId).toBe('store-1');
+
+    const since = args.where.createdAt.gte as Date;
+    expect(since).toBeInstanceOf(Date);
+    const windowMs = Date.now() - since.getTime();
+    expect(windowMs).toBeGreaterThan((DENIAL_WINDOW_MINUTES - 1) * 60_000);
+    expect(windowMs).toBeLessThan((DENIAL_WINDOW_MINUTES + 1) * 60_000);
+  });
+
+  it('never calls the per-store findMany when no store had any activity in the window', async () => {
+    await handleAgentWriteDeniedWatch();
+    expect(mockAuditFindMany).not.toHaveBeenCalled();
   });
 });
 
@@ -85,7 +128,7 @@ describe('agent-write-denied-watch — silence below threshold', () => {
   });
 
   it('sends no alert one refusal below the integration threshold', async () => {
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.integrationBroken - 1 }, () =>
         deniedRow('invalid', '1.1.1.1')
       )
@@ -96,7 +139,7 @@ describe('agent-write-denied-watch — silence below threshold', () => {
   });
 
   it('sends no alert for a pile of credential-less attempts below the volume floor', async () => {
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.anonymousFlood - 1 }, (_, i) =>
         deniedRow('none', `2.2.2.${i % 5}`)
       )
@@ -109,7 +152,7 @@ describe('agent-write-denied-watch — silence below threshold', () => {
 
 describe('agent-write-denied-watch — dispatch at threshold', () => {
   it('sends a store-scoped p1 naming the store when an integration breaks', async () => {
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.integrationBroken }, () =>
         deniedRow('invalid', '1.1.1.1')
       )
@@ -128,7 +171,7 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
   });
 
   it('keeps the alert title free of counts so sendAlert can de-duplicate a flap', async () => {
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.integrationBroken + 7 }, () =>
         deniedRow('invalid', '1.1.1.1')
       )
@@ -141,7 +184,7 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
   });
 
   it('escalates a lookup failure to a platform p0 rather than blaming the caller', async () => {
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.platformFault }, () => deniedRow('error', '1.1.1.1'))
     );
     await handleAgentWriteDeniedWatch();
@@ -156,7 +199,7 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
     // only reach `integration_never_credentialed` if the watcher actually
     // performs the prior-agent lookup and threads the flag through — a
     // classifier arm nobody feeds is the same defect as no arm at all.
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.integrationNeverCredentialed }, () =>
         deniedRow('none', '1.1.1.1')
       )
@@ -176,7 +219,7 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
   });
 
   it('stays quiet on the same rows when the store has no agent history', async () => {
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.integrationNeverCredentialed }, () =>
         deniedRow('none', '1.1.1.1')
       )
@@ -190,7 +233,7 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
   });
 
   it('separates probing from a broken integration on the IP spread alone', async () => {
-    mockAuditFindMany.mockResolvedValue(
+    setDenials(
       Array.from({ length: DENIAL_THRESHOLDS.credentialProbing }, (_, i) =>
         deniedRow('invalid', `9.9.9.${i}`)
       )

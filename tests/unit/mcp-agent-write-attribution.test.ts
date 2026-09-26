@@ -43,7 +43,7 @@ vi.mock('@api/services/payment-event.service', () => ({
   recordPaymentEvent: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@api/services/cart.service', () => ({
-  CartService: { addItem: vi.fn(), getOrCreate: vi.fn() },
+  CartService: { addItem: vi.fn(), getOrCreate: vi.fn(), view: vi.fn() },
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -190,7 +190,7 @@ describe('add_to_cart — attribution', () => {
   });
 
   it('leaves view_cart ANONYMOUS — a read is never gated (FM-1 guard)', async () => {
-    vi.mocked(CartService.getOrCreate).mockResolvedValue({
+    vi.mocked(CartService.view).mockResolvedValue({
       items: [],
       bundles: [],
       subtotal: 0,
@@ -199,6 +199,6 @@ describe('add_to_cart — attribution', () => {
 
     // No `extra` at all — exactly what an unauthenticated agent produces.
     await expect(tools.view_cart({ cartId: 'sess_x' })).resolves.toBeDefined();
-    expect(CartService.getOrCreate).toHaveBeenCalled();
+    expect(CartService.view).toHaveBeenCalled();
   });
 });

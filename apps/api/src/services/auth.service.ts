@@ -1186,7 +1186,23 @@ export class AuthService {
 
     // Warm the Redis cache with the new version so the middleware sees it
     // immediately without a DB round-trip on the next request.
-    await redis.setUserTokenVersion(userId, updated.tokenVersion);
+    //
+    // Deferred (#1859, 2026-09-25): Redis has no rollback. Awaiting this
+    // inline — inside a caller's ambient tenant transaction (e.g.
+    // `PUT /admin/users/:id`) — bumps the cache before that transaction's own
+    // COMMIT. A later COMMIT or audit-log failure then rolls back Postgres
+    // while Redis keeps the bumped tokenVersion: every access token for this
+    // user is permanently rejected with no DB row recording why, and no
+    // retry path recovers it. `deferAfterTenantCommit` fires this only once
+    // the ambient transaction has actually committed, and DROPS it if the
+    // transaction rolled back — matching `eraseAccount`'s propagation above.
+    // Outside a request transaction (Inngest, scripts, self-service auth
+    // routes with no ambient tx) it still runs inline, unchanged.
+    void deferAfterTenantCommit('auth.revokeAllSessions.setTokenVersion', () =>
+      redis.setUserTokenVersion(userId, updated.tokenVersion)
+    ).catch(err =>
+      logger.warn({ err, userId }, '[auth.revokeAllSessions] redis tokenVersion bump failed')
+    );
 
     // Revoke all live refresh tokens — prevents session resumption via
     // token rotation even before the access token's tv is checked.

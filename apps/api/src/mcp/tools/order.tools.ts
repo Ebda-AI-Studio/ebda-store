@@ -236,69 +236,79 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           );
         }
 
-        const order = await OrderService.create(store.id, undefined, cartId, {
-          shippingAddress,
-          paymentMethod: 'online',
-          source: 'agent',
-        });
+        // #900: tenant-scoped like the COD branch above and like the human
+        // path (payment.routes.ts:230) — order-create, createPayment and the
+        // compensating rollback all run inside ONE runInTenantContext so RLS
+        // policies enforce isolation under the force_app role. Without this,
+        // every SELECT the payment provider call makes (PaymentConfig lookup,
+        // store row, etc.) silently fell through to the "current_store_id()
+        // IS NULL → see all rows" branch of the policies — latent only
+        // because production connects as the BYPASSRLS role today.
+        return await runInTenantContext(store.id, async () => {
+          const order = await OrderService.create(store.id, undefined, cartId, {
+            shippingAddress,
+            paymentMethod: 'online',
+            source: 'agent',
+          });
 
-        const base = storefrontBaseUrl(store);
-        try {
-          // Faithfully replicates POST /payments/create's online-branch
-          // request shape (payment.routes.ts): same customer/items mapping,
-          // same callback/error URL convention, same
-          // `.../webhooks/payment/<provider>` webhook shape — provider is
-          // resolved explicitly above rather than left undefined.
-          const payment = await PaymentService.createPayment(
-            {
+          const base = storefrontBaseUrl(store);
+          try {
+            // Faithfully replicates POST /payments/create's online-branch
+            // request shape (payment.routes.ts): same customer/items mapping,
+            // same callback/error URL convention, same
+            // `.../webhooks/payment/<provider>` webhook shape — provider is
+            // resolved explicitly above rather than left undefined.
+            const payment = await PaymentService.createPayment(
+              {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                amount: order.total,
+                currency: order.currency as Currency,
+                customer: {
+                  id: `guest-${order.id}`,
+                  name: customer.name,
+                  email: customer.email ?? '',
+                  phone: customer.phone,
+                },
+                // Same collapse every other payment-provider call site uses
+                // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
+                // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
+                // note): a bundle box must reach the gateway's hosted page as
+                // ONE line at the bundle price, never its per-component
+                // allocated shares. This call site mapped `order.items` raw and
+                // was the one instance final review missed.
+                items: buildPaymentLineItems(order.items),
+                callbackUrl: `${base}/checkout/success`,
+                errorUrl: `${base}/checkout/error`,
+                webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
+              },
+              provider,
+              store.id
+            );
+
+            return ok({
               orderId: order.id,
               orderNumber: order.orderNumber,
-              amount: order.total,
-              currency: order.currency as Currency,
-              customer: {
-                id: `guest-${order.id}`,
-                name: customer.name,
-                email: customer.email ?? '',
-                phone: customer.phone,
-              },
-              // Same collapse every other payment-provider call site uses
-              // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
-              // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
-              // note): a bundle box must reach the gateway's hosted page as
-              // ONE line at the bundle price, never its per-component
-              // allocated shares. This call site mapped `order.items` raw and
-              // was the one instance final review missed.
-              items: buildPaymentLineItems(order.items),
-              callbackUrl: `${base}/checkout/success`,
-              errorUrl: `${base}/checkout/error`,
-              webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
-            },
-            provider,
-            store.id
-          );
-
-          return ok({
-            orderId: order.id,
-            orderNumber: order.orderNumber,
-            status: order.status,
-            paymentMethod: 'online',
-            total: order.total,
-            currency: order.currency,
-            paymentUrl: payment.paymentUrl,
-          });
-        } catch (err) {
-          // Compensating rollback — same pattern as POST /payments/create's
-          // catch block: the order committed (cart cleared, inventory
-          // decremented) but the payment step failed, so undo it rather than
-          // strand an unpaid, cart-less order the agent/customer can't retry.
-          await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>
-            logger.error(
-              { err: rbErr, orderId: order.id, storeId: store.id },
-              '[MCP place_order] order rollback failed after payment-create failure'
-            )
-          );
-          throw err;
-        }
+              status: order.status,
+              paymentMethod: 'online',
+              total: order.total,
+              currency: order.currency,
+              paymentUrl: payment.paymentUrl,
+            });
+          } catch (err) {
+            // Compensating rollback — same pattern as POST /payments/create's
+            // catch block: the order committed (cart cleared, inventory
+            // decremented) but the payment step failed, so undo it rather than
+            // strand an unpaid, cart-less order the agent/customer can't retry.
+            await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>
+              logger.error(
+                { err: rbErr, orderId: order.id, storeId: store.id },
+                '[MCP place_order] order rollback failed after payment-create failure'
+              )
+            );
+            throw err;
+          }
+        });
       } catch (err) {
         // A REJECTED checkout is the signal we most want and the one nothing
         // recorded before: an agent order that failed COD availability, ran out

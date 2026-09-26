@@ -151,15 +151,18 @@ export function registerCartTools(server: McpServer, store: McpStore): void {
     {
       description:
         "View a cart's items, bundles, and subtotal by its cartId. `bundles` are boxes the store sells at a fixed price — each is one entry, never split into its component products.",
-      // Same bound, same reason on a different table: `getOrCreate` mints a
-      // Cart row on a miss with this exact string as its `sessionId`, so an
-      // unbounded value is a write amplifier on an anonymous read path. Every
-      // cartId in circulation is `sess_` + 32 hex (minted here or by
-      // `apps/web/src/lib/api.ts`), far inside the cap.
+      // Same bound as `add_to_cart`'s ids, same discipline on a different
+      // table: `CartService.view` is read-only (#1661 — it used to be
+      // `getOrCreate`, which mints a Cart row on ANY miss with this exact
+      // string as its `sessionId`, making an anonymous read a write
+      // amplifier), but an unbounded string is still worth capping here on
+      // general principle. Every cartId in circulation is `sess_` + 32 hex
+      // (minted by `add_to_cart` or `apps/web/src/lib/api.ts`), far inside
+      // the cap.
       inputSchema: { cartId: z.string().min(1).max(MCP_ID_MAX_CHARS) },
     },
     async ({ cartId }) => {
-      const cart = await CartService.getOrCreate(store.id, cartId);
+      const cart = await CartService.view(store.id, cartId);
       return ok(cartView(cartId, cart, store.currency));
     }
   );
