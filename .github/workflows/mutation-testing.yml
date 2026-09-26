@@ -198,14 +198,17 @@ jobs:
           npm run build -w packages/shared
           npm run build -w packages/database
 
-      # The main config sets `retry: 1` for genuinely flaky NETWORK tests in the
-      # e2e/integration tiers. On unit tests that retry masks state pollution:
+      # ci.yml's e2e/integration jobs opt into `--retry=1` at the invocation
+      # site for genuinely flaky NETWORK tests (the main config itself
+      # defaults to `retry: 0` since #1248 — see vitest.config.ts). Before
+      # that fix, a global `retry: 1` masked state pollution on unit tests:
       # a queued mockResolvedValueOnce left undrained by clearAllMocks fed the
       # next test's first call, and the retry — which re-runs only the failures,
       # by then against a drained queue — turned it green. Five accounting
-      # tests were passing that way (fixed 2026-09-02). The Stryker config
-      # already sets retry: 0 and includes exactly tests/unit/**, so running it
-      # here is the honest unit gate, ~20s, with no risk to the e2e tier.
+      # tests were passing that way (fixed 2026-09-02). This job's explicit
+      # `--retry=0` below is now reinforcement of ci.yml's own default rather
+      # than the only honest unit gate, and stays as a second line of defence
+      # against the default ever drifting back.
       - name: Unit tier with retries disabled (no masked-flaky tests)
         # ci.yml's config with retry forced off — NOT the stryker config.
         #
@@ -221,8 +224,9 @@ jobs:
         # flake would hide.
         #
         # The main config's include is broad, so the same positional list
-        # narrows it to exactly ci.yml's unit scope, and --retry=0 overrides the
-        # retry: 1 that hides order-dependent failures.
+        # narrows it to exactly ci.yml's unit scope, and this explicit
+        # --retry=0 stays as reinforcement even though the config now
+        # defaults to it (#1248).
         #
         # Keep this list in step with ci.yml's "Run unit tests with coverage".
         run: |

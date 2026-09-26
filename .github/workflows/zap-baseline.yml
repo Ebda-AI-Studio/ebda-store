@@ -20,6 +20,17 @@ permissions:
   # on a nightly schedule.
   contents: read
 
+# #1748: `gh run list` on 2026-09-25 showed several nightly runs sitting
+# QUEUED for 1-24h before running/being cancelled — the self-hosted runner was
+# out of disk space (17 MB free, confirmed in a run's own annotations), not
+# scanning slowly. A superseded queued run (yesterday's scan of the same URL,
+# still waiting for a runner) is stale the moment a newer one is dispatched, so
+# let the newer one cancel it instead of the two competing for the same
+# starved runner.
+concurrency:
+  group: zap-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   zap:
     name: ZAP baseline

@@ -174,20 +174,57 @@ function findHardcodedHits(source: string): string[] {
   const hits: string[] = [];
   let match: RegExpExecArray | null;
 
+  // Collapse ALL whitespace runs (including newlines) to a single space
+  // before matching (#1934). JSX_TEXT_REGEX's capture class excludes `\n`,
+  // so a hardcoded English paragraph wrapped across multiple lines — the
+  // dominant real-world shape of prettier-formatted JSX text, not the
+  // single-line case this guard was written against — could not match at
+  // all. Normalizing whitespace first collapses the wrap onto one line
+  // without changing which characters count as text.
+  const normalized = source.replace(/\s+/g, ' ');
+
   JSX_TEXT_REGEX.lastIndex = 0;
-  while ((match = JSX_TEXT_REGEX.exec(source))) {
-    const inner = match[1];
+  while ((match = JSX_TEXT_REGEX.exec(normalized))) {
+    // Collapsing whitespace can pad a short standalone-line value (a 2-letter
+    // avatar badge like "SA" on its own line) with the single space that used
+    // to be a newline, pushing it past the regex's own 3-char minimum by
+    // whitespace alone rather than real content. Trim before checking length
+    // so that padding can never count as content the un-collapsed source
+    // never had.
+    const inner = match[1].trim();
+    if (inner.length < 3) continue;
     if (!ALLOWLIST.has(inner)) hits.push(`[text] ${inner}`);
   }
 
   CHROME_ATTR_REGEX.lastIndex = 0;
-  while ((match = CHROME_ATTR_REGEX.exec(source))) {
+  while ((match = CHROME_ATTR_REGEX.exec(normalized))) {
     const inner = match[1];
     if (!ALLOWLIST.has(inner)) hits.push(`[attr] ${inner}`);
   }
 
   return hits;
 }
+
+describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)', () => {
+  it('flags a hardcoded English paragraph wrapped across several lines', () => {
+    // The dominant real-world shape a prettier-formatted long JSX text node
+    // takes — the guard must not require it to be on one line.
+    const fixture = `
+      <p>
+        This is a hardcoded English paragraph that a formatter has wrapped
+        across several lines instead of leaving it on one.
+      </p>
+    `;
+    const hits = findHardcodedHits(fixture);
+    expect(hits.some(h => h.includes('This is a hardcoded English paragraph'))).toBe(true);
+  });
+
+  it('still flags the single-line case (no regression)', () => {
+    const fixture = `<p>This is a hardcoded English sentence.</p>`;
+    const hits = findHardcodedHits(fixture);
+    expect(hits.some(h => h.includes('This is a hardcoded English sentence'))).toBe(true);
+  });
+});
 
 describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
   it('lists exactly the 55 files this guard covers', () => {

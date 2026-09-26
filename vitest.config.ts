@@ -48,8 +48,16 @@ export default defineConfig({
     // Run integration tests sequentially to avoid port conflicts
     pool: 'forks',
     maxWorkers: 1,
-    // Retry failing tests once (useful for flaky network tests)
-    retry: 1,
+    // No retry by default (#1248): a global `retry: 1` let a retry re-run
+    // ONLY the failures of an order-dependent unit test against an
+    // already-drained mock queue, going green while the attempt-1 failure
+    // was the real defect (5 bank-reconciliation tests, fixed 2026-09-02).
+    // That masking landed on the required "Unit Tests" CI job, which uses
+    // this root config with no override, so masking a state-pollution bug
+    // there merged silently. Genuinely network-flaky tiers (integration,
+    // e2e) re-enable retry with a per-invocation `--retry=1` in ci.yml
+    // instead of a blanket default here.
+    retry: 0,
   },
   resolve: {
     // Single source of truth — see vitest.shared.ts for why there is no

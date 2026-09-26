@@ -107,9 +107,23 @@ describe('defence-mutation gate triggers on everything it measures', () => {
     expect(runIdx, 'the retry-0 gate command moved — re-point this test').toBeGreaterThan(-1);
     const runCmd = mut.slice(runIdx, mut.indexOf('\n\n', runIdx));
 
+    // Tokenize and compare by exact token, not `runCmd.includes(dir)`
+    // substring containment (#1385): a future narrowing of ci.yml's command
+    // from `apps/web` to `apps/web/src/lib` still satisfies
+    // `'... apps/web/src/lib ...'.includes('apps/web')`, passing this test
+    // while re-orphaning exactly the colocated tests ci.yml's own comment
+    // records as having shipped outside the glob before. Strip the shell
+    // line-continuation backslash before tokenizing.
+    const runTokens = new Set(
+      runCmd
+        .split(/\s+/)
+        .map(t => t.replace(/\\$/, ''))
+        .filter(Boolean)
+    );
+
     for (const dir of ciScope) {
       expect(
-        runCmd.includes(dir),
+        runTokens.has(dir),
         `ci.yml runs unit tests over ${dir} but the retry-0 gate's command does not — masked flakes there go uncaught`
       ).toBe(true);
     }

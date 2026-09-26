@@ -168,10 +168,32 @@ jobs:
           # and changeable without touching this file. Reverting on the
           # assumption that it is missing would permanently stop the auto-fix
           # repairing a workflow the day the scope is granted.
-          WF_CHANGED="$(git status --porcelain -- '.github/workflows/**' | awk '{print $2}')"
+          # TRACKED modifications only (#1768): `git status --porcelain` codes
+          # a tracked change as ` M` and a brand-new file as `??` identically
+          # once piped through `awk '{print $2}'`, so this used to collect
+          # both. A NEW workflow file is never staged (see NEW_FILES below),
+          # so including it here made two false claims — "will attempt to
+          # push" it below, and later the fallback undo step further down
+          # (below the push attempt) failed immediately with "pathspec did
+          # not match any file(s) known to git" for a path that was never
+          # staged, aborting that step atomically under this step's `set -e`
+          # and losing the already-staged non-workflow fix with it (measured:
+          # PR #1720 lost every fix in the commit this way). Restrict to
+          # tracked codes so only paths that get staged below appear here.
+          # `grep` exits 1 when nothing matches, and this step's shell runs
+          # under GitHub Actions' default `set -e` — with no workflow changes
+          # at all (the common case), an unguarded `grep -v` here would abort
+          # the whole auto-fix before it staged anything. `|| true` only
+          # affects the grep's exit code, not $WF_CHANGED/$WF_NEW's content.
+          WF_CHANGED="$(git status --porcelain -- '.github/workflows/**' | { grep -v '^??' || true; } | awk '{print $2}')"
+          WF_NEW="$(git status --porcelain -- '.github/workflows/**' | { grep '^??' || true; } | awk '{print $2}')"
           if [ -n "$WF_CHANGED" ]; then
             echo "Auto-fix edited workflow file(s); will attempt to push them:"
             echo "$WF_CHANGED" | sed 's/^/  /'
+          fi
+          if [ -n "$WF_NEW" ]; then
+            echo "::warning::Auto-fix created new workflow file(s), which are never auto-staged/pushed (the same 'workflows' permission gap as an edit — see below):"
+            echo "$WF_NEW" | sed 's/^/::warning::  /'
           fi
 
           # `git add -u` + an explicit new-file list, never `git add -A`:
@@ -181,7 +203,14 @@ jobs:
           # genuinely new files are added by name, and listed in the log so
           # the commit's contents are reviewable from the job output.
           git add -u
-          NEW_FILES="$(git ls-files --others --exclude-standard -- apps packages tests docs scripts .zap)"
+          # Exclusion-based, not a hardcoded root list (#1758): the old
+          # pathspec named exactly six roots (apps packages tests docs
+          # scripts .zap), so a new file anywhere else — .github/ai-review/*.mjs,
+          # .husky/**, a new root-level config — was silently never staged
+          # and never mentioned. New workflow files are the one deliberate
+          # exclusion (WF_NEW above already warns about them); everything
+          # else the fix created gets staged, wherever it landed.
+          NEW_FILES="$(git ls-files --others --exclude-standard -- . ':!.github/workflows/**')"
           if [ -n "$NEW_FILES" ]; then
             echo "Auto-fix created new file(s):"
             echo "$NEW_FILES" | sed 's/^/  /'

@@ -61,7 +61,8 @@ export function buildBundleTestApp(): Express {
  * A cart session id that is unique per CALL, therefore unique per test
  * ATTEMPT.
  *
- * `vitest.config.ts` sets `retry: 1`, and a retry re-runs the test BODY
+ * The integration CI job runs with `--retry=1` (vitest.config.ts itself
+ * defaults to `retry: 0` since #1248), and a retry re-runs the test BODY
  * against the same database. A session id derived only from a per-file
  * suffix is therefore reused across attempts, so the retry starts against
  * the cart the failed attempt already populated: `addToCart` runs a second

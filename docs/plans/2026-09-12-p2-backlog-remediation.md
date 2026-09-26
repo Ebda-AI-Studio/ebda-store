@@ -23,6 +23,7 @@
 If (1) differs from the control by even one test, the PR does not open.
 
 - **Money path files** (the rule's scope): `apps/api/src/services/order.service.ts`, `routes/order.routes.ts`, `services/cart.service.ts`, `routes/cart.routes.ts`, `services/payment-providers/**`, `routes/payment.routes.ts`, `services/inventory.service.ts`, `lib/effective-inventory.ts`, `apps/web/src/app/checkout/**`, `apps/api/src/mcp/tools/{cart,order}.tools.ts`, `lib/inngest/functions/order-*.ts`.
+- **Integration tests must be RETRY-SAFE** (CLAUDE.md's RETRY-SAFE section): take cart sessions from `cartSessionId()` (`tests/helpers/bundle-fixtures.ts`), and give every other per-test fixture a per-CALL unique id, never one derived from a per-file suffix. Batch 3 is exactly a cart-focused integration-test batch, so this applies to it directly — a fixture keyed on a per-file id is reused across the integration job's `--retry=1` attempts and turns a real attempt-1 failure into a misleading attempt-2 artefact.
 - **Never widen a money-path query.** Narrowing filters (`deletedAt: null`, `storeId`) are safe and already proven. Widening one, or changing an amount/rounding/currency expression, requires its own PR with nothing else in it.
 - **Audit findings are claims, not facts.** Verify each against current code before fixing. Roughly 1 in 4 does not reproduce.
 - **Mutation-prove every fix**: break it, name the reddening test, restore byte-identical.
@@ -96,7 +97,8 @@ For each issue, open the `**Location:**` and check the claim reproduces. Record 
 container run -d --name fwb-p2-pg -p 55432:5432 \
   -e POSTGRES_PASSWORD=testpw -e POSTGRES_USER=test -e POSTGRES_DB=fwb_test \
   -e PGDATA=/var/lib/postgresql/data/pgdata docker.io/library/postgres:17
-export TEST_DATABASE_URL="postgresql://test:testpw@127.0.0.1:55432/fwb_test"
+export PG_TEST_PW=testpw
+export TEST_DATABASE_URL="postgresql://test:${PG_TEST_PW}@127.0.0.1:55432/fwb_test"
 export DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" JWT_SECRET=t
 npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
 ```

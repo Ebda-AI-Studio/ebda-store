@@ -102,3 +102,52 @@ describe('api-base safety claims are enforced, not just documented', () => {
     expect(m.API_BASE).toBe('http://localhost:4000/api/v1');
   });
 });
+
+describe('resolveRaw precedence (#1637)', () => {
+  // Same reasoning as the block above: dynamic import + resetModules, because
+  // the module resolves its base ONCE at load time from process.env.
+  const ENV = { ...process.env };
+  beforeEach(() => {
+    vi.resetModules();
+    delete process.env.TEST_API_URL;
+    delete process.env.TEST_API_BASE;
+    delete process.env.API_URL;
+    delete process.env.API_HOST;
+  });
+  afterEach(() => {
+    process.env = { ...ENV };
+    vi.resetModules();
+  });
+
+  it('defaults to localhost:4000 when nothing is set', async () => {
+    const m = await import('../helpers/api-base');
+    expect(m.API_ORIGIN).toBe('http://localhost:4000');
+    expect(m.API_BASE).toBe('http://localhost:4000/api/v1');
+  });
+
+  it('TEST_API_URL wins when both TEST_API_URL and TEST_API_BASE are set', async () => {
+    process.env.TEST_API_URL = 'http://localhost:5000';
+    process.env.TEST_API_BASE = 'http://localhost:6000';
+    const m = await import('../helpers/api-base');
+    expect(m.API_ORIGIN).toBe('http://localhost:5000');
+  });
+
+  it('TEST_API_BASE is honoured alone, as the older alias', async () => {
+    process.env.TEST_API_BASE = 'http://localhost:6000';
+    const m = await import('../helpers/api-base');
+    expect(m.API_ORIGIN).toBe('http://localhost:6000');
+  });
+
+  // The regression this file exists to prevent: the SERVER's own env vars
+  // (deployed values include `API_URL=https://api.force-ai.co`) must never be
+  // read as the suite's base, or a local `npm run test:integration` on a
+  // machine holding production values would POST /auth/register at prod.
+  it('never consults API_URL/API_HOST — a deployed value stays inert', async () => {
+    process.env.API_URL = 'https://api.force-ai.co';
+    process.env.API_HOST = 'localhost';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = await import('../helpers/api-base');
+    expect(m.API_ORIGIN).toBe('http://localhost:4000');
+    warn.mockRestore();
+  });
+});

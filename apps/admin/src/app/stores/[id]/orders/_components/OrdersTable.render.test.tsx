@@ -6,23 +6,16 @@
  * click/change event — see handoff.md "Unproven" note on the agent-key page).
  *
  * Proves the order-list status `<select>` offers exactly the transitions
- * `VALID_TRANSITIONS` declares for the row's current status, and offers NO
- * status control at all for a status with no forward transitions.
+ * `statusOptionsFor` (types.ts) computes for the row's current status and
+ * payment status, and offers NO status control at all when there are no
+ * forward transitions.
  *
- * SCOPE NOTE: the task spec asked this to prove `statusOptionsFor` gates
- * "Refunded" behind `paymentStatus === 'paid'` for a cancelled order. That
- * function lives on branch `fix/pre-clone-batch-a` (added there, confirmed
- * via `git show origin/fix/pre-clone-batch-a:.../types.ts`) and is NOT yet
- * on `origin/main` — this worktree branches off `origin/main`, where
- * `types.ts` only exports the plain `VALID_TRANSITIONS` map and
- * `OrdersTable` reads it directly with no payment-status gating at all.
- * Per the task's own fallback instruction, this file tests the CURRENT
- * `VALID_TRANSITIONS` behaviour instead: on main, `cancelled` is not even a
- * key in the map, so a cancelled order gets `transitions.length === 0` and
- * renders no dropdown — "never offers Refunded to a cancelled order" holds
- * today because it offers no status change at all. When batch-a's
- * `statusOptionsFor` lands on main, this test should be extended to cover
- * the paid/unpaid split it introduces.
+ * `statusOptionsFor` filters `refunded` out of `VALID_TRANSITIONS[status]`
+ * for an UNPAID order, but only for `status === 'pending' || status ===
+ * 'cancelled'` — every other status (including `confirmed`) passes
+ * `VALID_TRANSITIONS[status]` through unfiltered regardless of payment
+ * status. `pending` is exercised directly below, both paid and unpaid,
+ * because it previously had no coverage at all.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
@@ -56,7 +49,7 @@ vi.mock('next/link', () => ({
 }));
 
 import { OrdersTable } from './OrdersTable';
-import { VALID_TRANSITIONS, type Order } from './types';
+import type { Order } from './types';
 
 afterEach(() => {
   cleanup();
@@ -113,8 +106,42 @@ describe('OrdersTable status dropdown (renders the real DOM via jsdom)', () => {
 
     const optionValues = statusOptionValues();
 
-    expect(optionValues).toEqual(VALID_TRANSITIONS.confirmed);
+    // A hardcoded literal, not `VALID_TRANSITIONS.confirmed` (#1967): that
+    // comparison is the derived value against itself for `confirmed`, which
+    // `statusOptionsFor` never filters — it would stay green even if the
+    // transitions map silently dropped an entry.
+    expect(optionValues).toEqual(['processing', 'shipped', 'delivered', 'cancelled', 'refunded']);
     expect(optionValues).toContain('refunded');
+  });
+
+  it('offers every transition including refunded for a PAID pending order (#1967)', () => {
+    // Previously untested entirely: `statusOptionsFor` filters `refunded`
+    // for pending/cancelled ONLY when unpaid, so a paid pending order must
+    // keep it.
+    const order = baseOrder({ id: 'order-pending-paid', status: 'pending', paymentStatus: 'paid' });
+    renderTable([order]);
+
+    expect(statusOptionValues()).toEqual([
+      'confirmed',
+      'processing',
+      'shipped',
+      'delivered',
+      'cancelled',
+      'refunded',
+    ]);
+  });
+
+  it('hides refunded for an UNPAID pending order (#1967)', () => {
+    const order = baseOrder({
+      id: 'order-pending-unpaid',
+      status: 'pending',
+      paymentStatus: 'unpaid',
+    });
+    renderTable([order]);
+
+    const optionValues = statusOptionValues();
+    expect(optionValues).toEqual(['confirmed', 'processing', 'shipped', 'delivered', 'cancelled']);
+    expect(optionValues).not.toContain('refunded');
   });
 
   it('offers only Refunded for a PAID cancelled order, and no control for an unpaid one (PR #1897)', () => {

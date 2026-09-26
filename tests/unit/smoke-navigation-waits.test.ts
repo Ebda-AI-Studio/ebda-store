@@ -28,7 +28,7 @@ describe('production smoke navigation waits are explicit', () => {
     expect(files.length, 'no smoke specs found — has the path changed?').toBeGreaterThan(0);
   });
 
-  it.each(files)('%s: every goto and waitForURL names its waitUntil', file => {
+  it.each(files)('%s: every goto and waitForURL waits for domcontentloaded', file => {
     const src = readFileSync(new URL(file, SMOKE_DIR), 'utf8');
     const lines = src.split('\n');
 
@@ -37,19 +37,16 @@ describe('production smoke navigation waits are explicit', () => {
       // The call may span lines; take the next few so an options object on a
       // following line still counts.
       const call = lines.slice(i, i + 6).join(' ');
+      // A single positive value-check, not a presence check + a denylist of
+      // one literal (#1646): the old pair passed on `waitUntil: 'networkidle'`
+      // (present, not 'load') and on a double-quoted `waitUntil: "load"`
+      // (denylist was a single-quoted literal). Pin the one value this suite
+      // actually wants, in any quote style.
       expect(
         call,
-        `${file}:${i + 1} navigates without stating waitUntil — it will default to 'load' and wait for every asset`
-      ).toMatch(/waitUntil:/);
+        `${file}:${i + 1} does not wait for domcontentloaded — it will default to (or was set to) ` +
+          `'load'/'networkidle', waiting for assets instead of navigation`
+      ).toMatch(/waitUntil:\s*['"`]domcontentloaded['"`]/);
     });
-  });
-
-  it('none of them waits for full load', () => {
-    for (const file of files) {
-      const src = readFileSync(new URL(file, SMOKE_DIR), 'utf8');
-      expect(src, `${file} waits for 'load' — assets, not navigation`).not.toMatch(
-        /waitUntil:\s*'load'/
-      );
-    }
   });
 });

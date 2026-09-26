@@ -69,3 +69,38 @@ above covers the platform hosts regardless.
 Nightly ZAP runs continue (self-hosted, action v0.15.0 — the v0.12 artifact-API
 failure is fixed). Append material changes in warning counts to the evidence log
 in `security-overview.md`.
+
+## Follow-up 2026-09-25 (#1748)
+
+Audit-followup #1748 reported the predicted alert-fatigue scenario had "actually
+been happening for 13+ consecutive nights" (`gh run list --workflow=zap-baseline.yml`,
+14 runs since the 2026-09-12 `-I`-removal PR: mostly `failure`/`cancelled`).
+Investigated with `gh run view --log-failed` on two representative runs
+(36104847966, 35697774760) and a fresh `curl` against production:
+
+- **Not (only) alert fatigue.** Run 36104847966's own job only took 10m46s of
+  a 1h21m32s wall-clock run — most of the "failure" was QUEUE TIME on the
+  self-hosted runner, and its annotations show `You are running out of disk
+space. Free space left: 17 MB` plus `docker failed with exit code 2`. The
+  `cancelled` runs (35967069299 at 7h40m, 35829519117 at 1h4m) are the same
+  starved-runner symptom, not a scan result. **This is a separate defect —
+  self-hosted runner disk space — filed as its own follow-up; it is not fixed
+  by anything in `.zap/rules.tsv`.** A `concurrency` group was added to
+  `zap-baseline.yml` so a stale queued run no longer competes with a fresh one
+  for the same runner.
+
+- **Real WARN-NEW findings, checked against production 2026-09-25:**
+
+  | ZAP id | Warning                                                          | Status                                                                                                                                                                                                                          | Action                                                                         |
+  | ------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+  | 10011  | Cookie without Secure flag                                       | NOT reproducing — `curl -sI` on `/affiliate` and `/palora/*` shows `Secure` present on every `Set-Cookie` today                                                                                                                 | none; left unsuppressed so a real regression re-fires                          |
+  | 10035  | HSTS header not set                                              | NOT reproducing — `curl -sI https://store.force-ai.co` shows `strict-transport-security` present                                                                                                                                | none; left unsuppressed                                                        |
+  | 10098  | Cross-Domain Misconfiguration (`Access-Control-Allow-Origin: *`) | NOT reproducing — no ACAO header on the root or a static chunk today, checked with a cross-origin `Origin` header                                                                                                               | none; left unsuppressed                                                        |
+  | 10044  | Big Redirect (potential info leak)                               | REPRODUCING — the apex 307 body is the public 404 page's markup, ~22KB, no PII/session data                                                                                                                                     | accepted, `.zap/rules.tsv`                                                     |
+  | 10063  | Permissions-Policy not set (static JS/CSS chunks)                | REPRODUCING — this is the SAME gap this doc already accepted above ("Permissions-Policy is meaningless on static assets — not added"); it was never encoded as a suppression, so it re-failed every night once `-I` was dropped | accepted, `.zap/rules.tsv` (closes the gap between this doc and the mechanism) |
+  | 10109  | Modern Web Application                                           | informational; ZAP's own alert text says no action required                                                                                                                                                                     | accepted, `.zap/rules.tsv`                                                     |
+
+  10011/10035/10098 not reproducing on a single later check is evidence, not
+  proof of a fluke — needs owner: is a follow-up dispatch run (fresh WARN-NEW
+  ids) worth scheduling to confirm they stay gone, given the scan environment
+  (self-hosted, disk-constrained) may itself be an unreliable witness?

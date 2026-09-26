@@ -97,11 +97,38 @@ function codesMappedInCheckout(): Set<string> {
     'utf-8'
   );
   const callsBundleHandler = /checkoutBundleErrorCopy\(/.test(src);
-  const bundleCodes = callsBundleHandler
-    ? [...bundleSrc.matchAll(/code === '([A-Z_]+)'/g)].map(m => m[1])
-    : [];
+  const bundleCodes = callsBundleHandler ? unconditionallyAnsweredBundleCodes(bundleSrc) : [];
 
   return new Set([...cases, ...viaConstant, ...bundleCodes]);
+}
+
+/**
+ * Bundle-handler codes whose `if (code === '...') { ... }` branch ALWAYS
+ * returns copy — never `null` (#1827).
+ *
+ * A blind `code === 'X'` regex over checkout-bundle-errors.ts double-counted
+ * `INSUFFICIENT_INVENTORY`: that branch returns `null` when the failure
+ * message doesn't name a bundle component (a PLAIN PRODUCT stock failure),
+ * so the code is answered only if the checkout's OWN switch also has a case
+ * for it — crediting the bundle handler alone hides the exact regression
+ * this gate exists to catch: delete CheckoutClient's `case
+ * 'INSUFFICIENT_INVENTORY'` and this test would still pass while shoppers
+ * hitting a plain out-of-stock item got the generic "Something went wrong".
+ */
+function unconditionallyAnsweredBundleCodes(bundleSrc: string): string[] {
+  const codes: string[] = [];
+  for (const m of bundleSrc.matchAll(/if \(code === '([A-Z_]+)'\) \{/g)) {
+    const blockStart = m.index! + m[0].length;
+    let depth = 1;
+    let i = blockStart;
+    for (; i < bundleSrc.length && depth > 0; i++) {
+      if (bundleSrc[i] === '{') depth++;
+      else if (bundleSrc[i] === '}') depth--;
+    }
+    const block = bundleSrc.slice(blockStart, i - 1);
+    if (!/return null;/.test(block)) codes.push(m[1]);
+  }
+  return codes;
 }
 
 /**

@@ -121,6 +121,49 @@ function readWebSource(relPath: string): string {
   return readFileSync(path.join(REPO_ROOT, 'apps/web/src', relPath), 'utf-8');
 }
 
+// ─── The production mount graph itself (#1995) ──────────────────────────────
+//
+// buildApp() above hand-wires '/stores' -> adminRouter and '/public' ->
+// publicLoyaltyRoutes directly against the real loyalty.routes.ts module — it
+// never imports or reads apps/api/src/routes/index.ts, the file that
+// actually mounts the production router graph. A regression THERE (re-adding
+// `router.use('/public', loyaltyRoutes)` — the whole admin router — or
+// dropping the '/public' mount entirely) would reach production 404ing or
+// re-exposing the admin surface, and this suite would not see it: it tests
+// its own idealized mount, not the one Express actually serves.
+//
+// Read the real file instead of importing it — index.ts wires in Redis,
+// Sentry and dozens of other route modules that have no place in a route
+// unit test.
+function readIndexRoutes(): string {
+  return readFileSync(path.join(REPO_ROOT, 'apps/api/src/routes/index.ts'), 'utf-8');
+}
+
+describe('the real router graph mounts loyalty the same way this suite tests it (#1995)', () => {
+  it("mounts the admin router ('loyaltyRoutes') at '/stores'", () => {
+    const src = readIndexRoutes();
+    expect(src).toMatch(/router\.use\(\s*'\/stores'[^)]*\bloyaltyRoutes\b\s*\)/);
+  });
+
+  it("mounts the customer router ('publicLoyaltyRoutes') at '/public'", () => {
+    const src = readIndexRoutes();
+    expect(src).toMatch(/router\.use\(\s*'\/public'[^)]*\bpublicLoyaltyRoutes\b\s*\)/);
+  });
+
+  it("never mounts the admin router ('loyaltyRoutes') at '/public'", () => {
+    // The regression this whole test file exists to prevent: mounting the
+    // WHOLE loyalty router (not just the customer-only export) at '/public'
+    // republishes admin endpoints where csrfProtection and
+    // restrictPlatformOnlyOrigins both stop applying (see the header
+    // comment on the describe block below).
+    const src = readIndexRoutes();
+    const publicMounts = [...src.matchAll(/router\.use\(\s*'\/public'([^;]*)\)/g)].map(m => m[1]);
+    for (const args of publicMounts) {
+      expect(args).not.toMatch(/\bloyaltyRoutes\b/);
+    }
+  });
+});
+
 const STORE_ID = '11111111-1111-1111-1111-111111111111';
 
 interface ClientCall {

@@ -313,7 +313,11 @@ jobs:
         #
         # Adding a colocated test outside these paths = a test that does not run.
         # Prefer tests/unit; if you must colocate, add the directory here.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2
+        #
+        # --retry=0 (#1248): explicit, not just inherited from vitest.config.ts's
+        # default, so a future config change can't silently re-mask
+        # order-dependent state pollution on this required merge gate.
+        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
@@ -554,7 +558,10 @@ jobs:
         # Introduced in #501 without this exclusion, which is why this job was
         # red on main from 2026-07-02 onward despite RLS force_app coverage
         # passing in its own job the whole time.
-        run: npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-force-app.test.ts --reporter=verbose
+        # --retry=1 (#1248): this tier makes real network/DB calls against the
+        # service containers above, unlike the unit tier which is retry:0 by
+        # default (vitest.config.ts) to stop retry masking state pollution.
+        run: npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-force-app.test.ts --reporter=verbose --retry=1
         env:
           # Integration tests run against the ephemeral postgres SERVICE CONTAINER
           # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
@@ -829,7 +836,10 @@ jobs:
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
 
       - name: Run E2E tests
-        run: npm run test:e2e
+        # --retry=1 (#1248): same reasoning as the integration job — this
+        # tier hits a real HTTP server + Postgres + Redis, unlike the
+        # retry:0-by-default unit tier.
+        run: npm run test:e2e -- --retry=1
         env:
           DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
