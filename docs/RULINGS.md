@@ -1431,6 +1431,51 @@ change neither widens nor narrows.
 
 ---
 
+## 2026-09-26 — Answer-engine Gemini grounding (issue #929)
+
+Context: audit-followup P2 `apps/api/src/services/answer-engine/gemini.provider.ts:47` — the
+adapter's only grounding tool shape (`googleSearchRetrieval`, from `@google/generative-ai@0.24.1`)
+was live-measured against the production key and found to be REJECTED (HTTP 400) by every 2.x
+model, so the "ChatGPT/Gemini cites your store" signal had never fired. Branch
+`fix/answer-engine-free-grounding`.
+
+**Ruling GEM-1 — call the Gemini REST endpoint with plain `fetch`, not the `@google/genai` SDK.**
+Both fix the tool-shape bug (the maintained SDK exposes `googleSearch: {}`; the REST API takes
+`google_search`). A new SDK dependency means a lockfile regen and a fresh dependency-discipline
+pass (registry/license/audit/leaf-override) for a single call site, when the sibling
+`perplexity.provider.ts` / `openai.provider.ts` adapters in the same directory already call their
+providers' REST APIs directly with `fetch` — no SDK — for exactly this reason ("per the task
+constraint", their own file headers). Matching that pattern is the smaller, safer, more consistent
+change: zero new dependencies, zero lockfile/audit surface, one fewer SDK version to track for
+drift. Cost if wrong: a future Gemini REST response-shape change breaks this adapter without an SDK
+maintainer's typed layer to catch it at compile time — mitigated by the defensive, untrusted-input
+parsing already required of every other provider adapter in this file (`detectCitation` in
+`provider.ts` is explicit about this contract).
+
+**Ruling GEM-2 — default model is `gemini-2.5-flash-lite` (free), not a `-latest` alias.** Live
+probes against the production key (2026-09-26): `gemini-2.5-flash-lite` + `google_search` → HTTP
+200, `groundingChunks` populated, free. `gemini-flash-lite-latest` / `gemini-flash-latest` /
+`gemini-3.5-flash-lite` + the same tool → HTTP 429 ("exceeded your current quota") — grounding is
+paid-only on those aliases. `gemini-2.5-flash` → HTTP 404 (retired for new users). Per owner
+decision (Ahmad, free option), the default points at the verified-free model; a merchant/operator
+who wants a paid, higher-quality model can still override via `ANSWER_ENGINE_GEMINI_MODEL`. Cost if
+wrong: if `gemini-2.5-flash-lite` is later retired or rationed the same way, every scan silently
+falls back to ungrounded (by design — see GEM-3) until an operator notices the dashboard's new
+"grounding unavailable" caveat and re-probes for a new free model.
+
+**Ruling GEM-3 — a persisted `groundingUnavailableReason` column, not a log-only signal.** The
+brief's fallback contract ("record the answer as not-grounded with a reason so the dashboard shows
+'search grounding unavailable'") needs a signal the merchant-facing dashboard can read, and
+`AnswerEngineCheck` had no column carrying the in-memory `EngineAnswer.grounded` flag at all (see
+the pre-existing `GROUNDED-CAVEAT PROXY` note in `dashboard.service.ts` — the existing
+`groundedCaveat` is already a proxy off `citedUrls` emptiness because of this gap). Reusing that
+proxy for the new "grounding could not run" case would conflate it with "grounding ran fine, cited
+nothing" — a merchant told "no live citations found" when the real cause is a rationed model reads
+as their store's real citation performance. Added one nullable, additive `TEXT` column
+(`grounding_unavailable_reason`) instead — no RLS policy change needed, the tenant policy on
+`answer_engine_checks` is table-level. Cost if wrong: a schema change for what could have been a
+log-line; the residual is a single small migration against an append-only table, reversible by
+dropping the column.
 Context: branch `fix/p2-r3-residuals` — four items previously parked as needs-owner or accepted
 residuals, decided by the owner rule "fix everything" (Ahmad, 2026-09-25): #1955, #1608, #1766,
 #1954.

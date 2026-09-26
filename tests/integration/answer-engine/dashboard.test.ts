@@ -291,4 +291,38 @@ describe('GET /stores/:storeId/answer-engine/summary', () => {
     expect(body.error?.code ?? body.code).toBe('FEATURE_DISABLED');
     expect(body.data).toBeUndefined();
   });
+
+  // Issue #929: a Gemini row that recorded a `groundingUnavailableReason`
+  // (the provider's grounded call was rejected/rationed and it fell back to
+  // an ungrounded call — see `gemini.provider.ts`) must surface as
+  // `groundingUnavailable: true`, distinct from the pre-existing
+  // `groundedCaveat` ("grounded fine, cited nothing"). Own store, isolated
+  // from the fixtures above, so it can't perturb their totalChecks/citedCount
+  // assertions.
+  it('an engine whose latest check recorded a groundingUnavailableReason reports groundingUnavailable: true', async () => {
+    const groundingStore = await createStoreAdminWithStore('grounding-unavailable');
+
+    await prisma.answerEngineCheck.create({
+      data: {
+        storeId: groundingStore.storeId,
+        engine: 'gemini',
+        promptText: 'best gadgets in Kuwait',
+        locale: 'en',
+        cited: false,
+        citedUrls: [],
+        competitorUrls: [],
+        groundingUnavailableReason: 'http_429',
+        runAt: new Date(),
+      },
+    });
+
+    const res = await fetch(`${API_URL}/stores/${groundingStore.storeId}/answer-engine/summary`, {
+      headers: authHeaders(groundingStore.token),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const byEngine = Object.fromEntries(body.data.engines.map((e: any) => [e.engine, e]));
+    expect(byEngine.gemini).toMatchObject({ groundedCaveat: true, groundingUnavailable: true });
+  });
 });

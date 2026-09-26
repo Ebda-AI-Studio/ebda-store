@@ -27,6 +27,19 @@
  * minor finding this dashboard closes). Treating "every latest-per-prompt
  * check for this engine has an empty citedUrls array" as the caveat
  * condition directly implements that finding without a schema change.
+ *
+ * GROUNDING-UNAVAILABLE (issue #929): a SEPARATE, real signal from the
+ * caveat proxy above. `groundingUnavailableReason` IS persisted (added by
+ * the same fix) and is set only when `gemini.provider.ts` attempted a
+ * grounded call and the model/key combination could not perform it (a
+ * retired alias, a rejected tool shape, or exhausted quota — HTTP
+ * 400/404/429) and fell back to an ungrounded call. That is categorically
+ * different from "grounding worked but cited nothing" (the caveat proxy's
+ * case) — a merchant should be told the signal is temporarily unavailable,
+ * not that their store simply wasn't cited. `groundingUnavailable` is true
+ * when ANY of an engine's latest-per-prompt checks carries a reason; it
+ * takes priority over the generic `groundedCaveat` in the UI (see
+ * `EngineSummaryCards.tsx`).
  */
 import { prisma, Prisma } from '@force/database';
 import { getCachedAnalytics } from '../analytics.service';
@@ -47,6 +60,11 @@ export interface AnswerEngineSummaryEngine {
    * citations for any prompt — see file header. Dashboard should surface
    * this as "based on model knowledge / unverified". */
   groundedCaveat: boolean;
+  /** True when the most recent run recorded a `groundingUnavailableReason`
+   * for this engine — grounding was attempted and could not run (retired
+   * model, rejected tool, quota), not merely "cited nothing". Takes
+   * priority over `groundedCaveat` in the UI — see file header. */
+  groundingUnavailable: boolean;
 }
 
 export interface AnswerEngineTrendPoint {
@@ -83,6 +101,7 @@ type CheckRow = {
   snippet: string | null;
   citedUrls: Prisma.JsonValue;
   competitorUrls: Prisma.JsonValue;
+  groundingUnavailableReason: string | null;
   runAt: Date;
 };
 
@@ -141,6 +160,7 @@ export function aggregateAnswerEngineChecks(checks: CheckRow[]): AnswerEngineSum
       const groundedCaveat =
         latestForEngine.length > 0 &&
         latestForEngine.every(c => asStringArray(c.citedUrls).length === 0);
+      const groundingUnavailable = latestForEngine.some(c => c.groundingUnavailableReason != null);
 
       return {
         engine,
@@ -148,6 +168,7 @@ export function aggregateAnswerEngineChecks(checks: CheckRow[]): AnswerEngineSum
         citedCount: totals.cited,
         citedRate: totals.total > 0 ? totals.cited / totals.total : 0,
         groundedCaveat,
+        groundingUnavailable,
       };
     }
   );
@@ -203,6 +224,7 @@ async function computeAnswerEngineSummary(storeId: string): Promise<AnswerEngine
       snippet: true,
       citedUrls: true,
       competitorUrls: true,
+      groundingUnavailableReason: true,
       runAt: true,
     },
   });

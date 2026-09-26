@@ -161,6 +161,7 @@ export async function runCitationScan(
             snippet: citation.snippet,
             citedUrls: answer.citedUrls ?? [],
             competitorUrls: citation.competitorUrls,
+            groundingUnavailableReason: answer.groundingUnavailableReason ?? null,
           },
         });
         checks += 1;

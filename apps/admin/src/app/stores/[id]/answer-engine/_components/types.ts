@@ -7,6 +7,10 @@ export interface AnswerEngineSummaryEngine {
   citedCount: number;
   citedRate: number;
   groundedCaveat: boolean;
+  /** True when the latest run could not perform grounded web search at all
+   * (retired model, rejected tool, quota) — distinct from `groundedCaveat`
+   * ("grounded, but cited nothing"). Takes priority in the UI. */
+  groundingUnavailable: boolean;
 }
 
 export interface AnswerEngineTrendPoint {

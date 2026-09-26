@@ -26,6 +26,17 @@ export type EngineAnswer = {
    * ungrounded model knowledge — the dashboard should caveat the signal.
    */
   grounded?: boolean;
+  /**
+   * Set (by `gemini.provider.ts` only, so far) when a grounded call was
+   * attempted but the model/key combination couldn't perform it right now
+   * (a retired alias, a rejected tool shape, or a quota limit — HTTP
+   * 400/404/429) and the provider fell back to an ungrounded call rather
+   * than failing the scan. A short machine-readable tag, e.g. `'http_429'`
+   * — distinct from a plain `grounded: false`, which also covers "grounding
+   * ran fine but found nothing to cite". Persisted so the dashboard can
+   * show "search grounding unavailable" instead of the generic caveat.
+   */
+  groundingUnavailableReason?: string;
   raw?: unknown;
 };
 

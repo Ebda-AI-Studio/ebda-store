@@ -6830,6 +6830,7 @@
       "noData": "No citation checks yet — the weekly scan will populate this once it runs.",
       "citedRate": "{rate} cited rate",
       "groundedCaveat": "Based on model knowledge — no live citations found in the latest run. Treat this signal as unverified.",
+      "groundingUnavailable": "Search grounding is temporarily unavailable for this engine — showing model knowledge only. This is not a reflection of your store's citation performance.",
       "trendTitle": "Cited rate — recent runs",
       "promptsTitle": "Prompts checked (latest run)",
       "citedInstead": "Cited instead:",

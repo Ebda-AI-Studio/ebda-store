@@ -4168,17 +4168,24 @@ model WarehouseStock {
 // the platform default key and needs no row here. Not tenant data — no RLS.
 
 model AnswerEngineCheck {
-  id             String   @id @default(uuid())
-  storeId        String   @map("store_id")
-  engine         String // 'gemini' | 'perplexity' | 'openai'
-  promptText     String   @map("prompt_text")
-  locale         String   @default("en")
-  cited          Boolean  @default(false)
-  rank           Int?
-  snippet        String?
-  citedUrls      Json     @default("[]") @map("cited_urls")
-  competitorUrls Json     @default("[]") @map("competitor_urls")
-  runAt          DateTime @default(now()) @map("run_at")
+  id                         String   @id @default(uuid())
+  storeId                    String   @map("store_id")
+  engine                     String // 'gemini' | 'perplexity' | 'openai'
+  promptText                 String   @map("prompt_text")
+  locale                     String   @default("en")
+  cited                      Boolean  @default(false)
+  rank                       Int?
+  snippet                    String?
+  citedUrls                  Json     @default("[]") @map("cited_urls")
+  competitorUrls             Json     @default("[]") @map("competitor_urls")
+  // Set only when a provider attempted grounded web search and it was
+  // unavailable (retired model alias, rejected tool shape, quota) so it
+  // fell back to an ungrounded call — a short tag like `http_429`, distinct
+  // from a plain grounded=false (which also covers "grounded, cited
+  // nothing"). Null for every other row, including all pre-existing ones.
+  // See `gemini.provider.ts` / issue #929.
+  groundingUnavailableReason String?  @map("grounding_unavailable_reason")
+  runAt                      DateTime @default(now()) @map("run_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

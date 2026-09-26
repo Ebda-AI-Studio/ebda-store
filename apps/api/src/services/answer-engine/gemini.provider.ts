@@ -3,106 +3,204 @@
  * "answer engine insights" feature. Asks Gemini a representative shopper
  * prompt and reports which URLs it cited (if grounded web search worked).
  *
- * GROUNDING FEASIBILITY (verified 2026-07-22, Task 3):
- * The installed SDK is `@google/generative-ai@0.24.1`. Its `Tool` union
- * (`dist/types/requests.d.ts`) is
- * `FunctionDeclarationsTool | CodeExecutionTool | GoogleSearchRetrievalTool`
- * — there is NO `googleSearch: {}` shape in this SDK version. The only
- * grounding tool it types is the legacy
- * `{ googleSearchRetrieval: { dynamicRetrievalConfig? } }`
- * (`dist/types/search-grounding.d.ts`), and the response DOES carry
- * `candidates[].groundingMetadata.groundingChunks[].web.uri`
- * (`dist/types/responses.d.ts`). That is outcome (b) from the task brief:
- * the tool shape compiles and the response type supports parsing citations,
- * but `googleSearchRetrieval` is the OLDER Gemini 1.x-era grounding tool —
- * newer 2.x-family models (which `gemini-flash-lite-latest` aliases to) use
- * a different `google_search` tool that this SDK version does not expose.
- * Sending `googleSearchRetrieval` to a model that doesn't support it is not
- * a compile-time error; whether it actually grounds is a live-API question
- * this task's mocked tests cannot settle.
+ * GROUNDING, LIVE-VERIFIED (2026-09-26, issue #929 — was P2 "unverified"):
+ * `@google/generative-ai@0.24.1`'s only grounding tool shape is the legacy
+ * `{ googleSearchRetrieval: {} }` (Gemini 1.x-era grounding). Measured live
+ * against the production key, every 2.x-family model now REJECTS that shape
+ * with HTTP 400 ("google_search_retrieval is not supported. Please use
+ * google_search tool instead.") — so the grounded signal had never actually
+ * fired; every check silently degraded to `grounded: false`.
  *
- * Because of that, this adapter:
- *   - Passes `tools: [{ googleSearchRetrieval: {} }]` as the SDK's most
- *     current available shape (parseable, forward-compatible).
- *   - Reads the model from `ANSWER_ENGINE_GEMINI_MODEL`, defaulting to the
- *     platform's `gemini-flash-lite-latest` — but flash-lite is NOT
- *     verified to support grounding. An operator who needs real grounded
- *     citations should override this env var to a grounding-capable model
- *     once one is confirmed live against this SDK/account.
- *   - Sets `grounded: true` only when the response actually carries
- *     `groundingMetadata` for the first candidate, so a model/tool
- *     combination that silently ignores the tool degrades to
- *     `grounded: false` (never claims a stronger signal than what came
- *     back) rather than throwing or lying about groundedness.
+ * `{ google_search: {} }` (the current tool name) returned HTTP 200 with
+ * `candidates[0].groundingMetadata.groundingChunks[].web.uri` populated (4
+ * web chunks) on `gemini-2.5-flash-lite` — and it's FREE on the current key.
+ * The SAME tool on `gemini-flash-lite-latest` / `gemini-flash-latest` /
+ * `gemini-3.5-flash-lite` returned HTTP 429 ("exceeded your current quota")
+ * — grounding is paid-only on those aliases — and `gemini-2.5-flash`
+ * returned 404 (retired for new users). Per owner decision (free option),
+ * this adapter defaults to the verified-free model rather than a paid one.
+ *
+ * SDK CHOICE — plain `fetch`, not a new SDK dependency: `@google/genai` (the
+ * maintained SDK that exposes `googleSearch: {}`) would fix this too, but
+ * pulling in a whole new SDK for one provider's one tool shape means a
+ * lockfile regen + dependency-discipline pass (registry/license/audit) for
+ * a call this codebase already makes without an SDK elsewhere — the sibling
+ * `perplexity.provider.ts` / `openai.provider.ts` adapters in this same
+ * directory both call their provider's REST API directly with `fetch`, no
+ * SDK, specifically "per the task constraint" (see their headers). Calling
+ * Gemini's `v1beta/models/{model}:generateContent` REST endpoint the same
+ * way is the smaller, safer, more consistent change: zero new dependencies,
+ * zero lockfile/audit surface, one less SDK version to track for drift.
+ *
+ * FALLBACK CONTRACT: a versioned/aliased model can be retired or rationed
+ * without notice (see the 429/404 cases above) — this must never take down
+ * the whole citation scan or silently misreport groundedness. If the
+ * grounded call returns HTTP 400/404/429, this adapter retries ONCE with NO
+ * tools (an ordinary ungrounded call on the same model) instead of failing
+ * the scan or pretending it grounded. The result is `grounded: false` +
+ * `groundingUnavailableReason: 'http_<status>'` — a distinct, persisted
+ * signal from a plain `grounded: false` (which also covers "grounding ran
+ * fine but cited nothing"), so the dashboard can show "search grounding
+ * unavailable" instead of the generic "no live citations" caveat. A warning
+ * is logged at most ONCE PER PROCESS for this condition — a single citation
+ * scan queries every enabled prompt (~8) against Gemini, and a retired
+ * model/tripped quota fails identically on every one of them, so per-query
+ * logging would spam 8 near-duplicate warnings for one root cause.
+ *
+ * Any OTHER non-2xx response (5xx, auth failure, malformed request, etc.)
+ * is a real error and throws — `citation-scan.service.ts`'s per-engine
+ * fail-soft catch already treats a throw as `provider_error` and skips only
+ * this engine's remaining prompts for this store, same as before.
  */
-import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import { assertAiQuota } from '../../lib/ai-quota';
 import { recordUsage } from '../ai.service';
+import logger from '../../lib/logger';
 import type { AnswerEngineProvider, EngineAnswer } from './provider';
 
-const MODEL = process.env.ANSWER_ENGINE_GEMINI_MODEL || 'gemini-flash-lite-latest';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-/** The minimal shape this adapter needs from a Gemini model — narrow enough
- * that tests can inject a plain mock object instead of the real SDK client. */
-export type GeminiQueryModel = Pick<GenerativeModel, 'generateContent'>;
+// Free, live-verified grounding model (2026-09-26) — see file header. The
+// `-latest` aliases ration grounding behind a paid quota and `gemini-2.5-flash`
+// is retired for new users on the current key; override via
+// ANSWER_ENGINE_GEMINI_MODEL if this model is ever retired in turn.
+const MODEL = process.env.ANSWER_ENGINE_GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
-let cachedClient: GoogleGenerativeAI | null = null;
-function getClient(): GoogleGenerativeAI {
-  if (!config.googleAiKey) {
-    throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI features are not configured on this server.');
-  }
-  if (!cachedClient) cachedClient = new GoogleGenerativeAI(config.googleAiKey);
-  return cachedClient;
+// HTTP statuses that mean "this model/key combination can't ground right
+// now" (retired alias, rejected tool shape, or exhausted quota) rather than
+// a hard outage — see file header. Only ever checked on the GROUNDED call;
+// the ungrounded fallback call re-using the same status would otherwise
+// loop forever trying to "fall back" from an already-ungrounded call.
+const GROUNDING_UNAVAILABLE_STATUSES = new Set([400, 404, 429]);
+
+// Module-level flag: see the FALLBACK CONTRACT note above for why this is
+// throttled to once per process rather than once per query. Exported so
+// tests (and, if ever needed, an explicit per-scan boundary) can reset it.
+let hasWarnedGroundingUnavailable = false;
+export function resetGeminiGroundingWarnOnce(): void {
+  hasWarnedGroundingUnavailable = false;
 }
 
-function getDefaultModel(): GeminiQueryModel {
-  return getClient().getGenerativeModel({
-    model: MODEL,
-    tools: [{ googleSearchRetrieval: {} }],
-  });
+type GeminiRestCandidate = {
+  content?: { parts?: Array<{ text?: string }> };
+  groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string } }> };
+};
+
+type GeminiRestResponse = {
+  candidates?: GeminiRestCandidate[];
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+  error?: { message?: string };
+};
+
+type GeminiCallResult =
+  | { ok: true; body: GeminiRestResponse }
+  | { ok: false; status: number; errorMessage?: string };
+
+/** Untrusted third-party response — every accessor is defensive by design,
+ * same spirit as `detectCitation` in `provider.ts`. */
+function extractText(response: GeminiRestResponse): string {
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  return parts.map(p => (typeof p?.text === 'string' ? p.text : '')).join('');
+}
+
+function extractCitedUrls(response: GeminiRestResponse): string[] {
+  const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+  return chunks
+    .map(chunk => chunk?.web?.uri)
+    .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0);
 }
 
 export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
   readonly engine = 'gemini';
-  private readonly model: GeminiQueryModel;
-
-  /**
-   * `model` is injectable (constructor arg) so tests can pass a mock and
-   * never touch the real Gemini API / require `GOOGLE_GENERATIVE_AI_KEY`.
-   * Omit it in production to lazily build the real client on first use.
-   */
-  constructor(model?: GeminiQueryModel) {
-    this.model = model ?? getDefaultModel();
-  }
 
   async query(storeId: string, prompt: string): Promise<EngineAnswer> {
     await assertAiQuota({ storeId });
 
-    const result = await this.model.generateContent(prompt);
-    const response = result.response;
-
-    let text = '';
-    try {
-      text = response.text();
-    } catch {
-      // Blocked prompt/candidate (safety filters etc.) — degrade to an
-      // empty, ungrounded answer rather than throwing through to the caller.
-      text = '';
+    if (!config.googleAiKey) {
+      throw new AppError(
+        503,
+        'AI_NOT_CONFIGURED',
+        'AI features are not configured on this server.'
+      );
     }
 
-    const candidate = response.candidates?.[0];
-    const groundingChunks = candidate?.groundingMetadata?.groundingChunks ?? [];
-    const citedUrls = groundingChunks
-      .map(chunk => chunk?.web?.uri)
-      .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0);
-    const grounded = candidate?.groundingMetadata !== undefined;
+    let response: GeminiRestResponse;
+    let grounded: boolean;
+    let groundingUnavailableReason: string | undefined;
+
+    const groundedCall = await this.callGemini(prompt, [{ google_search: {} }]);
+
+    if (groundedCall.ok) {
+      response = groundedCall.body;
+      grounded = response.candidates?.[0]?.groundingMetadata !== undefined;
+    } else if (GROUNDING_UNAVAILABLE_STATUSES.has(groundedCall.status)) {
+      if (!hasWarnedGroundingUnavailable) {
+        hasWarnedGroundingUnavailable = true;
+        logger.warn(
+          { status: groundedCall.status, model: MODEL, message: groundedCall.errorMessage },
+          'answer-engine gemini: search grounding unavailable on this model/key (retired ' +
+            'alias, rejected tool shape, or quota) — falling back to an ungrounded call for ' +
+            'the rest of this scan'
+        );
+      }
+      groundingUnavailableReason = `http_${groundedCall.status}`;
+
+      const fallback = await this.callGemini(prompt, []);
+      if (!fallback.ok) {
+        throw new AppError(
+          502,
+          'GEMINI_API_ERROR',
+          fallback.errorMessage ?? `Gemini API returned HTTP ${fallback.status}`
+        );
+      }
+      response = fallback.body;
+      grounded = false;
+    } else {
+      throw new AppError(
+        502,
+        'GEMINI_API_ERROR',
+        groundedCall.errorMessage ?? `Gemini API returned HTTP ${groundedCall.status}`
+      );
+    }
+
+    const text = extractText(response);
+    const citedUrls = grounded ? extractCitedUrls(response) : [];
 
     const promptTokens = response.usageMetadata?.promptTokenCount ?? 0;
     const candidateTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
     await recordUsage(storeId, 'answer_engine_gemini', promptTokens, candidateTokens, false);
 
-    return { text, citedUrls, grounded, raw: result };
+    return {
+      text,
+      citedUrls,
+      grounded,
+      ...(groundingUnavailableReason ? { groundingUnavailableReason } : {}),
+      raw: response,
+    };
+  }
+
+  private async callGemini(
+    prompt: string,
+    tools: Record<string, unknown>[]
+  ): Promise<GeminiCallResult> {
+    const res = await fetch(`${GEMINI_API_BASE}/${MODEL}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': config.googleAiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        ...(tools.length ? { tools } : {}),
+      }),
+    });
+
+    const json = (await res.json().catch(() => ({}))) as GeminiRestResponse;
+
+    if (!res.ok) {
+      return { ok: false, status: res.status, errorMessage: json?.error?.message };
+    }
+    return { ok: true, body: json };
   }
 }

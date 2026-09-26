@@ -20,13 +20,22 @@ function EngineCard({ engine }: { engine: AnswerEngineSummaryEngine }) {
       <p className="mt-1 text-xs text-muted-foreground">
         {t('citedRate', { rate: formatPercent(engine.citedRate) })}
       </p>
-      {engine.groundedCaveat && (
+      {engine.groundingUnavailable ? (
         <p
           className="mt-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 px-2.5 py-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-400"
           dir="auto"
         >
-          {t('groundedCaveat')}
+          {t('groundingUnavailable')}
         </p>
+      ) : (
+        engine.groundedCaveat && (
+          <p
+            className="mt-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 px-2.5 py-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-400"
+            dir="auto"
+          >
+            {t('groundedCaveat')}
+          </p>
+        )
       )}
     </div>
   );
