@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { resolveProductCardDefaults } from '../../templates/shared/product-card-defaults';
+import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Image from 'next/image';
 import type { Product } from '@/lib/api';
@@ -59,23 +59,23 @@ export function ProductListItem({
   // Task 3 B3/B4: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
   const {
-    ctaShape: resolvedCtaShape,
-    ctaSize: resolvedCtaSize,
-    ctaColor: resolvedCtaColor,
-    ctaTextColor: resolvedCtaTextColor,
-    ctaLabelTextEn: resolvedCtaLabelTextEn,
-    ctaLabelTextAr: resolvedCtaLabelTextAr,
-    oosDimColor: resolvedOosDimColor,
-    oosLabel: resolvedOosLabel,
-    oosLabelTextEn: resolvedOosLabelTextEn,
-    oosLabelTextAr: resolvedOosLabelTextAr,
-    oosLabelShape: resolvedOosLabelShape,
-    oosLabelPlacement: resolvedOosLabelPlacement,
-    oosLabelColor: resolvedOosLabelColor,
-    oosLabelTextColor: resolvedOosLabelTextColor,
+    resolvedCtaShape,
+    resolvedCtaSize,
+    resolvedCtaColor,
+    resolvedCtaTextColor,
+    resolvedCtaLabelTextEn,
+    resolvedCtaLabelTextAr,
+    resolvedOosDimColor,
+    resolvedOosLabel,
+    resolvedOosLabelTextEn,
+    resolvedOosLabelTextAr,
+    resolvedOosLabelShape,
+    resolvedOosLabelPlacement,
+    resolvedOosLabelColor,
+    resolvedOosLabelTextColor,
     nameCase,
     viewOnly,
-  } = resolveProductCardDefaults(layout);
+  } = resolveProductCardCtaOosDefaults(layout);
   // Discount/sale + custom badge — same single-owner mutex as the grid
   // cards. `orderable` here is the list view's richer inventory-based signal
   // computed above, not `product.inStock`. No collision inputs needed here:

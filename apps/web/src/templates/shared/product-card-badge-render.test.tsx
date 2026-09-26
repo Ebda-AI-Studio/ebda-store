@@ -547,6 +547,52 @@ describe('heart collision — modern/elegant (heart at top-end)', () => {
     const chip = stripBadgeChip(html).chips[0];
     expect(chip).toMatch(/\btop-3 right-3\b/);
   });
+
+  // Issue #1997 — before this fix, avoiding the heart corner only ever
+  // checked the OTHER top corner against a second action button
+  // (topStartReserved), never against the NEW badge these same two themes
+  // render unconditionally at that exact corner. A badge relocated off the
+  // heart landed directly under the NEW chip instead.
+  it.each([
+    ['modern/ProductCard', ModernProductCard],
+    ['elegant/ProductCard', ElegantProductCard],
+  ] as const)(
+    '%s: a top-right badge on a NEW product drops to the bottom, not onto the NEW chip at top-left',
+    (_name, Card) => {
+      const html = renderWithWishlistHandler(
+        Card,
+        { ...NO_SALE, ...LABEL, isNew: true },
+        {
+          layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }),
+        }
+      );
+      const chip = stripBadgeChip(html).chips[0];
+      // Both top corners are now spoken for (heart at top-right, NEW at
+      // top-left) — same side as the merchant's chosen corner, but lifted
+      // above the always-mounted CTA band per issue #1611/#1609.
+      expect(chip).toMatch(/\bbottom-24 right-3\b/);
+      expect(chip).not.toMatch(/\btop-3 left-3\b/);
+      expect(chip).not.toMatch(/\btop-3 right-3\b/);
+    }
+  );
+
+  it.each([
+    ['modern/ProductCard', ModernProductCard],
+    ['elegant/ProductCard', ElegantProductCard],
+  ] as const)(
+    '%s: a top-right badge on a product that is NOT new still moves to top-left (no regression)',
+    (_name, Card) => {
+      const html = renderWithWishlistHandler(
+        Card,
+        { ...NO_SALE, ...LABEL, isNew: false },
+        {
+          layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }),
+        }
+      );
+      const chip = stripBadgeChip(html).chips[0];
+      expect(chip).toMatch(/\btop-3 left-3\b/);
+    }
+  );
 });
 
 describe('bottom-band collision — the 5 theme cards never sit under the mobile CTA (issue #1611)', () => {

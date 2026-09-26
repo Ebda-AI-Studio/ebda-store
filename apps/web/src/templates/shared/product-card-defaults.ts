@@ -62,3 +62,55 @@ export function resolveProductCardDefaults(
     viewOnly: defaults?.ctaMode === 'viewOnly',
   };
 }
+
+/**
+ * `resolveProductCardDefaults` output, pre-renamed to the `resolved*` names
+ * every CTA/OOS card render path needs (the local scope in each of those
+ * components already has its own `ctaShape`/`ctaSize`/etc. from other props,
+ * so the fields must not collide). Before this, ProductListItem.tsx,
+ * elegant/ProductCard.tsx and ProductCarousel.tsx each repeated the identical
+ * ~15-line `const { ctaShape: resolvedCtaShape, ... } = resolveProductCardDefaults(layout)`
+ * destructure — dream #1095. One rename here, one call site each there.
+ */
+export interface ResolvedProductCardCtaOosDefaults {
+  resolvedCtaShape?: CtaShape;
+  resolvedCtaSize?: CtaSize;
+  resolvedCtaColor?: ProductCardDefaults['ctaColor'];
+  resolvedCtaTextColor?: ProductCardDefaults['ctaTextColor'];
+  resolvedCtaLabelTextEn?: ProductCardDefaults['ctaLabelTextEn'];
+  resolvedCtaLabelTextAr?: ProductCardDefaults['ctaLabelTextAr'];
+  resolvedOosDimColor?: ProductCardDefaults['oosDimColor'];
+  resolvedOosLabel?: ProductCardDefaults['oosLabel'];
+  resolvedOosLabelTextEn?: ProductCardDefaults['oosLabelTextEn'];
+  resolvedOosLabelTextAr?: ProductCardDefaults['oosLabelTextAr'];
+  resolvedOosLabelShape?: CtaShape;
+  resolvedOosLabelPlacement?: ProductCardDefaults['oosLabelPlacement'];
+  resolvedOosLabelColor?: ProductCardDefaults['oosLabelColor'];
+  resolvedOosLabelTextColor?: ProductCardDefaults['oosLabelTextColor'];
+  nameCase?: ProductCardDefaults['productNameCase'];
+  viewOnly: boolean;
+}
+
+export function resolveProductCardCtaOosDefaults(
+  layout?: StoreLayoutSettings | null
+): ResolvedProductCardCtaOosDefaults {
+  const r = resolveProductCardDefaults(layout);
+  return {
+    resolvedCtaShape: r.ctaShape,
+    resolvedCtaSize: r.ctaSize,
+    resolvedCtaColor: r.ctaColor,
+    resolvedCtaTextColor: r.ctaTextColor,
+    resolvedCtaLabelTextEn: r.ctaLabelTextEn,
+    resolvedCtaLabelTextAr: r.ctaLabelTextAr,
+    resolvedOosDimColor: r.oosDimColor,
+    resolvedOosLabel: r.oosLabel,
+    resolvedOosLabelTextEn: r.oosLabelTextEn,
+    resolvedOosLabelTextAr: r.oosLabelTextAr,
+    resolvedOosLabelShape: r.oosLabelShape,
+    resolvedOosLabelPlacement: r.oosLabelPlacement,
+    resolvedOosLabelColor: r.oosLabelColor,
+    resolvedOosLabelTextColor: r.oosLabelTextColor,
+    nameCase: r.nameCase,
+    viewOnly: r.viewOnly,
+  };
+}

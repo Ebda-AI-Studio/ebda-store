@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
 
@@ -49,6 +51,7 @@ export default function InsightsSegmentsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.segments');
+  const locale = useLocale();
 
   const [data, setData] = useState<SegmentsData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,14 +90,19 @@ export default function InsightsSegmentsPage() {
   // Sort by count descending
   const sorted = [...data.segments].sort((a, b) => b.count - a.count);
 
+  // Locale-aware AI narration body (#1933) — the API already returns both
+  // `en` and `ar`; render whichever matches the admin's active locale
+  // instead of always the English one.
+  const narration = pickNarration(data.narration, locale);
+
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-5xl space-y-6">
         {/* AI narration callout */}
-        {data.narration?.en && (
+        {narration && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
             <span className="not-italic font-semibold text-primary">{t('aiLabel')}</span>{' '}
-            {data.narration.en}
+            {narration}
           </div>
         )}
 

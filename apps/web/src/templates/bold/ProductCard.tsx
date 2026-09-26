@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { resolveProductCardDefaults } from '../shared/product-card-defaults';
+import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -106,23 +106,23 @@ function BoldProductCard({
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
   const {
-    ctaShape: resolvedCtaShape,
-    ctaSize: resolvedCtaSize,
-    ctaColor: resolvedCtaColor,
-    ctaTextColor: resolvedCtaTextColor,
-    ctaLabelTextEn: resolvedCtaLabelTextEn,
-    ctaLabelTextAr: resolvedCtaLabelTextAr,
-    oosDimColor: resolvedOosDimColor,
-    oosLabel: resolvedOosLabel,
-    oosLabelTextEn: resolvedOosLabelTextEn,
-    oosLabelTextAr: resolvedOosLabelTextAr,
-    oosLabelShape: resolvedOosLabelShape,
-    oosLabelPlacement: resolvedOosLabelPlacement,
-    oosLabelColor: resolvedOosLabelColor,
-    oosLabelTextColor: resolvedOosLabelTextColor,
+    resolvedCtaShape,
+    resolvedCtaSize,
+    resolvedCtaColor,
+    resolvedCtaTextColor,
+    resolvedCtaLabelTextEn,
+    resolvedCtaLabelTextAr,
+    resolvedOosDimColor,
+    resolvedOosLabel,
+    resolvedOosLabelTextEn,
+    resolvedOosLabelTextAr,
+    resolvedOosLabelShape,
+    resolvedOosLabelPlacement,
+    resolvedOosLabelColor,
+    resolvedOosLabelTextColor,
     nameCase,
     viewOnly,
-  } = resolveProductCardDefaults(layout);
+  } = resolveProductCardCtaOosDefaults(layout);
   // Discount/sale + custom badge — merchant-configurable corner + color.
   // `resolveCardBadges` is the SINGLE owner of both chips' final render
   // corner (issues #1609/#1611/#548): it suppresses the custom badge when
@@ -147,6 +147,10 @@ function BoldProductCard({
     discountPosition: defaults?.discountBadge?.position,
     topStartReserved: Boolean(onToggleCompare),
     topEndReserved: Boolean(onRemoveFromWishlist),
+    // Issue #1997 — the NEW badge below renders at logical top-start under
+    // this exact condition; a discount/custom badge avoiding a reserved
+    // heart corner must not land on top of it.
+    newOrBrandBadgeReserved: Boolean(orderable && product.isNew),
     // The mobile quick-add CTA band below is an unconditional full-width
     // overlay (hidden only via a `lg:` desktop hover state, never removed
     // from the DOM), so it reserves the whole bottom edge.

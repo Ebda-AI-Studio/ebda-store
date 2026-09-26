@@ -317,7 +317,15 @@ export default function CustomerDetailPage() {
     },
     {
       header: t('colPayment'),
-      mobileBadge: true,
+      // NOT mobileBadge (issue #1930): the cell below carries the refund
+      // amount/provider/date/reason as free text, sometimes several lines.
+      // DataTable renders every mobileBadge column inside a `shrink-0` slot
+      // in the card's title row — a slot that cannot shrink below content
+      // width — and colStatus already occupies that slot on its own, so a
+      // second mobileBadge column here doubled up two wedged, unreadable
+      // blocks in the top-right corner and let the refund text overflow the
+      // card. Left as a normal column, it renders as a full-width label/
+      // value row that wraps correctly instead.
       cell: order => {
         // Find the refund payment (most-recent payment row with a non-zero
         // refundedAmount). Refund metadata travels on the Payment row, not

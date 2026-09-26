@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -43,6 +45,7 @@ export default function InsightsFunnelPage() {
   const storeId = params?.id as string;
   const t = useT('insights.funnel');
   const tc = useT('common');
+  const locale = useLocale();
 
   const [window, setWindow] = useState<Window>('30');
   const [data, setData] = useState<FunnelData | null>(null);
@@ -100,6 +103,9 @@ export default function InsightsFunnelPage() {
 
   const maxStep = steps.reduce((m, s) => Math.max(m, s.value), 1) || 1;
 
+  // Locale-aware AI narration body (#1933) — see segments/page.tsx.
+  const narration = pickNarration(data?.narration, locale);
+
   const sortedDays = data
     ? [...data.days].sort(
         (a, b) => new Date(b.periodDate).getTime() - new Date(a.periodDate).getTime()
@@ -142,9 +148,10 @@ export default function InsightsFunnelPage() {
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-4xl space-y-6">
         {/* AI narration callout */}
-        {data?.narration?.en && (
+        {narration && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
-            <span className="not-italic font-semibold text-primary">AI:</span> {data.narration.en}
+            <span className="not-italic font-semibold text-primary">{t('aiLabel')}</span>{' '}
+            {narration}
           </div>
         )}
 

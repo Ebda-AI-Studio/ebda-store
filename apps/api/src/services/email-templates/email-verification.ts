@@ -4,7 +4,12 @@ export interface EmailVerificationData {
   email: string;
   name: string;
   verificationUrl: string;
-  expiresIn: string;
+  // A count of hours, not a pre-formatted string (issue #1860, same class as
+  // password-reset.ts's `expiresInMinutes`). The old `expiresIn: string`
+  // let the caller bake in an English phrase ("24 hours") that the `ar`
+  // template then embedded VERBATIM into Arabic copy on every registration.
+  // Each language now formats its own copy from the same number.
+  expiresInHours: number;
 }
 
 export const emailVerificationTemplate = {
@@ -22,7 +27,7 @@ export const emailVerificationTemplate = {
     <p style="text-align: center; margin: 24px 0;">
       <a href="${urlEsc}" class="button">Verify Email</a>
     </p>
-    <p>This link expires in ${escapeHtml(d.expiresIn)}.</p>
+    <p>This link expires in ${d.expiresInHours} hours.</p>
     <p style="font-size: 14px; color: #666;">If you didn't create an account, you can safely ignore this email.</p>
     <p style="font-size: 12px; color: #999; margin-top: 24px;">
       If the button above doesn't work, copy and paste this link into your browser:<br>
@@ -40,7 +45,7 @@ export const emailVerificationTemplate = {
     <p style="text-align: center; margin: 24px 0;">
       <a href="${urlEsc}" class="button">تأكيد البريد الإلكتروني</a>
     </p>
-    <p>الرابط ينتهي خلال ${escapeHtml(d.expiresIn)}.</p>
+    <p>الرابط ينتهي خلال ${d.expiresInHours} ساعة.</p>
     <p style="font-size: 14px; color: #666;">إذا لم تنشئ حساباً، يمكنك تجاهل هذه الرسالة بأمان.</p>
     <p style="font-size: 12px; color: #999; margin-top: 24px;">
       إذا لم يعمل الزر أعلاه، انسخ هذا الرابط والصقه في متصفحك:<br>

@@ -6389,7 +6389,8 @@
       "monthLabel": "Cohort",
       "periodLabel": "Month",
       "customers": "Customers",
-      "retention": "Retention"
+      "retention": "Retention",
+      "aiLabel": "AI:"
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -6404,7 +6405,8 @@
       "completed": "Orders Completed",
       "abandoned": "Abandoned",
       "revenue": "Revenue (KWD)",
-      "dropoff": "Drop-off"
+      "dropoff": "Drop-off",
+      "aiLabel": "AI:"
     },
     "segments": {
       "title": "Customer Segments (RFM)",

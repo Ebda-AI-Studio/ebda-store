@@ -99,31 +99,41 @@ const ICON_TARGETS: ReadonlyArray<{
  * a fixed `filename` per icon key so re-uploading a new source OVERWRITES
  * the same R2 object instead of accumulating orphans per upload.
  *
- * Fails loud (throws AppError) rather than the fire-and-forget/fail-soft
- * posture `image-resize.service.ts` uses for cosmetic resizing — a broken
- * icon set left half-written would leave `Store.pwaSettings` pointing at a
- * mix of new and stale URLs, which is worse than rejecting the upload.
+ * Two separate failure domains, handled in two phases (issues #1913/#1916):
+ *
+ *  1. Run the ENTIRE sharp pipeline first and hold every output buffer in
+ *     memory before any upload starts. A corrupt/garbage source, an
+ *     unsupported format, or a decode/OOM failure therefore never touches
+ *     a live R2 object — it 400s as `ICON_GENERATION_FAILED` with
+ *     `Store.pwaSettings` and every existing icon object untouched, exactly
+ *     as the old single-try version claimed (but did not actually
+ *     guarantee, since it uploaded and processed in the same loop).
+ *  2. Only once every buffer exists do uploads start. This phase can still
+ *     fail (R2 outage, a dropped `pwa` folder allowlist entry, a network
+ *     blip) — since every icon key is fixed and re-upload overwrites it in
+ *     place (see above), a failure partway through THIS phase (upload #N
+ *     of 8) can still leave the live set mixed old/new for the icons
+ *     already uploaded before it failed. That residual is real and is not
+ *     hidden: a genuine StorageService `AppError` (503
+ *     `STORAGE_NOT_CONFIGURED`, 400 `INVALID_FOLDER`/`MISSING_TENANT`, …)
+ *     is re-thrown UNCHANGED instead of being masked as "your image is
+ *     invalid", so an infra failure surfaces with its real status code
+ *     (error-handler.ts escalates >=500 to Sentry) instead of a silent,
+ *     unalerted 400. An unrecognized upload error becomes 502
+ *     `ICON_UPLOAD_FAILED` — also not "your image is invalid".
  */
 export async function generatePwaIconSet(
   storeId: string,
   sourceBuffer: Buffer,
   background: { r: number; g: number; b: number; alpha: number } = { r: 0, g: 0, b: 0, alpha: 0 }
 ): Promise<GeneratedPwaIcons> {
+  let sourcePng: Buffer;
+  const prepared: Array<{ target: (typeof ICON_TARGETS)[number]; buffer: Buffer }> = [];
   try {
-    const results: Partial<GeneratedPwaIcons> = {};
-
-    // Upload the source as-is (normalized to PNG) so the pipeline can be
-    // re-run later against the original artwork without re-asking the
-    // merchant to upload again.
-    const sourcePng = await sharp(sourceBuffer).png({ compressionLevel: 9 }).toBuffer();
-    const sourceUpload = await StorageService.upload(sourcePng, 'source.png', {
-      folder: 'pwa',
-      storeId,
-      filename: 'source',
-      contentType: 'image/png',
-      allowedTypes: ['image/png'],
-    });
-    results.iconSource = sourceUpload.url;
+    // Normalize the source as-is to PNG so the pipeline can be re-run later
+    // against the original artwork without re-asking the merchant to
+    // upload again.
+    sourcePng = await sharp(sourceBuffer).png({ compressionLevel: 9 }).toBuffer();
 
     for (const target of ICON_TARGETS) {
       const innerSize = target.padded ? Math.floor(target.size * 0.8) : target.size;
@@ -141,7 +151,30 @@ export async function generatePwaIconSet(
         .png({ compressionLevel: 9 })
         .toBuffer();
 
-      const uploaded = await StorageService.upload(buf, `${target.key}.png`, {
+      prepared.push({ target, buffer: buf });
+    }
+  } catch (err) {
+    logger.error({ err, storeId }, 'pwa: icon set generation failed (image processing)');
+    throw new AppError(
+      400,
+      'ICON_GENERATION_FAILED',
+      'Could not process the uploaded icon. Use a valid square PNG, JPEG, WebP or SVG image.'
+    );
+  }
+
+  const results: Partial<GeneratedPwaIcons> = {};
+  try {
+    const sourceUpload = await StorageService.upload(sourcePng, 'source.png', {
+      folder: 'pwa',
+      storeId,
+      filename: 'source',
+      contentType: 'image/png',
+      allowedTypes: ['image/png'],
+    });
+    results.iconSource = sourceUpload.url;
+
+    for (const { target, buffer } of prepared) {
+      const uploaded = await StorageService.upload(buffer, `${target.key}.png`, {
         folder: 'pwa',
         storeId,
         filename: target.key,
@@ -153,11 +186,16 @@ export async function generatePwaIconSet(
 
     return results as GeneratedPwaIcons;
   } catch (err) {
-    logger.error({ err, storeId }, 'pwa: icon set generation failed');
+    logger.error({ err, storeId }, 'pwa: icon set upload failed');
+    // A StorageService AppError (503 STORAGE_NOT_CONFIGURED, 400
+    // INVALID_FOLDER/MISSING_TENANT, …) already carries its real status
+    // code and meaning — re-throw it unchanged rather than relabeling an
+    // infra failure as "your image is invalid" (#1916).
+    if (err instanceof AppError) throw err;
     throw new AppError(
-      400,
-      'ICON_GENERATION_FAILED',
-      'Could not process the uploaded icon. Use a valid square PNG, JPEG, WebP or SVG image.'
+      502,
+      'ICON_UPLOAD_FAILED',
+      'Could not upload the generated icons. Please try again.'
     );
   }
 }

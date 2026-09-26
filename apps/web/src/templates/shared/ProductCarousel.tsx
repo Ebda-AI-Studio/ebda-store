@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { resolveProductCardDefaults } from './product-card-defaults';
+import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -112,23 +112,23 @@ export function ProductCarousel({
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const cardDefaults = layout?.productCardDefaults;
   const {
-    ctaShape: resolvedCtaShape,
-    ctaSize: resolvedCtaSize,
-    ctaColor: resolvedCtaColor,
-    ctaTextColor: resolvedCtaTextColor,
-    ctaLabelTextEn: resolvedCtaLabelTextEn,
-    ctaLabelTextAr: resolvedCtaLabelTextAr,
-    oosDimColor: resolvedOosDimColor,
-    oosLabel: resolvedOosLabel,
-    oosLabelTextEn: resolvedOosLabelTextEn,
-    oosLabelTextAr: resolvedOosLabelTextAr,
-    oosLabelShape: resolvedOosLabelShape,
-    oosLabelPlacement: resolvedOosLabelPlacement,
-    oosLabelColor: resolvedOosLabelColor,
-    oosLabelTextColor: resolvedOosLabelTextColor,
+    resolvedCtaShape,
+    resolvedCtaSize,
+    resolvedCtaColor,
+    resolvedCtaTextColor,
+    resolvedCtaLabelTextEn,
+    resolvedCtaLabelTextAr,
+    resolvedOosDimColor,
+    resolvedOosLabel,
+    resolvedOosLabelTextEn,
+    resolvedOosLabelTextAr,
+    resolvedOosLabelShape,
+    resolvedOosLabelPlacement,
+    resolvedOosLabelColor,
+    resolvedOosLabelTextColor,
     nameCase,
     viewOnly,
-  } = resolveProductCardDefaults(layout);
+  } = resolveProductCardCtaOosDefaults(layout);
   // Discount/sale + custom badge styling — the per-product FINAL corner
   // decision (`resolveCardBadges`) happens inside the map below, since it
   // depends on that product's own label + stock state AND (issue #1609)
@@ -359,6 +359,13 @@ export function ProductCarousel({
                 orderable,
                 customPosition: cardDefaults?.customBadge?.position,
                 discountPosition: cardDefaults?.discountBadge?.position,
+                // Issue #1997 — the carousel has no heart/compare button (so
+                // topStartReserved/topEndReserved are never set here), but
+                // the NEW badge / brand pill below still unconditionally
+                // occupies logical top-start under this exact condition. A
+                // merchant-configured top-corner badge must avoid it too.
+                newOrBrandBadgeReserved:
+                  showNewBadge || (inStock && store.theme?.showBrandBadge === true),
                 // The carousel has no heart/compare/remove-wishlist button —
                 // only the quick-add (+) circle, which is corner-only
                 // (logical bottom-end), not a full-width band.

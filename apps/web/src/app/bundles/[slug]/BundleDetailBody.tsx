@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL, type PublicBundleDetail } from '../../../lib/api';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
+import { buildOgImages } from '../../../lib/seo/og-images';
 import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
 import { bundleJsonLd, breadcrumbJsonLd, storeAbsoluteUrl } from '../../../lib/structured-data';
 import { JsonLd } from '../../../components/JsonLd';
@@ -81,18 +82,7 @@ export function buildBundleMetadata(
     `/bundles/${bundle.slug}`
   );
 
-  const ogImages = bundle.image
-    ? [{ url: bundle.image, alt: bundle.name }]
-    : storeSlug
-      ? [
-          {
-            url: `/og?slug=${encodeURIComponent(storeSlug)}`,
-            width: 1200,
-            height: 630,
-            alt: storeName,
-          },
-        ]
-      : [];
+  const ogImages = buildOgImages(bundle.image, storeSlug, storeName, bundle.name);
 
   return {
     title,

@@ -336,6 +336,44 @@
     }
   }
 
+  /* Hover-reveal — a control that should stay visible on any device with no
+     real hover input (touch phones AND touch tablets, e.g. an iPad at
+     >=768px) and only hide-until-hover on a device that actually HAS a fine
+     pointer + hover capability. `md:opacity-0 md:group-hover:opacity-100`
+     gated on VIEWPORT WIDTH instead of input capability made this
+     unreachable on a touch tablet (issue #1356) — a real device for a
+     Kuwait merchant editing product images. Visible by default; the media
+     query only ever hides it, never the reverse, so a browser/environment
+     that can't evaluate `hover`/`pointer` (or reports them oddly) fails
+     open to "always visible" rather than open to "unreachable". */
+  .hover-reveal {
+    opacity: 1;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hover-reveal {
+      opacity: 0;
+    }
+
+    .group:hover .hover-reveal,
+    .group:focus-within .hover-reveal {
+      opacity: 1;
+    }
+  }
+
+  /* Same capability gate for a hover-only dimming scrim (MultiImageGrid's
+     dark overlay behind the reorder/remove controls) — touch devices never
+     get the dim, only the controls themselves via `.hover-reveal`. */
+  .hover-reveal-scrim {
+    background-color: transparent;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .group:hover .hover-reveal-scrim {
+      background-color: rgb(0 0 0 / 0.3);
+    }
+  }
+
   /* Force Empty State */
   .force-empty-state {
     @apply flex flex-col items-center justify-center py-16 text-center;

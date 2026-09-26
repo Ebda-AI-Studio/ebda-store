@@ -308,7 +308,12 @@ export class AuthService {
     // Generate verification token
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Same constant feeds both the token's real TTL and the copy that
+    // describes it, so a TTL change can never again desync the two (#1860 —
+    // the previous literal 'expiresIn: string' let an English phrase get
+    // baked in and rendered verbatim inside the Arabic template).
+    const EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
     // Store verification token
     await prisma.verificationToken.create({
@@ -329,7 +334,7 @@ export class AuthService {
           email,
           name,
           verificationUrl,
-          expiresIn: '24 hours',
+          expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
         },
         language
       );

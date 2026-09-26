@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { resolveProductCardDefaults } from './product-card-defaults';
+import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import { memo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -169,23 +169,23 @@ function PecannbeeProductCardImpl({
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
   const {
-    ctaShape: resolvedCtaShape,
-    ctaSize: resolvedCtaSize,
-    ctaColor: resolvedCtaColor,
-    ctaTextColor: resolvedCtaTextColor,
-    ctaLabelTextEn: resolvedCtaLabelTextEn,
-    ctaLabelTextAr: resolvedCtaLabelTextAr,
-    oosDimColor: resolvedOosDimColor,
-    oosLabel: resolvedOosLabel,
-    oosLabelTextEn: resolvedOosLabelTextEn,
-    oosLabelTextAr: resolvedOosLabelTextAr,
-    oosLabelShape: resolvedOosLabelShape,
-    oosLabelPlacement: resolvedOosLabelPlacement,
-    oosLabelColor: resolvedOosLabelColor,
-    oosLabelTextColor: resolvedOosLabelTextColor,
+    resolvedCtaShape,
+    resolvedCtaSize,
+    resolvedCtaColor,
+    resolvedCtaTextColor,
+    resolvedCtaLabelTextEn,
+    resolvedCtaLabelTextAr,
+    resolvedOosDimColor,
+    resolvedOosLabel,
+    resolvedOosLabelTextEn,
+    resolvedOosLabelTextAr,
+    resolvedOosLabelShape,
+    resolvedOosLabelPlacement,
+    resolvedOosLabelColor,
+    resolvedOosLabelTextColor,
     nameCase,
     viewOnly,
-  } = resolveProductCardDefaults(layout);
+  } = resolveProductCardCtaOosDefaults(layout);
   // Discount/sale + custom badge — merchant-configurable corner + color.
   // `resolveCardBadges` is the SINGLE owner of both chips' final render
   // corner: it suppresses the custom badge when the product isn't

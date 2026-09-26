@@ -249,6 +249,27 @@ export interface ResolveCardBadgesInput {
   topStartReserved?: boolean;
   topEndReserved?: boolean;
   /**
+   * Issue #1997 — a THIRD reserved-corner input, distinct from
+   * `topStartReserved`/`topEndReserved` above. Those two model action
+   * BUTTONS (heart/compare); this one models the NEW badge / brand pill
+   * every theme renders unconditionally at the LOGICAL top-start corner
+   * whenever the product is new (or, on `PecannbeeProductCard`/
+   * `ProductCarousel`, whenever the opt-in brand pill shows instead). The
+   * original avoidance model only knew about action buttons, so a badge
+   * relocated off a reserved heart corner could land directly on top of a
+   * NEW chip it had no way to see — the fix a merchant made to avoid one
+   * collision quietly created a different one. Always LOGICAL top-start
+   * (never top-end — no surface renders NEW/the brand pill at top-end), so
+   * unlike the two booleans above this needs no left/right split from the
+   * caller; the corner conversion below does that. Pass the exact same
+   * expression the surface uses to decide whether it renders the NEW badge
+   * (or the brand pill in the surfaces that have one) — same per-surface
+   * platform-fact contract as `topStartReserved`/`topEndReserved`. Defaults
+   * to false (no reservation — byte-identical to today for callers that
+   * don't pass it).
+   */
+  newOrBrandBadgeReserved?: boolean;
+  /**
    * Issues #1609/#1611 — which bottom side(s), if any, a quick-add button
    * or the mobile add-to-cart CTA band occupies on this surface. See
    * `BadgeBottomOverlay` above. Defaults to `'none'`.
@@ -329,6 +350,7 @@ export function resolveCardBadges({
   discountVisible = false,
   topStartReserved = false,
   topEndReserved = false,
+  newOrBrandBadgeReserved = false,
   bottomOverlay = 'none',
 }: ResolveCardBadgesInput): ResolvedCardBadges {
   const label = getCustomBadgeText(product, isRtl);
@@ -377,8 +399,12 @@ export function resolveCardBadges({
   // LOGICAL reserved sides (top-start / top-end, which mirror with reading
   // direction — that's how every theme renders its heart/compare/remove
   // button) into the PHYSICAL left/right corners this module renders in.
-  const topLeftReserved = isRtl ? topEndReserved : topStartReserved;
-  const topRightReserved = isRtl ? topStartReserved : topEndReserved;
+  // Issue #1997 — `newOrBrandBadgeReserved` folds into whichever physical
+  // side is LOGICAL top-start (never top-end), the same conversion, so a
+  // badge avoiding a reserved heart corner also treats an occupied NEW/
+  // brand-pill corner as unavailable instead of landing on top of it.
+  const topLeftReserved = isRtl ? topEndReserved : topStartReserved || newOrBrandBadgeReserved;
+  const topRightReserved = isRtl ? topStartReserved || newOrBrandBadgeReserved : topEndReserved;
   // The quick-add button / CTA band is itself LOGICAL (bottom-end on the
   // carousel, or the full bottom-band on the 5 theme cards) — same
   // start/end → left/right conversion.

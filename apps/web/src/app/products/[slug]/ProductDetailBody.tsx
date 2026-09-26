@@ -7,6 +7,7 @@ import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect'
 import { fetchPublicShippingZones } from '../../../lib/shipping-public';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
+import { buildOgImages } from '../../../lib/seo/og-images';
 import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
 import {
   productJsonLd,
@@ -97,18 +98,7 @@ export function buildProductMetadata(
   // og:image — the product photo when present, else the store-aware OG card
   // (`/og?slug=`, resolved against the layout's metadataBase) so an imageless
   // product still gets the store's branded preview instead of a blank card.
-  const ogImages = ogImage
-    ? [{ url: ogImage, alt: product.name }]
-    : storeSlug
-      ? [
-          {
-            url: `/og?slug=${encodeURIComponent(storeSlug)}`,
-            width: 1200,
-            height: 630,
-            alt: storeName,
-          },
-        ]
-      : [];
+  const ogImages = buildOgImages(ogImage, storeSlug, storeName, product.name);
 
   return {
     title,

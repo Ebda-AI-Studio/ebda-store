@@ -130,7 +130,10 @@ describe('emailVerificationTemplate', () => {
     email: 'a@example.com',
     name: 'Ahmad',
     verificationUrl: 'https://store.test/verify?token=xyz',
-    expiresIn: '24 hours',
+    // #1860: a number, not a pre-formatted English phrase — see the ar-body
+    // test below, which is the regression this replaces (password-reset.ts
+    // got this fix earlier; the two verification templates did not).
+    expiresInHours: 24,
   };
 
   it('en subject', () => {
@@ -147,10 +150,17 @@ describe('emailVerificationTemplate', () => {
     expect(html).toContain('24 hours');
   });
 
-  it('ar body has Arabic text', () => {
+  it('ar body has Arabic text, the verification URL, and an Arabic expiry — no leaked English', () => {
     const html = emailVerificationTemplate.ar(data, STORE);
     expect(html).toContain('تأكيد');
     expect(html).toContain(data.verificationUrl);
+    expect(html).toContain('24 ساعة');
+    // The bug this test guards: the old template embedded the EN template's
+    // own literal English phrase ("24 hours") verbatim into Arabic copy —
+    // sent on every registration and every resend, to every Arabic-locale
+    // shopper on every store.
+    expect(html).not.toContain('hours');
+    expect(html).not.toContain('hour');
   });
 
   it('XSS in verificationUrl escaped (en)', () => {
@@ -171,7 +181,9 @@ describe('resendVerificationTemplate', () => {
     email: 'a@example.com',
     name: 'Fatima',
     verificationUrl: 'https://store.test/verify?token=new',
-    expiresIn: '2 hours',
+    // #1860: same fix as emailVerificationTemplate — a number, not a
+    // pre-formatted English phrase.
+    expiresInHours: 2,
   };
 
   it('en subject includes "New Link"', () => {
@@ -188,10 +200,13 @@ describe('resendVerificationTemplate', () => {
     expect(html).toContain('Fatima');
   });
 
-  it('ar body has Arabic text and URL', () => {
+  it('ar body has Arabic text, URL, and an Arabic expiry — no leaked English', () => {
     const html = resendVerificationTemplate.ar(data, STORE);
     expect(html).toContain('رابط');
     expect(html).toContain(data.verificationUrl);
+    expect(html).toContain('2 ساعة');
+    expect(html).not.toContain('hours');
+    expect(html).not.toContain('hour');
   });
 
   it('XSS in name escaped (ar)', () => {

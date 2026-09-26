@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { resolveProductCardDefaults } from '../shared/product-card-defaults';
+import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
@@ -112,23 +112,23 @@ function MinimalProductCard({
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
   const {
-    ctaShape: resolvedCtaShape,
-    ctaSize: resolvedCtaSize,
-    ctaColor: resolvedCtaColor,
-    ctaTextColor: resolvedCtaTextColor,
-    ctaLabelTextEn: resolvedCtaLabelTextEn,
-    ctaLabelTextAr: resolvedCtaLabelTextAr,
-    oosDimColor: resolvedOosDimColor,
-    oosLabel: resolvedOosLabel,
-    oosLabelTextEn: resolvedOosLabelTextEn,
-    oosLabelTextAr: resolvedOosLabelTextAr,
-    oosLabelShape: resolvedOosLabelShape,
-    oosLabelPlacement: resolvedOosLabelPlacement,
-    oosLabelColor: resolvedOosLabelColor,
-    oosLabelTextColor: resolvedOosLabelTextColor,
+    resolvedCtaShape,
+    resolvedCtaSize,
+    resolvedCtaColor,
+    resolvedCtaTextColor,
+    resolvedCtaLabelTextEn,
+    resolvedCtaLabelTextAr,
+    resolvedOosDimColor,
+    resolvedOosLabel,
+    resolvedOosLabelTextEn,
+    resolvedOosLabelTextAr,
+    resolvedOosLabelShape,
+    resolvedOosLabelPlacement,
+    resolvedOosLabelColor,
+    resolvedOosLabelTextColor,
     nameCase,
     viewOnly,
-  } = resolveProductCardDefaults(layout);
+  } = resolveProductCardCtaOosDefaults(layout);
   // Discount/sale badge — minimal's badge is inline text below the price
   // (no corner overlay by design, "minimal pack stays chrome-free"), so
   // only the merchant-configurable COLOR applies here; the position field

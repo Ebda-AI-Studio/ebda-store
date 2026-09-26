@@ -1,6 +1,59 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
+
+// 768px — the SAME breakpoint as Tailwind's default `md:` prefix (used by
+// AdminSkeletonTable and the inventory page's select-all overlay below), so
+// the real table's chosen tree and everything visually anchored to it never
+// disagree about where "desktop" starts.
+const DESKTOP_QUERY = '(min-width: 768px)';
+
+// jsdom (this repo's vitest environment for admin render tests) has no
+// `window.matchMedia` implementation at all — guard both functions so a
+// render test isn't required to polyfill it, and so this degrades to the
+// same mobile-first fallback as SSR in any other real environment that
+// somehow lacks it, rather than throwing.
+function hasMatchMedia(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+}
+
+function subscribeToDesktopQuery(onChange: () => void): () => void {
+  if (!hasMatchMedia()) return () => {};
+  const mql = window.matchMedia(DESKTOP_QUERY);
+  mql.addEventListener('change', onChange);
+  return () => mql.removeEventListener('change', onChange);
+}
+
+function getIsDesktop(): boolean {
+  if (!hasMatchMedia()) return false;
+  return window.matchMedia(DESKTOP_QUERY).matches;
+}
+
+// Mirrors the mobile-first default the old CSS-only version effectively
+// used for its FIRST paint below md (and is the shape most admin sessions
+// on a phone need). Hydration then reconciles to the real value in the
+// same commit useSyncExternalStore's client snapshot resolves — this is
+// not a persistent guess, just what renders before that.
+function getServerSnapshot(): boolean {
+  return false;
+}
+
+/**
+ * Renders exactly ONE of the two DataTable trees, gated on `matchMedia`
+ * (input/viewport capability at the SAME 768px breakpoint the old CSS used)
+ * rather than mounting both and hiding one with `hidden md:block` /
+ * `md:hidden` (issues #1929/#1931). The old approach kept the desktop
+ * `<table>` — with real `<input>` cells wherever a caller wraps DataTable in
+ * a `<form>` — in the DOM on mobile, `display:none` and all; a `display:
+ * none` element still participates in native constraint validation, so the
+ * FIRST invalid control in DOM order on a phone was always the invisible
+ * desktop copy, and `<form>`'s submit silently aborted with no visible
+ * error. It also meant every `column.cell()` ran twice per row per render
+ * across ~50 admin list consumers.
+ */
+function useIsDesktopTable(): boolean {
+  return useSyncExternalStore(subscribeToDesktopQuery, getIsDesktop, getServerSnapshot);
+}
 
 export interface DataTableColumn<T> {
   /** Column header. Doubles as the per-row label on the mobile card
@@ -81,9 +134,16 @@ export function DataTable<T>({
   onRowClick,
   alwaysCards = false,
 }: DataTableProps<T>) {
+  // Called unconditionally, before the early return below, per the rules of
+  // hooks — this is also why the decision can't just live in a plain `if`.
+  const isDesktop = useIsDesktopTable();
+
   if (rows.length === 0 && emptyState) {
     return <>{emptyState}</>;
   }
+
+  const showDesktopTable = !alwaysCards && isDesktop;
+  const showMobileCards = alwaysCards || !isDesktop;
 
   const mobileColumns = columns.filter(c => !c.hideOnMobile);
   const primaryColumn = mobileColumns.find(c => c.primaryOnMobile);
@@ -96,8 +156,8 @@ export function DataTable<T>({
   return (
     <>
       {/* Desktop table */}
-      {!alwaysCards && (
-        <div className="hidden md:block overflow-x-auto rounded-xl border border-border bg-card">
+      {showDesktopTable && (
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
@@ -144,76 +204,78 @@ export function DataTable<T>({
       )}
 
       {/* Mobile cards */}
-      <div className={alwaysCards ? 'space-y-3' : 'space-y-3 md:hidden'}>
-        {rows.map((row, i) => (
-          <div
-            key={rowKey(row, i)}
-            onClick={onRowClick ? () => onRowClick(row, i) : undefined}
-            className={`rounded-xl border border-border bg-card p-4 shadow-sm ${
-              onRowClick ? 'cursor-pointer active:bg-muted/50 transition-colors' : ''
-            }`}
-          >
-            {/* Title row: primary cell on the left, badges on the right.
+      {showMobileCards && (
+        <div className="space-y-3">
+          {rows.map((row, i) => (
+            <div
+              key={rowKey(row, i)}
+              onClick={onRowClick ? () => onRowClick(row, i) : undefined}
+              className={`rounded-xl border border-border bg-card p-4 shadow-sm ${
+                onRowClick ? 'cursor-pointer active:bg-muted/50 transition-colors' : ''
+              }`}
+            >
+              {/* Title row: primary cell on the left, badges on the right.
                 Wraps if the title is long so badges don't get pushed
                 off-card. */}
-            {(primaryColumn || badgeColumns.length > 0) && (
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1 text-base font-semibold text-foreground">
-                  <bdi>{primaryColumn?.cell(row, i)}</bdi>
-                </div>
-                {badgeColumns.length > 0 && (
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    {badgeColumns.map((c, ci) => (
-                      <div key={ci}>
-                        <bdi>{c.cell(row, i)}</bdi>
-                      </div>
-                    ))}
+              {(primaryColumn || badgeColumns.length > 0) && (
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1 text-base font-semibold text-foreground">
+                    <bdi>{primaryColumn?.cell(row, i)}</bdi>
                   </div>
-                )}
-              </div>
-            )}
+                  {badgeColumns.length > 0 && (
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                      {badgeColumns.map((c, ci) => (
+                        <div key={ci}>
+                          <bdi>{c.cell(row, i)}</bdi>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* Label/value rows. `gap-3` natural flow (label hugs left,
+              {/* Label/value rows. `gap-3` natural flow (label hugs left,
                 value hugs label) — no more `justify-between` blowing up
                 short values to the right edge of the card. */}
-            {labelColumns.length > 0 && (
-              <dl
-                className={`space-y-1 text-sm ${
-                  primaryColumn || badgeColumns.length > 0 ? 'mt-3' : ''
-                }`}
-              >
-                {labelColumns.map((c, ci) => (
-                  <div key={ci} className="flex items-baseline gap-3">
-                    <dt className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {c.header}
-                    </dt>
-                    <dd
-                      className={`min-w-0 flex-1 text-foreground ${
-                        c.alignEnd ? 'text-end' : 'text-start'
-                      }`}
-                    >
-                      <bdi>{c.cell(row, i)}</bdi>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
+              {labelColumns.length > 0 && (
+                <dl
+                  className={`space-y-1 text-sm ${
+                    primaryColumn || badgeColumns.length > 0 ? 'mt-3' : ''
+                  }`}
+                >
+                  {labelColumns.map((c, ci) => (
+                    <div key={ci} className="flex items-baseline gap-3">
+                      <dt className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {c.header}
+                      </dt>
+                      <dd
+                        className={`min-w-0 flex-1 text-foreground ${
+                          c.alignEnd ? 'text-end' : 'text-start'
+                        }`}
+                      >
+                        <bdi>{c.cell(row, i)}</bdi>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
 
-            {/* Actions toolbar — full-width strip at the bottom of the
+              {/* Actions toolbar — full-width strip at the bottom of the
                 card, with overflow-x-auto so 4+ buttons can scroll
                 horizontally rather than wrap. The wrapped child (a
                 button/link) decides its own padding/sizing. */}
-            {actionsColumn && (
-              <div
-                className="-mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pt-2 [&_*]:shrink-0 border-t border-border/40"
-                onClick={e => e.stopPropagation()}
-              >
-                {actionsColumn.cell(row, i)}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+              {actionsColumn && (
+                <div
+                  className="-mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pt-2 [&_*]:shrink-0 border-t border-border/40"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {actionsColumn.cell(row, i)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

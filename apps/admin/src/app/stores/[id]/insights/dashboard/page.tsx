@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
@@ -72,6 +74,7 @@ export default function InsightsDashboardPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.dashboard');
+  const locale = useLocale();
 
   const [data, setData] = useState<InsightsDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +111,9 @@ export default function InsightsDashboardPage() {
   const aovLast = data.aov?.lastPeriodFils ?? 0;
   const aovChange = aovLast > 0 ? ((aovThis - aovLast) / aovLast) * 100 : 0;
 
+  // Locale-aware AI narration body (#1933) — see segments/page.tsx.
+  const narration = pickNarration(data.narration, locale);
+
   const topSkusColumns: DataTableColumn<TopSku>[] = [
     {
       header: 'SKU',
@@ -138,10 +144,10 @@ export default function InsightsDashboardPage() {
     <AdminLayout title={t('title')}>
       <div className="max-w-5xl space-y-6">
         {/* AI narration callout */}
-        {data.narration?.en && (
+        {narration && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
             <span className="not-italic font-semibold text-primary">{t('aiCallout')}</span>{' '}
-            {data.narration.en}
+            {narration}
           </div>
         )}
 

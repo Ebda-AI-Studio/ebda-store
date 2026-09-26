@@ -32,24 +32,27 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
             </span>
           )}
           {/*
-            Controls are ALWAYS visible below the md breakpoint and hover-gated
-            above it. They used to be `opacity-0 group-hover:opacity-100` at
-            every width, and a touch device has no hover state — so reordering
-            and removing images was unreachable on mobile entirely. That also
-            made the 44px `.touch-target` sizing self-defeating: the buttons
-            were enlarged for exactly the devices that could never reveal them.
-            768px is the same breakpoint `.touch-target` itself switches on.
+            Controls stay ALWAYS visible on any device with no real hover
+            input and hover-gated only where `(hover: hover) and
+            (pointer: fine)` actually holds (`.hover-reveal` /
+            `.hover-reveal-scrim`, globals.css). They used to be
+            `opacity-0 group-hover:opacity-100` at every width, and a touch
+            device has no hover state — so reordering and removing images
+            was unreachable on mobile entirely. A later `md:` viewport-width
+            gate "fixed" phones but broke touch tablets at >=768px the same
+            way (issue #1356) — capability, not width, is the right gate.
 
-            The dark scrim stays hover-only: on mobile the buttons carry their
-            own white / destructive fills and a shadow, so they read against the
-            thumbnail without dimming the image the merchant is trying to see.
+            The dark scrim stays hover-only: on a device with no hover the
+            buttons carry their own white / destructive fills and a shadow,
+            so they read against the thumbnail without dimming the image the
+            merchant is trying to see.
 
             `flex-wrap` because three 44px circles plus two 4px gaps is 140px,
             and a `grid-cols-2` cell is ~138px wide on a 320px viewport — they
             overflowed the thumbnail rather than wrapping. Two rows of 44px fit
             an aspect-square cell at that width.
           */}
-          <div className="absolute inset-0 md:bg-black/0 md:group-hover:bg-black/30 transition-colors flex flex-wrap items-center justify-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+          <div className="absolute inset-0 hover-reveal-scrim hover-reveal transition-colors flex flex-wrap items-center justify-center gap-1">
             {i > 0 && (
               <button
                 type="button"

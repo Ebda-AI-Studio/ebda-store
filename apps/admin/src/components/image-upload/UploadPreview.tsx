@@ -34,12 +34,13 @@ export function UploadPreview({ value, alt, onRemove, className = '' }: UploadPr
           onClick={onRemove}
           // Same defect class as MultiImageGrid: a hover-gated CONTROL is
           // unreachable on touch, where there is no hover state — so removing
-          // an uploaded image was impossible on mobile. Visible below md,
-          // hover-gated above, matching the idiom already used in
-          // apps/web/src/templates/minimal/ProductCard.tsx. `touch-target`
-          // replaces `p-1` (~24px) so the tap area clears the 44px floor the
-          // rest of the admin uses.
-          className="absolute top-1 end-1 touch-target bg-destructive text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+          // an uploaded image was impossible on mobile. `hover-reveal` gates
+          // on `(hover: hover) and (pointer: fine)` — input capability, not
+          // viewport width — so it stays visible on a touch tablet at >=768px
+          // too (issue #1356 found the old `md:` gate broke exactly that
+          // device). `touch-target` replaces `p-1` (~24px) so the tap area
+          // clears the 44px floor the rest of the admin uses.
+          className="absolute top-1 end-1 touch-target bg-destructive text-white rounded-full hover-reveal transition-opacity"
           aria-label={t('remove')}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -678,7 +678,7 @@ export class EmailService {
       email: string;
       name: string;
       verificationUrl: string;
-      expiresIn: string;
+      expiresInHours: number;
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
@@ -735,7 +735,7 @@ export class EmailService {
       email: string;
       name: string;
       verificationUrl: string;
-      expiresIn: string;
+      expiresInHours: number;
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
