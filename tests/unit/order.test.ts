@@ -11,6 +11,7 @@ import { socketService } from '@api/services/socket.service';
 
 // Mock dependencies
 vi.mock('@force/database', () => ({
+  setTenantGucs: async () => undefined,
   prisma: {
     order: {
       findMany: vi.fn(),

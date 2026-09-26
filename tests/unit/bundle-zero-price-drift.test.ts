@@ -166,6 +166,7 @@ const { mockPrisma } = vi.hoisted(() => ({
 }));
 
 vi.mock('@force/database', () => ({
+  setTenantGucs: async () => undefined,
   prisma: mockPrisma,
   Prisma: { TransactionIsolationLevel: { ReadCommitted: 'ReadCommitted' } },
   OrderStatus: {},

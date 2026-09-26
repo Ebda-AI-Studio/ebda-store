@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -260,7 +260,7 @@ const bulkAiFaqAeoFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -532,7 +532,7 @@ No other text, no markdown code fences — pure JSON only.`;
         },
         'bulk-ai-faq-aeo complete'
       );
-    })(); // end runInTenantContext
+    }); // end runInStoreScope
   }
 );
 export const bulkAiFaqAeo: InngestFunction.Any = bulkAiFaqAeoFn;
@@ -573,7 +573,7 @@ const bulkAiHowtoAeoFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -844,7 +844,7 @@ No markdown, no code fences — pure JSON only.`;
         },
         'bulk-ai-howto-aeo complete'
       );
-    })(); // end runInTenantContext
+    }); // end runInStoreScope
   }
 );
 export const bulkAiHowtoAeo: InngestFunction.Any = bulkAiHowtoAeoFn;
@@ -904,7 +904,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -1287,7 +1287,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
         { jobId, storeId, filled, skipped, failed, quotaReached, force },
         'bulk-ai-meta-aeo complete'
       );
-    })(); // end runInTenantContext
+    }); // end runInStoreScope
   }
 );
 export const bulkAiMetaAeo: InngestFunction.Any = bulkAiMetaAeoFn;

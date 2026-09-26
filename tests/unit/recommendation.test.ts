@@ -8,6 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock prisma before importing the service
 vi.mock('@force/database', () => ({
+  hasTenantContext: () => false,
+  runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
   prisma: {
     productRelation: {
       findMany: vi.fn(),

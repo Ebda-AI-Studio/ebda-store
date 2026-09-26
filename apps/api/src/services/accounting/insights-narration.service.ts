@@ -15,7 +15,7 @@
  * keeps Gemini call counts low.
  */
 
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { callGemini } from './gemini-ai.service';
 import logger from '../../lib/logger';
 
@@ -44,6 +44,19 @@ export async function generateInsightNarration(
   storeId: string,
   scope: NarrationScope
 ): Promise<Narration | null> {
+  // The snapshot tables read below (customer_cohort_snapshots,
+  // customer_rfm_snapshots, funnel_snapshots) carry STRICT RLS policies, and
+  // insights.routes.ts runs this as a sibling of its `runInTenantContext`
+  // reads, i.e. with no context: under `force_app` every narration came back
+  // null. A store scope, not a transaction, because a Gemini call sits
+  // between the reads.
+  if (!UUID_RE.test(storeId)) return null;
+  return runInStoreScope(storeId, () => narrate(storeId, scope));
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function narrate(storeId: string, scope: NarrationScope): Promise<Narration | null> {
   // Check store-level opt-in
   let store: { aiNarrationEnabled: boolean; name: string } | null = null;
   try {

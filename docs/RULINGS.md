@@ -8,6 +8,46 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25 — RLS strict policies (cutover attempt #1 rollback)
+
+Context: `docs/plans/2026-07-02-rls-cutover.md` § "2026-09-25 — first Phase 3 attempt". Branch
+`fix/rls-strict-policy-contextless-reads`.
+
+**Ruling RLS-S1 — the 24 STRICT policies stay strict; the readers get a context.** Weakening
+`store_faqs`/`store_howtos` (or any of the 24) to allow-contextless would make the public-route bug
+disappear by removing the database backstop the cutover exists to add, and no migration or doc
+records allow-contextless as the intended shape for them. Every contextless reader found was given
+the store it had already resolved. No policy migration ships. Cost if wrong: a contextless reader
+the audit and the parity gate both missed returns empty after the next flip — bounded by the
+parity gate, the staging soak list, and a one-env-var rollback.
+
+**Ruling RLS-S2 — `prisma.$transaction` opened inside a context inherits that context's GUCs.**
+Measured under a real `force_app` login: inside `runInTenantContext`, a strict-table count was 2
+directly and 0 through `withMoneyTx` or a batch `$transaction([...])`. Fixing it in the proxy covers
+all 23 `withMoneyTx` and ~20 batch call sites at once. The transaction still opens separately (no
+nesting, callers keep their isolation/timeout options). Inert on the owner role. Cost if wrong: a
+caller that deliberately used a second transaction to escape its store's scope now sees only its
+store — none was found, and such a caller would itself be a tenancy bug.
+
+**Ruling RLS-S3 — long jobs use `runInStoreScope` (one short tenant tx per query), not
+`runInTenantContext`.** #461 removed the bulk-AI wrapper because a 30s interactive transaction
+cannot span Gemini calls; its premise ("products + bulk_ai_jobs are not RLS-protected") was false.
+Cost if wrong: one extra BEGIN/SET/COMMIT round-trip per query in bulk jobs — negligible next to a
+2.5s AI throttle.
+
+**Ruling RLS-S4 — the R2 orphan check runs under `withRlsBypass`.** "Is this URL referenced
+anywhere" is cross-store by definition (cloned stores share image URLs); inside a store context
+every other store's rows are invisible and the object would be deleted while still in use. Cost if
+wrong: none on correctness — the check only ever reads, and bypass only widens what it can see.
+
+**Ruling RLS-S5 — accepted residual: the parity gate covers public/storefront endpoints only.**
+Admin routes, Inngest jobs and crons are covered by the force_app integration suite and the new
+registry/inheritance tests, not by an owner-vs-force_app payload diff. Cost if wrong: an admin or
+background path that returns fewer rows (not an error) under force_app is found in the staging soak
+or in production instead of CI.
+
+---
+
 ## 2026-09-25 — returns/refunds money batch (M1)
 
 Context: branch `fix/p2-m1-returns-refunds`, 19 issues in the return-completion

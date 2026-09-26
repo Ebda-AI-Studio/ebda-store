@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { tenantContext } from '../middleware/tenant-context';
 import { requireStoreAccess } from '../middleware/store-access';
 import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
@@ -1417,6 +1418,9 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const faqs = await prisma.storeFaq.findMany({
@@ -1436,6 +1440,9 @@ router.post(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.parse(req.body);
@@ -1465,6 +1472,9 @@ router.put(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.partial().parse(req.body);
@@ -1497,6 +1507,9 @@ router.delete(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const deleted = await prisma.storeFaq.deleteMany({
@@ -1537,6 +1550,9 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const howtos = await prisma.storeHowto.findMany({
@@ -1556,6 +1572,9 @@ router.post(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = howtoSchema.parse(req.body);
@@ -1587,6 +1606,9 @@ router.put(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = howtoSchema.partial().parse(req.body);
@@ -1627,6 +1649,9 @@ router.delete(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // store_faqs / store_howtos have STRICT RLS policies; this router is
+  // context-less (routes/index.ts), so set the store's context per route.
+  tenantContext,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const deleted = await prisma.storeHowto.deleteMany({

@@ -2,6 +2,7 @@ import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
+import { readInStoreContext } from '../lib/store-scoped-read';
 
 // ==========================================
 // Recommendation Service
@@ -89,16 +90,24 @@ class RecommendationService {
       // AI recommendations — second priority after manual cross-sells.
       // When the bulk-ai-recommendations sweep has been run for this store
       // these rows are populated and ordered by Gemini confidence score.
-      const aiRecRows = await prisma.aiRecommendation.findMany({
-        where: { storeId, sourceProductId: productId },
-        orderBy: { score: 'desc' },
-        take: 4,
-        select: {
-          targetProduct: { select: productSelect },
-          score: true,
-          reason: true,
-        },
-      });
+      //
+      // `ai_recommendation` has a STRICT RLS policy and the public
+      // `/public/:storeId/products/:productId/recommendations` route runs
+      // with no tenant context (recommendation.routes.ts is deliberately
+      // context-less, see routes/index.ts) — so under `force_app` this read
+      // returned [] and the storefront silently fell back to FBT.
+      const aiRecRows = await readInStoreContext(storeId, () =>
+        prisma.aiRecommendation.findMany({
+          where: { storeId, sourceProductId: productId },
+          orderBy: { score: 'desc' },
+          take: 4,
+          select: {
+            targetProduct: { select: productSelect },
+            score: true,
+            reason: true,
+          },
+        })
+      );
 
       if (aiRecRows.length > 0) {
         crossSell = aiRecRows.map(r => ({

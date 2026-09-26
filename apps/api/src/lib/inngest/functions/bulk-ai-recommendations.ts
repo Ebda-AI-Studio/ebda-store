@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { Prisma, prisma, withMoneyTx } from '@force/database';
+import { Prisma, prisma, withMoneyTx, runInStoreScope } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -195,7 +195,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       // Flip the job to 'running' as the very first step BEFORE any heavy
       // load. Two reasons: (a) the queue-depth watcher can distinguish
       // "Inngest never delivered the event" (status stays 'queued' for
@@ -549,7 +549,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
         { jobId, storeId, filled, skipped, failed, quotaReached, force },
         'bulk-ai-recommendations complete'
       );
-    })(); // end runInTenantContext — FIXED (2026-07): this used to be
+    }); // end runInStoreScope. FIXED (2026-07): this used to be
     // `return async () => {...};` with NO invocation — a genuine bug that
     // meant the entire sweep body above never ran (Inngest received an
     // uninvoked function reference as the handler's resolved value). The

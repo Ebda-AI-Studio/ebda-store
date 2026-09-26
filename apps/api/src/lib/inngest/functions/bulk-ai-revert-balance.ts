@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { revertProductBalance } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -62,7 +62,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -225,7 +225,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
       });
 
       logger.info({ jobId, storeId, reverted, skipped, failed }, 'bulk-ai-revert-balance complete');
-    })();
+    }); // end runInStoreScope
   }
 );
 export const bulkAiRevertBalance: InngestFunction.Any = bulkAiRevertBalanceFn;

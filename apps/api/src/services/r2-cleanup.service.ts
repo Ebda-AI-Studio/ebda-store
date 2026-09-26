@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
@@ -58,9 +58,16 @@ export function urlToR2Key(url: string | null | undefined): string | null {
  * store.(logo|logoAr|heroImage|ogImage|favicon), user.avatar.
  */
 async function isStillReferenced(url: string): Promise<boolean> {
-  // Run all the existence checks in parallel; any single match is
-  // enough to abort the delete. Using `findFirst` + `select: { id }`
-  // keeps each query as a one-row index probe.
+  // Run all the existence checks; any single match is enough to abort the
+  // delete. Using `findFirst` + `select: { id }` keeps each query as a
+  // one-row index probe.
+  //
+  // Under `withRlsBypass`, because "is this URL referenced ANYWHERE" is a
+  // cross-store question (cloned demo stores share image URLs). Callers run
+  // this inside a store's tenant transaction (deferred work) or with no
+  // context at all; under `force_app` the first hid every other store's rows
+  // and the second hid EVERY `blog_posts` row (strict policy), so a still-used
+  // image read as orphaned and was deleted from R2.
   const [
     pi,
     pv,
@@ -73,19 +80,21 @@ async function isStillReferenced(url: string): Promise<boolean> {
     storeOg,
     storeFavicon,
     userAvatar,
-  ] = await Promise.all([
-    prisma.productImage.findFirst({ where: { url }, select: { id: true } }),
-    prisma.productVariant.findFirst({ where: { imageUrl: url }, select: { id: true } }),
-    prisma.category.findFirst({ where: { image: url }, select: { id: true } }),
-    prisma.storePage.findFirst({ where: { coverImage: url }, select: { id: true } }),
-    prisma.blogPost.findFirst({ where: { coverImage: url }, select: { id: true } }),
-    prisma.store.findFirst({ where: { logo: url }, select: { id: true } }),
-    prisma.store.findFirst({ where: { logoAr: url }, select: { id: true } }),
-    prisma.store.findFirst({ where: { heroImage: url }, select: { id: true } }),
-    prisma.store.findFirst({ where: { ogImage: url }, select: { id: true } }),
-    prisma.store.findFirst({ where: { favicon: url }, select: { id: true } }),
-    prisma.user.findFirst({ where: { avatar: url }, select: { id: true } }),
-  ]);
+  ] = await withRlsBypass(tx =>
+    Promise.all([
+      tx.productImage.findFirst({ where: { url }, select: { id: true } }),
+      tx.productVariant.findFirst({ where: { imageUrl: url }, select: { id: true } }),
+      tx.category.findFirst({ where: { image: url }, select: { id: true } }),
+      tx.storePage.findFirst({ where: { coverImage: url }, select: { id: true } }),
+      tx.blogPost.findFirst({ where: { coverImage: url }, select: { id: true } }),
+      tx.store.findFirst({ where: { logo: url }, select: { id: true } }),
+      tx.store.findFirst({ where: { logoAr: url }, select: { id: true } }),
+      tx.store.findFirst({ where: { heroImage: url }, select: { id: true } }),
+      tx.store.findFirst({ where: { ogImage: url }, select: { id: true } }),
+      tx.store.findFirst({ where: { favicon: url }, select: { id: true } }),
+      tx.user.findFirst({ where: { avatar: url }, select: { id: true } }),
+    ])
+  );
   return Boolean(
     pi ||
     pv ||

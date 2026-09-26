@@ -687,6 +687,85 @@ jobs:
           DIRECT_URL: postgresql://force_app:ci-only-force-app-pw@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           NODE_ENV: test
 
+  # RLS payload parity — the gate that would have caught the 2026-09-25
+  # cutover rollback. The two jobs above prove force_app can run the code
+  # paths without ERRORING; neither compares what comes BACK. A STRICT RLS
+  # policy read with no tenant context does not error, it returns fewer rows
+  # (store_faqs/store_howtos came back `[]` on every public store payload).
+  # This job boots the built API twice against one database — as the owner
+  # (RLS bypassed, today's production) and as force_app (RLS enforced) —
+  # calls the storefront endpoints for every store, and fails on any array
+  # that shrank or field that vanished. scripts/rls-payload-parity.mjs.
+  test-rls-payload-parity:
+    name: RLS Payload Parity (owner vs force_app)
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 15
+    needs: [build]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: force_test
+        ports:
+          # Dynamic host port, same reasoning as the jobs above.
+          - 5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # No 'cache: npm' — see the Lint job.
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database + shared + API
+        run: |
+          npm run build -w packages/database
+          npm run build -w packages/shared
+          npm run build -w apps/api
+
+      - name: Run database migrations + seed (as the ephemeral Postgres superuser)
+        run: |
+          npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+          npm run db:seed --if-present
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          ADMIN_PASSWORD: test-admin-password-ci
+          ADMIN_EMAIL: admin@forcemedia.com
+
+      - name: Give force_app a CI-only login
+        # Same disposable per-job password as the jobs above; never exists
+        # outside this container.
+        run: |
+          cat <<'SQL' | npx prisma db execute --url "postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test" --stdin
+          ALTER ROLE force_app WITH PASSWORD 'ci-only-force-app-pw' LOGIN;
+          SQL
+
+      - name: Compare owner vs force_app storefront payloads
+        # --seed adds two realistic fixture stores (FAQs, how-tos, locations,
+        # bundles, blog posts, pages, AI recommendations) so every strict
+        # table the storefront reads has rows to lose. The script refuses to
+        # pass if the force_app URL can bypass RLS or nothing was compared.
+        run: node scripts/rls-payload-parity.mjs --seed
+        env:
+          PARITY_OWNER_DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          PARITY_APP_DATABASE_URL: postgresql://force_app:ci-only-force-app-pw@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+
   test-e2e:
     name: E2E Tests
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
@@ -896,7 +975,17 @@ jobs:
     runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs:
-      [lint, typecheck, security, build, test-unit, test-integration, test-rls-force-app, test-e2e]
+      [
+        lint,
+        typecheck,
+        security,
+        build,
+        test-unit,
+        test-integration,
+        test-rls-force-app,
+        test-rls-payload-parity,
+        test-e2e,
+      ]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Compose + send Telegram alert
@@ -916,6 +1005,7 @@ jobs:
           UNIT_RES: ${{ needs.test-unit.result }}
           INT_RES: ${{ needs.test-integration.result }}
           RLS_FORCE_APP_RES: ${{ needs.test-rls-force-app.result }}
+          RLS_PARITY_RES: ${{ needs.test-rls-payload-parity.result }}
           E2E_RES: ${{ needs.test-e2e.result }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
@@ -926,7 +1016,7 @@ jobs:
           # Collect which jobs failed (vs which skipped vs passed) so Ahmad
           # can see what to look at without clicking through.
           FAILED_JOBS=""
-          for entry in "lint:$LINT_RES" "typecheck:$TYPECHECK_RES" "security:$SECURITY_RES" "build:$BUILD_RES" "unit:$UNIT_RES" "integration:$INT_RES" "rls-force-app:$RLS_FORCE_APP_RES" "e2e:$E2E_RES"; do
+          for entry in "lint:$LINT_RES" "typecheck:$TYPECHECK_RES" "security:$SECURITY_RES" "build:$BUILD_RES" "unit:$UNIT_RES" "integration:$INT_RES" "rls-force-app:$RLS_FORCE_APP_RES" "rls-payload-parity:$RLS_PARITY_RES" "e2e:$E2E_RES"; do
             name="${entry%:*}"
             res="${entry#*:}"
             if [ "$res" = "failure" ]; then

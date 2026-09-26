@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import type { AiFieldSources } from '@force/shared';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -94,7 +94,7 @@ const bulkAiExcerptFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -335,7 +335,7 @@ const bulkAiExcerptFn = inngest.createFunction(
         { jobId, storeId, filled, skipped, failed, quotaReached, force },
         'bulk-ai-excerpt complete'
       );
-    })();
+    }); // end runInStoreScope
   }
 );
 export const bulkAiExcerpt: InngestFunction.Any = bulkAiExcerptFn;

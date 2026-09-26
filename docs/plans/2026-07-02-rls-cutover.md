@@ -16,7 +16,7 @@ Source of the problem: `docs/audits/2026-07-02-tenancy-rls-auth.md` (F1/F2/F3) +
   `current_store_id() IS NULL OR app.bypass_rls='true' OR store_id = current_store_id()`.
   → A query with **no context set returns ALL tenants' rows**. This is fail-open by design (safe during the half-migration) but means the backstop only bites when context is actually set.
 - **Context is set** by `runInTenantContext(storeId, fn)` (`packages/database/src/index.ts`) via `SET LOCAL app.current_store_id`. `withRlsBypass(fn)` sets `app.bypass_rls='true'`.
-- **CI runs tests as the `test` superuser** (`ci.yml` `POSTGRES_USER: test`, `DATABASE_URL: postgresql://test:test@…`). → CI does **not** exercise RLS as `force_app` today. This is the biggest gap: we cannot prove the cutover safe without it.
+- **CI runs tests as the `test` superuser** (`ci.yml` `POSTGRES_USER: test`, `DATABASE_URL` as the `test` user). → CI does **not** exercise RLS as `force_app` today. This is the biggest gap: we cannot prove the cutover safe without it.
 
 ### The three blockers that break at cutover (must fix in Phase 1)
 
@@ -118,3 +118,38 @@ Exit criteria: full staging pass on force_app, zero permission errors, p95 withi
 ## Definition of done
 
 Prod `current_user = force_app`, `rolbypassrls = false`; the Phase-0 schema query returns **zero** RLS-enabled-without-policy tables; the CI force_app job (incl. cross-tenant negative tests) is green; checkout + admin + jobs verified on staging then prod; `ALLOW_BYPASSRLS_ROLE` removed; docs corrected.
+
+---
+
+## 2026-09-25 — first Phase 3 attempt, rolled back (13:21–13:25)
+
+**What broke.** Minutes after production's API switched to `force_app`, the public store payloads (`GET /public/stores/:slugOrId`, `GET /public/store/resolve`) returned `faqs: []` / `howtos: []` (pecannbee has 24/9 active, wady-aljuz 8/3). No error anywhere. Rolled back to the owner role.
+
+**The class.** The policies come in two shapes, and this plan only described one:
+
+- **allow-contextless** — `current_store_id() IS NULL OR … OR store_id = current_store_id()`. A query with no context sees every row. 74 tables.
+- **STRICT** — `store_id = current_setting('app.current_store_id', true) OR current_setting('app.bypass_rls', true) = 'true'`. A query with no context sees **zero** rows and a write is **rejected**. 24 tables: `accounts, ai_recommendation, ai_usage, backorder_lines, blog_posts, bulk_ai_jobs, customer_cohort_snapshots, customer_rfm_snapshots, deadstock_flags, expenses, funnel_snapshots, journal_entries, journal_lines, profit_anomalies, purchase_order_items, purchase_orders, reorder_rules, reorder_suggestions, sequences, stock_adjustment_items, stock_adjustments, store_faqs, store_howtos, suppliers`. Pinned by the `RLS policy registry` test in `tests/integration/rls-force-app.test.ts`.
+
+Every contextless reader of a strict table fails silently under `force_app`. The CI integration suite already ran the API as `force_app` and passed, because nothing compared what came back.
+
+**Paths found (all fixed in `fix/rls-strict-policy-contextless-reads`):**
+
+| Path                                                                                                                                                                                 | Strict table                                                                                 | Symptom under force_app                                             | Fix                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `GET /public/stores/:slugOrId`, `GET /public/store/resolve` (nested `store.faqs/howtos`)                                                                                             | store_faqs, store_howtos                                                                     | `[]`                                                                | read in the resolved store's context (`readInStoreContext`)         |
+| `GET /public/:storeId/products/:productId/recommendations`                                                                                                                           | ai_recommendation                                                                            | AI cross-sell gone, silent FBT fallback                             | same                                                                |
+| Admin `/stores/:id/faqs*`, `/stores/:id/howtos*` (store.routes is context-less)                                                                                                      | store_faqs, store_howtos                                                                     | list empty, create rejected, edit/delete 404                        | route-level `tenantContext`                                         |
+| Every `withMoneyTx` / `prisma.$transaction` opened inside a context (stock-adjustment post, PO receive, backorder cancel, bulk-AI recommendation persist, ai-autofill-cleanup batch) | backorder_lines, stock_adjustments, purchase_orders, purchase_order_items, ai_recommendation | reads empty, updates hit 0 rows, PO receive 404s                    | the proxy's `$transaction` now starts with the ambient `SET LOCAL`s |
+| Public checkout `OrderService.create` (no ambient context)                                                                                                                           | backorder_lines                                                                              | insert rejected, whole order rolled back when a line is backordered | `setTenantGucs(tx, { storeId })` at the top of the transaction      |
+| All 12 bulk-AI Inngest jobs (wrapper removed in #461 on the belief they touch no RLS table)                                                                                          | bulk_ai_jobs, ai_usage, ai_recommendation, store_faqs, store_howtos                          | first `bulkAiJob.update` → P2025; quota never counts                | `runInStoreScope(storeId, …)` — per-query tenant tx, no 30s tx      |
+| Insights narration (sibling of the route's `runInTenantContext`)                                                                                                                     | customer_cohort/rfm, funnel snapshots                                                        | narration always null                                               | `runInStoreScope` in the service                                    |
+| `deleteR2ObjectIfOrphan` reference check                                                                                                                                             | blog_posts (+ cross-store visibility on every table)                                         | a still-used image reads as orphaned and is **deleted from R2**     | `withRlsBypass` — "referenced anywhere" is a cross-store question   |
+
+**The gate.** `scripts/rls-payload-parity.mjs` + CI job **RLS Payload Parity (owner vs force_app)**: boots the built API twice on one database (owner, force_app), calls the storefront endpoints for every store, deep-diffs the JSON, fails on any shrunk array / missing field. On `main` it reproduces the FAQ loss (8 of 111 comparisons); on the fix branch 111/111 match.
+
+**Before a second attempt:**
+
+1. The parity job and the RLS registry test green on `main`.
+2. Run the parity script against a **restored copy of production** (Neon branch, `PARITY_ALLOW_REMOTE=1`) — the fixtures cover the shapes, real stores cover the data.
+3. Admin + Inngest paths are NOT covered by the parity gate (it only drives public endpoints). Staging soak (Phase 2) still has to exercise: bulk-AI jobs, FAQ/how-to admin, stock adjustments post, PO receive, backorder cancel, insights narration, a checkout with a backordered line.
+4. Watch for P2025 / "violates row-level security policy" / empty-array regressions in Sentry for the first hour after the flip.

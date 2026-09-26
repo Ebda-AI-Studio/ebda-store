@@ -49,6 +49,7 @@ const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoist
 });
 
 vi.mock('@force/database', () => ({
+  withRlsBypass: (fn: (tx: unknown) => unknown) => fn(prismaMock),
   prisma: prismaMock,
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),

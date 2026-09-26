@@ -191,6 +191,7 @@ const { mockPrisma, capturedOrderCreate } = vi.hoisted(() => {
 });
 
 vi.mock('@force/database', () => ({
+  setTenantGucs: async () => undefined,
   prisma: mockPrisma,
   Prisma: {},
   OrderStatus: {},

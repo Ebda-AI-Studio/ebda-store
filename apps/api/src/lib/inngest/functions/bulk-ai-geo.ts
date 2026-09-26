@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -119,7 +119,7 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -334,7 +334,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
         },
         'bulk-ai-llms-txt complete'
       );
-    })(); // end runInTenantContext
+    }); // end runInStoreScope
   }
 );
 export const bulkAiLlmsTxt: InngestFunction.Any = bulkAiLlmsTxtFn;
@@ -377,7 +377,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -616,7 +616,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
         { jobId, storeId, filled, skipped, failed, quotaReached, force },
         'bulk-ai-citation-copy complete'
       );
-    })(); // end runInTenantContext
+    }); // end runInStoreScope
   }
 );
 export const bulkAiCitationCopy: InngestFunction.Any = bulkAiCitationCopyFn;
@@ -649,7 +649,7 @@ const bulkAiBrandFactsFn = inngest.createFunction(
       return;
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -842,7 +842,7 @@ Populate using only the information provided above. For keyCategories, use the c
         },
         'bulk-ai-brand-facts complete'
       );
-    })(); // end runInTenantContext
+    }); // end runInStoreScope
   }
 );
 export const bulkAiBrandFacts: InngestFunction.Any = bulkAiBrandFactsFn;

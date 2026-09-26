@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -94,7 +94,7 @@ const bulkAiTranslateFn = inngest.createFunction(
       return fillTo === 'ar' ? (en ?? '') : (ar ?? '');
     }
 
-    return (async () => {
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -541,7 +541,7 @@ const bulkAiTranslateFn = inngest.createFunction(
         { jobId, storeId, filled, skipped, failed, errorCount: errors.length, quotaReached },
         'bulk-ai-translate complete'
       );
-    })(); // end runInTenantContext
+    }); // end runInStoreScope
   }
 );
 export const bulkAiTranslate: InngestFunction.Any = bulkAiTranslateFn;

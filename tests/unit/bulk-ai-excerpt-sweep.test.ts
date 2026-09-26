@@ -40,6 +40,7 @@ const mockFindUniqueJob = vi.fn();
 const mockUpdateJob = vi.fn();
 
 vi.mock('@force/database', () => ({
+  runInStoreScope: (_storeId: string, fn: () => unknown) => fn(),
   prisma: {
     store: { findUnique: (...args: unknown[]) => mockFindUniqueStore(...args) },
     product: {

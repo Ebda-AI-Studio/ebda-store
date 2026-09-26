@@ -42,7 +42,14 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
+import {
+  prisma,
+  withRlsBypass,
+  runInTenantContext,
+  runInStoreScope,
+  withMoneyTx,
+  setTenantGucs,
+} from '@force/database';
 
 const TEST_PREFIX = 'fatest-';
 
@@ -56,6 +63,8 @@ let returnItemB = '';
 let addressA = '';
 let addressB = '';
 let wishlistItemB = '';
+let faqA = '';
+let faqB = '';
 
 async function makeStoreWithOwner(slug: string): Promise<{ storeId: string; userId: string }> {
   return withRlsBypass(async tx => {
@@ -222,6 +231,15 @@ beforeAll(async () => {
       data: { wishlistId: wishlistB.id, productId: prodB.id },
     });
     wishlistItemB = wishlistItem.id;
+
+    // ── store_faqs / store_howtos: STRICT policy sample ──
+    faqA = (await tx.storeFaq.create({ data: { storeId: storeA, question: 'qa', answer: 'a' } }))
+      .id;
+    faqB = (await tx.storeFaq.create({ data: { storeId: storeB, question: 'qb', answer: 'b' } }))
+      .id;
+    await tx.storeHowto.create({
+      data: { storeId: storeB, title: 'hb', description: 'd', steps: [] },
+    });
   });
 });
 
@@ -409,5 +427,156 @@ describe('RLS-3: userContext middleware call surface — wishlist (header-derive
     // as here, not opening a tenant context at all.
     const row = await prisma.wishlistItem.findUnique({ where: { id: wishlistItemB } });
     expect(row?.id).toBe(wishlistItemB);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// STRICT policies (2026-09-25 cutover rollback).
+//
+// Most tables allow a query that sets no context (`current_store_id() IS
+// NULL OR …`). 24 do not: a contextless read returns ZERO rows and a
+// contextless write is rejected. The public store payloads read
+// store_faqs/store_howtos with no context and shipped `faqs: []` to every
+// storefront the moment production switched to force_app.
+// ─────────────────────────────────────────────────────────────────────────
+describe('force_app real-login: store_faqs (STRICT policy)', () => {
+  it('a contextless read sees NOTHING — the reason every reader must set context', async () => {
+    expect(await prisma.storeFaq.count({ where: { id: { in: [faqA, faqB] } } })).toBe(0);
+  });
+
+  it('store B context sees its own FAQ and not store A (control + isolation)', async () => {
+    const ids = await runInTenantContext(storeB, () =>
+      prisma.storeFaq.findMany({ where: { id: { in: [faqA, faqB] } }, select: { id: true } })
+    );
+    expect(ids.map(r => r.id)).toEqual([faqB]);
+  });
+
+  it('a nested store.faqs select outside context comes back empty (the exact shipped bug)', async () => {
+    const store = await prisma.store.findUnique({
+      where: { id: storeB },
+      select: { faqs: { select: { id: true } }, howtos: { select: { id: true } } },
+    });
+    expect(store?.faqs).toEqual([]);
+    expect(store?.howtos).toEqual([]);
+  });
+});
+
+describe('force_app real-login: a transaction opened inside a context inherits it', () => {
+  // `$transaction` is never routed to the ambient tenant transaction, so it
+  // opens a new one on another connection. Before 2026-09-25 that connection
+  // carried no RLS settings: a strict table read as empty inside it.
+  it('withMoneyTx inside runInTenantContext sees the strict rows', async () => {
+    const n = await runInTenantContext(storeB, () =>
+      withMoneyTx(prisma, tx => tx.storeFaq.count({ where: { id: faqB } }))
+    );
+    expect(n).toBe(1);
+  });
+
+  it('batch $transaction([...]) inside runInTenantContext sees the strict rows', async () => {
+    const [n] = await runInTenantContext(storeB, () =>
+      prisma.$transaction([prisma.storeFaq.count({ where: { id: faqB } })])
+    );
+    expect(n).toBe(1);
+  });
+
+  it('the inherited context is still scoped — store A cannot see store B inside it', async () => {
+    const n = await runInTenantContext(storeA, () =>
+      withMoneyTx(prisma, tx => tx.storeFaq.count({ where: { id: faqB } }))
+    );
+    expect(n).toBe(0);
+  });
+
+  it('setTenantGucs scopes a contextless caller-opened transaction (public checkout shape)', async () => {
+    const n = await withMoneyTx(prisma, async tx => {
+      await setTenantGucs(tx, { storeId: storeB });
+      return tx.storeFaq.count({ where: { id: faqB } });
+    });
+    expect(n).toBe(1);
+  });
+});
+
+describe('force_app real-login: runInStoreScope (long jobs, no long transaction)', () => {
+  it('model reads, raw queries, fn- and batch-transactions all see the store', async () => {
+    const r = await runInStoreScope(storeB, async () => ({
+      count: await prisma.storeFaq.count({ where: { id: faqB } }),
+      raw: await prisma.$queryRaw<Array<{ n: number }>>`
+        SELECT count(*)::int AS n FROM store_faqs WHERE id = ${faqB}`,
+      fnTx: await prisma.$transaction(tx => tx.storeFaq.count({ where: { id: faqB } })),
+      batch: await prisma.$transaction([prisma.storeFaq.count({ where: { id: faqB } })]),
+      money: await withMoneyTx(prisma, tx => tx.storeFaq.count({ where: { id: faqB } })),
+    }));
+    expect(r).toEqual({ count: 1, raw: [{ n: 1 }], fnTx: 1, batch: [1], money: 1 });
+  });
+
+  it('writes land and stay scoped', async () => {
+    const updated = await runInStoreScope(storeB, () =>
+      prisma.storeFaq.update({ where: { id: faqB }, data: { orderIndex: 3 } })
+    );
+    expect(updated.orderIndex).toBe(3);
+    const other = await runInStoreScope(storeB, () =>
+      prisma.storeFaq.count({ where: { id: faqA } })
+    );
+    expect(other).toBe(0);
+  });
+
+  it('rejects a non-UUID store id', () => {
+    expect(() => runInStoreScope('not-a-uuid', async () => 1)).toThrow('Invalid store ID format');
+  });
+});
+
+/**
+ * The STRICT set, pinned. A strict policy is a trap for every contextless
+ * reader (public routes, Inngest jobs, `withMoneyTx`), so adding one — or
+ * relaxing one — must be a deliberate change that updates this list AND
+ * re-runs `scripts/rls-payload-parity.mjs`. See docs/plans/2026-07-02-rls-cutover.md.
+ */
+const STRICT_TABLES = [
+  'accounts',
+  'ai_recommendation',
+  'ai_usage',
+  'backorder_lines',
+  'blog_posts',
+  'bulk_ai_jobs',
+  'customer_cohort_snapshots',
+  'customer_rfm_snapshots',
+  'deadstock_flags',
+  'expenses',
+  'funnel_snapshots',
+  'journal_entries',
+  'journal_lines',
+  'profit_anomalies',
+  'purchase_order_items',
+  'purchase_orders',
+  'reorder_rules',
+  'reorder_suggestions',
+  'sequences',
+  'stock_adjustment_items',
+  'stock_adjustments',
+  'store_faqs',
+  'store_howtos',
+  'suppliers',
+];
+
+describe('RLS policy registry', () => {
+  it('the set of STRICT-policy tables is exactly the pinned list', async () => {
+    const rows = await prisma.$queryRaw<Array<{ table: string; qual: string | null }>>`
+      SELECT c.relname AS table, pg_get_expr(p.polqual, p.polrelid) AS qual
+      FROM pg_policy p
+      JOIN pg_class c ON c.oid = p.polrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+      WHERE c.relrowsecurity
+        AND p.polcmd IN ('*', 'r')
+        AND (p.polroles = '{0}' OR (SELECT oid FROM pg_roles WHERE rolname = 'force_app') = ANY (p.polroles))`;
+    const allowsContextless = new Set<string>();
+    const policied = new Set<string>();
+    for (const r of rows) {
+      policied.add(r.table);
+      const q = r.qual ?? '';
+      if (/current_(store|user)_id\(\) IS NULL/.test(q) || q.trim() === 'true') {
+        allowsContextless.add(r.table);
+      }
+    }
+    const strict = [...policied].filter(t => !allowsContextless.has(t)).sort();
+    expect(strict).toEqual(STRICT_TABLES);
   });
 });

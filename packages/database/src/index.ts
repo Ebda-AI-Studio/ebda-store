@@ -1,6 +1,7 @@
 // Database Package - Prisma Client Export
 import { PrismaClient, Prisma } from '@prisma/client';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { applyGucs, gucStatements, type TenantGucs } from './tenant-gucs';
 
 // Options are extracted so the client's TYPE can be derived from them. A global
 // `omit` narrows PrismaClient's generic, so a plain `PrismaClient` annotation on
@@ -115,6 +116,109 @@ type TenantTx = Omit<
 
 /** Stores the active tenant transaction for the current async context. */
 const tenantStorage = new AsyncLocalStorage<TenantTx>();
+
+/**
+ * The RLS settings each tenant transaction was opened with, so a SECOND
+ * transaction started from inside it can carry the same ones (see
+ * `$transaction` in the proxy below).
+ */
+const txGucs = new WeakMap<object, TenantGucs>();
+
+/**
+ * A store scope WITHOUT a long-lived transaction — see `runInStoreScope`.
+ */
+const storeScope = new AsyncLocalStorage<{ storeId: string }>();
+
+/** The RLS settings in force on this async context, if any. */
+function ambientGucs(): TenantGucs | undefined {
+  const tx = tenantStorage.getStore();
+  if (tx) return txGucs.get(tx as object);
+  const scope = storeScope.getStore();
+  return scope ? { storeId: scope.storeId } : undefined;
+}
+
+/**
+ * A deferred query issued inside `runInStoreScope`. Lazy like a PrismaPromise:
+ * nothing runs until it is awaited, and then it runs in its own short
+ * `runInTenantContext`. Inside a batch `prisma.$transaction([...])` the whole
+ * batch instead runs in ONE tenant transaction via `exec` (see
+ * `transactionWithGucs`), so batch atomicity is kept.
+ */
+const SCOPED_OP = Symbol('forceScopedOp');
+interface ScopedOp extends PromiseLike<unknown> {
+  [SCOPED_OP]: true;
+  exec: () => Promise<unknown>;
+}
+
+function isScopedOp(v: unknown): v is ScopedOp {
+  return Boolean(v && typeof v === 'object' && (v as Record<symbol, unknown>)[SCOPED_OP]);
+}
+
+function scopedOp(storeId: string, exec: () => Promise<unknown>): ScopedOp & Promise<unknown> {
+  let started: Promise<unknown> | undefined;
+  const run = () => (started ??= runInTenantContext(storeId, exec));
+  const op = {
+    [SCOPED_OP]: true as const,
+    exec,
+    then: (a?: (v: unknown) => unknown, b?: (e: unknown) => unknown) => run().then(a, b),
+    catch: (b?: (e: unknown) => unknown) => run().catch(b),
+    finally: (f?: () => void) => run().finally(f),
+    [Symbol.toStringTag]: 'ScopedPrismaPromise',
+  };
+  return op as unknown as ScopedOp & Promise<unknown>;
+}
+
+/**
+ * `prisma.$transaction` when RLS settings are in force on this context.
+ *
+ * `$transaction` is never routed to the ambient tenant transaction (see
+ * `hasTenantContext`), so it opens a NEW transaction on another connection —
+ * and that connection used to carry none of the settings. Every table with a
+ * STRICT policy (store_id = app.current_store_id, no contextless allowance)
+ * then read as empty and rejected writes, while allow-contextless tables
+ * silently lost their tenant scoping. Measured on 2026-09-25 under a real
+ * `force_app` login: inside `runInTenantContext`, a direct count of
+ * `ai_recommendation` returned 2 rows, the same count through `withMoneyTx`
+ * or a batch `$transaction([...])` returned 0.
+ *
+ * The new transaction still opens separately (nesting is impossible in
+ * Prisma and callers rely on their own isolation/timeout options); it now
+ * starts with the same `SET LOCAL`s. Inert on a BYPASSRLS role.
+ */
+function transactionWithGucs(gucs: TenantGucs) {
+  const base = basePrisma.$transaction.bind(basePrisma) as (...a: unknown[]) => Promise<unknown>;
+  return (arg: unknown, opts?: unknown): Promise<unknown> => {
+    if (typeof arg === 'function') {
+      const fn = arg as (tx: TenantTx) => Promise<unknown>;
+      return base(async (tx: TenantTx) => {
+        await applyGucs(tx, gucs);
+        return fn(tx);
+      }, opts);
+    }
+    if (Array.isArray(arg)) {
+      if (arg.length > 0 && arg.every(isScopedOp)) {
+        return runInTenantContext(gucs.storeId, async () => {
+          const out: unknown[] = [];
+          for (const op of arg) out.push(await op.exec());
+          return out;
+        });
+      }
+      const sets = gucStatements(gucs).map(sql => basePrisma.$executeRawUnsafe(sql));
+      return base([...sets, ...arg], opts).then(r => (r as unknown[]).slice(sets.length));
+    }
+    return base(arg, opts);
+  };
+}
+
+function isModelDelegate(prop: string, value: unknown): value is object {
+  return (
+    prop[0] !== '$' &&
+    prop[0] !== '_' &&
+    Boolean(value) &&
+    typeof value === 'object' &&
+    typeof (value as { findMany?: unknown }).findMany === 'function'
+  );
+}
 
 /**
  * Tenant transactions whose `runInTenantContext` callback has already
@@ -249,6 +353,11 @@ function isProxiedProp(prop: string | symbol): boolean {
  * when it never reads back what it wrote and so never throws.
  *
  * Prisma does not support nested interactive transactions in any case.
+ *
+ * Since 2026-09-25 that separate transaction at least starts with the SAME RLS
+ * settings (`transactionWithGucs` below), so it no longer reads a STRICT-policy
+ * table as empty. It is still a different connection with its own commit —
+ * everything above about write-then-read and commit atomicity still holds.
  */
 export function hasTenantContext(): boolean {
   return tenantStorage.getStore() !== undefined;
@@ -273,6 +382,37 @@ export const prisma = new Proxy(basePrisma, {
         reportClosedTenantTxAccess(String(prop));
       }
       return Reflect.get(tx, prop, tx);
+    }
+    if (prop === '$transaction') {
+      const gucs = ambientGucs();
+      if (gucs && (gucs.storeId || gucs.userId)) return transactionWithGucs(gucs);
+    }
+    // `runInStoreScope`: no transaction is open, so each model call and raw
+    // query runs in its own short tenant transaction instead.
+    const scope = tx ? undefined : storeScope.getStore();
+    if (scope && typeof prop === 'string') {
+      const self = prisma as unknown as Record<string, unknown>;
+      if (PROXIED_PRISMA_METHODS.has(prop)) {
+        return (...args: unknown[]) =>
+          scopedOp(scope.storeId, () =>
+            (self[prop] as (...a: unknown[]) => Promise<unknown>)(...args)
+          );
+      }
+      const value = Reflect.get(target, prop, receiver);
+      if (isModelDelegate(prop, value)) {
+        return new Proxy(value, {
+          get(delegate, method, r) {
+            const v = Reflect.get(delegate, method, r);
+            if (typeof v !== 'function' || typeof method !== 'string') return v;
+            return (...args: unknown[]) =>
+              scopedOp(scope.storeId, () => {
+                const d = self[prop] as Record<string, (...a: unknown[]) => Promise<unknown>>;
+                return d[method](...args);
+              });
+          },
+        });
+      }
+      return value;
     }
     return Reflect.get(target, prop, receiver);
   },
@@ -328,6 +468,9 @@ export { prisma as db };
 // Money-safe transaction wrapper (Neon pgbouncer P2028 guard). Use for every
 // interactive $transaction call site. See ./with-money-tx.ts.
 export { withMoneyTx } from './with-money-tx';
+
+// Set RLS settings on a caller-opened transaction. See ./tenant-gucs.ts.
+export { setTenantGucs, type TenantGucs } from './tenant-gucs';
 
 /**
  * Run a callback inside a Prisma interactive transaction with
@@ -387,16 +530,8 @@ export async function runInTenantContext<T>(
   }
   return basePrisma.$transaction(
     async tx => {
-      if (storeId) {
-        await tx.$executeRawUnsafe(
-          `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
-        );
-      }
-      if (userId) {
-        await tx.$executeRawUnsafe(
-          `SET LOCAL app.current_user_id = '${userId.replace(/'/g, "''")}'`
-        );
-      }
+      await applyGucs(tx, { storeId, userId });
+      txGucs.set(tx as object, { storeId, userId });
       try {
         return await tenantStorage.run(tx, fn);
       } finally {
@@ -437,6 +572,33 @@ export async function withTenantContext<T>(
     },
     { maxWait: 10000, timeout: 30000 }
   );
+}
+
+/**
+ * Scope every Prisma call in `fn` to `storeId` under RLS WITHOUT holding one
+ * transaction open for the whole of `fn`.
+ *
+ * For long-running per-store work — the bulk-AI Inngest jobs, which interleave
+ * Gemini calls and multi-second throttles between queries. Those jobs were
+ * once wrapped in `runInTenantContext`; its 30s interactive transaction
+ * expired mid-sweep (#461), so the wrapper was removed on the belief that the
+ * jobs touch no RLS-protected table. They do: `bulk_ai_jobs`, `ai_usage`,
+ * `ai_recommendation`, `store_faqs` and `store_howtos` all carry STRICT
+ * policies, so under `force_app` every one of those jobs would read nothing
+ * and fail its first `bulkAiJob.update` (P2025).
+ *
+ * Inside the scope, each model call / raw query runs in its own short
+ * `runInTenantContext(storeId, …)`; `$transaction` / `withMoneyTx` start with
+ * the store's `SET LOCAL`; an explicit `runInTenantContext` / `withRlsBypass`
+ * inside the scope behaves exactly as it does anywhere else. Results are
+ * identical on the owner role — the only cost is one short transaction per
+ * query, negligible next to an AI call.
+ */
+export function runInStoreScope<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  if (!UUID_RE.test(storeId)) {
+    throw new Error('Invalid store ID format');
+  }
+  return storeScope.run({ storeId }, fn);
 }
 
 /**

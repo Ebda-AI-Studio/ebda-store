@@ -6,6 +6,7 @@ import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType } from '@force/database';
+import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirect } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
 import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
@@ -1335,6 +1336,45 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 /**
+ * The store's active FAQs + how-tos for the public store payloads below.
+ *
+ * `store_faqs` / `store_howtos` carry STRICT RLS policies — `store_id =
+ * app.current_store_id OR app.bypass_rls` — with no allowance for a query that
+ * sets no context. These public routes run outside `tenantContext`, so under
+ * the non-bypass `force_app` role a nested `store.faqs` select silently
+ * returned `[]` for every store. That is what emptied pecannbee's 24 FAQs and
+ * 9 how-tos during the 2026-09-25 cutover attempt, with no error anywhere.
+ *
+ * The store has already been resolved from the unscoped `stores` table, so
+ * read its rows inside ITS tenant context: correct under RLS and still scoped
+ * to that one store. Identical result on the owner role. The keys stay last
+ * in the payload, where the nested select used to put them.
+ */
+async function fetchStoreFaqsAndHowtos(storeId: string) {
+  return readInStoreContext(storeId, async () => {
+    const faqs = await prisma.storeFaq.findMany({
+      where: { storeId, isActive: true },
+      orderBy: { orderIndex: 'asc' },
+      select: { id: true, question: true, questionAr: true, answer: true, answerAr: true },
+    });
+    const howtos = await prisma.storeHowto.findMany({
+      where: { storeId, isActive: true },
+      orderBy: { orderIndex: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        titleAr: true,
+        description: true,
+        descriptionAr: true,
+        steps: true,
+        stepsAr: true,
+      },
+    });
+    return { faqs, howtos };
+  });
+}
+
+/**
  * Public projection of a store's published Locations, threaded onto the
  * store-resolve payloads below for the opt-in storefront-footer "Branches"
  * column (B3, 2026-09-25). Gated on BOTH `locationsEnabled` (the existing
@@ -1459,30 +1499,6 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
           createdAt: true,
           llmsTxt: true,
           aboutJson: true,
-          faqs: {
-            where: { isActive: true },
-            orderBy: { orderIndex: 'asc' },
-            select: {
-              id: true,
-              question: true,
-              questionAr: true,
-              answer: true,
-              answerAr: true,
-            },
-          },
-          howtos: {
-            where: { isActive: true },
-            orderBy: { orderIndex: 'asc' },
-            select: {
-              id: true,
-              title: true,
-              titleAr: true,
-              description: true,
-              descriptionAr: true,
-              steps: true,
-              stepsAr: true,
-            },
-          },
         },
       });
 
@@ -1495,6 +1511,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       const publicStore = {
         ...store,
         marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+        ...(await fetchStoreFaqsAndHowtos(store.id)),
       };
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
@@ -1655,30 +1672,6 @@ router.get(
             heroImage: true,
             llmsTxt: true,
             aboutJson: true,
-            faqs: {
-              where: { isActive: true },
-              orderBy: { orderIndex: 'asc' },
-              select: {
-                id: true,
-                question: true,
-                questionAr: true,
-                answer: true,
-                answerAr: true,
-              },
-            },
-            howtos: {
-              where: { isActive: true },
-              orderBy: { orderIndex: 'asc' },
-              select: {
-                id: true,
-                title: true,
-                titleAr: true,
-                description: true,
-                descriptionAr: true,
-                steps: true,
-                stepsAr: true,
-              },
-            },
           },
         });
 
@@ -1705,6 +1698,7 @@ router.get(
         const publicStore = {
           ...store,
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+          ...(await fetchStoreFaqsAndHowtos(store.id)),
         };
 
         const locations = await fetchFooterLocations(store);

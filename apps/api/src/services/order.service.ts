@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { prisma, Prisma, OrderStatus, withMoneyTx } from '@force/database';
+import { prisma, Prisma, OrderStatus, withMoneyTx, setTenantGucs } from '@force/database';
 import { checkMinimumOrder, allocateBundlePrice } from '@force/shared';
 import { generateOrderNumber } from '../utils/order-number';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
@@ -786,6 +786,13 @@ export class OrderService {
     // and serialized every checkout on a hot SKU (see
     // docs/superpowers/plans/2026-06-05-checkout-concurrency-scaling.md).
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+      // The public checkout (`POST /public/orders`) and the MCP `place_order`
+      // tool reach this with NO tenant context, and `backorder_lines` (written
+      // below for backordered lines) has a STRICT RLS policy: under `force_app`
+      // that insert is rejected and the whole order rolls back. Set the store
+      // on this transaction's own connection. Inert on the owner role; a
+      // no-op repeat when the caller's context already carried it.
+      await setTenantGucs(tx, { storeId });
       // backorderedItems collects items where the pre-decrement inventory was
       // insufficient and the inventory.backorder feature is enabled — these get
       // a BackorderLine row created after the order is persisted (further down

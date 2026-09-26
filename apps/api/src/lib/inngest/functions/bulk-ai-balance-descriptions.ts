@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { balanceProductLanguages } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -75,11 +75,11 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
       return;
     }
 
-    // NOTE: products + bulk_ai_jobs are NOT RLS-protected and every query here
-    // scopes by storeId/jobId explicitly, so no tenant context is needed. AI
-    // work must never run inside a long-lived DB transaction — a plain IIFE
-    // (no runInTenantContext wrapper) avoids that trap.
-    return (async () => {
+    // `bulk_ai_jobs` and `ai_usage` carry STRICT RLS policies, so this job
+    // needs the store's context — but AI work must never run inside a
+    // long-lived DB transaction (#461). `runInStoreScope` gives each query its
+    // own short tenant transaction instead.
+    return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -264,7 +264,7 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
         { jobId, storeId, balanced, skipped, failed, quotaReached },
         'bulk-ai-balance-descriptions complete'
       );
-    })();
+    }); // end runInStoreScope
   }
 );
 export const bulkAiBalanceDescriptions: InngestFunction.Any = bulkAiBalanceDescriptionsFn;
