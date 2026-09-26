@@ -423,6 +423,70 @@ rightward, even in RTL. PR #726 kept the keyframes on purpose for a future
 skeleton wired to real image-load state. Cost if wrong: none today; building
 that skeleton is new work, not unfinished work.
 
+---
+
+Context: branch `fix/inngest-webhook-rate-limit-exempt` — the global 200
+mutations/15min per-IP limiter (`apps/api/src/index.ts`) sits in front of
+`/api/v1/inngest` and `/api/v1/webhooks`. Inngest Cloud executes every
+function STEP as its own POST from a small, fixed pool of IPs (an order
+fanout is ~12 steps; cron sweeps run many functions back to back), so a busy
+period can push one Inngest IP past 200/15min and get 429'd — a local harness
+reproduced exactly this, delaying/retrying order emails, refunds and stock
+restore.
+
+**Ruling RL-1 — `POST /api/v1/inngest` is exempted from the global limiter on
+`x-inngest-signature` HEADER PRESENCE, not on verifying it in the skip
+predicate.** `skipGlobalRateLimit` (`middleware/global-rate-limit-skip.ts`)
+only checks the header exists; the actual HMAC check is `inngestServe`'s
+(mounted in `index.ts`), which runs on every POST regardless of whether the
+global limiter counted the request. Verified against the installed
+inngest@4.2.6 source (`srcof inngest@4.2.6`): `InngestCommHandler
+.validateSignature` (`src/components/InngestCommHandler.ts:2623-2652`) throws
+when `sig` is falsy and `client.mode === 'cloud'`, and otherwise verifies the
+HMAC via `RequestSignature.verifySignature` against `signingKey` (+
+`signingKeyFallback`); `handleAction` (same file, ~1594-1609) awaits that
+result for every POST and returns `{ status: 401 }` **before** touching
+`this.fns` or running any step when it did not succeed. `lib/inngest/
+client.ts` sets `isDev: config.nodeEnv !== 'production'`, so production is
+always `cloud` mode — an unsigned or forged-signature POST is rejected before
+any function code runs, so skipping the RATE-LIMIT COUNTER on header
+presence alone costs nothing an attacker without `INNGEST_SIGNING_KEY` can
+use. Only `POST` on the exact path `/api/v1/inngest` matches (mutation-tested
+against a stripped signature check, a lookalike path, a `..`-traversal path,
+and a non-POST method — all KILLED, `defence-mutations.json` id
+`inngest-bypass-requires-signature-header`). Cost if wrong: if
+`INNGEST_SIGNING_KEY` were ever unset in production, `validateSignature`
+throws its OWN error ("No signing key found…") before ever reaching the `sig`
+check — so a missing key fails the Inngest platform integration outright,
+loudly, rather than opening a quiet hole; it does not silently degrade this
+bypass into an open one.
+
+**Ruling RL-2 — the payment-provider webhook routes (`/api/v1/webhooks/
+payment/:provider`, `/api/v1/webhooks/payment`) are NOT exempted from the
+global limiter.** Read `webhook.routes.ts`: `verifyWebhookSignature` only
+checks that a signature HEADER is non-empty — any string satisfies it. The
+real HMAC check (`PaymentService.handleWebhook` → `p.verifyWebhook`,
+`payment.factory.ts:964-1005`) runs only AFTER `enqueueOrProcessWebhook` has
+already durably persisted the raw payload to the `webhook_events` inbox and
+called `inngest.send()` — on the common path (Inngest reachable) that HMAC
+check happens later still, asynchronously, inside the Inngest consumer, well
+after this route already answered 200. So the route "acts" (a DB write +
+queue send, both attacker-reachable resource costs) before verifying
+anything — it does not satisfy "verifies before acting", the bar the
+Inngest exemption above clears. These routes keep riding the global 200/
+15min bucket as their only bound today. The shipping-carrier routes under
+the same mount (`/shipping/icarry`, `/shipping/aramex`) DO verify
+(`verifyCarrierWebhookSecret`, timing-safe, fail-closed) synchronously
+BEFORE calling `shippingCarrierService.processWebhook` — but they are out of
+this PR's scope (the reported incident and the task were payment webhooks +
+Inngest) and are left untouched. Cost if wrong: unauthenticated garbage POSTs
+to the payment webhook routes still cost a `webhook_events` row + an Inngest
+enqueue before being rejected, and remain capped only by the shared 200/
+15min-per-IP bucket alongside every other mutation from that IP — a
+follow-up that reorders verification before persistence (or adds a
+dedicated, still-bounded bucket per the pattern used for `/auth/refresh`)
+is the natural next step if this is ever measured as a real flood vector.
+
 ## 2026-09-16
 
 Context: `docs/plans/2026-09-16-store-resolve-transient-not-404.md` — a transient

@@ -842,6 +842,16 @@
       "test": "tests/unit/global-rate-limit-skip.test.ts"
     },
     {
+      "id": "inngest-bypass-requires-signature-header",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the Inngest step-callback bypass stops checking for x-inngest-signature, so ANY unauthenticated POST to /api/v1/inngest skips the global 200/15min per-IP mutation counter, not just Inngest Cloud's signed traffic",
+      "source": "apps/api/src/middleware/global-rate-limit-skip.ts",
+      "find": "    req.path === '/api/v1/inngest' &&\n    Boolean(req.header('x-inngest-signature'))\n  ) {",
+      "replace": "    req.path === '/api/v1/inngest'\n  ) {",
+      "test": "tests/unit/global-rate-limit-skip.test.ts"
+    },
+    {
       "id": "throttle-is-waited-out-not-reported",
       "domain": "authn / session",
       "tier": "unit",

@@ -28,6 +28,16 @@ const req = (over: Partial<Request> = {}): Request =>
     ...over,
   }) as unknown as Request;
 
+// Builds a request carrying (or not) the Inngest signature header, matching
+// how express's `req.header()` reads it case-insensitively.
+const inngestReq = (opts: { signature?: string; path?: string; method?: string } = {}): Request =>
+  req({
+    method: opts.method ?? 'POST',
+    path: opts.path ?? '/api/v1/inngest',
+    header: (name: string) =>
+      name.toLowerCase() === 'x-inngest-signature' ? opts.signature : undefined,
+  });
+
 // Bypass 0 short-circuits on the test env, so every other branch is dead under
 // vitest unless these are cleared. Without this the suite would pass no matter
 // what the predicate said.
@@ -85,6 +95,48 @@ describe('the global mutation limiter skips the refresh route', () => {
   });
 });
 
+describe('the global mutation limiter skips signed Inngest step callbacks', () => {
+  it('lets a signed POST /api/v1/inngest past uncounted', () => {
+    expect(skipGlobalRateLimit(inngestReq({ signature: 't=123&s=abc' }))).toBe(true);
+  });
+
+  it('does NOT skip an unsigned POST /api/v1/inngest (dev-mode / attacker without the key)', () => {
+    expect(skipGlobalRateLimit(inngestReq({ signature: undefined }))).toBe(false);
+    expect(skipGlobalRateLimit(inngestReq({ signature: '' }))).toBe(false);
+  });
+
+  it('does not open the bypass to lookalike paths', () => {
+    // The negative control. A predicate keyed on a prefix or substring match
+    // instead of an exact path would let these through.
+    for (const path of [
+      '/api/v1/inngest-x',
+      '/api/v1/inngest/extra',
+      '/api/v1/inngest/../stores',
+      '/inngest',
+      '/api/v2/inngest',
+    ]) {
+      expect(
+        skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', path })),
+        `${path} must stay counted even with a signature header`
+      ).toBe(false);
+    }
+  });
+
+  it('does not extend the bypass to other methods on that path', () => {
+    expect(skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', method: 'PUT' }))).toBe(false);
+    expect(skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', method: 'DELETE' }))).toBe(false);
+  });
+
+  it('still counts every other mutation, signature header notwithstanding', () => {
+    for (const path of ['/api/v1/orders', '/api/v1/webhooks/payment/tap', '/api/v1/auth/login']) {
+      expect(
+        skipGlobalRateLimit(inngestReq({ signature: 't=1&s=a', path })),
+        `${path} must stay counted`
+      ).toBe(false);
+    }
+  });
+});
+
 describe('req.path at app-level really is the full mounted path', () => {
   it('is /api/v1/auth/refresh, not /refresh', async () => {
     // The bypass matches a literal string, so it is only correct if Express
@@ -112,6 +164,34 @@ describe('req.path at app-level really is the full mounted path', () => {
       expect(res.status).toBe(200);
       expect(seenPath).toBe('/api/v1/auth/refresh');
       expect(seenSkip).toBe(true);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('is /api/v1/inngest, not /inngest, and only skips with the signature header', async () => {
+    const app = express();
+    const seen: Array<{ path: string; skip: boolean }> = [];
+    app.use((r, _res, next) => {
+      seen.push({ path: r.path, skip: skipGlobalRateLimit(r) });
+      next();
+    });
+    app.use(
+      '/api/v1',
+      express.Router().post('/inngest', (_r, res) => res.json({ ok: true }))
+    );
+
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      await fetch(`http://127.0.0.1:${port}/api/v1/inngest`, {
+        method: 'POST',
+        headers: { 'x-inngest-signature': 't=123&s=abc' },
+      });
+      await fetch(`http://127.0.0.1:${port}/api/v1/inngest`, { method: 'POST' });
+
+      expect(seen[0]).toEqual({ path: '/api/v1/inngest', skip: true });
+      expect(seen[1]).toEqual({ path: '/api/v1/inngest', skip: false });
     } finally {
       server.close();
     }

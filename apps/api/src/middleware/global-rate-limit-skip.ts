@@ -46,5 +46,45 @@ export function skipGlobalRateLimit(req: Request): boolean {
   if (method === 'POST' && req.path === '/api/v1/auth/refresh') {
     return true;
   }
+  // Bypass 4: Inngest step-execution callbacks. Inngest Cloud POSTs this
+  // endpoint once per FUNCTION STEP, from a small, fixed pool of Inngest
+  // IPs — an order fanout is ~12 steps, and a cron sweep runs many
+  // functions back to back. Busy periods can push a single Inngest IP past
+  // 200 mutations/15min and get 429'd here, which delays/retries
+  // background jobs (order emails, refunds, stock restore) rather than any
+  // browser-facing traffic. A local harness reproduced exactly this.
+  //
+  // Safe to skip on HEADER PRESENCE alone, not on verifying it here:
+  // `inngestServe` (mounted in index.ts) cryptographically verifies
+  // `x-inngest-signature` against INNGEST_SIGNING_KEY and returns 401
+  // BEFORE running any function whenever the client is in "cloud" mode —
+  // which `lib/inngest/client.ts` sets via `isDev: config.nodeEnv !==
+  // 'production'`, so production is always cloud mode. Verified against the
+  // installed inngest@4.2.6 source (srcof):
+  //   - InngestCommHandler.validateSignature (src/components/
+  //     InngestCommHandler.ts:2623-2652) throws "No x-inngest-signature
+  //     provided" when `sig` is falsy and `client.mode === 'cloud'`, and
+  //     otherwise verifies the HMAC via RequestSignature.verifySignature
+  //     against signingKey (+ signingKeyFallback).
+  //   - InngestCommHandler.handleAction (same file, ~1594-1609) awaits that
+  //     validation for every POST and returns `{ status: 401 }` immediately
+  //     — before touching `this.fns` or executing any step — when it did
+  //     not succeed.
+  // So an attacker without the real signing key gains nothing but a
+  // rejected 401, same posture as the load-test bypass above. Dev-mode
+  // (INNGEST_DEV) traffic from the local dev server does not carry a real
+  // signature and so does NOT match this header-presence check — it stays
+  // subject to the limiter (moot in practice: dev/test already exits via
+  // Bypass 0).
+  //
+  // Matched exactly, like the /auth/refresh bypass: a lookalike path
+  // (`/api/v1/inngest-x`, a `..`-traversal path) must NOT fall through.
+  if (
+    method === 'POST' &&
+    req.path === '/api/v1/inngest' &&
+    Boolean(req.header('x-inngest-signature'))
+  ) {
+    return true;
+  }
   return false;
 }

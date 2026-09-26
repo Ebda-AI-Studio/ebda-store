@@ -212,6 +212,37 @@ and bypasses the retry loop — no double-counting.
 
 ---
 
+### 5. Global mutation limiter exempts signed step callbacks (2026-09-25)
+
+**Problem:** the API's global limiter (`apps/api/src/index.ts`) caps 200
+mutations (POST/PUT/PATCH/DELETE) per IP per 15 minutes. Inngest Cloud
+executes every function **step** as its own POST to `/api/v1/inngest`, from a
+small, fixed pool of Inngest IPs — an order fanout is ~12 steps, and a cron
+sweep runs several functions back to back. A busy period can push one Inngest
+IP past 200/15min and get 429'd, which Inngest treats as a failed delivery
+and retries — delaying order emails, refunds and stock restore. A local
+harness reproduced this exactly.
+
+**Fix:** `skipGlobalRateLimit` (`apps/api/src/middleware/
+global-rate-limit-skip.ts`) skips the global limiter for `POST
+/api/v1/inngest` **only when the request carries `x-inngest-signature`**. It
+does not verify the header itself — `inngestServe` does that cryptographically
+against `INNGEST_SIGNING_KEY` and rejects (401) before running any function
+code, so an attacker without the key gains nothing but a rejected request.
+See `docs/RULINGS.md` Ruling RL-1 for the full citation into the installed
+`inngest` SDK source, and Ruling RL-2 for why the payment-webhook routes
+(`/api/v1/webhooks/payment/*`) were deliberately NOT given the same
+exemption — they persist + enqueue the inbound event before their signature
+is actually verified, so skipping the counter there would let an
+unauthenticated flood cost real DB/queue work before rejection.
+
+If Inngest step callbacks start 429ing again, check first whether the
+signature header changed name/casing on Inngest's side (it would silently
+stop matching and fall back to the counted path) before assuming the cap
+itself needs raising.
+
+---
+
 ## Related
 
 - **Stuck job alert**: Telegram `@ForceAI1_bot` P1 level — see docs/DEPLOYMENT.md §4
