@@ -286,6 +286,10 @@ function handleCustomDomain(
 ): NextResponse {
   requestHeaders.set('x-store-domain', storeIdentifier);
   requestHeaders.set('x-store-identifier', storeIdentifier);
+  // Host-resolved, never cookie-resolved — clear any client-supplied value
+  // (requestHeaders is seeded from the raw request) so a custom-domain
+  // response is never wrongly marked non-shared-cacheable.
+  requestHeaders.delete('x-store-slug-source');
 
   // Custom-domain /favicon.ico → dynamic per-store favicon (falling back to the
   // neutral platform default when the store has none). Unreachable on a platform
@@ -319,6 +323,12 @@ function handlePlatformDomain(
   isPreviewIframe: boolean
 ): NextResponse {
   requestHeaders.set('x-is-platform', 'true');
+  // requestHeaders is seeded from the raw client request, so a caller could
+  // send this header themselves. Clear it first so only the cookie-fallback
+  // branch below (the sole `.set` for this header) can ever turn it on —
+  // otherwise a spoofed value could force a legitimately URL-resolved
+  // response into the private/non-shared-cacheable path below.
+  requestHeaders.delete('x-store-slug-source');
 
   const slugInfo = extractStoreSlug(request.nextUrl.pathname);
   if (slugInfo) {
@@ -378,6 +388,14 @@ function handlePlatformDomain(
     : request.cookies.get('x-store-slug')?.value;
   if (cookieSlug) {
     requestHeaders.set('x-store-slug', cookieSlug);
+    // Signal-only header (nothing routes on it): the agent-discovery routes
+    // (llms.txt, .well-known/acp.json, .well-known/ucp) need to tell "the
+    // slug came from the URL" apart from "the slug came from this cookie
+    // fallback" so they can mark a cookie-resolved response non-shared-
+    // cacheable — the same request line can otherwise answer with a
+    // different store depending on which visitor's cookie it carried
+    // (scoped-audit P2 on PR #1942).
+    requestHeaders.set('x-store-slug-source', 'cookie');
 
     if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe)) {
       const storeTreeUrl = buildStoreTreeUrl(

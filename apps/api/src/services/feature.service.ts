@@ -1,6 +1,7 @@
 import { prisma, Prisma, withMoneyTx, withRlsBypass } from '@force/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
+import { bustStoreCaches } from './store.service';
 import logger from '../lib/logger';
 import { retryOnWriteConflict } from '../lib/db-retry';
 
@@ -170,6 +171,30 @@ class FeatureService {
     }
   }
 
+  /**
+   * Bust the PUBLIC-facing store cache (`public:store:*`) after any change
+   * that affects the resolved feature map. `enabledFeatures` is embedded in
+   * the `/public/stores/:slugOrId` and `/public/store/resolve` payloads,
+   * which are cached independently (120s TTL) of this service's own
+   * `features:store:*` cache — `invalidateCache` above only busts the
+   * latter. Without this, a super-admin feature toggle meant to be a <=300s
+   * rollback lever could take up to that OTHER cache's TTL to reach
+   * llms.txt / the storefront (audit-followup #1668). Best-effort, mirrors
+   * `bustStoreCaches`'s own error handling: a Redis outage here must not
+   * fail the admin write that already committed.
+   */
+  private async bustPublicStoreCache(storeId: string): Promise<void> {
+    try {
+      const store = await withRlsBypass(tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
+      );
+      if (!store) return;
+      await bustStoreCaches(storeId, store.slug, store.domain);
+    } catch (err) {
+      logger.warn({ err, storeId }, '[FeatureService] Public cache bust failed (non-fatal)');
+    }
+  }
+
   // ==========================================
   // Public API
   // ==========================================
@@ -283,6 +308,7 @@ class FeatureService {
     });
 
     await this.writeToCache(storeId, freshFeatures);
+    await this.bustPublicStoreCache(storeId);
 
     logger.info(
       { storeId, updatedKeys: Object.keys(updates) },
@@ -319,6 +345,7 @@ class FeatureService {
         // Row didn't exist — already at baseline. No-op.
       });
     await this.invalidateCache(storeId);
+    await this.bustPublicStoreCache(storeId);
     return this.getStoreFeatures(storeId);
   }
 
@@ -329,6 +356,7 @@ class FeatureService {
   async resetAllOverrides(storeId: string): Promise<Record<FeatureKey, boolean>> {
     await prisma.storeFeature.deleteMany({ where: { storeId } });
     await this.invalidateCache(storeId);
+    await this.bustPublicStoreCache(storeId);
     logger.info({ storeId }, '[FeatureService] All overrides cleared (reset to plan baseline)');
     return this.getStoreFeatures(storeId);
   }
@@ -349,6 +377,7 @@ class FeatureService {
       data: { plan, updatedAt: new Date() },
     });
     await this.invalidateCache(storeId);
+    await this.bustPublicStoreCache(storeId);
     logger.info(
       { storeId, plan, userId },
       '[FeatureService] Store plan changed (overrides preserved)'

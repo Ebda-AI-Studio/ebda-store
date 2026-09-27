@@ -132,9 +132,46 @@ psql "$URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 zcat < ~/Desktop/projects/_backups/force-website-builder/<chosen>.sql.gz \
   | psql "$URL" --single-transaction -v ON_ERROR_STOP=1
 
-# 3. Re-apply RLS (dump restore does NOT preserve runtime policy wiring), verify, then
-#    promote restore-candidate to primary in the Neon console (Branches → main → Restore from branch)
-npm run db:rls
+# 3. Catch the branch up to head. Both DATABASE_URL and DIRECT_URL must point
+#    at "$URL" — the schema's datasource reads DATABASE_URL directly
+#    (packages/database/prisma/schema.prisma:16), so DIRECT_URL alone either
+#    fails closed or silently runs against the operator's ambient .env
+#    (production). This is NOT what re-creates RLS policies — see step 4.
+psql "$URL" -c "select 'orders='||count(*) from orders;"
+DATABASE_URL="$URL" DIRECT_URL="$URL" npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+
+# 4. MEASURE RLS state before promoting — do not infer it from step 3's exit
+#    code. A full pg_dump already contains every CREATE POLICY + ENABLE/FORCE
+#    ROW LEVEL SECURITY statement as schema DDL, so the restore in step 2
+#    should already carry them — but it also restores `_prisma_migrations`
+#    fully-applied, so step 3 reports "No pending migrations" having run
+#    zero SQL either way. Compare the same two counts against production
+#    and this branch (full procedure, the per-table deny-all query, and the
+#    idempotency status of every CREATE POLICY migration if a re-apply is
+#    needed: docs/DB-BACKUP-RESTORE.md steps 5-6):
+PROD_URL=$(neonctl connection-string main --project-id "$PID" --org-id "$ORG" \
+        --role-name neondb_owner --database-name neondb)
+for label_url in "prod:$PROD_URL" "restored:$URL"; do
+  label="${label_url%%:*}"; target="${label_url#*:}"
+  echo "-- $label --"
+  psql "$target" -c "select count(*) as total_policies from pg_policies where schemaname = 'public';"
+  psql "$target" -c "
+    select count(*) as denyall_tables from (
+      select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+      left join pg_policy p on p.polrelid = c.oid
+      where c.relkind = 'r' and c.relrowsecurity
+      group by c.relname
+      having count(p.polname) = 0
+    ) denyall;
+  "
+done
+# total_policies and denyall_tables BOTH match prod → promote restore-candidate
+# to primary in the Neon console (Branches → main → Restore from branch).
+# They don't match → do NOT promote; follow docs/DB-BACKUP-RESTORE.md step 6's
+# targeted re-apply (replaying the whole migration history with psql errors on
+# most of these files — most have no `DROP POLICY IF EXISTS`).
 ```
 
 ⚠️ **Restore is destructive to writes since the backup:** orders placed, products edited, store settings changed, R2 uploads referenced from new schema rows — all lost on restore. For FWB this means **per-tenant data loss across multiple stores**. Coordinate with the Force team before doing this.

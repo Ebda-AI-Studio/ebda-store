@@ -151,18 +151,102 @@ URL=$(neonctl connection-string restore-candidate --project-id "$PID" --org-id "
 psql "$URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 zcat < "$DUMP" | psql "$URL" --single-transaction -v ON_ERROR_STOP=1
 
-# 4. Verify, then re-apply RLS (dump restore does NOT preserve the runtime role/policy wiring).
-#    There is no standalone `db:rls` script — RLS policies + force_app grants ship as
-#    ordinary Prisma migrations, so replaying the full migration history against the
-#    restored branch's DIRECT_URL re-creates every policy (idempotent DROP POLICY IF
-#    EXISTS + CREATE) and re-issues the force_app grants from 20260404000000:
+# 4. Verify data landed, then catch the restored branch up to head. Both
+#    DATABASE_URL and DIRECT_URL must point at "$URL" — the schema's
+#    datasource reads DATABASE_URL directly (packages/database/prisma/
+#    schema.prisma:16), so DIRECT_URL alone either fails closed ("Environment
+#    variable not found: DATABASE_URL") or silently runs against whatever
+#    DATABASE_URL sits in the operator's ambient .env — production.
 psql "$URL" -c "select 'orders='||count(*) from orders;"
-DIRECT_URL="$URL" npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma  # REQUIRED after a dump restore
-# webhook_events has RLS intentionally never enabled (all access via withRlsBypass) — nothing
-# to re-apply for that table specifically; see the RLS matrix in
-# docs/audits/2026-07-16-rls-cutover-readiness-map.md §1.
+DATABASE_URL="$URL" DIRECT_URL="$URL" npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+# ^ This catches ONLY migrations added AFTER the dump was taken — it is a
+#   genuine no-op if none exist, which is normal. It is NOT what re-creates
+#   RLS policies: a full pg_dump (no --exclude-table, no --data-only — see
+#   .github/workflows/db-backup.yml) already contains every CREATE POLICY and
+#   ENABLE/FORCE ROW LEVEL SECURITY statement as ordinary schema DDL, so
+#   step 3's restore already carries them. It ALSO restores `_prisma_migrations`
+#   fully-applied, so `migrate deploy` reports "No pending migrations" having
+#   run zero SQL either way — a clean exit here is evidence there was nothing
+#   newer than the dump, never evidence RLS survived. Measure that instead.
 
-# 5. Cut over (repoint the app, or promote the branch in the console), then delete scratch branches.
+# 5. MEASURE RLS state — compare the SAME two counts against production and
+#    this branch. Don't infer policy presence from step 4's exit code.
+PROD_URL=$(neonctl connection-string main --project-id "$PID" --org-id "$ORG" \
+        --role-name neondb_owner --database-name neondb)
+for label_url in "prod:$PROD_URL" "restored:$URL"; do
+  label="${label_url%%:*}"; target="${label_url#*:}"
+  echo "-- $label --"
+  psql "$target" -c "select count(*) as total_policies from pg_policies where schemaname = 'public';"
+  psql "$target" -c "
+    select count(*) as denyall_tables from (
+      select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+      left join pg_policy p on p.polrelid = c.oid
+      where c.relkind = 'r' and c.relrowsecurity
+      group by c.relname
+      having count(p.polname) = 0
+    ) denyall;
+  "
+done
+# denyall_tables is the same query as docs/plans/2026-07-02-rls-cutover.md
+# Phase 0's deny-all detector, wrapped to a scalar count (that doc's version
+# lists the table names — rerun it unwrapped in step 6 if you need names).
+# webhook_events has RLS intentionally never enabled (all access via
+# withRlsBypass) — it is invisible to both queries (relrowsecurity is false),
+# not a gap; see the RLS matrix in docs/audits/2026-07-16-rls-cutover-readiness-map.md §1.
+
+# 6. total_policies and denyall_tables BOTH match prod exactly → RLS survived
+#    the restore intact. Proceed to cut over.
+#
+#    They DON'T match → the dump's policy DDL was lost or partial (first
+#    confirm the dump command itself ran without --exclude-table/--data-only
+#    before assuming Postgres dropped something). Re-run Phase 0's UNGROUPED
+#    query against "$URL" to get the actual missing table names, then
+#    re-apply ONLY those tables' policies from the migration that created
+#    them. Do NOT replay the whole migration history with psql — most of
+#    these files have no `DROP POLICY IF EXISTS`, so re-running one whose
+#    policies already exist errors ("policy ... already exists") and aborts
+#    the rest of that file's statements. Migrations containing
+#    `CREATE POLICY`, oldest first (idempotent = safe to re-run with
+#    `psql -f <path>/migration.sql`; NOT idempotent = prefix every
+#    CREATE POLICY you re-run from it with a matching
+#    `DROP POLICY IF EXISTS <name> ON <table>;` first, or it errors on any
+#    policy that's already present):
+#   20260404000000_add_rls_policies — NOT idempotent — has bare CREATE POLICY
+#   20260430010000_cart_last_activity_and_store_pages_rls — NOT idempotent — has bare CREATE POLICY
+#   20260519100000_accounting_foundations — NOT idempotent — has bare CREATE POLICY
+#   20260519210000_accounting_batch_2 — NOT idempotent — has bare CREATE POLICY
+#   20260520000000_accounting_batch_3 — NOT idempotent — has bare CREATE POLICY
+#   20260520020000_accounting_batch_4 — NOT idempotent — has bare CREATE POLICY
+#   20260522000000_rls_for_8_missing_tables — NOT idempotent — has bare CREATE POLICY
+#   20260602000000_fix_ai_usage_rls_bypass — idempotent (has DROP POLICY IF EXISTS)
+#   20260609000000_complete_force_rls_coverage — idempotent (has DROP POLICY IF EXISTS)
+#   20260615000000_add_bank_reconciliation — NOT idempotent — has bare CREATE POLICY
+#   20260615000000_add_journal_line_fx_fields — NOT idempotent — has bare CREATE POLICY
+#   20260615000000_barcode_scanning — NOT idempotent — has bare CREATE POLICY
+#   20260615000000_multi_warehouse — idempotent (has DROP POLICY IF EXISTS)
+#   20260615010000_add_staff_role_and_store_staff — NOT idempotent — has bare CREATE POLICY
+#   20260616120000_add_store_locations — NOT idempotent — has bare CREATE POLICY
+#   20260616210000_store_staff_write_policies — NOT idempotent — has bare CREATE POLICY
+#   20260618000000_shipping_area_rate — NOT idempotent — has bare CREATE POLICY
+#   20260621060000_store_staff_rls_tighten — idempotent (has DROP POLICY IF EXISTS)
+#   20260622100000_product_daily_views — NOT idempotent — has bare CREATE POLICY
+#   20260701010111_order_events — idempotent (has DROP POLICY IF EXISTS)
+#   20260702170000_rls_close_denyall_tables — idempotent (has DROP POLICY IF EXISTS)
+#   20260716000000_fix_product_daily_views_rls — idempotent (has DROP POLICY IF EXISTS)
+#   20260716000100_store_staff_update_policy — idempotent (has DROP POLICY IF EXISTS)
+#   20260721120000_customer_groups — idempotent (has DROP POLICY IF EXISTS)
+#   20260722000000_answer_engine_check — idempotent (has DROP POLICY IF EXISTS)
+#   20260722000100_gsc_daily_metric — idempotent (has DROP POLICY IF EXISTS)
+#   20260722140000_promotions_and_coupon_targeting — idempotent (has DROP POLICY IF EXISTS)
+#   20260722190000_slug_redirect_rls — NOT idempotent — has bare CREATE POLICY
+#   20260906120000_product_bundles — idempotent (has DROP POLICY IF EXISTS)
+#   20260911190000_merchant_api_keys — idempotent (has DROP POLICY IF EXISTS)
+#    After re-applying, re-run step 5's two queries again to confirm the
+#    counts now match prod before proceeding.
+
+# 7. Cut over (repoint the app, or promote the branch in the console), then delete scratch branches.
 neonctl branches delete restore-candidate --project-id "$PID" --org-id "$ORG"
 ```
 

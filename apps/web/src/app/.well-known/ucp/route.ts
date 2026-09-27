@@ -1,6 +1,10 @@
 import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
-import { resolveAgentStore, storefrontBaseUrl } from '../../../lib/agent-store-resolver';
+import {
+  resolveAgentStore,
+  resolvedViaCookie,
+  storefrontBaseUrl,
+} from '../../../lib/agent-store-resolver';
 
 /**
  * `/.well-known/ucp` — Universal Commerce Protocol discovery.
@@ -38,7 +42,7 @@ export async function GET() {
 
   const h = await headers();
   const base = storefrontBaseUrl(store, h.get('host'));
-  const writesOpen = store.enabledFeatures?.includes('agent_checkout_open_writes') === true;
+  const viaCookie = await resolvedViaCookie();
 
   const body = {
     ucp_version: '2026-01',
@@ -64,11 +68,14 @@ export async function GET() {
         type: 'mcp',
         url: `${API_URL}/mcp/${store.slug}`,
         transport: 'streamable-http',
-        // Reads anonymous, writes credentialed — the same split every other
-        // surface states. Keep in step with acp.json and llms.txt.
-        auth: writesOpen
-          ? { read: 'none', write: 'none' }
-          : { read: 'none', write: 'api_key', header: 'x-agent-key' },
+        // Reads anonymous, writes ALWAYS advertised as credentialed — even
+        // for a store with the agent_checkout_open_writes escape hatch on.
+        // This document is public, so branching on the hatch would publish
+        // which stores accept an uncredentialed place_order; an open store
+        // still accepts a keyless write, it just isn't distinguishable here.
+        // Keep in step with acp.json's `authentication` block and llms.txt
+        // (audit-followup: scoped-audit P2 on PR #1942).
+        auth: { read: 'none', write: 'api_key', header: 'x-agent-key' },
       },
     ],
     catalog: {
@@ -85,8 +92,14 @@ export async function GET() {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      // See acp.json: this is permission state, so the TTL is short.
-      'Cache-Control': 'public, max-age=300, s-maxage=300',
+      // See acp.json for the full reasoning: URL slug / custom-domain Host
+      // resolution stays public+s-maxage (Vary: Cookie protects it from a
+      // stray Cookie header); the sticky x-store-slug cookie fallback makes
+      // the response cookie-dependent, and Vary alone doesn't protect that
+      // on Cloudflare (edge-cache.ts), so it drops to private instead
+      // (scoped-audit P2 on PR #1942).
+      'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
+      ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },
   });
 }

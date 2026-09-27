@@ -223,15 +223,15 @@ function PrivacyFallback() {
               </li>
               <li>
                 {t(
-                  'Cloudflare and Neon (hosting & infrastructure) — to host the store, deliver content securely, and store your account and order data.',
-                  'Cloudflare و Neon (الاستضافة والبنية التحتية) — لاستضافة المتجر وتسليم المحتوى بأمان وتخزين بيانات حسابك وطلباتك.'
+                  "Cloudflare and Neon (hosting & infrastructure) — to host the store, deliver content securely, and store your account and order data. Neon's database is hosted in Frankfurt, Germany (EU).",
+                  'Cloudflare و Neon (الاستضافة والبنية التحتية) — لاستضافة المتجر وتسليم المحتوى بأمان وتخزين بيانات حسابك وطلباتك. تُستضاف قاعدة بيانات Neon في فرانكفورت، ألمانيا (الاتحاد الأوروبي).'
                 )}
               </li>
             </ul>
             <p className="mt-3 text-muted-foreground">
               {t(
-                'International transfers: some providers (for example, PostHog) process data on servers in the European Union. We choose providers with strong, recognized data-protection standards.',
-                'عمليات النقل الدولية: يعالج بعض المزودين (مثل PostHog) البيانات على خوادم في الاتحاد الأوروبي. نختار مزودين يلتزمون بمعايير قوية ومعترف بها لحماية البيانات.'
+                "International transfers: some providers (for example, PostHog and Neon) process data on servers in the European Union — Neon's database specifically is in Frankfurt, Germany. We choose providers with strong, recognized data-protection standards.",
+                'عمليات النقل الدولية: يعالج بعض المزودين (مثل PostHog و Neon) البيانات على خوادم في الاتحاد الأوروبي — وتحديداً تُستضاف قاعدة بيانات Neon في فرانكفورت، ألمانيا. نختار مزودين يلتزمون بمعايير قوية ومعترف بها لحماية البيانات.'
               )}
             </p>
             <p className="mt-2 text-muted-foreground">

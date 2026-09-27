@@ -1,6 +1,10 @@
 import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
-import { resolveAgentStore, storefrontBaseUrl } from '../../../lib/agent-store-resolver';
+import {
+  resolveAgentStore,
+  resolvedViaCookie,
+  storefrontBaseUrl,
+} from '../../../lib/agent-store-resolver';
 
 /**
  * `/.well-known/acp.json` — Agentic Commerce Protocol discovery.
@@ -51,11 +55,7 @@ export async function GET() {
 
   const h = await headers();
   const base = storefrontBaseUrl(store, h.get('host'));
-
-  // Writes need the store's agent key UNLESS the per-store escape hatch is on.
-  // This mirrors `llms.txt`'s `mcpWriteLine` exactly: an agent that reads one
-  // document and acts on the other must not get a different answer.
-  const writesOpen = store.enabledFeatures?.includes('agent_checkout_open_writes') === true;
+  const viaCookie = await resolvedViaCookie();
 
   const body = {
     // ACP is still a moving target; the version an agent sees is the one this
@@ -94,15 +94,21 @@ export async function GET() {
     },
     authentication: {
       // Reads are anonymous by design — that is the whole strategic surface.
+      // Writes are ALWAYS advertised as requiring a key, even for a store
+      // with the `agent_checkout_open_writes` escape hatch on. This document
+      // is public and unauthenticated, so branching this on the hatch would
+      // publish, in machine-readable form, exactly which stores accept an
+      // uncredentialed place_order — a scan of every merchant's acp.json
+      // enumerates the open ones. An open store still accepts a write
+      // request that omits the key (the MCP auth layer decides that, not
+      // this document); it just isn't told apart from a credentialed one
+      // here. Keep in step with `ucp`'s `auth` block and llms.txt's
+      // `mcpWriteLine` (audit-followup: scoped-audit P2 on PR #1942).
       read: 'none',
-      write: writesOpen ? 'none' : 'api_key',
-      ...(writesOpen
-        ? {}
-        : {
-            write_header: 'x-agent-key',
-            write_instructions:
-              'Ask the merchant (see merchant.contact) to issue an agent key. Without it the read tools still work and the write tools return an error explaining this.',
-          }),
+      write: 'api_key',
+      write_header: 'x-agent-key',
+      write_instructions:
+        'Ask the merchant (see merchant.contact) to issue an agent key. Without it the read tools still work and the write tools return an error explaining this.',
     },
     tools: {
       read: ['search_products', 'get_product', 'get_store_info', 'view_cart', 'get_order_status'],
@@ -114,11 +120,27 @@ export async function GET() {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      // Short TTL: the two things that change here — the feature gate and the
-      // escape hatch — are permission state, and a stale answer tells an agent
-      // it may write when it may not (or the reverse). Five minutes bounds the
-      // window without making this a per-request DB read.
-      'Cache-Control': 'public, max-age=300, s-maxage=300',
+      // Short TTL either way: the feature gate is permission state, and a
+      // stale answer tells an agent it may transact when it may not (or the
+      // reverse). Five minutes bounds the window without a per-request DB
+      // read. The SHARED-cacheability differs by how the store was resolved:
+      //
+      // - URL slug segment or custom-domain Host → the response is a pure
+      //   function of the request line, safe for any shared cache
+      //   (`public, s-maxage`). `Vary: Cookie` still protects a
+      //   Vary-respecting cache from a stray Cookie header on this path.
+      // - Sticky `x-store-slug` COOKIE fallback (middleware.ts, a subroute
+      //   with no slug segment in the URL — exactly this path on a bare
+      //   platform-host request) → the SAME request line answers with a
+      //   DIFFERENT merchant's contact info depending on which visitor's
+      //   cookie it carried. `Vary: Cookie` alone does not close this:
+      //   Cloudflare's cache ignores `Vary` outside its Enterprise-only
+      //   feature (see apps/api/src/lib/edge-cache.ts), and `s-maxage` is
+      //   what authorizes a shared cache to store this response at all. Drop
+      //   shared-cacheability entirely (`private`) rather than rely on Vary
+      //   (scoped-audit P2 on PR #1942).
+      'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
+      ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },
   });
 }

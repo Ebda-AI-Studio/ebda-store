@@ -28,6 +28,8 @@
  * bearing).
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import request from 'supertest';
@@ -83,5 +85,29 @@ describe('setEdgeCache Vary semantics', () => {
     expect(vary.filter(t => t === 'x-store-domain')).toHaveLength(1);
     // Cache-Control contract unchanged by the Vary fix.
     expect(res.headers['cache-control']).toBe('public, s-maxage=60, stale-while-revalidate=300');
+  });
+});
+
+/**
+ * audit-followup #1269: the header comment used to claim "the moment a
+ * cache rule is added, the Vary set below becomes load-bearing for tenant
+ * isolation" — false for Cloudflare, which ignores Vary (other than
+ * Accept-Encoding) outside its Enterprise-only Vary/image-caching features.
+ * A future engineer adding a CF Cache Rule and trusting that claim would
+ * ship a cross-tenant cache-key collision. Locked down as a source
+ * assertion since the defect was in the doc comment itself, not runtime
+ * behaviour.
+ */
+describe('edge-cache.ts doc comment does not overclaim Vary is load-bearing on Cloudflare', () => {
+  const source = readFileSync(join(__dirname, '../../apps/api/src/lib/edge-cache.ts'), 'utf8');
+
+  it('no longer claims a CF cache rule makes Vary load-bearing for tenant isolation', () => {
+    expect(source).not.toMatch(/the Vary set below becomes load-bearing for tenant isolation/);
+  });
+
+  it('explains that Cloudflare ignores Vary outside its Enterprise-only feature', () => {
+    expect(source).toMatch(/NOT load-bearing on Cloudflare/);
+    expect(source).toMatch(/key the cache/);
+    expect(source).toMatch(/store id/);
   });
 });

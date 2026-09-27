@@ -103,6 +103,28 @@ export async function resolveAgentStore(): Promise<AgentStore | null> {
 }
 
 /**
+ * True when THIS request's store identity came from the sticky
+ * `x-store-slug` cookie fallback (middleware.ts's "subroute with no slug in
+ * the URL" branch — exactly the shape of `/llms.txt` and the two
+ * `.well-known/*` discovery paths on a bare platform-host request), not from
+ * an explicit URL slug segment or a custom-domain Host. middleware.ts sets
+ * `x-store-slug-source: cookie` ONLY on that branch and clears it everywhere
+ * else, so its presence here is not client-spoofable through the normal
+ * request path.
+ *
+ * A response resolved this way must not be marked publicly/shared-cacheable:
+ * the exact same request line can answer with a different merchant's data
+ * depending on which visitor's cookie it carried (scoped-audit P2 on
+ * PR #1942 — `Vary: Cookie` alone doesn't help here because Cloudflare's
+ * cache ignores `Vary` outside its Enterprise-only feature, see
+ * apps/api/src/lib/edge-cache.ts).
+ */
+export async function resolvedViaCookie(): Promise<boolean> {
+  const h = await headers();
+  return h.get('x-store-slug-source') === 'cookie';
+}
+
+/**
  * The public base URL for this store's storefront — its own domain when it has
  * one, otherwise its path under the platform host. Discovery documents must
  * quote absolute URLs, and an agent that follows a platform-rooted link for a

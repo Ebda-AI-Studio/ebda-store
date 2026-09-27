@@ -124,6 +124,17 @@ interface MetaCAPIPayload {
     };
   }>;
   test_event_code?: string;
+  // The long-lived per-store token, sent as a body field rather than a URL
+  // query parameter — the API auto-instruments outbound HTTP (OpenTelemetry
+  // `http.url` span attribute, Sentry fetch breadcrumbs), which would
+  // otherwise capture the plaintext token in every trace/log for this call.
+  // Meta's own Conversions API examples pass `access_token` as a request
+  // parameter (form field in their curl sample) rather than exclusively a
+  // query string, and the Graph API treats query-string and body parameters
+  // interchangeably; TikTok's call below already keeps its token out of the
+  // URL (in an `Access-Token` header) for the same reason.
+  // audit-followup #190.
+  access_token: string;
 }
 
 /**
@@ -171,13 +182,14 @@ async function sendMetaCAPI(
         },
       },
     ],
+    access_token: accessToken,
   };
 
   if (testEventCode) {
     payload.test_event_code = testEventCode;
   }
 
-  const url = `https://graph.facebook.com/${META_API_VERSION}/${pixelId}/events?access_token=${accessToken}`;
+  const url = `https://graph.facebook.com/${META_API_VERSION}/${pixelId}/events`;
 
   const response = await fetch(url, {
     method: 'POST',

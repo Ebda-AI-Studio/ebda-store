@@ -96,6 +96,7 @@ describe('safeFetch (redirects)', () => {
     return {
       status,
       headers: { get: (n: string) => (n.toLowerCase() === 'location' ? location : null) },
+      body: { cancel: vi.fn().mockResolvedValue(undefined) },
     };
   }
   const ok = { status: 200, headers: { get: () => null } };
@@ -172,5 +173,48 @@ describe('safeFetch (redirects)', () => {
 
     expect(fetchSpy.mock.calls[1][1].method).toBe('POST');
     expect(fetchSpy.mock.calls[1][1].body).toBe('{"a":1}');
+  });
+
+  // audit-followup #1713: an intermediate redirect response is discarded —
+  // only the final response is ever returned to the caller. Leaving its
+  // body unconsumed holds the underlying connection open until GC.
+  it('cancels the response body of every followed redirect hop', async () => {
+    const hop1 = redirect('https://cdn2.example.com/x.png');
+    fetchSpy.mockResolvedValueOnce(hop1).mockResolvedValueOnce(ok);
+
+    await safeFetch('https://cdn.example.com/x.png');
+
+    expect(hop1.body.cancel).toHaveBeenCalledOnce();
+  });
+
+  it('cancels the response body of every hop, including the one that trips the redirect limit', async () => {
+    const loopRes = redirect('https://cdn.example.com/loop');
+    fetchSpy.mockResolvedValue(loopRes);
+
+    await expect(safeFetch('https://cdn.example.com/x.png')).rejects.toThrow(/too many redirects/);
+
+    // One cancel per fetch call — including the last hop, whose response is
+    // discarded right before the loop exits and throws.
+    expect(loopRes.body.cancel).toHaveBeenCalledTimes(fetchSpy.mock.calls.length);
+  });
+
+  it('does not cancel the final (non-redirect) response — the caller owns that body', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(redirect('https://cdn2.example.com/x.png'))
+      .mockResolvedValue(ok);
+
+    const res = await safeFetch('https://cdn.example.com/x.png');
+
+    expect(res).toBe(ok);
+    // `ok` has no `body` mock at all — if safeFetch tried to cancel it,
+    // this would throw rather than silently pass.
+  });
+
+  it('swallows a cancel() rejection instead of failing the redirect', async () => {
+    const hop1 = redirect('https://cdn2.example.com/x.png');
+    hop1.body.cancel.mockRejectedValueOnce(new Error('already closed'));
+    fetchSpy.mockResolvedValueOnce(hop1).mockResolvedValueOnce(ok);
+
+    await expect(safeFetch('https://cdn.example.com/x.png')).resolves.toBe(ok);
   });
 });

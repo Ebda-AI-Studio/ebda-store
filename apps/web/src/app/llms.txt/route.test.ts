@@ -59,7 +59,14 @@ describe('buildPerStoreBody — agent_checkout MCP advertisement', () => {
     );
   });
 
-  it('drops the credential requirement from the advertisement when the store has the open-writes escape hatch on', () => {
+  /**
+   * audit-followup #1663: this document is public and unauthenticated —
+   * disclosing "no credential required on this store" here doesn't just
+   * inform the intended agent, it announces to anyone which stores have the
+   * emergency open-write hatch enabled. The line must drop the auth-posture
+   * confirmation entirely rather than switch to a different confirmation.
+   */
+  it('drops the credential requirement from the advertisement when the store has the open-writes escape hatch on, without disclosing the auth posture', () => {
     const body = buildPerStoreBody(
       { ...baseStore, enabledFeatures: ['agent_checkout', 'agent_checkout_open_writes'] },
       [],
@@ -67,9 +74,10 @@ describe('buildPerStoreBody — agent_checkout MCP advertisement', () => {
       0
     );
 
-    expect(body).toContain('Write tools (no credential required on this store)');
+    expect(body).toContain('Write tools: add_to_cart, place_order');
     expect(body).not.toContain('x-agent-key');
-    expect(body).not.toContain('Write tools (credential required)');
+    expect(body).not.toContain('credential required');
+    expect(body).not.toContain('no credential required');
   });
 
   it('omits the MCP section when agent_checkout is not in enabledFeatures', () => {

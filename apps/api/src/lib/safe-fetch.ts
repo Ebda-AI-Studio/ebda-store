@@ -167,6 +167,13 @@ export async function safeFetch(rawUrl: string, init?: RequestInit): Promise<Res
       const next = new URL(loc, current); // resolve relative redirects
       currentInit = initForHop(currentInit, res.status, next.origin === validated.origin);
       current = next.toString();
+      // This hop's response is discarded — only the LAST response in the
+      // chain is ever returned to the caller. Leaving an intermediate body
+      // unconsumed holds its underlying connection open until GC, one leak
+      // per redirect hop (audit-followup #1713). Applies to every hop,
+      // including the one right before the "too many redirects" throw below
+      // — that response also goes through this branch first.
+      await res.body?.cancel().catch(() => {});
       continue;
     }
     return res;

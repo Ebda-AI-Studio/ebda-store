@@ -10,10 +10,13 @@
  *     an inactive store and a platform-level request all 404 with the same
  *     body. A document that says "this store exists but will not sell to you"
  *     is a capability leak with no upside for the agent.
- *  2. **They agree with llms.txt about the credential.** An agent that reads
- *     one and acts on the other must not get a different answer about whether
- *     writes need `x-agent-key` — including when the per-store escape hatch is
- *     on, where the credential line would otherwise be a lie.
+ *  2. **They never disclose the open-writes escape hatch.** Both documents
+ *     always advertise writes as requiring `x-agent-key`, even for a store
+ *     with `agent_checkout_open_writes` on — these documents are public and
+ *     unauthenticated, so branching the disclosure on the hatch would let
+ *     anyone enumerate which stores accept an uncredentialed `place_order`.
+ *     An open store still accepts a keyless write; the documents just never
+ *     confirm the posture either way (scoped-audit P2 on PR #1942).
  *  3. **Custom-domain merchants get their OWN URLs.** A platform-rooted link
  *     served on `wadyaljuz.com` sends the agent to a redirect at best. This is
  *     the bug `/llms.txt` actually shipped with once.
@@ -24,6 +27,10 @@ const headerBag = {
   slug: null as string | null,
   domain: null as string | null,
   host: 'store.force-ai.co',
+  // 'cookie' mirrors middleware.ts's x-store-slug-source signal (set only on
+  // the sticky-cookie fallback branch, cleared everywhere else) — see
+  // resolvedViaCookie() in apps/web/src/lib/agent-store-resolver.ts.
+  slugSource: null as 'cookie' | null,
 };
 
 vi.mock('next/headers', () => ({
@@ -33,6 +40,7 @@ vi.mock('next/headers', () => ({
         if (k === 'x-store-slug') return headerBag.slug;
         if (k === 'x-store-domain') return headerBag.domain;
         if (k === 'host') return headerBag.host;
+        if (k === 'x-store-slug-source') return headerBag.slugSource;
         return null;
       },
     }),
@@ -79,6 +87,7 @@ beforeEach(() => {
   headerBag.slug = 'pecanbee';
   headerBag.domain = null;
   headerBag.host = 'store.force-ai.co';
+  headerBag.slugSource = null;
 });
 
 describe('acp.json', () => {
@@ -101,13 +110,18 @@ describe('acp.json', () => {
     expect(b.authentication.write_header).toBe('x-agent-key');
   });
 
-  it('says writes are open when the per-store escape hatch is on', async () => {
-    // Otherwise the credential line is a lie for that store — the same reason
-    // llms.txt branches on this feature.
+  it('still advertises the credentialed shape when the per-store escape hatch is on', async () => {
+    // This document is PUBLIC and unauthenticated — branching the
+    // disclosure on the hatch would let anyone enumerate which stores
+    // accept an uncredentialed place_order via one probe per merchant
+    // domain. An open store still accepts a keyless write (the MCP auth
+    // layer decides that at request time, not this document); the
+    // discovery document just never confirms the posture either way
+    // (scoped-audit P2 on PR #1942).
     mockStore({ features: ['agent_checkout', 'agent_checkout_open_writes'] });
     const b = await body(await acpGet());
-    expect(b.authentication.write).toBe('none');
-    expect(b.authentication.write_header).toBeUndefined();
+    expect(b.authentication.write).toBe('api_key');
+    expect(b.authentication.write_header).toBe('x-agent-key');
   });
 
   it('404s a store without agent_checkout — fail closed', async () => {
@@ -160,10 +174,37 @@ describe('acp.json', () => {
     expect(b.capabilities.returns).toBe(false);
   });
 
-  it('is cached briefly — the gate and the hatch are permission state', async () => {
+  it('is cached briefly and shared-cacheable when resolved from the URL slug', async () => {
     mockStore();
     const res = await acpGet();
-    expect(res.headers.get('cache-control')).toMatch(/max-age=300/);
+    expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
+    expect(res.headers.get('vary')).toBe('Cookie');
+  });
+
+  it('stays shared-cacheable on a custom domain (the 3 live stores) — same as URL slug', async () => {
+    headerBag.slug = null;
+    headerBag.domain = 'wadyaljuz.com';
+    headerBag.host = 'wadyaljuz.com';
+    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    const res = await acpGet();
+    expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
+    expect(res.headers.get('vary')).toBe('Cookie');
+  });
+
+  it('drops shared-cacheability when resolved via the sticky cookie fallback', async () => {
+    // The exact shape middleware.ts produces for a bare `/.well-known/acp.json`
+    // request with no slug in the URL: x-store-slug set from the cookie, plus
+    // x-store-slug-source: cookie. Vary: Cookie alone doesn't stop Cloudflare
+    // from replaying this response across visitors (edge-cache.ts), so the
+    // response must not authorize shared caching at all (scoped-audit P2 on
+    // PR #1942).
+    headerBag.slug = 'pecanbee';
+    headerBag.slugSource = 'cookie';
+    mockStore();
+    const res = await acpGet();
+    expect(res.headers.get('cache-control')).toBe('private, max-age=300');
+    expect(res.headers.get('cache-control')).not.toMatch(/s-maxage/);
+    expect(res.headers.get('vary')).toBeNull();
   });
 });
 
@@ -176,6 +217,16 @@ describe('ucp', () => {
     expect(ucp.transports[0].url).toBe(acp.endpoints.mcp);
     expect(ucp.transports[0].auth.write).toBe('api_key');
     expect(ucp.transports[0].auth.header).toBe(acp.authentication.write_header);
+  });
+
+  it('still advertises the credentialed shape when the per-store escape hatch is on, agreeing with acp.json', async () => {
+    // Same non-disclosure rule as acp.json: this document is public, so it
+    // never confirms whether a store's open-writes hatch is on
+    // (scoped-audit P2 on PR #1942).
+    mockStore({ features: ['agent_checkout', 'agent_checkout_open_writes'] });
+    const b = await body(await ucpGet());
+    expect(b.transports[0].auth.write).toBe('api_key');
+    expect(b.transports[0].auth.header).toBe('x-agent-key');
   });
 
   it('declares KWD as 1000 minor units — the 10x trap', async () => {
@@ -203,5 +254,32 @@ describe('ucp', () => {
     mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
     const b = await body(await ucpGet());
     expect(b.documents.acp).toBe('https://wadyaljuz.com/.well-known/acp.json');
+  });
+
+  it('is shared-cacheable when resolved from the URL slug, same as acp.json', async () => {
+    mockStore();
+    const res = await ucpGet();
+    expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
+    expect(res.headers.get('vary')).toBe('Cookie');
+  });
+
+  it('stays shared-cacheable on a custom domain (the 3 live stores)', async () => {
+    headerBag.slug = null;
+    headerBag.domain = 'wadyaljuz.com';
+    headerBag.host = 'wadyaljuz.com';
+    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    const res = await ucpGet();
+    expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
+    expect(res.headers.get('vary')).toBe('Cookie');
+  });
+
+  it('drops shared-cacheability when resolved via the sticky cookie fallback', async () => {
+    headerBag.slug = 'pecanbee';
+    headerBag.slugSource = 'cookie';
+    mockStore();
+    const res = await ucpGet();
+    expect(res.headers.get('cache-control')).toBe('private, max-age=300');
+    expect(res.headers.get('cache-control')).not.toMatch(/s-maxage/);
+    expect(res.headers.get('vary')).toBeNull();
   });
 });

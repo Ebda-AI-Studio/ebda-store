@@ -23,8 +23,19 @@ import type { Response } from 'express';
  * 2026-09-02: `api.force-ai.co` IS Cloudflare-proxied (live response carries
  * `server: cloudflare` + `cf-ray`), but `cf-cache-status: DYNAMIC` — CF does
  * not cache these JSON responses without an explicit cache rule, so today
- * these headers are honored-but-inert. The moment a cache rule is added,
- * the Vary set below becomes load-bearing for tenant isolation.
+ * these headers are honored-but-inert.
+ *
+ * The Vary set below is NOT load-bearing on Cloudflare even once a cache
+ * rule IS added: Cloudflare's cache key ignores the `Vary` header (other
+ * than `Vary: Accept-Encoding`) unless the account has the Enterprise-only
+ * "Cache by Vary header" / "Vary for images" feature turned on for that
+ * rule — plain `Vary` tokens like the ones this file sets are otherwise
+ * invisible to CF's cache-key computation (audit-followup #1269). If edge
+ * caching of these tenant-scoped responses is ever turned on, key the cache
+ * explicitly on store id — a CF Cache Rule custom cache key, or a
+ * URL-embedded tenant segment — rather than relying on Vary. `Vary` still
+ * matters for any Vary-respecting cache in front of Cloudflare (browsers,
+ * corporate proxies), which is why it stays set.
  * (Supersedes the 2026-07-13 open item in
  * docs/audits/2026-07-13-cache-stampede.md.)
  *

@@ -209,8 +209,22 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toMatch(/^https:\/\/graph\.facebook\.com\/v\d+\.\d+\/PIXELMETA123\/events/);
-    expect(url).toContain('access_token=EAAB_REAL_TOKEN_XYZ');
+    expect(url).toBe('https://graph.facebook.com/v21.0/PIXELMETA123/events');
+  });
+
+  // audit-followup #190: the plaintext long-lived token must never be part of
+  // the URL — OpenTelemetry/Sentry auto-instrument outbound fetch calls and
+  // record the full URL (including query string) in traces/breadcrumbs. It
+  // goes in the JSON body instead, exactly like TikTok's request already
+  // keeps its token out of its URL (in a header).
+  it('sends the access token in the POST body, never in the URL', async () => {
+    await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).not.toContain('access_token');
+    expect(url).not.toContain('EAAB_REAL_TOKEN_XYZ');
+    const body = JSON.parse(init.body as string);
+    expect(body.access_token).toBe('EAAB_REAL_TOKEN_XYZ');
   });
 
   it('sends event_name=Purchase and action_source=website', async () => {

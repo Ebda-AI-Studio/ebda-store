@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
+import { resolvedViaCookie } from '../../lib/agent-store-resolver';
 
 /**
  * Dynamic /llms.txt — served at three levels:
@@ -300,12 +301,26 @@ export function buildPerStoreBody(
   // (Ruling M1, 2026-09-09); reads never do. An agent that discovers 7 tools
   // here and gets an unexplained error on two of them is a broken surface.
   // `agent_checkout_open_writes` is the per-store escape hatch that turns the
-  // requirement off — when it is on, say so, because then the credential line
-  // would be a lie. Keep this copy in step with
-  // `AGENT_CREDENTIAL_REQUIRED_MESSAGE` in apps/api/src/mcp/agent-auth.ts.
+  // requirement off. Do NOT disclose "no credential required" when it's on —
+  // this document is public and unauthenticated, so that line would announce
+  // to anyone (not just the intended agent) which stores have the emergency
+  // open-write hatch enabled (audit-followup #1663). State only that write
+  // tools exist; an agent that tries without a credential either succeeds
+  // (open) or gets the same explanatory error as any other store. Keep this
+  // copy in step with `AGENT_CREDENTIAL_REQUIRED_MESSAGE` in
+  // apps/api/src/mcp/agent-auth.ts.
+  //
+  // Non-disclosure note: the two well-known JSON documents below go further
+  // and ALWAYS advertise the machine-readable `write: 'api_key'` shape, even
+  // when this hatch is on — they never flip to a "no credential" value the
+  // way this prose line drops the credential mention entirely. Both surfaces
+  // implement the same rule (never CONFIRM the hatch is on to a public,
+  // unauthenticated reader); do not "fix" acp.json/ucp to branch on the hatch
+  // to match this file's wording — that would reintroduce the disclosure
+  // (scoped-audit P2 on PR #1942).
   const mcpWritesOpen = store.enabledFeatures?.includes('agent_checkout_open_writes');
   const mcpWriteLine = mcpWritesOpen
-    ? `- Write tools (no credential required on this store): add_to_cart, place_order`
+    ? `- Write tools: add_to_cart, place_order`
     : `- Write tools (credential required): add_to_cart, place_order\n- Write authentication: send the store's agent key in the \`x-agent-key\` request header. Ask the store (see Contact above) to issue one. Without it the read tools still work and the write tools return an error explaining this.`;
   // The two well-known discovery documents (added 2026-09-11) carry the SAME
   // endpoint and the same credential contract in ACP (OpenAI/Stripe/Meta) and
@@ -406,7 +421,7 @@ export function fixCategoryLinks(body: string, categories: Array<{ slug: string 
  * otherwise enumerate categories + products. Shared by the platform-path
  * (slug) and custom-domain branches so both render identically.
  */
-async function perStoreResponse(store: PublicStore): Promise<Response> {
+async function perStoreResponse(store: PublicStore, viaCookie: boolean): Promise<Response> {
   // The public store endpoint always includes id, so this should never fall
   // back to slug — but we guard anyway.
   const storeId: string = store.id || store.slug;
@@ -432,7 +447,21 @@ async function perStoreResponse(store: PublicStore): Promise<Response> {
     status: 200,
     headers: {
       'Content-Type': 'text/markdown; charset=utf-8',
-      'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=86400',
+      // `GET` can reach this via a `x-store-slug` set from the sticky cookie
+      // fallback (middleware.ts, subroute with no slug in the URL — this
+      // exact path on a bare platform-root request), in which case the SAME
+      // request line answers with a DIFFERENT merchant's index depending on
+      // which visitor's cookie it carried. `Vary: Cookie` alone doesn't
+      // protect that: Cloudflare's cache ignores Vary outside its
+      // Enterprise-only feature (apps/api/src/lib/edge-cache.ts), and
+      // `s-maxage` is what authorizes a shared cache to store it at all — so
+      // a cookie-resolved response drops shared-cacheability entirely
+      // instead. A URL slug segment or custom-domain Host stays
+      // public+s-maxage (scoped-audit P2 on PR #1942).
+      'Cache-Control': viaCookie
+        ? 'private, max-age=600'
+        : 'public, s-maxage=600, stale-while-revalidate=86400',
+      ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },
   });
 }
@@ -441,6 +470,7 @@ export async function GET() {
   const headersList = await headers();
   const storeSlug = headersList.get('x-store-slug');
   const storeDomain = headersList.get('x-store-domain');
+  const viaCookie = await resolvedViaCookie();
 
   // ── Per-store mode (platform path: store.force-ai.co/<slug>/llms.txt) ───────
   if (storeSlug) {
@@ -448,7 +478,7 @@ export async function GET() {
     if (!store || store.status !== 'active') {
       return new Response('Not Found', { status: 404 });
     }
-    return perStoreResponse(store);
+    return perStoreResponse(store, viaCookie);
   }
 
   // ── Per-store mode (custom domain: wadyaljuz.com/llms.txt) ──────────────────
@@ -461,7 +491,8 @@ export async function GET() {
     const resolved = await fetchStoreByHost(storeDomain);
     const store = resolved?.slug ? ((await fetchStore(resolved.slug)) ?? resolved) : resolved;
     if (store && (!store.status || store.status === 'active')) {
-      return perStoreResponse(store);
+      // Custom-domain resolution is Host-based, never cookie-based.
+      return perStoreResponse(store, false);
     }
   }
 

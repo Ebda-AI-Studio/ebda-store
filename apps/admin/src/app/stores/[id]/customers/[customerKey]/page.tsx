@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
@@ -110,6 +110,7 @@ function StatusChip({ status }: { status: string }) {
 
 export default function CustomerDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const storeId = params?.id as string;
   const customerKey = params?.customerKey as string;
 
@@ -271,15 +272,18 @@ export default function CustomerDetailPage() {
       }
       toastSuccess(tPrivacy('erasedToastTitle'), tPrivacy('erasedToastDescription'));
       setShowEraseModal(false);
-      // The customer's identifying fields are gone — re-fetch so the page
-      // reflects the anonymized row rather than showing stale PII.
-      await fetchDetail();
+      // Do NOT re-fetch: the GET route matches a customer only by
+      // customerId or shippingAddress.email/phone, and eraseAccount just
+      // nulled/scrubbed all three — so a re-fetch 404s every time,
+      // surfacing an error banner over the stale pre-erase PII still in
+      // state (audit-followup #1872). Navigate back to the list instead.
+      router.push(`/stores/${storeId}/customers`);
     } catch (err) {
       toastError(tPrivacy('eraseFailed'), err instanceof Error ? err.message : '');
     } finally {
       setIsErasing(false);
     }
-  }, [storeId, customer, tPrivacy, toastError, toastSuccess, fetchDetail]);
+  }, [storeId, customer, tPrivacy, toastError, toastSuccess, router]);
 
   const displayName =
     customer && (customer.firstName || customer.lastName)
