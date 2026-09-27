@@ -69,7 +69,10 @@ router.get(
         getAdjustment(req.params.storeId, req.params.id)
       );
       if (!data) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Stock adjustment not found.' },
+        });
         return;
       }
       res.json({ data });
@@ -90,7 +93,14 @@ router.post(
     try {
       const body = createSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -150,7 +160,14 @@ router.post(
     try {
       const bodyParsed = csvImportBodySchema.safeParse(req.body);
       if (!bodyParsed.success) {
-        res.status(422).json({ error: 'validation', issues: bodyParsed.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: bodyParsed.error.issues },
+          },
+        });
         return;
       }
       const { csvContent, type, reason, reasonAr, postImmediately } = bodyParsed.data;
@@ -162,10 +179,12 @@ router.post(
       // If every single row has parse errors, bail early
       if (!parseResult.hasValidRows) {
         res.status(422).json({
-          error: 'csv_parse_failed',
-          message: 'No valid rows found in CSV. Check the errors and resubmit.',
-          errors: parseResult.errors,
-          totalRows: parseResult.totalRows,
+          success: false,
+          error: {
+            code: 'csv_parse_failed',
+            message: 'No valid rows found in CSV. Check the errors and resubmit.',
+            details: { errors: parseResult.errors, totalRows: parseResult.totalRows },
+          },
         });
         return;
       }
@@ -271,10 +290,12 @@ router.post(
 
       if (importedItems.length === 0) {
         res.status(422).json({
-          error: 'no_resolvable_rows',
-          message: 'Could not resolve any CSV rows to products in this store.',
-          errors: allErrors,
-          totalRows: parseResult.totalRows,
+          success: false,
+          error: {
+            code: 'no_resolvable_rows',
+            message: 'Could not resolve any CSV rows to products in this store.',
+            details: { errors: allErrors, totalRows: parseResult.totalRows },
+          },
         });
         return;
       }

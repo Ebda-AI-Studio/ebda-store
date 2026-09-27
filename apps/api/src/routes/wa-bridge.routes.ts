@@ -505,7 +505,14 @@ export async function buildCustomerHistory(
             }
           }
         }
-        // Product frequency — total quantity across all orders in the window
+        // Product frequency — total quantity across all orders in the window.
+        // A bundle component line is skipped (#1561): its `price` is the
+        // allocated share of a discounted box, a number the product was never
+        // sold at, and the WBS bot quotes `priceFils` straight to the shopper.
+        // The box itself is already surfaced through `lastOrder`. Categories
+        // above still count the component: they carry no price, and the
+        // customer did buy from that category.
+        if (item.bundleGroupId) continue;
         const existing = productCount.get(item.productId);
         if (existing) {
           existing.totalQty += item.quantity;

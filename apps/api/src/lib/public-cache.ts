@@ -123,11 +123,11 @@ export async function invalidateCachedPrefix(prefix: string): Promise<void> {
  */
 /** Redis-only half, so a caller that will purge for itself doesn't double-fire. */
 async function clearCategoriesRedis(storeId: string): Promise<void> {
+  // Redis ONLY — the storefront purge is the caller's (#1220). This helper
+  // used to fire its own purge as well, so every product write and every ORDER
+  // sent two outbound purges, and a category write sent the same tag twice.
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCached(`admin:categories:${storeId}`);
-  // Same reasoning as invalidateStoreProductCaches: the storefront holds the
-  // API's response in the Next data cache, so Redis alone is not enough.
-  revalidateStorefront({ tags: [`categories:${storeId}`] });
 }
 
 export async function invalidateStoreCategoriesCaches(storeId: string): Promise<void> {
@@ -162,15 +162,20 @@ export async function invalidateStoreCategoriesCaches(storeId: string): Promise<
  * every product-write call site a second time for this dependency) is the
  * safe default: it costs two extra single-key deletes, not a scan.
  */
-export async function invalidateStoreProductCaches(storeId: string): Promise<void> {
+/** The Redis half of {@link invalidateStoreProductCaches}, shared with the order path. */
+async function clearProductsRedis(storeId: string): Promise<void> {
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   await invalidateCachedPrefix(`public:product:${storeId}:`);
   await invalidateCachedPrefix(`public:suggest:${storeId}:`);
   await invalidateCachedPrefix(`admin:products:${storeId}:`);
-  // Redis-only: this function fires ONE purge below covering both tags. Calling
-  // the public categories invalidator here would fire a second outbound POST
-  // for every product write — two requests per bust, and one per order.
+  // Redis-only: the caller fires ONE purge covering both tags. Calling the
+  // public categories invalidator here would fire a second outbound POST for
+  // every product write — two requests per bust, and two per order.
   await clearCategoriesRedis(storeId);
+}
+
+export async function invalidateStoreProductCaches(storeId: string): Promise<void> {
+  await clearProductsRedis(storeId);
 
   // Clearing Redis is only half the job. The Next.js storefront caches the
   // API's RESPONSE in its own data cache, so after a save the merchant kept
@@ -183,6 +188,65 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
   // ONE request carrying both tags. revalidateStorefront accepts a list, so
   // there is no reason to open a second connection to say the other half.
   revalidateStorefront({ tags: [`products:${storeId}`, `categories:${storeId}`] });
+}
+
+/**
+ * How long an order-driven storefront purge is coalesced per store (#1220).
+ *
+ * STALENESS CLASS: inventory is NEVER-stale, and this keeps every write path
+ * invalidating: the API's Redis layer is cleared on EVERY order, immediately,
+ * and the storefront purge is leading-edge — the first order in a quiet period
+ * purges at once. Only a BURST is coalesced: orders arriving while a purge
+ * window is open share ONE trailing purge at its end. The residual is that,
+ * mid-burst, the storefront's own data cache may show stock up to this long
+ * behind. That residual is display only — checkout re-reads stock from the
+ * database on every order, so it cannot oversell.
+ */
+export const ORDER_PURGE_COALESCE_MS = 10_000;
+
+/** Open coalescing windows by store: `pending` = an order arrived mid-window. */
+const orderPurgeWindows = new BoundedMap<string, { pending: boolean }>(10_000);
+
+function purgeStorefrontProducts(storeId: string): void {
+  revalidateStorefront({ tags: [`products:${storeId}`, `categories:${storeId}`] });
+}
+
+function openOrderPurgeWindow(storeId: string): void {
+  const window = { pending: false };
+  orderPurgeWindows.set(storeId, window);
+  const timer = setTimeout(() => {
+    if (orderPurgeWindows.get(storeId) !== window) return;
+    if (window.pending) {
+      purgeStorefrontProducts(storeId);
+      openOrderPurgeWindow(storeId);
+    } else {
+      orderPurgeWindows.delete(storeId);
+    }
+  }, ORDER_PURGE_COALESCE_MS);
+  // Never hold the process open for a cache purge.
+  timer.unref?.();
+}
+
+/**
+ * The order path's product-cache bust: stock changed, content did not.
+ *
+ * `OrderService` used to call {@link invalidateStoreProductCaches} on every
+ * checkout and every inventory-affecting status change, so each order purged
+ * every `products:<storeId>` and `categories:<storeId>` storefront fetch — the
+ * homepage blocks, the PLP, every PDP, the sitemap and the feed. During a
+ * flash sale the storefront's data cache was invalidated faster than it could
+ * be used and every render fell through to the API. Content edits keep the
+ * immediate purge; see {@link ORDER_PURGE_COALESCE_MS} for this one.
+ */
+export async function invalidateStoreProductCachesAfterOrder(storeId: string): Promise<void> {
+  await clearProductsRedis(storeId);
+  const open = orderPurgeWindows.get(storeId);
+  if (open) {
+    open.pending = true;
+    return;
+  }
+  purgeStorefrontProducts(storeId);
+  openOrderPurgeWindow(storeId);
 }
 
 /** Cache key for the admin aggregated-customers snapshot (`customers.routes.ts`). */

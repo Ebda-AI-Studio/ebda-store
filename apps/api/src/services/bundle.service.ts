@@ -171,7 +171,7 @@ export async function resolveBundle(
               price: true,
               trackInventory: true,
               inventory: true,
-              variants: { select: { inventory: true } },
+              variants: { select: { inventory: true, isActive: true } },
               deletedAt: true,
               status: true,
             },

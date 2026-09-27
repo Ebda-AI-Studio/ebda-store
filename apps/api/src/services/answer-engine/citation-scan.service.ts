@@ -57,6 +57,19 @@ export interface RunCitationScanOptions {
   providers?: AnswerEngineProvider[];
   /** Injectable for tests — defaults to `generatePrompts(storeId)`. */
   prompts?: GeneratedPrompt[];
+  /**
+   * Start of the Inngest run this scan belongs to, memoized in its own step so
+   * it is identical across step retries (#910). When set, an engine × prompt
+   * that already has an `AnswerEngineCheck` row at or after this instant is
+   * NOT re-queried: a step that crashed after writing 3 of 8 rows resumes at
+   * row 4 instead of re-issuing 3 paid provider calls and duplicating 3 rows.
+   * Omitted (tests, ad-hoc callers) = no resume, every pair is queried.
+   */
+  runStartedAt?: Date;
+}
+
+function checkKey(engine: string, promptText: string, locale: string): string {
+  return JSON.stringify([engine, promptText, locale]);
 }
 
 // Paid engines (perplexity/openai) are the only ones that need a
@@ -87,6 +100,17 @@ export async function runCitationScan(
   });
   const citationStore = { domain: store?.domain ?? null, brand: store?.name };
 
+  // Pairs this run already answered before a step retry (#910). One read per
+  // store scan, bounded by engines × prompts rows.
+  const alreadyChecked = new Set<string>();
+  if (opts.runStartedAt) {
+    const prior = await prisma.answerEngineCheck.findMany({
+      where: { storeId, runAt: { gte: opts.runStartedAt } },
+      select: { engine: true, promptText: true, locale: true },
+    });
+    for (const row of prior) alreadyChecked.add(checkKey(row.engine, row.promptText, row.locale));
+  }
+
   const results: CitationScanEngineResult[] = [];
 
   for (const provider of providers) {
@@ -106,6 +130,13 @@ export async function runCitationScan(
     let skipped: CitationScanEngineResult['skipped'];
 
     for (const prompt of prompts) {
+      // #910: written by an earlier attempt of this same run — count it, and
+      // spend neither a provider call nor a second row on it.
+      if (alreadyChecked.has(checkKey(provider.engine, prompt.text, prompt.locale))) {
+        checks += 1;
+        continue;
+      }
+
       // M3: re-check the paid-engine budget before EACH call, not just once
       // up front. The initial check above stops a run that's ALREADY over
       // budget from starting; this recheck stops a run that TRIPS the cap
@@ -169,7 +200,9 @@ export async function runCitationScan(
         if (isPaidEngine) {
           const feature = paidEngineFeature(provider.engine);
           if (feature) {
-            await recordUsage(storeId, feature, 0, 0, false);
+            await recordUsage(storeId, feature, 0, 0, false, {
+              ...(provider.modelId ? { model: provider.modelId } : {}),
+            });
           }
         }
       } catch (err) {

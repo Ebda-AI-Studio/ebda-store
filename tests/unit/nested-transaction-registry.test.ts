@@ -42,7 +42,13 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SERVICES = path.resolve(__dirname, '../../apps/api/src/services');
+/**
+ * The whole API source tree, not just `services/` (#1787): route handlers,
+ * Inngest functions and MCP tools open transactions too, and a route handler
+ * is the MOST likely place for a new request-path one. Paths below are
+ * relative to this root.
+ */
+const API_SRC = path.resolve(__dirname, '../../apps/api/src');
 
 /**
  * Call sites reviewed and left on their own transaction, with why.
@@ -62,7 +68,27 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
   // proximity check (the file's OTHER `hasTenantContext()` branch, in a
   // different method ~1200 lines away, used to clear this one too under the
   // old whole-file check).
-  'auth.service.ts': 'verifyEmail — /auth routes carry no ambient tenant transaction',
+  'services/auth.service.ts': 'verifyEmail — /auth routes carry no ambient tenant transaction',
+  // #1787 — the route-level sites the services-only scan could not see. Each
+  // is an ARRAY batch of updates/upserts to rows that existed before the
+  // request, referencing nothing but `storeId`; the handler writes nothing
+  // through the proxy first, so there is no uncommitted row to be invisible.
+  //
+  // Measured 2026-09-25 against Postgres 16: a batch built from PROXIED
+  // accessors inside `runInTenantContext` does NOT join the request
+  // transaction. It runs on its own connection and commits even when the
+  // request transaction then rolls back. (Since #1984 it starts with the same
+  // RLS GUCs — `transactionWithGucs` — so it no longer reads strict tables as
+  // empty; the separate commit is unchanged.) So these batches are atomic
+  // among themselves but not with the rest of the request.
+  'routes/category.routes.ts':
+    'reorder batches (category.updateMany / productCategory.updateMany) over existing rows; no prior write in the request',
+  'routes/product.routes.ts':
+    'reorder batches (product.update) over existing rows; no prior write in the request',
+  'routes/shipping.routes.ts':
+    'area-rate upsert batches keyed on (storeId, country, governorate, area); reference only storeId; no prior write in the request',
+  'routes/order.routes.ts':
+    'COD mark-paid / bulk-mark-paid flip existing payment + order rows. Its own commit is load-bearing today: the handler enqueues `order/created` BEFORE the request commits, and the accounting + WBS consumers must read the order as paid. Moving the flip into the request transaction needs that send moved behind deferAfterTenantCommit first — see Ruling M5-3',
 };
 
 /**
@@ -75,33 +101,63 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
  * a new call site should be resolved when it is written.
  */
 const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
-  'affiliate.service.ts',
-  'barcode-scan.service.ts',
-  'blog.service.ts',
-  'bulk.service.ts',
-  'customer-group.service.ts',
-  'inventory.service.ts',
-  'loyalty-automation.service.ts',
-  'loyalty.service.ts',
-  'payment-confirm.service.ts',
-  'shipping-carrier.service.ts',
-  'shipping.service.ts',
+  'services/affiliate.service.ts',
+  'services/barcode-scan.service.ts',
+  'services/bulk.service.ts',
+  'services/customer-group.service.ts',
+  'services/inventory.service.ts',
+  'services/loyalty-automation.service.ts',
+  'services/loyalty.service.ts',
+  'services/payment-confirm.service.ts',
+  'services/shipping-carrier.service.ts',
+  'services/shipping.service.ts',
+  // Surfaced by widening the scan to all of apps/api/src and counting
+  // `withMoneyTx(` — which calls `$transaction` on the caller's behalf, so the
+  // literal never appears in the caller (#1787). Not yet reviewed for the
+  // write-then-reference shape; listed so they are counted, not hidden.
+  'lib/inngest/functions/ai-autofill-cleanup.ts',
+  'lib/inngest/functions/bulk-ai-product-faqs.ts',
+  'lib/inngest/functions/bulk-ai-recommendations.ts',
+  'lib/inngest/functions/order-refunded.ts',
+  'services/accounting/backorder.service.ts',
+  'services/accounting/purchase-order.service.ts',
+  'services/accounting/stock-adjustment.service.ts',
+  'services/feature.service.ts',
+  'services/order.service.ts',
+  'services/product.service.ts',
+  'services/provisioning.service.ts',
+  'services/store.service.ts',
+  'services/variant.service.ts',
+  'services/warehouse.service.ts',
 ]);
 
-function serviceFiles(dir: string, rel = ''): string[] {
+function sourceFiles(dir: string, rel = ''): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
     const next = path.join(dir, e.name);
     const relName = rel ? `${rel}/${e.name}` : e.name;
-    if (e.isDirectory()) return serviceFiles(next, relName);
+    if (e.isDirectory()) return e.name === '__tests__' ? [] : sourceFiles(next, relName);
     return e.name.endsWith('.ts') && !e.name.endsWith('.test.ts') ? [relName] : [];
   });
 }
 
-/** Files that call `prisma.$transaction` at all. */
+/**
+ * Source with comments blanked (line count preserved, so the proximity window
+ * below still lines up), so a file that only DOCUMENTS the class (e.g.
+ * `bundle.routes.ts` explaining why it does not open one) is not a caller.
+ */
+function code(file: string): string {
+  return fs
+    .readFileSync(path.join(API_SRC, file), 'utf-8')
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+/** Opens its own transaction: directly, or through `withMoneyTx`. */
+const OPENS_TRANSACTION = /prisma\.\$transaction\b|\bwithMoneyTx\(/;
+
+/** Files that open a transaction at all. */
 function callers(): string[] {
-  return serviceFiles(SERVICES).filter(f =>
-    fs.readFileSync(path.join(SERVICES, f), 'utf-8').includes('prisma.$transaction')
-  );
+  return sourceFiles(API_SRC).filter(f => OPENS_TRANSACTION.test(code(f)));
 }
 
 /**
@@ -120,12 +176,12 @@ function callers(): string[] {
  */
 const OCCURRENCE_PROXIMITY_LINES = 50;
 
-/** `prisma.$transaction` occurrences in `file` with no nearby `hasTenantContext`. */
+/** Transaction openings in `file` with no nearby `hasTenantContext`. */
 function unguardedTransactionLines(file: string): number[] {
-  const lines = fs.readFileSync(path.join(SERVICES, file), 'utf-8').split('\n');
+  const lines = code(file).split('\n');
   const unguarded: number[] = [];
   lines.forEach((line, i) => {
-    if (!line.includes('prisma.$transaction')) return;
+    if (!OPENS_TRANSACTION.test(line)) return;
     const start = Math.max(0, i - OCCURRENCE_PROXIMITY_LINES);
     const end = Math.min(lines.length, i + OCCURRENCE_PROXIMITY_LINES + 1);
     const nearby = lines.slice(start, end).join('\n');
@@ -151,17 +207,21 @@ describe('nested-transaction registry', () => {
   it('keeps the unreviewed list from growing', () => {
     // The list is a debt ledger. It may shrink; it may not grow. A new entry
     // means someone met the question and wrote "later" instead of answering.
-    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.size).toBeLessThanOrEqual(11);
+    // main's 11 minus blog.service.ts (a comment, not a call) plus the files
+    // the widened scan surfaced (#1787).
+    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.size).toBeLessThanOrEqual(24);
   });
 
   it('does not list a file that has since been fixed', () => {
     // Keeps the ledger honest in the other direction: a service that grew a
     // `hasTenantContext()` branch must come OFF the list, or the count stops
     // meaning anything.
+    const opening = new Set(callers());
     const stale = [...UNREVIEWED_PREDATING_THIS_REGISTRY].filter(f => {
-      const abs = path.join(SERVICES, f);
+      const abs = path.join(API_SRC, f);
       if (!fs.existsSync(abs)) return true;
-      return fs.readFileSync(abs, 'utf-8').includes('hasTenantContext');
+      if (!opening.has(f)) return true;
+      return unguardedTransactionLines(f).length === 0;
     });
 
     expect(stale, 'these are listed as unreviewed but no longer qualify').toEqual([]);
@@ -170,10 +230,29 @@ describe('nested-transaction registry', () => {
   it('cart.service.ts is NOT on the list — it is the one that is fixed', () => {
     // The positive control. If the registry were vacuous (a bad glob, an empty
     // `callers()`), this would fail too.
-    expect(callers()).toContain('cart.service.ts');
-    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.has('cart.service.ts')).toBe(false);
-    expect(fs.readFileSync(path.join(SERVICES, 'cart.service.ts'), 'utf-8')).toContain(
+    expect(callers()).toContain('services/cart.service.ts');
+    expect(UNREVIEWED_PREDATING_THIS_REGISTRY.has('services/cart.service.ts')).toBe(false);
+    expect(fs.readFileSync(path.join(API_SRC, 'services/cart.service.ts'), 'utf-8')).toContain(
       'hasTenantContext'
     );
+  });
+
+  it('sees beyond services/ — route handlers and withMoneyTx callers are in scope (#1787)', () => {
+    // The scan used to be rooted at services/, so all four route-level sites
+    // and every withMoneyTx caller read as clean while never being looked at.
+    const found = callers();
+    expect(found).toContain('routes/order.routes.ts');
+    expect(found).toContain('lib/inngest/functions/order-refunded.ts');
+    expect(found).toContain('services/order.service.ts');
+    // A file that only mentions the call in a comment is not a caller.
+    expect(found).not.toContain('routes/bundle.routes.ts');
+  });
+
+  it('every reviewed entry is a real caller with a written reason', () => {
+    const opening = new Set(callers());
+    for (const [file, reason] of Object.entries(REVIEWED_OWN_TRANSACTION)) {
+      expect(opening.has(file), `${file} no longer opens a transaction`).toBe(true);
+      expect(reason.length, `${file} needs a reason`).toBeGreaterThan(20);
+    }
   });
 });

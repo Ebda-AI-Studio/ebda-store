@@ -128,7 +128,13 @@ describe('GeminiAnswerEngineProvider', () => {
     await provider.query('store-42', 'prompt text');
 
     expect(mockAssertAiQuota).toHaveBeenCalledTimes(1);
-    expect(mockRecordUsage).toHaveBeenCalledWith('store-42', 'answer_engine_gemini', 10, 5, false);
+    // The 6th arg carries the model actually invoked, so the usage row is
+    // priced at ANSWER_ENGINE_GEMINI_MODEL's rate rather than GEMINI_MODEL's
+    // (#1038).
+    expect(mockRecordUsage).toHaveBeenCalledWith('store-42', 'answer_engine_gemini', 10, 5, false, {
+      model: 'gemini-2.5-flash-lite',
+    });
+    expect(provider.modelId).toBe('gemini-2.5-flash-lite');
 
     // assertAiQuota must run before the model is actually called.
     const quotaOrder = mockAssertAiQuota.mock.invocationCallOrder[0];
@@ -178,7 +184,9 @@ describe('GeminiAnswerEngineProvider', () => {
     const provider = new GeminiAnswerEngineProvider();
     await provider.query('store-9', 'prompt');
 
-    expect(mockRecordUsage).toHaveBeenCalledWith('store-9', 'answer_engine_gemini', 0, 0, false);
+    expect(mockRecordUsage).toHaveBeenCalledWith('store-9', 'answer_engine_gemini', 0, 0, false, {
+      model: 'gemini-2.5-flash-lite',
+    });
   });
 
   it('falls back to an ungrounded call on HTTP 429 (quota) and records a groundingUnavailableReason', async () => {
@@ -212,7 +220,9 @@ describe('GeminiAnswerEngineProvider', () => {
     expect(secondBody.tools).toBeUndefined();
 
     // The scan still gets a usable answer written — never a thrown error.
-    expect(mockRecordUsage).toHaveBeenCalledWith('store-1', 'answer_engine_gemini', 5, 6, false);
+    expect(mockRecordUsage).toHaveBeenCalledWith('store-1', 'answer_engine_gemini', 5, 6, false, {
+      model: 'gemini-2.5-flash-lite',
+    });
   });
 
   it('falls back on HTTP 400 (legacy tool rejected) and on HTTP 404 (retired model)', async () => {
@@ -287,7 +297,10 @@ describe('GeminiAnswerEngineProvider', () => {
           jsonResponse(200, { candidates: [{ content: { parts: [{ text: 'x' }] } }] })
         );
       global.fetch = mockFetch2 as unknown as typeof fetch;
+      mockRecordUsage.mockClear();
       await new OverriddenProvider().query('store-1', 'prompt');
+      // #1038: usage is priced at the model actually called, not GEMINI_MODEL's.
+      expect(mockRecordUsage.mock.calls[0]?.[5]).toEqual({ model: 'gemini-custom-model' });
       expect(mockFetch2.mock.calls[0][0] as string).toContain('/models/gemini-custom-model:');
     } finally {
       if (originalEnv === undefined) delete process.env.ANSWER_ENGINE_GEMINI_MODEL;

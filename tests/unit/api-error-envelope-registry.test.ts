@@ -61,25 +61,12 @@ const DELIBERATE_FLAT_SHAPE: Record<string, string> = {
 const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'wa-templates.routes.ts',
   'public.routes.ts',
-  'payment-links.routes.ts',
   'inventory.routes.ts',
-  // The accounting / finance / insights surfaces share a DIFFERENT convention:
-  // a flat lower-case discriminant (`{ error: 'not_found' }`,
-  // `{ error: 'validation_failed', details }`) that their own pages read as a
-  // string rather than through `data.error.code`. That is self-consistent, so
-  // it is not the webhook-replay defect — but it is a second envelope on the
-  // same platform, and nobody has decided whether it should converge. Listed
-  // rather than swept: changing a shape a page already reads correctly would
-  // be this gate breaking working code.
-  'alert-webhooks.routes.ts',
-  'backorders.routes.ts',
-  'expenses.routes.ts',
-  'finance.routes.ts',
-  'insights.routes.ts',
-  'purchase-orders.routes.ts',
-  'smart-layer.routes.ts',
-  'stock-adjustments.routes.ts',
-  'suppliers.routes.ts',
+  // The accounting / finance / insights surfaces (alert-webhooks, backorders,
+  // expenses, finance, insights, purchase-orders, smart-layer,
+  // stock-adjustments, suppliers) were migrated onto the standard
+  // `{ success: false, error: { code, message, details? } }` envelope in
+  // #1829 and removed from this list.
 ]);
 
 function routeFiles(dir: string, rel = ''): string[] {

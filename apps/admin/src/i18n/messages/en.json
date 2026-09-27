@@ -7088,7 +7088,17 @@
       "toastSendFailedTitle": "Send failed",
       "removeItemAriaLabel": "Remove item",
       "orderNumberLabel": "Order #{orderNumber}",
-      "invoiceIdLabel": "Invoice {invoiceId}"
+      "invoiceIdLabel": "Invoice {invoiceId}",
+      "errInvalidBody": "Check the phone number and items, then try again.",
+      "errStoreNotFound": "This store could not be found.",
+      "errWbsNotConfigured": "Connect WhatsApp (WBS) first before sending payment links.",
+      "errTemplateNotFound": "The payment-link WhatsApp template is not set up yet. Generate templates first.",
+      "errTemplateNotApproved": "The payment-link WhatsApp template is not approved by Meta yet. Wait for approval before sending.",
+      "errProductNotFound": "One of the selected products is no longer in this store.",
+      "errOutOfStock": "{name} does not have enough stock.",
+      "errPaymentNotConfigured": "Set up a payment provider in Store Settings → Payments before sending payment links.",
+      "errWbsKeyInvalid": "The saved WhatsApp (WBS) key could not be read. Reconnect WBS.",
+      "errWbsSendFailed": "WhatsApp could not send the payment link. Try again shortly."
     },
     "botAnalytics": {
       "notConnected": "WBS is not connected for this store. Configure the integration in the Connection tab first.",

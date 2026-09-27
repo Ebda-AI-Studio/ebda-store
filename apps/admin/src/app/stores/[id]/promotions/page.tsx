@@ -15,6 +15,7 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { dateTimeLocalValue } from '@/lib/form-text';
 import { ScopePicker } from '../_components/ScopePicker';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
@@ -153,8 +154,8 @@ export default function PromotionsPage() {
       maxDiscount: promo.maxDiscount != null ? String(promo.maxDiscount / 1000) : '',
       priority: String(promo.priority),
       isActive: promo.isActive,
-      startsAt: promo.startsAt ? promo.startsAt.slice(0, 16) : '',
-      expiresAt: promo.expiresAt ? promo.expiresAt.slice(0, 16) : '',
+      startsAt: dateTimeLocalValue(promo.startsAt),
+      expiresAt: dateTimeLocalValue(promo.expiresAt),
       customerGroupId: promo.customerGroupId ?? '',
       firstOrderOnly: promo.firstOrderOnly,
       minOrderAmount: promo.minOrderAmount != null ? String(promo.minOrderAmount / 1000) : '',

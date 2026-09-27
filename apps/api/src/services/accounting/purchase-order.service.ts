@@ -212,7 +212,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
           select: {
             inventory: true,
             costPrice: true,
-            variants: { select: { inventory: true } },
+            variants: { select: { inventory: true, isActive: true } },
           },
         });
         if (!product) throw new Error(`Product ${item.productId} not found`);

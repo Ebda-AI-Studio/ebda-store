@@ -187,7 +187,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         // below could see it — the filter has to agree with the computation.
         OR: [
           { variants: { none: {} }, inventory: { gt: 0 } },
-          { variants: { some: { inventory: { gt: 0 } } } },
+          { variants: { some: { isActive: true, inventory: { gt: 0 } } } },
         ],
         costPrice: { gt: 0 },
       },
@@ -199,7 +199,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         costPrice: true,
         // For a variant product the on-hand quantity is the variant sum;
         // `inventory` is unused for one. See lib/effective-inventory.ts.
-        variants: { select: { inventory: true } },
+        variants: { select: { inventory: true, isActive: true } },
       },
     });
 

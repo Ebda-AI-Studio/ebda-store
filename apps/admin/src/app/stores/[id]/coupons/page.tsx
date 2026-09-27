@@ -12,6 +12,7 @@ import { CouponsTable } from './_components/CouponsTable';
 import type { Coupon, CouponFormData } from './_components/types';
 import { INITIAL_FORM_DATA } from './_components/types';
 import { useCoupons } from './_hooks/useCoupons';
+import { dateTimeLocalValue } from '@/lib/form-text';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 interface CustomerGroupOption {
@@ -82,8 +83,8 @@ export default function CouponsPage() {
       usageLimit: coupon.usageLimit ? String(coupon.usageLimit) : '',
       usageLimitPerUser: coupon.usageLimitPerUser ? String(coupon.usageLimitPerUser) : '',
       isActive: coupon.isActive,
-      startsAt: coupon.startsAt ? coupon.startsAt.slice(0, 16) : '',
-      expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 16) : '',
+      startsAt: dateTimeLocalValue(coupon.startsAt),
+      expiresAt: dateTimeLocalValue(coupon.expiresAt),
       customerGroupId: coupon.customerGroupId ?? '',
       firstOrderOnly: coupon.firstOrderOnly ?? false,
       minQuantity: coupon.minQuantity != null ? String(coupon.minQuantity) : '',

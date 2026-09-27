@@ -62,6 +62,7 @@ const URL_REGEX = /https?:\/\/[^\s)"'<>]+/g;
 
 export class OpenAiAnswerEngineProvider implements AnswerEngineProvider {
   readonly engine = 'openai';
+  readonly modelId = MODEL;
 
   constructor(private readonly apiKey: string) {}
 

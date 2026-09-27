@@ -66,15 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // no separate ref is needed here.
   const refreshToken = useCallback(async (): Promise<boolean> => {
     // On iOS/iPadOS the refresh token lives in localStorage (the httpOnly
-    // cookie is unreliable for installed PWAs). Bail out if iOS has no
-    // localStorage token — there is nothing to exchange.
-    // On all other browsers the refresh token rides in the refresh_token
-    // httpOnly cookie (sent automatically via credentials:'include'), so
-    // we DO NOT bail out early when localStorage is empty — let the server
-    // read it from the cookie. The /auth/refresh route accepts either.
-    if (typeof window !== 'undefined' && isIosWebkit() && !localStorage.getItem('refreshToken')) {
-      return false;
-    }
+    // cookie is unreliable for installed PWAs); elsewhere it rides in the
+    // refresh_token httpOnly cookie. /auth/refresh accepts either, and is
+    // called even when iOS has no stored token: a browser holding dead session
+    // cookies gets them cleared by that request and by nothing else (#1531).
     // The context's own contract stays boolean — only 'refreshed' is a
     // success. checkAuth needs the third outcome and calls refreshSession()
     // directly.

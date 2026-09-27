@@ -113,6 +113,8 @@ function extractCitedUrls(response: GeminiRestResponse): string[] {
 
 export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
   readonly engine = 'gemini';
+  // The model actually called, recorded as usage provenance (#1038).
+  readonly modelId = MODEL;
 
   async query(storeId: string, prompt: string): Promise<EngineAnswer> {
     await assertAiQuota({ storeId });
@@ -169,7 +171,11 @@ export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
 
     const promptTokens = response.usageMetadata?.promptTokenCount ?? 0;
     const candidateTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
-    await recordUsage(storeId, 'answer_engine_gemini', promptTokens, candidateTokens, false);
+    // Provenance is the model actually invoked: ANSWER_ENGINE_GEMINI_MODEL may
+    // differ from GEMINI_MODEL, which recordUsage would otherwise assume (#1038).
+    await recordUsage(storeId, 'answer_engine_gemini', promptTokens, candidateTokens, false, {
+      model: MODEL,
+    });
 
     return {
       text,

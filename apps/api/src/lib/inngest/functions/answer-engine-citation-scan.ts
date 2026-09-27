@@ -142,6 +142,10 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
       )
     );
 
+    // Memoized, so a retried per-store step below sees the SAME instant and
+    // resumes past the rows its crashed attempt already wrote (#910).
+    const runStartedAt = new Date(await step.run('run-started-at', () => new Date().toISOString()));
+
     const batches = chunk(stores, BULK_AI_BATCH_SIZE);
 
     let scannedStores = 0;
@@ -160,7 +164,9 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
         // per-store throw (feature-check outage, or any of runCitationScan's
         // own pre-loop reads) into a `skipped: 'error'` marker so one bad
         // store can never abort this loop for the rest — see its docstring.
-        const result = await step.run(`scan-${store.id}`, () => scanStoreCitations(store.id));
+        const result = await step.run(`scan-${store.id}`, () =>
+          scanStoreCitations(store.id, { runStartedAt })
+        );
 
         if (result.skipped === 'error') {
           erroredStores += 1;
@@ -231,8 +237,10 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     // On-demand also runs without HTTP tenant context — wrap so FORCE RLS
     // sees the correct GUC.
+    // See the cron: memoized so a retried `scan` step resumes (#910).
+    const runStartedAt = new Date(await step.run('run-started-at', () => new Date().toISOString()));
     const engineResults = await step.run('scan', () =>
-      runInTenantContext(storeId, () => runCitationScan(storeId))
+      runInTenantContext(storeId, () => runCitationScan(storeId, { runStartedAt }))
     );
 
     logger.info({ storeId, engineResults }, 'answer-engine-scan-on-demand completed');

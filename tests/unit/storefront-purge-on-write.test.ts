@@ -13,7 +13,7 @@
  * must emit the tag the storefront fetches are tagged with.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const revalidateSpy = vi.fn();
 
@@ -31,8 +31,12 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
   },
 }));
 
-const { invalidateStoreProductCaches, invalidateStoreCategoriesCaches } =
-  await import('../../apps/api/src/lib/public-cache');
+const {
+  invalidateStoreProductCaches,
+  invalidateStoreCategoriesCaches,
+  invalidateStoreProductCachesAfterOrder,
+  ORDER_PURGE_COALESCE_MS,
+} = await import('../../apps/api/src/lib/public-cache');
 
 const STORE = 'store-abc';
 
@@ -73,5 +77,86 @@ describe('storefront purge on product/category writes', () => {
       ([arg]) => (arg as { tags?: string[] })?.tags ?? []
     );
     expect(tags.every(t => t.endsWith(`:${STORE}`))).toBe(true);
+  });
+});
+
+// #1220 — one outbound purge per bust, and orders coalesced per store.
+describe('storefront purge volume', () => {
+  beforeEach(() => revalidateSpy.mockClear());
+
+  it('a product write sends exactly ONE purge carrying both tags', async () => {
+    await invalidateStoreProductCaches(STORE);
+    expect(revalidateSpy).toHaveBeenCalledTimes(1);
+    expect(revalidateSpy.mock.calls[0][0]).toEqual({
+      tags: [`products:${STORE}`, `categories:${STORE}`],
+    });
+  });
+
+  it('a category write sends exactly ONE purge', async () => {
+    await invalidateStoreCategoriesCaches(STORE);
+    expect(revalidateSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('order-driven purge is coalesced per store (#1220)', () => {
+  beforeEach(() => {
+    revalidateSpy.mockClear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  it('the first order in a quiet period purges immediately', async () => {
+    await invalidateStoreProductCachesAfterOrder('store-quiet');
+    expect(revalidateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a burst shares ONE trailing purge, and the store is purged again after it', async () => {
+    const store = 'store-burst';
+    await invalidateStoreProductCachesAfterOrder(store); // leading edge
+    for (let i = 0; i < 20; i++) await invalidateStoreProductCachesAfterOrder(store);
+    expect(revalidateSpy).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(ORDER_PURGE_COALESCE_MS);
+    // The orders that arrived mid-window are not left stale: one trailing purge.
+    expect(revalidateSpy).toHaveBeenCalledTimes(2);
+
+    // Nothing arrived in the second window — it closes without a purge.
+    vi.advanceTimersByTime(ORDER_PURGE_COALESCE_MS);
+    expect(revalidateSpy).toHaveBeenCalledTimes(2);
+
+    // Quiet again: the next order purges immediately.
+    await invalidateStoreProductCachesAfterOrder(store);
+    expect(revalidateSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('one store’s burst never delays another store’s purge', async () => {
+    await invalidateStoreProductCachesAfterOrder('store-a');
+    await invalidateStoreProductCachesAfterOrder('store-b');
+    expect(revalidateSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('a content write is never coalesced, even mid-burst', async () => {
+    await invalidateStoreProductCachesAfterOrder('store-edit');
+    await invalidateStoreProductCaches('store-edit');
+    expect(revalidateSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('the order path uses the coalesced bust (#1220)', () => {
+  it('OrderService.bustProductCaches calls the order variant, not the content purge', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/services/order.service.ts'),
+      'utf8'
+    );
+    const start = src.indexOf('async function bustProductCaches(');
+    expect(start).toBeGreaterThan(-1);
+    const body = src.slice(start, src.indexOf('\n}\n', start));
+    expect(body).toContain('invalidateStoreProductCachesAfterOrder(storeId)');
+    expect(body).not.toMatch(/invalidateStoreProductCaches\(/);
   });
 });

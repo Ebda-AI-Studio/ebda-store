@@ -8,8 +8,15 @@
  * description intact. The edit path must send `null`; the create path, which
  * has nothing to clear, must keep sending `undefined`.
  */
-import { describe, it, expect } from 'vitest';
-import { textFieldValue, numericFieldValue, dateFieldValue } from '../form-text';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  textFieldValue,
+  numericFieldValue,
+  dateFieldValue,
+  dateTimeLocalValue,
+} from '../form-text';
 
 /** What the browser would actually put on the wire for a payload value. */
 function serialize(value: unknown): string {
@@ -148,5 +155,48 @@ describe('dateFieldValue — create (new-record forms)', () => {
     expect(dateFieldValue('2026-12-01T00:00', 'create')).toBe(
       new Date('2026-12-01T00:00').toISOString()
     );
+  });
+});
+
+// #1570: a stored UTC instant hydrated into a datetime-local input and saved
+// straight back must be the SAME instant. Hydrating with `iso.slice(0, 16)`
+// rendered UTC wall-clock that dateFieldValue re-read as local, so in Kuwait
+// (UTC+3) every edit-save moved a coupon's expiry three hours earlier.
+describe('dateTimeLocalValue — the inverse of dateFieldValue (#1570)', () => {
+  let savedTz: string | undefined;
+  beforeAll(() => {
+    savedTz = process.env.TZ;
+    process.env.TZ = 'Asia/Kuwait';
+  });
+  afterAll(() => {
+    if (savedTz === undefined) delete process.env.TZ;
+    else process.env.TZ = savedTz;
+  });
+
+  it('renders the LOCAL wall-clock time of the stored instant', () => {
+    expect(dateTimeLocalValue('2026-12-01T00:00:00.000Z')).toBe('2026-12-01T03:00');
+  });
+
+  it('stored -> hydrate -> save round-trips to the identical instant, repeatedly', () => {
+    let stored = '2026-12-01T00:00:00.000Z';
+    for (let save = 0; save < 4; save++) {
+      stored = dateFieldValue(dateTimeLocalValue(stored), 'update') as string;
+    }
+    expect(stored).toBe('2026-12-01T00:00:00.000Z');
+  });
+
+  it('empty or unparsable input hydrates as an empty field', () => {
+    expect(dateTimeLocalValue(null)).toBe('');
+    expect(dateTimeLocalValue(undefined)).toBe('');
+    expect(dateTimeLocalValue('not a date')).toBe('');
+  });
+
+  it('no admin form hydrates a starts/expires date by slicing the UTC string', () => {
+    const root = join(__dirname, '../../app/stores/[id]');
+    for (const page of ['coupons/page.tsx', 'promotions/page.tsx', 'bundles/page.tsx']) {
+      const src = readFileSync(join(root, page), 'utf8');
+      expect(src, page).not.toMatch(/(startsAt|expiresAt)\.slice\(0,\s*16\)/);
+      expect(src, page).toContain('dateTimeLocalValue(');
+    }
   });
 });

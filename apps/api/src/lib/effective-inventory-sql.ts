@@ -10,9 +10,16 @@ import { Prisma } from '@force/database';
  *
  * Assumes the products table is aliased `p`. Keep this in lockstep with
  * `effectiveInventory` — they are one rule with two evaluators, and a query
- * that hand-rolls its own version is how this class of bug started.
+ * that hand-rolls its own version is how this class of bug started. That
+ * includes the variant rule: a disabled variant is not stock, and a product
+ * whose variants are all disabled has 0 (#1103).
  */
-export const ON_HAND_SQL = Prisma.sql`COALESCE(
-  (SELECT SUM(pv.inventory) FROM public.product_variants pv WHERE pv.product_id = p.id),
-  p.inventory
-)`;
+export const ON_HAND_SQL = Prisma.sql`CASE
+  WHEN EXISTS (SELECT 1 FROM public.product_variants pv WHERE pv.product_id = p.id)
+  THEN COALESCE(
+    (SELECT SUM(pv.inventory) FROM public.product_variants pv
+      WHERE pv.product_id = p.id AND pv.is_active),
+    0
+  )
+  ELSE p.inventory
+END`;

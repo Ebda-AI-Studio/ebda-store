@@ -450,6 +450,8 @@ class ApiClient {
       // (every checkout write 403'd until a manual re-login). The
       // /auth/refresh route accepts either and answers 400 when neither is
       // present, which lands on the same `null` the old bail returned.
+      // And when the browser holds DEAD session cookies, that 400 now clears
+      // them, so the next checkout write takes the cookieless guest path (#1531).
       //
       // The READ is iOS-gated (#1945), mirroring admin/orders: a non-iOS
       // browser carrying a leftover entry (written before the writes were

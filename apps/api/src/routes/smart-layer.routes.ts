@@ -57,7 +57,14 @@ router.get(
     try {
       const parsed = reorderListSchema.safeParse(req.query);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const { page, perPage, status } = parsed.data;
@@ -150,7 +157,14 @@ router.get(
     try {
       const parsed = deadstockListSchema.safeParse(req.query);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const { page, perPage, status } = parsed.data;
@@ -250,7 +264,14 @@ router.get(
     try {
       const parsed = anomalyListSchema.safeParse(req.query);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const { page, perPage, severity, acknowledged } = parsed.data;

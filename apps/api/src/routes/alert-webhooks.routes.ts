@@ -23,11 +23,19 @@ function requireToken(req: Request, res: Response): boolean {
   if (!ALERTS_TOKEN) return true;
   const token = (req.query.token as string) || req.header('x-alerts-token') || '';
   if (!token || token.length !== ALERTS_TOKEN.length) {
-    res.status(401).json({ ok: false, error: 'invalid_token' });
+    res.status(401).json({
+      ok: false,
+      success: false,
+      error: { code: 'invalid_token', message: 'Missing or invalid alerts webhook token.' },
+    });
     return false;
   }
   if (!crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ALERTS_TOKEN))) {
-    res.status(401).json({ ok: false, error: 'invalid_token' });
+    res.status(401).json({
+      ok: false,
+      success: false,
+      error: { code: 'invalid_token', message: 'Missing or invalid alerts webhook token.' },
+    });
     return false;
   }
   return true;
@@ -198,7 +206,11 @@ router.post('/generic', async (req, res, next) => {
       source?: string;
     };
     if (!body.title) {
-      res.status(400).json({ ok: false, error: 'missing_title' });
+      res.status(400).json({
+        ok: false,
+        success: false,
+        error: { code: 'missing_title', message: 'Missing required field: title.' },
+      });
       return;
     }
     await sendAlert({

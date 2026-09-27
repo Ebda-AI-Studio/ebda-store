@@ -299,7 +299,14 @@ router.get(
 
       const parsed = funnelQuerySchema.safeParse(req.query);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const { window: days } = parsed.data;
@@ -389,7 +396,14 @@ router.get(
 
       const parsed = productsQuerySchema.safeParse(req.query);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const { perPage } = parsed.data;
@@ -493,9 +507,10 @@ router.get(
       );
 
       if (!snapshot) {
-        res
-          .status(404)
-          .json({ error: 'not_found', message: 'No RFM snapshot found for this customer.' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'No RFM snapshot found for this customer.' },
+        });
         return;
       }
 

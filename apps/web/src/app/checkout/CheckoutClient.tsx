@@ -1079,6 +1079,10 @@ export default function CheckoutClient() {
       }
     }
 
+    // The order this attempt created, once it exists — so a payment-leg
+    // refusal can point at it instead of at a fresh checkout (#1826).
+    let createdOrderId: string | null = null;
+
     try {
       // Create order. Include the form's email on the shipping address so
       // the invoice / order confirmation can show the *buyer's* contact email
@@ -1176,6 +1180,7 @@ export default function CheckoutClient() {
       }
 
       const order = orderResult.data.order;
+      createdOrderId = order.id;
 
       // Paid in full from the customer wallet: the order was created paid and
       // there is nothing left for a gateway — /payments/create would refuse it.
@@ -1460,6 +1465,20 @@ export default function CheckoutClient() {
             'هذا المتجر لا يوصل إلى المنطقة التي اخترتها. يرجى اختيار منطقة أخرى.'
           );
           setStep(1);
+          break;
+        case 'ORDER_ALREADY_PAID':
+          // Payment leg (#1826): this order already has a settled payment —
+          // a double submit, or a payment that landed while the page waited.
+          // Paying again is the one thing that must not happen, so this is
+          // NOT a retry: show the order's confirmation, which verifies its
+          // status with the server.
+          friendly = t(
+            'This order has already been paid. Opening your order confirmation…',
+            'تم دفع هذا الطلب بالفعل. جارٍ فتح تأكيد طلبك…'
+          );
+          if (createdOrderId) {
+            router.push(storeUrl(`/checkout/success?orderId=${createdOrderId}`));
+          }
           break;
         case 'TIMEOUT':
           friendly = t(

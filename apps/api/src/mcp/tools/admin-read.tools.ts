@@ -183,6 +183,10 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
           sku: v.sku ?? undefined,
           price: v.price,
           inventory: v.inventory,
+          // A disabled variant's inventory is not stock (#1103) — the product's
+          // `inventory` above already excludes it; this says why a row's
+          // units are missing from that total.
+          isActive: v.isActive !== false,
         })),
         images: (p.images ?? []).map((i: any) => i.url),
       });

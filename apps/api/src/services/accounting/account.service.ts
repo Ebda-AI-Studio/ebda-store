@@ -89,6 +89,8 @@ async function postOpeningBalanceIfNeeded(
   const variantRows = await tx.productVariant.findMany({
     where: {
       product: { storeId, deletedAt: null, status: { not: 'archived' }, trackInventory: true },
+      // A disabled variant is not stock (#1103), so it is not inventory value.
+      isActive: true,
       inventory: { gt: 0 },
     },
     select: {

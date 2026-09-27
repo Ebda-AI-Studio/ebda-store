@@ -42,7 +42,14 @@ router.post(
     try {
       const body = cancelSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>

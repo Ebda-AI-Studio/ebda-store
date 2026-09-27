@@ -8,6 +8,103 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25 — batch M5 (misc money surfaces)
+
+Context: branch `fix/p2-m5`, fourteen audit issues plus the owner's #1103
+decision. Owner's rule for the batch: production must not break, and nothing
+changes how buying or paying works unless an issue explicitly requires it.
+
+**Ruling M5-1 — #1809 (`allocateBundlePrice` is 106 lines) is not refactored.**
+The length is the documented closed-form residual distribution that replaced a
+per-unit loop, and it is equivalence-tested against that loop on every run
+(`tests/unit/bundle-allocation-equivalence.test.ts`) plus exhaustive and
+property checks of both invariants, the zero-price case and odd remainders
+(`tests/unit/bundle-pricing.test.ts`) — every test the issue asked for already
+exists. Splitting a money allocator to satisfy a line-count metric adds risk of
+exactly the off-by-one-fil error the tests guard against, for no behaviour.
+Cost if wrong: the function stays harder to read than it could be; a future
+edit to it must still pass the equivalence suite, which is the real guard.
+
+**Ruling M5-2 — #1602: the customers router keeps its bare `/stores/:storeId`
+mount; the double transaction is closed in `tenantContext` instead.** Moving
+the mount (the issue's first fix) was built and then reverted: that mount has
+wrapped every later `/stores/<uuid>/*` request since 2026-04-27, so the
+"context-less" phase-2 routers (`insights`, `finance`, `inventory`,
+`notification`, `newsletter`, `recommendation`, the accounting routers…) have
+run inside its tenant transaction in production ever since, whatever
+`rls-router-context-invariant.test.ts` documents. Removing it would silently
+change their atomicity and GUCs in one deploy. `tenantContext` now joins an
+open transaction of the SAME store and user instead of nesting a second one,
+so every request is one transaction again and no router loses the one it has.
+Cost if wrong: the phase-2 routers stay wrapped by accident rather than by
+design — the documented "context-less" set is not what runs, and that
+mismatch needs its own audit before anyone relies on either description.
+
+**Ruling M5-3 — #1787: the COD mark-paid batch stays on its own transaction.**
+Measured against Postgres 16: a `prisma.$transaction([...])` batch built from
+proxied accessors inside the tenant context runs on its own connection and
+commits even if the request then rolls back (it has carried the request's GUCs
+since Ruling RLS-S1's `transactionWithGucs`; the separate commit is unchanged). For
+mark-paid that commit is load-bearing today: the handler enqueues
+`order/created` BEFORE the request commits, and the accounting journal and WBS
+notification read the order as paid. Moving the flip into the request
+transaction first needs that send behind `deferAfterTenantCommit`, which is a
+money-path change no issue in this batch requires. Recorded in
+`REVIEWED_OWN_TRANSACTION` with this reason. Cost if wrong: a mark-paid
+request that fails AFTER the flip leaves the order paid without its payment
+event row; the merchant sees paid, the audit trail has a gap.
+
+**Ruling M5-4 — #1826: the checkout does not reuse the order id to retry the
+payment.** The issue's premise that "try again" always duplicates the order is
+half true: every payment failure thrown after the order is found runs
+`rollbackForPaymentFailure` server-side (order cancelled, stock and coupon
+returned), so re-creating the order is the designed recovery. Reusing the id
+after such a failure would mint an invoice for a CANCELLED order —
+`/payments/create` does not check order status. Only three codes leave the
+order pending: `ORDER_ALREADY_PAID` (now answered by opening the order's
+confirmation, never a retry), and `NOT_FOUND` / `PAYMENT_FAILED`, recorded in
+the gate's `DELIBERATELY_GENERIC` with why a retry is honest. Cost if wrong: a
+shopper who retries after those two strands one pending order that holds its
+stock until `order-auto-cancel-unpaid` releases it (2 days) and sends the
+customer a cancellation notice.
+
+**Ruling M5-5 — #1220: order-driven storefront purges are coalesced for up to
+10 seconds per store; the residual is display-only.** Redis is still cleared
+on every order, immediately; the storefront purge is leading-edge, so an order
+in a quiet period purges at once and only a burst shares one trailing purge.
+Mid-burst the storefront's own data cache may show stock up to 10s behind.
+Checkout re-reads stock from the database on every order, so it cannot
+oversell. Content edits (product, variant, bulk AI) keep the immediate purge.
+Cost if wrong: during a flash sale a shopper can see "in stock" for up to 10s
+after the last unit sold and be refused at checkout.
+
+**Ruling M5-6 — #1103: a query that pre-filters to ACTIVE variants falls back
+to the parent column when every variant is disabled.** The shared helpers,
+`ON_HAND_SQL` and `enrichStockFlags` see all variants with their flag and give 0. The PDP and the WhatsApp bridge's display selects keep `where: { isActive:
+true }` (they list variants to the shopper), so for an all-disabled product
+they read the parent column instead — which the inventory-model invariant
+holds at 0, and which is ≤ 0 on every product the 2026-08-30 drift touched.
+Cost if wrong: a variant product whose parent column is somehow positive AND
+whose variants are all disabled shows that number on the PDP and to the bot.
+
+**Ruling M5-7 — #1547: `payment-abandonments.routes.ts` has no recovery or
+charge endpoint to test.** The issue's fix idea named "abandonment recovery
+charge"; the router exposes only `GET /` and `GET /stats` (retargeting is the
+`payment-abandonment-sweep` Inngest push). Its test covers what exists: masking,
+shapes, validation and the fail-closed feature gate. Cost if wrong: none for
+this router; a future action endpoint needs its own test.
+
+**Ruling M5-8 — #1462's defence mutation targets the migration SQL, not the
+database.** `money-loyalty-reversal-index` weakens `CREATE UNIQUE INDEX` to
+`CREATE INDEX` in the migration file; the integration test derives its list
+from the migrations, so the derivation loses the index and goes red. It proves
+the index cannot be quietly removed from the migration history; the same test's
+`pg_indexes` assertion is what catches a database that lost it (a `db:push`, an
+old restore) — shown red by dropping the index on a local Postgres 16. Cost if
+wrong: none known; both halves were watched fail.
+
+---
+
 ## 2026-09-25 — RLS strict policies (cutover attempt #1 rollback)
 
 Context: `docs/plans/2026-07-02-rls-cutover.md` § "2026-09-25 — first Phase 3 attempt". Branch
@@ -1451,6 +1548,9 @@ EXISTS, not that it renders; what the copy says is asserted in the two copy
 suites, and that the message survives the step change is asserted in
 `checkout-error-alert-renders.test.tsx`.
 
+_Update 2026-09-25 (#1826, Ruling M5-4): the gate now also reads the
+`/payments/create` handler, the checkout's second call._
+
 Cost if wrong: the gate is scoped to `OrderService.create`, bounded at the next
 `static async`. A code thrown by a helper that method calls — rather than in
 its own body — is invisible to it. `DELIBERATELY_GENERIC` is empty today, and
@@ -1490,6 +1590,11 @@ against the object shape will read `undefined` from any of those nine routes.
 The registry is what makes that a decision someone takes rather than a surprise
 someone debugs — but it does not force the convergence, and until it happens
 the answer to "what shape does this API return?" is "it depends which router".
+
+_Update 2026-09-25 (#1829): the "self-consistent" premise above was false —
+those pages read errors through the same normaliser as the webhook page. The
+nine routes now answer the platform envelope, keeping their lower-case
+discriminants as `code` and moving `issues`/`details` under `error.details`._
 
 **Ruling P2-B8-2 — four of this batch's findings are one defect, and the gate
 is the actual deliverable.**

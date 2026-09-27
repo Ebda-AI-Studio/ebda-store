@@ -131,7 +131,9 @@ router.get(
         getExpense(req.params.storeId, req.params.id)
       );
       if (!data) {
-        res.status(404).json({ error: 'not_found' });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'not_found', message: 'Expense not found.' } });
         return;
       }
       res.json({ data });
@@ -152,7 +154,14 @@ router.post(
     try {
       const body = createSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -219,7 +228,14 @@ router.post(
       // reason is accepted but not stored on the model (v1 — no rejection reason column yet)
       const body = rejectSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -247,16 +263,18 @@ router.post(
   async (req, res, next) => {
     try {
       if (!req.file) {
-        res
-          .status(400)
-          .json({ error: 'no_file', message: 'No file uploaded. Send field name: file' });
+        res.status(400).json({
+          success: false,
+          error: { code: 'no_file', message: 'No file uploaded. Send field name: file' },
+        });
         return;
       }
 
       if (!StorageService.isAvailable()) {
-        res
-          .status(503)
-          .json({ error: 'storage_unavailable', message: 'R2 storage is not configured.' });
+        res.status(503).json({
+          success: false,
+          error: { code: 'storage_unavailable', message: 'R2 storage is not configured.' },
+        });
         return;
       }
 

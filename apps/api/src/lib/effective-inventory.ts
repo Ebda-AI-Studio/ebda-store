@@ -25,7 +25,27 @@ export interface StockShape {
   inventory: number;
   trackInventory?: boolean;
   allowBackorder?: boolean;
-  variants?: Array<{ inventory: number; allowBackorder?: boolean }> | null;
+  /**
+   * EVERY variant of the product, disabled ones included, each with its
+   * `isActive` flag — do not pre-filter with `where: { isActive: true }`. A
+   * product with only disabled variants is still a variant product; filtered
+   * to zero rows it would read as variant-less and fall back to the unused
+   * parent column. An omitted `isActive` counts as active.
+   */
+  variants?: Array<{ inventory: number; allowBackorder?: boolean; isActive?: boolean }> | null;
+}
+
+/**
+ * The stock rule for variants (owner decision, 2026-09-25, #1103): a DISABLED
+ * variant (`isActive = false`) is not stock — not on the storefront, not in the
+ * admin, not to the WhatsApp bot, not in low-stock alerts, not in finance.
+ * Checkout could never sell one, so counting it only produced a product that
+ * read "in stock" on inventory nobody could buy.
+ */
+export function activeVariants<V extends { isActive?: boolean }>(
+  variants: readonly V[] | null | undefined
+): V[] {
+  return (variants ?? []).filter(v => v.isActive !== false);
 }
 
 /**
@@ -39,14 +59,17 @@ export const EFFECTIVE_STOCK_SELECT = {
   inventory: true,
   trackInventory: true,
   allowBackorder: true,
-  variants: { select: { inventory: true, allowBackorder: true } },
+  variants: { select: { inventory: true, allowBackorder: true, isActive: true } },
 } as const;
 
-/** Stock for a product: the variant sum when it has variants, else its own column. */
+/**
+ * Stock for a product: the sum of its ACTIVE variants when it has variants
+ * (0 when every variant is disabled), else its own column.
+ */
 export function effectiveInventory(product: StockShape): number {
   const variants = product.variants ?? [];
   if (variants.length === 0) return product.inventory;
-  return variants.reduce((sum, v) => sum + (v.inventory ?? 0), 0);
+  return activeVariants(variants).reduce((sum, v) => sum + (v.inventory ?? 0), 0);
 }
 
 /**
@@ -63,8 +86,8 @@ export function isOrderable(
   if (product.trackInventory === false) return true;
   if (effectiveInventory(product) >= qty) return true;
 
-  const variants = product.variants ?? [];
   const allowsBackorder =
-    product.allowBackorder === true || variants.some(v => v.allowBackorder === true);
+    product.allowBackorder === true ||
+    activeVariants(product.variants).some(v => v.allowBackorder === true);
   return backorderFeatureEnabled && allowsBackorder;
 }

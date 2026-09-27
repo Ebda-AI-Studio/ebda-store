@@ -129,7 +129,8 @@ export async function generateProductMetaAeo(
     'aeo',
     usage?.promptTokenCount ?? 0,
     usage?.candidatesTokenCount ?? 0,
-    false
+    false,
+    { model: modelName }
   );
 
   const raw = result.response.text();

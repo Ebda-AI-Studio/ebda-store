@@ -192,7 +192,10 @@ router.get(
       );
 
       if (!entry) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Journal entry not found.' },
+        });
         return;
       }
 
@@ -258,8 +261,12 @@ router.post(
       const parsed = manualEntrySchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(422).json({
-          error: 'validation_failed',
-          details: parsed.error.flatten(),
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
         });
         return;
       }
@@ -365,7 +372,14 @@ router.post(
     try {
       const body = createChildSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const acct = await runInTenantContext(req.params.storeId, () =>
@@ -396,7 +410,14 @@ router.patch(
     try {
       const body = setActiveSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const acct = await runInTenantContext(req.params.storeId, () =>
@@ -810,13 +831,23 @@ router.get(
     try {
       const parsed = taxReportQuerySchema.safeParse(req.query);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const from = new Date(parsed.data.from + 'T00:00:00.000Z');
       const to = new Date(parsed.data.to + 'T23:59:59.999Z');
       if (isNaN(from.getTime()) || isNaN(to.getTime())) {
-        res.status(422).json({ error: 'invalid_date', message: 'from and to must be valid dates' });
+        res.status(422).json({
+          success: false,
+          error: { code: 'invalid_date', message: 'from and to must be valid dates' },
+        });
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -846,13 +877,23 @@ router.get(
     try {
       const parsed = taxReportQuerySchema.safeParse(req.query);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const from = new Date(parsed.data.from + 'T00:00:00.000Z');
       const to = new Date(parsed.data.to + 'T23:59:59.999Z');
       if (isNaN(from.getTime()) || isNaN(to.getTime())) {
-        res.status(422).json({ error: 'invalid_date', message: 'from and to must be valid dates' });
+        res.status(422).json({
+          success: false,
+          error: { code: 'invalid_date', message: 'from and to must be valid dates' },
+        });
         return;
       }
       const report = await runInTenantContext(req.params.storeId, () =>
@@ -1017,7 +1058,14 @@ router.post(
     try {
       const parsed = fxRateCreateSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
         return;
       }
       const { currency, rate, rateDate } = parsed.data;
@@ -1089,13 +1137,23 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        res.status(422).json({ error: 'file_required', message: 'Upload a CSV or OFX file' });
+        res.status(422).json({
+          success: false,
+          error: { code: 'file_required', message: 'Upload a CSV or OFX file' },
+        });
         return;
       }
 
       const bodyParsed = importBodySchema.safeParse(req.body);
       if (!bodyParsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: bodyParsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: bodyParsed.error.flatten(),
+          },
+        });
         return;
       }
 
@@ -1118,9 +1176,10 @@ router.post(
         await wb.xlsx.load(ab);
         const sheet = wb.worksheets[0];
         if (!sheet) {
-          res
-            .status(422)
-            .json({ error: 'empty_xlsx', message: 'The uploaded XLSX file has no sheets.' });
+          res.status(422).json({
+            success: false,
+            error: { code: 'empty_xlsx', message: 'The uploaded XLSX file has no sheets.' },
+          });
           return;
         }
         const csvLines: string[] = [];
@@ -1227,7 +1286,10 @@ router.get(
       );
 
       if (!stmt) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Bank statement not found.' },
+        });
         return;
       }
 
@@ -1261,7 +1323,10 @@ router.get(
         })
       );
       if (!stmt) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Bank statement not found.' },
+        });
         return;
       }
 
@@ -1295,7 +1360,10 @@ router.get(
         })
       );
       if (!stmt) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Bank statement not found.' },
+        });
         return;
       }
 
@@ -1361,7 +1429,10 @@ router.post(
         })
       );
       if (!stmt) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Bank statement not found.' },
+        });
         return;
       }
 
@@ -1389,7 +1460,14 @@ router.patch(
     try {
       const bodyParsed = manualMatchSchema.safeParse(req.body);
       if (!bodyParsed.success) {
-        res.status(422).json({ error: 'validation_failed', details: bodyParsed.error.flatten() });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: bodyParsed.error.flatten(),
+          },
+        });
         return;
       }
 
@@ -1404,15 +1482,29 @@ router.patch(
       res.json({ data: updated });
     } catch (err: any) {
       if (err.statusCode === 404) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Bank transaction or journal entry not found.' },
+        });
         return;
       }
       if (err.statusCode === 409) {
-        res.status(409).json({ error: err.message });
+        // err.message here is the service's own lower-case discriminant
+        // (e.g. "journal_entry_already_matched") — kept as `code` verbatim.
+        res.status(409).json({
+          success: false,
+          error: {
+            code: err.message,
+            message: 'This journal entry is already matched to a different bank transaction.',
+          },
+        });
         return;
       }
       if (err.statusCode === 400) {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({
+          success: false,
+          error: { code: 'bad_request', message: err.message },
+        });
         return;
       }
       next(err);
@@ -1435,7 +1527,10 @@ router.delete(
         })
       );
       if (!stmt) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Bank statement not found.' },
+        });
         return;
       }
 

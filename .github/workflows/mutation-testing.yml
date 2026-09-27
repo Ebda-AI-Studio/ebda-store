@@ -93,6 +93,9 @@ on:
       # Customer wallet (D1): the no-negative-balance guard, the idempotent
       # replay and the wallet row lock.
       - 'apps/api/src/services/wallet.service.ts'
+      # The loyalty reversal partial unique index (#1462) — defended in
+      # migration SQL because Prisma cannot declare a partial index.
+      - 'packages/database/prisma/migrations/20260903130000_loyalty_reversal_tag_unique/migration.sql'
       # Batch M2/D2: the free_shipping coupon eligibility guard lives in
       # order.service.ts; the atomic affiliate payout audit row in
       # affiliate.service.ts.

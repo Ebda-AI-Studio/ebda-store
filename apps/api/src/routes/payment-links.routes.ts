@@ -89,8 +89,11 @@ router.post(
       if (!parsed.success) {
         res.status(400).json({
           success: false,
-          error: 'INVALID_BODY',
-          details: parsed.error.flatten(),
+          error: {
+            code: 'INVALID_BODY',
+            message: parsed.error.issues[0]?.message ?? 'Invalid payment link request.',
+            details: parsed.error.flatten(),
+          },
         });
         return;
       }
@@ -121,14 +124,19 @@ router.post(
         },
       });
       if (!store) {
-        res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'STORE_NOT_FOUND', message: 'Store not found.' },
+        });
         return;
       }
       if (!store.wbsEnabled || !store.wbsApiKey) {
         res.status(400).json({
           success: false,
-          error: 'WBS_NOT_CONFIGURED',
-          message: 'Connect WBS first before sending payment links via WhatsApp.',
+          error: {
+            code: 'WBS_NOT_CONFIGURED',
+            message: 'Connect WBS first before sending payment links via WhatsApp.',
+          },
         });
         return;
       }
@@ -147,16 +155,21 @@ router.post(
       if (!tmpl) {
         res.status(400).json({
           success: false,
-          error: 'TEMPLATE_NOT_FOUND',
-          message: 'paymentLink template is not seeded. Generate templates first.',
+          error: {
+            code: 'TEMPLATE_NOT_FOUND',
+            message: 'paymentLink template is not seeded. Generate templates first.',
+          },
         });
         return;
       }
       if (tmpl.status !== 'approved') {
         res.status(400).json({
           success: false,
-          error: 'TEMPLATE_NOT_APPROVED',
-          message: `paymentLink template status is ${tmpl.status}. Wait for Meta approval before sending.`,
+          error: {
+            code: 'TEMPLATE_NOT_APPROVED',
+            message: `paymentLink template status is ${tmpl.status}. Wait for Meta approval before sending.`,
+            details: { templateStatus: tmpl.status },
+          },
         });
         return;
       }
@@ -192,8 +205,11 @@ router.post(
         if (!p) {
           res.status(400).json({
             success: false,
-            error: 'PRODUCT_NOT_FOUND',
-            message: `Product ${it.productId} not in this store.`,
+            error: {
+              code: 'PRODUCT_NOT_FOUND',
+              message: `Product ${it.productId} not in this store.`,
+              details: { productId: it.productId },
+            },
           });
           return;
         }
@@ -204,8 +220,11 @@ router.post(
         if (!isOrderable(p, it.quantity, backorderFeatureEnabled)) {
           res.status(400).json({
             success: false,
-            error: 'OUT_OF_STOCK',
-            message: `Product ${it.productId} has insufficient stock.`,
+            error: {
+              code: 'OUT_OF_STOCK',
+              message: `${p.name} has insufficient stock.`,
+              details: { productId: it.productId, productName: p.name },
+            },
           });
           return;
         }
@@ -317,9 +336,11 @@ router.post(
         await prisma.order.delete({ where: { id: draftOrder.id } }).catch(() => null);
         res.status(400).json({
           success: false,
-          error: 'PAYMENT_NOT_CONFIGURED',
-          message:
-            'Configure a payment provider in Store Settings → Payments before sending payment links.',
+          error: {
+            code: 'PAYMENT_NOT_CONFIGURED',
+            message:
+              'Configure a payment provider in Store Settings → Payments before sending payment links.',
+          },
         });
         return;
       }
@@ -361,7 +382,13 @@ router.post(
         // Clean up the draft order before failing
         await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
         draftOrderId = null;
-        res.status(400).json({ success: false, error: 'WBS_KEY_INVALID' });
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'WBS_KEY_INVALID',
+            message: 'The stored WBS API key could not be read. Reconnect WBS.',
+          },
+        });
         return;
       }
 
@@ -413,8 +440,13 @@ router.post(
         draftOrderId = null;
         res.status(502).json({
           success: false,
-          error: wbsBody.error || 'WBS_SEND_FAILED',
-          message: wbsBody.message,
+          error: {
+            code: 'WBS_SEND_FAILED',
+            message: wbsBody.message || 'WhatsApp could not send the payment link.',
+            // The bridge's own code, kept for diagnosis rather than as the
+            // envelope's code, so the client sees one stable failure code.
+            ...(wbsBody.error ? { details: { wbsError: wbsBody.error } } : {}),
+          },
         });
         return;
       }

@@ -352,6 +352,15 @@ function isProxiedProp(prop: string | symbol): boolean {
  * `tenantContext` is already wrong on RLS scoping and commit atomicity, even
  * when it never reads back what it wrote and so never throws.
  *
+ * The ARRAY form is no exception (measured 2026-09-25, #1787): a
+ * `prisma.$transaction([prisma.x.update(...)])` batch built from proxied
+ * accessors inside `runInTenantContext` runs on its own connection, cannot see
+ * the request's uncommitted rows, and commits even when the request then rolls
+ * back (it carries the request's GUCs since `transactionWithGucs`, which was
+ * not true when this was first measured). Route handlers open these too — the full
+ * enumeration, including `withMoneyTx` callers, is
+ * `tests/unit/nested-transaction-registry.test.ts`.
+ *
  * Prisma does not support nested interactive transactions in any case.
  *
  * Since 2026-09-25 that separate transaction at least starts with the SAME RLS

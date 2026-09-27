@@ -79,6 +79,10 @@ export function numericFieldValue(
  * Same clear-on-empty convention as {@link textFieldValue}, for a
  * datetime-local input: sends an ISO string on a value, `null` to clear on
  * update, `undefined` (omitted key) on create.
+ *
+ * A datetime-local value carries no zone, so it is read as the browser's LOCAL
+ * time. Hydrate the input with {@link dateTimeLocalValue} — its exact inverse —
+ * or every edit-save shifts the stored instant by the UTC offset (#1570).
  */
 export function dateFieldValue(
   raw: string | null | undefined,
@@ -95,4 +99,24 @@ export function dateFieldValue(
 ): string | null | undefined {
   if (raw) return new Date(raw).toISOString();
   return intent === 'update' ? null : undefined;
+}
+
+/**
+ * The value to hydrate a `datetime-local` input with from a stored ISO
+ * instant: the instant's LOCAL wall-clock time, `YYYY-MM-DDTHH:mm`.
+ *
+ * `iso.slice(0, 16)` renders the UTC wall-clock instead, which
+ * {@link dateFieldValue} then re-reads as local — in Kuwait (UTC+3) each
+ * edit-save walked a coupon's expiry three hours earlier (#1570). This is the
+ * inverse that makes stored → hydrate → save return the same instant.
+ */
+export function dateTimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
 }

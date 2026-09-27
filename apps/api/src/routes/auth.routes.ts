@@ -442,6 +442,17 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     const refreshToken = bodyRefreshToken || (req.cookies?.refresh_token as string | undefined);
 
     if (!refreshToken) {
+      // Session cookies present but no refresh token to present is a dead
+      // session, the same fact the 401 branch below heals (#1531): a `token`
+      // cookie minted before rotating refresh tokens shipped, or one whose
+      // `refresh_token` partner is gone. It would otherwise never reach that
+      // branch (this 400 returns first) and, with a 365-day maxAge, keep the
+      // cookieless guest branch in csrfProtection from firing for up to a
+      // year — a permanent 403 on POST /payments/create. A caller with no
+      // session cookie at all gets no Set-Cookie.
+      if (req.cookies?.token || req.cookies?.refresh_token) {
+        clearSessionCookies(res);
+      }
       res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'Refresh token is required' },

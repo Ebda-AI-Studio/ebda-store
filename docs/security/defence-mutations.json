@@ -1170,6 +1170,26 @@
       "find": "  '/:campaignId/test',\n  authenticate,\n",
       "replace": "  '/:campaignId/test',\n",
       "test": "tests/unit/campaign-routes.test.ts"
+    },
+    {
+      "id": "refresh-no-token-clears-dead-cookies",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "a browser holding a token cookie but no refresh token keeps its dead session for up to a year, so the cookieless guest CSRF branch never fires and POST /payments/create 403s permanently (#1531)",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "      if (req.cookies?.token || req.cookies?.refresh_token) {\n        clearSessionCookies(res);\n      }",
+      "replace": "",
+      "test": "tests/unit/auth-refresh-dead-cookie-clear.test.ts"
+    },
+    {
+      "id": "money-loyalty-reversal-index",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "the loyalty reversal partial unique index stops being unique, so the refund-revoke / redeem-recredit P2002 handlers become dead code and one order can be reversed twice (#1462)",
+      "source": "packages/database/prisma/migrations/20260903130000_loyalty_reversal_tag_unique/migration.sql",
+      "find": "CREATE UNIQUE INDEX IF NOT EXISTS \"loyalty_transactions_reversal_tag_unique\"",
+      "replace": "CREATE INDEX IF NOT EXISTS \"loyalty_transactions_reversal_tag_unique\"",
+      "test": "tests/integration/partial-unique-indexes.test.ts"
     }
   ]
 }

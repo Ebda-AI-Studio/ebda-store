@@ -50,6 +50,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { BundleItemPicker, type BundleItemRow } from './_components/BundleItemPicker';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { dateTimeLocalValue } from '@/lib/form-text';
 import {
   computeAvailability,
   computeComponentSum,
@@ -273,8 +274,8 @@ export default function BundlesPage() {
             ? String(basisPointsToPercent(detail.pricingValue))
             : filsToKwd(detail.pricingValue),
         isActive: detail.isActive,
-        startsAt: detail.startsAt ? detail.startsAt.slice(0, 16) : '',
-        expiresAt: detail.expiresAt ? detail.expiresAt.slice(0, 16) : '',
+        startsAt: dateTimeLocalValue(detail.startsAt),
+        expiresAt: dateTimeLocalValue(detail.expiresAt),
         items,
       });
       setSlugTouched(true); // editing an existing slug should never auto-rewrite

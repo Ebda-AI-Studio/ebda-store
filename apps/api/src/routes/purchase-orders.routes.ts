@@ -87,7 +87,10 @@ router.get(
         getPurchaseOrder(req.params.storeId, req.params.id)
       );
       if (!data) {
-        res.status(404).json({ error: 'not_found' });
+        res.status(404).json({
+          success: false,
+          error: { code: 'not_found', message: 'Purchase order not found.' },
+        });
         return;
       }
       res.json({ data });
@@ -108,7 +111,14 @@ router.post(
     try {
       const body = createSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -137,7 +147,14 @@ router.post(
     try {
       const body = receiveSchema.safeParse(req.body);
       if (!body.success) {
-        res.status(422).json({ error: 'validation', issues: body.error.issues });
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation',
+            message: 'Validation failed.',
+            details: { issues: body.error.issues },
+          },
+        });
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>

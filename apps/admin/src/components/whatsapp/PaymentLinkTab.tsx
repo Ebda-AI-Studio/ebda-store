@@ -10,6 +10,7 @@ import { Button, useToast } from '@force/ui';
 import { apiGet, apiPost } from '../../lib/api';
 import { formatPrice } from '../../lib/format';
 import { useT } from '../../i18n/useT';
+import { paymentLinkErrorMessage } from './payment-link-errors';
 
 interface PaymentLinkResponse {
   paymentUrl: string;
@@ -215,7 +216,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         }
       );
       if (error) {
-        toastError(t('toastCouldNotSendTitle'), error.message || t('toastUnknownError'));
+        toastError(t('toastCouldNotSendTitle'), paymentLinkErrorMessage(error, t));
         return;
       }
       if (payload) {

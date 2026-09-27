@@ -37,6 +37,7 @@ const EMPTY_ANSWER: EngineAnswer = { text: '', citedUrls: [], grounded: false };
 
 export class PerplexityAnswerEngineProvider implements AnswerEngineProvider {
   readonly engine = 'perplexity';
+  readonly modelId = MODEL;
 
   constructor(private readonly apiKey: string) {}
 

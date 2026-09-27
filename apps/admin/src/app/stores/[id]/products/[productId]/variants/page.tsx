@@ -74,7 +74,11 @@ export default function ProductVariantsPage() {
     );
   }
 
-  const totalVariantInventory = variants.reduce((sum, v) => sum + v.inventory, 0);
+  // A disabled variant is not stock (#1103) — same rule as the API's
+  // effectiveInventory, so this total matches the product list and storefront.
+  const totalVariantInventory = variants
+    .filter(v => v.isActive !== false)
+    .reduce((sum, v) => sum + v.inventory, 0);
 
   return (
     <AdminLayout

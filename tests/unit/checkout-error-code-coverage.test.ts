@@ -1,5 +1,6 @@
 /**
- * Every error code the checkout can receive is answered with advice that can
+ * Every error code the checkout can receive — from order creation AND from the
+ * payment call that follows it (#1826) — is answered with advice that can
  * work.
  *
  * THE RECURRING DEFECT
@@ -47,6 +48,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
 const ORDER_SERVICE = path.join(ROOT, 'apps/api/src/services/order.service.ts');
+const PAYMENT_ROUTES = path.join(ROOT, 'apps/api/src/routes/payment.routes.ts');
 const CHECKOUT = path.join(ROOT, 'apps/web/src/app/checkout/CheckoutClient.tsx');
 
 /**
@@ -66,6 +68,41 @@ function codesThrownByOrderCreate(): string[] {
   const nextMethod = rest.search(/\n {2}(?:static )?async [a-zA-Z]/);
   const body = nextMethod === -1 ? rest : rest.slice(0, nextMethod);
   return [...new Set([...body.matchAll(/new AppError\(\s*\d+,\s*'([A-Z_]+)'/g)].map(m => m[1]))];
+}
+
+/**
+ * The SECOND server call the checkout makes: `POST /payments/create` (#1826).
+ *
+ * `handleSubmit` creates the order and then asks for a payment. The order leg
+ * was the only one enumerated, so the payment leg's refusals —
+ * `ORDER_ALREADY_PAID` among them — all fell to "please try again", whose
+ * retry re-enters `handleSubmit` from the top and creates the order again.
+ * The handler answers with inline `code: '…'` bodies as well as AppErrors, so
+ * both shapes are read; bounded to the `/create` route. `PAYMENT_FAILED` is the
+ * code the checkout synthesizes itself when the answer carries neither `cod`
+ * nor a `paymentUrl`, so it is added when the client still does that.
+ */
+function codesFromPaymentCreate(): string[] {
+  const src = fs.readFileSync(PAYMENT_ROUTES, 'utf-8');
+  const start = src.indexOf("'/create',");
+  expect(start, 'POST /payments/create not found — this gate is measuring nothing').toBeGreaterThan(
+    -1
+  );
+  const rest = src.slice(start);
+  const next = rest.indexOf('\nrouter.', 1);
+  const body = next === -1 ? rest : rest.slice(0, next);
+  const inline = [...body.matchAll(/code:\s*'([A-Z_]+)'/g)].map(m => m[1]);
+  const thrown = [...body.matchAll(/new AppError\(\s*\d+,\s*'([A-Z_]+)'/g)].map(m => m[1]);
+  // The fallback code for a failed payment call is synthesized client-side —
+  // inline in CheckoutClient originally, in checkout/_lib/paymentResult.ts
+  // since #1990 moved the result handling there. Read both.
+  const checkout =
+    fs.readFileSync(CHECKOUT, 'utf-8') +
+    fs.readFileSync(path.resolve(path.dirname(CHECKOUT), '_lib/paymentResult.ts'), 'utf-8');
+  const synthesized = /(?:paymentResult|result)\.error\?\.code \|\| 'PAYMENT_FAILED'/.test(checkout)
+    ? ['PAYMENT_FAILED']
+    : [];
+  return [...new Set([...inline, ...thrown, ...synthesized])];
 }
 
 /**
@@ -138,7 +175,42 @@ function unconditionallyAnsweredBundleCodes(bundleSrc: string): string[] {
  * failure is transient, or the customer genuinely has no specific action.
  * "I did not write copy for it yet" is not a reason.
  */
-const DELIBERATELY_GENERIC: Record<string, string> = {};
+const DELIBERATELY_GENERIC: Record<string, string> = {
+  // Payment leg (#1826). Both leave the order PENDING — no compensating
+  // rollback runs for them — and a retry creates a fresh order that can
+  // succeed. The stranded pending order holds its stock until
+  // `order-auto-cancel-unpaid` releases it (Ruling M5-4 records why the
+  // checkout does not reuse the order id instead).
+  NOT_FOUND:
+    'the order is not visible to the payment call — only when the auth state changed between the two calls, so a retry (which re-creates the order under the current auth) makes both calls agree',
+  PAYMENT_FAILED:
+    'the gateway accepted the request but returned no payment URL — transient on the provider side, and a retry mints a new invoice',
+};
+
+describe('checkout answers every code the payment call can return (#1826)', () => {
+  it('maps them, or names them as deliberately generic', () => {
+    const mapped = codesMappedInCheckout();
+    const unanswered = codesFromPaymentCreate().filter(
+      code => !mapped.has(code) && !(code in DELIBERATELY_GENERIC)
+    );
+    expect(
+      unanswered,
+      'these payment-leg codes reach the shopper as "please try again", and that retry creates the order a second time. Add a `case`, or list the code in DELIBERATELY_GENERIC with the reason a retry is honest for it.'
+    ).toEqual([]);
+  });
+
+  it('finds the payment leg codes — the extractor is not silently empty', () => {
+    const codes = codesFromPaymentCreate();
+    expect(codes).toContain('ORDER_ALREADY_PAID');
+    expect(codes).toContain('COD_NOT_AVAILABLE');
+    expect(codes).toContain('PAYMENT_FAILED');
+  });
+
+  it('ORDER_ALREADY_PAID is answered — paying twice is the one outcome a retry must not invite', () => {
+    expect(codesMappedInCheckout().has('ORDER_ALREADY_PAID')).toBe(true);
+    expect('ORDER_ALREADY_PAID' in DELIBERATELY_GENERIC).toBe(false);
+  });
+});
 
 describe('checkout answers every code order creation can throw', () => {
   it('maps them, or names them as deliberately generic', () => {

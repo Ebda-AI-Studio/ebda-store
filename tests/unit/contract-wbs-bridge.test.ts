@@ -642,6 +642,15 @@ describe('contract: GET /wa-bridge/store-catalog (FWB → WBS consumer)', () => 
       expect(serialized).not.toContain('Honey');
       expect(serialized).not.toContain('Nuts');
       expect(serialized).not.toContain('3724');
+
+      // #1561: frequentProducts iterates the same rows and used to carry each
+      // component at its allocated share (Dates 3.724) — a price the bot
+      // quotes to the shopper. The whole history payload must be free of it.
+      expect(res.body.customerHistory.frequentProducts).toEqual([]);
+      const history = JSON.stringify(res.body.customerHistory);
+      for (const allocated of ['3724', '4966', '1655']) {
+        expect(history).not.toContain(allocated);
+      }
     });
 
     it('NEW-P1: a repeat-order payload built from this bundle row round-trips through cartFromWaSchema (WBS `handleRepeatLastOrder` shape)', async () => {
@@ -749,6 +758,16 @@ describe('contract: GET /wa-bridge/store-catalog (FWB → WBS consumer)', () => 
           productNameAr: 'علبة تمر',
           quantity: 1,
           priceFils: 3500,
+        },
+      ]);
+      // A plain line still feeds frequentProducts at its real price (#1561).
+      expect(res.body.customerHistory.frequentProducts).toEqual([
+        {
+          productId: MOCK_PRODUCT.id,
+          name: 'Date Box',
+          nameAr: 'علبة تمر',
+          priceFils: 3500,
+          totalQuantity: 1,
         },
       ]);
     });

@@ -164,7 +164,7 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
         lowStockThreshold: true,
         // For a variant product the on-hand quantity is the variant sum;
         // `inventory` is unused for one. See lib/effective-inventory.ts.
-        variants: { select: { inventory: true } },
+        variants: { select: { inventory: true, isActive: true } },
       },
     });
 

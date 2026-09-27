@@ -148,7 +148,8 @@ export async function generateProductFaqs(
     'product-faqs',
     usage?.promptTokenCount ?? 0,
     usage?.candidatesTokenCount ?? 0,
-    false
+    false,
+    { model: modelName }
   );
 
   const raw = result.response.text();

@@ -28,7 +28,10 @@ import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
 import { computeOrderTax } from '../lib/order-tax';
-import { invalidateStoreProductCaches, invalidateCustomersCache } from '../lib/public-cache';
+import {
+  invalidateStoreProductCachesAfterOrder,
+  invalidateCustomersCache,
+} from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 
 /**
@@ -41,7 +44,9 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
  */
 async function bustProductCaches(storeId: string): Promise<void> {
   try {
-    await invalidateStoreProductCaches(storeId);
+    // Stock-only change: Redis cleared now, storefront purge coalesced per
+    // store during a burst of orders (#1220) — see public-cache.ts.
+    await invalidateStoreProductCachesAfterOrder(storeId);
   } catch (err) {
     logger.warn(
       { err: err instanceof Error ? err.message : 'unknown', storeId },

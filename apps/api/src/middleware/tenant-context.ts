@@ -61,6 +61,23 @@ import { runRequestInTransaction } from './request-transaction';
 // the matching downstream router (which interprets the path itself).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * The tenant scope of the request transaction already open on this response.
+ *
+ * A request can meet `tenantContext` more than once: the bare-prefix mount
+ * `router.use('/stores/:storeId', tenantContext, customersRoutes)` matches
+ * EVERY `/stores/<uuid>/*` request, and when its router answers nothing the
+ * request falls through to a later mount whose own `router.param('storeId',
+ * tenantContext)` opened a SECOND transaction on a second connection (#1602).
+ * Since commits gate the response, that meant two serialized COMMITs before
+ * the first byte, and a 500 over already-durable writes if the empty outer
+ * COMMIT failed. A repeat with the SAME scope now joins the open transaction,
+ * so the request is one transaction again. A different scope still opens its
+ * own, exactly as before.
+ */
+const REQUEST_TENANT_SCOPE = Symbol('fwb.requestTenantScope');
+type TenantScope = { storeId: string; userId: string | undefined };
+
 export function tenantContext(req: Request, res: Response, next: NextFunction): void {
   const storeId = req.params.storeId || req.params.id;
 
@@ -86,6 +103,13 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
   // store-scoped route. Undefined for unauthenticated requests — identical to
   // today's behavior (GUC unset → allow-contextless).
   const userId = req.user?.userId;
+
+  const open = (res as unknown as Record<symbol, TenantScope | undefined>)[REQUEST_TENANT_SCOPE];
+  if (open && open.storeId === storeId && open.userId === userId) {
+    next();
+    return;
+  }
+  (res as unknown as Record<symbol, TenantScope>)[REQUEST_TENANT_SCOPE] = { storeId, userId };
 
   runRequestInTransaction(
     res,

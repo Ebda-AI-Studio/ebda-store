@@ -7088,7 +7088,17 @@
       "toastSendFailedTitle": "فشل الإرسال",
       "removeItemAriaLabel": "إزالة المنتج",
       "orderNumberLabel": "الطلب رقم {orderNumber}",
-      "invoiceIdLabel": "الفاتورة {invoiceId}"
+      "invoiceIdLabel": "الفاتورة {invoiceId}",
+      "errInvalidBody": "تحقق من رقم الهاتف والمنتجات ثم حاول مرة أخرى.",
+      "errStoreNotFound": "تعذر العثور على هذا المتجر.",
+      "errWbsNotConfigured": "اربط واتساب (WBS) أولاً قبل إرسال روابط الدفع.",
+      "errTemplateNotFound": "قالب واتساب الخاص برابط الدفع غير مُعد بعد. أنشئ القوالب أولاً.",
+      "errTemplateNotApproved": "قالب واتساب الخاص برابط الدفع لم تتم الموافقة عليه من Meta بعد. انتظر الموافقة قبل الإرسال.",
+      "errProductNotFound": "أحد المنتجات المختارة لم يعد موجوداً في هذا المتجر.",
+      "errOutOfStock": "المخزون غير كافٍ لـ {name}.",
+      "errPaymentNotConfigured": "أعِد مزود دفع من إعدادات المتجر ← المدفوعات قبل إرسال روابط الدفع.",
+      "errWbsKeyInvalid": "تعذرت قراءة مفتاح واتساب (WBS) المحفوظ. أعد ربط WBS.",
+      "errWbsSendFailed": "تعذر على واتساب إرسال رابط الدفع. حاول مرة أخرى بعد قليل."
     },
     "botAnalytics": {
       "notConnected": "WBS غير متصل بهذا المتجر. يرجى إعداد الربط في تبويب الاتصال أولاً.",

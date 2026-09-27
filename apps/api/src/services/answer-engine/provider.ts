@@ -14,6 +14,12 @@
 
 export interface AnswerEngineProvider {
   engine: string;
+  /**
+   * The model id this provider actually calls. Recorded as usage provenance
+   * so cost is priced at the invoked model's rate, not `GEMINI_MODEL`'s
+   * (#1038). Optional only so test doubles can omit it.
+   */
+  modelId?: string;
   query(storeId: string, prompt: string): Promise<EngineAnswer>;
 }
 

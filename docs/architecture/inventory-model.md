@@ -14,6 +14,16 @@
 There is no third case. A variant product's parent column is not a cached
 total, not a running counter, and not a fallback.
 
+**A disabled variant is not stock** (owner decision 2026-09-25, #1103). "Its
+stock" above means the sum over variants with `is_active = true`; a variant
+with `is_active = false` counts for nothing — not on the storefront, not in the
+admin list or detail, not to the WhatsApp bot, not in low-stock / dead-stock
+scans, not in finance valuation or the PO weighted-average cost. A product
+whose variants are ALL disabled has stock `0`, never its parent column.
+Checkout can never sell a disabled variant, so counting one only produced a
+product that read "in stock" on units nobody could buy — and, before this rule,
+two different totals for the same product depending on which screen you asked.
+
 ## Reading stock
 
 Never dereference `product.inventory` to answer "is this available" or "how
@@ -31,7 +41,12 @@ routes, so it stays free of any `@force/database` import — otherwise every one
 of their unit-test mocks has to stub `Prisma.sql`.
 
 Spread `EFFECTIVE_STOCK_SELECT` into a product `select` rather than listing
-the columns by hand. An omitted `variants` is indistinguishable at runtime
+the columns by hand. It selects every variant WITH its `isActive` flag and lets
+the helper drop the disabled ones; a hand-written select must do the same
+(`variants: { select: { inventory: true, isActive: true } }`). A select that
+pre-filters with `where: { isActive: true }` is safe for display but, for a
+product whose variants are all disabled, reads as variant-less and falls back
+to the parent column — which the invariant holds at `0`. An omitted `variants` is indistinguishable at runtime
 from "this product has no variants", which is exactly how a variant-blind read
 passes review and fails in production.
 
@@ -43,13 +58,17 @@ express it as relation filters:
 ```ts
 OR: [
   { variants: { none: {} }, inventory: { gt: 0 } }, // no variants → own column
-  { variants: { some: { inventory: { gt: 0 } } } }, // has variants → any in stock
+  { variants: { some: { isActive: true, inventory: { gt: 0 } } } }, // any ACTIVE in stock
 ];
 ```
 
+`tests/unit/effective-inventory.test.ts` fails on a stock-only variant select
+without `isActive` and on a `some: { inventory … }` filter without it.
+
 The public storefront is a special case that needs no helper:
 `enrichStockFlags` (`product.service.ts`) already overwrites the serialized
-`inventory` with the variant-aware aggregate, so every `apps/web` surface
+`inventory` with the variant-aware aggregate (active variants only, and a
+disabled variant's own `inStock` is `false`), so every `apps/web` surface
 reading `p.inventory` is correct as-is.
 
 ## Writing stock

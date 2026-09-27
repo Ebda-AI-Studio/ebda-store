@@ -7,10 +7,10 @@ import {
   SlugEntityType,
 } from '@force/database';
 import { AppError } from '../middleware/error-handler';
-import { effectiveInventory } from '../lib/effective-inventory';
+import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
 import { slugify, slugifyWithFallback, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import { redis } from './redis.service';
-import { invalidateStoreProductCaches, invalidateStoreCategoriesCaches } from '../lib/public-cache';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { inngest } from '../lib/inngest/client';
@@ -145,7 +145,7 @@ interface StockFlags {
   availableQty: number | null;
 }
 
-function enrichStockFlags<
+export function enrichStockFlags<
   P extends {
     inventory: number;
     allowBackorder: boolean;
@@ -153,6 +153,7 @@ function enrichStockFlags<
     variants?: Array<{
       inventory: number;
       allowBackorder?: boolean;
+      isActive?: boolean;
       [key: string]: unknown;
     }>;
     [key: string]: unknown;
@@ -160,28 +161,36 @@ function enrichStockFlags<
 >(product: P): P & StockFlags {
   const variants = product.variants ?? [];
   const hasVariants = variants.length > 0;
+  // A disabled variant is not stock (#1103) — the same rule as
+  // lib/effective-inventory.ts, which this must never disagree with.
+  const sellable = activeVariants(variants);
 
-  // Variant products: effective stock = sum of variant inventory. Single-SKU
-  // products keep their own product-level inventory.
+  // Variant products: effective stock = sum of ACTIVE variant inventory (0 when
+  // every variant is disabled). Single-SKU products keep their own column.
   const effectiveInventory = hasVariants
-    ? variants.reduce((sum, v) => sum + (v.inventory ?? 0), 0)
+    ? sellable.reduce((sum, v) => sum + (v.inventory ?? 0), 0)
     : product.inventory;
 
   // Backorder is allowed when the product flag is set, or (for variant products)
-  // any variant permits backorder.
+  // any ACTIVE variant permits backorder.
   const productAllowsBackorder =
-    product.allowBackorder || (hasVariants && variants.some(v => v.allowBackorder === true));
+    product.allowBackorder || (hasVariants && sellable.some(v => v.allowBackorder === true));
 
   const inStock = effectiveInventory > 0;
   const lowStock = inStock && effectiveInventory <= product.lowStockThreshold;
   const acceptsBackorder = effectiveInventory <= 0 && productAllowsBackorder;
   const availableQty = lowStock || acceptsBackorder ? effectiveInventory : null;
 
-  const enrichedVariants = variants.map(v => {
-    const vInStock = v.inventory > 0;
+  // `isActive` is read here and stripped: it drives the flags, it is not part
+  // of the storefront variant shape.
+  const enrichedVariants = variants.map(({ isActive, ...v }) => {
+    const sellableVariant = isActive !== false;
+    const vInStock = sellableVariant && v.inventory > 0;
     const vLowStock = vInStock && v.inventory <= product.lowStockThreshold;
     const vAcceptsBackorder =
-      v.inventory <= 0 && ((v.allowBackorder ?? false) || product.allowBackorder);
+      sellableVariant &&
+      v.inventory <= 0 &&
+      ((v.allowBackorder ?? false) || product.allowBackorder);
     const vAvailableQty = vLowStock || vAcceptsBackorder ? v.inventory : null;
     return {
       ...v,
@@ -603,8 +612,18 @@ export class ProductService {
         // that mapping isn't silently undefined. Additive, so it doesn't
         // change what the admin detail page renders. `title` is the actual
         // Prisma field (ProductVariant has no `name` column) — the MCP tool
-        // maps it to the response's `name` key.
-        variants: { select: { id: true, title: true, sku: true, price: true, inventory: true } },
+        // maps it to the response's `name` key. `isActive` feeds
+        // effectiveInventory: a disabled variant is not stock (#1103).
+        variants: {
+          select: {
+            id: true,
+            title: true,
+            sku: true,
+            price: true,
+            inventory: true,
+            isActive: true,
+          },
+        },
       },
     });
 
@@ -661,8 +680,10 @@ export class ProductService {
     // Clear product list / detail / suggest caches (both Redis + in-memory,
     // public AND admin). Shared with OrderService's checkout-driven
     // inventory paths so the key definition lives in exactly one place.
+    // invalidateStoreProductCaches already clears the category caches and
+    // purges the `categories:` tag in the same request, so a second
+    // invalidateStoreCategoriesCaches here only sent a duplicate purge (#1220).
     await invalidateStoreProductCaches(storeId);
-    await invalidateStoreCategoriesCaches(storeId);
   }
 
   /**
@@ -1423,6 +1444,8 @@ export class ProductService {
               compareAtPrice: true,
               inventory: true,
               allowBackorder: true,
+              // Stock only — enrichStockFlags reads and strips it (#1103).
+              isActive: true,
             },
           },
         },
@@ -1517,6 +1540,8 @@ export class ProductService {
             compareAtPrice: true,
             inventory: true,
             allowBackorder: true,
+            // Stock only — enrichStockFlags reads and strips it (#1103).
+            isActive: true,
           },
         },
       },
@@ -1990,8 +2015,8 @@ export class ProductService {
         { trackInventory: false },
         // No variants: the product column is the stock.
         { variants: { none: {} }, inventory: { gt: 0 } },
-        // Has variants: at least one of them carries stock.
-        { variants: { some: { inventory: { gt: 0 } } } },
+        // Has variants: at least one ACTIVE one carries stock (#1103).
+        { variants: { some: { isActive: true, inventory: { gt: 0 } } } },
       ];
     }
 
