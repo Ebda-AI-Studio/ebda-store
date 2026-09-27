@@ -322,6 +322,56 @@ describe('PaymentService.refund — an absent transaction id is refused, not loo
   });
 });
 
+describe('PaymentService.refund — the claim is a compare-and-swap, not a plain status flip', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * A plain `status === 'completed'` read-check is a TOCTOU race: two
+   * concurrent refund requests (admin double-click, client retry, two staff
+   * on one order) both read 'completed', both pass, and both call
+   * provider.refund() — a double refund at the gateway with no undo API. The
+   * guard is a compare-and-swap on `refundedAmount`: the claim's WHERE must
+   * match the balance this call just read, so a second concurrent claim
+   * (which wrote a different refundedAmount first) cannot also match.
+   *
+   * This asserts the CAS is actually issued — not merely that a race is
+   * refused (the test below covers that), which a status-only claim would
+   * also pass in isolation.
+   */
+  it('claims the payment with a WHERE that pins refundedAmount to the balance just read', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    await PaymentService.refund({ transactionId: TRANSACTION_ID });
+
+    expect(paymentUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ refundedAmount: 0 }),
+      })
+    );
+  });
+
+  /**
+   * `claim.count === 0` means some OTHER request's claim won the race — the
+   * balance this request read is already stale. Refusing here, before the
+   * provider is ever called, is the only thing standing between that race
+   * and a double refund at the gateway.
+   */
+  it('refuses the refund and never calls the provider when the claim loses the race', async () => {
+    mockHappyPathUpToEffects();
+    paymentUpdateMany.mockResolvedValue({ count: 0 }); // lost the race
+
+    await expect(PaymentService.refund({ transactionId: TRANSACTION_ID })).rejects.toThrow(
+      /not refundable|already in progress/i
+    );
+
+    expect(providerRefund).not.toHaveBeenCalled();
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+  });
+});
+
 /**
  * #1487 — the in-band refund must seed the per-refund status map alongside the
  * accounted-id list. With the map empty, isRefundEventAlreadySeen falls back to

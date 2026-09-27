@@ -45,7 +45,17 @@ on:
       - 'railway.json'
       - 'Dockerfile.api'
       - '.github/workflows/railway-deploy.yml'
+      # A lockfile-only dependency/security fix changes what the Docker build
+      # actually ships (Dockerfile.api runs `npm ci`) without touching any
+      # app or package source — previously invisible to this trigger.
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
+  # Independent of everything above: see the guest-checkout-probe job's own
+  # header comment for why this exists on a schedule rather than only inside
+  # the deploy job.
+  schedule:
+    - cron: '0 * * * *' # hourly — a single curl call, negligible runner cost
 
 # Never cancel a mid-flight production API deploy.
 concurrency:
@@ -67,7 +77,12 @@ jobs:
     # secrets. The token is still checked below, but as a FAILURE rather than a
     # skip: once this is switched on, a missing token is a misconfiguration and
     # must be loud, not silently absorbed.
-    if: vars.RAILWAY_ACTIONS_DEPLOY == 'true'
+    #
+    # event_name != 'schedule' is load-bearing, not decoration: the hourly
+    # cron added for guest-checkout-probe triggers this WHOLE workflow, and
+    # without this guard a post-cutover RAILWAY_ACTIONS_DEPLOY='true' would
+    # redeploy production every hour regardless of whether anything changed.
+    if: vars.RAILWAY_ACTIONS_DEPLOY == 'true' && github.event_name != 'schedule'
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     # Covers checkout + setup-node + a global CLI install + `railway up --ci`
     # streaming a full multi-stage Docker build of this monorepo, AND the verify
@@ -256,6 +271,67 @@ jobs:
             exit 1
           fi
           echo "Guest checkout admitted: cleared CSRF and reached business logic."
+
+  # Same probe as the deploy job's "Verify guest checkout is still admitted"
+  # step, but INDEPENDENT of the RAILWAY_ACTIONS_DEPLOY gate and of any push
+  # to main — this repeats it hourly against whatever is actually live.
+  #
+  # The deploy job's copy only runs post-cutover (RAILWAY_ACTIONS_DEPLOY=
+  # 'true') and only right after an Actions-triggered deploy. Until cutover,
+  # Railway's own GitHub-App auto-deploy is still what ships main — a deploy
+  # path this workflow does not see at all — so the 2026-09-03 regression
+  # class (a correct-looking CSRF fix that silently locks out cookieless
+  # guest checkout) had NO monitor for as long as that stayed true. A probe
+  # that only fires from inside a job gated on a switch that isn't flipped
+  # yet is a probe that has never actually run.
+  guest-checkout-probe:
+    name: Guest checkout admission probe (scheduled)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 3
+    steps:
+      # The self-hosted runner has no node on the Actions shell PATH — the
+      # probe's response-parsing step below is `node -e ...`, which would
+      # die with "command not found" (exit 127) without this.
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Verify guest checkout is still admitted
+        env:
+          API_BASE: ${{ vars.RAILWAY_API_BASE || 'https://api.force-ai.co' }}
+        run: |
+          set -euo pipefail
+          body=$(mktemp) || body="${RUNNER_TEMP:-/tmp}/admission-probe.json"
+          probe_args=(-s -m 20 -o "$body" -w '%{http_code}' -X POST "$API_BASE/api/v1/payments/create" -H 'Content-Type: application/json' -H 'X-Session-ID: scheduled-admission-probe' -d '{"orderId":"00000000-0000-0000-0000-000000000000","provider":"tap"}')
+          code=$(curl "${probe_args[@]}") || code=000
+          err=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s)?.error?.code ?? ""))}catch{process.exit(3)}})' < "$body" 2>/dev/null) || err='__UNPARSEABLE__'
+          echo "status=$code error_code=${err:-<none>}"
+          case "$err" in
+            CSRF_*)
+              echo "::error::Guest checkout is locked out again: POST /payments/create returned $code $err for a cookieless request. This is the 2026-09-03 regression. Do not leave this deploy serving."
+              exit 1 ;;
+            __UNPARSEABLE__)
+              echo "::error::$API_BASE/api/v1/payments/create returned $code with a body this probe could not parse, so admission could not be verified. A broken check is not a healthy deploy."
+              exit 1 ;;
+          esac
+          if [ "$code" != "404" ]; then
+            echo "::error::Expected 404 NOT_FOUND for a non-existent order (proving the request cleared CSRF and reached business logic), got $code. Admission is unverified."
+            exit 1
+          fi
+          echo "Guest checkout admitted: cleared CSRF and reached business logic."
+
+      - name: Telegram alert on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+        run: |
+          [ -z "$TELEGRAM_BOT_TOKEN" ] && exit 0
+          curl -sS -m 15 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
+            -d text="🚨 Guest checkout admission probe FAILED (scheduled) — cookieless POST /payments/create is not reaching business logic. This is the 2026-09-03 CSRF-lockout regression class. Check the run." >/dev/null || true
 
   notify-failure:
     name: Notify on failure

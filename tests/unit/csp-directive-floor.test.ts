@@ -22,6 +22,58 @@ import { join } from 'node:path';
 
 const ROOT = join(__dirname, '../..');
 
+/**
+ * Blank out `//` and `/* *\/` comment bodies so a comment that merely NAMES a
+ * directive (or, as this repo's own next.config.js comments do, happens to
+ * quote a directive's exact value while explaining why it's safe) cannot
+ * satisfy an assertion meant to read the real, active config. String/template
+ * literal CONTENTS pass through untouched and, crucially, are not scanned for
+ * `//` — the CSP values here are full of `https://` — but are still tracked
+ * so a `//` or `/*` inside one is never mistaken for a comment start.
+ */
+function stripJsComments(src: string): string {
+  let out = '';
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "'" || c === '"' || c === '`') {
+      const quote = c;
+      out += c;
+      i++;
+      while (i < src.length && src[i] !== quote) {
+        if (src[i] === '\\') {
+          out += src[i];
+          i++;
+        }
+        out += src[i];
+        i++;
+      }
+      out += src[i] ?? '';
+      continue;
+    }
+    if (c === '/' && src[i + 1] === '/') {
+      while (i < src.length && src[i] !== '\n') {
+        out += ' ';
+        i++;
+      }
+      out += '\n';
+      continue;
+    }
+    if (c === '/' && src[i + 1] === '*') {
+      out += '  ';
+      i += 2;
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) {
+        out += src[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      out += '  ';
+      i++;
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
 /** Every app that serves HTML and therefore owes a CSP. */
 const CONFIGS = [
   'apps/web/next.config.js',
@@ -35,8 +87,18 @@ const CONFIGS = [
  *  - base-uri    — a `<base>` injection re-points every relative URL
  *  - object-src  — <object>/<embed> are not covered by script-src
  *  - form-action — where a form may POST, not where scripts may load from
+ *
+ * Each is matched WITH its required value as one token
+ * (`/base-uri\s+'self'/`, not a bare `includes('base-uri')`) — a plain
+ * substring match is satisfied by a comment that merely NAMES the directive
+ * (e.g. "base-uri, form-action and object-src must be explicit") even after
+ * the real directive line below it is deleted.
  */
-const REQUIRED = ['base-uri', 'object-src', 'form-action'];
+const REQUIRED: { directive: string; pattern: RegExp }[] = [
+  { directive: 'base-uri', pattern: /base-uri\s+'self'/ },
+  { directive: 'object-src', pattern: /object-src\s+'none'/ },
+  { directive: 'form-action', pattern: /form-action\s+'self'/ },
+];
 
 describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
   const present = CONFIGS.filter(c => existsSync(join(ROOT, c)));
@@ -49,14 +111,28 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
   });
 
   it.each(CONFIGS.filter(c => existsSync(join(ROOT, c))))('%s', config => {
-    const src = readFileSync(join(ROOT, config), 'utf8');
-    // Only look at files that actually declare a CSP; an app that serves no
-    // HTML owes none, and asserting on one it never had would be noise.
-    if (!src.includes('Content-Security-Policy')) return;
+    const raw = readFileSync(join(ROOT, config), 'utf8');
+    // Assertions run against the comment-stripped source: a comment can name
+    // a directive, or (as this repo's own next.config.js comments do) even
+    // quote its exact value while explaining why it's safe, and either would
+    // satisfy a check meant to read the real, active config.
+    const src = stripJsComments(raw);
+    // Every config in CONFIGS serves HTML (see the file docstring) and so
+    // owes a CSP header outright. This is a POSITIVE assertion, not the
+    // early-return it replaces: `.zap/rules.tsv` globally IGNOREs 10038
+    // ("CSP header not set"), so a config that dropped the header entirely
+    // would be invisible to the nightly scan too — this is the only gate
+    // left standing for that regression.
+    expect(
+      src.includes('Content-Security-Policy'),
+      `${config} no longer declares a Content-Security-Policy header at all. ` +
+        `ZAP rule 10038 is globally IGNOREd in .zap/rules.tsv, so the nightly ` +
+        `scan will NOT report this either.`
+    ).toBe(true);
 
-    for (const directive of REQUIRED) {
+    for (const { directive, pattern } of REQUIRED) {
       expect(
-        src.includes(directive),
+        pattern.test(src),
         `${config} no longer sets \`${directive}\` in its CSP. ZAP rule 10055 ` +
           `is IGNOREd in .zap/rules.tsv (for the unsafe-inline debt), so the ` +
           `nightly scan will NOT report this — which is why the assertion ` +

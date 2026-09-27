@@ -51,7 +51,7 @@
 
 # ── Added 2026-09-11 ───────────────────────────────────────────────────────
 10055	IGNORE	CSP unsafe-inline/unsafe-eval - Next.js App Router requirement, needs nonce work. ALSO masks the default-src-fallback fix; csp-directive-floor.test.ts guards that; review-by:2026-12-31
-10038	IGNORE	CSP header not set - fires on the apex 307 redirect; every 200 carries a CSP (verified against production 2026-09-11); review-by:2026-12-31
+10038	IGNORE	CSP header not set - fires on the apex 307 redirect; every 200 carries a CSP (verified against production 2026-09-11). This IGNORE is global (no URL scoping), so a config that dropped the header from a real 200 would go undetected here — tests/unit/csp-directive-floor.test.ts now asserts every config declares Content-Security-Policy at all, closing that gap deterministically at the PR-blocking tier; review-by:2026-12-31
 10202	IGNORE	Anti-CSRF tokens - double-submit cookie + X-CSRF-Token header, not a hidden form field; review-by:2027-03-31
 
 # ── Added 2026-09-25 (#1748 — see docs/security/zap-triage-2026-07-15.md "Follow-up 2026-09-25") ──

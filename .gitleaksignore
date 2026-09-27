@@ -23,10 +23,9 @@ c8e3b3ba15048ba4c9c9d741d902698ef06a3355:.github/workflows/ci.yml:generic-api-ke
 8a6629ddf256b0b33eb530abb1bc2dd062b5259f:.github/workflows/ci.yml:generic-api-key:281
 8a6629ddf256b0b33eb530abb1bc2dd062b5259f:.github/workflows/ci.yml:generic-api-key:364
 
-# Test fixture, not a credential: the literal is
-# 'test-encryption-key-for-ci-32chars', a stub key mocked into @api/config so the
-# real AES-256-GCM round trip can still be exercised. It is flagged only because
-# CI checks out full history, so gitleaks scans commits from other in-flight
-# branches too — this finding is not reachable from main. Same TODO as the block
-# above: it belongs in generated test setup rather than an allowlist entry.
-cad3d87e734d5b87f12dfcbc7d24e61277634d5a:tests/unit/mcp-agent-write-auth.test.ts:generic-api-key:47
+# The mcp-agent-write-auth.test.ts fixture (commit cad3d87e; the literal there
+# at the time was test-encryption-key-at-least-32-characters-long, since
+# changed to test-encryption-key-for-ci-32chars) used to be allowlisted here
+# by commit-SHA fingerprint. Moved to .gitleaks.toml's regexes (commit-
+# independent — a fingerprint stops matching the moment a squash-merge gives
+# that commit a new SHA, which is how this exact line would have gone stale).

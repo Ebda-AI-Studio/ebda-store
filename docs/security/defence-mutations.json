@@ -1092,6 +1092,46 @@
       "test": "tests/unit/auth-erase-propagation.test.ts"
     },
     {
+      "id": "money-return-completion-claim",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a merchant double-clicking Complete refunds the same return twice — the atomic claim is the only mutex before the provider round-trip",
+      "source": "apps/api/src/services/return.service.ts",
+      "find": "    if (claim.count !== 1) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/return-complete-gateway-refund.test.ts"
+    },
+    {
+      "id": "money-return-claim-retained-when-refund-executed",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a retry after the gateway refund already executed recomputes the same allocation and refunds the customer a second time — the completion claim must stay held, never released, once money may have moved",
+      "source": "apps/api/src/services/return.service.ts",
+      "find": "      if (providerRefundExecuted) {\n        logger.error(",
+      "replace": "      if (false) {\n        logger.error(",
+      "test": "tests/unit/return-complete-gateway-refund.test.ts"
+    },
+    {
+      "id": "money-refund-amount-not-positive",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a zero or negative refund amount is a caller bug, not \"refund the whole payment\" — accepting it turned a partial return into a full-payment refund plus a whole-order reversal",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "    if (request.amount != null && request.amount <= 0) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/payment-service-refund.test.ts"
+    },
+    {
+      "id": "money-refund-claim-cas-on-balance",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "two concurrent refund requests both reading the same balance both pass a plain status check and both call the provider — a real double refund at the gateway with no undo API",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "          status: { in: ['completed', 'partially_refunded'] },\n          refundedAmount: alreadyRefunded,\n        },",
+      "replace": "          status: { in: ['completed', 'partially_refunded'] },\n        },",
+      "test": "tests/unit/payment-service-refund.test.ts"
+    },
+    {
       "id": "money-wallet-no-negative-balance",
       "domain": "money / payment / refund",
       "tier": "unit",

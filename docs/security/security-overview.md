@@ -136,6 +136,19 @@ test — each is proven to FAIL when the control is removed. See
 runs in CI on every PR touching a defended source and fails if any defence
 survives its mutation, i.e. if a test would pass with the control deleted.
 
+**Scope, precisely:** this per-defence record proves query-level guards — a
+`WHERE storeId` clause, a permission check, a CAS on a claim column — mostly
+at the `unit` tier (one `integration`-tier entry, `password-reset-bumps-
+token-version`, runs against a real Postgres in CI). For **tenant/RLS**
+specifically, it covers 7 such query-level guards; it does **not** cover the
+session-GUC mechanism itself (`runInTenantContext` / `app.current_store_id` /
+`app.current_user_id`, `apps/api/src/middleware/tenant-context.ts`) — that
+runs under a REAL `force_app` login role in a separate, dedicated CI job
+(`test-rls-force-app` in `ci.yml`, driving `tests/integration/
+rls-force-app.test.ts`), not in this record. Both are real, CI-blocking
+proofs; they are just two different mechanisms; conflating them here would
+overstate what a green `defence-mutation-record.md` alone proves about RLS.
+
 ## Evidence log
 
 | Artifact                                    | Date       | Result                                                                                               |

@@ -39,9 +39,63 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+/**
+ * Blank out comments and string/template contents, keeping every other
+ * character (including newlines, for line-number stability) in place. Without
+ * this, a `// algorithms: ['none']` comment or a `'issuer: none'` string
+ * literal inside a `jwt.verify(...)` argument list satisfies the regexes
+ * below on text a human never reads as configuration.
+ */
+function stripCommentsAndStrings(s: string): string {
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    const c2 = s[i + 1];
+    if (c === '/' && c2 === '/') {
+      while (i < s.length && s[i] !== '\n') {
+        out += ' ';
+        i++;
+      }
+      continue;
+    }
+    if (c === '/' && c2 === '*') {
+      out += '  ';
+      i += 2;
+      while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) {
+        out += s[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      out += '  ';
+      i += 2;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') {
+      const quote = c;
+      out += ' ';
+      i++;
+      while (i < s.length && s[i] !== quote) {
+        if (s[i] === '\\') {
+          out += '  ';
+          i += 2;
+          continue;
+        }
+        out += s[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      out += ' ';
+      i++;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
 /** Each `jwt.verify(...)` call with its full argument list. */
-function verifyCalls(): { file: string; line: number; call: string }[] {
-  const out: { file: string; line: number; call: string }[] = [];
+function verifyCalls(): { file: string; line: number; call: string; clean: string }[] {
+  const out: { file: string; line: number; call: string; clean: string }[] = [];
   for (const file of sourceFiles(API_SRC)) {
     const src = fs.readFileSync(file, 'utf-8');
     for (const m of src.matchAll(/jwt\.verify\s*\(/g)) {
@@ -57,10 +111,14 @@ function verifyCalls(): { file: string; line: number; call: string }[] {
           }
         }
       }
+      const call = src.slice(m.index!, end + 1);
       out.push({
         file: path.relative(process.cwd(), file),
         line: src.slice(0, m.index).split('\n').length,
-        call: src.slice(m.index!, end + 1),
+        call,
+        // Assertions below run against `clean`, never `call` — a comment or
+        // string literal must not be able to satisfy them.
+        clean: stripCommentsAndStrings(call),
       });
     }
   }
@@ -69,15 +127,18 @@ function verifyCalls(): { file: string; line: number; call: string }[] {
 
 /**
  * Where skipping `exp` is deliberate. Each entry must be a call that
- * establishes IDENTITY only — never one that authorises a request.
+ * establishes IDENTITY only — never one that authorises a request. The value
+ * PINS THE EXACT COUNT of allowlisted calls in that file — membership alone
+ * (a bare Set) lets a SECOND, unreviewed `ignoreExpiration: true` call ride
+ * in on the same file's existing allowlisting, invisibly.
  */
-const IGNORE_EXPIRATION_ALLOWED = new Set([
+const IGNORE_EXPIRATION_ALLOWED: Record<string, number> = {
   // CSRF principal: derives who a request belongs to so the CSRF token can be
   // bound to them. `authenticate` still enforces expiry before anything is
   // authorised; treating a just-expired cookie as anonymous here would turn a
   // silent-refresh 401 into a confusing 403.
-  'apps/api/src/middleware/security.ts',
-]);
+  'apps/api/src/middleware/security.ts': 1,
+};
 
 describe('JWT lens — the envelope is checked before the claims are believed', () => {
   it('finds jwt.verify calls at all (the lens must not pass by finding nothing)', () => {
@@ -88,26 +149,31 @@ describe('JWT lens — the envelope is checked before the claims are believed', 
 
   it('pins `algorithms` on every jwt.verify', () => {
     const unpinned = verifyCalls()
-      .filter(c => !/algorithms\s*:/.test(c.call))
+      .filter(c => !/algorithms\s*:/.test(c.clean))
       .map(c => `${c.file}:${c.line}`);
     expect(unpinned).toEqual([]);
   });
 
   it('checks issuer and audience on every jwt.verify', () => {
     const missing = verifyCalls()
-      .filter(c => !/issuer\s*:/.test(c.call) || !/audience\s*:/.test(c.call))
+      .filter(c => !/issuer\s*:/.test(c.clean) || !/audience\s*:/.test(c.clean))
       .map(c => `${c.file}:${c.line}`);
     expect(missing).toEqual([]);
   });
 
-  it('skips expiry only where allowlisted, and never silently', () => {
+  it('skips expiry only where allowlisted, at the exact reviewed count, and never silently', () => {
+    const seen: Record<string, number> = {};
     for (const c of verifyCalls()) {
-      if (!/ignoreExpiration\s*:\s*true/.test(c.call)) continue;
+      if (!/ignoreExpiration\s*:\s*true/.test(c.clean)) continue;
+      seen[c.file] = (seen[c.file] ?? 0) + 1;
       expect(
-        IGNORE_EXPIRATION_ALLOWED.has(c.file),
+        c.file in IGNORE_EXPIRATION_ALLOWED,
         `${c.file}:${c.line} skips expiry without being allowlisted in this test`
       ).toBe(true);
     }
+    // Whole-file membership lets a SECOND unreviewed call in an already
+    // allowlisted file pass unnoticed — pin the count so it can't.
+    expect(seen).toEqual(IGNORE_EXPIRATION_ALLOWED);
   });
 
   it('keeps jwt.decode rare enough that each use stays reviewed', () => {

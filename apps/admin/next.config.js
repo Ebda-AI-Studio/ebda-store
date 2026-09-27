@@ -24,23 +24,43 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
  * their preview. Pecannbee's page-builder showed Chrome's "This content is
  * blocked" for exactly that reason — `pecannbee.com.kw` was never added.
  *
- * `ADMIN_PREVIEW_FRAME_SRC` was supposed to be the relief valve ("without a
+ * `ADMIN_DEFAULT_FRAME_SRC` (env var; was `ADMIN_PREVIEW_FRAME_SRC` — renamed
+ * 2026-09-25, #1675) was supposed to be the relief valve ("without a
  * deploy"), but it is read here, in next.config.js, which Next evaluates at
  * BUILD time — so it never could take effect without a rebuild, and it was
- * never set in any environment.
+ * never set in any environment. The old name was also backwards: this value
+ * feeds the CATCH-ALL rule below (every route EXCEPT the preview), not the
+ * preview route itself — the preview route's frame-src is the hardcoded
+ * `PREVIEW_PAGE_FRAME_SRC` a few lines down, unaffected by any env var.
  *
  * A merchant's custom domain is arbitrary and unknowable at build time, so the
  * allowlist cannot be enumerated. Rather than keep a list that is wrong the
  * moment the next merchant signs up, the preview route (and only that route)
  * permits any https origin; every other admin route keeps the strict list.
  */
-const PREVIEW_FRAME_SRC =
-  process.env.ADMIN_PREVIEW_FRAME_SRC ??
+const DEFAULT_FRAME_SRC =
+  process.env.ADMIN_DEFAULT_FRAME_SRC ??
   'https://store.force-ai.co https://*.force-ai.co https://store.forcemediakw.com https://*.forcemediakw.com';
 
 const CSP_PREFIX =
   "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co wss://store-api.forcemediakw.com wss://api.force-ai.co https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; frame-src https://onesignal.com https://*.onesignal.com ";
 const CSP_SUFFIX = "; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'";
+
+/**
+ * The two `headers()` route patterns, named so
+ * tests/unit/admin-page-builder-preview-csp.test.ts can compile these EXACT
+ * strings with Next's own path-to-regexp and assert which real admin paths
+ * each one matches — hand-relabelling the two rules 'page-builder'/'other'
+ * in the test (the previous approach) never actually checks that this regex
+ * routes the way the label assumes.
+ */
+const PAGE_BUILDER_PREVIEW_SOURCE = '/stores/:id/page-builder';
+// Named capture group (`:path(...)`), not the unnamed `(...)` form this used
+// to be — functionally identical (verified: both compile to the same
+// path-to-regexp match matrix), but the named form is what Next's own docs
+// use and is proven by the source-pattern test below rather than by a
+// production curl.
+const ADMIN_CATCHALL_SOURCE = '/:path((?!stores/[^/]+/page-builder$).*)';
 
 /**
  * The preview route accepts any https origin because a merchant's custom
@@ -54,7 +74,7 @@ const PREVIEW_PAGE_FRAME_SRC = 'https:';
 /**
  * The admin's security headers. `frameSrc` is the only thing that varies:
  * the page-builder preview must embed a merchant's own custom domain, which
- * is arbitrary and unknowable at build time (see PREVIEW_FRAME_SRC above).
+ * is arbitrary and unknowable at build time (see DEFAULT_FRAME_SRC above).
  */
 function securityHeaders(frameSrc) {
   return [
@@ -69,6 +89,15 @@ function securityHeaders(frameSrc) {
     {
       key: 'Content-Security-Policy',
       value: CSP_PREFIX + frameSrc + CSP_SUFFIX,
+    },
+    // The admin is an internal merchant dashboard, never to be indexed.
+    // Belt-and-suspenders with public/robots.txt and layout.tsx's `robots`
+    // metadata (see their comments) — those two assumed this header existed;
+    // it never did, so a crawler that honours X-Robots-Tag over the other two
+    // layers saw no signal at all.
+    {
+      key: 'X-Robots-Tag',
+      value: 'noindex, nofollow, noarchive, nosnippet, noimageindex',
     },
   ];
 }
@@ -175,12 +204,12 @@ const nextConfig = {
       // same header key would leave precedence to framework internals — the
       // kind of detail that silently changes on an upgrade.
       {
-        source: '/stores/:id/page-builder',
+        source: PAGE_BUILDER_PREVIEW_SOURCE,
         headers: securityHeaders(PREVIEW_PAGE_FRAME_SRC),
       },
       {
-        source: '/((?!stores/[^/]+/page-builder$).*)',
-        headers: securityHeaders(PREVIEW_FRAME_SRC),
+        source: ADMIN_CATCHALL_SOURCE,
+        headers: securityHeaders(DEFAULT_FRAME_SRC),
       },
     ];
   },

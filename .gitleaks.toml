@@ -37,6 +37,14 @@ regexes = [
   # Fake WBS-bridge encryption-key fixture (wbs-bridge.test.ts) — CI-only, sibling of the
   # test-encryption-key-for-ci-32chars entry above with a different literal value.
   '''test-encryption-key-that-is-32-chars''',
+  # mcp-agent-write-auth.test.ts's fixture used THIS literal at commit cad3d87e
+  # before a later commit switched it to test-encryption-key-for-ci-32chars
+  # above — but CI checks out full history, so gitleaks still scans that old
+  # commit's content. It was allowlisted by SHA-pinned fingerprint in
+  # .gitleaksignore, which stops matching the moment that commit's SHA changes
+  # (every squash-merge); this regex is commit-independent. CI-only, not a
+  # real credential.
+  '''test-encryption-key-at-least-32-characters-long''',
   # Throwaway RSA key generated for the GSC service-account client test (8B) — CI-only,
   # never a real credential (distinctive middle-of-body substring). CORRECTED 2026-09-02:
   # the previous entry here (`ItsSCX8UKLL5pB6IGJ0EOrC6PNjAEw0q`) was missing the `+` the

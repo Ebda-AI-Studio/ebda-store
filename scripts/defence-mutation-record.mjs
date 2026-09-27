@@ -50,6 +50,27 @@ const only = args
   .filter(Boolean);
 const tier = args.find(a => a.startsWith('--tier='))?.slice(7) ?? 'unit';
 
+// The committed record is supposed to be the WHOLE spec's measured verdicts —
+// that is the only thing that makes "the record is stale" (mutation-testing.yml's
+// git-diff check) mean anything. --write with --only=<id> would silently
+// TRUNCATE docs/security/defence-mutation-record.md to just the selected
+// rows, and --write with a partial --tier (the unit-only default) silently
+// DROPS every integration-tier entry from it — exactly the failure mode that
+// let a real integration-tier entry (password-reset-bumps-token-version) go
+// unrun by every CI invocation while the record still claimed a clean scope.
+if (WRITE && only) {
+  console.error(
+    '--write refuses a partial --only selection — it would truncate the committed record to just these ids. Run without --write to preview a subset, or drop --only to write the full spec.'
+  );
+  process.exit(2);
+}
+if (WRITE && tier !== 'all') {
+  console.error(
+    `--write refuses tier='${tier}' — it would silently drop every other tier's entries from the committed record. Pass --tier=all.`
+  );
+  process.exit(2);
+}
+
 /** Files we have edited and must put back, even if the process dies. */
 const dirty = new Map();
 
@@ -103,10 +124,27 @@ function runOne(entry) {
   }
 
   dirty.set(abs, original);
-  writeFileSync(abs, original.replace(entry.find, entry.replace));
+  // A replacer FUNCTION, not a plain string: String.prototype.replace treats a
+  // string second argument as a pattern ($&, $1, $$, ...), so a `replace` value
+  // that happens to contain e.g. `${...}` followed by a digit, or `$$`, would
+  // apply the WRONG substitution while the script silently believed it had
+  // written the spec's literal text.
+  writeFileSync(
+    abs,
+    original.replace(entry.find, () => entry.replace)
+  );
   const after = runTest(entry);
   writeFileSync(abs, original);
   dirty.delete(abs);
+
+  if (after.collectionError) {
+    // The mutation broke something vitest couldn't even RUN (a syntax error,
+    // a broken import) rather than something the guarding test asserted
+    // against. That is not evidence the defence is guarded — it is no
+    // evidence at all, and scoring it KILLED would claim a test result that
+    // was never produced.
+    return { verdict: 'ERROR', detail: after.summary };
+  }
 
   return after.passed
     ? { verdict: 'SURVIVED', detail: 'test still passed with the defence removed' }
@@ -129,9 +167,27 @@ function runTest(entry) {
   // because the second means the spec's test path is wrong, not that the
   // defence is guarded. Scoring that as KILLED is how a record goes false-green.
   if (/No test files found/i.test(out)) {
-    return { passed: false, noTests: true, summary: 'no test files matched' };
+    return { passed: false, collectionError: true, summary: 'no test files matched' };
   }
-  return { passed: res.status === 0, summary: counts || `exit ${res.status}` };
+  // A transform/collection failure (a mutation that breaks JS/TS syntax, or
+  // otherwise makes a file fail to import) also exits non-zero, but vitest
+  // never executes a single assertion — it reports the literal `Tests  no
+  // tests` summary. That is a DIFFERENT failure mode from a real red test,
+  // and the previous version scored it identically: `passed: false` either
+  // way, reported upstream as KILLED. Require at least one test to have
+  // actually run.
+  const executed = [...counts.matchAll(/(\d+)\s+(?:passed|failed)/gi)].reduce(
+    (sum, m) => sum + Number(m[1]),
+    0
+  );
+  if (!counts || executed < 1) {
+    return {
+      passed: false,
+      collectionError: true,
+      summary: `vitest produced no test summary (${counts || `exit ${res.status}`}) — a transform/collection failure, not a guarded assertion`,
+    };
+  }
+  return { passed: res.status === 0, summary: counts };
 }
 
 // Preflight: the workspace packages must be BUILT. Unbuilt @force/shared makes

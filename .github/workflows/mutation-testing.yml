@@ -69,8 +69,11 @@ on:
       - 'apps/api/src/services/loyalty.service.ts'
       - 'apps/api/src/services/payment-providers/**'
       # ReturnService.complete drives the gateway refund: the order-level returns
-      # lock, the per-return refund key, and following PaymentService's own
-      # whole-order decision are defended sources there.
+      # lock, the per-return refund key, following PaymentService's own
+      # whole-order decision, the atomic completion claim, and the
+      # providerRefundExecuted retain-on-throw latch are all defended sources
+      # there — added because `mutation-gate-trigger-coverage` failed without
+      # it (#1319).
       - 'apps/api/src/services/return.service.ts'
       # Carrier clients: iCarry's resolveBaseUrl is the SSRF defence
       # (assertPublicHttpUrl on a merchant-supplied baseUrl). Added because
@@ -188,13 +191,37 @@ jobs:
   # scores whole FILES. This job answers the per-defence question instead —
   # "remove this exact guard; does a test stop you?" — for the controls the
   # standard marks mutation-record-mandatory (authn/session, tenant/RLS,
-  # money/payment/refund, consent, erasure). It is cheap (~2 min) and gates on
-  # a SURVIVED defence, so it runs on every PR that touches a defended source
-  # or the spec itself.
+  # money/payment/refund, consent, erasure). It is cheap (~1-2 min for all 78
+  # defences, measured 2026-09-25) and gates on a SURVIVED defence, so it runs
+  # on every PR that touches a defended source or the spec itself. Runs
+  # --tier=all (unit AND the one integration-tier entry) in this SAME job —
+  # a Postgres service is enough (see below); no separate integration job or
+  # schedule is needed for a single defence this cheap.
   defence-mutations:
     name: Defence mutation record
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
+    # Postgres only, no Redis: the one integration-tier defence
+    # (password-reset-bumps-token-version, tests/integration/refresh-token-rotation.test.ts)
+    # drives AuthService directly against Prisma — no HTTP layer, and it
+    # fail-opens on a missing Redis client (see that test file's header).
+    # Verified locally (2026-09-25) against a real Postgres: the full
+    # --tier=all run needs nothing else — no API server, no Redis.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: force_test
+        ports:
+          - 5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -216,6 +243,12 @@ jobs:
         run: |
           npm run build -w packages/shared
           npm run build -w packages/database
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
 
       # ci.yml's e2e/integration jobs opt into `--retry=1` at the invocation
       # site for genuinely flaky NETWORK tests (the main config itself
@@ -254,12 +287,23 @@ jobs:
 
       # --write both measures and refreshes the markdown, and exits non-zero if
       # any defence SURVIVED. One run, not two — the measurement is the artifact.
+      # --tier=all is REQUIRED, not a default: the script now refuses --write
+      # on anything less (#1233/#1262) because a partial-tier write silently
+      # DROPS the other tiers' entries from the committed record — which is
+      # exactly how the integration-tier entry here went unrun by every CI
+      # invocation while the record still claimed a clean scope.
       - name: Run the defence mutation record
-        run: npm run test:defence-mutations -- --write
+        run: npm run test:defence-mutations -- --write --tier=all
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          JWT_SECRET: test-jwt-secret-for-ci-only-32chars
+          ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
+          NODE_ENV: test
 
       # A drifted record is the failure mode this job exists to prevent, so the
       # committed markdown must match what the run just produced.
       - name: Fail if the committed record is stale
         run: |
           git diff --exit-code -- docs/security/defence-mutation-record.md \
-            || { echo "::error::docs/security/defence-mutation-record.md is stale — re-run 'npm run test:defence-mutations -- --write' and commit it"; exit 1; }
+            || { echo "::error::docs/security/defence-mutation-record.md is stale — re-run 'npm run test:defence-mutations -- --write --tier=all' (a DATABASE_URL is needed for the one integration-tier entry) and commit it"; exit 1; }

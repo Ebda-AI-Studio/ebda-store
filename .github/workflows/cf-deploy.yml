@@ -30,6 +30,12 @@ on:
       - 'scripts/cf-build.sh'
       - 'scripts/cf-setup-local.sh'
       - '.github/workflows/cf-deploy.yml'
+      # A lockfile-only dependency/security fix (npm audit remediation, a
+      # transitive bump) changes what actually ships without touching any
+      # app or package source — previously invisible to this trigger, so
+      # main could sit deployed on a vulnerable dependency indefinitely.
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
     inputs:
       force_cloud:
@@ -85,7 +91,7 @@ jobs:
           changed="$(git diff --name-only HEAD~1 HEAD)"
           echo "Changed files:"; echo "$changed"
           shared=false
-          if echo "$changed" | grep -qE '^(packages/|scripts/cf-(build|setup-local)\.sh$|\.github/workflows/cf-deploy\.yml$)'; then
+          if echo "$changed" | grep -qE '^(packages/|scripts/cf-(build|setup-local)\.sh$|\.github/workflows/cf-deploy\.yml$|package\.json$|package-lock\.json$)'; then
             shared=true
           fi
           for app in web admin orders; do

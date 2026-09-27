@@ -44,16 +44,112 @@ function sourceFiles(): string[] {
 
 const rel = (f: string) => path.relative(process.cwd(), f);
 
+/**
+ * Index of the character matching `src[openIdx]` (one of `<`/`(`), tracking
+ * nesting depth. Used instead of a character-class regex because a generic
+ * type argument can itself contain `<...>` — `Array<{ id: string }>` closes
+ * the OUTER generic on its own final `>`, which `[^>]*` cannot cross.
+ */
+function findMatchingBracket(src: string, openIdx: number, open: string, close: string): number {
+  let depth = 0;
+  for (let i = openIdx; i < src.length; i++) {
+    const c = src[i];
+    if (c === open) depth++;
+    else if (c === close) {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Index of the `)` closing the call whose `(` is at `openIdx`, skipping over
+ * string/template literal contents so a stray paren inside a quoted value
+ * cannot desync the count.
+ */
+function findCallArgsEnd(src: string, openIdx: number): number {
+  let depth = 0;
+  for (let i = openIdx; i < src.length; i++) {
+    const c = src[i];
+    if (c === '`' || c === "'" || c === '"') {
+      const quote = c;
+      i++;
+      while (i < src.length && src[i] !== quote) {
+        if (src[i] === '\\') i++;
+        i++;
+      }
+      continue;
+    }
+    if (c === '(') depth++;
+    else if (c === ')') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** The full backtick literal starting at `src[startIdx]` (which must be `` ` ``). */
+function readTemplateLiteral(src: string, startIdx: number): string | null {
+  if (src[startIdx] !== '`') return null;
+  let i = startIdx + 1;
+  while (i < src.length && src[i] !== '`') {
+    if (src[i] === '\\') i++;
+    i++;
+  }
+  return i < src.length ? src.slice(startIdx, i + 1) : null;
+}
+
+/**
+ * If a `$queryRawUnsafe`/`$executeRawUnsafe` call's first argument is a bare
+ * identifier rather than an inline template literal, trace it back to its
+ * declaration (`const <name> = \`...\``) earlier in the same source, so a SQL
+ * fragment built into a variable and then passed by name is not invisible to
+ * this lens.
+ */
+function resolveIdentifierTemplate(src: string, name: string, beforeIndex: number): string | null {
+  const declRe = new RegExp(`\\bconst\\s+${name}\\s*=\\s*\``, 'g');
+  let best: string | null = null;
+  for (const m of src.slice(0, beforeIndex).matchAll(declRe)) {
+    const tplStart = m.index! + m[0].length - 1; // index of the opening backtick
+    const tpl = readTemplateLiteral(src, tplStart);
+    if (tpl) best = tpl; // keep the LAST (nearest-preceding) declaration
+  }
+  return best;
+}
+
 /** `$queryRawUnsafe` / `$executeRawUnsafe` whose SQL string interpolates. */
 function unsafeInterpolating(): { file: string; args: string[] }[] {
   const out: { file: string; args: string[] }[] = [];
   for (const f of sourceFiles()) {
     const src = fs.readFileSync(f, 'utf-8');
-    for (const m of src.matchAll(/\$(?:query|execute)RawUnsafe\s*(?:<[^>]*>)?\s*\(/g)) {
-      const seg = src.slice(m.index!, m.index! + 700);
-      const bt = /`([^`]*)`/s.exec(seg);
-      if (!bt) continue;
-      const args = [...bt[1].matchAll(/\$\{([^}]+)\}/g)].map(x => x[1].trim());
+    for (const m of src.matchAll(/\$(?:query|execute)RawUnsafe\b/g)) {
+      let i = m.index! + m[0].length;
+      while (/\s/.test(src[i])) i++;
+      if (src[i] === '<') {
+        const close = findMatchingBracket(src, i, '<', '>');
+        if (close === -1) continue;
+        i = close + 1;
+        while (/\s/.test(src[i])) i++;
+      }
+      if (src[i] !== '(') continue; // not a call (e.g. a comment or property read)
+      const argsEnd = findCallArgsEnd(src, i);
+      if (argsEnd === -1) continue;
+
+      let j = i + 1;
+      while (/\s/.test(src[j])) j++;
+
+      let sql: string | null = null;
+      if (src[j] === '`') {
+        sql = readTemplateLiteral(src, j);
+      } else {
+        const ident = /^[A-Za-z_$][\w$]*/.exec(src.slice(j))?.[0];
+        if (ident) sql = resolveIdentifierTemplate(src, ident, m.index!);
+      }
+      if (!sql) continue;
+
+      const args = [...sql.matchAll(/\$\{([^}]+)\}/g)].map(x => x[1].trim());
       if (args.length) out.push({ file: rel(f), args });
     }
   }
@@ -71,6 +167,12 @@ const UNSAFE_INTERPOLATION_ALLOWED: Record<string, string> = {
   'apps/api/src/services/accounting/journal.service.ts': 'sp is `je_idem_${Date.now()}`',
   'apps/api/src/lib/inngest/functions/audit-log-archive.ts': 'a module constant',
   'packages/database/src/index.ts': 'SET LOCAL cannot bind; UUID-validated then quote-escaped',
+  'apps/api/src/services/accounting/reports.service.ts':
+    "baseSql's ${asOf ? ... : ''} ternary chooses between two fixed SQL fragments " +
+    '(neither derived from caller text); the actual date value is bound as $2, never interpolated',
+  'apps/api/src/services/accounting/bank-reconcile.service.ts':
+    "the unmatched-ledger query's ${periodStart ? ... : ''} ternary chooses between two fixed " +
+    'SQL fragments; periodStart itself is bound as $4, never interpolated',
 };
 
 /** Files permitted to call `Prisma.raw`, with why the argument is not user text. */
