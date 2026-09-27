@@ -156,6 +156,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const headersList = await headers();
   const draftToken =
     headersList.get('x-preview-draft') ?? cookieStore.get('force-preview-draft')?.value;
+  // Middleware already resolved platform-vs-custom-domain for this request
+  // (`x-is-platform`) — hand it to StoreProvider so the FIRST render already
+  // knows, instead of guessing `false` until a client `useEffect` corrects
+  // it. See StoreContext.tsx's `isPlatform` doc comment.
+  const initialIsPlatform = headersList.get('x-is-platform') === 'true';
   // API_URL already includes the /api/v1 prefix (see lib/api.ts); the helper
   // appends the route path directly to avoid a doubled /api/v1/api/v1/ 404.
   const draftBundle = await fetchDraftBundleForCurrentRequest(store.id, draftToken, API_URL);
@@ -517,7 +522,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           Skip to main content
         </a>
-        <StoreProvider initialStore={store} previewDraftToken={draftToken}>
+        <StoreProvider
+          initialStore={store}
+          previewDraftToken={draftToken}
+          initialIsPlatform={initialIsPlatform}
+        >
           <LanguageProvider defaultLanguage={resolvedLanguage}>
             <ConsentProvider initialConsent={resolvedConsent}>
               {/* PostHog product analytics — mounted INSIDE ConsentProvider

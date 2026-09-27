@@ -4,7 +4,7 @@ import { startTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useStoreUrl } from '../contexts/StoreContext';
+import { useIsPlatform, useStoreUrl } from '../contexts/StoreContext';
 import { isStoreTemporarilyUnavailable } from '../lib/store-unavailable';
 
 interface RouteErrorFallbackProps {
@@ -53,6 +53,7 @@ interface RouteErrorFallbackProps {
 export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
   const { t } = useLanguage();
   const storeUrl = useStoreUrl();
+  const isPlatform = useIsPlatform();
   const router = useRouter();
 
   /**
@@ -157,17 +158,24 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
         >
           {t('Try Again', 'حاول مرة أخرى')}
         </button>
-        {/* NO "Go Home" during a transient. We do not know which store this
-            is — `getStore()` fell back to the demo sentinel — so `useStoreUrl`
-            suppresses the `/<slug>` prefix and this link resolves to `/`. On
-            the platform host that is NOT the merchant's storefront: measured
-            2026-09-16, `https://store.force-ai.co/` answers
-            `307 → https://force-ai.co`. So the only non-retry control on the
-            page would walk a merchant's shopper off their store and onto the
+        {/* "Go Home" is suppressed during a transient ONLY on a platform host.
+            We do not know which store this is there — `getStore()` fell back
+            to the demo sentinel — so `useStoreUrl` drops the `/<slug>` prefix
+            and the link would resolve to bare `/`, which on the platform host
+            is NOT the merchant's storefront: measured 2026-09-16,
+            `https://store.force-ai.co/` answers `307 → https://force-ai.co`.
+            That would walk a merchant's shopper off their store and onto the
             Force platform pitch — the HARD multi-tenant rule in
-            `app/not-found.tsx`. "Try Again" is the only correct action while
-            the store is unresolvable. Ruling SR-7. */}
-        {!isTemporarilyUnavailable && (
+            `app/not-found.tsx`. Ruling SR-7.
+
+            On a CUSTOM domain, bare `/` IS the merchant's own storefront home
+            regardless of whether this particular request could resolve the
+            store — there is no platform pitch to redirect to. Suppressing the
+            link there too (the original SR-7 fix did, unconditionally) took
+            away a working escape route from custom-domain merchants, who are
+            the majority production configuration. Issue #1841 / CORRECTION to
+            SR-7 in docs/RULINGS.md. */}
+        {(!isTemporarilyUnavailable || !isPlatform) && (
           <Link
             href={storeUrl('/')}
             className="rounded-lg border border-border px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"

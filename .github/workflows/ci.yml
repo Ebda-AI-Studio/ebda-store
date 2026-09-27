@@ -59,6 +59,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      cf: ${{ steps.cf-filter.outputs.cf }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -86,6 +87,33 @@ jobs:
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+      - id: cf-filter
+        name: Detect changes that could move the Cloudflare Worker bundle
+        # audit-followup #1632: the `build` job above only proves `next build`
+        # succeeds — it never exercises the pinned `@opennextjs/cloudflare`
+        # adapter that actually ships to production (`scripts/cf-build.sh`,
+        # invoked only at deploy time by cf-deploy.yml). A `next`/adapter
+        # version bump, or an edit to the adapter config itself, can move the
+        # Worker bundle while `next build` stays green. Narrowly scoped to
+        # the files that can affect that bundle so an unrelated PR doesn't pay
+        # for 3 extra OpenNext builds.
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # No PR base = a push to main or a manual run. cf-deploy.yml already
+          # runs this exact adapter build on every main push, so repeating it
+          # here would only add three more OpenNext builds to the busy
+          # self-hosted runners.
+          if [ -z "$BASE_SHA" ]; then
+            echo "cf=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE \
+              '^(package-lock\.json|package\.json|scripts/cf-build\.sh|scripts/cf-setup-local\.sh|apps/(web|admin|orders)/(package\.json|wrangler\.jsonc|open-next\.config\.ts|next\.config\.js))$'; then
+            echo "cf=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cf=false" >> "$GITHUB_OUTPUT"
           fi
 
   lint:
@@ -251,6 +279,50 @@ jobs:
 
       - name: Build all packages
         run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+
+  # audit-followup #1632: `build` above only proves `next build` succeeds.
+  # web/admin/orders actually ship as Cloudflare Workers through the pinned
+  # `@opennextjs/cloudflare` adapter (`scripts/cf-build.sh`), which rewrites
+  # Next's build output — exactly the surface a `next` or adapter version
+  # bump moves. Before this job, that adapter build ran ONLY at deploy time
+  # (cf-deploy.yml), so a green CI here proved nothing about the Worker
+  # bundle a `next` minor bump actually ships. Gated on `changes.outputs.cf`
+  # (package.json/lockfile/adapter-config changes only) so an unrelated PR
+  # doesn't pay for 3 extra OpenNext builds.
+  cf-build-check:
+    name: Cloudflare Worker Build Check (${{ matrix.app }})
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.cf == 'true'
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 20
+    needs: [lint, typecheck, changes]
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web, admin, orders]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build -w packages/database
+
+      - name: Build shared package
+        run: npm run build -w packages/shared
+
+      - name: Build ${{ matrix.app }} for Cloudflare (OpenNext adapter)
+        run: bash scripts/cf-build.sh ${{ matrix.app }}
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
@@ -1019,6 +1091,7 @@ jobs:
         typecheck,
         security,
         build,
+        cf-build-check,
         test-unit,
         test-integration,
         test-rls-force-app,
@@ -1041,6 +1114,7 @@ jobs:
           TYPECHECK_RES: ${{ needs.typecheck.result }}
           SECURITY_RES: ${{ needs.security.result }}
           BUILD_RES: ${{ needs.build.result }}
+          CF_BUILD_RES: ${{ needs.cf-build-check.result }}
           UNIT_RES: ${{ needs.test-unit.result }}
           INT_RES: ${{ needs.test-integration.result }}
           RLS_FORCE_APP_RES: ${{ needs.test-rls-force-app.result }}
@@ -1055,7 +1129,7 @@ jobs:
           # Collect which jobs failed (vs which skipped vs passed) so Ahmad
           # can see what to look at without clicking through.
           FAILED_JOBS=""
-          for entry in "lint:$LINT_RES" "typecheck:$TYPECHECK_RES" "security:$SECURITY_RES" "build:$BUILD_RES" "unit:$UNIT_RES" "integration:$INT_RES" "rls-force-app:$RLS_FORCE_APP_RES" "rls-payload-parity:$RLS_PARITY_RES" "e2e:$E2E_RES"; do
+          for entry in "lint:$LINT_RES" "typecheck:$TYPECHECK_RES" "security:$SECURITY_RES" "build:$BUILD_RES" "cf-build:$CF_BUILD_RES" "unit:$UNIT_RES" "integration:$INT_RES" "rls-force-app:$RLS_FORCE_APP_RES" "rls-payload-parity:$RLS_PARITY_RES" "e2e:$E2E_RES"; do
             name="${entry%:*}"
             res="${entry#*:}"
             if [ "$res" = "failure" ]; then

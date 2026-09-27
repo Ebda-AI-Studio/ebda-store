@@ -137,14 +137,27 @@ describe('the retry page never links a merchant shopper to the platform', () => 
     ).toBe(true);
   });
 
-  it('suppresses the Go Home link on the store-unavailable branch', () => {
+  it('suppresses the Go Home link on the store-unavailable branch, but only on a platform host', () => {
+    // Issue #1841 / CORRECTION to SR-7: the original guard suppressed the link
+    // on EVERY host during a transient, including custom domains where `/` is
+    // already the merchant's own storefront home and there is no platform
+    // pitch to redirect a shopper to. The guard must reference BOTH
+    // `isTemporarilyUnavailable` and `isPlatform` so it only hides the link
+    // when both are true.
     const src = readFileSync(join(APP_DIR, '..', 'components', 'RouteErrorFallback.tsx'), 'utf8');
 
     expect(src).toContain('<Link');
     expect(
-      /\{!isTemporarilyUnavailable && \(/.test(src),
-      'the Go Home link is no longer guarded — a rate-limited path-based store ' +
-        'would send its shopper to the Force platform landing'
+      /\{\(!isTemporarilyUnavailable \|\| !isPlatform\) && \(/.test(src),
+      'the Go Home link must render whenever the request is not on a platform ' +
+        'host OR the store is not merely temporarily unavailable — reverting to ' +
+        'a bare `!isTemporarilyUnavailable` guard suppresses it for custom-domain ' +
+        'merchants too, where the underlying platform-pitch defect does not exist'
+    ).toBe(true);
+    expect(
+      src.includes('useIsPlatform'),
+      'the platform-vs-custom-domain check must come from the shared useIsPlatform() ' +
+        'hook (StoreContext.tsx), not a re-derived local check'
     ).toBe(true);
   });
 });

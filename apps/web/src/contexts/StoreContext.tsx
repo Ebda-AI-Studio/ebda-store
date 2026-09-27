@@ -199,6 +199,17 @@ interface StoreContextValue {
    * nav/footer/utility changes preview before save. Null for normal visitors.
    */
   draftSettings: Record<string, unknown> | null;
+  /**
+   * Whether the current request is on a platform host (`store.force-ai.co`,
+   * `localhost`, etc.) rather than a merchant's custom domain — see
+   * `lib/platform-host.ts`. Seeded server-side from the `x-is-platform`
+   * header middleware already sets (`layout.tsx`), so the FIRST render
+   * already has the right answer instead of guessing `false` until a
+   * `useEffect` corrects it on mount. That gap used to ship a bare `/` home
+   * link in the server-rendered HTML on a platform host, reachable by a
+   * pre-hydration click or a crawler following the raw href.
+   */
+  isPlatform: boolean;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -230,6 +241,13 @@ interface StoreProviderProps {
    * typography) — not just the homepage. Absent for normal visitors.
    */
   previewDraftToken?: string;
+  /**
+   * Server-resolved platform-host check (`middleware.ts`'s `x-is-platform`
+   * header, read in `layout.tsx`). Optional so any caller that hasn't been
+   * updated still falls back to the client-side `isPlatformHost()` detection
+   * below instead of failing to compile.
+   */
+  initialIsPlatform?: boolean;
 }
 
 /**
@@ -247,7 +265,12 @@ function applyTheme(theme: StoreTheme | undefined): void {
   });
 }
 
-export function StoreProvider({ children, initialStore, previewDraftToken }: StoreProviderProps) {
+export function StoreProvider({
+  children,
+  initialStore,
+  previewDraftToken,
+  initialIsPlatform,
+}: StoreProviderProps) {
   // Merge initialStore with defaults to ensure theme is always present
   const mergedInitialStore = initialStore
     ? { ...DEFAULT_STORE, ...initialStore, theme: initialStore.theme || DEFAULT_THEME }
@@ -256,6 +279,17 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
   const [store] = useState<StoreData>(mergedInitialStore);
   const [isLoading] = useState(!initialStore);
   const [error] = useState<Error | null>(null);
+  // Seed from the server's answer when the caller has one; otherwise start
+  // `false` and let the effect below correct it on mount (pre-existing
+  // client-only fallback — no hydration mismatch either way, since SSR
+  // always renders the seeded/false value and the effect only fires after
+  // hydration completes).
+  const [isPlatform, setIsPlatform] = useState(initialIsPlatform ?? false);
+  useEffect(() => {
+    if (initialIsPlatform !== undefined) return;
+    setIsPlatform(isPlatformHost(window.location.hostname));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [layout, setLayout] = useState<import('@force/shared').StoreLayoutSettings | null>(null);
   // Draft-only settings (navMenu / footerLinks / utilityBar). Populated from
   // the layout-draft bundle when a preview token is active; null otherwise so
@@ -362,7 +396,7 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
 
   return (
     <StoreContext.Provider
-      value={{ store: effectiveStore, isLoading, error, layout, draftSettings }}
+      value={{ store: effectiveStore, isLoading, error, layout, draftSettings, isPlatform }}
     >
       {children}
     </StoreContext.Provider>
@@ -436,29 +470,13 @@ export function useStoreContact() {
  * On custom domains, URLs are returned as-is.
  */
 export function useStoreUrl() {
-  const { store } = useStore();
-
-  // Compute platform check in state to avoid hydration mismatch.
-  //
-  // Treat the current hostname as a "platform" host (where store URLs need
-  // to be slug-prefixed) when:
-  //   1. it's local dev (`localhost`, `127.0.0.1`)
-  //   2. it's the production storefront platform domain
-  //      (`store.forcemediakw.com` / `store.force-ai.co`) — this used to be
-  //      missed, so links from stores on the new domain returned bare
-  //      `/products` instead of `/<slug>/products` and the bare-root
-  //      redirect kicked in.
-  // Otherwise it's a custom merchant domain — store routes resolve at the
-  // root path so no prefix is needed.
-  const [isPlatform, setIsPlatform] = useState(false);
-  useEffect(() => {
-    // Use the SHARED platform-host list (lib/platform-host.ts) so this never
-    // drifts from the middleware. The old hardcoded subset here was missing
-    // `store.force-ai.co`, so after the CF migration store links on that host
-    // dropped the `/<slug>` prefix and the Home link went to the platform
-    // landing / demo store. (Regression fixed 2026-06-27.)
-    setIsPlatform(isPlatformHost(window.location.hostname));
-  }, []);
+  // `isPlatform` is computed once, centrally, in `StoreProvider` (seeded
+  // server-side from `x-is-platform` where the caller passes it, with a
+  // client-only `isPlatformHost()` fallback otherwise — see there for the
+  // hydration-mismatch reasoning). Reading it from context instead of
+  // re-deriving it here keeps every `useStoreUrl()` caller and
+  // `useIsPlatform()` in agreement about which host this is.
+  const { store, isPlatform } = useStore();
 
   const prefix = isPlatform && store.slug && store.id !== 'demo' ? `/${store.slug}` : '';
 
@@ -477,4 +495,19 @@ export function useStoreUrl() {
     },
     [prefix]
   );
+}
+
+/**
+ * Whether this request is on a platform host (`store.force-ai.co`,
+ * `localhost`, a preview subdomain) rather than a merchant's custom domain.
+ *
+ * Exposed separately from `useStoreUrl()` (rather than changing that hook's
+ * return shape) because 20+ call sites already destructure it as a bare
+ * `storeUrl` function — a shape change there would touch every one of them
+ * for no benefit. Consumers that need to make a platform-vs-custom-domain
+ * decision (e.g. `RouteErrorFallback` deciding whether "Go Home" is safe to
+ * show during a transient) call this instead.
+ */
+export function useIsPlatform(): boolean {
+  return useStore().isPlatform;
 }

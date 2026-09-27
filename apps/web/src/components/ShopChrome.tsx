@@ -9,13 +9,9 @@ import { withBundlesNavEntry, bundlesNavVisible } from '../lib/bundles-nav';
 import { BottomTabBar } from '../templates/shared/BottomTabBar';
 import { FloatingWidget } from '../templates/shared/FloatingWidget';
 import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
+import { resolveFooterAutoContrastBg } from '../lib/footer-logo-bg';
 import type { FloatingWidgetConfig } from '@force/shared';
-import {
-  resolveColor,
-  footerLogoContrastFilter,
-  resolveBackgroundPreset,
-  sanitizeUrl,
-} from '@force/shared';
+import { resolveColor, footerLogoContrastFilter, sanitizeUrl } from '@force/shared';
 import type { StoreLayoutSettings } from '@force/shared';
 import { sectionVisibilityClass } from '../templates/shared/section-spacing';
 import type {
@@ -452,19 +448,16 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           footerLogo={store.theme?.footerLogo ?? undefined}
           footerLogoInvert={store.theme?.footerLogoInvert === true}
           hideFooterLogoMobile={store.theme?.hideFooterLogoMobile === true}
-          footerLogoAutoFilter={(() => {
-            // Resolve the EFFECTIVE footer background so the brand-logo fallback
-            // is auto-contrasted against whatever color the footer actually paints.
-            // Priority: merchant's explicit page-builder override (resolved hex) →
-            // theme default (the section-alt HSL triplet from resolveBackgroundPreset).
-            // Both formats are parseable by pickReadableForeground in @force/shared.
-            const explicitBg = layout?.footer?.bgColor
-              ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)
-              : undefined;
-            const themeBg =
-              explicitBg ?? `hsl(${resolveBackgroundPreset(store.theme).bgSectionAlt})`;
-            return footerLogoContrastFilter(themeBg, store.theme?.footerLogoInvert);
-          })()}
+          footerLogoAutoFilter={footerLogoContrastFilter(
+            resolveFooterAutoContrastBg(
+              store.template,
+              store.theme,
+              layout?.footer?.bgColor
+                ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)
+                : undefined
+            ),
+            store.theme?.footerLogoInvert
+          )}
           theme={store.theme}
           locations={store.locations}
         />

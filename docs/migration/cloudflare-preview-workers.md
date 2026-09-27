@@ -42,6 +42,20 @@ bash scripts/cf-build.sh web && (cd apps/web && npx wrangler deploy)
 
 ## What's committed vs local-only
 
+> **STALE as of the per-tenant cutover (2026-07-07) — kept for the historical
+> `instrumentation.ts` / build-recipe detail below, which is still accurate.**
+> This section describes the PREVIEW-phase state, where Vercel was still
+> production and the CF build tooling was deliberately kept off `main`. Both
+> the "Next steps" item this section refers to are done: `@opennextjs/cloudflare`
+>
+> - `wrangler` are now regular devDependencies in `apps/{web,admin,orders}/package.json`,
+>   and each app's `wrangler.jsonc`/`open-next.config.ts` are committed (git
+>   tracked, not in `.gitignore` — the `.gitignore` entries below are also
+>   stale). `scripts/cf-build.sh` now also runs in CI (`ci.yml`'s
+>   `cf-build-check` job, gated on package.json/lockfile/adapter-config
+>   changes) — audit-followup #1632 — not just at deploy time
+>   (`cf-deploy.yml`).
+
 **Committed** (zero Vercel impact, mirrors web's #314 shape):
 
 - `apps/{web,admin,orders}/next.config.js` — `IS_CLOUDFLARE` gate → `images.unoptimized` on the CF build only (Vercel stays optimized; Workers can't run native `sharp`).
@@ -101,7 +115,7 @@ This is triggered by the **mere presence** of `instrumentation.ts`, independent 
 ## Next steps (when promoting beyond preview)
 
 1. Re-check newer `@opennextjs/cloudflare` for the `copyTracedFiles` instrumentation fix; if shipped, drop the move-aside. `@sentry/cloudflare` is live for web — repeat for admin.
-2. Commit the build tooling (devDeps + worker config) + wire a CI build job, lockfile regenerated with npm 10.8.2.
+2. ~~Commit the build tooling (devDeps + worker config) + wire a CI build job~~ — **done.** Build tooling committed at the per-tenant cutover (2026-07-07); the CI build job (`cf-build-check` in `ci.yml`) landed 2026-09-25 (audit-followup #1632).
 3. Cloudflare for SaaS custom-hostname onboarding per client domain (production DNS — canary 1–2 stores first, per `cloudflare-readiness.md`).
 
 > **The per-tenant cutover is complete (2026-07-07).** See **[`cloudflare-cutover-runbook.md`](./cloudflare-cutover-runbook.md)** for the procedure that was used (`scripts/cf-setup-local.sh` clones these git-ignored build files for you; `scripts/cf-migrate-store.sh <slug>` provisions the CF hostname + flips the store). Vercel is cancelled and removed — the `DomainProvider` resolver now always resolves to Cloudflare-for-SaaS.
