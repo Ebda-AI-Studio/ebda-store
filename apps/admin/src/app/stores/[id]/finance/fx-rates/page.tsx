@@ -31,10 +31,6 @@ interface FxRateEntry {
   createdAt: string;
 }
 
-interface FxRatesResponse {
-  data: FxRateEntry[];
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function todayIso(): string {
@@ -84,8 +80,11 @@ export default function FxRatesPage() {
     const url = `/api/v1/stores/${storeId}/finance/fx-rates${
       filterCurrency ? `?currency=${filterCurrency}` : ''
     }`;
-    const { data } = await apiGet<FxRatesResponse>(url);
-    setRates(data?.data ?? []);
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the rate array — reading `data?.data` double-unwrapped to
+    // undefined and the table always rendered empty (#831 sweep).
+    const { data } = await apiGet<FxRateEntry[]>(url);
+    setRates(data ?? []);
     setLoading(false);
   }
 

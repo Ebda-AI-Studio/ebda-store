@@ -1,5 +1,6 @@
-import { prisma } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';
 
 // ==========================================
@@ -26,15 +27,20 @@ interface RecordAffiliateEventInput {
  * Design rules (mirrors payment-event.service.ts):
  * - NEVER throws — any DB failure is logged and swallowed so the caller's
  *   main transaction is not affected.
- * - Called AFTER the mutation succeeds (fire-and-forget pattern).
+ * - Called AFTER the mutation succeeds, and awaited (see the return note).
  * - Returns the created row on success or null on failure — and null when
  *   the write was deferred to after the request's tenant transaction commits
- *   (see below). Every current caller fire-and-forgets the result.
+ *   (see below). Every caller awaits it and ignores the result: awaiting
+ *   costs nothing when deferred, and is what makes the inline (Inngest)
+ *   insert land before the caller's transaction commits (#1589).
  */
 export function recordAffiliateEvent(
   input: RecordAffiliateEventInput
 ): Promise<{ id: string } | null> {
-  // Callers fire this without awaiting, from affiliate routes that DO run
+  // Callers await this (#1589 — the un-awaited `void` form raced the COMMIT of
+  // the Inngest money paths, where there is no deferral scope and the insert
+  // runs inline). Historically they fired it without awaiting, from affiliate
+  // routes that DO run
   // under `tenantContext` (affiliate.routes.ts registers
   // `router.param('storeId', tenantContext)`). The single
   // `affiliateEvent.create` below therefore raced the request's transaction
@@ -48,18 +54,27 @@ export function recordAffiliateEvent(
 }
 
 /**
- * The audit row for a MONEY movement, as a write to put in the SAME batch
- * transaction that moves the money (#1590).
+ * The audit row for a MONEY movement, written on the SAME transaction client
+ * that moves the money (#1590).
  *
  * The deferred `recordAffiliateEvent` above runs after the request commits and
  * is DROPPED when the request rolls back. That is right for work that reacts to
- * the request's own writes, but the affiliate balance batches commit on their
- * own (a batch transaction is not proxied to the ambient tenant tx), so a 5xx
- * left a durable commission/payout with no audit row. Written in the batch, the
- * row commits — or rolls back — with the balance change it describes.
+ * the request's own writes, but not for the audit row of a balance change: a
+ * 5xx must not leave a durable commission/payout with no audit row, nor an
+ * audit row for money that never moved. Written through `db` — the transaction
+ * the balance write runs on (the ambient tenant transaction, or the caller's
+ * own `withMoneyTx`, see `inAffiliateMoneyTx` in affiliate.service.ts) — the
+ * row commits, or rolls back, with the balance change it describes. Not
+ * savepointed on purpose: a failed audit insert rolls the money back with it.
  */
-export function affiliateEventCreate(input: RecordAffiliateEventInput) {
-  return prisma.affiliateEvent.create({
+export function affiliateEventCreate(
+  input: RecordAffiliateEventInput,
+  db: Pick<
+    Prisma.TransactionClient,
+    'affiliateEvent'
+  > = prisma as unknown as Prisma.TransactionClient
+) {
+  return db.affiliateEvent.create({
     data: affiliateEventData(input),
     select: { id: true },
   });
@@ -81,10 +96,17 @@ async function recordAffiliateEventNow(
   input: RecordAffiliateEventInput
 ): Promise<{ id: string } | null> {
   try {
-    const event = await prisma.affiliateEvent.create({
-      data: affiliateEventData(input),
-      select: { id: true },
-    });
+    // Savepoint: with no deferral scope (the Inngest money paths) this runs
+    // INLINE on the caller's tenant transaction, which the callers now await
+    // (#1589). A failed insert would otherwise abort that transaction and
+    // take the caller's writes down with it — "never throws" has to mean
+    // "never poisons the caller's transaction" too.
+    const event = await withSavepoint(() =>
+      prisma.affiliateEvent.create({
+        data: affiliateEventData(input),
+        select: { id: true },
+      })
+    );
 
     logger.info(
       {

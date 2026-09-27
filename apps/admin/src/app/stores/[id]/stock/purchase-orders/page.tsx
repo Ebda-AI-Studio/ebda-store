@@ -25,11 +25,6 @@ interface PurchaseOrder {
   };
 }
 
-interface POListResponse {
-  data: PurchaseOrder[];
-  meta: { total: number; page: number; perPage: number };
-}
-
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_CLASSES: Record<string, string> = {
@@ -56,12 +51,15 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => {
     if (!storeId) return;
-    apiGet<POListResponse>(`/api/v1/stores/${storeId}/purchase-orders?perPage=50`)
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the PO array — reading `data?.data` double-unwrapped to
+    // undefined and the page always rendered empty (#831 sweep).
+    apiGet<PurchaseOrder[]>(`/api/v1/stores/${storeId}/purchase-orders?perPage=50`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);
         } else {
-          setOrders(data?.data ?? []);
+          setOrders(data ?? []);
         }
       })
       .catch(() => setError('Failed to load purchase orders'));

@@ -70,7 +70,21 @@ type Feature =
   | 'answer_engine_gemini'
   | 'answer_engine_perplexity'
   | 'answer_engine_openai'
-  | 'campaign';
+  | 'campaign'
+  // Accounting smart layer — called through accounting/gemini-ai.service.ts,
+  // which records through `recordUsage` below so these rows carry model +
+  // cost like every other AI call (#1037).
+  | AccountingAiFeature;
+
+/** Feature labels the accounting smart layer writes to ai_usage. */
+export type AccountingAiFeature =
+  | 'reorder-scan'
+  | 'deadstock-scan'
+  | 'expense-ocr'
+  | 'profit-anomaly'
+  | 'insights-narration-cohort'
+  | 'insights-narration-funnel'
+  | 'insights-narration-segment';
 type Lang = 'en' | 'ar';
 
 export type TranslationKind =

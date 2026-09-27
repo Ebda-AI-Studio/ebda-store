@@ -74,14 +74,18 @@ export default function AiUsagePage() {
       if (!isAuthenticated || !storeId) return;
       setLogError(false);
       try {
-        const logRes = await apiGet<{ data: LogData }>(
+        // apiGet already unwraps the API's `{ success, data }` envelope, so
+        // `data` IS the LogData object — reading `data?.data` double-
+        // unwrapped to undefined and the log table always rendered empty
+        // (#831 sweep).
+        const logRes = await apiGet<LogData>(
           `/api/v1/stores/${storeId}/ai/usage/log?page=${p}&pageSize=20`
         );
         if (logRes.error) {
           setLogError(true);
           return;
         }
-        setLog(logRes.data?.data ?? null);
+        setLog(logRes.data ?? null);
       } catch {
         setLogError(true);
       } finally {

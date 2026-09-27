@@ -7,8 +7,9 @@
  *
  * Quota / usage:
  *   - assertAiQuota() from lib/ai-quota.ts is called before every non-cached request.
- *   - Token counts are written to AiUsage (same table as ai.service.ts) so the
- *     global daily/monthly cap tracking stays consistent.
+ *   - Token counts are recorded through ai.service.ts's `recordUsage` (the one
+ *     writer of ai_usage), so the daily/monthly caps stay consistent AND each
+ *     row carries model + cost like every other AI call (#1037).
  *
  * Design:
  *   - Reuses the same singleton GoogleGenerativeAI client strategy as ai.service.ts
@@ -23,11 +24,11 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { prisma } from '@force/database';
 import { assertAiQuota } from '../../lib/ai-quota';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
 import { rethrowAsAppError } from '../../lib/ai/gemini-errors';
+import { recordUsage, type AccountingAiFeature } from '../ai.service';
 
 // ---------------------------------------------------------------------------
 // Client singleton
@@ -61,22 +62,6 @@ function stripJsonFences(text: string): string {
     .trim();
 }
 
-/** Record token usage in AiUsage. Never throws — a logging failure must not surface to callers. */
-async function recordUsage(
-  storeId: string,
-  feature: string,
-  inputTokens: number,
-  outputTokens: number
-): Promise<void> {
-  try {
-    await prisma.aiUsage.create({
-      data: { storeId, feature, inputTokens, outputTokens, cachedHit: false },
-    });
-  } catch (err) {
-    logger.warn({ err, storeId, feature }, 'gemini-ai.service: failed to record AI usage');
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -84,8 +69,8 @@ async function recordUsage(
 export interface CallGeminiOpts {
   /** Full prompt text (system + user combined, or just user if you prefer). */
   prompt: string;
-  /** Feature label written to AiUsage. e.g. 'reorder-scan' | 'deadstock-scan' | 'expense-ocr' */
-  feature: string;
+  /** Feature label written to AiUsage. */
+  feature: AccountingAiFeature;
   /** storeId for quota attribution + AiUsage row. */
   storeId: string;
   /** Optional base64-encoded image bytes for vision calls. */
@@ -106,7 +91,7 @@ export interface CallGeminiBatchOpts<TItem> {
    */
   perItemPrompt: (item: TItem) => string;
   /** Feature label for AiUsage. */
-  feature: string;
+  feature: AccountingAiFeature;
   /** storeId for quota attribution. */
   storeId: string;
   /**
@@ -158,11 +143,17 @@ export async function callGemini<T>(opts: CallGeminiOpts): Promise<T> {
 
   const raw = stripJsonFences(result.response.text());
   const usage = result.response.usageMetadata;
+  // The central writer (ai.service.ts) — not a local copy — so the row
+  // carries `model` and `costMicros` and accounting AI spend is counted in
+  // the per-store AI cost reporting (#1037). MODEL is passed explicitly: this
+  // module resolves GEMINI_MODEL itself and may not match the central default.
   await recordUsage(
     opts.storeId,
     opts.feature,
     usage?.promptTokenCount ?? 0,
-    usage?.candidatesTokenCount ?? 0
+    usage?.candidatesTokenCount ?? 0,
+    false,
+    { model: MODEL }
   );
 
   try {

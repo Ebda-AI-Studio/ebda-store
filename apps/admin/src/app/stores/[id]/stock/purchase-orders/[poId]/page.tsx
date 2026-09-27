@@ -32,10 +32,6 @@ interface PurchaseOrder {
   items: POItem[];
 }
 
-interface POResponse {
-  data: PurchaseOrder;
-}
-
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_CLASSES: Record<string, string> = {
@@ -70,12 +66,15 @@ export default function PurchaseOrderDetailPage() {
   const loadPO = useCallback(() => {
     if (!storeId || !poId) return;
     setError(null);
-    apiGet<POResponse>(`/api/v1/stores/${storeId}/purchase-orders/${poId}`)
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the purchase order — reading `data?.data` double-unwrapped
+    // to undefined and the detail page never loaded (#831 sweep).
+    apiGet<PurchaseOrder>(`/api/v1/stores/${storeId}/purchase-orders/${poId}`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);
-        } else if (data?.data) {
-          const fetched = data.data;
+        } else if (data) {
+          const fetched = data;
           setPo(fetched);
           // Seed receive inputs with remaining qty (ordered - received)
           const defaults: Record<string, string> = {};

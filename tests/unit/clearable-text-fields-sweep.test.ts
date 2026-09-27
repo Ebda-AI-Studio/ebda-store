@@ -13,6 +13,8 @@
  * the stored value alone.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
@@ -296,5 +298,41 @@ describe('PUT /stores/:storeId/tax/rates/:id — an emptied tax-rate field clear
 
     expect(res.status).toBe(200);
     expect(mockPrisma.taxRate.update.mock.calls[0][0].data.country).toBeUndefined();
+  });
+});
+
+// ─── Warehouses admin caller — lat/lng must clear on update (issue #1568) ────
+//
+// updateWarehouseSchema (apps/api/src/routes/warehouse.routes.ts) already
+// declares `lat`/`lng` as `.nullable().optional()` — the server has always
+// accepted a clearing `null`. The bug was entirely in the admin caller:
+// `apps/admin/src/app/stores/[id]/stock/warehouses/page.tsx` built the save
+// payload as `form.lat !== '' ? parseFloat(form.lat) : undefined` (same for
+// `lng`), so an emptied coordinate field always sent `undefined` — even on
+// the update branch — and the old value silently survived the save, the
+// numeric sibling of the text-field bug the rest of this file covers.
+//
+// A schema-level test can't catch this: the schema was never wrong. This is
+// a static scan of the admin caller itself, so it fails on the OLD page.tsx
+// (mutation-proven: temporarily restoring the old ternary line turns this
+// red — see the fix commit for the captured output).
+describe('warehouses admin caller — lat/lng use the clear-on-update helper', () => {
+  const source = readFileSync(
+    path.resolve(__dirname, '../../apps/admin/src/app/stores/[id]/stock/warehouses/page.tsx'),
+    'utf-8'
+  );
+
+  it('does not build lat/lng with the raw "!== \'\' ? parse… : undefined" ternary', () => {
+    // This is exactly the shape that dropped a cleared coordinate to
+    // `undefined` on the update (PUT) branch instead of `null`.
+    expect(source).not.toMatch(/!==\s*''\s*\?\s*parseFloat\([^)]*\)\s*:\s*undefined/);
+  });
+
+  it('routes lat through numericFieldValue so update sends null and create sends undefined', () => {
+    expect(source).toMatch(/lat:\s*numericFieldValue\(/);
+  });
+
+  it('routes lng through numericFieldValue so update sends null and create sends undefined', () => {
+    expect(source).toMatch(/lng:\s*numericFieldValue\(/);
   });
 });

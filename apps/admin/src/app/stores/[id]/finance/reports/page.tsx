@@ -69,6 +69,7 @@ interface TaxReportData {
   rows: TaxReportRow[];
   summary: {
     transactionCount: number;
+    orderCount: number;
     totalTaxableSales: number;
     totalTaxCollected: number;
     byRate: TaxRateSummary[];
@@ -705,8 +706,11 @@ function TaxReportTab({ storeId }: { storeId: string }) {
           {/* Summary cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="rounded-xl border border-border p-4">
-              <p className="text-xs text-muted-foreground mb-1">{tt('transactionCount')}</p>
-              <p className="text-2xl font-semibold font-mono">{data.summary.transactionCount}</p>
+              <p className="text-xs text-muted-foreground mb-1">{tt('orderCount')}</p>
+              <p className="text-2xl font-semibold font-mono">{data.summary.orderCount}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {tt('entryCount', { count: data.summary.transactionCount })}
+              </p>
             </div>
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxableSales')}</p>
@@ -734,7 +738,7 @@ function TaxReportTab({ storeId }: { storeId: string }) {
                         {tt('taxRate')}
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {tt('transactions')}
+                        {tt('entries')}
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
                         {tt('taxableBase')} (KWD)
@@ -802,7 +806,12 @@ function TaxReportTab({ storeId }: { storeId: string }) {
                     </thead>
                     <tbody>
                       {data.rows.map((row, i) => (
-                        <tr key={i} className="border-t border-border/40">
+                        <tr
+                          key={i}
+                          className={`border-t border-border/40${
+                            row.kind === 'sale' ? '' : ' text-muted-foreground bg-muted/10'
+                          }`}
+                        >
                           <td className="px-3 py-2 text-xs">
                             {row.kind === 'sale' ? tt('kindSale') : tt('kindReversal')}
                           </td>

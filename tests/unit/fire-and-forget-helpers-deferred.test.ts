@@ -53,6 +53,7 @@ vi.mock('@force/database', () => ({
   prisma: prismaMock,
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),
+  hasTenantContext: vi.fn(() => false),
   // #1599: isStillReferenced now runs its 11 probes through `withRlsBypass`,
   // not the bare `prisma` export — this file's concern is COMMIT-TIMING (the
   // header docstring), not RLS routing (that has its own dedicated coverage

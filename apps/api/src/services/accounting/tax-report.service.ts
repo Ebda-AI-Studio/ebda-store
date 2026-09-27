@@ -60,6 +60,8 @@ export interface TaxReportResult {
   summary: {
     /** Journal entries in the period (sales + reversals/adjustments), not orders */
     transactionCount: number;
+    /** Distinct orders those entries belong to (#1208) */
+    orderCount: number;
     /** NET taxable sales in fils — sales minus refund/return reversals */
     totalTaxableSales: number;
     /** NET tax collected in fils — sales minus refund/return reversals */
@@ -232,6 +234,7 @@ export async function generateTaxReport(
     rows: txRows,
     summary: {
       transactionCount: txRows.length,
+      orderCount: new Set(txRows.map(r => r.orderNumber)).size,
       totalTaxableSales,
       totalTaxCollected,
       byRate,

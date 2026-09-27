@@ -23,10 +23,6 @@ interface Supplier {
   notesAr: string | null;
 }
 
-interface SupplierResponse {
-  data: Supplier;
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PAYMENT_TERMS = ['net0', 'net15', 'net30', 'net60', 'custom'] as const;
@@ -61,12 +57,15 @@ export default function NewSupplierPage() {
 
   useEffect(() => {
     if (!isEdit || !storeId || !supplierId) return;
-    apiGet<SupplierResponse>(`/api/v1/stores/${storeId}/suppliers/${supplierId}`).then(
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the supplier — reading `data?.data` double-unwrapped to
+    // undefined and the edit form never populated (#831 sweep).
+    apiGet<Supplier>(`/api/v1/stores/${storeId}/suppliers/${supplierId}`).then(
       ({ data, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);
-        } else if (data?.data) {
-          const s = data.data;
+        } else if (data) {
+          const s = data;
           setName(s.name);
           setNameAr(s.nameAr ?? '');
           setContactName(s.contactName ?? '');

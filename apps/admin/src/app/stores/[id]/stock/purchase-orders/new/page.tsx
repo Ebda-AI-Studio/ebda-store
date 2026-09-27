@@ -15,10 +15,6 @@ interface SupplierOption {
   name: string;
 }
 
-interface SuppliersResponse {
-  data: SupplierOption[];
-}
-
 interface ProductOption {
   id: string;
   name: string;
@@ -74,10 +70,13 @@ export default function NewPurchaseOrderPage() {
 
   useEffect(() => {
     if (!storeId) return;
-    // Load active suppliers
-    apiGet<SuppliersResponse>(`/api/v1/stores/${storeId}/suppliers?isActive=true`).then(
+    // Load active suppliers. apiGet already unwraps the API's
+    // `{ success, data }` envelope, so `data` IS the supplier array —
+    // reading `data.data` double-unwrapped to undefined and the dropdown
+    // was always empty (#831 sweep).
+    apiGet<SupplierOption[]>(`/api/v1/stores/${storeId}/suppliers?isActive=true`).then(
       ({ data }) => {
-        if (data) setSuppliers(data.data ?? []);
+        if (data) setSuppliers(data ?? []);
       }
     );
     // Load products for line item selects

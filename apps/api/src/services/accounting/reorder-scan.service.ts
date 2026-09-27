@@ -24,6 +24,7 @@
 import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
+import { effectiveInventory } from '../../lib/effective-inventory';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -217,6 +218,11 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         nameAr: true,
         sku: true,
         inventory: true,
+        // A variant product's stock is SUM(variants.inventory); its parent
+        // column is held at 0 (docs/architecture/inventory-model.md). Without
+        // this, every variant product scans as onHand=0 and becomes a false
+        // reorder candidate that also spends Gemini quota.
+        variants: { select: { inventory: true, isActive: true } },
         lowStockThreshold: true,
         reorderRules: {
           where: { variantId: null, isActive: true },
@@ -291,7 +297,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
           leadTimeDays = supplierLt ?? 7;
         }
 
-        const onHand = product.inventory;
+        const onHand = effectiveInventory(product);
 
         // Sum qty - qtyReceived for active PO items (status IN ('sent','partial'))
         const onOrderAgg = await tx.purchaseOrderItem.aggregate({

@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'crypto';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { recordAffiliateEvent, affiliateEventCreate } from './affiliate-event.service';
@@ -23,6 +23,23 @@ const CONFIG_DEFAULTS: AffiliateConfigDefaults = {
   autoApprove: false,
   publicSignupEnabled: true,
 };
+
+/**
+ * Run a commission money write atomically.
+ *
+ * Both production callers (the Inngest order-status-changed and order-refunded
+ * fanouts) wrap the service in `runInTenantContext`, and `$transaction` is not
+ * proxied onto that ambient transaction (see `hasTenantContext`): the old
+ * `prisma.$transaction([...])` therefore ran the balance writes on a second,
+ * GUC-less connection that committed independently of the tenant tx. Inside a
+ * tenant context the ambient transaction already makes the writes atomic, so
+ * use it; outside one, open a transaction of our own.
+ */
+function inAffiliateMoneyTx<T>(fn: (db: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return hasTenantContext()
+    ? fn(prisma as unknown as Prisma.TransactionClient)
+    : withMoneyTx(prisma, fn);
+}
 
 interface ApplyAffiliateData {
   name: string;
@@ -191,7 +208,7 @@ class AffiliateService {
       '[AffiliateService] New affiliate applied'
     );
 
-    void recordAffiliateEvent({
+    await recordAffiliateEvent({
       affiliateId: affiliate.id,
       storeId,
       eventType: 'created',
@@ -236,7 +253,7 @@ class AffiliateService {
       '[AffiliateService] Admin created affiliate'
     );
 
-    void recordAffiliateEvent({
+    await recordAffiliateEvent({
       affiliateId: affiliate.id,
       storeId,
       eventType: 'created',
@@ -329,7 +346,7 @@ class AffiliateService {
       data: { status: 'approved', approvedAt: new Date(), approvedBy: userId },
     });
 
-    void recordAffiliateEvent({
+    await recordAffiliateEvent({
       affiliateId: id,
       storeId,
       eventType: 'approve',
@@ -353,7 +370,7 @@ class AffiliateService {
       data: { status: 'rejected', approvedBy: userId },
     });
 
-    void recordAffiliateEvent({
+    await recordAffiliateEvent({
       affiliateId: id,
       storeId,
       eventType: 'reject',
@@ -373,7 +390,7 @@ class AffiliateService {
       data: { status: 'suspended', approvedBy: userId },
     });
 
-    void recordAffiliateEvent({
+    await recordAffiliateEvent({
       affiliateId: id,
       storeId,
       eventType: 'suspend',
@@ -505,27 +522,47 @@ class AffiliateService {
 
     const commissionAmount = Math.round((order.total * rate) / 100);
 
-    // Update referral and affiliate balances atomically — and the audit row
-    // with them, so it commits (or rolls back) with the money it records.
-    await prisma.$transaction([
-      prisma.affiliateReferral.update({
-        where: { id: referral.id },
+    // Claim-then-credit (#618). The findFirst above is only a fast path: two
+    // duplicate `order/status-changed` deliveries can both pass it. The
+    // conditional updateMany is the real guard — Postgres serialises the two
+    // UPDATEs on the referral's row lock and re-checks the WHERE against the
+    // winner's committed row, so the loser matches 0 rows and never reaches
+    // the balance increment. Both writes share one transaction, so a failed
+    // credit also un-claims the referral.
+    const claimed = await inAffiliateMoneyTx(async db => {
+      const claim = await db.affiliateReferral.updateMany({
+        where: { id: referral.id, status: 'converted', commissionAmount: null },
         data: { commissionAmount, status: 'commission_paid' },
-      }),
-      prisma.affiliate.update({
+      });
+      if (claim.count !== 1) return false;
+      await db.affiliate.update({
         where: { id: referral.affiliateId },
         data: {
           totalEarned: { increment: commissionAmount },
           pendingBalance: { increment: commissionAmount },
         },
-      }),
-      affiliateEventCreate({
-        affiliateId: referral.affiliateId,
-        storeId,
-        eventType: 'commission_recorded',
-        details: { orderId, commissionAmount, rate, referralId: referral.id },
-      }),
-    ]);
+      });
+      // The audit row rides the same transaction as the credit (#1590), and
+      // only the claim winner writes it — a skipped duplicate moved no money.
+      await affiliateEventCreate(
+        {
+          affiliateId: referral.affiliateId,
+          storeId,
+          eventType: 'commission_recorded',
+          details: { orderId, commissionAmount, rate, referralId: referral.id },
+        },
+        db
+      );
+      return true;
+    });
+
+    if (!claimed) {
+      logger.info(
+        { storeId, orderId, referralId: referral.id },
+        '[AffiliateService] Commission already processed by a concurrent run — skipped'
+      );
+      return null;
+    }
 
     logger.info(
       { storeId, orderId, affiliateId: referral.affiliateId, commissionAmount, rate },
@@ -558,25 +595,42 @@ class AffiliateService {
 
     const amount = referral.commissionAmount ?? 0;
 
-    await prisma.$transaction([
-      prisma.affiliateReferral.update({
-        where: { id: referral.id },
+    // Same claim-then-debit guard as processCommission (#618): a duplicate
+    // refund delivery that also passed the findFirst matches 0 rows here and
+    // cannot decrement the affiliate twice.
+    const claimed = await inAffiliateMoneyTx(async db => {
+      const claim = await db.affiliateReferral.updateMany({
+        where: { id: referral.id, status: 'commission_paid' },
         data: { status: 'refunded' },
-      }),
-      prisma.affiliate.update({
+      });
+      if (claim.count !== 1) return false;
+      await db.affiliate.update({
         where: { id: referral.affiliateId },
         data: {
           totalEarned: { decrement: amount },
           pendingBalance: { decrement: amount },
         },
-      }),
-      affiliateEventCreate({
-        affiliateId: referral.affiliateId,
-        storeId,
-        eventType: 'commission_reversed',
-        details: { orderId, amount, referralId: referral.id },
-      }),
-    ]);
+      });
+      // Audit row in the same transaction as the debit (#1590).
+      await affiliateEventCreate(
+        {
+          affiliateId: referral.affiliateId,
+          storeId,
+          eventType: 'commission_reversed',
+          details: { orderId, amount, referralId: referral.id },
+        },
+        db
+      );
+      return true;
+    });
+
+    if (!claimed) {
+      logger.info(
+        { storeId, orderId, referralId: referral.id },
+        '[AffiliateService] Commission already reversed by a concurrent run — skipped'
+      );
+      return null;
+    }
 
     logger.info(
       { storeId, orderId, affiliateId: referral.affiliateId, amount },
@@ -652,11 +706,26 @@ class AffiliateService {
       throw new AppError(400, 'INSUFFICIENT_BALANCE', 'Payout amount exceeds pending balance');
     }
 
-    // Id minted here so the audit row in the same batch can name the payout.
+    // On the request's tenant transaction (affiliate routes run under
+    // tenantContext), not a second GUC-less `$transaction` — see
+    // inAffiliateMoneyTx. The balance check above is a plain read, so the
+    // debit re-checks it atomically: two concurrent payouts that each fit the
+    // balance on their own cannot both be paid out of it.
+    // Id minted here so the audit row in the same transaction names the payout.
     const payoutId = randomUUID();
     const method = data.method ?? 'manual';
-    const [payout] = await prisma.$transaction([
-      prisma.affiliatePayout.create({
+    const payout = await inAffiliateMoneyTx(async db => {
+      const debit = await db.affiliate.updateMany({
+        where: { id: affiliateId, storeId, pendingBalance: { gte: data.amount } },
+        data: {
+          pendingBalance: { decrement: data.amount },
+          totalPaid: { increment: data.amount },
+        },
+      });
+      if (debit.count !== 1) {
+        throw new AppError(400, 'INSUFFICIENT_BALANCE', 'Payout amount exceeds pending balance');
+      }
+      const created = await db.affiliatePayout.create({
         data: {
           id: payoutId,
           storeId,
@@ -666,21 +735,19 @@ class AffiliateService {
           status: 'pending',
           notes: data.notes,
         },
-      }),
-      prisma.affiliate.update({
-        where: { id: affiliateId },
-        data: {
-          pendingBalance: { decrement: data.amount },
-          totalPaid: { increment: data.amount },
+      });
+      // Audit row in the same transaction as the debit (#1590).
+      await affiliateEventCreate(
+        {
+          affiliateId,
+          storeId,
+          eventType: 'payout_initiated',
+          details: { payoutId, amount: data.amount, method },
         },
-      }),
-      affiliateEventCreate({
-        affiliateId,
-        storeId,
-        eventType: 'payout_initiated',
-        details: { payoutId, amount: data.amount, method },
-      }),
-    ]);
+        db
+      );
+      return created;
+    });
 
     logger.info(
       { storeId, affiliateId, payoutId: payout.id, amount: data.amount },

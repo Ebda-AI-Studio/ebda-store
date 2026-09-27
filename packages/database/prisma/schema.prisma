@@ -3491,6 +3491,8 @@ model StockAdjustment {
   postedBy         String?               @map("posted_by")
   journalEntryId   String?               @unique @map("journal_entry_id")
   createdBy        String?               @map("created_by")
+  /// Client-supplied idempotency key for the CSV import (#226). NULL for manual adjustments.
+  importKey        String?               @map("import_key") @db.VarChar(64)
   createdAt        DateTime              @default(now()) @map("created_at")
   updatedAt        DateTime              @updatedAt @map("updated_at")
 
@@ -3498,6 +3500,7 @@ model StockAdjustment {
   items StockAdjustmentItem[]
 
   @@unique([storeId, adjustmentNumber])
+  @@unique([storeId, importKey])
   @@index([storeId, status])
   @@index([storeId, postedAt(sort: Desc)])
   @@map("stock_adjustments")

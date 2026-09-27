@@ -21,10 +21,6 @@ interface Supplier {
   isActive: boolean;
 }
 
-interface SuppliersResponse {
-  data: Supplier[];
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SuppliersPage() {
@@ -44,12 +40,15 @@ export default function SuppliersPage() {
 
   function load() {
     if (!storeId) return;
-    apiGet<SuppliersResponse>(`/api/v1/stores/${storeId}/suppliers`)
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the supplier array — reading `data?.data` double-unwrapped
+    // to undefined and the page always rendered empty (#831 sweep).
+    apiGet<Supplier[]>(`/api/v1/stores/${storeId}/suppliers`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);
         } else {
-          setSuppliers(data?.data ?? []);
+          setSuppliers(data ?? []);
         }
       })
       .catch(() => setError('Failed to load suppliers'));

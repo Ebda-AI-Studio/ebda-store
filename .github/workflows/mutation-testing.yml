@@ -90,6 +90,9 @@ on:
       # becomes irreversible.
       - 'apps/api/src/services/r2-cleanup.service.ts'
       - 'apps/api/src/lib/inngest/functions/order-refunded.ts'
+      # Affiliate commission claim guards (#618): a duplicate Inngest delivery
+      # credits or debits the affiliate twice without them.
+      - 'apps/api/src/services/affiliate.service.ts'
       # Customer wallet (D1): the no-negative-balance guard, the idempotent
       # replay and the wallet row lock.
       - 'apps/api/src/services/wallet.service.ts'
@@ -98,9 +101,8 @@ on:
       - 'packages/database/prisma/migrations/20260903130000_loyalty_reversal_tag_unique/migration.sql'
       # Batch M2/D2: the free_shipping coupon eligibility guard lives in
       # order.service.ts; the atomic affiliate payout audit row in
-      # affiliate.service.ts.
+      # affiliate.service.ts (listed above).
       - 'apps/api/src/services/order.service.ts'
-      - 'apps/api/src/services/affiliate.service.ts'
       - 'apps/web/src/lib/consent-cookie.ts'
       - 'apps/web/src/lib/store-resolver.ts'
       # #1993: the mount table — no admin router may be mounted at '/public'.

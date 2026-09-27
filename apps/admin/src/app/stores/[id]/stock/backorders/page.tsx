@@ -31,10 +31,6 @@ interface BackorderLine {
   };
 }
 
-interface BackordersResponse {
-  data: BackorderLine[];
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysWaiting(createdAt: string): number {
@@ -129,12 +125,15 @@ export default function BackordersPage() {
   const load = useCallback(() => {
     if (!storeId) return;
     setError(null);
-    apiGet<BackordersResponse>(`/api/v1/stores/${storeId}/backorders`)
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the backorder line array — reading `data?.data` double-
+    // unwrapped to undefined and the page always rendered empty (#831).
+    apiGet<BackorderLine[]>(`/api/v1/stores/${storeId}/backorders`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);
         } else {
-          setLines(data?.data ?? []);
+          setLines(data ?? []);
         }
       })
       .catch(() => setError('Failed to load backorders'));

@@ -86,6 +86,22 @@ no-op; those routers only get context if they register
 | 17  | `services/provisioning.service.ts:243,258`                                                                                                                                                                                                                                                                                                                     | `domainSvc.removeDomain`, `EmailService.sendWelcome`                 | NO — `adminRoutes` is a bare `/admin` mount, documented CONTEXT-LESS                                                                                | YES for the email                                                               | not defective                                                                                                                                                        | none                                                                                                                 |
 | 18  | `services/product.service.ts:753,949,987`                                                                                                                                                                                                                                                                                                                      | `inngest.send`                                                       | YES (product router)                                                                                                                                | NO — HTTP to Inngest                                                            | not defective                                                                                                                                                        | none                                                                                                                 |
 
+**Correction (2026-09-25, #1589) — rows 3 and 14 were wrong for the Inngest
+money paths.** `processCommission` and `reverseCommission` are called from the
+`order-status-changed` and `order-refunded` Inngest functions INSIDE
+`runInTenantContext`. There is no deferral scope there, so
+`deferAfterTenantCommit` runs the `affiliateEvent.create` inline on that tenant
+transaction — and the `void` call let the callback return before the insert
+finished, which is the "one un-awaited query, callback returns → P2028" shape
+this audit calls defective. Row 14's "Inngest functions generally" is true of
+`sendAlert`/`inngest.send`, not of a service that opens its own tenant
+context. The five remaining `recordAffiliateEvent` sites (apply, admin create,
+approve, reject, suspend) are now awaited, and the insert runs under
+`withSavepoint` so a failed audit row cannot abort the caller's transaction.
+The three money sites no longer call it at all: their audit row is written on
+the same transaction as the balance change (`affiliateEventCreate`, #1590 —
+see below).
+
 ## The fix
 
 `apps/api/src/lib/after-tenant-commit.ts`
@@ -117,10 +133,13 @@ no-op; those routers only get context if they register
   a 500 instead of a 201 over a lost write). Either way its deferred work is
   **dropped** — the rows it reacts to no longer exist. That is only true of
   work reacting to the request's OWN writes: the three affiliate money sites
-  (`processCommission`, `reverseCommission`, `createPayout`) commit in their own
-  `$transaction` batch, so a later rollback dropped the audit row for a durable
-  balance change (#1590). Their audit row now rides IN that batch
-  (`affiliateEventCreate`) and is no longer deferred.
+  (`processCommission`, `reverseCommission`, `createPayout`) committed in their
+  own `$transaction` batch, so a later rollback dropped the audit row for a
+  durable balance change (#1590). Their balance writes now run on the ambient
+  tenant transaction, or their own `withMoneyTx` outside one (#618,
+  `inAffiliateMoneyTx`), and the audit row is written on that same client
+  (`affiliateEventCreate(input, db)`) — it commits or rolls back with the money
+  and is no longer deferred.
 - A failing task logs at error level AND fires the standard Telegram alert
   (`sendAlert`, `p1`, `source: after-tenant-commit.<task>`). Remaining tasks
   still run.

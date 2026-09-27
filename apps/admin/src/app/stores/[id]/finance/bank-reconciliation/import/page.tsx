@@ -16,14 +16,12 @@ interface AccountOption {
   type: string;
 }
 
-interface AccountsResponse {
-  data: {
-    asset: AccountOption[];
-    liability: AccountOption[];
-    equity: AccountOption[];
-    revenue: AccountOption[];
-    expense: AccountOption[];
-  };
+interface AccountsTree {
+  asset: AccountOption[];
+  liability: AccountOption[];
+  equity: AccountOption[];
+  revenue: AccountOption[];
+  expense: AccountOption[];
 }
 
 interface ImportResult {
@@ -55,10 +53,13 @@ export default function ImportStatementPage() {
   // ── Load bank accounts (asset type) ──
   const loadAccounts = useCallback(async () => {
     if (!storeId) return;
-    const { data } = await apiGet<AccountsResponse>(`/api/v1/stores/${storeId}/finance/accounts`);
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the accounts tree — reading `data.data` double-unwrapped to
+    // undefined and the account dropdown was always empty (#831 sweep).
+    const { data } = await apiGet<AccountsTree>(`/api/v1/stores/${storeId}/finance/accounts`);
     if (!data) return;
     // Flatten all accounts; bank accounts are typically assets
-    const flat: AccountOption[] = [...(data.data?.asset ?? []), ...(data.data?.liability ?? [])];
+    const flat: AccountOption[] = [...(data.asset ?? []), ...(data.liability ?? [])];
     setAccounts(flat);
   }, [storeId]);
 

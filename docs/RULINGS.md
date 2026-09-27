@@ -8,6 +8,65 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25 — P2 batch M4 + D1 (inventory, accounting, tax)
+
+Branch `fix/p2-m4-d1-inventory-accounting`.
+
+**Ruling M4-1 — #1705 (invoice/email `/1000` + `toFixed(3)`) is not changed.**
+It is the non-KWD currency case, and Ruling PC-2 keeps FWB KWD-only: the
+write path still stores `price * 1000` for every currency, so a
+currency-aware invoice formatter would print a correctly-formatted wrong
+number. The fix belongs to Ebda's money layer. Cost if wrong: an invoice for
+a non-KWD order prints a 3-decimal KWD-shaped amount, which cannot happen
+until a non-KWD store exists.
+
+**Ruling M4-2 — #193 (VAT taxable base) needs the owner.** Checkout levies
+tax on the PRE-discount subtotal (`order.service.ts`: `Math.round(subtotal *
+taxRate)`), the GL credits revenue net of discount, and `docs/uat/tax-reports.md`
+E6 expects tax on the DISCOUNTED amount. Which base is intended decides
+whether the report or checkout is wrong, and changing checkout changes what
+shoppers pay. Left unchanged; E6 now carries the open note. Cost if wrong:
+a store with an active tax rate and coupons sees an inflated effective rate
+and fragmented by-rate buckets until it is decided.
+
+**Ruling M4-3 — #1103 (variant `isActive` in the stock helpers) needs the
+owner.** "Stock" means two things here: SELLABLE stock (a disabled variant
+cannot be bought) and ON-HAND stock (a disabled variant's units still exist
+and are valued on the balance sheet). The admin list counts active variants
+only; `effectiveInventory`/`ON_HAND_SQL` count all. Picking one rule changes
+either availability flags or the inventory valuation. Left unchanged. Cost if
+wrong: admin list and detail keep disagreeing for products with a disabled
+variant that holds stock.
+
+_Superseded 2026-09-27, on merging main:_ the owner decided #1103 in batch M5
+(Ruling M5-6 — the shared helpers count ACTIVE variants only). The reorder scan
+this batch moved onto `effectiveInventory` (#1100) now selects `isActive` so it
+follows that rule; `tests/unit/effective-inventory.test.ts` flagged it.
+
+**Ruling M4-4 — #1049 (receipt downscale to 2000px before OCR) is left for
+the owner.** Proving OCR accuracy needs real merchant receipts; a synthetic
+receipt would pass for the wrong reason. Cost if wrong: small receipt totals
+extract less reliably than they could, and a merchant corrects them by hand.
+
+**Ruling M4-5 — the 5,000-row CSV post (#225) stays ONE transaction.**
+Chunking the post would let an import half-apply, which is worse than a
+timeout on a stock ledger. The resolve step went from up to ~10,000 queries
+to 4, the snapshot to 2, and history rows to one INSERT; the per-line stock
+UPDATEs remain. Residual: a full 5,000-line post is still bounded by the
+30s tenant transaction and is not measured here. Cost if wrong: a very large
+import times out and must be split by the merchant.
+
+**Ruling M4-6 — `WarehouseService.syncAggregateInventory` writing
+`products.inventory = SUM(variants)` is recorded, not fixed.** It breaks the
+inventory-model invariant (a variant product's parent stays 0), but two
+integration tests (`stock-race`, `reconcile`) assert that rollup on purpose,
+so removing it is a contract change for multi-warehouse stores, not a
+sibling fix. Readers go through `effectiveInventory`/`ON_HAND_SQL`, which
+ignore the parent for variant products. Cost if wrong: a variant-blind
+reader added later reads a warehouse store's parent column as stock.
+
+---
+
 ## 2026-09-25 (fix/p2-r2-o2 batch)
 
 Context: scoped-audit issue #1828 — the GSC runbook understated what the

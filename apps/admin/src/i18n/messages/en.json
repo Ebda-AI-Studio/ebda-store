@@ -5925,7 +5925,10 @@
         "guest": "Guest",
         "type": "Type",
         "kindSale": "Sale",
-        "kindReversal": "Refund / return"
+        "kindReversal": "Refund / return",
+        "orderCount": "Orders",
+        "entryCount": "{count} tax entries (sales and refunds/returns)",
+        "entries": "Entries"
       },
       "exportXlsxComing": "XLSX export coming soon"
     },

@@ -42,11 +42,6 @@ interface ExpenseListItem {
   status: string;
 }
 
-interface ExpensesListResponse {
-  data: ExpenseListItem[];
-  meta?: { total: number };
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function flattenTree(nodes: AccountNode[]): AccountNode[] {
@@ -211,11 +206,15 @@ export default function NewExpensePage() {
       pollTimerRef.current = setTimeout(async () => {
         polls += 1;
 
-        const { data } = await apiGet<ExpensesListResponse>(
+        // GET /expenses returns `{ data: items, meta }` — apiGet unwraps one
+        // layer AND drops the sibling `meta`, so `data` IS the item array;
+        // reading `data?.data` double-unwrapped to undefined and this poll
+        // never found the newly-created draft (#831 sweep).
+        const { data } = await apiGet<ExpenseListItem[]>(
           `/api/v1/stores/${storeId}/expenses?status=draft&hasOcr=true&perPage=1`
         );
 
-        const items = data?.data ?? [];
+        const items = data ?? [];
         const newest = items[0];
 
         if (newest) {

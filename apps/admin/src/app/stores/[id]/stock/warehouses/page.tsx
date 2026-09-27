@@ -6,7 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
-import { textFieldValue } from '@/lib/form-text';
+import { textFieldValue, numericFieldValue } from '@/lib/form-text';
 import { Button, useToast } from '@force/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ export default function WarehousesPage() {
         code: form.code.trim(),
         isDefault: form.isDefault,
         priority: form.priority,
-        lat: form.lat !== '' ? parseFloat(form.lat) : undefined,
-        lng: form.lng !== '' ? parseFloat(form.lng) : undefined,
+        lat: numericFieldValue(form.lat.trim(), intent, parseFloat),
+        lng: numericFieldValue(form.lng.trim(), intent, parseFloat),
         address: textFieldValue(form.address.trim(), intent),
       };
 

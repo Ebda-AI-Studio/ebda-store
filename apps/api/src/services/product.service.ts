@@ -1468,11 +1468,24 @@ export class ProductService {
         return pa - pb;
       });
 
-      // Apply the same skip/take window the cursor path uses.
-      const effectiveSkip = cursor ? 0 : skip;
-      const page_products = cursor
-        ? allSorted.slice(1, limit + 1) // approximate for cursor — fall through to normal path
-        : allSorted.slice(effectiveSkip, effectiveSkip + limit);
+      // Page mode: the offset window. Cursor mode (#1371): real keyset paging
+      // over the merchant-ordered list — the cursor is the id of the LAST row
+      // the client already has, so the page starts right after it. This used
+      // to be `allSorted.slice(1, limit + 1)` whatever the cursor said, so
+      // every cursor request (and its 120s cache entry) got the same wrong
+      // window. An id that is no longer in the list (product removed from the
+      // category, or not in it at all) yields an empty page rather than a
+      // silent restart from the top.
+      let page_products: typeof allSorted;
+      let nextCursor: string | undefined;
+      if (cursor) {
+        const at = allSorted.findIndex(p => p.id === cursor);
+        const after = at === -1 ? [] : allSorted.slice(at + 1);
+        page_products = after.slice(0, limit);
+        nextCursor = after.length > limit ? page_products[limit - 1].id : undefined;
+      } else {
+        page_products = allSorted.slice(skip, skip + limit);
+      }
 
       const result = {
         // No type-erasing cast here: keeping the precise Prisma payload type
@@ -1485,7 +1498,7 @@ export class ProductService {
           limit,
           total,
           totalPages: cursor ? undefined : Math.ceil(total / limit),
-          nextCursor: undefined as string | undefined,
+          nextCursor,
           skipCapped: skipCapped || undefined,
         },
       };
@@ -1505,7 +1518,9 @@ export class ProductService {
     // "Load more" + crawler-safe deep scans.
     // Append `id` as the final tiebreaker. The query below is served with
     // `cursor: { id }`, and keyset pagination is only stable when the ORDER BY
-    // uniquely identifies the cursor row. None of the sorts resolved above are
+    // uniquely identifies the cursor row. (The merchant-ordered category path
+    // above returns early and pages in memory instead — see #1371.)
+    // None of the sorts resolved above are
     // unique on their own — price, bestSellerPosition and newArrivalPosition
     // all repeat freely, and createdAt ties across products imported in the
     // same batch, which is how most catalogues are seeded. A page boundary
@@ -1559,10 +1574,15 @@ export class ProductService {
     ]);
 
     // When using cursor we fetched limit+1; slice to limit + extract next cursor.
+    // The next cursor is the LAST row returned, because the next request skips
+    // the cursor row itself (`skip: 1`). It used to be the extra (limit+1)th
+    // row, which the next request then skipped — one product lost per page.
     const products =
       cursor && productsRaw.length > limit ? productsRaw.slice(0, limit) : productsRaw;
     const nextCursor =
-      cursor && productsRaw.length > limit ? (productsRaw[limit] as { id: string }).id : undefined;
+      cursor && productsRaw.length > limit
+        ? (productsRaw[limit - 1] as { id: string }).id
+        : undefined;
 
     const result = {
       // No type-erasing cast (see the position-ordered path above).

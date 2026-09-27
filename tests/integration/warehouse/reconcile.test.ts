@@ -21,7 +21,6 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@force/database';
 import { WarehouseService } from '../../../apps/api/src/services/warehouse.service';
 import logger from '../../../apps/api/src/lib/logger';
-import { retryOnWriteConflict } from '../../../apps/api/src/lib/db-retry';
 
 describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
   let storeId: string;
@@ -361,15 +360,12 @@ describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
     // (Postgres 40P01 / Prisma P2034) fix wave 1 added a retry for — no
     // artificial mocking, real transactions, real locks.
     // The deadlock this inverted lock order creates is symmetric — Postgres
-    // picks EITHER side as the victim, arbitrarily. `reconcileWarehouseStockToAggregate`
-    // now retries itself internally (the actual fix). `adjustStock` is
-    // Task-1 code this task must NOT modify, so it has no internal retry —
-    // exactly like every other caller of it today. Wrapping the test's own
-    // calls in the SAME shared `retryOnWriteConflict` helper stands in for
-    // what any caller already ought to do around a Serializable-adjacent
-    // write under heavy contention (identical to how cart.service already
-    // uses this helper) — this is caller-side retry, not a change to
-    // adjustStock's source.
+    // picks EITHER side as the victim, arbitrarily. Both sides now retry
+    // themselves internally: reconcile since fix wave 1, and `adjustStock` /
+    // `setStock` since #937 (`WAREHOUSE_WRITE_RETRY`). The adjustStock calls
+    // below are therefore made BARE, exactly as the warehouse routes make
+    // them — a caller-side retry here would hide the 500 the route used to
+    // return when adjustStock was the victim.
     const CONCURRENT_ADJUSTS = 40;
 
     // WHY THIS IS A LOOP (2026-08-08 flake fix).
@@ -410,10 +406,7 @@ describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
         const [reconcileResult] = await Promise.all([
           WarehouseService.reconcileWarehouseStockToAggregate(storeId, productId, null),
           ...Array.from({ length: CONCURRENT_ADJUSTS }, () =>
-            retryOnWriteConflict(
-              () => WarehouseService.adjustStock(storeId, warehouseId, { productId, delta: 0 }),
-              { extraRetryCodes: ['40P01', '40001'], label: 'test-adjustStock-guard' }
-            )
+            WarehouseService.adjustStock(storeId, warehouseId, { productId, delta: 0 })
           ),
         ]);
 

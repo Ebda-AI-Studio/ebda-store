@@ -22,11 +22,6 @@ interface BankStatementRow {
   _count: { transactions: number };
 }
 
-interface StatementsResponse {
-  data: BankStatementRow[];
-  meta: { total: number; page: number; perPage: number; totalPages: number };
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(iso: string | null): string {
@@ -54,15 +49,23 @@ export default function BankReconciliationPage() {
 
   const fetchStatements = useCallback(async () => {
     if (!storeId) return;
-    const { data, error: err } = await apiGet<StatementsResponse>(
+    // GET /finance/bank-statements returns `{ data: items, meta }` — apiGet
+    // unwraps one layer AND drops the sibling `meta`, so `data` IS the
+    // statement array; reading `data?.data` double-unwrapped to undefined
+    // and this page always rendered empty (#831 sweep). `meta.total` is not
+    // recoverable through apiGet (it drops the sibling), so the footer count
+    // falls back to the fetched-page length — correct as long as a store has
+    // ≤50 statements (the requested perPage); beyond that it undercounts.
+    // A true fix needs a raw-response variant of apiGet that preserves `meta`.
+    const { data, error: err } = await apiGet<BankStatementRow[]>(
       `/api/v1/stores/${storeId}/finance/bank-statements?perPage=50`
     );
     if (err) {
       setError(err.message ?? 'Failed to load statements');
       return;
     }
-    setStatements(data?.data ?? []);
-    setTotal(data?.meta?.total ?? 0);
+    setStatements(data ?? []);
+    setTotal(data?.length ?? 0);
   }, [storeId]);
 
   useEffect(() => {

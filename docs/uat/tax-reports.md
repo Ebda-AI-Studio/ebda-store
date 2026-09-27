@@ -28,7 +28,7 @@
 1. Set **From** = first day of a month that has paid taxable orders, **To** = last day of that month
 2. Click away (the fetch auto-triggers on field change)
 3. **Expect:**
-   - **Entries (sales + refunds)** card shows the count of tax-moving journal entries in that period: each sale, and each refund or return that reversed tax (not a count of orders)
+   - **Orders** card shows the number of distinct orders with a tax movement in that period, with the number of tax entries (each sale, and each refund or return that reversed tax) underneath
    - **Total Taxable Sales** card shows the sum of (subtotal - discount) in KWD (3 decimal places)
    - **Total Tax Collected** card (amber) shows the sum of tax collected in KWD
 
@@ -37,15 +37,15 @@
 1. With the same date range
 2. **Expect:** A "Breakdown by Rate" section appears if tax rates differ
    - One row per distinct effective tax rate (e.g. 5.00%, 10.00%)
-   - Columns: Tax Rate, Transactions, Taxable Base (KWD), Tax Collected (KWD)
+   - Columns: Tax Rate, Entries, Taxable Base (KWD), Tax Collected (KWD)
    - Totals across all rates match the summary cards
 
 ### 4. Verify transaction table
 
 1. **Expect:** One row per tax-moving journal entry, ordered by date ascending: the sale, plus one row per refund or return that reversed tax (negative amounts)
    - Type | Date | Order # | Customer | Taxable Base (KWD) | Tax Rate | Tax Collected (KWD) | Order Total (KWD)
-   - Type is **Sale** on the sale row and **Refund / return** on the rows that reverse it; one order can show several rows with the same Order #
-   - Order Total is filled on the Sale row only (— on refund/return rows), so the column sums to each order's value once (#1253)
+   - Type is **Sale** on the sale row and **Refund / return** on the rows that reverse it; one order can show several rows with the same Order #; refund/return rows are muted
+   - Order Total is filled on the Sale row only (— on refund/return rows), so the column sums to each order's value once (#1253, #1208)
    - Guest orders show "Guest" in the Customer column
    - Footer row shows column totals for Taxable Base and Tax Collected
    - Order C (tax = 0) does NOT appear in the list
@@ -108,6 +108,12 @@
    `subtotal − discount` base is the base the tax was actually charged on. Orders placed before
    that change were taxed on the full subtotal and will still show an inflated derived rate.
 
+> **Open (#193, needs owner):** checkout currently levies tax on the PRE-discount
+> subtotal (`order.service.ts`: `Math.round(subtotal * taxRate)`), so this order
+> is charged 1.000 KWD, not 0.750, and the report shows a 6.67% effective rate
+> on a 15.000 base. Whether tax belongs on the discounted or the gross amount
+> has not been decided; until it is, this case does not pass as written.
+
 ### E7 — Tenant isolation
 
 1. The report only shows orders for the current store; orders for other stores never appear, even if they share the same user account
@@ -140,6 +146,7 @@ Feature: accounting.tax_reports (Enterprise)
     ],
     "summary": {
       "transactionCount": 1,        ← journal entries (sales + reversals), not orders
+      "orderCount": 1,              ← distinct orders
       "totalTaxableSales": 10000,   ← fils
       "totalTaxCollected": 500,     ← fils
       "byRate": [

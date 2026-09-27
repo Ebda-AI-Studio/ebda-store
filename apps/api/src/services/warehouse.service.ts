@@ -134,6 +134,29 @@ const WAREHOUSE_SELECT = {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
+/**
+ * Retry policy for every warehouse_stock writer (#937).
+ *
+ * `setStock`/`adjustStock` lock warehouse_stock first and the aggregate row
+ * second; `reconcileWarehouseStockToAggregate` takes them in the opposite
+ * order, so a concurrent pair can deadlock (Postgres 40P01). Postgres picks
+ * the victim arbitrarily, so BOTH sides need the retry — before this only
+ * reconcile had it, and a merchant's stock edit that lost surfaced as a 500.
+ *
+ * Safe to retry: the whole `withMoneyTx` rolls back on the error, so a re-run
+ * applies the set (absolute) or the delta exactly once. The transaction is
+ * its own (`$transaction` is not proxied onto the request's tenant tx — see
+ * `hasTenantContext` in @force/database), so the retry never runs inside an
+ * aborted outer transaction. Raw-query failures carry the SQLSTATE at
+ * `err.meta.code`, which is why the codes are passed explicitly (see the
+ * reconcile docstring below).
+ */
+const WAREHOUSE_WRITE_RETRY = {
+  retries: 3,
+  label: 'warehouse-stock-write',
+  extraRetryCodes: ['40P01', '40001'],
+};
+
 export class WarehouseService {
   /**
    * List all warehouses for a store, with total SKU / unit counts.
@@ -491,18 +514,22 @@ export class WarehouseService {
 
     const variantId = input.variantId ?? null;
 
-    await withMoneyTx(prisma, async tx => {
-      await WarehouseService.upsertWarehouseStock(tx, {
-        warehouseId,
-        productId: input.productId,
-        variantId,
-        storeId,
-        setExpr: Prisma.sql`${input.quantity}`,
-        initialQty: input.quantity,
-      });
+    await retryOnWriteConflict(
+      () =>
+        withMoneyTx(prisma, async tx => {
+          await WarehouseService.upsertWarehouseStock(tx, {
+            warehouseId,
+            productId: input.productId,
+            variantId,
+            storeId,
+            setExpr: Prisma.sql`${input.quantity}`,
+            initialQty: input.quantity,
+          });
 
-      await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
-    });
+          await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
+        }),
+      WAREHOUSE_WRITE_RETRY
+    );
   }
 
   /**
@@ -532,51 +559,55 @@ export class WarehouseService {
 
     const variantId = input.variantId ?? null;
 
-    const newQty = await withMoneyTx(prisma, async tx => {
-      // Best-effort snapshot for the InventoryHistory audit row only. The
-      // actual new quantity below is computed atomically INSIDE Postgres from
-      // the row's value at UPDATE time (`warehouse_stock.quantity` in the SET
-      // clause of upsertWarehouseStock refers to the pre-update row, read
-      // under the row's own write lock) — never from this read. A very tight
-      // concurrent race could make this logged "previousStock" one write
-      // stale; it never affects the persisted quantity itself (that's the
-      // actual bug this task fixes).
-      const before = await tx.warehouseStock.findFirst({
-        where: { warehouseId, productId: input.productId, variantId },
-        select: { quantity: true },
-      });
-      const previousQty = before?.quantity ?? 0;
+    const newQty = await retryOnWriteConflict(
+      () =>
+        withMoneyTx(prisma, async tx => {
+          // Best-effort snapshot for the InventoryHistory audit row only. The
+          // actual new quantity below is computed atomically INSIDE Postgres from
+          // the row's value at UPDATE time (`warehouse_stock.quantity` in the SET
+          // clause of upsertWarehouseStock refers to the pre-update row, read
+          // under the row's own write lock) — never from this read. A very tight
+          // concurrent race could make this logged "previousStock" one write
+          // stale; it never affects the persisted quantity itself (that's the
+          // actual bug this task fixes).
+          const before = await tx.warehouseStock.findFirst({
+            where: { warehouseId, productId: input.productId, variantId },
+            select: { quantity: true },
+          });
+          const previousQty = before?.quantity ?? 0;
 
-      const newQty = await WarehouseService.upsertWarehouseStock(tx, {
-        warehouseId,
-        productId: input.productId,
-        variantId,
-        storeId,
-        setExpr: Prisma.sql`GREATEST(0, "warehouse_stock"."quantity" + ${input.delta})`,
-        initialQty: Math.max(0, input.delta),
-      });
+          const newQty = await WarehouseService.upsertWarehouseStock(tx, {
+            warehouseId,
+            productId: input.productId,
+            variantId,
+            storeId,
+            setExpr: Prisma.sql`GREATEST(0, "warehouse_stock"."quantity" + ${input.delta})`,
+            initialQty: Math.max(0, input.delta),
+          });
 
-      await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
+          await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
 
-      // Record in InventoryHistory for audit trail
-      const changeType = input.delta >= 0 ? 'manual_add' : 'manual_remove';
-      await tx.inventoryHistory.create({
-        data: {
-          productId: input.productId,
-          storeId,
-          type: changeType,
-          quantity: input.delta,
-          previousStock: previousQty,
-          newStock: newQty,
-          reason: input.reason
-            ? `[Warehouse: ${warehouse.code}] ${input.reason}`
-            : `[Warehouse: ${warehouse.code}] delta adjustment`,
-          reference: warehouseId,
-        },
-      });
+          // Record in InventoryHistory for audit trail
+          const changeType = input.delta >= 0 ? 'manual_add' : 'manual_remove';
+          await tx.inventoryHistory.create({
+            data: {
+              productId: input.productId,
+              storeId,
+              type: changeType,
+              quantity: input.delta,
+              previousStock: previousQty,
+              newStock: newQty,
+              reason: input.reason
+                ? `[Warehouse: ${warehouse.code}] ${input.reason}`
+                : `[Warehouse: ${warehouse.code}] delta adjustment`,
+              reference: warehouseId,
+            },
+          });
 
-      return newQty;
-    });
+          return newQty;
+        }),
+      WAREHOUSE_WRITE_RETRY
+    );
 
     logger.info(
       { storeId, warehouseId, productId: input.productId, delta: input.delta, newQty },
@@ -816,7 +847,9 @@ export class WarehouseService {
    * wrong), this method is wrapped in `retryOnWriteConflict` at the call
    * site: reconcile is read-then-diff-then-write and idempotent (re-running
    * converges to the same `SUM == aggregate`), so retrying the whole
-   * transaction on a deadlock/serialization failure is safe.
+   * transaction on a deadlock/serialization failure is safe. Postgres may
+   * pick EITHER side as the deadlock victim, so `setStock`/`adjustStock`
+   * carry the same retry (`WAREHOUSE_WRITE_RETRY`, #937).
    *
    * Verified empirically against real docker Postgres: the raw
    * `$queryRaw`/`$executeRaw` calls this method and `upsertWarehouseStock`

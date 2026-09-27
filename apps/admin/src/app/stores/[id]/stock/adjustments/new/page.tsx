@@ -42,6 +42,18 @@ interface CsvImportResult {
   importedRows: number;
   skippedRows: number;
   errors?: Record<number, string[]>;
+  /** True when the server answered a retry with the first import's result (#226). */
+  replayed?: boolean;
+}
+
+/**
+ * One idempotency key per loaded file (#226). A double-click or a network
+ * retry re-sends the same key and the server replays the first import instead
+ * of posting the stock and GL movement twice; loading a file (even the same
+ * one again) mints a new key, so a deliberate re-import still works.
+ */
+function newImportKey(): string {
+  return crypto.randomUUID();
 }
 
 type TabMode = 'manual' | 'csv';
@@ -80,12 +92,14 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
   const [reasonAr, setReasonAr] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
+  const [importKey, setImportKey] = useState(newImportKey);
   const [error, setError] = useState<string | null>(null);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setSelectedFileName(file.name);
+    setImportKey(newImportKey());
     setImportResult(null);
     setError(null);
     const reader = new FileReader();
@@ -102,6 +116,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
     setCsvContent('');
     setSelectedFileName('');
     setParseResult(null);
+    setImportKey(newImportKey());
     setImportResult(null);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -123,7 +138,10 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
     setError(null);
     setSubmitting(true);
     try {
-      const { data, error: apiError } = await apiPost<{ data: CsvImportResult }>(
+      // apiPost already unwraps the `{ data }` envelope, so `data` IS the
+      // CsvImportResult. Reading `data.data` (#202) was always undefined: a
+      // successful import showed no result panel and invited a second click.
+      const { data, error: apiError } = await apiPost<CsvImportResult>(
         `/api/v1/stores/${storeId}/stock-adjustments/csv-import`,
         {
           csvContent,
@@ -131,14 +149,15 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           reason: reason || undefined,
           reasonAr: reasonAr || undefined,
           postImmediately: true,
+          idempotencyKey: importKey,
         }
       );
       if (apiError) {
         setError(apiError.message);
         return;
       }
-      if (data?.data) {
-        setImportResult(data.data);
+      if (data) {
+        setImportResult(data);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));

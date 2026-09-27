@@ -227,6 +227,34 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(result.summary.transactionCount).toBe(3);
   });
 
+  // #1208 — the merchant-facing count is ORDERS; the entry count (sales plus
+  // their refund/return rows) is kept alongside it.
+  it('counts distinct orders separately from journal entries', async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      makeRow({ order_number: 'ORD-9', base_delta: BigInt(8_000), tax_delta: BigInt(900) }),
+      makeRow({
+        order_number: 'ORD-9',
+        base_delta: BigInt(-1_778),
+        tax_delta: BigInt(-200),
+        is_sale: false,
+      }),
+      makeRow({
+        order_number: 'ORD-9',
+        base_delta: BigInt(-8_000),
+        tax_delta: BigInt(-900),
+        is_sale: false,
+      }),
+      makeRow({ order_number: 'ORD-10' }),
+    ]);
+
+    const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
+
+    expect(result.rows.map(r => r.kind)).toEqual(['sale', 'reversal', 'reversal', 'sale']);
+    expect(result.rows.map(r => r.total)).toEqual([10_500, null, null, 10_500]);
+    expect(result.summary.transactionCount).toBe(4);
+    expect(result.summary.orderCount).toBe(2);
+  });
+
   it('asks the database which entry is the sale (sourceId = the order id)', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([]);
     await generateTaxReport(STORE_ID, { from: FROM, to: TO });

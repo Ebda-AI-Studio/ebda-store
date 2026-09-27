@@ -864,7 +864,9 @@ router.get(
  * GET /:storeId/finance/reports/tax-report.xlsx
  *
  * XLSX export of the tax report. Same auth + feature gate as the JSON endpoint.
- * Sheet: "Tax Report" — one transaction row per order + a summary section appended below.
+ * Sheet: "Tax Report" — one row per tax-moving journal entry (Type = Sale /
+ * Refund / return; Order Total on the sale row only) + a summary section
+ * appended below.
  */
 router.get(
   '/:storeId/finance/reports/tax-report.xlsx',
@@ -941,7 +943,7 @@ router.get(
         {
           rowType: 'Summary',
           date: '',
-          orderNumber: `Entries (sales + refunds): ${report.summary.transactionCount}`,
+          orderNumber: `Orders: ${report.summary.orderCount} — Entries (sales + refunds): ${report.summary.transactionCount}`,
           customer: '',
           subtotal: report.summary.totalTaxableSales / 1000,
           taxRate: '',
@@ -964,7 +966,7 @@ router.get(
           rowType: 'By Rate',
           date: '',
           orderNumber: '',
-          customer: `${byRate.taxRate}% — ${byRate.transactionCount} entry(ies)`,
+          customer: `${byRate.taxRate}% — ${byRate.transactionCount} entr${byRate.transactionCount === 1 ? 'y' : 'ies'}`,
           subtotal: byRate.totalSubtotal / 1000,
           taxRate: `${byRate.taxRate}%`,
           taxCollected: byRate.totalTaxCollected / 1000,

@@ -412,12 +412,22 @@
       "test": "tests/unit/mcp-agent-write-attribution.test.ts"
     },
     {
+      "id": "audit-affiliate-commission-event-on-money-tx",
+      "domain": "audit",
+      "tier": "unit",
+      "why": "the commission audit row is written on the bare client instead of the transaction that credits the affiliate, so outside a tenant context it commits on its own — an audit row for a credit that rolled back, or none for one that committed (#1590)",
+      "source": "apps/api/src/services/affiliate.service.ts",
+      "find": "          details: { orderId, commissionAmount, rate, referralId: referral.id },\n        },\n        db\n      );",
+      "replace": "          details: { orderId, commissionAmount, rate, referralId: referral.id },\n        }\n      );",
+      "test": "tests/unit/affiliate.test.ts"
+    },
+    {
       "id": "audit-affiliate-payout-event-atomic",
       "domain": "audit",
       "tier": "unit",
       "why": "an affiliate payout commits its balance change while its audit row is deferred and dropped on a later 5xx — a durable money movement with no audit trail (#1590)",
       "source": "apps/api/src/services/affiliate.service.ts",
-      "find": "      affiliateEventCreate({\n        affiliateId,\n        storeId,\n        eventType: 'payout_initiated',\n        details: { payoutId, amount: data.amount, method },\n      }),\n",
+      "find": "      await affiliateEventCreate(\n        {\n          affiliateId,\n          storeId,\n          eventType: 'payout_initiated',\n          details: { payoutId, amount: data.amount, method },\n        },\n        db\n      );\n",
       "replace": "",
       "test": "tests/unit/affiliate.test.ts"
     },
@@ -1230,6 +1240,56 @@
       "find": "  '/:campaignId/test',\n  authenticate,\n",
       "replace": "  '/:campaignId/test',\n",
       "test": "tests/unit/campaign-routes.test.ts"
+    },
+    {
+      "id": "money-affiliate-commission-claim-predicate",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "two duplicate order/status-changed deliveries both pass the findFirst fast path; without the status + commissionAmount predicate the loser's claim matches the already-paid referral again and the affiliate is credited twice (reproduced 6x against real Postgres, #618)",
+      "source": "apps/api/src/services/affiliate.service.ts",
+      "find": "        where: { id: referral.id, status: 'converted', commissionAmount: null },",
+      "replace": "        where: { id: referral.id },",
+      "test": "tests/unit/affiliate-commission-idempotency.test.ts"
+    },
+    {
+      "id": "money-affiliate-commission-claim-count",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "the losing duplicate delivery claims 0 rows but credits totalEarned + pendingBalance anyway — a double commission payout (#618)",
+      "source": "apps/api/src/services/affiliate.service.ts",
+      "find": "      if (claim.count !== 1) return false;\n      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { increment: commissionAmount },",
+      "replace": "      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { increment: commissionAmount },",
+      "test": "tests/unit/affiliate-commission-idempotency.test.ts"
+    },
+    {
+      "id": "money-affiliate-reversal-claim-count",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a duplicate order-refunded delivery decrements the affiliate's earnings a second time, driving pendingBalance below what was ever paid (#618)",
+      "source": "apps/api/src/services/affiliate.service.ts",
+      "find": "      if (claim.count !== 1) return false;\n      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { decrement: amount },",
+      "replace": "      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { decrement: amount },",
+      "test": "tests/unit/affiliate-commission-idempotency.test.ts"
+    },
+    {
+      "id": "injection-csv-numeric-exemption-anchored",
+      "domain": "injection",
+      "tier": "unit",
+      "why": "the negative-amount exemption (#811) matched any cell starting with a sign and a digit, so \"-1+cmd|' /C calc'!A0\" reached a spreadsheet un-neutralised in every CSV/XLSX export",
+      "source": "packages/shared/src/csv-utils.ts",
+      "find": "const PLAIN_SIGNED_NUMBER = /^[+-]?\\d+(?:\\.\\d+)?$/;",
+      "replace": "const PLAIN_SIGNED_NUMBER = /^[+-]?\\d/;",
+      "test": "tests/unit/csv-formula-guard.test.ts"
+    },
+    {
+      "id": "money-affiliate-payout-balance-predicate",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "two concurrent payouts that each fit the affiliate's pending balance both pass the read check and both debit it, paying out more than was ever earned",
+      "source": "apps/api/src/services/affiliate.service.ts",
+      "find": "        where: { id: affiliateId, storeId, pendingBalance: { gte: data.amount } },",
+      "replace": "        where: { id: affiliateId, storeId },",
+      "test": "tests/unit/affiliate-commission-idempotency.test.ts"
     },
     {
       "id": "refresh-no-token-clears-dead-cookies",

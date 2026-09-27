@@ -101,7 +101,11 @@ Consequences worth stating explicitly:
   its on-hand term must be variant-aware — see `purchase-order.service.ts`.
 - **A product-scoped write aimed at a variant product must fail loud.**
   `InventoryService.adjustInventory` / `bulkAdjustInventory` return a 400
-  (`VARIANT_PRODUCT`) rather than writing a column that moves no stock.
+  (`VARIANT_PRODUCT`) rather than writing a column that moves no stock. The
+  CSV stock-adjustment import (`POST …/stock-adjustments/csv-import`) rejects
+  such a row with a per-row error pointing at the variant SKU (2026-09-25).
+  Known gap, not yet closed: the manual stock-adjustment form and the
+  cycle-count reconcile still send product-level lines without a `variantId`.
 - **A non-variant product may legitimately go negative** — that is real
   backorder debt. Only variant rows are floored at 0.
 

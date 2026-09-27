@@ -149,8 +149,9 @@ export async function withDeferredWork<T>(
     // drop it. That premise only holds for work reacting to the REQUEST's
     // writes: anything recording a write that commits on its own (a
     // `prisma.$transaction([...])` batch is not proxied to this transaction)
-    // must not be deferred at all — put it in that batch instead, as the
-    // affiliate money audit rows do (`affiliateEventCreate`, #1590).
+    // must not be deferred at all — write it on the same transaction as the
+    // write it records, as the affiliate money audit rows do
+    // (`affiliateEventCreate`, #1590).
     if (scope.tasks.length > 0) {
       logger.warn(
         { storeId: ctx.storeId, dropped: scope.tasks.map(t => t.name) },

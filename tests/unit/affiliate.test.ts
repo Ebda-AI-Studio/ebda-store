@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { affiliateService } from '@api/services/affiliate.service';
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import { AppError } from '@api/middleware/error-handler';
 
 // ==========================================
@@ -28,6 +28,7 @@ vi.mock('@force/database', () => ({
       count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
       aggregate: vi.fn(),
     },
@@ -37,6 +38,7 @@ vi.mock('@force/database', () => ({
       count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     affiliatePayout: {
       findMany: vi.fn(),
@@ -52,6 +54,8 @@ vi.mock('@force/database', () => ({
     $transaction: vi.fn(),
   },
   Prisma: {},
+  hasTenantContext: vi.fn(() => false),
+  withMoneyTx: vi.fn((client: unknown, fn: (tx: unknown) => unknown) => fn(client)),
 }));
 
 vi.mock('@api/services/redis.service', () => ({
@@ -185,7 +189,7 @@ describe('AffiliateService', () => {
 
       vi.mocked(prisma.affiliateReferral.findFirst).mockResolvedValue(referral as any);
       vi.mocked(prisma.order.findUnique).mockResolvedValue(order as any);
-      vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}] as any);
+      vi.mocked(prisma.affiliateReferral.updateMany).mockResolvedValue({ count: 1 } as any);
 
       const result = await affiliateService.processCommission(STORE_ID, 'order-1');
 
@@ -211,7 +215,7 @@ describe('AffiliateService', () => {
 
       vi.mocked(prisma.affiliateReferral.findFirst).mockResolvedValue(referral as any);
       vi.mocked(prisma.order.findUnique).mockResolvedValue(order as any);
-      vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}] as any);
+      vi.mocked(prisma.affiliateReferral.updateMany).mockResolvedValue({ count: 1 } as any);
 
       const result = await affiliateService.processCommission(STORE_ID, 'order-2');
 
@@ -326,7 +330,8 @@ describe('AffiliateService', () => {
         updatedAt: new Date(),
       };
 
-      vi.mocked(prisma.$transaction).mockResolvedValue([mockPayout, {}] as any);
+      vi.mocked(prisma.affiliate.updateMany).mockResolvedValue({ count: 1 } as any);
+      vi.mocked(prisma.affiliatePayout.create).mockResolvedValue(mockPayout as any);
 
       const result = await affiliateService.createPayout(STORE_ID, 'affiliate-1', {
         amount: 2000,
@@ -346,18 +351,32 @@ describe('AffiliateService', () => {
     });
   });
 
-  // #1590 — the audit row for each affiliate MONEY movement rides in the same
-  // $transaction batch as the balance change, so it commits (or rolls back)
-  // with it instead of being queued after the request and dropped on a 5xx.
+  // #1590 — the audit row for each affiliate MONEY movement is written on the
+  // SAME transaction client as the balance change, so it commits (or rolls
+  // back) with it instead of being queued after the request and dropped on a
+  // 5xx. Outside a tenant context that client is withMoneyTx's own tx — an
+  // audit row written on the bare client would commit on its own.
   describe('money movements write their audit row atomically', () => {
-    const inBatch = (eventType: string) => {
-      const batch = vi.mocked(prisma.$transaction).mock.calls[0][0] as unknown[];
-      return batch.some(
-        op =>
-          (op as { __affiliateEventCreate?: { data: { eventType: string } } } | undefined)
-            ?.__affiliateEventCreate?.data.eventType === eventType
-      );
-    };
+    function txClient() {
+      const tx = {
+        affiliate: {
+          update: vi.fn(async () => ({})),
+          updateMany: vi.fn(async () => ({ count: 1 })),
+        },
+        affiliateReferral: { updateMany: vi.fn(async () => ({ count: 1 })) },
+        affiliatePayout: {
+          create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...data })),
+        },
+        affiliateEvent: { create: vi.fn(async () => ({ id: 'evt-1' })) },
+      };
+      vi.mocked(withMoneyTx).mockImplementationOnce(((_c: unknown, fn: (t: unknown) => unknown) =>
+        fn(tx)) as any);
+      return tx;
+    }
+    const auditOn = (tx: ReturnType<typeof txClient>, eventType: string) =>
+      (tx.affiliateEvent.create.mock.calls as unknown as [{ data: { eventType: string } }][]).find(
+        ([args]) => args.data.eventType === eventType
+      )?.[0];
 
     it('processCommission', async () => {
       vi.mocked(prisma.affiliateReferral.findFirst).mockResolvedValue({
@@ -368,9 +387,10 @@ describe('AffiliateService', () => {
         affiliate: { ...mockAffiliate, commissionRate: null },
       } as any);
       vi.mocked(prisma.order.findUnique).mockResolvedValue({ id: 'o', total: 1000 } as any);
-      vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}, {}] as any);
+      const tx = txClient();
       await affiliateService.processCommission(STORE_ID, 'o');
-      expect(inBatch('commission_recorded')).toBe(true);
+      expect(auditOn(tx, 'commission_recorded')).toBeDefined();
+      expect(prisma.affiliateEvent.create).not.toHaveBeenCalled();
     });
 
     it('reverseCommission', async () => {
@@ -380,9 +400,10 @@ describe('AffiliateService', () => {
         status: 'commission_paid',
         commissionAmount: 100,
       } as any);
-      vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}, {}] as any);
+      const tx = txClient();
       await affiliateService.reverseCommission(STORE_ID, 'o');
-      expect(inBatch('commission_reversed')).toBe(true);
+      expect(auditOn(tx, 'commission_reversed')).toBeDefined();
+      expect(prisma.affiliateEvent.create).not.toHaveBeenCalled();
     });
 
     it('createPayout — the audit row names the payout it created', async () => {
@@ -391,15 +412,16 @@ describe('AffiliateService', () => {
         status: 'approved',
         pendingBalance: 5000,
       } as any);
-      vi.mocked(prisma.$transaction).mockImplementation((async (ops: unknown[]) => [
-        { id: 'x', method: 'manual' },
-        ...ops.slice(1),
-      ]) as any);
+      const tx = txClient();
       await affiliateService.createPayout(STORE_ID, 'affiliate-1', { amount: 1000 });
-      expect(inBatch('payout_initiated')).toBe(true);
-      const batch = vi.mocked(prisma.$transaction).mock.calls[0][0] as any[];
-      const payoutId = vi.mocked(prisma.affiliatePayout.create).mock.calls[0][0].data.id;
-      expect(batch[2].__affiliateEventCreate.data.details.payoutId).toBe(payoutId);
+      const audit = auditOn(tx, 'payout_initiated') as
+        | { data: { details: { payoutId: string } } }
+        | undefined;
+      expect(audit).toBeDefined();
+      const payoutId = (tx.affiliatePayout.create.mock.calls[0] as any)[0].data.id;
+      expect(payoutId).toEqual(expect.any(String));
+      expect(audit!.data.details.payoutId).toBe(payoutId);
+      expect(prisma.affiliateEvent.create).not.toHaveBeenCalled();
     });
   });
 });

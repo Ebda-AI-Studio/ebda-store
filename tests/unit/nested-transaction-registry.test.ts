@@ -101,7 +101,6 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
  * a new call site should be resolved when it is written.
  */
 const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
-  'services/affiliate.service.ts',
   'services/barcode-scan.service.ts',
   'services/bulk.service.ts',
   'services/customer-group.service.ts',

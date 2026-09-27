@@ -609,13 +609,20 @@ describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
     expect(rows).toHaveLength(4);
     expect(rows.reduce((s, r) => s + r.taxCollected, 0)).toBe(0);
     expect(rows.reduce((s, r) => s + r.subtotal, 0)).toBe(0);
-    // #1253: exactly one of the four is the sale, and only it carries the
-    // order total, so the exported Order Total column counts the order once.
-    // The +200 reversal-of-the-adjustment is a reversal row despite its sign.
+    // #1253 / #1208: exactly one of the four is the sale, and only it carries
+    // the order total, so the exported Order Total column counts the order
+    // once. The +200 reversal-of-the-adjustment is a reversal row despite its
+    // sign; the partial-return adjustment is the -200 one.
     expect(rows.filter(r => r.kind === 'sale')).toHaveLength(1);
     expect(rows.find(r => r.kind === 'sale')?.taxCollected).toBe(900);
     expect(rows.reduce((s, r) => s + (r.total ?? 0), 0)).toBe(order.total);
     expect(rows.filter(r => r.kind === 'reversal').every(r => r.total === null)).toBe(true);
+    expect(
+      rows
+        .filter(r => r.kind === 'reversal')
+        .map(r => r.taxCollected)
+        .sort((a, b) => a - b)
+    ).toEqual([-900, -200, 200]);
   });
 
   it('no-ops when the order never posted a sale journal', async () => {

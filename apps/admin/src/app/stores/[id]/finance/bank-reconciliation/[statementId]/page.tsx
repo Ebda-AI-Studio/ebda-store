@@ -64,11 +64,6 @@ interface StatementDetail {
   difference: ReconciliationDifference;
 }
 
-interface TxsResponse {
-  data: BankTx[];
-  meta: { total: number; page: number; perPage: number; totalPages: number };
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const kwd = filsToKwd;
@@ -164,29 +159,39 @@ export default function StatementDetailPage() {
   // ── Fetch statement detail ──
   const fetchStmt = useCallback(async () => {
     if (!storeId || !statementId) return;
-    const { data, error: err } = await apiGet<{ data: StatementDetail }>(
+    // apiGet already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the statement detail — reading `data?.data` double-unwrapped
+    // to undefined and the page never rendered a loaded statement (#831
+    // sweep).
+    const { data, error: err } = await apiGet<StatementDetail>(
       `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}`
     );
     if (err) {
       setError(err.message ?? 'Failed to load statement');
       return;
     }
-    setStmt(data?.data ?? null);
+    setStmt(data ?? null);
   }, [storeId, statementId]);
 
   // ── Fetch transactions ──
   const fetchTxs = useCallback(async () => {
     if (!storeId || !statementId) return;
     const qs = filter !== 'all' ? `&matchStatus=${filter}` : '';
-    const { data, error: err } = await apiGet<TxsResponse>(
+    // Same double-unwrap: `data` IS the transaction array. `meta.total` is
+    // not recoverable through apiGet (it drops the sibling), so the count
+    // falls back to the fetched-page length — correct as long as the
+    // statement has ≤200 transactions (the requested perPage); beyond that
+    // it undercounts. A true fix needs a raw-response variant of apiGet
+    // that preserves `meta`.
+    const { data, error: err } = await apiGet<BankTx[]>(
       `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}/transactions?perPage=200${qs}`
     );
     if (err) {
       setError(err.message ?? 'Failed to load transactions');
       return;
     }
-    setTxs(data?.data ?? []);
-    setTxTotal(data?.meta?.total ?? 0);
+    setTxs(data ?? []);
+    setTxTotal(data?.length ?? 0);
   }, [storeId, statementId, filter]);
 
   useEffect(() => {
@@ -200,15 +205,21 @@ export default function StatementDetailPage() {
   async function handleAutoMatch() {
     setAutoMatchLoading(true);
     setAutoMatchMsg(null);
+    // apiPost already unwraps the API's `{ success, data }` envelope, so
+    // `data` IS the match-result object — reading `data?.data` double-
+    // unwrapped to undefined and the result message never showed (#831
+    // sweep).
     const { data, error: err } = await apiPost<{
-      data: { matched: number; unmatched: number; ambiguous: number };
+      matched: number;
+      unmatched: number;
+      ambiguous: number;
     }>(`/api/v1/stores/${storeId}/finance/bank-statements/${statementId}/auto-match`);
     setAutoMatchLoading(false);
     if (err) {
       setAutoMatchMsg(`Error: ${err.message}`);
       return;
     }
-    const r = data?.data;
+    const r = data;
     if (r) {
       setAutoMatchMsg(
         t('autoMatchResult')

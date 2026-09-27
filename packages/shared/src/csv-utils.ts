@@ -30,11 +30,25 @@ export function csvField(value: string | number | null | undefined | Date): stri
 }
 
 /**
+ * A value that is ENTIRELY a signed decimal number ("-1.500", "+3.2", "12").
+ * Anchored at both ends on purpose: "-1+cmd|' /C calc'!A0" starts with a digit
+ * after its sign and is a real DDE payload, so "sign followed by a digit" is
+ * NOT a safe test — only "the whole cell is a number" is.
+ */
+const PLAIN_SIGNED_NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
+
+/**
  * Neutralise a spreadsheet-formula-injection payload WITHOUT CSV quoting — for
  * XLSX cells (ExcelJS) and any non-CSV spreadsheet output. A cell beginning with
  * `= + - @`, a tab, or a CR can execute as a formula when opened in Excel /
  * Google Sheets; prefixing a single quote makes the leading char inert.
+ *
+ * A plain signed number is left alone (#811): a spreadsheet parses "-1.500" as
+ * the number -1.5, never as a formula, and the quote prefix turned every
+ * negative amount in the finance exports (a net loss, a liability balance)
+ * into text that SUM() skips.
  */
 export function neutralizeFormula(value: string): string {
+  if (PLAIN_SIGNED_NUMBER.test(value)) return value;
   return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }

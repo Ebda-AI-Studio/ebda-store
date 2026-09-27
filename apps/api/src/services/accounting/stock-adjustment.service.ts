@@ -28,6 +28,8 @@ export interface CreateAdjustmentInput {
   reasonAr?: string;
   evidenceUrl?: string;
   createdBy?: string;
+  /** CSV-import idempotency key (#226); unique per store. */
+  importKey?: string;
   items: Array<{
     productId: string;
     variantId?: string;
@@ -69,36 +71,47 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
 
   const adjustmentNumber = await nextSequence(input.storeId, 'adjustment');
 
-  // Snapshot current state for every item line
-  const snapshots = await Promise.all(
-    input.items.map(async item => {
-      if (item.variantId) {
-        const variant = await prisma.productVariant.findFirst({
-          // `product: { storeId }` is load-bearing: the product-only branch
-          // below always scoped by store, this one never did.
-          where: {
-            id: item.variantId,
-            productId: item.productId,
-            product: { storeId: input.storeId },
-          },
-          select: { inventory: true, costPrice: true },
-        });
-        const previousQty = variant?.inventory ?? 0;
-        const unitCost = variant?.costPrice ?? 0;
-        const deltaQty = item.newQty - previousQty;
-        return { ...item, previousQty, unitCost, deltaQty };
-      } else {
-        const product = await prisma.product.findFirst({
-          where: { id: item.productId, storeId: input.storeId },
-          select: { inventory: true, costPrice: true },
-        });
-        const previousQty = product?.inventory ?? 0;
-        const unitCost = product?.costPrice ?? 0;
-        const deltaQty = item.newQty - previousQty;
-        return { ...item, previousQty, unitCost, deltaQty };
-      }
-    })
-  );
+  // Snapshot current state for every item line. Two batched reads, not one
+  // query per line (#225): a 5,000-row CSV used to fan out into 5,000
+  // concurrent findFirst calls and exhaust the connection pool. The
+  // `product: { storeId }` / `storeId` scoping is load-bearing — it is the
+  // same tenant guard the per-line queries carried.
+  const variantIds = input.items.flatMap(i => (i.variantId ? [i.variantId] : []));
+  const productOnlyIds = input.items.flatMap(i => (i.variantId ? [] : [i.productId]));
+  const [variantRows, productRows] = await Promise.all([
+    variantIds.length > 0
+      ? prisma.productVariant.findMany({
+          where: { id: { in: variantIds }, product: { storeId: input.storeId } },
+          select: { id: true, productId: true, inventory: true, costPrice: true },
+        })
+      : Promise.resolve([]),
+    productOnlyIds.length > 0
+      ? prisma.product.findMany({
+          where: { id: { in: productOnlyIds }, storeId: input.storeId },
+          select: { id: true, inventory: true, costPrice: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const variantById = new Map(variantRows.map(v => [v.id, v]));
+  const productById = new Map(productRows.map(p => [p.id, p]));
+
+  const snapshots = input.items.map(item => {
+    if (item.variantId) {
+      const variant = variantById.get(item.variantId);
+      // The variant must also belong to the named product (the old per-line
+      // query filtered on both ids).
+      const match = variant && variant.productId === item.productId ? variant : undefined;
+      const previousQty = match?.inventory ?? 0;
+      const unitCost = match?.costPrice ?? 0;
+      const deltaQty = item.newQty - previousQty;
+      return { ...item, previousQty, unitCost, deltaQty };
+    }
+    const product = productById.get(item.productId);
+    const previousQty = product?.inventory ?? 0;
+    const unitCost = product?.costPrice ?? 0;
+    const deltaQty = item.newQty - previousQty;
+    return { ...item, previousQty, unitCost, deltaQty };
+  });
 
   const totalValueImpact = snapshots.reduce((sum, s) => sum + s.deltaQty * s.unitCost, 0);
 
@@ -113,6 +126,7 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
       evidenceUrl: input.evidenceUrl,
       totalValueImpact,
       createdBy: input.createdBy,
+      importKey: input.importKey ?? null,
       items: {
         create: snapshots.map(s => ({
           productId: s.productId,
@@ -151,13 +165,28 @@ export async function postAdjustment(
     include: { items: true },
   });
 
-  if (!adjustment) throw new Error(`StockAdjustment ${id} not found in store ${storeId}`);
-  if (adjustment.status !== 'draft')
-    throw new Error(`StockAdjustment ${id} is already posted (status=${adjustment.status})`);
+  if (!adjustment) throw new AppError(404, 'NOT_FOUND', 'Stock adjustment not found');
+  if (adjustment.status !== 'draft') {
+    throw new AppError(409, 'ALREADY_POSTED', 'This stock adjustment has already been posted');
+  }
 
   const inventoryType = INVENTORY_TYPE_MAP[adjustment.type];
 
   await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+    // Claim the draft FIRST (#226). The status check above is a plain read,
+    // so two concurrent posts of the same draft (a double-click on "post", or
+    // a CSV-import replay racing the original) both passed it and both wrote
+    // the inventory, the history rows and the GL event. The conditional
+    // update takes the row lock; the loser re-checks `status = 'draft'`
+    // against the winner's committed row, matches 0 and stops here.
+    const claim = await tx.stockAdjustment.updateMany({
+      where: { id, storeId, status: 'draft' },
+      data: { status: 'posted', postedAt: new Date(), postedBy: postedBy ?? null },
+    });
+    if (claim.count !== 1) {
+      throw new AppError(409, 'ALREADY_POSTED', 'This stock adjustment has already been posted');
+    }
+
     for (const item of adjustment.items) {
       // Belt-and-braces on top of the createAdjustment guard: updateMany lets
       // us carry a relation filter that update() (unique-where only) cannot,
@@ -179,29 +208,21 @@ export async function postAdjustment(
           throw new AppError(404, 'NOT_FOUND', 'One or more referenced records were not found');
         }
       }
-
-      await tx.inventoryHistory.create({
-        data: {
-          productId: item.productId,
-          storeId,
-          type: inventoryType,
-          quantity: item.deltaQty,
-          previousStock: item.previousQty,
-          newStock: item.newQty,
-          reason: adjustment.reason ?? adjustment.type,
-          reference: adjustment.adjustmentNumber,
-          createdBy: postedBy,
-        },
-      });
     }
 
-    await tx.stockAdjustment.update({
-      where: { id },
-      data: {
-        status: 'posted',
-        postedAt: new Date(),
-        postedBy: postedBy ?? null,
-      },
+    // One INSERT for the whole ledger instead of one per line (#225).
+    await tx.inventoryHistory.createMany({
+      data: adjustment.items.map(item => ({
+        productId: item.productId,
+        storeId,
+        type: inventoryType,
+        quantity: item.deltaQty,
+        previousStock: item.previousQty,
+        newStock: item.newQty,
+        reason: adjustment.reason ?? adjustment.type,
+        reference: adjustment.adjustmentNumber,
+        createdBy: postedBy,
+      })),
     });
   });
 
@@ -214,7 +235,11 @@ export async function postAdjustment(
   // fire below it. One adjustment can touch many line items/SKUs, so every
   // item's own (productId, variantId) — never admin-supplied — is reconciled
   // independently; one bad SKU doesn't block its siblings.
-  for (const item of adjustment.items) {
+  // Most stores have no warehouses, and reconcile's own fast path is a
+  // warehouse COUNT per call — 5,000 of them for a full CSV import (#225).
+  // Ask once; skip the loop when there is nothing to reconcile.
+  const hasWarehouses = (await prisma.warehouse.count({ where: { storeId } })) > 0;
+  for (const item of hasWarehouses ? adjustment.items : []) {
     try {
       await WarehouseService.reconcileWarehouseStockToAggregate(
         storeId,
@@ -252,6 +277,25 @@ export async function postAdjustment(
         },
       },
     },
+  });
+}
+
+/**
+ * The adjustment an earlier CSV import with this idempotency key created, or
+ * null. Used by the csv-import route to replay a retried request (#226).
+ */
+export async function findAdjustmentByImportKey(
+  storeId: string,
+  importKey: string
+): Promise<{
+  id: string;
+  adjustmentNumber: string;
+  status: StockAdjustment['status'];
+  _count: { items: number };
+} | null> {
+  return prisma.stockAdjustment.findFirst({
+    where: { storeId, importKey },
+    select: { id: true, adjustmentNumber: true, status: true, _count: { select: { items: true } } },
   });
 }
 
