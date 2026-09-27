@@ -25,8 +25,33 @@ import { anonymousAgentExtra } from '../helpers/mcp-agent-auth';
 
 const mockAuditLog = vi.fn().mockResolvedValue(undefined);
 
+// #1644 / #1649: the DENIED path now inserts via `prisma.auditLog.create`
+// directly (so it can remember the row id for same-window coalescing),
+// rather than through the shared `auditLog()` helper. Redis is unmocked here
+// (the real, unconnected singleton), so `isAvailable()` is false and every
+// call in this file takes the "first in window" create path — reshape the
+// Prisma `data` payload into the same flat shape `auditLog()` used to receive
+// so `deniedRow()` below is unaffected.
 vi.mock('@force/database', () => ({
-  prisma: { paymentConfig: { findFirst: vi.fn() } },
+  prisma: {
+    paymentConfig: { findFirst: vi.fn() },
+    auditLog: {
+      create: (args: { data: Record<string, unknown> }) => {
+        const { data } = args;
+        mockAuditLog({
+          action: data.action,
+          resourceType: data.resourceType,
+          resourceId: data.resourceId,
+          storeId: data.storeId,
+          ip: data.ipAddress,
+          userAgent: data.userAgent,
+          details: data.details,
+        });
+        return Promise.resolve({ id: 'row-1', ...data });
+      },
+      update: vi.fn().mockResolvedValue(undefined),
+    },
+  },
   runInTenantContext: vi.fn((_s: string, fn: () => unknown) => fn()),
   withTenantContext: vi.fn((_s: string, fn: (tx: unknown) => unknown) => fn({})),
 }));

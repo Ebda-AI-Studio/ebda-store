@@ -242,3 +242,47 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
     expect(mockSendAlert.mock.calls[0][0].source).toBe('mcp.agent-write-denied.credential_probing');
   });
 });
+
+describe('agent-write-denied-watch — reads the coalesced count (#1644 / #1649)', () => {
+  /**
+   * `auditAgentWrite` coalesces repeat denials from the same store/ip/tool
+   * within a 60s window onto one row carrying `details.count`. If the watcher
+   * fed the classifier one-row-per-attempt regardless, a real flood arriving
+   * as a handful of coalesced rows would never cross a volume threshold — the
+   * exact failure the reverted, count-less first attempt at this fix caused.
+   */
+  it('a SINGLE coalesced row with details.count at the flood floor still fires', async () => {
+    setDenials([
+      {
+        storeId: 'store-1',
+        ipAddress: '2.2.2.2',
+        details: {
+          credential: 'none',
+          tool: 'add_to_cart',
+          source: 'agent',
+          count: DENIAL_THRESHOLDS.anonymousFlood,
+        },
+        store: { name: 'Acme', slug: 'acme' },
+      },
+    ]);
+
+    const result = await handleAgentWriteDeniedWatch();
+
+    expect(result.findings).toBe(1);
+    expect(mockSendAlert).toHaveBeenCalledTimes(1);
+    const alert = mockSendAlert.mock.calls[0][0];
+    expect(alert.source).toBe('mcp.agent-write-denied.anonymous_flood');
+    expect(alert.context.count).toBe(DENIAL_THRESHOLDS.anonymousFlood);
+  });
+
+  it('a row missing `details.count` still weighs exactly 1 (pre-existing rows are unaffected)', async () => {
+    setDenials(
+      Array.from({ length: DENIAL_THRESHOLDS.anonymousFlood - 1 }, (_, i) =>
+        deniedRow('none', `2.2.2.${i % 5}`)
+      )
+    );
+    const result = await handleAgentWriteDeniedWatch();
+    expect(result.findings).toBe(0);
+    expect(mockSendAlert).not.toHaveBeenCalled();
+  });
+});

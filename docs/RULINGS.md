@@ -1711,6 +1711,64 @@ change neither widens nor narrows.
 
 ---
 
+**Ruling MCP-2 — denied-write audits coalesce to one row per (store, ip, tool)
+per minute, and the count is kept, not dropped (#1644 / #1649, owner decision
+2026-09-25).**
+
+Every refused MCP write (`add_to_cart` / `place_order` with no or a wrong
+`x-agent-key`) opened its OWN interactive `runInTenantContext` transaction —
+reachable by a fully unauthenticated caller, bounded only by `publicLimiter`'s
+300/min/IP. A distributed prober could hold up to 5 interactive transactions
+per second per IP on the small Neon pool the human checkout path shares, and
+grow `audit_logs` (90 days hot, 7-year R2 archive) at the same rate: the
+security control's own telemetry becoming the DoS surface (#1644, #1649).
+
+A FIRST attempt at this fix, the same day, coalesced denials to one row per
+(store, ip, tool) per 10s window via a Redis sentinel — and was reverted
+within the hour (commit `af8df622`) because it dropped the repeat count
+entirely: a sustained flood would have logged roughly one row per 10 seconds
+with no record of how many attempts each row stood for, which could push
+`classifyAgentDenials`'s volume thresholds (`anonymousFlood`, etc.) below the
+real attack rate and silently mute the alert the thresholds exist to fire.
+Ahmad ruled the same day that the fix ships only WITH the count preserved.
+
+This version: the FIRST denial in a (store, ip, tool) 60s window
+(`DENIAL_COALESCE_WINDOW_SECONDS`) still writes a durable row through
+`runInTenantContext`, exactly as before, and remembers the row's id in Redis.
+Every REPEAT in that window costs one plain, non-transactional
+`prisma.auditLog.update()` bumping that row's `details.count` — never a new
+row, never a new transaction. `rls_audit_logs_tenant`'s policy admits the
+unscoped update the same way it already admits an unscoped insert
+(`current_store_id() IS NULL` outside any tenant transaction). If the cached
+row id cannot be found (a Redis restart mid-window, a TTL race, or the update
+itself failing), the code falls through and writes a fresh row rather than
+dropping the attempt — self-healing at the cost of starting a new window.
+Redis unavailable (`incrementRateLimit` returning 0, its documented fail-open
+value) degrades to exactly today's per-attempt behaviour: one row per denial,
+same as before this change. `agent.write.failed` (an AUTHORISED write that
+then threw) is never coalesced — it requires credential possession, so it is
+already bounded by who holds a key, not by an anonymous caller's request rate.
+
+`classifyAgentDenials` (`agent-denial-alerts.ts`) and the watcher
+(`agent-write-denied-watch.ts`) were updated to weigh a row by its
+`details.count` (defaulting to 1 for an uncoalesced row) rather than by row
+count — otherwise the classifier itself would reproduce the reverted attempt's
+bug one layer up, by counting coalesced rows as single attempts.
+
+Mutation-proven: `agent-denial-write-coalesced-with-count`
+(`docs/security/defence-mutations.json`, domain `agent identity`) removes the
+coalescing gate and asserts `tests/unit/agent-denial-coalesce.test.ts` goes
+red; all 80 registered defences are KILLED after this change
+(`docs/security/defence-mutation-record.md`).
+
+Cost if wrong: if the Redis row-id cache and the counter ever drift (an
+extremely narrow race between the `incrementRateLimit` call and the
+`rememberDenialRow` write, both best-effort), a repeat in that window falls
+back to writing its OWN fresh row instead of updating the existing one — one
+extra row and a fresh coalescing window, never a lost attempt and never a
+reintroduced interactive transaction per repeat, since the update path itself
+never opens one.
+
 ## 2026-09-26 — Answer-engine Gemini grounding (issue #929)
 
 Context: audit-followup P2 `apps/api/src/services/answer-engine/gemini.provider.ts:47` — the

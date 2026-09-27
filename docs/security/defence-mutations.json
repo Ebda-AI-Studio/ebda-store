@@ -527,7 +527,7 @@
       "tier": "unit",
       "why": "a refused agent write is recorded but nothing read the rows; if the threshold branch never fires, a broken merchant integration and a probe of the write surface both stay invisible",
       "source": "apps/api/src/mcp/agent-denial-alerts.ts",
-      "find": "      if (presented.length >= threshold) {",
+      "find": "      if (presentedCount >= threshold) {",
       "replace": "      if (false) {",
       "test": "tests/unit/agent-denial-alerts.test.ts"
     },
@@ -537,7 +537,7 @@
       "tier": "unit",
       "why": "a wrong/rotated ENCRYPTION_KEY refuses agent writes on every store, but spread thinly (below threshold in any single store) the platform p0 never fires if the check only looks at one store bucket at a time",
       "source": "apps/api/src/mcp/agent-denial-alerts.ts",
-      "find": "  if (allFaults.length >= DENIAL_THRESHOLDS.platformFault) {",
+      "find": "  if (allFaultsCount >= DENIAL_THRESHOLDS.platformFault) {",
       "replace": "  if (false) {",
       "test": "tests/unit/agent-denial-alerts.test.ts"
     },
@@ -567,8 +567,8 @@
       "tier": "unit",
       "why": "an integration that predates the credential requirement cannot present a key it was never issued, so it lands in the same bucket as a crawler; folding it into anonymousFlood means the one failure this rollout actually causes is the one signature the monitor is built to stay quiet about, and the merchant learns from lost orders",
       "source": "apps/api/src/mcp/agent-denial-alerts.ts",
-      "find": "      hadPriorAgentActivity &&\n      anonymous.length >= DENIAL_THRESHOLDS.integrationNeverCredentialed",
-      "replace": "      anonymous.length >= DENIAL_THRESHOLDS.anonymousFlood",
+      "find": "    if (hadPriorAgentActivity && anonymousCount >= DENIAL_THRESHOLDS.integrationNeverCredentialed) {",
+      "replace": "    if (anonymousCount >= DENIAL_THRESHOLDS.anonymousFlood) {",
       "test": "tests/unit/agent-denial-alerts.test.ts"
     },
     {
@@ -620,6 +620,16 @@
       "find": "        if (decryptFailed) {\n          context.credential = 'error';\n        } else if",
       "replace": "        if (false) {\n          context.credential = 'error';\n        } else if",
       "test": "tests/unit/mcp-agent-write-auth.test.ts"
+    },
+    {
+      "id": "agent-denial-write-coalesced-with-count",
+      "domain": "agent identity",
+      "tier": "unit",
+      "why": "every refused MCP write opened its OWN interactive runInTenantContext transaction, reachable by a fully unauthenticated caller at publicLimiter's 300/min/IP — a distributed prober could hold 5 interactive transactions/sec/IP on the pool the human checkout path shares and grow audit_logs at the same rate; the fix must coalesce repeats onto one row per window WITHOUT dropping the attempt count (#1644 / #1649, a first count-less attempt was reverted for exactly that)",
+      "source": "apps/api/src/mcp/agent-auth.ts",
+      "find": "    if (attemptsInWindow > 1) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/agent-denial-coalesce.test.ts"
     },
     {
       "id": "ssrf-carrier-merchant-base-url",

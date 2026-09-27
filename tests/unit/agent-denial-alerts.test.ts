@@ -431,3 +431,78 @@ describe('integration_never_credentialed — the rollout breaking someone quietl
     expect(classifyAgentDenials(bare)).toEqual([]);
   });
 });
+
+describe('coalesced rows — weigh by `details.count`, not by row count (#1644 / #1649)', () => {
+  /**
+   * `auditAgentWrite` now coalesces repeat denials from the same
+   * store/ip/tool within a 60s window onto ONE row carrying `details.count`.
+   * If the classifier counted ROWS instead of attempts, a real 50-attempt
+   * flood arriving as a handful of coalesced rows would silently stop
+   * crossing `anonymousFlood` — the exact failure the reverted, count-less
+   * first attempt at this fix would have caused.
+   */
+
+  it('a single coalesced row with count=50 fires anonymous_flood on its own', () => {
+    const found = classifyAgentDenials([
+      {
+        storeId: 'a',
+        storeName: 'Store a',
+        credential: 'none',
+        ipAddress: '10.0.0.1',
+        tool: 'add_to_cart',
+        count: DENIAL_THRESHOLDS.anonymousFlood,
+      },
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].kind).toBe('anonymous_flood');
+    expect(found[0].count).toBe(DENIAL_THRESHOLDS.anonymousFlood);
+  });
+
+  it('does NOT fire when the same single row is one attempt short of the floor', () => {
+    const found = classifyAgentDenials([
+      {
+        storeId: 'a',
+        credential: 'none',
+        ipAddress: '10.0.0.1',
+        count: DENIAL_THRESHOLDS.anonymousFlood - 1,
+      },
+    ]);
+    expect(found).toEqual([]);
+  });
+
+  it('sums counts across several coalesced rows in the same window', () => {
+    const found = classifyAgentDenials([
+      { storeId: 'a', credential: 'invalid', ipAddress: '10.0.0.1', count: 2 },
+      { storeId: 'a', credential: 'invalid', ipAddress: '10.0.0.1', count: 1 },
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].kind).toBe('integration_broken');
+    expect(found[0].count).toBe(3);
+  });
+
+  it('an absent count still weighs 1 — every pre-existing per-attempt row is unaffected', () => {
+    const found = classifyAgentDenials(
+      rows({
+        storeId: 'a',
+        credential: 'invalid',
+        count: DENIAL_THRESHOLDS.integrationBroken,
+        ips: 1,
+      })
+    );
+    expect(found[0].count).toBe(DENIAL_THRESHOLDS.integrationBroken);
+  });
+
+  it('a zero or negative count is treated as 1 rather than shrinking or erasing the row', () => {
+    // Same IP throughout so the spread stays under PROBE_DISTINCT_IPS and this
+    // reads as `integration_broken`, not `credential_probing` (a different,
+    // higher threshold) — the point under test is the count floor, not the
+    // IP-spread classification.
+    const found = classifyAgentDenials([
+      { storeId: 'a', credential: 'invalid', ipAddress: '10.0.0.1', count: 0 },
+      { storeId: 'a', credential: 'invalid', ipAddress: '10.0.0.1', count: -5 },
+      { storeId: 'a', credential: 'invalid', ipAddress: '10.0.0.1' },
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].count).toBe(3);
+  });
+});

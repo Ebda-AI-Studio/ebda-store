@@ -120,6 +120,17 @@ export interface AgentDenialRow {
   /** `details.tool` — reported so the operator knows which write was refused. */
   tool?: string | null;
   /**
+   * `details.count` — how many actual denial ATTEMPTS this one row stands in
+   * for (#1644 / #1649, 2026-09-25: `auditAgentWrite` coalesces repeat
+   * denials from the same store/ip/tool within a 60s window onto one row
+   * rather than opening a transaction per attempt). Absent/1 for a row that
+   * was never coalesced — every threshold below must weight by this, not by
+   * row count, or a real flood undercounts by however many attempts were
+   * coalesced into each row and can silently stop crossing the threshold it
+   * exists to catch.
+   */
+  count?: number;
+  /**
    * Has this store EVER completed an agent-sourced write (`Order.source =
    * 'agent'`)? Supplied by the watcher.
    *
@@ -184,6 +195,22 @@ function countDistinctIps(rows: AgentDenialRow[]): number {
 }
 
 /**
+ * Sum of ATTEMPTS a set of rows represents, not the row count — a coalesced
+ * row's `details.count` (#1644 / #1649) can stand in for many denials from
+ * the same store/ip/tool within one minute. Every threshold below must
+ * weight by this or a real flood undercounts by however much was coalesced
+ * and can stop crossing the threshold it exists to catch. A row with no
+ * `count` (never coalesced, or produced before this change) weighs 1, so
+ * every existing per-row caller is unaffected.
+ */
+function weightedCount(rows: AgentDenialRow[]): number {
+  return rows.reduce((sum, r) => {
+    const c = r.count;
+    return sum + (typeof c === 'number' && Number.isFinite(c) && c > 0 ? c : 1);
+  }, 0);
+}
+
+/**
  * Decide what (if anything) to alert on for one window's denial rows.
  *
  * TOTAL and pure: no clock, no I/O, no throwing. An empty input returns an
@@ -213,12 +240,13 @@ export function classifyAgentDenials(rows: AgentDenialRow[]): AgentDenialFinding
   // `credential_probing` cross-store roll-up's shape (no `store` field).
   const allRows = [...byStore.values()].flat();
   const allFaults = allRows.filter(r => r.credential === 'error');
-  if (allFaults.length >= DENIAL_THRESHOLDS.platformFault) {
+  const allFaultsCount = weightedCount(allFaults);
+  if (allFaultsCount >= DENIAL_THRESHOLDS.platformFault) {
     findings.push({
       kind: 'platform_fault',
       level: 'p0',
       scope: 'platform',
-      count: allFaults.length,
+      count: allFaultsCount,
       distinctIps: countDistinctIps(allFaults),
       tools: toolsOf(allFaults),
       storesAffected: new Set(allFaults.map(r => r.storeId)).size,
@@ -237,18 +265,19 @@ export function classifyAgentDenials(rows: AgentDenialRow[]): AgentDenialFinding
       r => r.credential === 'invalid' || r.credential === 'unconfigured'
     );
     if (presented.length > 0) {
+      const presentedCount = weightedCount(presented);
       const distinctIps = countDistinctIps(presented);
       const probing = distinctIps >= PROBE_DISTINCT_IPS;
       const threshold = probing
         ? DENIAL_THRESHOLDS.credentialProbing
         : DENIAL_THRESHOLDS.integrationBroken;
-      if (presented.length >= threshold) {
+      if (presentedCount >= threshold) {
         findings.push({
           kind: probing ? 'credential_probing' : 'integration_broken',
           level: 'p1',
           scope: 'store',
           store,
-          count: presented.length,
+          count: presentedCount,
           distinctIps,
           tools: toolsOf(presented),
         });
@@ -269,28 +298,26 @@ export function classifyAgentDenials(rows: AgentDenialRow[]): AgentDenialFinding
     // silently: at 10 refused orders/hour a real merchant never reaches the
     // 50-per-16-minute flood threshold, so nothing fires at all.
     const anonymous = storeRows.filter(r => r.credential === 'none' || r.credential == null);
+    const anonymousCount = weightedCount(anonymous);
     const hadPriorAgentActivity = storeRows.some(r => r.storeHadPriorAgentActivity === true);
 
-    if (
-      hadPriorAgentActivity &&
-      anonymous.length >= DENIAL_THRESHOLDS.integrationNeverCredentialed
-    ) {
+    if (hadPriorAgentActivity && anonymousCount >= DENIAL_THRESHOLDS.integrationNeverCredentialed) {
       findings.push({
         kind: 'integration_never_credentialed',
         level: 'p1',
         scope: 'store',
         store,
-        count: anonymous.length,
+        count: anonymousCount,
         distinctIps: countDistinctIps(anonymous),
         tools: toolsOf(anonymous),
       });
-    } else if (anonymous.length >= DENIAL_THRESHOLDS.anonymousFlood) {
+    } else if (anonymousCount >= DENIAL_THRESHOLDS.anonymousFlood) {
       findings.push({
         kind: 'anonymous_flood',
         level: 'info',
         scope: 'store',
         store,
-        count: anonymous.length,
+        count: anonymousCount,
         distinctIps: countDistinctIps(anonymous),
         tools: toolsOf(anonymous),
       });

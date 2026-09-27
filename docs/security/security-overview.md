@@ -57,7 +57,23 @@ deps) — dated reports live in `docs/audits/`.
   then archived to R2 for 7 years. Agent writes are recorded whether they
   succeed or not — `agent.write.denied` / `agent.write.failed` carry the caller
   ip and user agent, and a completed agent order's `payment.created` row carries
-  both as well.
+  both as well. `agent.write.denied` is coalesced to at most one row per
+  (store, ip, tool) per 60s (`DENIAL_COALESCE_WINDOW_SECONDS`, #1644 / #1649,
+  owner ruling 2026-09-25) rather than one row per refused request — an
+  unauthenticated caller could otherwise open a fresh interactive transaction
+  per attempt at `publicLimiter`'s 300/min/IP ceiling. The FIRST denial in a
+  window still writes its row through `runInTenantContext` exactly as before;
+  every repeat in that window costs one plain, non-transactional `UPDATE` of
+  that row's `details.count` rather than a new row or a new transaction — no
+  attempt count is ever dropped, and a Redis outage fails open to one row per
+  attempt (today's pre-coalescing behaviour). That `count` is a per-row DELTA:
+  the Redis pointer stores the window counter's value its row started from,
+  because the counter re-`EXPIRE`s on every attempt and so outlives the 60s
+  pointer under a continuous flood — stamping the replacement row with the raw
+  counter would restate attempts the previous row already carried and inflate
+  the weighted totals the thresholds below read. `agent.write.failed` is never
+  coalesced; it requires credential possession, so it is already bounded by
+  who holds a key.
 - Detection on refusals: `agent-write-denied-watch` (a 15-minute Inngest cron)
   reads the `agent.write.denied` rows and alerts through the Telegram channel.
   It classifies by what the caller PRESENTED — a lookup failure of ours (p0),
@@ -65,8 +81,10 @@ deps) — dated reports live in `docs/audits/`.
   credential sweep from many sources (p1, escalating to one platform p0 across
   3+ stores), credential-less volume (info) — rather than on the raw denial
   rate, which is dominated by unauthenticated agents finding the tools through
-  `llms.txt` and would get the alert muted. Thresholds and reasoning:
-  `apps/api/src/mcp/agent-denial-alerts.ts`.
+  `llms.txt` and would get the alert muted. Every threshold weighs a row by
+  its `details.count` (defaulting to 1 for a row that was never coalesced),
+  not by row count, so coalescing denial rows never silently defeats a volume
+  threshold. Thresholds and reasoning: `apps/api/src/mcp/agent-denial-alerts.ts`.
 
 ## Incident response
 
