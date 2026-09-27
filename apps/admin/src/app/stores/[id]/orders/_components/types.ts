@@ -1,3 +1,5 @@
+import { ORDER_STATUS_TRANSITIONS, orderStatusOptions } from '@force/shared';
+
 export interface OrderCustomer {
   id: string;
   firstName: string;
@@ -66,42 +68,19 @@ export interface Pagination {
   totalPages: number;
 }
 
-// Valid status transitions — must mirror `assertValidTransition` in
-// apps/api/src/services/order.service.ts. Admins can jump ahead in the
-// workflow (e.g. confirmed → delivered for same-day COD) instead of
-// stepping through every intermediate state. Backwards moves are still
-// blocked. `refunded` is reachable from confirmed/processing/shipped/
-// delivered (not just delivered) — money-integrity Task 6 unified this
-// list with the payment-gateway refund flow, which could already refund an
-// order before it shipped.
-export const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
-  confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
-  processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
-  // Mirrors the API machine: shipment cancellation returns shipped -> processing.
-  shipped: ['delivered', 'refunded', 'processing'],
-  delivered: ['refunded'],
-  // A paid order cancelled by staff can still be refunded (PR #770).
-  cancelled: ['refunded'],
-  refunded: [],
-};
+// Valid status transitions and the per-order options — one canonical map in
+// @force/shared, read by the order list, the order page and the orders PWA
+// (#1936/#1947). The API enforces its own typed copy
+// (apps/api/src/services/order-status-machine.ts); a parity test pins them.
+export const VALID_TRANSITIONS: Readonly<Record<string, readonly string[]>> =
+  ORDER_STATUS_TRANSITIONS;
 
 /**
  * Status options to offer for an order. `refunded` from pending/cancelled only
  * applies to an order that captured a payment; the API rejects it otherwise
  * (ORDER_NOT_PAID), so don't offer it.
  */
-export function statusOptionsFor(order: {
-  status: string;
-  paymentStatus?: string | null;
-}): string[] {
-  const all = VALID_TRANSITIONS[order.status] ?? [];
-  const unpaid = order.paymentStatus !== 'paid';
-  if (unpaid && (order.status === 'pending' || order.status === 'cancelled')) {
-    return all.filter(s => s !== 'refunded');
-  }
-  return all;
-}
+export const statusOptionsFor = orderStatusOptions;
 
 export const STATUS_FILTERS = [
   'all',

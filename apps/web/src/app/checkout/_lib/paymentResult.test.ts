@@ -1,0 +1,56 @@
+import { describe, it, expect, vi } from 'vitest';
+import { handlePaymentCreateResult } from './paymentResult';
+
+function actions() {
+  const calls: string[] = [];
+  return {
+    calls,
+    a: {
+      clearSavedCheckout: vi.fn(() => calls.push('clear')),
+      goToCodSuccess: vi.fn(() => calls.push('cod')),
+      goToGateway: vi.fn((url: string) => calls.push(`gateway:${url}`)),
+    },
+  };
+}
+
+// #1990 — the saved checkout form was cleared before the payment result was
+// checked, so a failed payment destroyed what the customer had typed.
+describe('handlePaymentCreateResult', () => {
+  it('keeps the saved form when payment creation fails, and throws the API code', () => {
+    const { a } = actions();
+    let thrown: (Error & { rawMessage?: string }) | undefined;
+    try {
+      handlePaymentCreateResult(
+        { success: false, error: { code: 'PAYMENT_PROVIDER_ERROR', message: 'timeout' } },
+        a
+      );
+    } catch (e) {
+      thrown = e as Error & { rawMessage?: string };
+    }
+    expect(thrown?.message).toBe('PAYMENT_PROVIDER_ERROR');
+    expect(thrown?.rawMessage).toBe('timeout');
+    expect(a.clearSavedCheckout).not.toHaveBeenCalled();
+    expect(a.goToCodSuccess).not.toHaveBeenCalled();
+    expect(a.goToGateway).not.toHaveBeenCalled();
+  });
+
+  it('keeps the saved form on a success response with no way forward', () => {
+    const { a } = actions();
+    expect(() => handlePaymentCreateResult({ success: true, data: {} }, a)).toThrow(
+      'PAYMENT_FAILED'
+    );
+    expect(a.clearSavedCheckout).not.toHaveBeenCalled();
+  });
+
+  it('clears the saved form, then goes to the COD success page', () => {
+    const { a, calls } = actions();
+    handlePaymentCreateResult({ success: true, data: { cod: true } }, a);
+    expect(calls).toEqual(['clear', 'cod']);
+  });
+
+  it('clears the saved form, then redirects to the gateway', () => {
+    const { a, calls } = actions();
+    handlePaymentCreateResult({ success: true, data: { paymentUrl: 'https://pay.test/x' } }, a);
+    expect(calls).toEqual(['clear', 'gateway:https://pay.test/x']);
+  });
+});

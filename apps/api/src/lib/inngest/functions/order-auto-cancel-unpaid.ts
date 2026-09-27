@@ -7,6 +7,7 @@ import { PaymentService } from '../../../services/payment-providers/payment.fact
 import { confirmPaymentFromProviderStatus } from '../../../services/payment-confirm.service';
 import type { PaymentProvider } from '../../../services/payment-providers/types';
 import { sendAlert } from '../../../services/alerts.service';
+import { AppError } from '../../../middleware/error-handler';
 
 /**
  * Auto-cancel stale unpaid orders — daily cron (03:00 UTC).
@@ -234,7 +235,7 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
           // The money WAS captured and every push path missed it. Route through
           // the shared single-writer so this transitions identically to a
           // webhook / verify-on-return confirmation and fans out exactly once.
-          await runInTenantContext(order.storeId, () =>
+          const staleConfirm = await runInTenantContext(order.storeId, () =>
             confirmPaymentFromProviderStatus({
               payment: {
                 id: payment.id,
@@ -254,7 +255,31 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
               source: 'auto_cancel_sweep',
               triggeredByUserId: null,
             })
+          ).then(
+            () => null,
+            (err: unknown) => {
+              // A 4xx AppError is a TERMINAL answer, not a transient one: the
+              // order left `pending` between this run's query and this step (a
+              // merchant cancelled it, or another path confirmed it and moved
+              // it on), so the confirm is a stale backwards transition (#763).
+              // Retrying cannot change that, and rethrowing failed the whole
+              // sweep: every order after this one went unprocessed and a
+              // non-actionable P1 fired. payment-webhook-process treats the
+              // same error the same way. The order is no longer pending, so
+              // tomorrow's run does not pick it up again.
+              if (err instanceof AppError && err.statusCode >= 400 && err.statusCode < 500) {
+                return err.code;
+              }
+              throw err;
+            }
           );
+          if (staleConfirm) {
+            logger.warn(
+              { orderId: order.id, storeId: order.storeId, code: staleConfirm },
+              'order-auto-cancel-unpaid: provider reports paid but the order moved on — not confirming'
+            );
+            return { action: 'skip', reason: `stale_confirm:${staleConfirm}` } as ReconcileOutcome;
+          }
 
           logger.warn(
             {

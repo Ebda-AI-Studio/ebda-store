@@ -871,15 +871,18 @@ router.get(
       };
 
       // Transaction rows
+      // Type tells the sale row from the refund/return rows that share its
+      // order number, and Order Total is filled on the sale row only, so the
+      // column sums to each order once (#1253).
       const txRows: XlsxRow[] = report.rows.map(r => ({
-        rowType: 'Transaction',
+        rowType: r.kind === 'sale' ? 'Sale' : 'Refund / return',
         date: r.date,
         orderNumber: r.orderNumber,
         customer: r.customerName ?? '',
         subtotal: r.subtotal / 1000,
         taxRate: `${r.taxRate}%`,
         taxCollected: r.taxCollected / 1000,
-        total: r.total / 1000,
+        total: r.total === null ? '' : r.total / 1000,
       }));
 
       // Summary section
@@ -897,7 +900,7 @@ router.get(
         {
           rowType: 'Summary',
           date: '',
-          orderNumber: `Total Transactions: ${report.summary.transactionCount}`,
+          orderNumber: `Entries (sales + refunds): ${report.summary.transactionCount}`,
           customer: '',
           subtotal: report.summary.totalTaxableSales / 1000,
           taxRate: '',
@@ -920,7 +923,7 @@ router.get(
           rowType: 'By Rate',
           date: '',
           orderNumber: '',
-          customer: `${byRate.taxRate}% — ${byRate.transactionCount} transaction(s)`,
+          customer: `${byRate.taxRate}% — ${byRate.transactionCount} entry(ies)`,
           subtotal: byRate.totalSubtotal / 1000,
           taxRate: `${byRate.taxRate}%`,
           taxCollected: byRate.totalTaxCollected / 1000,

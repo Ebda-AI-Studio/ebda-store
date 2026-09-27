@@ -39,6 +39,7 @@ export default function OrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [confirmRefundOpen, setConfirmRefundOpen] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     if (!storeId || !orderId) return;
@@ -65,6 +66,14 @@ export default function OrderDetailPage() {
   useEffect(() => {
     fetchOrder();
   }, [fetchOrder]);
+
+  // Choosing "Refunded" only RECORDS a refund: no money moves (that is
+  // "Refund via provider"). Confirm first — the footer offers it as the
+  // primary action on a paid, cancelled order (#1936).
+  const requestStatusChange = (newStatus: string) => {
+    if (newStatus === 'refunded') setConfirmRefundOpen(true);
+    else void handleStatusChange(newStatus);
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!order) return;
@@ -182,7 +191,7 @@ export default function OrderDetailPage() {
                 order={order}
                 storeId={storeId}
                 isUpdating={isUpdating}
-                onStatusChange={handleStatusChange}
+                onStatusChange={requestStatusChange}
                 onMarkPaid={handleMarkPaid}
                 onRefetch={fetchOrder}
               />
@@ -192,6 +201,45 @@ export default function OrderDetailPage() {
           </>
         )}
       </main>
+
+      {confirmRefundOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="manual-refund-title"
+        >
+          <div className="w-full max-w-sm rounded-t-3xl border border-border bg-card p-5 shadow-xl sm:rounded-3xl">
+            <p id="manual-refund-title" className="text-sm font-semibold text-foreground">
+              {t.detail.actions.manualRefundTitle}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t.detail.actions.manualRefundDesc}
+            </p>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={async () => {
+                  await handleStatusChange('refunded');
+                  setConfirmRefundOpen(false);
+                }}
+                className="flex-1 inline-flex h-11 items-center justify-center rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground disabled:opacity-50 active:opacity-80"
+              >
+                {isUpdating ? '…' : t.detail.actions.manualRefundConfirm}
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => setConfirmRefundOpen(false)}
+                className="flex-1 inline-flex h-11 items-center justify-center rounded-xl border border-border bg-card text-sm font-semibold text-foreground disabled:opacity-50 active:bg-muted/60"
+              >
+                {t.detail.actions.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

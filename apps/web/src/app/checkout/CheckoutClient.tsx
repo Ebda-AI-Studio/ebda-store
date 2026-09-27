@@ -31,6 +31,7 @@ import {
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
 import { saveCheckoutInfo, loadCheckoutInfo, clearCheckoutInfo } from './_lib/savedCheckout';
+import { handlePaymentCreateResult } from './_lib/paymentResult';
 import {
   resolveDeliverySelection,
   getNowMinutesInTimezone,
@@ -1211,31 +1212,26 @@ export default function CheckoutClient() {
         }
       );
 
-      // Order created -- clear the saved checkout form and promo code
-      // before leaving the page so they don't leak into the next order.
-      if (typeof window !== 'undefined') {
-        try {
-          if (checkoutStorageKey) window.sessionStorage.removeItem(checkoutStorageKey);
-          if (promoStorageKey) window.sessionStorage.removeItem(promoStorageKey);
-        } catch {
-          // Non-fatal
-        }
-      }
-
-      if (paymentResult.success && paymentResult.data?.cod) {
-        // Cash on delivery — go straight to success
-        router.push(storeUrl(`/checkout/success?orderId=${order.id}&cod=1`));
-      } else if (paymentResult.success && paymentResult.data?.paymentUrl) {
-        // Online payment — redirect to payment gateway
-        window.location.href = paymentResult.data.paymentUrl;
-      } else {
-        // Throw an Error so the catch block runs the customer-friendly mapping.
-        // We pass the API error code (not message) so the catch can decide.
-        const err = new Error(paymentResult.error?.code || 'PAYMENT_FAILED');
-        // Attach the raw message for the dev console only.
-        (err as Error & { rawMessage?: string }).rawMessage = paymentResult.error?.message || '';
-        throw err;
-      }
+      // Success clears the saved checkout form and promo code before leaving
+      // the page, so they don't leak into the next order. A failure keeps
+      // them (the order was rolled back and the cart restored, so the
+      // customer retries with the same details) and throws the API error
+      // code into the catch below, which maps it to customer copy (#1990).
+      handlePaymentCreateResult(paymentResult, {
+        clearSavedCheckout: () => {
+          if (typeof window === 'undefined') return;
+          try {
+            if (checkoutStorageKey) window.sessionStorage.removeItem(checkoutStorageKey);
+            if (promoStorageKey) window.sessionStorage.removeItem(promoStorageKey);
+          } catch {
+            // Non-fatal
+          }
+        },
+        goToCodSuccess: () => router.push(storeUrl(`/checkout/success?orderId=${order.id}&cod=1`)),
+        goToGateway: paymentUrl => {
+          window.location.href = paymentUrl;
+        },
+      });
     } catch (error) {
       // Log the technical detail for debugging — never show it to the customer.
       const raw =

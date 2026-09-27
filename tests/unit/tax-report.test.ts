@@ -31,6 +31,7 @@ function makeRow(overrides: {
   tax_delta?: bigint;
   base_delta?: bigint;
   order_total?: bigint;
+  is_sale?: boolean;
 }) {
   return {
     posted_at: overrides.posted_at ?? new Date('2026-01-15'),
@@ -39,6 +40,7 @@ function makeRow(overrides: {
     tax_delta: overrides.tax_delta ?? BigInt(500), // 5% of 10 KWD
     base_delta: overrides.base_delta ?? BigInt(10_000), // 10 KWD in fils
     order_total: overrides.order_total ?? BigInt(10_500),
+    is_sale: overrides.is_sale ?? true,
   };
 }
 
@@ -191,6 +193,45 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(result.summary.totalTaxCollected).toBe(700); // 900 − 200
     expect(result.summary.totalTaxableSales).toBe(6_222); // 8000 − 1778
     expect(result.summary.byRate).toHaveLength(1); // both rows in the 11.25 bucket
+  });
+
+  // #1253 — every row of an order carried the full order total and the same
+  // order number, with nothing to tell the sale from its refund/return rows,
+  // so summing the exported Order Total column counted an order once per
+  // journal entry (a sold, partly returned, then refunded 9.400 order read as
+  // 37.600).
+  it('marks the sale row and its reversal rows, and carries the order total on the sale only', async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      makeRow({ base_delta: BigInt(8_000), tax_delta: BigInt(900), order_total: BigInt(9_400) }),
+      makeRow({
+        base_delta: BigInt(-1_778),
+        tax_delta: BigInt(-200),
+        order_total: BigInt(9_400),
+        is_sale: false,
+      }),
+      makeRow({
+        base_delta: BigInt(-6_222),
+        tax_delta: BigInt(-700),
+        order_total: BigInt(9_400),
+        is_sale: false,
+      }),
+    ]);
+
+    const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
+
+    expect(result.rows.map(r => r.kind)).toEqual(['sale', 'reversal', 'reversal']);
+    expect(result.rows.map(r => r.total)).toEqual([9_400, null, null]);
+    expect(result.rows.reduce((s, r) => s + (r.total ?? 0), 0)).toBe(9_400);
+    // The netted tax figures are unchanged by this.
+    expect(result.summary.totalTaxCollected).toBe(0);
+    expect(result.summary.transactionCount).toBe(3);
+  });
+
+  it('asks the database which entry is the sale (sourceId = the order id)', async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([]);
+    await generateTaxReport(STORE_ID, { from: FROM, to: TO });
+    const sql = mockQueryRawUnsafe.mock.calls[0][0] as string;
+    expect(sql).toMatch(/\(e\.source_id = o\.id\) AS is_sale/);
   });
 
   it('date boundaries are preserved in the row.date field', async () => {

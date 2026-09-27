@@ -2,7 +2,7 @@
 
 import { orderActionVisibility } from '@force/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { VALID_TRANSITIONS, type OrderDetail } from '@/lib/orders';
+import { statusOptionsFor, type OrderDetail } from '@/lib/orders';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
@@ -39,10 +39,13 @@ export function ActionFooter({
   const { t } = useLanguage();
   const ta = t.detail.actions;
 
-  const transitions = VALID_TRANSITIONS[order.status] ?? [];
+  // Same options the admin offers (#1936): a PAID cancelled order's only
+  // option is `refunded`, so `cancelled` is not final here. The page confirms
+  // a `refunded` pick before sending it.
+  const transitions = statusOptionsFor(order);
   const nextStatus = transitions.find(s => s !== 'cancelled') ?? null;
   const canCancel = transitions.includes('cancelled');
-  const isFinal = ['delivered', 'cancelled', 'refunded'].includes(order.status);
+  const isFinal = ['delivered', 'refunded'].includes(order.status);
 
   // Shared with the admin ActionFooter — one gating rule for both surfaces.
   const { showMarkPaid, showManualMarkPaid, showRefundViaProvider, showRefreshRefundStatus } =

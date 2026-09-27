@@ -20,7 +20,7 @@
  * B4a's render-test layer.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { OrderDetail, OrderPaymentDetail } from './types';
 
 vi.mock('next-intl', () => {
@@ -93,13 +93,13 @@ function baseOrder(
   };
 }
 
-function renderFooter(order: OrderDetail) {
+function renderFooter(order: OrderDetail, onStatusChange: (s: string) => void = () => {}) {
   return render(
     <ActionFooter
       order={order}
       storeId="store-1"
       isUpdating={false}
-      onStatusChange={() => {}}
+      onStatusChange={onStatusChange}
       onMarkPaid={() => {}}
       onPrintInvoice={() => {}}
     />
@@ -176,5 +176,31 @@ describe('ActionFooter — money-safety button visibility (renders the real DOM 
     // The provider-tracking affordances should appear instead.
     expect(screen.getByTestId('payment-link-button')).toBeTruthy();
     expect(screen.getByTestId('refresh-payment-button')).toBeTruthy();
+  });
+});
+
+// #1947 — the detail page read the raw transition map and treated `cancelled`
+// as final, so a paid, cancelled order (refundable since PR #770) rendered no
+// status action here at all.
+describe('ActionFooter — status action for a cancelled order (#1947)', () => {
+  it('offers Refunded as the primary action on a PAID cancelled order', () => {
+    const onStatusChange = vi.fn();
+    renderFooter(baseOrder({ status: 'cancelled', paymentStatus: 'paid' }), onStatusChange);
+
+    // useT is mocked to echo the key, so the status label renders as 'refunded'.
+    fireEvent.click(screen.getByText('refunded'));
+    expect(onStatusChange).toHaveBeenCalledWith('refunded');
+    expect(screen.queryByText('cancel')).toBeNull();
+  });
+
+  it('offers no status action on an UNPAID cancelled order (nothing to refund)', () => {
+    renderFooter(baseOrder({ status: 'cancelled', paymentStatus: 'unpaid' }));
+    expect(screen.queryByText('refunded')).toBeNull();
+  });
+
+  it('does not offer Refunded on an unpaid pending order, and still offers its next step', () => {
+    renderFooter(baseOrder({ status: 'pending', paymentStatus: 'unpaid' }));
+    expect(screen.getByText('confirmed')).toBeTruthy();
+    expect(screen.queryByText('refunded')).toBeNull();
   });
 });

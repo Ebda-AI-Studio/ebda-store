@@ -39,6 +39,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma, withRlsBypass } from '@force/database';
 import { OrderService } from '../../apps/api/src/services/order.service';
+import { handleOrderRefunded } from '../../apps/api/src/lib/inngest/functions/order-refunded';
 
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
@@ -253,5 +254,138 @@ describe.skipIf(!hasDb)('rollbackForPaymentFailure marks the reversal as done', 
     ]);
     expect(stockMarker).not.toBeNull();
     expect(couponMarker).not.toBeNull();
+  });
+});
+
+/**
+ * #1946 — every order rolled back BEFORE the canonical markers existed
+ * (2026-04-25 → 2026-09-25) carries only an `adjustment` stock row with the
+ * rollback reason, and no `coupon_reversed` event, although that rollback
+ * restored the stock and released the coupon. Refunding one (auto-cancelled,
+ * then paid on the still-live invoice, then refunded) runs the real fanout
+ * here against Postgres: it must neither restock nor release the coupon again.
+ */
+describe.skipIf(!hasDb)('order/refunded on an order rolled back before the markers (#1946)', () => {
+  const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).substring(7)}`;
+  const couponCode = `RRL-COUPON-${suffix}`;
+  const INVENTORY_AFTER_ROLLBACK = 10;
+  const COUPON_USES_AFTER_ROLLBACK = 4;
+  let storeId: string;
+  let orderId: string;
+  let productId: string;
+
+  beforeAll(async () => {
+    await withRlsBypass(async tx => {
+      const owner = await tx.user.create({
+        data: {
+          email: `rr-owner-legacy-${suffix}@example.com`,
+          passwordHash: 'not-a-real-hash',
+          role: 'store_admin',
+          firstName: 'RR',
+          lastName: 'Legacy',
+        },
+      });
+      const store = await tx.store.create({
+        data: {
+          name: 'rr-legacy-store',
+          slug: `rr-test-legacy-${suffix}`,
+          template: 'modern',
+          currency: 'KWD',
+          ownerId: owner.id,
+        },
+      });
+      storeId = store.id;
+      const product = await tx.product.create({
+        data: {
+          storeId,
+          name: 'RR Legacy Product',
+          slug: `rr-product-legacy-${suffix}`,
+          price: 1000,
+          inventory: INVENTORY_AFTER_ROLLBACK,
+          trackInventory: true,
+        },
+      });
+      productId = product.id;
+      await tx.coupon.create({
+        data: {
+          storeId,
+          code: couponCode,
+          name: 'RR Legacy Coupon',
+          type: 'percentage',
+          value: 10,
+          usageCount: COUPON_USES_AFTER_ROLLBACK,
+        },
+      });
+      // The state the OLD rollback left: cancelled, stamped, stock already
+      // back (inventory above), coupon already released (usage above).
+      const order = await tx.order.create({
+        data: {
+          storeId,
+          orderNumber: `RR-TEST-LEGACY-${suffix}`,
+          status: 'cancelled',
+          paymentStatus: 'unpaid',
+          couponCode,
+          subtotal: 3000,
+          total: 3000,
+          shippingAddress: {},
+          billingAddress: {},
+          refundReversedAt: new Date(),
+          items: {
+            create: [
+              {
+                productId,
+                productName: 'RR Legacy Product',
+                quantity: 3,
+                price: 1000,
+                total: 3000,
+              },
+            ],
+          },
+        },
+      });
+      orderId = order.id;
+      await tx.inventoryHistory.create({
+        data: {
+          productId,
+          storeId,
+          type: 'adjustment',
+          quantity: 3,
+          previousStock: INVENTORY_AFTER_ROLLBACK - 3,
+          newStock: INVENTORY_AFTER_ROLLBACK,
+          reason: 'Order rollback — payment step failed',
+          reference: orderId,
+        },
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await withRlsBypass(async tx => {
+      await tx.orderEvent.deleteMany({ where: { storeId } }).catch(() => {});
+      await tx.inventoryHistory.deleteMany({ where: { storeId } }).catch(() => {});
+      await tx.order.deleteMany({ where: { storeId } }).catch(() => {});
+      await tx.coupon.deleteMany({ where: { storeId } }).catch(() => {});
+      await tx.product.deleteMany({ where: { storeId } }).catch(() => {});
+      await tx.store.deleteMany({ where: { id: storeId } }).catch(() => {});
+      await tx.user
+        .deleteMany({ where: { email: { startsWith: 'rr-owner-legacy-' } } })
+        .catch(() => {});
+    });
+  });
+
+  it('neither restocks nor releases the coupon a second time', async () => {
+    const step = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
+    await handleOrderRefunded(orderId, storeId, true, false, step);
+
+    const [product, coupon, returnRows] = await withRlsBypass(async tx => [
+      await tx.product.findUnique({ where: { id: productId }, select: { inventory: true } }),
+      await tx.coupon.findFirst({ where: { storeId, code: couponCode } }),
+      await tx.inventoryHistory.count({
+        where: { reference: orderId, storeId, type: 'return_stock' },
+      }),
+    ]);
+    expect(product?.inventory).toBe(INVENTORY_AFTER_ROLLBACK);
+    expect(coupon?.usageCount).toBe(COUPON_USES_AFTER_ROLLBACK);
+    expect(returnRows).toBe(0);
   });
 });

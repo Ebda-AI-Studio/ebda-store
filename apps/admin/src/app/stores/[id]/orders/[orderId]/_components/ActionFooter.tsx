@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { orderActionVisibility } from '@force/shared';
 import { useT } from '@/i18n/useT';
-import { VALID_TRANSITIONS } from '../../_components/types';
+import { statusOptionsFor } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
@@ -45,10 +45,15 @@ export function ActionFooter({
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
 
-  const transitions = VALID_TRANSITIONS[order.status] ?? [];
+  // statusOptionsFor, not the raw map: it drops `refunded` from an unpaid
+  // pending/cancelled order, the same options the order list offers. A PAID
+  // cancelled order's only option is `refunded` (PR #770), so `cancelled` is
+  // not final here; before #1947 it was, and this page offered no way to
+  // record that refund. The page confirms a `refunded` pick before sending it.
+  const transitions = statusOptionsFor(order);
   const nextStatus = transitions.find(s => s !== 'cancelled') ?? null;
   const canCancel = transitions.includes('cancelled');
-  const isFinal = ['delivered', 'cancelled', 'refunded'].includes(order.status);
+  const isFinal = ['delivered', 'refunded'].includes(order.status);
   // Money-action gating lives in @force/shared's orderActionVisibility,
   // shared with the orders PWA so the two surfaces cannot drift (#1908):
   //   - showMarkPaid: promoted out of the overflow on mobile — the PWA flow

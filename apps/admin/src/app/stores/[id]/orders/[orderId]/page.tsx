@@ -38,6 +38,7 @@ export default function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [confirmMarkPaidOpen, setConfirmMarkPaidOpen] = useState(false);
+  const [confirmRefundOpen, setConfirmRefundOpen] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     if (!storeId || !orderId) return;
@@ -62,6 +63,14 @@ export default function OrderDetailPage() {
   useEffect(() => {
     fetchOrder();
   }, [fetchOrder]);
+
+  // Choosing "Refunded" only RECORDS a refund: no money moves (that is
+  // "Refund via provider"). Confirm first, the same as the order list (#762) —
+  // the footer offers it as the primary action on a paid, cancelled order.
+  const requestStatusChange = (newStatus: string) => {
+    if (newStatus === 'refunded') setConfirmRefundOpen(true);
+    else void handleStatusChange(newStatus);
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!order) return;
@@ -235,7 +244,7 @@ export default function OrderDetailPage() {
               order={order}
               storeId={storeId}
               isUpdating={isUpdating}
-              onStatusChange={handleStatusChange}
+              onStatusChange={requestStatusChange}
               onMarkPaid={() => setConfirmMarkPaidOpen(true)}
               onPrintInvoice={openInvoice}
               onPaymentRefreshed={fetchOrder}
@@ -251,6 +260,21 @@ export default function OrderDetailPage() {
           cancelLabel={tList('confirm.cancel')}
           onConfirm={handleMarkPaid}
           onClose={() => setConfirmMarkPaidOpen(false)}
+        />
+
+        <ConfirmActionModal
+          open={confirmRefundOpen}
+          title={tList('confirm.manualRefundTitle')}
+          description={tList('confirm.manualRefundDescription')}
+          confirmLabel={tList('confirm.confirm')}
+          cancelLabel={tList('confirm.cancel')}
+          variant="destructive"
+          isLoading={isUpdating}
+          onConfirm={async () => {
+            await handleStatusChange('refunded');
+            setConfirmRefundOpen(false);
+          }}
+          onClose={() => setConfirmRefundOpen(false)}
         />
       </div>
     </AdminLayout>

@@ -27,6 +27,8 @@ const h = vi.hoisted(() => ({
   // already-restored quantities. Defaults to [] (no partial returns).
   orderEventFindMany: vi.fn().mockResolvedValue([]),
   orderEventCreate: vi.fn(),
+  // #1935: a failed customer refund email releases the refund_notified claim.
+  orderEventDeleteMany: vi.fn().mockResolvedValue({ count: 1 }),
   couponUpdateMany: vi.fn(),
   backorderLineUpdateMany: vi.fn(),
   reverseCommission: vi.fn(),
@@ -58,6 +60,7 @@ const txClient = {
     findFirst: h.orderEventFindFirst,
     findMany: h.orderEventFindMany,
     create: h.orderEventCreate,
+    deleteMany: h.orderEventDeleteMany,
   },
   coupon: { updateMany: h.couponUpdateMany },
   $queryRaw: h.queryRaw,
@@ -109,6 +112,12 @@ vi.mock('@api/lib/logger', () => ({
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 
 const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
+
+// The canonical stock marker is present; the legacy rollback row (#1946) is
+// not. The coupon step reads InventoryHistory too now, so a mock that answers
+// EVERY findFirst with a row would read as a legacy rollback and skip it.
+const canonicalStockMarkerOnly = (args: { where: Record<string, unknown> }) =>
+  Promise.resolve(JSON.stringify(args.where).includes('return_stock') ? { id: 'marker-1' } : null);
 
 const ORDER = {
   id: 'o1',
@@ -265,7 +274,7 @@ describe('order-refunded fanout — restore-inventory step', () => {
 describe('order-refunded fanout — reverse-coupon step', () => {
   beforeEach(() => {
     h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: 'SAVE10', customerId: 'c1' });
-    h.inventoryHistoryFindFirst.mockResolvedValue({ id: 'marker-1' }); // inventory already restored — irrelevant here
+    h.inventoryHistoryFindFirst.mockImplementation(canonicalStockMarkerOnly); // inventory already restored — irrelevant here
   });
 
   it('decrements coupon usageCount exactly once across two fires and writes the coupon_reversed marker', async () => {
@@ -489,7 +498,7 @@ describe('order-refunded fanout — reconcile-warehouse-stock step (Task 4)', ()
 describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
   beforeEach(() => {
     h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: null });
-    h.inventoryHistoryFindFirst.mockResolvedValue({ id: 'marker-1' }); // reversals no-op/skip cheaply
+    h.inventoryHistoryFindFirst.mockImplementation(canonicalStockMarkerOnly); // reversals no-op/skip cheaply
   });
 
   it('notify:false (unpaid cancel) — reversals run but NONE of the 3 notification steps fire', async () => {
@@ -524,13 +533,65 @@ describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
     expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
   });
 
-  it('a notification throwing — handler RESOLVES (swallowed)', async () => {
-    h.sendOrderRefunded.mockRejectedValue(new Error('smtp outage'));
+  it('the admin push throwing — handler RESOLVES (swallowed)', async () => {
+    h.notifyAdminsOfRefund.mockRejectedValue(new Error('onesignal down'));
 
     await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).resolves.not.toThrow();
 
+    expect(h.sendOrderRefunded).toHaveBeenCalledTimes(1);
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.orderEventDeleteMany).not.toHaveBeenCalled();
+  });
+
+  // #1935 — the refund_notified claim is committed before the sends. A
+  // swallowed customer-email failure used to end the run green with the claim
+  // held, so nothing (not a redelivery, not the notify:false stuck-sweep)
+  // could ever tell the customer their refund was issued.
+  it('the customer email failing — the rest still runs, then the claim is released and the run FAILS', async () => {
+    h.sendOrderRefunded.mockRejectedValue(new Error('enqueue failed'));
+    const order: string[] = [];
+    const recordingStep = {
+      run: async <T>(id: string, fn: () => Promise<T>): Promise<T> => {
+        order.push(id);
+        return fn();
+      },
+    };
+
+    await expect(handleOrderRefunded('o1', 's1', true, true, recordingStep)).rejects.toThrow(
+      /customer refund email for order o1 was not sent/
+    );
+
+    // The other notifications and every reversal still ran …
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.notifyAdminsOfRefund).toHaveBeenCalledTimes(1);
+    expect(h.orderUpdateMany).toHaveBeenCalledTimes(1); // claim-reversed stamp
+    // … and the claim was released only after the completion stamp, so a
+    // replay of the event can notify the customer.
+    expect(h.orderEventDeleteMany).toHaveBeenCalledWith({
+      where: { storeId: 's1', orderId: 'o1', toStatus: 'refund_notified' },
+    });
+    expect(order.indexOf('release-refund-notification-claim')).toBeGreaterThan(
+      order.indexOf('claim-reversed')
+    );
+  });
+
+  it('a partial return whose email fails is not claimed, so nothing is released, but the run still fails', async () => {
+    h.sendOrderRefunded.mockRejectedValue(new Error('enqueue failed'));
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      couponCode: null,
+      customerId: null,
+      items: [{ id: 'i1', productId: 'p1', variantId: null, quantity: 2 }],
+    });
+    h.orderEventFindFirst.mockResolvedValue(null);
+    await expect(
+      handleOrderRefunded('o1', 's1', true, true, stepStub, {
+        items: [{ orderItemId: 'i1', quantity: 1 }],
+        refundKey: 'ret-1',
+        refundAmount: 1000,
+      })
+    ).rejects.toThrow(/was not sent/);
+    expect(h.orderEventDeleteMany).not.toHaveBeenCalled();
   });
 });
 
@@ -719,5 +780,57 @@ describe('order-refunded fanout — "Refund issued" goes out once per order (PR 
     expect(h.orderEventCreate).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ toStatus: 'refund_notified' }) })
     );
+  });
+});
+
+// #1946 — rollbackForPaymentFailure wrote its stock restore as an
+// `adjustment` row (and no coupon_reversed event) until 2026-09-25. An order
+// rolled back before then and refunded afterwards (cancelled → refunded is
+// legal since PR #770) must not get its stock or its coupon back twice.
+describe('order-refunded fanout — orders rolled back before the canonical markers (#1946)', () => {
+  const legacyRowOnly = (args: { where: Record<string, unknown> }) =>
+    Promise.resolve(
+      JSON.stringify(args.where).includes('Order rollback — payment step failed')
+        ? { id: 'legacy-rollback-row' }
+        : null
+    );
+
+  beforeEach(() => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: 'SAVE10', customerId: null });
+    h.inventoryHistoryFindFirst.mockImplementation(legacyRowOnly);
+    h.orderEventFindFirst.mockResolvedValue(null); // no coupon_reversed event: legacy shape
+  });
+
+  it('does not restore stock a second time', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.productUpdate).not.toHaveBeenCalled();
+    expect(h.productVariantUpdate).not.toHaveBeenCalled();
+    expect(h.inventoryHistoryCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not release the coupon a second time', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.couponUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('matches the legacy row by its exact server-written shape, scoped to the order and store', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.inventoryHistoryFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          reference: 'o1',
+          storeId: 's1',
+          type: 'adjustment',
+          reason: 'Order rollback — payment step failed',
+        },
+      })
+    );
+  });
+
+  it('an ordinary adjustment row is not mistaken for a rollback (control)', async () => {
+    h.inventoryHistoryFindFirst.mockResolvedValue(null);
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+    expect(h.productUpdate).toHaveBeenCalled();
+    expect(h.couponUpdateMany).toHaveBeenCalledTimes(1);
   });
 });

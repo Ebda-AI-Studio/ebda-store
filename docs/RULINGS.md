@@ -504,6 +504,101 @@ rightward, even in RTL. PR #726 kept the keyframes on purpose for a future
 skeleton wired to real image-load state. Cost if wrong: none today; building
 that skeleton is new work, not unfinished work.
 
+Context: branch `fix/p2-r2-money` — money batch R2 (18 issues: refunds, returns,
+order lifecycle, VAT report, checkout). Owner rule for the batch: nothing changes
+how buying or paying works unless an issue requires it. PRs #1969 (returns and
+refunds) and #2007 (order lifecycle) were open, unmerged, on the same files.
+
+**Ruling R2-1 — #1207, #1351, #1209 and #1455 are left for the owner, under the
+questions #1969 already asks (its Rulings M1-7 and M1-8).** All four are "which
+GL account and which amount" decisions: the partial-return cash credit uses the
+pro-rata figure and the provider cash account for every refund method, and a
+partial refund made outside a return (order-page refund-via-provider, or the
+provider dashboard) posts no journal at all. Re-verified on main 2026-09-25.
+Answering them here would pick an account, or an amount-only journal shape, that
+#1969 asks the owner to pick, and would collide with its rewrite of
+`return.service.ts complete()`. Cost if wrong: those refunds keep posting to the
+provider cash account at the pro-rata amount, or not posting, until the owner
+answers; #1969 makes the no-journal case raise a P1.
+
+**Ruling R2-2 — #1361, #1474 and #1479 are fixed by #1969, not re-fixed here.**
+#1969 moves the return completion claim into the request transaction (a crash
+rolls it back, so it cannot strand a return: #1361) and rewrites the refund
+method dialog so it preselects nothing and disables "Original payment method",
+with the reason, for a COD order and for an exchange (#1474, #1479). Doing either
+again on main would conflict with every hunk of that PR. Cost if wrong: if #1969
+is abandoned, the three stay open and need their own change.
+
+**Ruling R2-3 — #1956 (partial gateway refund on a wallet-paid order) is left
+until #1969 merges.** The fix lives in the partial-gateway branch of
+`ReturnService.complete()`, the body #1969 restructures, and splitting a refund
+between the gateway and the wallet is a customer-visible choice. It cannot bite
+today: `customer_wallet` is off for every store (Ruling W-1), and wallet checkout
+is refused while accounting is on, which it is on all three live stores (Ruling
+W-3), so no live order has `walletAmount > 0`. Cost if wrong: the first store to
+enable wallet checkout with accounting off gets a 409 on a partial return of a
+wallet-paid order, and has to pick store credit.
+
+**Ruling R2-4 — #1705 (non-KWD formatting in invoices and emails) is declined
+under Ruling PC-2.** FWB is KWD-only; the `/1000`, three-decimal, `KWD` output is
+correct for every order it can hold, and the currency-aware money layer is built
+in Ebda. Cost if wrong: the same as PC-2's.
+
+**Ruling R2-5 — #1948 (the refund notice is claimed at CANCEL, before money
+moves) needs the owner.** Cancelling a paid order fires the `order/refunded`
+fanout with notify, which emails "Refund issued" for `order.total` and claims the
+once-per-order notice, so the real settlement later sends nothing. Every fix
+changes what customers of the live stores are told: send nothing at cancel (a
+paid order refunded off-platform would then never produce a notice), or add a
+"cancelled, refund pending" message (new EN and AR copy, and a new dispatcher key
+that merchants' WhatsApp templates would need), or re-notify when a different
+amount settles. Question for the owner: at the cancel of a paid order, before any
+money moves, what should the customer receive? Cost if wrong: until answered, a
+merchant who refunds a different amount than the total leaves the customer with
+the wrong figure.
+
+**Ruling R2-6 — #1049 (receipt photos downscaled to 2000 px before OCR) needs
+evidence, not a guess.** Raising the ceiling costs memory and Gemini tokens on
+every receipt; keeping it may cost OCR accuracy. Neither can be settled by
+reading the code, and no representative receipt set exists in the repo. What
+would settle it: the owner's real receipts, OCR'd at native size and at 2000 px,
+compared field by field. Cost if wrong: small-print receipts keep extracting
+worse than they could.
+
+**Ruling R2-7 — #1946: pre-marker rollbacks are recognised in code, not
+backfilled.** The fanout now treats the exact row the old rollback wrote
+(`inventory_history.type='adjustment'`, reason `Order rollback — payment step
+failed`, reference = the order) as both its stock marker and its coupon marker.
+No production row is written, and the match is on a server-written reason, never
+on `orders.notes` (shopper input at checkout). Residual: an order rolled back
+before 2026-09-25 whose every line had `trackInventory=false` wrote no stock row,
+so if it also had a coupon, refunding it would release that coupon once more.
+Production could not be queried from this session (neonctl was not
+authenticated), so the size of that set is unmeasured; `SELECT count(*) FROM
+orders WHERE notes LIKE '%[auto-cancelled: payment step failed before
+completion]%' AND coupon_code IS NOT NULL` against the rows with no matching
+`inventory_history` would settle it. Cost if wrong: one coupon redemption handed
+back to that coupon's limit, per such order refunded.
+
+**Ruling R2-8 — #1935: the refund email goes on the durable queue, and a failure
+that still happens fails the run instead of adding a re-send sweep.** A Resend
+outage is now retried by `email-queue` (3 attempts) like every other
+order-lifecycle email. A failure to render or enqueue it releases the
+`refund_notified` claim after every reversal has committed and throws a
+NonRetriableError, so `alerts-failure-watch` raises a P1 and replaying the event
+notifies the customer. A notify-capable sweep was not added: it would be a new
+cron and a second producer of the customer notice, which the claim exists to
+prevent. Residual: an email that exhausts the queue's retries lands in
+`email:failed`, which no UI shows — true of every queued email today. Cost if
+wrong: a customer is told late, after an operator replays the event.
+
+**Ruling R2-9 — marking an order Refunded from the order page or the orders PWA
+asks for confirmation.** #1936 and #1947 make "Refunded" the primary action on a
+paid, cancelled order. It records a refund without moving money, which is the
+confusion #762 is about, so both pages confirm first, reusing #2007's list-page
+copy (same keys and text in the admin, so the two merge as one). Cost if wrong:
+one extra tap for the merchant.
+
 ---
 
 Context: branch `fix/inngest-webhook-rate-limit-exempt` — the global 200

@@ -1,4 +1,4 @@
-import type { InngestFunction } from 'inngest';
+import { NonRetriableError, type InngestFunction } from 'inngest';
 import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@force/database';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
@@ -35,6 +35,23 @@ export interface PartialRefund {
 const PARTIAL_RESTORE_MARKER = 'partial_return_restored';
 
 /**
+ * The shape `OrderService.rollbackForPaymentFailure` wrote from 2026-04-25
+ * (6f439217) until 2026-09-25 (0268e4e5): its stock restore was typed
+ * `adjustment`, not the canonical `return_stock`, and it wrote no
+ * `coupon_reversed` event, although it released the coupon in the same
+ * transaction. It now writes both canonical markers, but every order rolled
+ * back before that still carries only this row. Refunding such an order
+ * (auto-cancelled, then paid on the still-live invoice, then refunded —
+ * `cancelled → refunded` is legal since PR #770) must not restore its stock
+ * or release its coupon a second time (#1946). The reason string is
+ * server-written, never shopper input, so it is safe to match on.
+ */
+const LEGACY_ROLLBACK_STOCK_ROW = {
+  type: 'adjustment' as const,
+  reason: 'Order rollback — payment step failed',
+};
+
+/**
  * Fans out side effects when an order is refunded — fires from
  * `OrderService.applyRefundEffects` so EVERY refund path (gateway-driven
  * webhook, admin "Refund via MyFatoorah", manual status-button) lands
@@ -66,7 +83,10 @@ const PARTIAL_RESTORE_MARKER = 'partial_return_restored';
  * money state. The notification block below is the OPPOSITE tier: it is
  * gated on `notify` (only paid, genuinely-new refunds) and swallows failures
  * via `Promise.allSettled` (best-effort — an SMTP outage must not block or
- * retry the reversals). The `notify` gate is mandatory: `order/refunded` now
+ * retry the reversals). One exception: a failed CUSTOMER refund email is
+ * swallowed only until the reversals and the completion stamp are done; then
+ * the claim is released and the run fails loudly (#1935, see the end of this
+ * function). The `notify` gate is mandatory: `order/refunded` now
  * fires for EVERY cancel/refund, including unpaid cancels where stock/coupon
  * were reserved but no money moved — without the gate, an unpaid cancel
  * would still email "Refund issued" + WhatsApp/SMS + push the merchant,
@@ -231,7 +251,11 @@ export async function handleOrderRefunded(
 
         // ---- FULL (whole-order) restore. ----
         const stockMarker = await tx.inventoryHistory.findFirst({
-          where: { reference: orderId, type: 'return_stock', storeId },
+          where: {
+            reference: orderId,
+            storeId,
+            OR: [{ type: 'return_stock' }, LEGACY_ROLLBACK_STOCK_ROW],
+          },
           select: { id: true },
         });
         if (stockMarker) return { skipped: true };
@@ -293,6 +317,14 @@ export async function handleOrderRefunded(
           select: { id: true },
         });
         if (couponMarker) return { skipped: true };
+
+        // A pre-2026-09-25 payment-failure rollback released the coupon in
+        // the same transaction as this stock row but wrote no event (#1946).
+        const legacyRollback = await tx.inventoryHistory.findFirst({
+          where: { reference: orderId, storeId, ...LEGACY_ROLLBACK_STOCK_ROW },
+          select: { id: true },
+        });
+        if (legacyRollback) return { skipped: true };
 
         // Decrement back to zero floor — concurrent refunds shouldn't push
         // usageCount negative.
@@ -471,6 +503,12 @@ export async function handleOrderRefunded(
         )
       )));
 
+  // Set when the customer's "Refund issued" email step fails for good. The
+  // claim above is already committed, so without a second look that customer
+  // is never told (#1935): the stuck-sweep re-sends with notify:false and a
+  // redelivery finds the claim. See the end of this function.
+  let customerEmailFailed = false;
+
   if (shouldNotify) {
     const store = await step.run('load-store', () =>
       runInTenantContext(storeId, () =>
@@ -507,9 +545,12 @@ export async function handleOrderRefunded(
         })
       ),
     ]).then(results => {
-      results.forEach(r => {
+      results.forEach((r, i) => {
         if (r.status === 'rejected') {
           logger.error({ err: r.reason, orderId }, 'order/refunded step failed');
+          // Index 0 is send-customer-refund-email. The dispatcher never
+          // throws (it logs internally) and the admin push is admin-facing.
+          if (i === 0) customerEmailFailed = true;
         }
       });
     });
@@ -628,6 +669,33 @@ export async function handleOrderRefunded(
       })
     );
   });
+
+  // The customer's refund email failed after every retry (the email itself is
+  // on the durable Redis queue, so this is a failure to render or enqueue it,
+  // not a Resend outage). Every reversal above has committed, so failing the
+  // run now costs nothing and dead-letters it to alerts-failure-watch instead
+  // of ending green with the customer never told (#1935). The whole-order
+  // claim is released first, so replaying this event from Inngest sends the
+  // notice; the reversals and the refundReversedAt stamp are idempotent. A
+  // partial return is never claimed, so its replay re-sends as it is.
+  if (customerEmailFailed) {
+    if (!isPartial) {
+      await step.run('release-refund-notification-claim', () =>
+        runInTenantContext(storeId, () =>
+          withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+            await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+            return tx.orderEvent.deleteMany({
+              where: { storeId, orderId, toStatus: 'refund_notified' },
+            });
+          })
+        )
+      );
+    }
+    throw new NonRetriableError(
+      `order/refunded: the customer refund email for order ${orderId} was not sent. ` +
+        'Replay this event to notify the customer.'
+    );
+  }
 }
 
 export const orderRefunded: InngestFunction.Any = inngest.createFunction(

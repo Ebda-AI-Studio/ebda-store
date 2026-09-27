@@ -162,6 +162,26 @@
       "test": "tests/unit/order-refunded-reversals.test.ts"
     },
     {
+      "id": "money-legacy-rollback-stock-marker",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "refunding an order rolled back before the canonical markers (adjustment-typed stock row) restores its stock a second time (#1946)",
+      "source": "apps/api/src/lib/inngest/functions/order-refunded.ts",
+      "find": "            OR: [{ type: 'return_stock' }, LEGACY_ROLLBACK_STOCK_ROW],",
+      "replace": "            OR: [{ type: 'return_stock' }],",
+      "test": "tests/unit/order-refunded-reversals.test.ts"
+    },
+    {
+      "id": "money-legacy-rollback-coupon-marker",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "refunding an order rolled back before the coupon_reversed event existed releases its coupon a second time (#1946)",
+      "source": "apps/api/src/lib/inngest/functions/order-refunded.ts",
+      "find": "        if (legacyRollback) return { skipped: true };",
+      "replace": "        if (false) return { skipped: true };",
+      "test": "tests/unit/order-refunded-reversals.test.ts"
+    },
+    {
       "id": "money-refund-effects-rejection-refund-path",
       "domain": "money / payment / refund",
       "tier": "unit",

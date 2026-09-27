@@ -8,6 +8,13 @@ import { prisma } from '@force/database';
  * All money fields are in FILS (integer — smallest KWD unit = 1/1000 KWD).
  */
 export interface TaxReportRow {
+  /**
+   * `sale` — the order's own sale entry (sourceId = the order id).
+   * `reversal` — a full refund reversal, a partial-return adjustment, or a
+   * reversal of one of those (sourceId = `<orderId>:…`). One order can show
+   * several rows with the same order number; this says which is which (#1253).
+   */
+  kind: 'sale' | 'reversal';
   /** ISO date string of the journal posting (= order payment / reversal date) */
   date: string;
   orderNumber: string;
@@ -26,14 +33,17 @@ export interface TaxReportRow {
    * credit. Positive on the sale, negative on a reversal/adjustment.
    */
   taxCollected: number;
-  /** Order total in fils (gross, unchanged across the order's rows) */
-  total: number;
+  /**
+   * Order total in fils on the SALE row only; null on a reversal row, so the
+   * column sums to each order's value once instead of once per entry (#1253).
+   */
+  total: number | null;
 }
 
 export interface TaxRateSummary {
   /** Tax rate percentage string, e.g. "5.00" */
   taxRate: string;
-  /** Number of tax-moving journal entries at this rate (reversals included) */
+  /** Number of tax-moving journal ENTRIES at this rate (reversals included), not orders */
   transactionCount: number;
   /** Net taxable-base movement in fils (reversals subtract) */
   totalSubtotal: number;
@@ -48,7 +58,7 @@ export interface TaxReportResult {
   rows: TaxReportRow[];
   /** Totals */
   summary: {
-    /** Rows in the period, reversal/adjustment rows included */
+    /** Journal entries in the period (sales + reversals/adjustments), not orders */
     transactionCount: number;
     /** NET taxable sales in fils — sales minus refund/return reversals */
     totalTaxableSales: number;
@@ -126,6 +136,7 @@ export async function generateTaxReport(
       tax_delta: bigint;
       base_delta: bigint;
       order_total: bigint;
+      is_sale: boolean;
     }>
   >(
     `
@@ -135,7 +146,8 @@ export async function generateTaxReport(
       NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS customer_name,
       COALESCE(SUM(CASE WHEN a.code = '2100' THEN l.credit - l.debit ELSE 0 END), 0)::bigint AS tax_delta,
       COALESCE(SUM(CASE WHEN a.code = '4000' THEN l.credit - l.debit ELSE 0 END), 0)::bigint AS base_delta,
-      o.total::bigint AS order_total
+      o.total::bigint AS order_total,
+      (e.source_id = o.id) AS is_sale
     FROM public.journal_entries e
     JOIN public.journal_lines l
       ON l.entry_id = e.id
@@ -153,7 +165,7 @@ export async function generateTaxReport(
       AND e.posted_at >= $2::timestamp
       AND e.posted_at <= $3::timestamp
       AND e.store_id = $1
-    GROUP BY e.id, e.posted_at, o.order_number, o.total, u.first_name, u.last_name
+    GROUP BY e.id, e.posted_at, e.source_id, o.id, o.order_number, o.total, u.first_name, u.last_name
     HAVING SUM(CASE WHEN a.code = '2100' THEN l.credit - l.debit ELSE 0 END) <> 0
     ORDER BY e.posted_at ASC, o.order_number ASC
     `,
@@ -177,13 +189,14 @@ export async function generateTaxReport(
       taxableBase !== 0 ? Math.round((taxCollected / taxableBase) * 10000) / 100 : 0;
 
     return {
+      kind: r.is_sale ? 'sale' : 'reversal',
       date: r.posted_at.toISOString().slice(0, 10),
       orderNumber: r.order_number,
       customerName: r.customer_name ?? null,
       subtotal: taxableBase,
       taxRate: effectiveRatePct.toFixed(2),
       taxCollected,
-      total: Number(r.order_total),
+      total: r.is_sale ? Number(r.order_total) : null,
     };
   });
 

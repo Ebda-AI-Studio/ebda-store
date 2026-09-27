@@ -5903,6 +5903,7 @@
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity"
       },
       "taxReport": {
+        "type": "Type",
         "date": "Date",
         "orderNumber": "Order #",
         "customer": "Customer",
@@ -5911,12 +5912,14 @@
         "taxCollected": "Tax Collected",
         "orderTotal": "Order Total",
         "totals": "Totals",
-        "transactionCount": "Total Transactions",
+        "transactionCount": "Entries (sales + refunds)",
         "totalTaxableSales": "Total Taxable Sales",
         "totalTaxCollected": "Total Tax Collected",
         "byRateBreakdown": "Breakdown by Rate",
         "transactions": "Transactions",
-        "noTransactions": "No taxable transactions in this period."
+        "noTransactions": "No taxable transactions in this period.",
+        "kindSale": "Sale",
+        "kindReversal": "Refund / return"
       },
       "exportXlsxComing": "XLSX export coming soon"
     },

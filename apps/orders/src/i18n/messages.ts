@@ -182,6 +182,9 @@ export interface Messages {
       emailInvoiceNoEmail: string;
       emailInvoiceFailed: string;
       invoiceOpenFailed: string;
+      manualRefundTitle: string;
+      manualRefundDesc: string;
+      manualRefundConfirm: string;
     };
   };
   nav: {
@@ -398,6 +401,10 @@ export const MESSAGES: Record<Locale, Messages> = {
         emailInvoiceNoEmail: 'Order has no customer email on file',
         emailInvoiceFailed: 'Could not queue invoice email',
         invoiceOpenFailed: 'Could not open invoice',
+        manualRefundTitle: 'Mark order as refunded?',
+        manualRefundDesc:
+          'This only records a refund — it does NOT send any money back. To return a card payment, use “Refund via provider”.',
+        manualRefundConfirm: 'Mark refunded',
       },
     },
     nav: {
@@ -612,6 +619,10 @@ export const MESSAGES: Record<Locale, Messages> = {
         emailInvoiceNoEmail: 'لا يوجد بريد عميل مسجّل للطلب',
         emailInvoiceFailed: 'تعذّرت جدولة إرسال الفاتورة',
         invoiceOpenFailed: 'تعذّر فتح الفاتورة',
+        manualRefundTitle: 'تعليم الطلب كمسترد؟',
+        manualRefundDesc:
+          'هذا يسجّل الاسترداد فقط — ولا يعيد أي مبلغ. لإعادة دفعة البطاقة استخدم «استرداد عبر المزوّد».',
+        manualRefundConfirm: 'تعليم كمسترد',
       },
     },
     nav: {

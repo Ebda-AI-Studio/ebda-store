@@ -28,7 +28,7 @@
 1. Set **From** = first day of a month that has paid taxable orders, **To** = last day of that month
 2. Click away (the fetch auto-triggers on field change)
 3. **Expect:**
-   - **Total Transactions** card shows the count of orders with tax > 0 in that period
+   - **Entries (sales + refunds)** card shows the count of tax-moving journal entries in that period: each sale, and each refund or return that reversed tax (not a count of orders)
    - **Total Taxable Sales** card shows the sum of (subtotal - discount) in KWD (3 decimal places)
    - **Total Tax Collected** card (amber) shows the sum of tax collected in KWD
 
@@ -42,8 +42,10 @@
 
 ### 4. Verify transaction table
 
-1. **Expect:** One row per taxable order, ordered by date ascending
-   - Date | Order # | Customer | Taxable Base (KWD) | Tax Rate | Tax Collected (KWD) | Order Total (KWD)
+1. **Expect:** One row per tax-moving journal entry, ordered by date ascending: the sale, plus one row per refund or return that reversed tax (negative amounts)
+   - Type | Date | Order # | Customer | Taxable Base (KWD) | Tax Rate | Tax Collected (KWD) | Order Total (KWD)
+   - Type is **Sale** on the sale row and **Refund / return** on the rows that reverse it; one order can show several rows with the same Order #
+   - Order Total is filled on the Sale row only (— on refund/return rows), so the column sums to each order's value once (#1253)
    - Guest orders show "Guest" in the Customer column
    - Footer row shows column totals for Taxable Base and Tax Collected
    - Order C (tax = 0) does NOT appear in the list
@@ -53,7 +55,7 @@
 1. Click **Export CSV** (enabled only when rows > 0)
 2. **Expect:**
    - Browser downloads `tax-report-YYYY-MM-DD-to-YYYY-MM-DD.csv`
-   - File has a header row and one data row per transaction
+   - File has a header row and one data row per entry, with Type as the first column
    - KWD amounts have 3 decimal places
 
 ### 6. Export XLSX
@@ -61,7 +63,7 @@
 1. Click **Export XLSX**
 2. **Expect:**
    - Browser downloads `tax-report-YYYY-MM-DD-to-YYYY-MM-DD.xlsx`
-   - Sheet "Tax Report" has: bold grey header row, transaction rows, then a summary section below
+   - Sheet "Tax Report" has: bold grey header row, entry rows (Type = Sale or Refund / return, Order Total empty on refund/return rows), then a summary section below
    - KWD columns formatted as `#,##0.000`
    - Amount columns are numeric (not text) so Excel can SUM them
 
@@ -126,17 +128,18 @@ Feature: accounting.tax_reports (Enterprise)
     "to": "2026-03-31T23:59:59.999Z",
     "rows": [
       {
+        "kind": "sale",             ← "sale" | "reversal" (a refund/return entry)
         "date": "2026-03-15",
         "orderNumber": "ORD-1001",
         "customerName": "Ahmad Sharaf",
         "subtotal": 10000,          ← fils integer (taxable base = subtotal - discount)
         "taxRate": "5.00",          ← string, e.g. "5.00" or "10.00"
         "taxCollected": 500,        ← fils integer
-        "total": 10500              ← fils integer
+        "total": 10500              ← fils integer on the sale row; null on a reversal row
       }
     ],
     "summary": {
-      "transactionCount": 1,
+      "transactionCount": 1,        ← journal entries (sales + reversals), not orders
       "totalTaxableSales": 10000,   ← fils
       "totalTaxCollected": 500,     ← fils
       "byRate": [

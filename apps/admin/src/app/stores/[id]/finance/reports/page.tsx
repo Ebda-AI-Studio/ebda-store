@@ -44,13 +44,16 @@ interface BalanceSheetData {
 }
 
 interface TaxReportRow {
+  /** `sale` = the order's sale entry; `reversal` = a refund/return entry for it (#1253). */
+  kind: 'sale' | 'reversal';
   date: string;
   orderNumber: string;
   customerName: string | null;
   subtotal: number;
   taxRate: string;
   taxCollected: number;
-  total: number;
+  /** Order total on the sale row only; null on a reversal row. */
+  total: number | null;
 }
 
 interface TaxRateSummary {
@@ -620,6 +623,7 @@ function TaxReportTab({ storeId }: { storeId: string }) {
   function exportCsv() {
     if (!data) return;
     const header = [
+      tt('type'),
       tt('date'),
       tt('orderNumber'),
       tt('customer'),
@@ -629,13 +633,14 @@ function TaxReportTab({ storeId }: { storeId: string }) {
       tt('orderTotal'),
     ];
     const rows = data.rows.map(r => [
+      r.kind === 'sale' ? tt('kindSale') : tt('kindReversal'),
       r.date,
       r.orderNumber,
       r.customerName ?? '',
       kwd(r.subtotal),
       `${r.taxRate}%`,
       kwd(r.taxCollected),
-      kwd(r.total),
+      r.total === null ? '' : kwd(r.total),
     ]);
     downloadCsv(`tax-report-${from}-to-${to}.csv`, [header, ...rows]);
   }
@@ -769,6 +774,9 @@ function TaxReportTab({ storeId }: { storeId: string }) {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/30">
                       <tr>
+                        <th className="text-start px-3 py-2 font-medium text-muted-foreground w-24">
+                          {tt('type')}
+                        </th>
                         <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
                           {tt('date')}
                         </th>
@@ -795,6 +803,9 @@ function TaxReportTab({ storeId }: { storeId: string }) {
                     <tbody>
                       {data.rows.map((row, i) => (
                         <tr key={i} className="border-t border-border/40">
+                          <td className="px-3 py-2 text-xs">
+                            {row.kind === 'sale' ? tt('kindSale') : tt('kindReversal')}
+                          </td>
                           <td className="px-3 py-2 font-mono text-xs">{row.date}</td>
                           <td className="px-3 py-2 font-mono text-xs">{row.orderNumber}</td>
                           <td className="px-3 py-2 text-muted-foreground">
@@ -805,13 +816,15 @@ function TaxReportTab({ storeId }: { storeId: string }) {
                           <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
                             {kwd(row.taxCollected)}
                           </td>
-                          <td className="px-3 py-2 text-end font-mono">{kwd(row.total)}</td>
+                          <td className="px-3 py-2 text-end font-mono">
+                            {row.total === null ? '—' : kwd(row.total)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-muted/20 border-t border-border">
                       <tr>
-                        <td className="px-3 py-2 font-semibold" colSpan={3}>
+                        <td className="px-3 py-2 font-semibold" colSpan={4}>
                           {tt('totals')}
                         </td>
                         <td className="px-3 py-2 text-end font-mono font-semibold">

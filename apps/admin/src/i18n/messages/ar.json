@@ -5903,6 +5903,7 @@
         "balanced": "الميزانية مثبّتة — الأصول = الالتزامات + حقوق الملكية"
       },
       "taxReport": {
+        "type": "النوع",
         "date": "التاريخ",
         "orderNumber": "رقم الطلب",
         "customer": "العميل",
@@ -5911,12 +5912,14 @@
         "taxCollected": "الضريبة المحصّلة",
         "orderTotal": "إجمالي الطلب",
         "totals": "المجاميع",
-        "transactionCount": "إجمالي المعاملات",
+        "transactionCount": "القيود (مبيعات + استردادات)",
         "totalTaxableSales": "إجمالي المبيعات الخاضعة للضريبة",
         "totalTaxCollected": "إجمالي الضريبة المحصّلة",
         "byRateBreakdown": "التفصيل حسب النسبة",
         "transactions": "المعاملات",
-        "noTransactions": "لا توجد معاملات خاضعة للضريبة في هذه الفترة."
+        "noTransactions": "لا توجد معاملات خاضعة للضريبة في هذه الفترة.",
+        "kindSale": "بيع",
+        "kindReversal": "استرداد / إرجاع"
       },
       "exportXlsxComing": "تصدير XLSX قادم قريباً"
     },

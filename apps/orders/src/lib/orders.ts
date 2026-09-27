@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { ORDER_STATUS_TRANSITIONS, orderStatusOptions } from '@force/shared';
 
 export interface OrderCustomer {
   id: string;
@@ -143,29 +144,18 @@ export interface Pagination {
 }
 
 /**
- * Valid status transitions — mirrors the admin's VALID_TRANSITIONS
- * (apps/admin/.../orders/_components/types.ts), which in turn mirrors the
- * single source of truth in apps/api/src/services/order-status-machine.ts.
- * Admins can jump ahead (e.g. confirmed → delivered for same-day COD).
- * Backwards moves are blocked server-side.
- *
- * #1899: this map had drifted from the API's — missing `cancelled` entirely
- * and missing `refunded` on confirmed/processing/shipped (PR #770's fix,
- * already synced to the admin mirror) — so the orders PWA's ActionFooter
- * derived its available actions from a stale, narrower machine than the API
- * actually enforces.
+ * Valid status transitions and the per-order options — the canonical map in
+ * @force/shared, the same one the admin order list and order page read. This
+ * file kept its own copy, which drifted: no `cancelled` key and `refunded`
+ * only from `delivered`, so a paid, cancelled order could not be marked
+ * refunded from the PWA (#1936, also #1899 — shipped -> processing on shipment
+ * cancellation is included). Backwards moves are blocked server-side.
  */
-export const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
-  confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
-  processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
-  // Mirrors the API machine: shipment cancellation returns shipped -> processing.
-  shipped: ['delivered', 'refunded', 'processing'],
-  delivered: ['refunded'],
-  // A paid order cancelled by staff can still be refunded (PR #770).
-  cancelled: ['refunded'],
-  refunded: [],
-};
+export const VALID_TRANSITIONS: Readonly<Record<string, readonly string[]>> =
+  ORDER_STATUS_TRANSITIONS;
+
+/** Status options to offer for one order (drops `refunded` on an unpaid pending/cancelled order). */
+export const statusOptionsFor = orderStatusOptions;
 
 /**
  * The status filter set surfaced in the PWA. `new` is a UI alias for the

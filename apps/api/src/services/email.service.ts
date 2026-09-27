@@ -526,7 +526,15 @@ export class EmailService {
         : 'en');
     const subject = orderRefundedTemplate.subject[lang](data);
     const content = orderRefundedTemplate[lang](data);
-    await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
+    // Durable retry queue, like every other order-lifecycle email: this is
+    // the ONE refund notice a customer gets (the order/refunded fanout claims
+    // it once per order), so a transient Resend failure must retry rather
+    // than vanish (#1935).
+    await this.sendForStore(
+      storeId,
+      { to: data.customerEmail, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   /**
