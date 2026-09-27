@@ -159,7 +159,7 @@ export default function InsightsCohortsPage() {
                 `<table>` per the same B1 exception journal/bank-
                 reconciliation use, with the first column pinned. */}
             <section>
-              <h2 className="text-base font-semibold mb-3">Retention Matrix</h2>
+              <h2 className="text-base font-semibold mb-3">{t('retentionMatrixTitle')}</h2>
               <div className="rounded-xl border border-border overflow-x-auto">
                 <table className="min-w-max text-sm">
                   <thead className="bg-muted/30">
@@ -225,7 +225,7 @@ export default function InsightsCohortsPage() {
 
             {/* LTV data table (simple) */}
             <section>
-              <h2 className="text-base font-semibold mb-3">Cumulative LTV by Cohort</h2>
+              <h2 className="text-base font-semibold mb-3">{t('ltvByCohortTitle')}</h2>
               <DataTable<string> columns={ltvColumns} rows={cohortMonths} rowKey={month => month} />
             </section>
           </>

@@ -287,7 +287,7 @@ export default function PurchaseOrderDetailPage() {
           {/* DataTable has no footer concept, so the total is a summary bar
               right below the table — visible on both layouts. */}
           <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
-            <span>Total</span>
+            <span>{tDetail('totalLabel')}</span>
             <span className="font-mono font-semibold">{formatPrice(po.totalCost)}</span>
           </div>
         </div>
@@ -305,10 +305,7 @@ export default function PurchaseOrderDetailPage() {
             >
               {receiving ? 'Receiving…' : tDetail('receiveButton')}
             </button>
-            <p className="text-xs text-muted-foreground">
-              Receiving updates inventory levels and posts to the Inventory and Accounts Payable
-              accounts.
-            </p>
+            <p className="text-xs text-muted-foreground">{tDetail('receiveHelp')}</p>
           </div>
         )}
 

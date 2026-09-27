@@ -231,7 +231,7 @@ export default function ExpensesPage() {
       {expenses && (
         <div className="max-w-6xl">
           {expenses.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No expenses yet.</p>
+            <p className="text-muted-foreground text-sm">{t('emptyState')}</p>
           ) : (
             <DataTable<ExpenseRow> columns={columns} rows={expenses} rowKey={exp => exp.id} />
           )}

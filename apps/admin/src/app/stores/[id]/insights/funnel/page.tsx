@@ -182,7 +182,7 @@ export default function InsightsFunnelPage() {
           <>
             {/* Funnel bars */}
             <section>
-              <h2 className="text-base font-semibold mb-3">Funnel Overview</h2>
+              <h2 className="text-base font-semibold mb-3">{t('overviewTitle')}</h2>
               <div className="space-y-3">
                 {steps.map((step, i) => {
                   const prevValue = i > 0 ? steps[i - 1].value : null;
@@ -233,14 +233,14 @@ export default function InsightsFunnelPage() {
                   <p className="text-2xl font-semibold font-mono text-amber-600">
                     {totals.ordersAbandoned}
                   </p>
-                  <p className="text-xs text-muted-foreground">carts</p>
+                  <p className="text-xs text-muted-foreground">{t('abandonedUnit')}</p>
                 </div>
               </div>
             )}
 
             {/* Daily trend table */}
             <section>
-              <h2 className="text-base font-semibold mb-3">Daily Breakdown</h2>
+              <h2 className="text-base font-semibold mb-3">{t('dailyBreakdownTitle')}</h2>
               <DataTable<FunnelDay>
                 columns={dailyColumns}
                 rows={sortedDays}

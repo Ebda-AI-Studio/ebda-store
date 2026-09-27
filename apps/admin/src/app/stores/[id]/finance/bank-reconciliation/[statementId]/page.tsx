@@ -96,6 +96,7 @@ interface ManualMatchModalProps {
 }
 
 function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
+  const t = useT('finance.bankRec.manualMatchModal');
   const [entryId, setEntryId] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -110,10 +111,8 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-        <h3 className="mb-4 text-base font-semibold text-gray-900">Link to Journal Entry</h3>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Journal Entry ID (UUID)
-        </label>
+        <h3 className="mb-4 text-base font-semibold text-gray-900">{t('title')}</h3>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('entryId')}</label>
         <input
           type="text"
           value={entryId}
@@ -127,7 +126,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
             onClick={onClose}
             className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={handle}
@@ -454,7 +453,7 @@ export default function StatementDetailPage() {
         <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
           {txs.length === 0 ? (
             <div className="py-12 text-center text-sm text-gray-400">
-              No transactions match the current filter.
+              {t('noTransactionsMatch')}
             </div>
           ) : (
             <table className="min-w-full divide-y divide-gray-100 text-sm">

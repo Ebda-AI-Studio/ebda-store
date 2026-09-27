@@ -1032,10 +1032,10 @@
         "markPaidDescription": "Confirm cash payment received for this order. This action cannot be undone.",
         "bulkMarkPaidTitle": "Mark Orders as Paid",
         "bulkMarkPaidDescription": "Mark {count} order(s) as paid? This action cannot be undone.",
-        "manualRefundTitle": "Mark Order as Refunded?",
-        "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\".",
         "confirm": "Confirm",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "manualRefundTitle": "Mark Order as Refunded?",
+        "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\"."
       },
       "toast": {
         "errorTitle": "Error",
@@ -4987,7 +4987,9 @@
       "colPriority": "Priority",
       "colTtl": "TTL",
       "wwwAutoAttachedTitle": "www subdomain handled automatically",
-      "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain."
+      "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain.",
+      "copy": "Copy",
+      "copyValueAriaLabel": "Copy {type} value"
     }
   },
   "categories": {
@@ -5724,7 +5726,8 @@
       "reverses": "Reverses",
       "viewDetail": "View",
       "account": "Account",
-      "noEntries": "No journal entries yet — they will appear here as orders complete."
+      "noEntries": "No journal entries yet — they will appear here as orders complete.",
+      "totalLabel": "Total"
     },
     "newEntry": {
       "title": "New Manual Journal Entry",
@@ -5768,7 +5771,8 @@
       "salesOrdersSource": "Orders",
       "salesOrdersRevenue": "Paid Orders Revenue",
       "salesOrdersCount": "Paid Orders",
-      "salesOrdersCountUnit": "orders in period"
+      "salesOrdersCountUnit": "orders in period",
+      "couldntLoad": "Couldn't load"
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -5807,6 +5811,7 @@
       "tax": "Tax (KWD)",
       "total": "Total (KWD)",
       "status": "Status",
+      "emptyState": "No expenses yet.",
       "statuses": {
         "draft": "Draft",
         "pending": "Pending Approval",
@@ -5903,7 +5908,6 @@
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity"
       },
       "taxReport": {
-        "type": "Type",
         "date": "Date",
         "orderNumber": "Order #",
         "customer": "Customer",
@@ -5918,6 +5922,8 @@
         "byRateBreakdown": "Breakdown by Rate",
         "transactions": "Transactions",
         "noTransactions": "No taxable transactions in this period.",
+        "guest": "Guest",
+        "type": "Type",
         "kindSale": "Sale",
         "kindReversal": "Refund / return"
       },
@@ -5991,9 +5997,10 @@
       "autoMatch": "Run Auto-match",
       "autoMatching": "Running…",
       "autoMatchResult": "Auto-matched {matched}, unmatched {unmatched}, ambiguous {ambiguous}.",
+      "noTransactionsMatch": "No transactions match the current filter.",
       "manualMatchModal": {
         "title": "Link to Journal Entry",
-        "entryId": "Journal Entry ID",
+        "entryId": "Journal Entry ID (UUID)",
         "confirm": "Link",
         "cancel": "Cancel"
       },
@@ -6075,7 +6082,8 @@
       "selectedCount": "{count} selected",
       "bulkSetThreshold": "Set threshold",
       "bulkThresholdFailed": "Threshold update failed",
-      "bulkThresholdDone": "{count} products updated"
+      "bulkThresholdDone": "{count} products updated",
+      "clearFilter": "Clear filter"
     },
     "scan": {
       "title": "Barcode Scan",
@@ -6134,7 +6142,9 @@
       "helpReceive": "Scan a product barcode and enter a quantity to record incoming stock (a delivery from a supplier).",
       "helpPick": "Load an order by its number, then scan each item to mark it picked and track fulfillment.",
       "helpCount": "Run a cycle count: scan items on a shelf and enter the counted quantity — the system auto-adjusts any difference from the recorded stock.",
-      "helpCamera": "Camera scanning works in Chrome (Android/desktop) and Safari on iPhone (iOS 17+). On other browsers, type the barcode manually. Products must have a barcode set to be found."
+      "helpCamera": "Camera scanning works in Chrome (Android/desktop) and Safari on iPhone (iOS 17+). On other browsers, type the barcode manually. Products must have a barcode set to be found.",
+      "scanWithCamera": "Scan with camera",
+      "pickChangeOrder": "Change"
     },
     "adjustments": {
       "title": "Stock Adjustments",
@@ -6174,9 +6184,23 @@
         "submitDraft": "Save as draft",
         "submitPost": "Save and post",
         "typeTip": "cycle_count = routine recount correction; damage = damaged, unsellable; theft = lost to theft or shrinkage; loss = lost or misplaced (not theft or damage); write_off = deliberately removed (expired or obsolete); found = previously-missing stock located (increases quantity); return_to_supplier = sent back to supplier.",
-        "glJournalTip": "GL journal = the accounting record (General Ledger). Posting auto-creates a balanced bookkeeping entry — e.g. a write-off debits a loss/expense account and credits inventory — keeping accounts accurate. Save as draft to review before it affects your books."
+        "glJournalTip": "GL journal = the accounting record (General Ledger). Posting auto-creates a balanced bookkeeping entry — e.g. a write-off debits a loss/expense account and credits inventory — keeping accounts accurate. Save as draft to review before it affects your books.",
+        "tabCsv": "CSV Import",
+        "tabManual": "Manual entry",
+        "csvHelpTitle": "How to use CSV import",
+        "csvHelpStep1": "Download the template below and fill in your stock counts.",
+        "csvHelpStep2": "Each row needs a <b>SKU</b> or <b>Barcode</b> to identify the product.",
+        "csvHelpStep3": "Use <b>New Quantity</b> for absolute stock counts (cycle count), or <b>Delta</b> (+/−) for signed adjustments (found/damaged units).",
+        "csvHelpStep4": "Upload the filled file and review the preview before applying.",
+        "csvDownloadTemplate": "Download template (.csv)",
+        "csvRowErrorsLabel": "Row errors (skipped during import):",
+        "csvShowRowErrors": "Show row errors",
+        "csvViewAllAdjustments": "View all adjustments",
+        "csvClear": "Clear",
+        "csvStatusError": "Error"
       },
-      "searchPlaceholder": "Search adjustments…"
+      "searchPlaceholder": "Search adjustments…",
+      "emptyState": "No stock adjustments yet. Create one with the button above."
     },
     "suppliers": {
       "title": "Suppliers",
@@ -6191,6 +6215,7 @@
       "paymentTerms": "Payment Terms",
       "active": "Active",
       "nameRequired": "Name is required.",
+      "emptyState": "No suppliers yet. Add one with the button above.",
       "terms": {
         "net0": "Cash on delivery",
         "net15": "Net 15 days",
@@ -6237,17 +6262,23 @@
         "unitCost": "Unit cost (KWD)",
         "lineTotal": "Line total (KWD)",
         "subtotal": "Subtotal",
-        "submit": "Create draft PO"
+        "submit": "Create draft PO",
+        "notesLabel": "Notes (English)",
+        "notesArLabel": "Notes (Arabic)",
+        "notesPlaceholder": "Optional notes"
       },
       "detail": {
         "qtyReceived": "Received",
         "qtyRemaining": "Remaining",
         "receiveSection": "Receive items",
         "receiveButton": "Receive",
+        "receiveHelp": "Receiving updates inventory levels and posts to the Inventory and Accounts Payable accounts.",
         "cancelButton": "Cancel PO",
-        "cancelConfirm": "Cancel this PO? This action cannot be undone."
+        "cancelConfirm": "Cancel this PO? This action cannot be undone.",
+        "totalLabel": "Total"
       },
-      "searchPlaceholder": "Search POs…"
+      "searchPlaceholder": "Search POs…",
+      "emptyState": "No purchase orders yet. Create one with the button above."
     },
     "backorders": {
       "title": "Open Backorders",
@@ -6381,6 +6412,7 @@
       "aov": "Average Order Value",
       "mrr30d": "30-day Revenue",
       "repeatPurchase": "Repeat Purchase Rate",
+      "repeatPurchaseHint": "of customers re-ordered",
       "topSegment": "Top Segment",
       "topSkus": "Top 5 SKUs (last 7 days)",
       "yesterdayFunnel": "Yesterday's Conversion",
@@ -6395,7 +6427,9 @@
       "periodLabel": "Month",
       "customers": "Customers",
       "retention": "Retention",
-      "aiLabel": "AI:"
+      "aiLabel": "AI:",
+      "retentionMatrixTitle": "Retention Matrix",
+      "ltvByCohortTitle": "Cumulative LTV by Cohort"
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -6411,7 +6445,10 @@
       "abandoned": "Abandoned",
       "revenue": "Revenue (KWD)",
       "dropoff": "Drop-off",
-      "aiLabel": "AI:"
+      "aiLabel": "AI:",
+      "overviewTitle": "Funnel Overview",
+      "abandonedUnit": "carts",
+      "dailyBreakdownTitle": "Daily Breakdown"
     },
     "segments": {
       "title": "Customer Segments (RFM)",
@@ -6451,6 +6488,31 @@
       "costPrice": "Cost"
     }
   },
+  "webhookEvents": {
+    "title": "Payment webhook inbox",
+    "subtitle": "Durable record of every payment-provider webhook. Replay re-fires the event (idempotency-safe).",
+    "refresh": "Refresh",
+    "statusAll": "all",
+    "loading": "Loading…",
+    "empty": "No webhook events",
+    "failedToLoad": "Failed to load webhook events",
+    "replay": "Replay",
+    "replaying": "Replaying…",
+    "confirmAlreadyProcessed": "This webhook is already processed. Replaying re-fires the payment event (idempotency-safe, but deliberate). Replay anyway?",
+    "replayCancelled": "Replay cancelled — webhook already processed.",
+    "replayFailed": "Replay failed: {message}",
+    "replaySuccess": "Replayed {id} — re-fired payment/webhook.received",
+    "columns": {
+      "received": "Received",
+      "provider": "Provider",
+      "status": "Status",
+      "attempts": "Attempts",
+      "result": "Result",
+      "resultOk": "ok",
+      "lastError": "Last error",
+      "action": "Action"
+    }
+  },
   "aiUsage": {
     "title": "AI Usage",
     "subtitle": "Monitor your store's AI call consumption and remaining quota.",
@@ -6476,9 +6538,50 @@
       "cached": "Cached",
       "live": "Live",
       "empty": "No AI calls recorded yet.",
+      "loadError": "Failed to load call log.",
       "prevPage": "Previous",
       "nextPage": "Next",
       "pageInfo": "Page {page} of {pages}"
+    },
+    "platform": {
+      "title": "AI Usage (platform)",
+      "subtitle": "Platform-wide AI call consumption across all stores.",
+      "loadError": "Failed to load platform AI usage data.",
+      "statCards": {
+        "today": "AI Calls Today (platform)",
+        "thisMonth": "Calls This Month (platform)",
+        "cacheHitRatio": "Cache Hit Ratio",
+        "monthSpend": "Spend This Month (platform)",
+        "activeStores": "Active Stores (filtered)"
+      },
+      "noRatesConfiguredTitle": "No model rates configured.",
+      "noRatesConfiguredBody": "Spend shows 0 because <code>AI_MODEL_RATES</code> is unset — not because AI is free. Set it on the API service to price usage.",
+      "unpricedCallsTitle": "{count} calls this month are unpriced.",
+      "unpricedCallsBody": "Their model has no entry in <code>AI_MODEL_RATES</code>, so they contribute nothing to the totals above — treat the spend figure as a floor.",
+      "unpricedTooltip": "These calls had no configured rate for their model, so they are NOT included in the amount above. The figure is a floor, not the true spend.",
+      "unpricedRowSuffix": "unpriced",
+      "filters": {
+        "planLabel": "Plan",
+        "featureLabel": "Feature",
+        "allPlans": "All plans",
+        "allFeatures": "All features",
+        "clear": "Clear filters",
+        "filterByPlan": "Filter by plan tier",
+        "filterByFeature": "Filter by AI feature"
+      },
+      "table": {
+        "store": "Store",
+        "plan": "Plan",
+        "today": "Today",
+        "month": "Month",
+        "dailyCapPct": "Daily cap %",
+        "monthlyCapPct": "Monthly cap %",
+        "spendMonth": "Spend (month)",
+        "lastCall": "Last call",
+        "empty": "No stores match the current filters."
+      },
+      "perStoreBreakdown": "Per-store breakdown",
+      "storesCount": "{count} stores"
     }
   },
   "pageBuilder": {

@@ -197,7 +197,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             const isError = Boolean(rowErrors?.length);
             return isError ? (
               <span className="text-destructive font-medium" title={rowErrors?.join('; ')}>
-                Error
+                {tNew('csvStatusError')}
               </span>
             ) : (
               <span className="text-[hsl(var(--success))]">OK</span>
@@ -211,18 +211,12 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
     <div className="space-y-5">
       {/* Instructions card */}
       <div className="rounded-xl border bg-info/5 p-5">
-        <h3 className="font-semibold text-info text-sm">How to use CSV import</h3>
+        <h3 className="font-semibold text-info text-sm">{tNew('csvHelpTitle')}</h3>
         <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-info">
-          <li>Download the template below and fill in your stock counts.</li>
-          <li>
-            Each row needs a <strong>SKU</strong> or <strong>Barcode</strong> to identify the
-            product.
-          </li>
-          <li>
-            Use <strong>New Quantity</strong> for absolute stock counts (cycle count), or{' '}
-            <strong>Delta</strong> (+/−) for signed adjustments (found/damaged units).
-          </li>
-          <li>Upload the filled file and review the preview before applying.</li>
+          <li>{tNew('csvHelpStep1')}</li>
+          <li>{tNew.rich('csvHelpStep2', { b: chunks => <strong>{chunks}</strong> })}</li>
+          <li>{tNew.rich('csvHelpStep3', { b: chunks => <strong>{chunks}</strong> })}</li>
+          <li>{tNew('csvHelpStep4')}</li>
         </ol>
         <button
           type="button"
@@ -237,7 +231,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
             />
           </svg>
-          Download template (.csv)
+          {tNew('csvDownloadTemplate')}
         </button>
       </div>
 
@@ -346,7 +340,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           {errorRowCount > 0 && (
             <div className="rounded-xl border border-border p-3 bg-destructive/5">
               <p className="text-xs font-medium text-destructive mb-1">
-                Row errors (skipped during import):
+                {tNew('csvRowErrorsLabel')}
               </p>
               <ul className="text-xs text-destructive space-y-0.5 max-h-36 overflow-y-auto">
                 {Object.entries(parseResult.errors).map(([rn, msgs]) => (
@@ -390,7 +384,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           </ul>
           {importResult.errors && Object.keys(importResult.errors).length > 0 && (
             <details className="text-xs text-destructive">
-              <summary className="cursor-pointer">Show row errors</summary>
+              <summary className="cursor-pointer">{tNew('csvShowRowErrors')}</summary>
               <ul className="mt-1 space-y-0.5 pl-2">
                 {Object.entries(importResult.errors).map(([rn, msgs]) => (
                   <li key={rn}>
@@ -405,7 +399,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             onClick={onSuccess}
             className="mt-1 px-4 py-2 bg-primary text-primary-foreground rounded text-sm"
           >
-            View all adjustments
+            {tNew('csvViewAllAdjustments')}
           </button>
         </div>
       )}
@@ -429,7 +423,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
               onClick={handleClear}
               className="px-4 py-2 border border-border rounded text-sm"
             >
-              Clear
+              {tNew('csvClear')}
             </button>
           )}
         </div>
@@ -447,6 +441,7 @@ export default function NewStockAdjustmentPage() {
   const searchParams = useSearchParams();
   const t = useT('stock.adjustments');
   const tNew = useT('stock.adjustments.new');
+  const tc = useT('common');
 
   // Pre-fill from query params (linked from inventory page)
   const prefillProductId = searchParams?.get('productId') ?? '';
@@ -638,7 +633,7 @@ export default function NewStockAdjustmentPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            CSV Import
+            {tNew('tabCsv')}
           </button>
           <button
             type="button"
@@ -649,7 +644,7 @@ export default function NewStockAdjustmentPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Manual entry
+            {tNew('tabManual')}
           </button>
         </div>
 
@@ -769,7 +764,7 @@ export default function NewStockAdjustmentPage() {
                 onClick={() => router.push(`/stores/${storeId}/stock/adjustments`)}
                 className="px-4 py-2 border border-border rounded text-sm"
               >
-                Cancel
+                {tc('cancel')}
               </button>
             </div>
 

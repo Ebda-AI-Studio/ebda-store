@@ -369,7 +369,7 @@ export default function StockInventoryPage() {
               onClick={retryProducts}
               className="shrink-0 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-medium hover:bg-destructive/10 transition-colors"
             >
-              Retry
+              {tc('retry')}
             </button>
           </div>
         )}
@@ -388,7 +388,7 @@ export default function StockInventoryPage() {
               onClick={() => router.replace(`/stores/${storeId}/stock/inventory`)}
               className="ms-auto rounded border border-border px-2 py-0.5 hover:bg-muted transition-colors"
             >
-              Clear filter
+              {t('clearFilter')}
             </button>
           </div>
         )}

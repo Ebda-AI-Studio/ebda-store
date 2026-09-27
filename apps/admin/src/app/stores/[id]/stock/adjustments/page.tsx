@@ -181,11 +181,7 @@ export default function StockAdjustmentsPage() {
             columns={columns}
             rows={filteredAdjustments ?? adjustments}
             rowKey={adj => adj.id}
-            emptyState={
-              <p className="text-muted-foreground text-sm">
-                No stock adjustments yet. Create one with the button above.
-              </p>
-            }
+            emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
           />
         </div>
       )}

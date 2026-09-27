@@ -9,7 +9,6 @@
  * The summary card is the same component embedded at the top of the AI Tools
  * page — DRY, single source of truth for quota numbers.
  *
- * Bilingual EN + AR labels throughout.
  * Data: GET /api/v1/stores/:storeId/ai/usage/summary + /ai/usage/log
  */
 
@@ -20,6 +19,7 @@ import { useAuth } from '../../../../lib/auth';
 import { apiGet } from '../../../../lib/api';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
+import { useT } from '../../../../i18n/useT';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -62,6 +62,7 @@ export default function AiUsagePage() {
   const params = useParams();
   const { isAuthenticated } = useAuth();
   const storeId = params?.id as string;
+  const t = useT('aiUsage');
 
   const [log, setLog] = useState<LogData | null>(null);
   const [logError, setLogError] = useState(false);
@@ -98,18 +99,18 @@ export default function AiUsagePage() {
 
   const columns: DataTableColumn<UsageRow>[] = [
     {
-      header: 'Date / التاريخ',
+      header: t('table.date'),
       primaryOnMobile: true,
       cell: row => (
         <span className="text-foreground whitespace-nowrap">{formatDate(row.createdAt)}</span>
       ),
     },
     {
-      header: 'Feature / الميزة',
+      header: t('table.feature'),
       cell: row => <span className="text-foreground">{formatFeature(row.feature)}</span>,
     },
     {
-      header: 'Tokens / الرموز',
+      header: t('table.tokens'),
       cell: row => (
         <span className="text-muted-foreground tabular-nums">
           {row.inputTokens + row.outputTokens > 0
@@ -119,26 +120,23 @@ export default function AiUsagePage() {
       ),
     },
     {
-      header: 'Status / الحالة',
+      header: t('table.status'),
       mobileBadge: true,
       cell: row =>
         row.cachedHit ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-            Cached / من الذاكرة
+            {t('table.cached')}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-            Live / مباشر
+            {t('table.live')}
           </span>
         ),
     },
   ];
 
   return (
-    <AdminLayout
-      title="AI Usage / استخدام الذكاء الاصطناعي"
-      subtitle="Monitor your store's AI call consumption and remaining quota."
-    >
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       {/* ── Quota summary card (shared with AI Tools page) ─────────── */}
       <div className="mb-6">
         {storeId && <AiUsageSummaryCard storeId={storeId} embedded={false} />}
@@ -147,10 +145,7 @@ export default function AiUsagePage() {
       {/* ── Log table ──────────────────────────────────────────────── */}
       <div className="rounded-xl border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-base font-semibold text-foreground">Recent AI Calls</h2>
-          <span className="text-xs text-muted-foreground" dir="rtl">
-            آخر الاستدعاءات
-          </span>
+          <h2 className="text-base font-semibold text-foreground">{t('table.title')}</h2>
         </div>
 
         {logLoading ? (
@@ -160,14 +155,9 @@ export default function AiUsagePage() {
         ) : logError || !log || log.rows.length === 0 ? (
           <div className="px-6 py-8 text-center">
             {logError ? (
-              <p className="text-sm text-destructive">Failed to load call log.</p>
+              <p className="text-sm text-destructive">{t('table.loadError')}</p>
             ) : (
-              <>
-                <p className="text-sm text-muted-foreground">No AI calls recorded yet.</p>
-                <p className="text-xs text-muted-foreground/70 mt-1" dir="rtl">
-                  لا توجد استدعاءات مسجّلة بعد.
-                </p>
-              </>
+              <p className="text-sm text-muted-foreground">{t('table.empty')}</p>
             )}
           </div>
         ) : (
@@ -183,10 +173,10 @@ export default function AiUsagePage() {
                   disabled={page === 1}
                   className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
                 >
-                  Previous / السابق
+                  {t('table.prevPage')}
                 </button>
                 <span className="text-xs text-muted-foreground">
-                  Page {log.page} of {log.pages}
+                  {t('table.pageInfo', { page: log.page, pages: log.pages })}
                 </span>
                 <button
                   type="button"
@@ -194,7 +184,7 @@ export default function AiUsagePage() {
                   disabled={page >= log.pages}
                   className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
                 >
-                  Next / التالي
+                  {t('table.nextPage')}
                 </button>
               </div>
             )}

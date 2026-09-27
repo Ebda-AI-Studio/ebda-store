@@ -60,6 +60,7 @@ export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const t = useT('stock.purchaseOrders');
   const tNew = useT('stock.purchaseOrders.new');
+  const tc = useT('common');
 
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -267,17 +268,17 @@ export default function NewPurchaseOrderPage() {
         {/* Notes */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="space-y-1">
-            <span className="text-sm font-medium">Notes (English)</span>
+            <span className="text-sm font-medium">{tNew('notesLabel')}</span>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder="Optional notes"
+              placeholder={tNew('notesPlaceholder')}
             />
           </label>
           <label className="space-y-1" dir="rtl">
-            <span className="text-sm font-medium">ملاحظات (عربي)</span>
+            <span className="text-sm font-medium">{tNew('notesArLabel')}</span>
             <textarea
               value={notesAr}
               onChange={e => setNotesAr(e.target.value)}
@@ -325,7 +326,7 @@ export default function NewPurchaseOrderPage() {
             onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders`)}
             className="px-4 py-2 border border-border rounded text-sm"
           >
-            Cancel
+            {tc('cancel')}
           </button>
         </div>
       </form>

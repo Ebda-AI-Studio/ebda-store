@@ -809,7 +809,7 @@ function TaxReportTab({ storeId }: { storeId: string }) {
                           <td className="px-3 py-2 font-mono text-xs">{row.date}</td>
                           <td className="px-3 py-2 font-mono text-xs">{row.orderNumber}</td>
                           <td className="px-3 py-2 text-muted-foreground">
-                            {row.customerName ?? <span className="italic">Guest</span>}
+                            {row.customerName ?? <span className="italic">{tt('guest')}</span>}
                           </td>
                           <td className="px-3 py-2 text-end font-mono">{kwd(row.subtotal)}</td>
                           <td className="px-3 py-2 text-end font-mono">{row.taxRate}%</td>

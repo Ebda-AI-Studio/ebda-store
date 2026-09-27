@@ -264,7 +264,7 @@ function BarcodeInput({
             onClick={onOpenCamera}
             disabled={disabled}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground hover:bg-muted/80 text-lg disabled:opacity-50"
-            title="Scan with camera"
+            title={t('scanWithCamera')}
           >
             📷
           </button>
@@ -551,7 +551,7 @@ function PickMode({ storeId }: { storeId: string }) {
                 }}
                 className="text-xs text-muted-foreground underline"
               >
-                Change
+                {t('pickChangeOrder')}
               </button>
             </div>
           </div>
@@ -651,6 +651,7 @@ function PickMode({ storeId }: { storeId: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function CountMode({ storeId }: { storeId: string }) {
   const t = useT('stock.scan');
+  const tc = useT('common');
   const cameraSupported = useBarcodeDetectorSupported();
   const [sessions, setSessions] = useState<
     | { id: string; status: string; note: string | null; lineCount: number; createdAt: string }[]
@@ -854,7 +855,7 @@ function CountMode({ storeId }: { storeId: string }) {
           }}
           className="text-xs text-muted-foreground underline min-h-[44px] px-2"
         >
-          Close
+          {tc('close')}
         </button>
       </div>
 

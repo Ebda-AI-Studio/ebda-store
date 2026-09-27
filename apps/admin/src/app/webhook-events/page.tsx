@@ -5,6 +5,7 @@ import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { useT } from '../../i18n/useT';
 
 /**
  * Super-admin: payment webhook inbox (WebhookEvent rows) + one-click replay.
@@ -36,6 +37,7 @@ function statusVariant(status: string): 'success' | 'warning' | 'destructive' | 
 }
 
 export default function WebhookEventsPage() {
+  const t = useT('webhookEvents');
   const [events, setEvents] = useState<WebhookEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -50,11 +52,11 @@ export default function WebhookEventsPage() {
       setEvents(data?.events || []);
     } catch (err) {
       console.error('Failed to fetch webhook events:', err);
-      setMessage('Failed to load webhook events');
+      setMessage(t('failedToLoad'));
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, t]);
 
   useEffect(() => {
     fetchEvents();
@@ -70,60 +72,55 @@ export default function WebhookEventsPage() {
       // before re-firing the payment event (idempotency-safe, but deliberate).
       if (!force && res.error.code === 'WEBHOOK_ALREADY_PROCESSED') {
         setReplaying(null);
-        if (
-          window.confirm(
-            'This webhook is already processed. Replaying re-fires the payment event ' +
-              '(idempotency-safe, but deliberate). Replay anyway?'
-          )
-        ) {
+        if (window.confirm(t('confirmAlreadyProcessed'))) {
           return replay(id, true);
         }
-        setMessage('Replay cancelled — webhook already processed.');
+        setMessage(t('replayCancelled'));
         return;
       }
-      setMessage(`Replay failed: ${res.error.message || 'error'}`);
+      setMessage(t('replayFailed', { message: res.error.message || 'error' }));
       setReplaying(null);
       return;
     }
-    setMessage(`Replayed ${id.slice(0, 8)} — re-fired payment/webhook.received`);
+    setMessage(t('replaySuccess', { id: id.slice(0, 8) }));
     await fetchEvents();
     setReplaying(null);
   };
 
   const columns: DataTableColumn<WebhookEvent>[] = [
     {
-      header: 'Received',
+      header: t('columns.received'),
       cell: ev => <span className="text-gray-600">{new Date(ev.receivedAt).toLocaleString()}</span>,
     },
     {
-      header: 'Provider',
+      header: t('columns.provider'),
       primaryOnMobile: true,
       cell: ev => <span className="font-medium text-gray-900">{ev.provider}</span>,
     },
     {
-      header: 'Status',
+      header: t('columns.status'),
       mobileBadge: true,
       cell: ev => <Badge variant={statusVariant(ev.status)}>{ev.status}</Badge>,
     },
     {
-      header: 'Attempts',
+      header: t('columns.attempts'),
       hideOnMobile: true,
       cell: ev => <span className="text-gray-600">{ev.attempts}</span>,
     },
     {
-      header: 'Result',
+      header: t('columns.result'),
       hideOnMobile: true,
       cell: ev =>
         ev.resultOrderId ? (
           <span className="text-gray-600" title={ev.resultOrderId}>
-            {ev.resultStatus || 'ok'} · {ev.resultOrderId.slice(0, 8)}
+            {ev.resultStatus || t('columns.resultOk')} · {ev.resultOrderId.slice(0, 8)}
           </span>
         ) : (
           <span className="text-gray-600">—</span>
         ),
     },
     {
-      header: 'Last error',
+      header: t('columns.lastError'),
       cell: ev => (
         <span className="block max-w-[240px] truncate text-destructive" title={ev.lastError || ''}>
           {ev.lastError || '—'}
@@ -131,7 +128,7 @@ export default function WebhookEventsPage() {
       ),
     },
     {
-      header: 'Action',
+      header: t('columns.action'),
       mobileActions: true,
       cell: ev => (
         <Button
@@ -141,21 +138,18 @@ export default function WebhookEventsPage() {
           disabled={replaying === ev.id}
           onClick={() => replay(ev.id)}
         >
-          {replaying === ev.id ? 'Replaying…' : 'Replay'}
+          {replaying === ev.id ? t('replaying') : t('replay')}
         </Button>
       ),
     },
   ];
 
   return (
-    <AdminLayout
-      title="Payment webhook inbox"
-      subtitle="Durable record of every payment-provider webhook. Replay re-fires the event (idempotency-safe)."
-    >
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="p-4 sm:p-6">
         <div className="mb-4 flex justify-end">
           <Button variant="outline" size="sm" onClick={() => fetchEvents()}>
-            Refresh
+            {t('refresh')}
           </Button>
         </div>
 
@@ -168,7 +162,7 @@ export default function WebhookEventsPage() {
                 status === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
               }`}
             >
-              {s || 'all'}
+              {s || t('statusAll')}
             </button>
           ))}
         </div>
@@ -181,7 +175,7 @@ export default function WebhookEventsPage() {
 
         {loading ? (
           <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
-            Loading…
+            {t('loading')}
           </div>
         ) : (
           <DataTable<WebhookEvent>
@@ -190,7 +184,7 @@ export default function WebhookEventsPage() {
             rowKey={ev => ev.id}
             emptyState={
               <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
-                No webhook events
+                {t('empty')}
               </div>
             }
           />

@@ -191,7 +191,7 @@ export default function JournalDetailPage() {
             <tfoot className="bg-muted/20 border-t border-border">
               <tr>
                 <td className="px-3 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>
-                  Total
+                  {t('totalLabel')}
                 </td>
                 <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
                   {filsToKwd(totalDr)}

@@ -253,7 +253,7 @@ export default function FinanceDashboardPage() {
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive truncate" title={dashboardErr}>
-                    Couldn't load
+                    {t('couldntLoad')}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">KWD</p>
@@ -275,7 +275,7 @@ export default function FinanceDashboardPage() {
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive truncate" title={dashboardErr}>
-                    Couldn't load
+                    {t('couldntLoad')}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">KWD</p>
@@ -306,7 +306,7 @@ export default function FinanceDashboardPage() {
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive truncate" title={dashboardErr}>
-                    Couldn't load
+                    {t('couldntLoad')}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">KWD</p>
@@ -371,7 +371,7 @@ export default function FinanceDashboardPage() {
                   </p>
                   {dashboardErr ? (
                     <p className="text-xs text-destructive truncate" title={dashboardErr}>
-                      Couldn't load
+                      {t('couldntLoad')}
                     </p>
                   ) : (
                     <p className="text-sm text-muted-foreground">KWD</p>
@@ -388,7 +388,7 @@ export default function FinanceDashboardPage() {
                   className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground"
                   title={dashboardErr}
                 >
-                  — <span className="text-xs text-destructive">Couldn't load</span>
+                  — <span className="text-xs text-destructive">{t('couldntLoad')}</span>
                 </div>
               ) : cash.length === 0 ? (
                 <div className="rounded-xl border border-border overflow-hidden p-4 text-sm text-muted-foreground">
@@ -428,7 +428,7 @@ export default function FinanceDashboardPage() {
                     </p>
                     {dashboardErr ? (
                       <p className="text-xs text-destructive truncate" title={dashboardErr}>
-                        Couldn't load
+                        {t('couldntLoad')}
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">KWD</p>

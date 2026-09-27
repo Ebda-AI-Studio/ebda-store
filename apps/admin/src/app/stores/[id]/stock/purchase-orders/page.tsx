@@ -170,11 +170,7 @@ export default function PurchaseOrdersPage() {
           rows={filteredOrders ?? []}
           rowKey={po => po.id}
           onRowClick={po => router.push(`/stores/${storeId}/stock/purchase-orders/${po.id}`)}
-          emptyState={
-            <p className="text-muted-foreground text-sm">
-              No purchase orders yet. Create one with the button above.
-            </p>
-          }
+          emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
         />
       </div>
     </AdminLayout>

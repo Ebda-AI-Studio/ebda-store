@@ -178,7 +178,7 @@ export default function SuppliersPage() {
                     }
                     className="text-primary text-xs underline underline-offset-2 hover:opacity-80 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
                   >
-                    Edit
+                    {tc('edit')}
                   </button>
                   {s.isActive && (
                     <button
@@ -187,7 +187,7 @@ export default function SuppliersPage() {
                       disabled={deleting === s.id}
                       className="text-red-600 text-xs underline underline-offset-2 hover:opacity-80 disabled:opacity-40 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
                     >
-                      Deactivate
+                      {tc('deactivate')}
                     </button>
                   )}
                 </div>
@@ -196,11 +196,7 @@ export default function SuppliersPage() {
           ]}
           rows={filteredSuppliers ?? []}
           rowKey={s => s.id}
-          emptyState={
-            <p className="text-muted-foreground text-sm">
-              No suppliers yet. Add one with the button above.
-            </p>
-          }
+          emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
         />
       </div>
     </AdminLayout>

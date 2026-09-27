@@ -13,8 +13,6 @@
  *
  * Route guard: super_admin only — store_admins are redirected to 404.
  * Data: GET /api/v1/super-admin/ai-usage/summary
- *
- * Bilingual EN + AR throughout.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -22,6 +20,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
+import { useT } from '../../i18n/useT';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -129,21 +128,16 @@ function PctBar({ pct, warn }: { pct: number; warn?: boolean }) {
 
 function StatCard({
   label,
-  labelAr,
   value,
   accent,
 }: {
   label: string;
-  labelAr: string;
   value: string | number;
   accent?: boolean;
 }) {
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground/60" dir="rtl">
-        {labelAr}
-      </p>
       <p
         className={`mt-1 text-2xl font-bold tabular-nums ${accent ? 'text-primary' : 'text-foreground'}`}
       >
@@ -156,6 +150,8 @@ function StatCard({
 // ── Page inner (needs RequireSuperAdmin wrapper) ───────────────────────
 
 function PlatformAiUsagePageInner() {
+  const t = useT('aiUsage.platform');
+  const tCommon = useT('common');
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -205,16 +201,13 @@ function PlatformAiUsagePageInner() {
   if (error || !data) {
     return (
       <div className="rounded-xl border bg-card p-8 text-center">
-        <p className="text-sm text-destructive">Failed to load platform AI usage data.</p>
-        <p className="text-xs text-muted-foreground mt-1" dir="rtl">
-          تعذّر تحميل بيانات الاستخدام على مستوى المنصة.
-        </p>
+        <p className="text-sm text-destructive">{t('loadError')}</p>
         <button
           type="button"
           onClick={fetchData}
           className="mt-4 text-sm text-primary hover:underline"
         >
-          Retry / إعادة المحاولة
+          {tCommon('retry')}
         </button>
       </div>
     );
@@ -241,7 +234,7 @@ function PlatformAiUsagePageInner() {
 
   const columns: DataTableColumn<StoreUsageRow>[] = [
     {
-      header: 'Store / المتجر',
+      header: t('table.store'),
       primaryOnMobile: true,
       cell: store => (
         <div>
@@ -251,12 +244,12 @@ function PlatformAiUsagePageInner() {
       ),
     },
     {
-      header: 'Plan / الخطة',
+      header: t('table.plan'),
       mobileBadge: true,
       cell: store => <PlanBadge plan={store.plan} />,
     },
     {
-      header: 'Today / اليوم',
+      header: t('table.today'),
       alignEnd: true,
       cell: store => (
         <span className="font-bold tabular-nums text-foreground">
@@ -265,22 +258,22 @@ function PlatformAiUsagePageInner() {
       ),
     },
     {
-      header: 'Month / الشهر',
+      header: t('table.month'),
       alignEnd: true,
       cell: store => (
         <span className="tabular-nums text-muted-foreground">{store.month.toLocaleString()}</span>
       ),
     },
     {
-      header: 'Daily cap % / اليومي',
+      header: t('table.dailyCapPct'),
       cell: store => <PctBar pct={store.dailyPct} />,
     },
     {
-      header: 'Monthly cap % / الشهري',
+      header: t('table.monthlyCapPct'),
       cell: store => <PctBar pct={store.monthlyPct} warn={store.monthlyPct >= 80} />,
     },
     {
-      header: 'Spend (month) / الإنفاق',
+      header: t('table.spendMonth'),
       alignEnd: true,
       cell: store => (
         <div className="tabular-nums">
@@ -288,16 +281,16 @@ function PlatformAiUsagePageInner() {
           {store.monthUnpricedCalls > 0 && (
             <div
               className="text-[11px] text-amber-600 dark:text-amber-500"
-              title="These calls had no configured rate for their model, so they are NOT included in the amount above. The figure is a floor, not the true spend."
+              title={t('unpricedTooltip')}
             >
-              +{store.monthUnpricedCalls.toLocaleString()} unpriced
+              +{store.monthUnpricedCalls.toLocaleString()} {t('unpricedRowSuffix')}
             </div>
           )}
         </div>
       ),
     },
     {
-      header: 'Last call / آخر استدعاء',
+      header: t('table.lastCall'),
       hideOnMobile: true,
       cell: store => (
         <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -312,29 +305,18 @@ function PlatformAiUsagePageInner() {
       {/* ── Platform totals ─────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <StatCard
-          label="AI Calls Today (platform)"
-          labelAr="استدعاءات اليوم (المنصة)"
+          label={t('statCards.today')}
           value={platform.todayCount.toLocaleString()}
           accent
         />
+        <StatCard label={t('statCards.thisMonth')} value={platform.monthCount.toLocaleString()} />
         <StatCard
-          label="Calls This Month (platform)"
-          labelAr="استدعاءات الشهر (المنصة)"
-          value={platform.monthCount.toLocaleString()}
-        />
-        <StatCard
-          label="Cache Hit Ratio"
-          labelAr="نسبة ضربات التخزين المؤقت"
+          label={t('statCards.cacheHitRatio')}
           value={`${(platform.cacheHitRatio * 100).toFixed(1)}%`}
         />
+        <StatCard label={t('statCards.monthSpend')} value={formatSpend(platform.monthCostMicros)} />
         <StatCard
-          label="Spend This Month (platform)"
-          labelAr="إنفاق الشهر (المنصة)"
-          value={formatSpend(platform.monthCostMicros)}
-        />
-        <StatCard
-          label="Active Stores (filtered)"
-          labelAr="المتاجر النشطة (مفلترة)"
+          label={t('statCards.activeStores')}
           value={filteredStores.length.toLocaleString()}
         />
       </div>
@@ -344,24 +326,23 @@ function PlatformAiUsagePageInner() {
           was never actually priced. */}
       {!platform.ratesConfigured ? (
         <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-          <strong>No model rates configured.</strong> Spend shows 0 because
-          <code className="mx-1 rounded bg-amber-100 px-1 dark:bg-amber-900/60">
-            AI_MODEL_RATES
-          </code>
-          is unset — not because AI is free. Set it on the API service to price usage.
-          <span className="block text-xs opacity-80 mt-0.5">
-            لم يتم ضبط أسعار النماذج — الإنفاق يظهر صفرًا لأن الأسعار غير مضبوطة، وليس لأن الاستخدام
-            مجاني.
-          </span>
+          <strong>{t('noRatesConfiguredTitle')}</strong>{' '}
+          {t.rich('noRatesConfiguredBody', {
+            code: chunks => (
+              <code className="mx-1 rounded bg-amber-100 px-1 dark:bg-amber-900/60">{chunks}</code>
+            ),
+          })}
         </div>
       ) : platform.monthUnpricedCalls > 0 ? (
         <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
           <strong>
-            {platform.monthUnpricedCalls.toLocaleString()} calls this month are unpriced.
+            {t('unpricedCallsTitle', { count: platform.monthUnpricedCalls.toLocaleString() })}
           </strong>{' '}
-          Their model has no entry in{' '}
-          <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">AI_MODEL_RATES</code>, so
-          they contribute nothing to the totals above — treat the spend figure as a floor.
+          {t.rich('unpricedCallsBody', {
+            code: chunks => (
+              <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">{chunks}</code>
+            ),
+          })}
         </div>
       ) : null}
 
@@ -369,16 +350,16 @@ function PlatformAiUsagePageInner() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-muted-foreground" htmlFor="plan-filter">
-            Plan / الخطة:
+            {t('filters.planLabel')}:
           </label>
           <select
             id="plan-filter"
             value={planFilter}
             onChange={e => setPlanFilter(e.target.value)}
             className="rounded-lg border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            aria-label="Filter by plan tier"
+            aria-label={t('filters.filterByPlan')}
           >
-            <option value="all">All plans / كل الخطط</option>
+            <option value="all">{t('filters.allPlans')}</option>
             {allPlans.map(p => (
               <option key={p} value={p}>
                 {planLabel(p)}
@@ -389,16 +370,16 @@ function PlatformAiUsagePageInner() {
 
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-muted-foreground" htmlFor="feature-filter">
-            Feature / الميزة:
+            {t('filters.featureLabel')}:
           </label>
           <select
             id="feature-filter"
             value={featureFilter}
             onChange={e => setFeatureFilter(e.target.value)}
             className="rounded-lg border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            aria-label="Filter by AI feature"
+            aria-label={t('filters.filterByFeature')}
           >
-            <option value="all">All features / كل الميزات</option>
+            <option value="all">{t('filters.allFeatures')}</option>
             {allFeatures.map(f => (
               <option key={f} value={f}>
                 {f.replace(/_/g, ' ')}
@@ -416,7 +397,7 @@ function PlatformAiUsagePageInner() {
             }}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            Clear filters / مسح الفلاتر ×
+            {t('filters.clear')}
           </button>
         )}
       </div>
@@ -424,11 +405,9 @@ function PlatformAiUsagePageInner() {
       {/* ── Per-store breakdown table ────────────────────────────────── */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-base font-semibold text-foreground">
-            Per-store breakdown / توزيع الاستخدام لكل متجر
-          </h2>
+          <h2 className="text-base font-semibold text-foreground">{t('perStoreBreakdown')}</h2>
           <span className="text-xs text-muted-foreground">
-            {filteredStores.length} stores / متجر
+            {t('storesCount', { count: filteredStores.length })}
           </span>
         </div>
 
@@ -438,7 +417,7 @@ function PlatformAiUsagePageInner() {
           rowKey={store => store.storeId}
           emptyState={
             <div className="px-6 py-8 text-center">
-              <p className="text-sm text-muted-foreground">No stores match the current filters.</p>
+              <p className="text-sm text-muted-foreground">{t('table.empty')}</p>
             </div>
           }
         />
@@ -450,12 +429,9 @@ function PlatformAiUsagePageInner() {
 // ── Page export (wrapped in super_admin guard) ─────────────────────────
 
 export default function PlatformAiUsagePage() {
+  const t = useT('aiUsage.platform');
   return (
-    <AdminLayout
-      title="AI Usage (platform) / استخدام الذكاء الاصطناعي (المنصة)"
-      subtitle="Platform-wide AI call consumption across all stores."
-      mode="super_admin"
-    >
+    <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="super_admin">
       <RequireSuperAdmin>
         <PlatformAiUsagePageInner />
       </RequireSuperAdmin>

@@ -192,7 +192,7 @@ export default function InsightsDashboardPage() {
               {t('repeatPurchase')}
             </p>
             <p className="text-2xl font-semibold font-mono">{pct(data.repeatPurchaseRate)}</p>
-            <p className="text-xs text-muted-foreground">of customers re-ordered</p>
+            <p className="text-xs text-muted-foreground">{t('repeatPurchaseHint')}</p>
           </div>
 
           {/* Top segment */}

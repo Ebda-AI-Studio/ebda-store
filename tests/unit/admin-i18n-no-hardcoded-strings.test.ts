@@ -1,6 +1,6 @@
 /**
- * Guard: the 55 admin files translated for B2 (admin i18n coverage) must
- * never regress a hardcoded English string back into JSX.
+ * Guard: the 81 admin files translated for B2 (admin i18n coverage, parts 1
+ * + 2) must never regress a hardcoded English string back into JSX.
  *
  * The file list is intentionally inlined here (not read from the throwaway
  * `.b2-files.txt` planning dotfile at the repo root, which isn't committed)
@@ -24,8 +24,14 @@
  *     brackets, ternaries, comparisons) — not a string at all.
  *
  * To prove this test can fail: temporarily hardcode a new English string
- * into any of the 55 files below (e.g. replace a `{t('foo')}` call with
+ * into any of the 81 files below (e.g. replace a `{t('foo')}` call with
  * literal JSX text) and re-run — the test must go red. Restore afterwards.
+ *
+ * B2 part 2 (2026-09-25) covered 47 files flagged by the same audit
+ * heuristic across the rest of the admin app (stock/finance/insights pages,
+ * the platform AI-usage + webhook-inbox super-admin pages, etc.); 26 of them
+ * are new and appended below the `// --- B2 part 2 ---` marker, the other
+ * 21 were already in the part-1 list above (see the comment there).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
@@ -33,9 +39,10 @@ import { resolve } from 'path';
 
 const ADMIN_SRC = resolve(__dirname, '../../apps/admin/src');
 
-// The 55 files translated for B2 admin i18n coverage (paths relative to
-// apps/admin/src), largest-hardcoded-string-count first per the 2026-09-25
-// audit.
+// The 81 files this guard covers (paths relative to apps/admin/src). Part 1
+// (55 files, largest-hardcoded-string-count first) per the 2026-09-25 audit;
+// 26 new part-2 files appended below (21 more part-2 files were already
+// covered by part 1 and are not repeated).
 const B2_FILES = [
   'app/stores/[id]/page-builder/page.tsx',
   'app/stores/[id]/floating-widget/page.tsx',
@@ -92,6 +99,43 @@ const B2_FILES = [
   'app/stores/[id]/branding/_components/ThemeTab.tsx',
   'app/stores/[id]/affiliates/_components/AffiliatesTable.tsx',
   'app/layout.tsx',
+
+  // --- B2 part 2 (2026-09-25) ---
+  // 21 of the 47 files the part-2 audit flagged (BulkExportPanel,
+  // BulkImportWizard, CategoryForm, categories/page, customers/page,
+  // finance/expenses/new, floating-widget, loyalty/transactions,
+  // orders/[orderId]/ItemsCard, page-builder, stores/[id]/page,
+  // ProductFaqSection, AreaRateEditor, stock/suppliers/new, StepIndicator,
+  // FooterLinksEditor, ImageUpload, NavMenuEditor, PaymentEventsTimeline,
+  // whatsapp/PaymentLinkTab, lib/auth.tsx) were already covered by part 1
+  // above and are NOT repeated here — their remaining hits were either
+  // fixed in place or are pre-existing allowlisted exceptions.
+  'app/ai-usage/page.tsx',
+  'app/stores/[id]/ai-tools/page.tsx',
+  'app/stores/[id]/ai-usage/page.tsx',
+  'app/stores/[id]/domain/page.tsx',
+  'app/stores/[id]/finance/bank-reconciliation/[statementId]/page.tsx',
+  'app/stores/[id]/finance/dashboard/page.tsx',
+  'app/stores/[id]/finance/expenses/page.tsx',
+  'app/stores/[id]/finance/fx-rates/page.tsx',
+  'app/stores/[id]/finance/journal/[entryId]/page.tsx',
+  'app/stores/[id]/finance/reports/page.tsx',
+  'app/stores/[id]/insights/cohorts/page.tsx',
+  'app/stores/[id]/insights/dashboard/page.tsx',
+  'app/stores/[id]/insights/funnel/page.tsx',
+  'app/stores/[id]/merchant-keys/page.tsx',
+  'app/stores/[id]/newsletter/page.tsx',
+  'app/stores/[id]/products/_components/MassEditModal.tsx',
+  'app/stores/[id]/stock/adjustments/new/page.tsx',
+  'app/stores/[id]/stock/adjustments/page.tsx',
+  'app/stores/[id]/stock/inventory/page.tsx',
+  'app/stores/[id]/stock/purchase-orders/[poId]/page.tsx',
+  'app/stores/[id]/stock/purchase-orders/new/page.tsx',
+  'app/stores/[id]/stock/purchase-orders/page.tsx',
+  'app/stores/[id]/stock/scan/page.tsx',
+  'app/stores/[id]/stock/suppliers/page.tsx',
+  'app/stores/[id]/stock/warehouses/page.tsx',
+  'app/webhook-events/page.tsx',
 ] as const;
 
 // Exact inner-text matches allowed to remain hardcoded. Keep this list
@@ -112,6 +156,12 @@ const ALLOWLIST = new Set<string>([
   '0.000',
   'info@store.com',
   'supplier@example.com',
+  'https://… (paste R2 upload URL)',
+  'e.g. 550e8400-e29b-41d4-a716-446655440000',
+  'MAIN',
+  '29.3759',
+  '47.9774',
+  'e.g. 0.30700',
 
   // --- currency code / brand-ish example values -----------------------
   'KWD',
@@ -152,6 +202,11 @@ const ALLOWLIST = new Set<string>([
   'pieces',
   'قطعة',
   'مثال: تصفح أفضل اختياراتنا',
+  'Optional reason in English',
+  'سبب التسوية بالعربية (اختياري)',
+  'Main Warehouse',
+  'المستودع الرئيسي',
+  'Shuwaikh Industrial Area, Kuwait',
 
   // --- TypeScript syntax the naive regex mistakes for JSX text --------
   'Promise',
@@ -165,6 +220,12 @@ const ALLOWLIST = new Set<string>([
   'customer.phone ? (',
   'previewLimit && (',
   'tx.order ? (',
+  'w.isDefault ? (',
+  'row.cachedHit ? (',
+  'ev.resultOrderId ? (',
+  'apiGet',
+  'subs.length && (',
+  'row.active ? (',
 ]);
 
 const JSX_TEXT_REGEX = />\s*([A-Za-z][A-Za-z ,.'!?:()&/-]{2,}?)\s*</g;
@@ -227,9 +288,9 @@ describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)',
 });
 
 describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
-  it('lists exactly the 55 files this guard covers', () => {
-    expect(B2_FILES.length).toBe(55);
-    expect(new Set(B2_FILES).size).toBe(55); // no duplicates
+  it('lists exactly the 81 files this guard covers', () => {
+    expect(B2_FILES.length).toBe(81);
+    expect(new Set(B2_FILES).size).toBe(81); // no duplicates
   });
 
   it.each(B2_FILES)('%s has no un-allowlisted hardcoded strings', relativePath => {
