@@ -146,7 +146,11 @@ export async function withDeferredWork<T>(
   } catch (err) {
     // The tenant transaction rolled back (5xx handler, timeout, DB error) or
     // its COMMIT failed. Deferred work reacts to writes that no longer exist —
-    // drop it.
+    // drop it. That premise only holds for work reacting to the REQUEST's
+    // writes: anything recording a write that commits on its own (a
+    // `prisma.$transaction([...])` batch is not proxied to this transaction)
+    // must not be deferred at all — put it in that batch instead, as the
+    // affiliate money audit rows do (`affiliateEventCreate`, #1590).
     if (scope.tasks.length > 0) {
       logger.warn(
         { storeId: ctx.storeId, dropped: scope.tasks.map(t => t.name) },

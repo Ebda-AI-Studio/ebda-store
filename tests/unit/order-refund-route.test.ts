@@ -153,4 +153,23 @@ describe('POST /:orderId/refund-via-provider', () => {
     expect(res.body.data.refundId).toBe('rf_123');
     expect(auditLog).toHaveBeenCalledTimes(1);
   });
+
+  // #1360 — a partially refunded payment still has a refundable balance; the
+  // lookup must find it or the button is dead after the first partial return.
+  it('looks up a partially_refunded payment as a refund source', async () => {
+    mockOrderWithCompletedPayment();
+    paymentServiceRefund.mockResolvedValue({
+      refundId: 'rf_2',
+      amount: 3000,
+      provider: 'myfatoorah',
+      status: 'completed',
+    });
+
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refund-via-provider`)
+      .send({});
+
+    const where = orderFindFirst.mock.calls[0][0].include.payments.where;
+    expect(where.status).toEqual({ in: ['completed', 'partially_refunded'] });
+  });
 });

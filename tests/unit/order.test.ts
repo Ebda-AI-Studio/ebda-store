@@ -19,6 +19,7 @@ vi.mock('@force/database', () => ({
       count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     cart: {
       findFirst: vi.fn(),
@@ -554,6 +555,101 @@ describe('OrderService', () => {
     // Money-integrity audit: `usageLimitPerUser` was collected + stored but
     // never enforced — only the store-wide `usageLimit` was. These cover the
     // new per-customer gate in OrderService.create.
+    // #1380 — the free_shipping coupon eligibility guard. Targeting used to be
+    // skipped for free_shipping, zeroing the delivery fee for anyone who typed
+    // a code restricted to a group / first order / min quantity / scope.
+    describe('free_shipping coupon targeting', () => {
+      const freeShipCoupon = (targeting: Record<string, unknown>) => ({
+        id: 'coupon-fs',
+        storeId: mockStoreId,
+        code: 'FREESHIP',
+        type: 'free_shipping',
+        value: 0,
+        minOrderAmount: null,
+        maxDiscount: null,
+        usageLimit: null,
+        usageCount: 0,
+        usageLimitPerUser: null,
+        isActive: true,
+        startsAt: new Date(Date.now() - 86400000),
+        expiresAt: new Date(Date.now() + 86400000),
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
+        ...targeting,
+      });
+
+      let capturedOrderData: Record<string, unknown> | undefined;
+      beforeEach(async () => {
+        capturedOrderData = undefined;
+        const { ShippingService } = await import('@api/services/shipping.service');
+        vi.spyOn(ShippingService, 'calculateShipping').mockResolvedValue({
+          shippingCost: 1500,
+          freeShipping: false,
+          matched: true,
+          storeHasAreaRates: false,
+        } as never);
+        vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) =>
+          fn({
+            order: {
+              create: vi.fn().mockImplementation((args: any) => {
+                capturedOrderData = args.data;
+                return Promise.resolve({ ...mockOrder, ...args.data });
+              }),
+              count: txOrderCount,
+            },
+            coupon: { updateMany: txCouponUpdateMany },
+            product: { update: vi.fn().mockResolvedValue({}) },
+            productVariant: { update: vi.fn().mockResolvedValue({}) },
+            cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
+            cartBundle: { deleteMany: vi.fn().mockResolvedValue({}) },
+            inventoryHistory: {
+              findFirst: vi.fn().mockResolvedValue(null),
+              create: vi.fn().mockResolvedValue({}),
+              createMany: vi.fn().mockResolvedValue({ count: 0 }),
+            },
+            orderEvent: {
+              findFirst: vi.fn().mockResolvedValue(null),
+              create: vi.fn().mockResolvedValue({}),
+            },
+            $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+          })
+        );
+      });
+
+      it('rejects an ineligible free_shipping coupon with COUPON_NOT_ELIGIBLE', async () => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue(
+          freeShipCoupon({ minQuantity: 999 }) as any
+        );
+
+        await expect(
+          OrderService.create(mockStoreId, mockCustomerId, mockSessionId, {
+            ...createOrderData,
+            couponCode: 'FREESHIP',
+          })
+        ).rejects.toMatchObject({ code: 'COUPON_NOT_ELIGIBLE' });
+        expect(capturedOrderData).toBeUndefined();
+      });
+
+      it('zeroes shipping for an eligible free_shipping coupon', async () => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue(freeShipCoupon({}) as any);
+
+        await OrderService.create(mockStoreId, mockCustomerId, mockSessionId, {
+          ...createOrderData,
+          couponCode: 'FREESHIP',
+        });
+
+        expect(capturedOrderData?.shipping).toBe(0);
+      });
+
+      it('control: without the coupon the delivery fee is charged', async () => {
+        await OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData);
+        expect(capturedOrderData?.shipping).toBe(1500);
+      });
+    });
+
     describe('coupon usageLimitPerUser enforcement', () => {
       const mockCoupon = {
         id: 'coupon-1',
@@ -1147,6 +1243,27 @@ describe('OrderService', () => {
         await expect(
           OrderService.updateStatus(mockStoreId, 'order-123', 'cancelled')
         ).resolves.toBeDefined();
+      });
+
+      // #558 / #619 — every transition arms the status-changed fanout: a fresh
+      // request stamp and a re-nulled claim, in the SAME update as the status.
+      it('arms the status-changed fanout claim with the status write', async () => {
+        vi.mocked(prisma.order.findFirst).mockResolvedValue({
+          ...mockOrder,
+          status: 'confirmed',
+        } as any);
+
+        await OrderService.updateStatus(mockStoreId, 'order-123', 'processing');
+
+        expect(prisma.order.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              status: 'processing',
+              statusFanoutRequestedAt: expect.any(Date),
+              statusFanoutClaimedAt: null,
+            }),
+          })
+        );
       });
 
       it('should allow confirmed -> processing', async () => {

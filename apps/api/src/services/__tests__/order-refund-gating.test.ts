@@ -8,6 +8,7 @@ vi.mock('@force/database', () => ({
   prisma: {
     order: {
       findFirst: vi.fn(),
+      updateMany: vi.fn(),
     },
     // These money-reversal tables must NOT be touched by applyRefundEffects
     // anymore (Task 1 of the money-integrity redesign) — the assertions
@@ -233,6 +234,25 @@ describe('OrderService.applyRefundEffects — fires order/refunded with reversal
     expect(prisma.inventoryHistory.create).not.toHaveBeenCalled();
     // The premature `refund_effects_applied` marker is gone too.
     expect(prisma.orderEvent.create).not.toHaveBeenCalled();
+  });
+
+  // #839/#855/#858 — every whole-order stock-restoring enqueue arms the
+  // stuck-reversal sweep: request stamp + re-nulled completion claim.
+  it('arms the stuck-reversal sweep for a whole-order stock-restoring event', async () => {
+    await OrderService.applyRefundEffects('store-1', 'order-123');
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'order-123', storeId: 'store-1' },
+      data: { refundReversalRequestedAt: expect.any(Date), refundReversedAt: null },
+    });
+  });
+
+  it('does NOT arm the sweep for a backorder-line cancel or a partial return', async () => {
+    await OrderService.applyRefundEffects('store-1', 'order-123', { restoreInventory: false });
+    await OrderService.applyRefundEffects('store-1', 'order-123', {
+      partial: { items: [{ orderItemId: 'oi-1', quantity: 1 }], refundKey: 'ret-1' },
+    });
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    expect(inngest.send).toHaveBeenCalledTimes(2);
   });
 
   it('is a no-op (no event fired) when the order does not exist', async () => {

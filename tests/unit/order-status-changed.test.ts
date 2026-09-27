@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
+  orderUpdateMany: vi.fn(),
   storeFindUnique: vi.fn(),
   sendPaymentSuccess: vi.fn(),
   sendOrderShipped: vi.fn(),
@@ -24,7 +25,10 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@force/database', () => ({
-  prisma: { order: { findUnique: h.orderFindUnique }, store: { findUnique: h.storeFindUnique } },
+  prisma: {
+    order: { findUnique: h.orderFindUnique, updateMany: h.orderUpdateMany },
+    store: { findUnique: h.storeFindUnique },
+  },
   runInTenantContext: h.runInTenant,
 }));
 vi.mock('@api/services/email.service', () => ({
@@ -82,6 +86,7 @@ const ORDER = {
 beforeEach(() => {
   vi.clearAllMocks();
   h.orderFindUnique.mockResolvedValue(ORDER);
+  h.orderUpdateMany.mockResolvedValue({ count: 1 });
   h.storeFindUnique.mockResolvedValue({ name: 'Test Store' });
   h.isFeatureEnabled.mockResolvedValue(false);
   for (const fn of [
@@ -180,5 +185,31 @@ describe('order-status-changed fanout', () => {
     const r = await handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub);
     expect(r.skipped).toBe('order-not-found');
     expect(h.sendOrderShipped).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #558 — the transition is claimed before any side effect, so a second event
+ * for the same order + transition (racing updateStatus calls, the inline
+ * fallback after a delayed send, a stuck-sweep re-send) sends nothing twice.
+ */
+describe('order-status-changed fanout — per-transition claim', () => {
+  it('claims the transition only while the order is still at that status', async () => {
+    await handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub);
+    expect(h.orderUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'o1', storeId: 's1', status: 'shipped', statusFanoutClaimedAt: null },
+      data: { statusFanoutClaimedAt: expect.any(Date) },
+    });
+  });
+
+  it('a duplicate event for an already-claimed transition sends NOTHING', async () => {
+    h.orderUpdateMany.mockResolvedValue({ count: 0 });
+    const r = await handleOrderStatusChanged('o1', 's1', 'delivered', false, stepStub);
+    expect(r).toEqual({ skipped: 'already-claimed', ran: [] });
+    expect(h.processCommission).not.toHaveBeenCalled();
+    expect(h.earnPoints).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.sendOrderShipped).not.toHaveBeenCalled();
+    expect(h.orderFindUnique).not.toHaveBeenCalled();
   });
 });

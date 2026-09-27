@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext, type OrderStatus } from '@force/database';
 import { groupOrderLinesForDisplay } from '@force/shared';
 import { EmailService } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
@@ -45,6 +45,32 @@ export async function handleOrderStatusChanged(
   if (!orderId || !storeId) {
     logger.warn({ orderId, storeId }, 'order/status-changed fired without ids — skipping');
     return { skipped: 'missing-ids', ran: [] };
+  }
+
+  // Claim THIS transition before any side effect (#558). updateStatus re-nulls
+  // `statusFanoutClaimedAt` with every transition, so exactly one fanout run
+  // per transition gets count=1: a duplicate event for the same transition
+  // (two racing updateStatus calls, the inline fallback after a delayed send,
+  // a stuck-sweep re-send that crossed the original) no-ops instead of sending
+  // every email and dispatch twice. `status` must still be the order's status:
+  // an event whose transition was superseded or rolled back claims nothing.
+  // Memoized as a step, so Inngest retries of the claimant still re-run its
+  // failed side effects. The UPDATE also waits on the order row lock, so it
+  // cannot claim before the request that changed the status has committed.
+  const claim = await step.run('claim-status-fanout', () =>
+    runInTenantContext(storeId, () =>
+      prisma.order.updateMany({
+        where: { id: orderId, storeId, status: status as OrderStatus, statusFanoutClaimedAt: null },
+        data: { statusFanoutClaimedAt: new Date() },
+      })
+    )
+  );
+  if (claim.count === 0) {
+    logger.info(
+      { orderId, storeId, status },
+      'order/status-changed: transition already claimed or superseded — skipping'
+    );
+    return { skipped: 'already-claimed', ran: [] };
   }
 
   const order = await step.run('load-order', () =>

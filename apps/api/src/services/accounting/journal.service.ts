@@ -3,6 +3,7 @@ import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
 import { Prisma as PrismaNs } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { broadcastToStore } from '../../lib/socket-broadcast';
+import { withSavepointOn } from '../../lib/savepoint';
 
 export interface JournalLineInput {
   accountId: string;
@@ -147,13 +148,12 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
     // Fix: wrap the create in a Postgres SAVEPOINT so that a conflict only
     // rolls back to the savepoint, leaving the outer transaction healthy.
     // If the conflict fires we fall back to a findFirst on the existing entry.
-    const sp = `je_idem_${Date.now()}`;
+    // `withSavepointOn` keeps the original error even if the rollback itself
+    // fails, so the P2002 check below still sees the P2002.
+    const tx = input.tx;
     try {
-      await input.tx.$executeRawUnsafe(`SAVEPOINT "${sp}"`);
-      entry = await input.tx.journalEntry.create({ data: createData });
-      await input.tx.$executeRawUnsafe(`RELEASE SAVEPOINT "${sp}"`);
+      entry = await withSavepointOn(tx, () => tx.journalEntry.create({ data: createData }));
     } catch (err: unknown) {
-      await input.tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT "${sp}"`);
       if (err instanceof PrismaNs.PrismaClientKnownRequestError && err.code === 'P2002') {
         // A concurrent caller (or a retry) already posted this entry — return it.
         const winner = await input.tx.journalEntry.findFirst({

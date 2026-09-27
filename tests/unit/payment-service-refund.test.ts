@@ -322,6 +322,32 @@ describe('PaymentService.refund — an absent transaction id is refused, not loo
   });
 });
 
+/**
+ * #1487 — the in-band refund must seed the per-refund status map alongside the
+ * accounted-id list. With the map empty, isRefundEventAlreadySeen falls back to
+ * the payment-wide `refundStatus` scalar, and once that reads 'completed' the
+ * NEXT (out-of-band) refund's webhook is dropped unread.
+ */
+describe('PaymentService.refund — per-refund ledger bookkeeping', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('records both the accounted refund id and its status', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 });
+
+    const write = paymentUpdate.mock.calls.find(
+      c => (c[0] as { data?: { refundId?: string } }).data?.refundId === 'rf_123'
+    );
+    const meta = (write?.[0] as { data: { metadata: Record<string, unknown> } }).data.metadata;
+    expect(meta.refundEventIds).toEqual(['rf_123']);
+    expect(meta.refundStatusById).toEqual({ rf_123: 'completed' });
+  });
+});
+
 describe('PaymentService.refund — one refund per key (a retry after a rollback)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

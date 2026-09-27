@@ -1372,6 +1372,22 @@ model Order {
   /// claim can. NULL past the staleness window is what
   /// refund-reversal-stuck-sweep recovers.
   refundReversedAt       DateTime? @map("refund_reversed_at")
+  /// Stamped (and refundReversedAt re-nulled) at every WHOLE-order,
+  /// stock-restoring `order/refunded` enqueue (OrderService.applyRefundEffects),
+  /// whatever produced it — a cancel/refund status change, a manual-method full
+  /// return on an order that stays `delivered`, a webhook refund. It is the
+  /// immutable "a reversal was requested at" clock refund-reversal-stuck-sweep
+  /// keys on: unlike updatedAt it is not bumped by an unrelated later edit, and
+  /// unlike the status filter it also covers refunds that never change status.
+  refundReversalRequestedAt DateTime? @map("refund_reversal_requested_at")
+  /// `order/status-changed` fanout bookkeeping (#558, #619). updateStatus
+  /// stamps RequestedAt and re-nulls ClaimedAt at every transition; the fanout
+  /// claims (ClaimedAt, only while the order is still AT the event's status)
+  /// before any side effect, so a duplicate event for the same transition
+  /// no-ops instead of re-sending emails/dispatches. order-status-fanout-
+  /// stuck-sweep re-sends a transition whose fanout never claimed it.
+  statusFanoutRequestedAt DateTime? @map("status_fanout_requested_at")
+  statusFanoutClaimedAt   DateTime? @map("status_fanout_claimed_at")
 
   // Enterprise: payment-gateway abandonment capture. Set by the Inngest
   // payment-abandonment-sweep cron when the order has a Payment row with a

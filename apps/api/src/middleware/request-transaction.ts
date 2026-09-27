@@ -82,6 +82,17 @@ import { AppError } from './error-handler';
  * `GET /admin/export/orders`, finance's and newsletter's `.xlsx` exports run
  * on context-less mounts and never enter a request transaction at all.
  *
+ * ## Ambiguous COMMIT — an accepted residual in BOTH lanes (#1603)
+ *
+ * A COMMIT that succeeds in Postgres but whose acknowledgement is lost (the
+ * connection resets after COMMIT is on the wire) cannot be told apart from a
+ * failed one here, so the client gets a 500 for a durable write. Where that
+ * costs money matters: the cart checkout cannot double-order on retry (the
+ * committed order cleared the cart in the same transaction, so a retry fails
+ * EMPTY_CART), while the merchant manual-order route can create a second
+ * pending/unpaid order that moved no money and reserved no stock. See ADR 0001
+ * Consequences and Ruling M2-3.
+ *
  * ## Detached (`void`) work — an unchanged, PRE-EXISTING residual
  *
  * Several in-transaction paths fire best-effort cleanup without awaiting it,

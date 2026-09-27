@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import type { Product } from './types';
+import { variantPriceToField, variantFieldToPrice } from '@/lib/variant-price';
 
 // ─── local types ─────────────────────────────────────────────────────────────
 
@@ -20,7 +21,8 @@ interface Variant {
   title: string;
   titleAr?: string;
   sku?: string | null;
-  price: number;
+  /** Override price; null = inherits the product price (schema: Int?). */
+  price: number | null;
   inventory: number;
 }
 
@@ -38,10 +40,6 @@ type InventoryMode = 'set' | 'adjust';
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 const VARIANT_LOAD_CAP = 25;
-
-function filsToKwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
 
 function kwdToFils(kwd: string): number {
   const n = parseFloat(kwd);
@@ -192,7 +190,9 @@ export function MassEditModal({
               // Clamp display to 0: existing negative values (from pre-fix
               // backorder decrements) should not confuse the merchant.
               inventory: String(Math.max(0, v.inventory)),
-              price: filsToKwd(v.price),
+              // An inheriting variant (price null) shows an EMPTY field, not
+              // 0.000 — saving 0.000 would pin it to a zero override price.
+              price: variantPriceToField(v.price),
             };
           }
         }
@@ -281,7 +281,7 @@ export function MassEditModal({
     const allVariantUpdates: Array<{
       productId: string;
       variantId: string;
-      price: number;
+      price: number | null;
       inventory: number;
     }> = [];
 
@@ -292,7 +292,8 @@ export function MassEditModal({
         allVariantUpdates.push({
           productId: prod.id,
           variantId: v.id,
-          price: kwdToFils(edit.price),
+          // Empty = keep inheriting the product price (null override).
+          price: variantFieldToPrice(edit.price),
           inventory: Math.max(0, parseInt(edit.inventory, 10) || 0),
         });
       }
@@ -567,7 +568,7 @@ export function MassEditModal({
                         prod.variants.map((v, vi) => {
                           const edit = variantEdits[v.id] ?? {
                             inventory: '0',
-                            price: '0.000',
+                            price: '',
                           };
                           return (
                             <tr key={v.id} className="hover:bg-muted/30 transition-colors">

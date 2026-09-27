@@ -32,6 +32,7 @@ vi.mock('@force/database', () => ({
       update: (...a: unknown[]) => orderUpdate(...a),
       findFirst: (...a: unknown[]) => orderFindFirst(...a),
     },
+    store: { findUnique: vi.fn().mockResolvedValue({ name: 'Store' }) },
   },
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
   // The error-handler middleware checks `err instanceof
@@ -90,6 +91,11 @@ const assertValidTransitionMock = vi.fn();
 vi.mock('@api/services/order.service', () => ({
   OrderService: { applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a) },
   assertValidTransition: (...a: unknown[]) => assertValidTransitionMock(...a),
+}));
+
+const sendAlert = vi.fn().mockResolvedValue(undefined);
+vi.mock('@api/services/alerts.service', () => ({
+  sendAlert: (...a: unknown[]) => sendAlert(...a),
 }));
 
 vi.mock('@api/lib/logger', () => ({
@@ -322,6 +328,143 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
       where: { id: ORDER_ID },
       data: { status: 'refunded', paymentStatus: 'refunded' },
     });
+  });
+
+  // #1432 / #1472 — a payment already recorded as partially_refunded must not
+  // be locked out: when the merchant refunds the balance in the provider
+  // portal, the refresh promotes it to refunded and runs the whole-order
+  // reversal exactly once.
+  it('promotes a partially_refunded payment when the balance is refunded later', async () => {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      refundId: 'rf_b',
+      provider: 'myfatoorah',
+      status: 'partially_refunded',
+      amount: 5000,
+      refundedAmount: 2000,
+      metadata: {
+        refundStatus: 'completed',
+        refundEventIds: ['rf_a'],
+        refundStatusById: { rf_a: 'completed' },
+      },
+    });
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundId: 'rf_b',
+      refundedAmount: 3000,
+      amount: 3000,
+      refundReference: 'ref-balance',
+    });
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data.status).toBe('refunded');
+    expect(data.refundedAmount).toBe(5000);
+    expect(applyRefundEffects).toHaveBeenCalledTimes(1);
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: ORDER_ID },
+      data: { status: 'refunded', paymentStatus: 'refunded' },
+    });
+  });
+
+  // #1969's partial_no_gl P1 fires once per partial refund recorded. Now that
+  // a partially_refunded payment re-enters this route, a refresh that adds
+  // nothing must not page again.
+  it('alerts partial_no_gl once, not on a repeat refresh that records nothing new', async () => {
+    mockPaymentNeedingSideEffects();
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundId: 'rf_a',
+      refundedAmount: 2000,
+      amount: 2000,
+    });
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+    const partialAlerts = () =>
+      sendAlert.mock.calls.filter(
+        c => (c[0] as { source: string }).source === 'payment.refund.partial_no_gl'
+      ).length;
+    expect(partialAlerts()).toBe(1);
+
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      refundId: 'rf_a',
+      provider: 'myfatoorah',
+      status: 'partially_refunded',
+      amount: 5000,
+      refundedAmount: 2000,
+      metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+    });
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+    expect(partialAlerts()).toBe(1);
+  });
+
+  it('settles the payment but does not re-reverse an order already marked refunded', async () => {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      refundId: 'rf_b',
+      provider: 'myfatoorah',
+      status: 'partially_refunded',
+      amount: 5000,
+      refundedAmount: 2000,
+      metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+    });
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundId: 'rf_b',
+      refundedAmount: 3000,
+      amount: 3000,
+    });
+    orderFindFirst.mockResolvedValue({ status: 'refunded' });
+
+    const res = await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data.status).toBe('refunded');
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it('re-entering a partially_refunded payment never re-counts an accounted refund', async () => {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      refundId: 'rf_a',
+      provider: 'myfatoorah',
+      status: 'partially_refunded',
+      amount: 5000,
+      refundedAmount: 2000,
+      metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+    });
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundId: 'rf_a',
+      refundedAmount: 2000,
+      amount: 2000,
+    });
+
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data.status).toBe('partially_refunded');
+    expect(data.refundedAmount).toBe(2000);
+    expect(applyRefundEffects).not.toHaveBeenCalled();
   });
 
   it('still records a FULL out-of-band refund as refunded', async () => {

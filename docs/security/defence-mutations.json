@@ -372,6 +372,36 @@
       "test": "tests/unit/mcp-agent-write-attribution.test.ts"
     },
     {
+      "id": "money-coupon-eligibility-guard",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a targeted free_shipping coupon zeroes the delivery fee for any customer who types it — group / first-order / min-quantity / scope ignored (#1380)",
+      "source": "apps/api/src/services/order.service.ts",
+      "find": "      if (!evalResult.eligible) {\n        throw new AppError(400, 'COUPON_NOT_ELIGIBLE', 'This coupon does not apply to your cart.');\n      }",
+      "replace": "      /* eligibility guard removed */",
+      "test": "tests/unit/order.test.ts"
+    },
+    {
+      "id": "money-agent-cod-compensating-rollback",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "an agent COD order whose Payment write fails stays committed with inventory decremented and the cart cleared — an orphan the agent cannot retry (#956)",
+      "source": "apps/api/src/mcp/tools/order.tools.ts",
+      "find": "            await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>\n              logger.error(\n                { err: rbErr, orderId: order.id, storeId: store.id },\n                '[MCP place_order] order rollback failed after COD payment-create failure'",
+      "replace": "            await Promise.resolve().catch(rbErr =>\n              logger.error(\n                { err: rbErr, orderId: order.id, storeId: store.id },\n                '[MCP place_order] order rollback failed after COD payment-create failure'",
+      "test": "tests/unit/mcp-agent-write-attribution.test.ts"
+    },
+    {
+      "id": "audit-affiliate-payout-event-atomic",
+      "domain": "audit",
+      "tier": "unit",
+      "why": "an affiliate payout commits its balance change while its audit row is deferred and dropped on a later 5xx — a durable money movement with no audit trail (#1590)",
+      "source": "apps/api/src/services/affiliate.service.ts",
+      "find": "      affiliateEventCreate({\n        affiliateId,\n        storeId,\n        eventType: 'payout_initiated',\n        details: { payoutId, amount: data.amount, method },\n      }),\n",
+      "replace": "",
+      "test": "tests/unit/affiliate.test.ts"
+    },
+    {
       "id": "authscope-email-must-be-scalar",
       "domain": "injection",
       "tier": "unit",

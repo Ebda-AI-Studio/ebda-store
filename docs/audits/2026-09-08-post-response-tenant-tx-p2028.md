@@ -115,7 +115,12 @@ no-op; those routers only get context if they register
 - A request that returns 5xx rolls its transaction back — and, since #1596, so
   does a request whose COMMIT itself fails (which now surfaces to the client as
   a 500 instead of a 201 over a lost write). Either way its deferred work is
-  **dropped** — the rows it reacts to no longer exist.
+  **dropped** — the rows it reacts to no longer exist. That is only true of
+  work reacting to the request's OWN writes: the three affiliate money sites
+  (`processCommission`, `reverseCommission`, `createPayout`) commit in their own
+  `$transaction` batch, so a later rollback dropped the audit row for a durable
+  balance change (#1590). Their audit row now rides IN that batch
+  (`affiliateEventCreate`) and is no longer deferred.
 - A failing task logs at error level AND fires the standard Telegram alert
   (`sendAlert`, `p1`, `source: after-tenant-commit.<task>`). Remaining tasks
   still run.

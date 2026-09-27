@@ -10,12 +10,14 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/i18n/useT';
+import { effectiveVariantPrice } from '@/lib/variant-price';
 
 interface ProductVariant {
   id: string;
   title: string;
   titleAr?: string | null;
-  price: number;
+  /** Override price; null = inherits the product price (schema: Int?). */
+  price: number | null;
   inventory: number;
   sku?: string | null;
   isActive: boolean;
@@ -275,7 +277,7 @@ export default function NewOrderPage() {
           productId: product.id,
           variantId: variant.id,
           productName: lineItemName,
-          unitPrice: variant.price,
+          unitPrice: effectiveVariantPrice(variant.price, product.price),
           quantity: 1,
         },
       ];
@@ -711,7 +713,9 @@ export default function NewOrderPage() {
                         className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/5 hover:border-primary/40 transition-colors"
                       >
                         {isRtl ? v.titleAr || v.title : v.title || v.titleAr || v.title}
-                        <span className="ms-1.5 text-muted-foreground">{formatPrice(v.price)}</span>
+                        <span className="ms-1.5 text-muted-foreground">
+                          {formatPrice(effectiveVariantPrice(v.price, pendingVariantProduct.price))}
+                        </span>
                         {v.inventory <= 0 && (
                           <span className="ms-1.5 text-destructive/70 text-[10px]">
                             {t('productsSection.outOfStock')}

@@ -89,12 +89,40 @@ describe('refund-reversal-stuck-sweep', () => {
 
     const where = mockOrderFindMany.mock.calls[0][0].where;
     expect(where.refundReversedAt).toBeNull();
-    expect(where.status).toEqual({ in: ['cancelled', 'refunded'] });
-    expect(where.updatedAt.lt).toBeInstanceOf(Date);
-    expect(where.updatedAt.gt).toBeInstanceOf(Date);
+    const [requested, legacy] = where.OR;
+    // Legacy rows (no request stamp): the original status + updatedAt window.
+    expect(legacy.refundReversalRequestedAt).toBeNull();
+    expect(legacy.status).toEqual({ in: ['cancelled', 'refunded'] });
+    expect(legacy.updatedAt.lt).toBeInstanceOf(Date);
+    expect(legacy.updatedAt.gt).toBeInstanceOf(Date);
     // The floor must be genuinely older than the staleness cutoff, otherwise
     // the window is empty and the sweep silently never recovers anything.
-    expect(where.updatedAt.gt.getTime()).toBeLessThan(where.updatedAt.lt.getTime());
+    expect(legacy.updatedAt.gt.getTime()).toBeLessThan(legacy.updatedAt.lt.getTime());
+    const w = requested.refundReversalRequestedAt;
+    expect(w.gt.getTime()).toBeLessThan(w.lt.getTime());
+  });
+
+  // #839 + #855 — the primary branch keys on the request stamp alone: no
+  // status filter (a manual full return leaves the order `delivered`) and no
+  // updatedAt (a later tracking edit must not push a stuck order out).
+  it('selects a requested-but-unclaimed reversal regardless of status or later edits', async () => {
+    await handleRefundReversalStuckSweep(stepStub);
+    const [requested] = mockOrderFindMany.mock.calls[0][0].where.OR;
+    expect(Object.keys(requested)).toEqual(['refundReversalRequestedAt']);
+  });
+
+  it('ages a stuck order by its request stamp, not a later updatedAt bump', async () => {
+    mockOrderFindMany.mockResolvedValue([
+      {
+        id: 'touched',
+        storeId: 's1',
+        status: 'delivered',
+        updatedAt: minsAgo(1),
+        refundReversalRequestedAt: minsAgo(120),
+      },
+    ]);
+    const res = await handleRefundReversalStuckSweep(stepStub);
+    expect(res.alerted).toBe(1);
   });
 
   it('caps each tick so one bad window cannot stampede Inngest', async () => {

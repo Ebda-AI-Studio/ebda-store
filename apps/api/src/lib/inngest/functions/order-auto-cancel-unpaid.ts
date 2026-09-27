@@ -211,6 +211,13 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
               'order-auto-cancel-unpaid: provider status check failed — skipping cancel'
             );
           }
+          // Throttle only after an actual provider call (see
+          // RECONCILE_THROTTLE_MS). It MUST sit inside this step: Inngest
+          // re-executes the handler body from the top at every step boundary
+          // and replays memoized steps instantly, so a sleep in plain loop code
+          // re-fires for every already-processed order on every pass
+          // (O(n²) across a 500-order backlog) without pacing any real call.
+          if (RECONCILE_THROTTLE_MS > 0) await sleep(RECONCILE_THROTTLE_MS);
         }
 
         const decision = decideAutoCancelAction({
@@ -290,11 +297,6 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
         });
         if (ok) cancelled += 1;
         else failed += 1;
-      }
-
-      // Throttle only after an actual provider call (see RECONCILE_THROTTLE_MS).
-      if (order.payments[0]?.transactionId && RECONCILE_THROTTLE_MS > 0) {
-        await sleep(RECONCILE_THROTTLE_MS);
       }
     }
 

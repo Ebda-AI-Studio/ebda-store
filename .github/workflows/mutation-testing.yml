@@ -93,6 +93,11 @@ on:
       # Customer wallet (D1): the no-negative-balance guard, the idempotent
       # replay and the wallet row lock.
       - 'apps/api/src/services/wallet.service.ts'
+      # Batch M2/D2: the free_shipping coupon eligibility guard lives in
+      # order.service.ts; the atomic affiliate payout audit row in
+      # affiliate.service.ts.
+      - 'apps/api/src/services/order.service.ts'
+      - 'apps/api/src/services/affiliate.service.ts'
       - 'apps/web/src/lib/consent-cookie.ts'
       - 'apps/web/src/lib/store-resolver.ts'
       # #1993: the mount table — no admin router may be mounted at '/public'.

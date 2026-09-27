@@ -17,13 +17,15 @@ import { ConfirmActionModal } from '../../../../components/ConfirmActionModal';
 import type { Period, ResolvedDateRange } from '../analytics/_components/types';
 import { resolveDateRange } from '../analytics/_components/types';
 
-type ConfirmType = 'markPaid' | 'bulkMarkPaid';
+type ConfirmType = 'markPaid' | 'bulkMarkPaid' | 'manualRefund';
 
 interface ConfirmState {
   open: boolean;
   type: ConfirmType;
   orderId?: string;
   ids?: string[];
+  /** manualRefund: the order the merchant picked "Refunded" for. */
+  order?: Order;
 }
 
 export default function StoreOrdersPage() {
@@ -155,7 +157,20 @@ export default function StoreOrdersPage() {
     }
   }, [storeId, isExporting, t, showError]);
 
+  // Choosing "Refunded" in the status dropdown only RECORDS a refund: it
+  // reverses stock/coupon/loyalty and sends the customer a "Refund issued"
+  // notification, but moves NO money — that is "Refund via provider" on the
+  // order page. Confirm first so a paid order is never marked refunded (and
+  // the customer told so) by a stray pick (#762).
   const handleStatusChange = async (order: Order, newStatus: string) => {
+    if (newStatus === 'refunded') {
+      setConfirmState({ open: true, type: 'manualRefund', orderId: order.id, order });
+      return;
+    }
+    await executeStatusChange(order, newStatus);
+  };
+
+  const executeStatusChange = async (order: Order, newStatus: string) => {
     setUpdatingId(order.id);
     try {
       const { error: apiError } = await apiPut(
@@ -303,21 +318,32 @@ export default function StoreOrdersPage() {
       const ids = confirmState.ids;
       setConfirmState(prev => ({ ...prev, open: false }));
       await executeBulkMarkPaid(ids);
+    } else if (confirmState.type === 'manualRefund' && confirmState.order) {
+      const order = confirmState.order;
+      setConfirmState(prev => ({ ...prev, open: false }));
+      await executeStatusChange(order, 'refunded');
     }
   };
 
   const closeConfirm = () => setConfirmState(prev => ({ ...prev, open: false }));
 
   const confirmTitle =
-    confirmState.type === 'markPaid' ? tConfirm('markPaidTitle') : tConfirm('bulkMarkPaidTitle');
+    confirmState.type === 'markPaid'
+      ? tConfirm('markPaidTitle')
+      : confirmState.type === 'manualRefund'
+        ? tConfirm('manualRefundTitle')
+        : tConfirm('bulkMarkPaidTitle');
 
   const confirmDescription =
     confirmState.type === 'markPaid'
       ? tConfirm('markPaidDescription')
-      : tConfirm('bulkMarkPaidDescription', { count: confirmState.ids?.length ?? 0 });
+      : confirmState.type === 'manualRefund'
+        ? tConfirm('manualRefundDescription')
+        : tConfirm('bulkMarkPaidDescription', { count: confirmState.ids?.length ?? 0 });
 
   const isConfirmLoading =
-    (confirmState.type === 'markPaid' && updatingId === confirmState.orderId) ||
+    ((confirmState.type === 'markPaid' || confirmState.type === 'manualRefund') &&
+      updatingId === confirmState.orderId) ||
     (confirmState.type === 'bulkMarkPaid' && isBulkProcessing);
 
   const handleToggleSelected = (orderId: string, checked: boolean) => {
@@ -455,6 +481,7 @@ export default function StoreOrdersPage() {
         description={confirmDescription}
         confirmLabel={tConfirm('confirm')}
         cancelLabel={tConfirm('cancel')}
+        variant={confirmState.type === 'manualRefund' ? 'destructive' : 'default'}
         onConfirm={handleConfirm}
         onClose={closeConfirm}
         isLoading={isConfirmLoading}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { orderActionVisibility } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { VALID_TRANSITIONS } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
@@ -48,49 +49,20 @@ export function ActionFooter({
   const nextStatus = transitions.find(s => s !== 'cancelled') ?? null;
   const canCancel = transitions.includes('cancelled');
   const isFinal = ['delivered', 'cancelled', 'refunded'].includes(order.status);
-  // Promoted out of the overflow on mobile — the PWA flow drops the
-  // merchant on this page from a "mark paid" deep link, so the action
-  // must be one tap away, not buried behind a kebab.
-  const showMarkPaid = order.paymentStatus !== 'paid';
-  // The MANUAL "Mark as Paid" button — separately gated. Only show when
-  // the order has NO provider-payment row. For orders with a payment-
-  // provider URL (MyFatoorah/Tap/Hesabe/UPayments — both website checkout
-  // AND merchant-initiated WhatsApp payment links), the paid status MUST
-  // come from the provider's webhook. Letting the merchant flip it
-  // manually would mark an order paid when the customer never actually
-  // paid — financial data integrity break. COD orders (and edge-case
-  // orders with no Payment row at all) keep the manual toggle because
-  // there's no provider to authoritatively confirm. PaymentLinkButton +
-  // RefreshPaymentButton still respect `showMarkPaid` — they're the
-  // affordances merchants USE on provider-payment orders to share the
-  // link or re-check status.
-  const hasProviderPayment = order.payments?.some(
-    p => p.provider !== 'cod' && (p.paymentUrl || p.paymentLink || p.transactionId)
-  );
-  const showManualMarkPaid = showMarkPaid && !hasProviderPayment;
-  // Refund-via-provider is only meaningful when:
-  //   - the order is paid (provider has money to give back)
-  //   - we have a completed online payment row with a transactionId
-  //     (rules out COD / manual-paid where the customer never gave
-  //     us their card)
-  //   - it hasn't already been refunded
-  const completedOnlinePayment = order.payments?.find(
-    p => p.status === 'completed' && p.transactionId && p.provider !== 'cod'
-  );
-  const showRefundViaProvider =
-    order.paymentStatus === 'paid' && !!completedOnlinePayment && order.status !== 'refunded';
-  // Refresh refund status — visible whenever there's a provider-issued
-  // refund (any payment row with a non-null transactionId AND payment
-  // status of refunded / partially_refunded). The button calls the
-  // provider's GetRefundStatus to confirm whether the finance team has
-  // executed the refund yet. Safety net for missed refund webhooks.
-  const refundedPayment = order.payments?.find(
-    p =>
-      (p.status === 'refunded' || p.status === 'partially_refunded') &&
-      p.transactionId &&
-      p.provider !== 'cod'
-  );
-  const showRefreshRefundStatus = !!refundedPayment;
+  // Money-action gating lives in @force/shared's orderActionVisibility,
+  // shared with the orders PWA so the two surfaces cannot drift (#1908):
+  //   - showMarkPaid: promoted out of the overflow on mobile — the PWA flow
+  //     drops the merchant here from a "mark paid" deep link.
+  //   - showManualMarkPaid: only with NO provider-payment row. A provider
+  //     order's paid status MUST come from the webhook; a manual flip could
+  //     mark paid an order the customer never paid. PaymentLinkButton +
+  //     RefreshPaymentButton still follow showMarkPaid.
+  //   - showRefundViaProvider: paid, a completed or partially refunded online
+  //     payment with a transactionId (never COD), not already refunded.
+  //   - showRefreshRefundStatus: a provider-issued refund exists — the safety
+  //     net for a missed refund webhook.
+  const { showMarkPaid, showManualMarkPaid, showRefundViaProvider, showRefreshRefundStatus } =
+    orderActionVisibility(order);
 
   return (
     // Lifted above the fixed MobileBottomNav (h-14 = 56px) on mobile so the

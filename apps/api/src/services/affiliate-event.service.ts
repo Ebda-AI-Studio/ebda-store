@@ -47,20 +47,42 @@ export function recordAffiliateEvent(
   return deferAfterTenantCommit('affiliate-event.record', () => recordAffiliateEventNow(input));
 }
 
+/**
+ * The audit row for a MONEY movement, as a write to put in the SAME batch
+ * transaction that moves the money (#1590).
+ *
+ * The deferred `recordAffiliateEvent` above runs after the request commits and
+ * is DROPPED when the request rolls back. That is right for work that reacts to
+ * the request's own writes, but the affiliate balance batches commit on their
+ * own (a batch transaction is not proxied to the ambient tenant tx), so a 5xx
+ * left a durable commission/payout with no audit row. Written in the batch, the
+ * row commits — or rolls back — with the balance change it describes.
+ */
+export function affiliateEventCreate(input: RecordAffiliateEventInput) {
+  return prisma.affiliateEvent.create({
+    data: affiliateEventData(input),
+    select: { id: true },
+  });
+}
+
+function affiliateEventData(input: RecordAffiliateEventInput) {
+  return {
+    affiliateId: input.affiliateId,
+    storeId: input.storeId,
+    eventType: input.eventType,
+    fromStatus: input.fromStatus ?? null,
+    toStatus: input.toStatus ?? null,
+    triggeredByUserId: input.triggeredByUserId ?? null,
+    details: (input.details ?? {}) as object,
+  };
+}
+
 async function recordAffiliateEventNow(
   input: RecordAffiliateEventInput
 ): Promise<{ id: string } | null> {
   try {
     const event = await prisma.affiliateEvent.create({
-      data: {
-        affiliateId: input.affiliateId,
-        storeId: input.storeId,
-        eventType: input.eventType,
-        fromStatus: input.fromStatus ?? null,
-        toStatus: input.toStatus ?? null,
-        triggeredByUserId: input.triggeredByUserId ?? null,
-        details: (input.details ?? {}) as object,
-      },
+      data: affiliateEventData(input),
       select: { id: true },
     });
 

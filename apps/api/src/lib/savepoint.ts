@@ -1,4 +1,10 @@
 import { prisma, hasTenantContext } from '@force/database';
+import logger from './logger';
+
+/** The one method the savepoint bracket needs from a Prisma client or tx. */
+interface RawExecutor {
+  $executeRawUnsafe(query: string): Promise<unknown>;
+}
 
 /**
  * Monotonic savepoint counter. Postgres allows a name to be reused (the newer
@@ -55,17 +61,43 @@ export async function withSavepoint<T>(fn: () => Promise<T>): Promise<T> {
     return fn();
   }
 
+  return withSavepointOn(prisma, fn);
+}
+
+/**
+ * The savepoint bracket itself, on an explicit client — for a caller that holds
+ * its own transaction handle (`journal.service.ts` posts inside a caller's
+ * `tx`) rather than the ambient tenant transaction. The caller guarantees a
+ * transaction block is open on `client`.
+ *
+ * The ORIGINAL error always propagates. If `ROLLBACK TO SAVEPOINT` itself fails
+ * (transaction already closed by a P2028 timeout, dropped Neon/pgbouncer
+ * connection), that failure is logged and swallowed: letting it replace `err`
+ * would hide the P2002 that the caller's recovery (`cart.service.ts`'s
+ * findFirst, `retryOnWriteConflict`'s `extraRetryCodes`) keys on. The savepoint
+ * is RELEASEd after the rollback so a retried attempt does not leave a live
+ * subtransaction behind for the rest of the request.
+ */
+export async function withSavepointOn<T>(client: RawExecutor, fn: () => Promise<T>): Promise<T> {
   // Name is generated here, never caller-supplied — no interpolation of
   // untrusted input into the raw statement.
   const name = `fwb_sp_${++savepointSeq}`;
 
-  await prisma.$executeRawUnsafe(`SAVEPOINT "${name}"`);
+  await client.$executeRawUnsafe(`SAVEPOINT "${name}"`);
   try {
     const result = await fn();
-    await prisma.$executeRawUnsafe(`RELEASE SAVEPOINT "${name}"`);
+    await client.$executeRawUnsafe(`RELEASE SAVEPOINT "${name}"`);
     return result;
   } catch (err) {
-    await prisma.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT "${name}"`);
+    try {
+      await client.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT "${name}"`);
+      await client.$executeRawUnsafe(`RELEASE SAVEPOINT "${name}"`);
+    } catch (rollbackErr) {
+      logger.error(
+        { rollbackErr, savepoint: name },
+        '[savepoint] rollback failed — rethrowing the original error'
+      );
+    }
     throw err;
   }
 }

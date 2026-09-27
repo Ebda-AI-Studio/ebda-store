@@ -1,8 +1,8 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
-import { recordAffiliateEvent } from './affiliate-event.service';
+import { recordAffiliateEvent, affiliateEventCreate } from './affiliate-event.service';
 
 // ==========================================
 // Interfaces
@@ -505,7 +505,8 @@ class AffiliateService {
 
     const commissionAmount = Math.round((order.total * rate) / 100);
 
-    // Update referral and affiliate balances atomically
+    // Update referral and affiliate balances atomically — and the audit row
+    // with them, so it commits (or rolls back) with the money it records.
     await prisma.$transaction([
       prisma.affiliateReferral.update({
         where: { id: referral.id },
@@ -518,19 +519,18 @@ class AffiliateService {
           pendingBalance: { increment: commissionAmount },
         },
       }),
+      affiliateEventCreate({
+        affiliateId: referral.affiliateId,
+        storeId,
+        eventType: 'commission_recorded',
+        details: { orderId, commissionAmount, rate, referralId: referral.id },
+      }),
     ]);
 
     logger.info(
       { storeId, orderId, affiliateId: referral.affiliateId, commissionAmount, rate },
       '[AffiliateService] Commission processed'
     );
-
-    void recordAffiliateEvent({
-      affiliateId: referral.affiliateId,
-      storeId,
-      eventType: 'commission_recorded',
-      details: { orderId, commissionAmount, rate, referralId: referral.id },
-    });
 
     return { commissionAmount, rate };
   }
@@ -570,19 +570,18 @@ class AffiliateService {
           pendingBalance: { decrement: amount },
         },
       }),
+      affiliateEventCreate({
+        affiliateId: referral.affiliateId,
+        storeId,
+        eventType: 'commission_reversed',
+        details: { orderId, amount, referralId: referral.id },
+      }),
     ]);
 
     logger.info(
       { storeId, orderId, affiliateId: referral.affiliateId, amount },
       '[AffiliateService] Commission reversed (order refunded)'
     );
-
-    void recordAffiliateEvent({
-      affiliateId: referral.affiliateId,
-      storeId,
-      eventType: 'commission_reversed',
-      details: { orderId, amount, referralId: referral.id },
-    });
 
     return { amount };
   }
@@ -653,13 +652,17 @@ class AffiliateService {
       throw new AppError(400, 'INSUFFICIENT_BALANCE', 'Payout amount exceeds pending balance');
     }
 
+    // Id minted here so the audit row in the same batch can name the payout.
+    const payoutId = randomUUID();
+    const method = data.method ?? 'manual';
     const [payout] = await prisma.$transaction([
       prisma.affiliatePayout.create({
         data: {
+          id: payoutId,
           storeId,
           affiliateId,
           amount: data.amount,
-          method: data.method ?? 'manual',
+          method,
           status: 'pending',
           notes: data.notes,
         },
@@ -671,19 +674,18 @@ class AffiliateService {
           totalPaid: { increment: data.amount },
         },
       }),
+      affiliateEventCreate({
+        affiliateId,
+        storeId,
+        eventType: 'payout_initiated',
+        details: { payoutId, amount: data.amount, method },
+      }),
     ]);
 
     logger.info(
       { storeId, affiliateId, payoutId: payout.id, amount: data.amount },
       '[AffiliateService] Payout created'
     );
-
-    void recordAffiliateEvent({
-      affiliateId,
-      storeId,
-      eventType: 'payout_initiated',
-      details: { payoutId: payout.id, amount: data.amount, method: payout.method },
-    });
 
     return payout;
   }

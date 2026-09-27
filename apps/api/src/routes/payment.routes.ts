@@ -705,7 +705,13 @@ router.post(
           orderId: paymentRow.orderId,
           eventType: 'refund',
           fromStatus: paymentRow.status,
-          toStatus: r.amount >= paymentRow.amount ? 'refunded' : 'partially_refunded',
+          // Against the REMAINING balance, as PaymentService.refund decides
+          // it (#1360): the last slice of a piecewise refund settles the
+          // payment even though it is smaller than the original amount.
+          toStatus:
+            (paymentRow.refundedAmount ?? 0) + r.amount >= paymentRow.amount
+              ? 'refunded'
+              : 'partially_refunded',
           provider: paymentRow.provider,
           triggeredByUserId: user.userId,
           details: {

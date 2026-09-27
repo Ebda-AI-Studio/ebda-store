@@ -1032,6 +1032,8 @@
         "markPaidDescription": "Confirm cash payment received for this order. This action cannot be undone.",
         "bulkMarkPaidTitle": "Mark Orders as Paid",
         "bulkMarkPaidDescription": "Mark {count} order(s) as paid? This action cannot be undone.",
+        "manualRefundTitle": "Mark Order as Refunded?",
+        "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\".",
         "confirm": "Confirm",
         "cancel": "Cancel"
       },

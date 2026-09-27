@@ -127,7 +127,8 @@ export class InvoiceService {
             },
           },
         },
-        payments: { where: { status: 'completed' }, take: 1 },
+        // A partial refund leaves the payment captured — keep showing it.
+        payments: { where: { status: { in: ['completed', 'partially_refunded'] } }, take: 1 },
         // Names the promotion behind the discount line when an automatic
         // promotion (not a coupon code) was the applied lever.
         appliedPromotion: { select: { name: true, nameAr: true } },

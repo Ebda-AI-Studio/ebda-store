@@ -1102,6 +1102,16 @@ export class PaymentService {
               // `refundedAmount`, so record its id: the provider's async settle
               // webhook for the SAME refund must not add it a second time.
               [REFUND_EVENT_IDS_KEY]: appendRefundEventId(currentMetadata, response.refundId),
+              // …and seed the per-refund status map in the same write (#1487),
+              // from the same freshly re-read metadata. Left empty,
+              // isRefundEventAlreadySeen falls back to the payment-wide
+              // scalar, which drops the NEXT refund's webhook unread once any
+              // refund settled.
+              [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(
+                currentMetadata,
+                response.refundId,
+                response.status
+              ),
               refundStatus: response.status,
               refundReason: request.reason ?? null,
               refundedAt: new Date().toISOString(),
@@ -1533,8 +1543,8 @@ export class PaymentService {
           // `refundIsFull` the whole-order fanout above gates on, so the status
           // written here and the effects that ran can never disagree.
           //
-          // Unlike the sibling refresh route this guard admits an
-          // ALREADY-partially-refunded row on purpose, so a second, genuinely
+          // Like the sibling refresh route (order.routes.ts, #1432), this guard
+          // admits an ALREADY-partially-refunded row on purpose, so a second, genuinely
           // out-of-band partial refund can still raise the total. That is only
           // safe because resolveRefundSettlement refuses to read an unreported
           // amount — or MyFatoorah's `RefundAmount ?? Amount` invoice echo — as

@@ -50,6 +50,7 @@ import { paymentWebhookProcess } from './payment-webhook-process';
 import { paymentWebhookStuckSweep } from './payment-webhook-stuck-sweep';
 import { orderCreatedStuckSweep } from './order-created-stuck-sweep';
 import { refundReversalStuckSweep } from './refund-reversal-stuck-sweep';
+import { orderStatusFanoutStuckSweep } from './order-status-fanout-stuck-sweep';
 import { paymentReconcileSweep } from './payment-reconcile-sweep';
 import { orderStatusChanged } from './order-status-changed';
 import { bulkAiBalanceDescriptions } from './bulk-ai-balance-descriptions';
@@ -155,6 +156,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // (the order/created enqueue is fire-and-forget with no fallback). 5-min cron.
   orderCreatedStuckSweep,
   refundReversalStuckSweep,
+  orderStatusFanoutStuckSweep,
   // Reconciliation watch: P0-alerts a CAPTURED payment sitting on a CANCELLED
   // order (money taken for an order that will never ship). Hourly cron,
   // alert-once via a durable reconciliation PaymentEvent marker.

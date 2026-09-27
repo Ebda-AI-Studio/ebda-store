@@ -1,0 +1,99 @@
+/**
+ * #1360 — POST /payments/refund writes an append-only audit row whose
+ * `toStatus` must agree with the Payment row PaymentService.refund just wrote.
+ * The service decides "full" against the REMAINING balance; the audit used to
+ * compare the slice against the ORIGINAL amount, so the final slice of a
+ * piecewise refund was audited as partially_refunded on a refunded payment.
+ */
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import express, { type Express } from 'express';
+import request from 'supertest';
+
+const h = vi.hoisted(() => ({
+  paymentFindFirst: vi.fn(),
+  refund: vi.fn(),
+  recordPaymentEvent: vi.fn(),
+}));
+
+vi.mock('@force/database', () => ({
+  prisma: { payment: { findFirst: (...a: unknown[]) => h.paymentFindFirst(...a) } },
+  runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+}));
+vi.mock('@api/middleware/auth', () => ({
+  authenticate: (req: any, _res: any, next: any) => {
+    req.user = { userId: 'u1', role: 'super_admin' };
+    next();
+  },
+  optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
+}));
+vi.mock('@api/middleware/rbac', () => ({
+  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+}));
+vi.mock('@api/middleware/security', () => ({
+  paymentLimiter: (_req: any, _res: any, next: any) => next(),
+  auditLog: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
+vi.mock('@api/services/payment-providers/payment.factory', () => ({
+  PaymentService: { refund: (...a: unknown[]) => h.refund(...a) },
+}));
+vi.mock('@api/services/payment-event.service', () => ({
+  recordPaymentEvent: (...a: unknown[]) => h.recordPaymentEvent(...a),
+}));
+vi.mock('@api/services/order.service', () => ({ OrderService: {} }));
+vi.mock('@api/config', () => ({ config: {} }));
+vi.mock('@api/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+let app: Express;
+beforeAll(async () => {
+  const { default: router } = await import('@api/routes/payment.routes');
+  const { errorHandler } = await import('@api/middleware/error-handler');
+  app = express();
+  app.use(express.json());
+  app.use('/api/v1/payments', router);
+  app.use(errorHandler);
+});
+afterEach(() => vi.clearAllMocks());
+
+function paymentRow(refundedAmount: number) {
+  return {
+    id: 'pay_1',
+    orderId: 'order_1',
+    status: refundedAmount > 0 ? 'partially_refunded' : 'completed',
+    provider: 'myfatoorah',
+    amount: 5000,
+    refundedAmount,
+    order: { store: { id: 'store_1', ownerId: 'owner' } },
+  };
+}
+
+describe('POST /payments/refund — audit toStatus', () => {
+  it('audits the final slice of a piecewise refund as refunded', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(2000));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_2', amount: 3000 });
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 3000 });
+
+    expect(res.status).toBe(200);
+    expect(h.recordPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ fromStatus: 'partially_refunded', toStatus: 'refunded' })
+    );
+  });
+
+  it('audits a first partial slice as partially_refunded (control)', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(h.recordPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ toStatus: 'partially_refunded' })
+    );
+  });
+});

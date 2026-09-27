@@ -149,28 +149,52 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // the human path: if `payment.create` throws, the `order.update` total
           // bump rolls back with it instead of leaving the order permanently
           // overcharged with no `cod_pending` Payment row to show for it.
-          const payment = await withTenantContext(store.id, async tx => {
-            if (codFee > 0) {
-              await tx.order.update({ where: { id: order.id }, data: { total } });
-            }
-            return tx.payment.create({
-              data: {
-                orderId: order.id,
-                provider: 'cod',
-                method: 'cod',
-                status: 'cod_pending',
-                amount: total,
-                currency: order.currency,
-                metadata: { codFee, originalTotal: order.total, source: 'agent' },
-              },
+          //
+          // But the ORDER above already committed (inventory decremented, cart
+          // cleared), so a failure here must undo it — the same compensating
+          // rollback the online branch below and the human path
+          // (payment.routes.ts) run. Otherwise the agent is left with an
+          // orphan order it cannot retry: its cart is gone (EMPTY_CART). #956
+          let payment;
+          try {
+            payment = await withTenantContext(store.id, async tx => {
+              if (codFee > 0) {
+                await tx.order.update({ where: { id: order.id }, data: { total } });
+              }
+              return tx.payment.create({
+                data: {
+                  orderId: order.id,
+                  provider: 'cod',
+                  method: 'cod',
+                  status: 'cod_pending',
+                  amount: total,
+                  currency: order.currency,
+                  metadata: { codFee, originalTotal: order.total, source: 'agent' },
+                },
+              });
             });
-          });
+          } catch (err) {
+            await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>
+              logger.error(
+                { err: rbErr, orderId: order.id, storeId: store.id },
+                '[MCP place_order] order rollback failed after COD payment-create failure'
+              )
+            );
+            throw err;
+          }
+          const codPayment = payment;
 
-          // Non-fatal bookkeeping (unchanged semantics — each still swallows
-          // its own error via .catch), now tenant-scoped like the human path.
+          // Non-fatal bookkeeping (each call swallows its own error via
+          // .catch), tenant-scoped like the human path. The order AND its
+          // cod_pending Payment are committed by now, so nothing past this
+          // point may surface as a failed checkout: the transaction envelope
+          // itself can reject before the callback runs (P2024 pool wait,
+          // P2028), and letting that reach the outer catch would audit a real,
+          // shippable order as `agent.write.failed` and tell the agent its
+          // checkout failed — while its retry hits EMPTY_CART. #1648
           await runInTenantContext(store.id, async () => {
             await recordPaymentEvent({
-              paymentId: payment.id,
+              paymentId: codPayment.id,
               storeId: store.id,
               orderId: order.id,
               eventType: 'created',
@@ -192,7 +216,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
             await auditLog({
               action: 'payment.created',
               resourceType: 'payment',
-              resourceId: payment.id,
+              resourceId: codPayment.id,
               storeId: store.id,
               ip: context.ip,
               userAgent: context.userAgent,
@@ -209,7 +233,12 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
             }).catch(err =>
               logger.error({ err, orderId: order.id }, '[MCP place_order] auditLog failed')
             );
-          });
+          }).catch(err =>
+            logger.error(
+              { err, orderId: order.id },
+              '[MCP place_order] post-commit bookkeeping failed'
+            )
+          );
 
           return ok({
             orderId: order.id,

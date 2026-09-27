@@ -202,3 +202,60 @@ describe('add_to_cart — attribution', () => {
     expect(CartService.view).toHaveBeenCalled();
   });
 });
+
+/**
+ * #956 / #1648 — the COD branch's writes that follow the committed order.
+ *   - a failed Payment write must UNDO the committed order (compensating
+ *     rollback, like the online branch), not strand it cart-less;
+ *   - once the order AND its Payment committed, a rejected bookkeeping
+ *     envelope must never surface as a failed checkout or a failed-write row.
+ */
+describe('place_order (cod) — writes after the order commits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPaymentConfigFindFirst.mockResolvedValue({ fixedFee: null });
+    vi.mocked(OrderService.create).mockResolvedValue({
+      id: 'order-1',
+      orderNumber: 'ORD-1',
+      status: 'pending',
+      total: 3000,
+      currency: 'KWD',
+      items: [],
+    } as never);
+    vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);
+  });
+
+  it('rolls the committed order back when the cod_pending Payment write fails', async () => {
+    const db = await import('@force/database');
+    vi.mocked(db.withTenantContext).mockRejectedValueOnce(new Error('P2028 tx closed'));
+    const tools = harness(registerOrderTools);
+
+    await expect(
+      tools.place_order(
+        { cartId: 'cart-1', paymentMethod: 'cod', customer },
+        authorizedAgentExtra({ ip: '198.51.100.4', userAgent: 'claude/1' })
+      )
+    ).rejects.toThrow('P2028');
+
+    expect(OrderService.rollbackForPaymentFailure).toHaveBeenCalledWith(
+      'store-1',
+      'order-1',
+      'cart-1'
+    );
+  });
+
+  it('returns the committed order (never agent.write.failed) when post-commit bookkeeping rejects', async () => {
+    const db = await import('@force/database');
+    vi.mocked(db.runInTenantContext).mockRejectedValueOnce(new Error('P2024 pool timeout'));
+    const tools = harness(registerOrderTools);
+
+    const result = await tools.place_order(
+      { cartId: 'cart-1', paymentMethod: 'cod', customer },
+      authorizedAgentExtra({ ip: '198.51.100.4', userAgent: 'claude/1' })
+    );
+
+    expect(JSON.stringify(result)).toContain('order-1');
+    expect(rowFor('agent.write.failed')).toBeUndefined();
+    expect(OrderService.rollbackForPaymentFailure).not.toHaveBeenCalled();
+  });
+});

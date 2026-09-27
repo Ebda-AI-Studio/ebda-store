@@ -1,5 +1,6 @@
 'use client';
 
+import { orderActionVisibility } from '@force/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { VALID_TRANSITIONS, type OrderDetail } from '@/lib/orders';
 import { PaymentLinkButton } from './PaymentLinkButton';
@@ -43,25 +44,9 @@ export function ActionFooter({
   const canCancel = transitions.includes('cancelled');
   const isFinal = ['delivered', 'cancelled', 'refunded'].includes(order.status);
 
-  const showMarkPaid = order.paymentStatus !== 'paid';
-  const hasProviderPayment = order.payments?.some(
-    p => p.provider !== 'cod' && (p.paymentUrl || p.paymentLink || p.transactionId)
-  );
-  const showManualMarkPaid = showMarkPaid && !hasProviderPayment;
-
-  const completedOnlinePayment = order.payments?.find(
-    p => p.status === 'completed' && p.transactionId && p.provider !== 'cod'
-  );
-  const showRefundViaProvider =
-    order.paymentStatus === 'paid' && !!completedOnlinePayment && order.status !== 'refunded';
-
-  const refundedPayment = order.payments?.find(
-    p =>
-      (p.status === 'refunded' || p.status === 'partially_refunded') &&
-      p.transactionId &&
-      p.provider !== 'cod'
-  );
-  const showRefreshRefundStatus = !!refundedPayment;
+  // Shared with the admin ActionFooter — one gating rule for both surfaces.
+  const { showMarkPaid, showManualMarkPaid, showRefundViaProvider, showRefreshRefundStatus } =
+    orderActionVisibility(order);
 
   const existingPaymentUrl =
     [...(order.payments ?? [])]

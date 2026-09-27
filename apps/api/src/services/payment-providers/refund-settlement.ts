@@ -1,3 +1,5 @@
+import logger from '../../lib/logger';
+
 /**
  * Does a reported refund settle the payment, and what is the cumulative total?
  *
@@ -144,6 +146,21 @@ export function resolveRefundSettlement(input: {
     typeof reportedEventId === 'string' &&
     reportedEventId.length > 0 &&
     !ids.includes(reportedEventId);
+
+  // A real, credible amount for a named refund is being HELD only because the
+  // payment predates the ledger. Recoverable, but invisible unless logged —
+  // the settled total stays short of what the provider sent back (#1487).
+  if (
+    !provenanceKnown &&
+    credibleAmount !== null &&
+    typeof reportedEventId === 'string' &&
+    reportedEventId.length > 0
+  ) {
+    logger.warn(
+      { reportedEventId, accounted, credibleAmount, paymentAmount },
+      '[refund-settlement] refund amount held: payment predates the per-refund ledger, provenance unknown — reconcile manually'
+    );
+  }
 
   const settled =
     isUnaccountedEvent && credibleAmount !== null

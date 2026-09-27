@@ -3,6 +3,7 @@ import { prisma, Prisma, OrderStatus, withMoneyTx, setTenantGucs } from '@force/
 import { checkMinimumOrder, allocateBundlePrice } from '@force/shared';
 import { generateOrderNumber } from '../utils/order-number';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { pairBackorderedLines } from '../lib/backorder-pairing';
 import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
@@ -1244,21 +1245,21 @@ export class OrderService {
 
       // Create BackorderLine rows and mark OrderItems as cost-deferred for any
       // items that were allowed through with insufficient inventory.
+      // One BackorderLine per backordered decrement — a CONSUMING pairing, so
+      // N bundle boxes sharing a product cannot each claim the same shortfall
+      // (see lib/backorder-pairing.ts, #1552).
       if (backorderedItems.length > 0) {
-        for (const newItem of newOrder.items) {
-          const bo = backorderedItems.find(
-            b =>
-              b.productId === newItem.productId &&
-              (b.variantId ?? null) === (newItem.variantId ?? null)
-          );
-          if (!bo) continue;
+        for (const { line: newItem, quantity } of pairBackorderedLines(
+          newOrder.items,
+          backorderedItems
+        )) {
           await tx.backorderLine.create({
             data: {
               storeId,
               orderItemId: newItem.id,
               productId: newItem.productId,
               variantId: newItem.variantId,
-              qty: newItem.quantity,
+              qty: quantity,
             },
           });
           await tx.orderItem.update({
@@ -1646,7 +1647,15 @@ export class OrderService {
 
     // Set deliveredAt when transitioning to delivered so the review-request
     // Inngest function has an accurate timestamp for the 90-day token expiry.
-    const statusData: Record<string, unknown> = { status };
+    const statusData: Record<string, unknown> = {
+      status,
+      // Arm the order/status-changed fanout for THIS transition: the fanout
+      // claims it once (dedup across duplicate events, #558) and
+      // order-status-fanout-stuck-sweep re-sends it if no fanout ever claims
+      // it (an accepted-but-undelivered event, #619).
+      statusFanoutRequestedAt: new Date(),
+      statusFanoutClaimedAt: null,
+    };
     if (status === 'delivered' && order.status !== 'delivered') {
       statusData.deliveredAt = new Date();
     }
@@ -1764,11 +1773,11 @@ export class OrderService {
         data: { orderId, storeId, status, hadCapturedPayment },
       })
       .catch((err: unknown) => {
-        // Unlike `order/created` (which has order-created-stuck-sweep), this
-        // event has no recovery sweep — so a failed enqueue (Inngest outage /
-        // mid-deploy) would silently lose EVERY migrated side effect. Fall back
-        // to running the fanout in-process (same pattern as the payment-webhook
-        // inline fallback). `handleOrderStatusChanged` is imported statically at
+        // A REJECTED enqueue (Inngest outage / mid-deploy) runs the fanout
+        // in-process right away (same pattern as the payment-webhook inline
+        // fallback) rather than waiting for order-status-fanout-stuck-sweep,
+        // which covers the accepted-but-never-delivered case. Both go through
+        // the fanout's claim, so the two can never both send. `handleOrderStatusChanged` is imported statically at
         // the top of this file — an earlier revision used a dynamic import to
         // dodge a load-time cycle and the note outlived the code.
         // Best-effort + non-blocking.
@@ -1878,6 +1887,23 @@ export class OrderService {
       select: { id: true },
     });
     if (!order) return;
+
+    // Arm the stuck-reversal sweep for a WHOLE-order, stock-restoring event,
+    // whatever produced it (status change, manual full return, webhook):
+    // stamp when the reversal was requested and re-null the completion claim,
+    // so the fanout's final `claim-reversed` step is what marks it done. Keyed
+    // on this rather than on status/updatedAt, a refund that never changes the
+    // order's status (#839), a later unrelated edit (#855) and an earlier
+    // event that claimed a still-live order (#858) can no longer hide a
+    // dropped fanout. restoreInventory:false (backorder-line cancel) is not
+    // armed: the sweep re-sends restoreInventory:true, which would invent
+    // stock that was never reserved. Partial events never claim, so never arm.
+    if (restoreInventory && !options.partial) {
+      await prisma.order.updateMany({
+        where: { id: orderId, storeId },
+        data: { refundReversalRequestedAt: new Date(), refundReversedAt: null },
+      });
+    }
 
     // Let a failed enqueue propagate — every call site already handles
     // applyRefundEffects failures (catch-and-log, or a deliberate

@@ -19,9 +19,12 @@ import { handleStuckRefundClaimSweep } from './refund-claim-stuck-sweep';
  * customer has their money back, and the stock is never returned. Nobody finds
  * out until a merchant notices phantom out-of-stock.
  *
- * This sweep finds cancelled/refunded orders whose fanout never claimed them
- * (`refundReversedAt IS NULL`) past the staleness window and re-sends
- * `order/refunded` once per tick.
+ * This sweep finds orders whose whole-order reversal was REQUESTED
+ * (`refundReversalRequestedAt`, stamped at every stock-restoring enqueue by
+ * applyRefundEffects — status-agnostic and immune to later unrelated writes)
+ * but never claimed (`refundReversedAt IS NULL`) past the staleness window, and
+ * re-sends `order/refunded` once per tick. Orders that predate that column fall
+ * back to the original cancelled/refunded + updatedAt predicate.
  *
  * WHY A CLAIM COLUMN AND NOT THE InventoryHistory MARKER: the `return_stock`
  * marker is legitimately absent in two cases — `restoreInventory: false`
@@ -46,7 +49,11 @@ interface StuckReversal {
   storeId: string;
   status: string;
   updatedAt: Date;
+  refundReversalRequestedAt: Date | null;
 }
+
+/** When the reversal was requested — the immutable clock when we have one. */
+const requestedAt = (o: StuckReversal): Date => o.refundReversalRequestedAt ?? o.updatedAt;
 
 const REFUND_REVERSAL_STUCK_MINUTES = Number(process.env.REFUND_REVERSAL_STUCK_MINUTES) || 10;
 
@@ -84,13 +91,32 @@ export async function handleRefundReversalStuckSweep(
     withRlsBypass(tx =>
       tx.order.findMany({
         where: {
-          status: { in: ['cancelled', 'refunded'] },
           refundReversedAt: null,
-          // Window: reversal is overdue, but the order is NOT older than the
-          // recency floor — so the historical back-catalog is never re-fired.
-          updatedAt: { lt: cutoff, gt: floorCutoff },
+          // Window: reversal is overdue, but NOT older than the recency floor —
+          // so the historical back-catalog is never re-fired.
+          OR: [
+            // Every whole-order stock-restoring enqueue stamps this
+            // (applyRefundEffects). Status-agnostic (a manual full return
+            // leaves the order `delivered`, #839) and immutable (a later
+            // tracking edit or webhook does not move it, #855).
+            { refundReversalRequestedAt: { lt: cutoff, gt: floorCutoff } },
+            // Legacy rows cancelled before that column existed: the original
+            // status + updatedAt predicate, unchanged. Empty within one
+            // recency floor of the deploy.
+            {
+              refundReversalRequestedAt: null,
+              status: { in: ['cancelled', 'refunded'] },
+              updatedAt: { lt: cutoff, gt: floorCutoff },
+            },
+          ],
         },
-        select: { id: true, storeId: true, status: true, updatedAt: true },
+        select: {
+          id: true,
+          storeId: true,
+          status: true,
+          updatedAt: true,
+          refundReversalRequestedAt: true,
+        },
         orderBy: { updatedAt: 'asc' },
         take: SWEEP_TAKE,
       })
@@ -131,7 +157,7 @@ export async function handleRefundReversalStuckSweep(
   // landing (persistent Inngest delivery problem) — page an operator. Stock
   // sitting un-restored is lost sales, so this is a P1.
   const veryStaleCutoff = Date.now() - 3 * REFUND_REVERSAL_STUCK_MINUTES * 60_000;
-  const veryStale = stuck.filter(o => o.updatedAt.getTime() < veryStaleCutoff);
+  const veryStale = stuck.filter(o => requestedAt(o).getTime() < veryStaleCutoff);
   if (veryStale.length > 0) {
     await step.run('alert-very-stale', async () => {
       await sendAlert({
@@ -140,13 +166,13 @@ export async function handleRefundReversalStuckSweep(
         source: 'order.refund.reversal.stuck',
         title: `order/refunded reversals stuck for ${veryStale.length} order(s)`,
         body:
-          `${veryStale.length} cancelled/refunded order(s) still have no reversal after ` +
+          `${veryStale.length} refunded/cancelled order(s) still have no reversal after ` +
           `> ${3 * REFUND_REVERSAL_STUCK_MINUTES}m — inventory NOT restored, coupon/loyalty/` +
           `affiliate NOT reversed. Stock is silently missing from the catalogue. ` +
           `Re-send isn't landing; investigate Inngest delivery.`,
         context: {
           ids: veryStale.slice(0, 20).map(o => o.id),
-          oldestUpdatedAt: veryStale[0]?.updatedAt?.toISOString(),
+          oldestRequestedAt: veryStale[0] ? requestedAt(veryStale[0]).toISOString() : undefined,
         },
       }).catch(() => undefined);
     });

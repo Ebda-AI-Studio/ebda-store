@@ -226,6 +226,66 @@ still 500 `/public/store/resolve` for that request.
 
 ## 2026-09-25
 
+Context: batch M2/D2 (order lifecycle + refund data integrity), branch
+`fix/p2-m2-d2`. Owner rule: production must not break; nothing changes how
+buying or paying works unless an issue requires it.
+
+**Ruling M2-1 — #1487's metadata backfill is NOT run; the in-band writer now
+seeds the per-refund status map and a held total logs at warn.** The proposed
+backfill seeds `refundEventIds = [metadata.refundId]` for every payment with
+`refundedAmount > 0`. `metadata.refundId` is only the LAST refund's id: a
+payment refunded twice in-band before the ledger shipped would be seeded with
+one of its two ids, and the provider's settle webhook for the other would then
+read as a brand-new refund and be ADDED to the total — overstating refunds and
+understating the refundable balance, the unrecoverable direction.
+`resolveRefundSettlement` deliberately holds the total when provenance is
+unknown ("understating a refund is recoverable, paying one twice is not"); the
+backfill would remove that hold on exactly the rows it cannot vouch for. Now
+observable instead: `[refund-settlement] refund amount held` at warn. Cost if
+wrong: a pre-ledger payment later refunded out-of-band keeps a short
+`refundedAmount` until reconciled by hand from that log line.
+
+**Ruling M2-2 — #762 is fixed with a confirm step, not by removing "Refunded"
+from the status dropdown.** The manual status is the only way to record an
+off-platform refund (cash, bank transfer) and to close out a COD order, so
+removing it would strand those. The dialog (en + ar) states that it moves no
+money and names the "Refund via provider" button. `VALID_TRANSITIONS` is
+unchanged (the gateway path needs confirmed→refunded). Cost if wrong: a merchant
+who clicks through the dialog still sends a "Refund issued" message for money
+that did not move.
+
+**Ruling M2-3 — #1603: no idempotency key on order creation.** Evidence: both
+order writers commit in their own `withMoneyTx` (not the request transaction),
+and the cart checkout clears the cart in that same transaction, so a retry after
+an ambiguous 500 fails `EMPTY_CART` — it cannot double-order. The manual-order
+route (`/orders/admin`) carries its items in the payload, so a human retry there
+can create a second order, but it is `pending`/`unpaid`, charges nothing and
+reserves no stock (admin orders do not decrement inventory at creation).
+Adding a key means a migration + unique index on `orders` and a client contract
+for the admin form, to remove a duplicate unpaid draft a merchant can cancel.
+The residual is now documented in `request-transaction.ts` and ADR 0001. Cost
+if wrong: a merchant occasionally sees and cancels a duplicate manual order.
+
+**Ruling M2-4 — #839/#855/#858 are fixed together by a request stamp, not by a
+status gate on the claim.** Gating `claim-reversed` on cancelled/refunded
+(#858's option b) would leave a manual-method FULL return — which restores stock
+on an order that stays `delivered` — permanently unclaimed, and a status-agnostic
+sweep (#839) would then re-send it every tick. Instead `applyRefundEffects`
+stamps `refundReversalRequestedAt` and re-nulls `refundReversedAt` at every
+whole-order stock-restoring enqueue (option a); the sweep keys on that stamp
+(immutable, #855; status-agnostic, #839); `restoreInventory:false` backorder
+events are not armed, so the sweep never invents stock. Pre-column orders keep
+the old status + `updatedAt` predicate. Cost if wrong: one extra `UPDATE orders`
+per cancel/refund enqueue.
+
+**Ruling M2-5 — #1552 keeps each BackorderLine's quantity equal to the whole
+force-decremented LINE, not the shortfall.** That is what every existing
+BackorderLine records (`qty: newItem.quantity`), and the receiving path clears
+by it; changing the unit of the column is a separate decision. The fix only
+makes the pairing consuming, so N bundle boxes of one product record one line
+per decremented box instead of N per box. Cost if wrong: backlog still counts
+whole lines, as it always has.
+
 Context: `docs/plans/2026-09-25-customer-wallet.md` — D1, the customer wallet
 (store credit). Owner's hard rule for the release: production must not break,
 and the three live stores see no change after deploy.

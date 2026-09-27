@@ -1117,11 +1117,13 @@ router.post(
           refundStatusCheckedAt: new Date().toISOString(),
         },
       };
-      if (
-        status.status === 'completed' &&
-        payment.status !== 'refunded' &&
-        payment.status !== 'partially_refunded'
-      ) {
+      // `partially_refunded` is admitted (#1432/#1472): excluding it locked a
+      // payment out of this route forever once any partial refund landed, so
+      // the balance refunded later in the provider portal was never recorded
+      // and the whole-order reversal never ran. resolveRefundSettlement never
+      // lowers the total and refuses to re-count an already-accounted refund
+      // id, so re-entering is safe.
+      if (status.status === 'completed' && payment.status !== 'refunded') {
         // Derive the terminal status from the arithmetic, do not assert it.
         // `refundedAmount` is the cumulative budget PaymentService.refund
         // compare-and-swaps against, and `status` decides whether ReturnService
@@ -1129,8 +1131,7 @@ router.post(
         // out-of-band refund reported here would otherwise be written as a full
         // one: the payment is marked settled while money remains refundable, so
         // every later partial return is rejected for having no refundable
-        // payment. The guard above already skips rows that are refunded or
-        // partially_refunded, so this only ever raises the total from zero.
+        // payment. The guard above only skips rows already fully refunded.
         //
         // A missing, non-finite or non-positive provider amount is NOT
         // evidence of a partial refund — a status payload that carries no
@@ -1218,11 +1219,26 @@ router.post(
       // avoid. A partial refresh updates the payment and stops there; the
       // returns flow owns item-level effects and carries the line data this
       // route does not have.
+      //
+      // Keyed on the payment's own transition INTO `refunded` rather than on a
+      // change of the metadata refundStatus: a payment first seen as a partial
+      // refund already carries refundStatus 'completed', so the later refresh
+      // that promotes it to fully refunded would otherwise never run the
+      // whole-order reversal (#1432). The guard above excludes an
+      // already-refunded payment, so a repeat refresh cannot re-fire it; the
+      // fanout subtracts lines already restored by partial returns.
       const refundIsFull = updateData.status === 'refunded';
       // A partial out-of-band refund recorded here reaches no GL poster — the
       // partial journal needs line data only the returns flow has (#1455).
       // Nothing books it, so say so instead of leaving it to a log line.
-      if (updateData.status === 'partially_refunded') {
+      //
+      // Only when THIS refresh recorded new money. A partially_refunded
+      // payment can now re-enter this route (#1432/#1472); a repeat refresh
+      // that adds nothing must not re-page for a refund already alerted.
+      const raisedRefundTotal =
+        typeof updateData.refundedAmount === 'number' &&
+        updateData.refundedAmount > (payment.refundedAmount ?? 0);
+      if (updateData.status === 'partially_refunded' && raisedRefundTotal) {
         const store = await prisma.store.findUnique({
           where: { id: storeId },
           select: { name: true },
@@ -1239,8 +1255,7 @@ router.post(
       }
       const needsSideEffects =
         status.status === 'completed' &&
-        statusChanged &&
-        payment.status === 'completed' &&
+        (payment.status === 'completed' || payment.status === 'partially_refunded') &&
         refundIsFull;
       if (needsSideEffects) {
         // Guard the direct Order.status write with the state machine — this
@@ -1256,12 +1271,19 @@ router.post(
         if (!currentOrder) {
           throw new AppError(404, 'NOT_FOUND', 'Order not found');
         }
-        assertValidTransition(currentOrder.status, 'refunded');
-        await OrderService.applyRefundEffects(storeId, orderId);
-        await prisma.order.update({
-          where: { id: orderId },
-          data: { status: 'refunded', paymentStatus: 'refunded' },
-        });
+        // An order already `refunded` (e.g. the merchant recorded the refund
+        // by status) has had its whole-order reversal. Now that a partially
+        // refunded payment can be promoted here (#1432), settling its payment
+        // must not re-run that reversal or fail on refunded → refunded — the
+        // same "has the ORDER been reversed" question the webhook asks.
+        if (currentOrder.status !== 'refunded') {
+          assertValidTransition(currentOrder.status, 'refunded');
+          await OrderService.applyRefundEffects(storeId, orderId);
+          await prisma.order.update({
+            where: { id: orderId },
+            data: { status: 'refunded', paymentStatus: 'refunded' },
+          });
+        }
       }
 
       await auditLog({
@@ -1344,7 +1366,12 @@ router.post(
         where: { id: orderId, storeId, deletedAt: null },
         include: {
           payments: {
-            where: { status: 'completed' },
+            // A partially refunded payment still has a refundable balance
+            // (#1360) — PaymentService.refund budgets against
+            // `amount - refundedAmount` and accepts it as a starting state, as
+            // ReturnService does. Filtering to 'completed' alone left this
+            // button dead after the first partial return.
+            where: { status: { in: ['completed', 'partially_refunded'] } },
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
@@ -1365,7 +1392,7 @@ router.post(
           error: {
             code: 'NO_COMPLETED_PAYMENT',
             message:
-              'No completed online payment found for this order. COD orders cannot be refunded via the provider — use the manual "Refunded" status instead.',
+              'No refundable online payment found for this order. COD orders cannot be refunded via the provider — use the manual "Refunded" status instead.',
           },
         });
         return;
