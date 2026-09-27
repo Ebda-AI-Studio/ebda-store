@@ -45,6 +45,18 @@ export default function VerifyEmailClient() {
 
         if (res.ok && json.success) {
           setState('success');
+        } else if (json.error?.code === 'RATE_LIMITED') {
+          // #1863: this route now has its own limiter, but the server's
+          // message is English-only like every other rate-limit message in
+          // this codebase — localize the one path that route change actually
+          // surfaces to shoppers instead of the raw server string.
+          setErrorMessage(
+            t(
+              'Too many verification attempts. Please wait a few minutes and try again.',
+              'محاولات تحقق كثيرة جدًا. يرجى الانتظار بضع دقائق ثم المحاولة مرة أخرى.'
+            )
+          );
+          setState('error');
         } else {
           setErrorMessage(
             json.error?.message || 'The verification link is invalid or has expired.'

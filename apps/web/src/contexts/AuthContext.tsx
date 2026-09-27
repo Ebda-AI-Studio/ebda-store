@@ -45,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await api.getProfile();
       if (result.success && result.data && result.data.user.role === 'customer') {
         setUser(result.data.user);
+      } else if (result.error?.code === 'RATE_LIMITED') {
+        // A throttled refresh is not a sign-out (see #1789): api.ts's
+        // request() now retries /auth/me through a refresh on a 401, and
+        // reports RATE_LIMITED only when that refresh itself was
+        // rate-limited — a "slow down", not a "you are signed out". Clearing
+        // `user` here would render an actually-still-signed-in customer as a
+        // guest for a reason that has nothing to do with their session.
+        // Leave the existing state alone; the next refreshUser() call (e.g.
+        // after the profile save on /account/profile) gets another chance.
       } else {
         setUser(null);
       }

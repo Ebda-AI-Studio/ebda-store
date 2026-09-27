@@ -10,6 +10,7 @@ import {
   refreshLimiter,
   refreshIpLimiter,
   resetEmailLimiter,
+  verifyEmailLimiter,
   auditLog,
   generateCsrfToken,
 } from '../middleware/security';
@@ -919,9 +920,15 @@ router.post(
 // resend-verification) sits behind authLimiter; this one didn't. The token
 // is 256-bit and hashed, so brute force is infeasible — this closes a
 // consistency gap, not a practical attack.
+//
+// #1863: authLimiter's key is `<ip>-<email || 'unknown'>`, and this route's
+// body carries no email, so it fell into the SAME bucket as /reset-password
+// — a real availability problem on a multi-tenant signup funnel that
+// authLimiter's guessing-surface budget was never sized for. verifyEmailLimiter
+// gives it its own, larger, un-pooled budget (see its docstring).
 router.post(
   '/verify-email',
-  authLimiter,
+  verifyEmailLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { token } = req.body;

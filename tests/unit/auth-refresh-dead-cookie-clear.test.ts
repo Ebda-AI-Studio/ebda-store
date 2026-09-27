@@ -25,6 +25,7 @@ vi.mock('@api/services/auth.service', () => ({
 vi.mock('@force/database', () => ({ prisma: {} }));
 vi.mock('@api/middleware/security', () => ({
   authLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  verifyEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   refreshLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   refreshIpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   resetEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),

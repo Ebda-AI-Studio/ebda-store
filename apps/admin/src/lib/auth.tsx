@@ -10,12 +10,7 @@ import {
   ReactNode,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import {
-  getApiUrl,
-  refreshSession,
-  refreshSessionWaitingOutThrottle,
-  clearStoredSession,
-} from './api';
+import { getApiUrl, refreshSession, checkSessionWithMountRetries } from './api';
 import { isIosWebkit, safeInternalPath } from '@force/shared';
 import { useT } from '@/i18n/useT';
 
@@ -45,6 +40,29 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = `${getApiUrl()}/api/v1`;
+
+/**
+ * Post-login destination: honor a validated internal ?returnTo= (set by the
+ * session-kick redirect below) so a re-authenticating user lands back where
+ * they were. `safeInternalPath` rejects offsite targets (absolute,
+ * protocol-relative `//host`, AND backslash tricks `/\host` that a naive
+ * `startsWith('//')` guard misses); we additionally reject the /login page
+ * itself to avoid a redirect loop.
+ *
+ * A plain module-level function (no hooks) so the login page can also call it
+ * — needed once that page redirects away on an already/newly-authenticated
+ * session (see #1814: the mount check now runs on /login too, and this is
+ * where a recovered session sends the user).
+ */
+export function postLoginDestination(): string {
+  if (typeof window === 'undefined') return '/';
+  const raw = new URLSearchParams(window.location.search).get('returnTo');
+  const dest = safeInternalPath(raw, '/');
+  if (dest === '/login' || dest.startsWith('/login/') || dest.startsWith('/login?')) {
+    return '/';
+  }
+  return dest;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const t = useT('auth.login');
@@ -78,60 +96,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     try {
-      // Send the Bearer token from localStorage when available — required
-      // for the iOS PWA path where Safari/WebKit purges the cross-origin
-      // cookie. The cookie is still sent via credentials:'include' as a
-      // fallback for browsers that can rely on it (Mac Chrome, etc.).
-      const accessToken =
-        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      const headers: Record<string, string> = {};
-      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-
-      const response = await fetch(`${API_URL}/auth/me`, {
-        credentials: 'include',
-        headers,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.data.user);
-      } else if (response.status === 401) {
-        // Access token is dead (expired or never set on this device).
-        // refreshToken() delegates to the same single-flight in api.ts so
-        // this path and any concurrent apiRequest 401-retries share ONE
-        // rotation instead of racing and tripping reuse-detection.
-        const outcome = await refreshSessionWaitingOutThrottle();
-        if (outcome === 'refreshed') {
-          // Re-verify with the new access token to populate user state.
-          const newAccessToken =
-            typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-          const retryHeaders: Record<string, string> = {};
-          if (newAccessToken) retryHeaders.Authorization = `Bearer ${newAccessToken}`;
-          const retryResponse = await fetch(`${API_URL}/auth/me`, {
-            credentials: 'include',
-            headers: retryHeaders,
-          });
-          if (retryResponse.ok) {
-            const retryData = await retryResponse.json();
-            setUser(retryData.data.user);
-          } else {
-            clearStoredSession();
-          }
-        } else if (outcome === 'rejected') {
-          clearStoredSession();
-        }
-        // Still 'throttled' after the retries above: leave the credential
-        // alone. The server said "slow down", not "you are signed out", and
-        // discarding the stored refresh token on that answer is unrecoverable
-        // on the iOS PWA where it is the only copy. The user lands on /login,
-        // but the token survives, so a reload recovers without a password.
+      // checkSessionWithMountRetries owns the full /auth/me -> throttle-retry
+      // decision (api.ts) so it is unit-testable without rendering this
+      // component (no jsdom in this repo — Ruling P2-B2-2/P2-B2-7). It stays
+      // 'throttled' — and this call keeps awaiting — for up to
+      // MOUNT_RETRY_DELAYS_MS's budget before giving up, so `isLoading` below
+      // stays true throughout and the redirect-to-/login effect cannot fire
+      // on a throttle that clears within that window (#1782). If it never
+      // clears, the credential still survives (never cleared on 'throttled')
+      // and the user lands on /login, where a full reload now actually
+      // re-checks instead of being a dead end (#1814).
+      const result = await checkSessionWithMountRetries(API_URL);
+      if (result.status === 'authenticated') {
+        setUser(result.user as User);
+      } else if (result.status === 'signed-out') {
+        setUser(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [refreshToken]);
+  }, []);
 
   // Request persistent storage so iOS ITP doesn't evict localStorage (and the
   // refresh token) after ~7 days of inactivity. Best-effort: no-ops on
@@ -142,18 +128,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Check auth ONCE on mount (skip on login page — no session to check).
-  // We deliberately do NOT include `pathname` in the dependency array:
+  // Check auth ONCE on mount, on EVERY route including /login. We
+  // deliberately do NOT include `pathname` in the dependency array:
   // re-running /auth/me on every navigation is wasteful and, worse, creates
   // a race where the checkAuth refresh and the api.ts 401-retry refresh fire
   // concurrently, rotate the same token twice, and trip reuse-detection →
   // instant logout. In-memory `user` state already reflects the session;
   // individual API calls handle their own 401→refresh→retry via api.ts.
+  //
+  // This used to skip the check entirely when the mount pathname was
+  // /login ("no session to check"), which was the actual bug in #1814: a
+  // throttled checkAuth on a PROTECTED route leaves the refresh token intact
+  // and routes here, and the documented recovery — "a reload signs you back
+  // in without a password" — never ran, because reloading /login is exactly
+  // the mount this skip suppressed. Running the check here too costs two
+  // extra fetches on a genuinely-anonymous /login visit (both resolve fast:
+  // /auth/me 401s, the refresh 401s with no cookie/localStorage token) and,
+  // on a real surviving session, lets the login page below redirect the user
+  // straight into the app instead of showing them a password form.
   useEffect(() => {
-    if (pathname === '/login') {
-      setIsLoading(false);
-      return;
-    }
     if (authCheckedRef.current) return;
     authCheckedRef.current = true;
     checkAuth();
@@ -174,24 +167,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.push(`/login${returnTo}`);
     }
   }, [isLoading, user, pathname, router]);
-
-  /**
-   * Post-login destination: honor a validated internal ?returnTo= (set by the
-   * session-kick redirect above) so a re-authenticating user lands back where
-   * they were. `safeInternalPath` rejects offsite targets (absolute,
-   * protocol-relative `//host`, AND backslash tricks `/\host` that a naive
-   * `startsWith('//')` guard misses); we additionally reject the /login page
-   * itself to avoid a redirect loop.
-   */
-  function postLoginDestination(): string {
-    if (typeof window === 'undefined') return '/';
-    const raw = new URLSearchParams(window.location.search).get('returnTo');
-    const dest = safeInternalPath(raw, '/');
-    if (dest === '/login' || dest.startsWith('/login/') || dest.startsWith('/login?')) {
-      return '/';
-    }
-    return dest;
-  }
 
   /** Shared token-storage logic used by both normal login and MFA completion. */
   function storeSession(data: {

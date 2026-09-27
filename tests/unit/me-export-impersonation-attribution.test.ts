@@ -47,6 +47,9 @@ vi.mock('@api/middleware/security', () => ({
   refreshIpLimiter: (_req: any, _res: any, next: any) => next(),
   resetEmailLimiter: (_req: any, _res: any, next: any) => next(),
   writeLimiter: (_req: any, _res: any, next: any) => next(),
+  // #1863: /verify-email got its own limiter instead of sharing authLimiter's
+  // <ip>-unknown bucket with /reset-password.
+  verifyEmailLimiter: (_req: any, _res: any, next: any) => next(),
   auditLog: h.auditLog,
   generateCsrfToken: vi.fn(() => 'csrf'),
 }));

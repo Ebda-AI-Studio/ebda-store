@@ -116,30 +116,32 @@ export function clearStoredSession(): void {
  * How a throttled refresh is waited out before the caller gives up.
  *
  * Preserving the credential is only half an answer: on the mount path the
- * provider stays unauthenticated, `isLoading` goes false, and the redirect
- * effect routes to /login anyway — so the user still sees a password prompt
- * while holding a perfectly good session. `checkAuth` runs ONCE, guarded by a
- * ref, so "the next request retries" was not true there; nothing
- * re-exercised the surviving token. These retries happen INSIDE checkAuth, so
- * `isLoading` stays true throughout and the redirect never fires.
+ * provider needs to stay unauthenticated-but-loading, not unauthenticated,
+ * or the redirect effect routes to /login anyway while the user holds a
+ * perfectly good session. This retry happens INSIDE checkAuth, so `isLoading`
+ * stays true throughout it and the redirect cannot fire mid-retry.
  *
- * ONE retry, and it is deliberately not a recovery from a real throttle.
+ * ONE retry here, and it is deliberately not a recovery from a real throttle
+ * by itself — see `checkSessionWithMountRetries` below, which wraps this in a
+ * further bounded ladder at the whole-session-check level (#1782), so a
+ * mount-time throttle gets more than one chance before the caller gives up.
  *
  * Both buckets it waits on are FIXED 15-minute windows backed by a
  * rate-limit-redis counter, so once a caller is over the cap every request
- * for the rest of the window 429s. No ladder short enough to sit inside
- * `checkAuth` can cross that boundary; a longer one would just be a longer
- * spinner that ends on the same login screen, two requests deeper into the
- * IP-wide cap. What this single retry buys is the case it can actually win —
- * a request that lands on the wrong side of a window boundary, or loses a
- * moment of Redis contention.
+ * for the rest of the window 429s. No ladder — at this layer or the outer one
+ * — can be long enough to reliably cross that boundary without the spinner
+ * itself becoming the problem; what retrying buys is the case it can actually
+ * win — a request that lands on the wrong side of a window boundary, or loses
+ * a moment of Redis contention.
  *
- * The real recovery from a genuine throttle is that the CREDENTIAL SURVIVES:
- * `clearStoredSession` is never called on this outcome, so a reload once the
- * window turns over signs the user back in without a password. Making that
- * automatic — re-checking on focus or `visibilitychange` rather than only on
- * mount — is the durable fix and is deliberately not in this PR; see Ruling
- * P2-B2-7.
+ * The recovery from a genuine, still-throttled-after-retries throttle is that
+ * the CREDENTIAL SURVIVES: `clearStoredSession` is never called on this
+ * outcome, so once the window turns over the user signs back in without a
+ * password — on the next full page load of a protected route, or now also on
+ * /login itself (previously a dead end; see #1814 and the login page's
+ * already-signed-in redirect). Making this automatic without any reload —
+ * re-checking on focus or `visibilitychange` — is the more durable fix and is
+ * deliberately still not in this PR; see Ruling P2-B2-7.
  */
 export const THROTTLE_RETRY_DELAYS_MS = [1_500] as const;
 
@@ -154,6 +156,82 @@ export async function refreshSessionWaitingOutThrottle(): Promise<RefreshOutcome
     outcome = await refreshSession();
   }
   return outcome;
+}
+
+/** A `GET /auth/me` outcome, named the same three ways as a refresh. */
+export type SessionCheckResult =
+  | { status: 'authenticated'; user: unknown }
+  | { status: 'signed-out' }
+  | { status: 'throttled' };
+
+async function fetchMe(apiUrl: string): Promise<Response> {
+  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  return fetch(`${apiUrl}/auth/me`, { credentials: 'include', headers });
+}
+
+/**
+ * The mount-time session check: `GET /auth/me`, and on a 401 wait out a
+ * throttle (`refreshSessionWaitingOutThrottle`) before deciding. Exported as
+ * a plain function — network calls only, no component state — so the
+ * decision logic is unit-testable without rendering `AuthProvider`: this repo
+ * has no jsdom (Ruling P2-B2-2 / P2-B2-7).
+ */
+export async function checkSession(apiUrl: string): Promise<SessionCheckResult> {
+  const first = await fetchMe(apiUrl);
+  if (first.ok) {
+    const data = await first.json();
+    return { status: 'authenticated', user: data.data.user };
+  }
+  if (first.status !== 401) {
+    return { status: 'signed-out' };
+  }
+
+  const outcome = await refreshSessionWaitingOutThrottle();
+  if (outcome === 'refreshed') {
+    const retry = await fetchMe(apiUrl);
+    if (retry.ok) {
+      const data = await retry.json();
+      return { status: 'authenticated', user: data.data.user };
+    }
+    clearStoredSession();
+    return { status: 'signed-out' };
+  }
+  if (outcome === 'rejected') {
+    clearStoredSession();
+    return { status: 'signed-out' };
+  }
+  // Still 'throttled': the server said "slow down", not "you are signed
+  // out" — leave the credential alone (see refreshSessionWaitingOutThrottle).
+  return { status: 'throttled' };
+}
+
+/**
+ * How a persistently-throttled mount check is waited out before the caller
+ * gives up. `THROTTLE_RETRY_DELAYS_MS` waits out a request-level blip inside
+ * ONE refresh; this is one layer up — bounded retries of the WHOLE session
+ * check, so a mount that lands on a throttle gets the same "wrong side of a
+ * window boundary" chance instead of being kicked straight to a login screen
+ * while holding a perfectly good refresh token (#1782).
+ *
+ * `isLoading` stays true across this whole call (see `auth.tsx`'s
+ * `checkAuth`), so the redirect-to-/login effect cannot fire mid-retry. If
+ * every attempt is still throttled after the budget, the caller falls back to
+ * the pre-existing behaviour: land on /login with the credential intact —
+ * where a full reload now actually re-checks instead of being a dead end
+ * (#1814), rather than this loop growing to cover the full 15-minute window.
+ */
+export const MOUNT_RETRY_DELAYS_MS = [5_000, 5_000, 5_000] as const;
+
+export async function checkSessionWithMountRetries(apiUrl: string): Promise<SessionCheckResult> {
+  let result = await checkSession(apiUrl);
+  for (const delay of MOUNT_RETRY_DELAYS_MS) {
+    if (result.status !== 'throttled') break;
+    await sleep(delay);
+    result = await checkSession(apiUrl);
+  }
+  return result;
 }
 
 export function refreshAccessToken(): Promise<string | null> {

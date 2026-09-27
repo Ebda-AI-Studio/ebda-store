@@ -2,12 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import {
-  getApiUrl,
-  refreshSession,
-  refreshSessionWaitingOutThrottle,
-  clearStoredSession,
-} from './api';
+import { getApiUrl, refreshSession, checkSessionWithMountRetries } from './api';
 
 /**
  * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where
@@ -48,6 +43,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void | MfaChallenge>;
   completeMfaLogin: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,52 +84,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     try {
-      const accessToken =
-        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      const headers: Record<string, string> = {};
-      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-
-      const response = await fetch(`${API_URL}/auth/me`, {
-        credentials: 'include',
-        headers,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.data.user);
-      } else if (response.status === 401) {
-        const outcome = await refreshSessionWaitingOutThrottle();
-        if (outcome === 'refreshed') {
-          // Re-verify with the new access token so we can set the user object.
-          const newAccessToken =
-            typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-          const retryHeaders: Record<string, string> = {};
-          if (newAccessToken) retryHeaders.Authorization = `Bearer ${newAccessToken}`;
-          const retryResponse = await fetch(`${API_URL}/auth/me`, {
-            credentials: 'include',
-            headers: retryHeaders,
-          });
-          if (retryResponse.ok) {
-            const retryData = await retryResponse.json();
-            setUser(retryData.data.user);
-          } else {
-            clearStoredSession();
-          }
-        } else if (outcome === 'rejected') {
-          clearStoredSession();
-        }
-        // Still 'throttled' after the retries above: leave the credential
-        // alone. Discarding the stored refresh token in answer to a 429 is
-        // unrecoverable on this app in particular — it is an installed iOS
-        // PWA that asks for persistent storage precisely to keep that one
-        // copy alive.
+      // checkSessionWithMountRetries owns the full /auth/me -> throttle-retry
+      // decision (api.ts) so it is unit-testable without rendering this
+      // component (no jsdom in this repo — Ruling P2-B2-2/P2-B2-7). It stays
+      // 'throttled' — and this call keeps awaiting — for up to
+      // MOUNT_RETRY_DELAYS_MS's budget before giving up, so `isLoading` below
+      // stays true throughout and the redirect-to-/login effect cannot fire
+      // on a throttle that clears within that window (#1782). If it never
+      // clears, the credential still survives (never cleared on 'throttled')
+      // and the user lands on /login, where a re-check now actually runs
+      // instead of being a dead end (#1814).
+      const result = await checkSessionWithMountRetries(API_URL);
+      if (result.status === 'authenticated') {
+        setUser(result.user as AuthUser);
+      } else if (result.status === 'signed-out') {
+        setUser(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [refreshToken]);
+  }, []);
 
   // Request persistent storage so iOS ITP doesn't evict localStorage (and the
   // refresh token) after ~7 days of inactivity. Best-effort: no-ops on
@@ -144,11 +116,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Re-check on every navigation, /login included (#1814): the login page's
+  // own "already signed in → go straight to orders" effect below is what
+  // turns a check that resolves here into a redirect, but that only ever
+  // gets a chance to fire if the check actually runs on this route.
   useEffect(() => {
-    if (pathname === '/login') {
-      setIsLoading(false);
-      return;
-    }
     checkAuth();
   }, [checkAuth, pathname]);
 
@@ -266,7 +238,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated: !!user, login, completeMfaLogin, logout }}
+      value={{
+        user,
+        isLoading,
+        isAuthenticated: !!user,
+        login,
+        completeMfaLogin,
+        logout,
+        refreshToken,
+      }}
     >
       {children}
     </AuthContext.Provider>

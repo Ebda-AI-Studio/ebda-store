@@ -24,7 +24,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import type { Request } from 'express';
-import { resetEmailLimiterKey } from '@api/middleware/security';
+import { resetEmailLimiterKey, verifyEmailLimiterKey } from '@api/middleware/security';
 
 function req(body: unknown): Request {
   return { body } as unknown as Request;
@@ -77,9 +77,44 @@ describe('S5-3 / S5-4: the limiters are actually wired onto their routes', () =>
     expect(middlewareBlock).toContain('resetEmailLimiter');
   });
 
-  it('POST /verify-email is behind authLimiter', () => {
+  it('POST /verify-email is behind verifyEmailLimiter, not the shared authLimiter bucket', () => {
+    // #1863: authLimiter's key is `<ip>-<email || 'unknown'>` and this route
+    // posts no email, so riding authLimiter pooled every verification click
+    // from an IP into the SAME bucket as /reset-password. verifyEmailLimiter
+    // has its own store namespace (see makeRateLimitStore's `prefix`) and a
+    // budget sized for shared-IP signup bursts instead.
     const match = routesSrc.match(/router\.post\(\s*'\/verify-email',([\s\S]*?)async \(req/);
     expect(match, 'could not find the /verify-email route handler').not.toBeNull();
-    expect(match![1]).toContain('authLimiter');
+    const middlewareBlock = match![1];
+    expect(middlewareBlock).toContain('verifyEmailLimiter');
+    expect(middlewareBlock).not.toContain('authLimiter');
+  });
+});
+
+describe('verifyEmailLimiterKey (#1863)', () => {
+  it("is IP-only — it never pools with authLimiter's email-keyed bucket", () => {
+    const key = verifyEmailLimiterKey({
+      ip: '1.1.1.1',
+      body: { token: 'abc' },
+    } as unknown as Request);
+    expect(key).not.toContain('unknown');
+  });
+
+  it('gives two different source IPs different buckets', () => {
+    const a = verifyEmailLimiterKey({ ip: '1.1.1.1', body: {} } as unknown as Request);
+    const b = verifyEmailLimiterKey({ ip: '2.2.2.2', body: {} } as unknown as Request);
+    expect(a).not.toBe(b);
+  });
+
+  it('is NOT keyed on the presented token — the token is unverified here, so keying on it would let an attacker mint an unlimited number of fresh buckets by varying the string', () => {
+    const a = verifyEmailLimiterKey({
+      ip: '1.1.1.1',
+      body: { token: 'aaa' },
+    } as unknown as Request);
+    const b = verifyEmailLimiterKey({
+      ip: '1.1.1.1',
+      body: { token: 'bbb' },
+    } as unknown as Request);
+    expect(a).toBe(b);
   });
 });

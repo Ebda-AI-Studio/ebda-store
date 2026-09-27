@@ -952,6 +952,56 @@
       "test": "tests/unit/refresh-limiter-bucket.test.ts"
     },
     {
+      "id": "verify-email-bucket-not-shared-unknown",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "/verify-email falls back onto authLimiter's shared `<ip>-unknown` bucket, pooling every signup confirmation on this multi-tenant platform behind one IP with /reset-password, so one busy shared IP 429s other merchants' shoppers off a link that was never guessable in the first place",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "  '/verify-email',\n  verifyEmailLimiter,",
+      "replace": "  '/verify-email',\n  authLimiter,",
+      "test": "tests/unit/reset-email-limiter.test.ts"
+    },
+    {
+      "id": "verify-email-bucket-is-ip-keyed-not-token-keyed",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "keying the verify-email bucket on the presented (unverified) token instead of IP lets an attacker mint an unlimited number of fresh buckets by varying the token string — the same bucket-shopping mistake an unverified jwt.decode makes for the refresh bucket",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "export function verifyEmailLimiterKey(req: Request): string {\n  return `verify-email-${ipKeyGenerator(req.ip ?? '')}`;\n}",
+      "replace": "export function verifyEmailLimiterKey(req: Request): string {\n  return `verify-email-${req.body?.token}`;\n}",
+      "test": "tests/unit/reset-email-limiter.test.ts"
+    },
+    {
+      "id": "mount-throttle-outer-ladder-not-abandoned-admin",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the mount-time session check stops retrying a persistent throttle beyond the single 1.5s inner retry, so isLoading goes false and the redirect effect routes an admin/staff user to /login within seconds of a throttle that would have cleared shortly after",
+      "source": "apps/admin/src/lib/api.ts",
+      "find": "  for (const delay of MOUNT_RETRY_DELAYS_MS) {",
+      "replace": "  for (const delay of []) {",
+      "test": "tests/unit/refresh-throttle-not-logout.test.ts"
+    },
+    {
+      "id": "mount-throttle-outer-ladder-not-abandoned-orders",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "same as mount-throttle-outer-ladder-not-abandoned-admin, on the orders PWA — the third frontend that must not diverge (Ruling P2-B2-5)",
+      "source": "apps/orders/src/lib/api.ts",
+      "find": "  for (const delay of MOUNT_RETRY_DELAYS_MS) {",
+      "replace": "  for (const delay of []) {",
+      "test": "tests/unit/refresh-throttle-not-logout.test.ts"
+    },
+    {
+      "id": "web-auth-me-refresh-not-skipped",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "/auth/me is folded back into the blanket /auth/ refresh-skip, so a customer's 401 on the storefront's own session check can never trigger a refresh — a signed-in customer with a perfectly valid refresh token is rendered a guest 30 minutes after login",
+      "source": "apps/web/src/lib/api.ts",
+      "find": "        (!endpoint.startsWith('/auth/') || endpoint === '/auth/me')",
+      "replace": "        !endpoint.startsWith('/auth/')",
+      "test": "tests/unit/refresh-throttle-not-logout.test.ts"
+    },
+    {
       "id": "ssrf-ai-image-url",
       "domain": "SSRF",
       "tier": "unit",

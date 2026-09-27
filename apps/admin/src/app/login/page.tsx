@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Button, Input } from '@force/ui';
-import { useAuth, type MfaChallenge } from '../../lib/auth';
+import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
 
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
@@ -11,7 +12,8 @@ const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 export default function LoginPage() {
   const t = useT('auth.login');
   const tb = useT('components.brand');
-  const { login, completeMfaLogin, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const { login, completeMfaLogin, isLoading: authLoading, isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -27,6 +29,18 @@ export default function LoginPage() {
       setRememberMe(true);
     }
   }, []);
+
+  // Already signed in → skip the form. This is also how a session that was
+  // only *throttled* elsewhere recovers: AuthProvider's mount check now runs
+  // on /login too (#1814), so a reload here can turn a surviving refresh
+  // token back into `isAuthenticated` without a password, and this effect is
+  // what actually carries the user onward instead of leaving them staring at
+  // a login form they don't need.
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.replace(postLoginDestination());
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   // MFA step state
   const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);

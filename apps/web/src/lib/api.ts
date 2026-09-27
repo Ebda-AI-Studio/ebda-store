@@ -378,6 +378,63 @@ const COOKIE_ROTATED = 'cookie-rotated';
 const SESSION_ENDED = 'session-ended';
 
 /**
+ * JS-visible record that a real session was once established in THIS browser.
+ * Written at login, on every successful `/auth/me`, and on every successful
+ * refresh; removed at logout and when the server rejects a refresh (401).
+ *
+ * It exists to keep ANONYMOUS traffic off `POST /auth/refresh`.
+ * `AuthContext.refreshUser()` calls `/auth/me` on every mount — a first-time
+ * visitor's included — and request() refreshes on a 401 there. Without this
+ * gate every guest page load posted a credential-less refresh, which
+ * `refreshLimiterKey` buckets as the SHARED `<ip>-refresh-anon` key (120/15min)
+ * under an IP-wide backstop (600/15min); express-rate-limit counts the request
+ * before the route can answer 400. Behind Kuwait carrier CGNAT or mall/office
+ * wifi, ordinary guest browsing exhausts those buckets, and the REAL signed-in
+ * customers on that IP then get 429 on the one route that renews their access
+ * token and re-mints their CSRF token — checkout writes 403 and the mount check
+ * leaves them as guests. Only a browser that has actually held a session may
+ * spend the bucket.
+ */
+const SESSION_MARKER_KEY = 'hadSession';
+
+function markSessionEstablished(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(SESSION_MARKER_KEY, '1');
+}
+
+/**
+ * Drop every JS-visible trace of the session. Called when the session ends
+ * (logout, or a refresh the server rejected) so a now-anonymous browser stops
+ * counting as evidence. `csrfToken` goes too: with no auth cookie left,
+ * csrfProtection's cookieless branch admits guest writes without one. So does
+ * the iOS-mirrored `refreshToken`: the server clears both auth cookies when it
+ * rejects a refresh, so that copy is dead — left behind it would read as
+ * evidence and buy one doomed refresh per page load.
+ */
+function clearSessionEvidence(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(SESSION_MARKER_KEY);
+  localStorage.removeItem('csrfToken');
+  localStorage.removeItem('refreshToken');
+}
+
+/**
+ * Has a session ever existed in this browser? The marker above plus the two
+ * pre-existing artefacts of a session — the iOS-mirrored `refreshToken` and the
+ * `csrfToken`, both written ONLY from a login/register/refresh response — so
+ * sessions that predate the marker stay refreshable while a never-signed-in
+ * visitor has nothing to present and is not let through.
+ */
+function hasSessionEvidence(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    localStorage.getItem(SESSION_MARKER_KEY) !== null ||
+    localStorage.getItem('refreshToken') !== null ||
+    localStorage.getItem('csrfToken') !== null
+  );
+}
+
+/**
  * A refresh the server THROTTLED, as opposed to one it rejected.
  *
  * 429 and 401 are opposite facts about a session — "slow down" versus "you
@@ -473,10 +530,18 @@ class ApiClient {
           body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
         });
         if (res.status === 429) throw new RefreshThrottledError();
-        if (res.status === 401) return SESSION_ENDED;
+        if (res.status === 401) {
+          // The server cleared both auth cookies on this answer: this browser
+          // holds no session any more, so it must stop presenting itself as one
+          // that could be refreshed.
+          clearSessionEvidence();
+          return SESSION_ENDED;
+        }
         if (!res.ok) return null;
         const json = await res.json();
         if (json.success && json.data) {
+          // A server that rotated this session is proof one exists here.
+          markSessionEstablished();
           // Only persist the rotated REFRESH token on iOS. On other browsers
           // the server already rotated the httpOnly cookies in this response —
           // no JS-visible token storage needed.
@@ -577,8 +642,31 @@ class ApiClient {
         }
       }
 
-      // On 401 (or a CSRF 403), attempt a single token refresh and retry
-      if (shouldRefreshRetry && !endpoint.startsWith('/auth/')) {
+      // On 401 (or a CSRF 403), attempt a single token refresh and retry.
+      // /auth/ endpoints are skipped in general — the loop guard only needs
+      // to exclude /auth/refresh itself, whose own 401/429 handling lives in
+      // refreshAccessToken() above (a raw fetch, not a recursive call through
+      // here). /auth/me is exempted from the skip: it's how AuthContext
+      // learns the customer is still signed in, and with the blanket skip a
+      // 401 there could never trigger a refresh — a customer returning after
+      // the 30-minute access-token window (with a perfectly valid 365-day
+      // refresh token) was rendered signed-out with nothing to recover it.
+      //
+      // A plain 401 additionally requires EVIDENCE that a session ever existed
+      // in this browser (`hasSessionEvidence`). /auth/me is called on every
+      // mount, so without that condition each anonymous storefront visitor
+      // fired a credential-less POST /auth/refresh into the shared
+      // `<ip>-refresh-anon` bucket and starved the signed-in customers behind
+      // the same CGNAT/wifi IP of their token-renewal path. A CSRF-403 is
+      // exempt from the evidence check: that is an active write failing, it is
+      // user-paced rather than per-page-load, and it is the one case where a
+      // session can be alive in the cookies while localStorage was evicted
+      // (Safari ITP) — the state #1526 exists to heal.
+      if (
+        shouldRefreshRetry &&
+        (csrfRejected || hasSessionEvidence()) &&
+        (!endpoint.startsWith('/auth/') || endpoint === '/auth/me')
+      ) {
         // A throttle must not read as a rejection. The storefront has
         // nothing to retry with here, so it returns the original response —
         // but it does NOT let the failure reach AuthContext as "signed out".
@@ -704,6 +792,9 @@ class ApiClient {
     }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password, storeId }) });
 
     if (result.success && result.data) {
+      // This browser now holds a session, so a later 401 on /auth/me is worth
+      // a refresh (see SESSION_MARKER_KEY).
+      markSessionEstablished();
       // The access token is always set as an HTTP-only cookie by the API
       // response. Persist the refresh token to localStorage ONLY on
       // iOS/iPadOS WebKit, where the cross-origin httpOnly cookie is
@@ -741,10 +832,18 @@ class ApiClient {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('refreshToken');
     }
+    clearSessionEvidence();
   }
 
   async getProfile() {
-    return this.request<{ user: User }>('/auth/me');
+    const result = await this.request<{ user: User }>('/auth/me');
+    // A 200 here is the other proof a session lives in this browser — it covers
+    // sessions established before the marker existed, and it re-arms one whose
+    // localStorage was cleared while the cookies survived.
+    if (result.success && result.data) {
+      markSessionEstablished();
+    }
+    return result;
   }
 
   async updateProfile(data: { firstName?: string; lastName?: string; phone?: string }) {

@@ -749,6 +749,59 @@ export const resetEmailLimiter = rateLimit({
 });
 
 /**
+ * Rate-limit bucket for `POST /auth/verify-email`.
+ *
+ * S5-4 (2026-09-22) put this route behind `authLimiter` for consistency with
+ * the rest of this router, but `authLimiter`'s key is
+ * `<ip>-<req.body.email || 'unknown'>` and this route posts only `{ token }`
+ * — no email — so every verification click from one IP pooled into the SAME
+ * `<ip>-unknown` bucket `authLimiter` already gives `/reset-password`. Ruling
+ * P2-B2-3 deliberately keeps THAT pooling for `/reset-password` +
+ * `/mfa/verify`: low-volume, single-account, credential-guessing surfaces.
+ * `/verify-email` isn't one — the token is a 256-bit hash (brute force is
+ * infeasible; see the S5-4 comment above) — and this platform is
+ * multi-tenant, so shoppers on DIFFERENT stores sharing one egress IP (a
+ * Kuwait mobile carrier, an office/retail wifi) pooled into one budget. The
+ * 16th person to click a perfectly valid verification link in 15 minutes got
+ * 429'd with `authLimiter`'s "Too many login attempts" message (#1863).
+ *
+ * A dedicated store namespace (`makeRateLimitStore`'s `prefix` scopes Redis
+ * keys per limiter) un-pools this from `/reset-password` entirely, and the
+ * budget is sized for shared-IP signup bursts rather than credential-
+ * stuffing volume. Kept IP-only rather than keyed on the presented token:
+ * the token is not verified before this middleware runs, so keying on it
+ * would let an attacker mint an unlimited number of fresh buckets just by
+ * varying the string — the bucket-shopping mistake Ruling P2-B2-6 records
+ * for an unverified `jwt.decode`.
+ *
+ * Exported so it can be unit-tested directly (same reasoning as
+ * `resetEmailLimiterKey`/`refreshLimiterKey` above): every limiter is
+ * disabled under vitest (`skipForLoadTestOrTests`), so a bug in the key is
+ * structurally invisible to any suite that only drives the route over HTTP.
+ */
+export function verifyEmailLimiterKey(req: Request): string {
+  return `verify-email-${ipKeyGenerator(req.ip ?? '')}`;
+}
+
+export const verifyEmailLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'verify-email'),
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMITED',
+      message: 'Too many verification attempts, please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: verifyEmailLimiterKey,
+});
+
+/**
  * Upper bound on a string we are willing to run an HMAC over in the refresh
  * key generator. Refresh JWTs are ~300-500 bytes; 4096 is generous headroom.
  */

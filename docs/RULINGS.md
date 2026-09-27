@@ -1562,6 +1562,27 @@ a decision rather than an oversight.
 **Ruling P2-B2-5 — the refresh-throttle fix belongs on all THREE frontends, and
 the first version shipped it on two.**
 
+> AMENDED 2026-09-25 after #1789. This ruling's claim about `apps/web` below —
+> "it never clears stored credentials except on an explicit logout, and its
+> `setUser(null)` is UI state that the next check recovers" — was wrong: there
+> is no next check. `refreshUser` is a `useCallback(..., [])` invoked once
+> from a mount effect, and `request()`'s `!endpoint.startsWith('/auth/')`
+> refresh-retry gate excluded `/auth/me` along with every other `/auth/`
+> route, so `getProfile()` could never take the refresh path at all. A signed-
+> in customer returning after the 30-minute access-token window was rendered
+> a guest — losing saved addresses/loyalty state and checking out as one —
+> with nothing that ever re-checked. Fixed by exempting `/auth/me` specifically
+> from the skip (`/auth/refresh` itself stays excluded — its own throttle/401
+> handling is a raw `fetch` in `refreshAccessToken()`, not a recursive call
+> through `request()`, so there was never a loop risk in exempting more than
+> that one route) and by having `AuthContext.refreshUser` leave `user` as-is
+> on a `RATE_LIMITED` result instead of clearing it, matching admin/orders'
+> "a throttle is not a sign-out" rule at the UI-state layer. Cost if wrong:
+> reintroducing the blanket `/auth/` skip silently brings this back, with no
+> test failing until one is written against a real 401→refresh→200 sequence
+> on `/auth/me` specifically — which is why `tests/unit/refresh-throttle-not-
+logout.test.ts` now includes one.
+
 `apps/orders` was left byte-identical to the bug: the same
 `if (!res.ok) return null`, the same blanket catch, the same
 `localStorage.removeItem('accessToken'/'refreshToken')` pair in its
@@ -1678,6 +1699,38 @@ PWA, and it is not on the order or payment path. The event-driven re-check is
 deferred because it is a behavioural change to the auth provider in two apps,
 with no jsdom in this repo to render it against — the same constraint recorded
 in Ruling P2-B2-2.
+
+> AMENDED 2026-09-25 after #1782 and #1814. Two of the three gaps this ruling
+> named as remaining were closed without the deferred event-driven re-check,
+> and are recorded separately from it so this ruling does not read as
+> superseded wholesale:
+>
+> 1. #1782 — "sees a login screen" was reached even when the throttle cleared
+>    within seconds, because `checkAuth`'s ONE 1.5s retry (this ruling) was
+>    the only retry at ANY layer; once it was exhausted, `isLoading` went
+>    false and the redirect fired immediately. `checkSessionWithMountRetries`
+>    (`api.ts`) now wraps this retry in a further bounded ladder
+>    (`MOUNT_RETRY_DELAYS_MS`, three more attempts 5s apart) at the
+>    whole-session-check level, so a mount-time throttle gets ~15 more seconds
+>    to clear before the caller gives up. This is still bounded and still
+>    cannot cross a full 15-minute window — the reasoning above for why a
+>    longer ladder is the wrong fix stands unchanged — it only narrows the
+>    "wrong side of a window boundary" case this ruling already scoped the
+>    original retry to.
+> 2. #1814 — "has to reload" was not even true: the mount effect skipped
+>    `checkAuth` entirely whenever it mounted with `pathname === '/login'`,
+>    so reloading /login (the one action this ruling names as the recovery)
+>    never re-checked anything. That skip is removed in both
+>    `apps/admin/src/lib/auth.tsx` and `apps/orders/src/lib/auth.tsx`, and the
+>    admin login page gained the "already signed in → redirect" effect
+>    `apps/orders`'s login page already had, so a reload (or, for orders, any
+>    navigation to /login) that recovers the session now actually carries the
+>    user onward instead of leaving them on the form.
+>
+> The event-driven re-check (focus/`visibilitychange`) is still deferred for
+> the reason stated above — it remains a behavioural change to the auth
+> provider with no jsdom in this repo to render it against.
+
 **Ruling P2-B5-1 — #1408 does not reproduce, and #1765 is answered by naming
 the products rather than by changing the cart contract.**
 

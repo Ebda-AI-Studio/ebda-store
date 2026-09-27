@@ -228,6 +228,53 @@ describe('web client — a throttled refresh is not a rejected request', () => {
 });
 
 /**
+ * #1789: `/auth/me` was folded into the blanket `/auth/` refresh-skip, so
+ * `AuthContext.refreshUser` (which calls exactly `getProfile()`, i.e.
+ * `/auth/me`) could NEVER take the refresh path — a signed-in customer past
+ * the 30-minute access-token window was rendered a guest with a perfectly
+ * valid 365-day refresh token sitting unused in the refresh_token cookie.
+ * `/auth/refresh` itself stays excluded from the retry (its own 401/429
+ * handling is the raw `fetch` inside `refreshAccessToken()`, never a
+ * recursive call through `request()`), so exempting more than that one route
+ * carries no loop risk.
+ */
+describe('web client — /auth/me specifically now takes the refresh-retry path (#1789)', () => {
+  it('getProfile() silently refreshes and returns the profile instead of reporting a dead session', async () => {
+    let meCalls = 0;
+    globalThis.fetch = vi.fn(async (url: unknown) => {
+      if (String(url).includes('/auth/refresh')) {
+        return res(200, { success: true, data: { refreshed: true, csrfToken: 'c' } });
+      }
+      meCalls += 1;
+      return meCalls === 1
+        ? res(401, { success: false })
+        : res(200, { success: true, data: { user: { id: 'u1', role: 'customer' } } });
+    }) as never;
+    const { api } = await import('@web/lib/api');
+
+    const result = await api.getProfile();
+
+    expect(result.success).toBe(true);
+    expect(result.data?.user).toEqual({ id: 'u1', role: 'customer' });
+    // The 401 THEN the retried 200 — proves a refresh actually happened
+    // in between rather than /auth/me being answered once and cached.
+    expect(meCalls).toBe(2);
+  });
+
+  it('reports RATE_LIMITED for /auth/me too — a throttle is not a sign-out here either', async () => {
+    globalThis.fetch = vi.fn(async (url: unknown) =>
+      String(url).includes('/auth/refresh') ? res(429) : res(401, { success: false })
+    ) as never;
+    const { api } = await import('@web/lib/api');
+
+    const result = await api.getProfile();
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe('RATE_LIMITED');
+  });
+});
+
+/**
  * Preserving the credential was only HALF an answer.
  *
  * On the mount path, `'throttled'` left the provider unauthenticated:
@@ -285,3 +332,74 @@ describe.each([
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * #1782 / #1814. Preserving the credential (above) was only half the answer:
+ * `checkAuth` ran the /auth/me + refresh sequence ONCE per mount, and
+ * `refreshSessionWaitingOutThrottle`'s own ladder is deliberately ONE 1.5s
+ * retry (Ruling P2-B2-7) — not a recovery from a real throttle by itself. So
+ * a throttle that would have cleared within seconds still left `isLoading`
+ * false and `user` null, and the redirect effect routed straight to /login.
+ *
+ * `checkSessionWithMountRetries` wraps the whole /auth/me-plus-refresh check
+ * in a further bounded ladder (`MOUNT_RETRY_DELAYS_MS`) at the mount-check
+ * layer, so `isLoading` stays true — and the redirect cannot fire — for a
+ * few more attempts before the caller gives up.
+ */
+describe.each([
+  ['admin', () => import('@admin/lib/api')],
+  ['orders', () => import('@orders/lib/api')],
+])(
+  '%s client — the mount-time session check outlasts a transient throttle (#1782)',
+  (_name, load) => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('recovers via the OUTER (mount-level) retry even when the inner refresh ladder alone would still be throttled', async () => {
+      let refreshCalls = 0;
+      globalThis.fetch = vi.fn(async (url: unknown) => {
+        if (String(url).includes('/auth/refresh')) {
+          refreshCalls += 1;
+          // The inner ladder (refreshSessionWaitingOutThrottle) makes exactly
+          // 2 attempts per call on its own (1 + THROTTLE_RETRY_DELAYS_MS.length
+          // = 1 + 1). Succeeding only on the 3rd attempt overall means recovery
+          // is IMPOSSIBLE unless checkSession is invoked a second time by the
+          // outer, mount-level ladder.
+          return refreshCalls >= 3
+            ? res(200, { success: true, data: { refreshed: true } })
+            : res(429);
+        }
+        // /auth/me: 401 until a refresh has actually succeeded.
+        return refreshCalls >= 3 ? res(200, { data: { user: { id: 'u1' } } }) : res(401, {});
+      }) as never;
+      const { checkSessionWithMountRetries } = await load();
+
+      const pending = checkSessionWithMountRetries('http://test/api/v1');
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      await expect(pending).resolves.toEqual({ status: 'authenticated', user: { id: 'u1' } });
+      expect(refreshCalls).toBeGreaterThanOrEqual(3);
+    });
+
+    it('gives up after a bounded budget rather than hanging when the throttle never clears', async () => {
+      globalThis.fetch = vi.fn(async (url: unknown) =>
+        String(url).includes('/auth/refresh') ? res(429) : res(401, {})
+      ) as never;
+      const { checkSessionWithMountRetries } = await load();
+
+      const pending = checkSessionWithMountRetries('http://test/api/v1');
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      await expect(pending).resolves.toEqual({ status: 'throttled' });
+    });
+
+    it('does not retry at all on a genuine sign-out', async () => {
+      globalThis.fetch = vi.fn(async () => res(401, {})) as never;
+      const { checkSessionWithMountRetries } = await load();
+
+      await expect(checkSessionWithMountRetries('http://test/api/v1')).resolves.toEqual({
+        status: 'signed-out',
+      });
+    });
+  }
+);
