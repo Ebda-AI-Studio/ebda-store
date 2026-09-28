@@ -67,3 +67,58 @@ describe('buildBundleMetadata — locale threading', () => {
     ).toBe(meta.description);
   });
 });
+
+/**
+ * Issue #1857, bundle half — the Arabic fallback description interpolated
+ * the ENGLISH `bundle.name`/`store.name` (`تسوق ${bundle.name} من
+ * ${storeName}`) even though `PublicBundleDetail.nameAr` is always present.
+ * Mutation-resistant: asserts the Arabic output does NOT contain the
+ * English noun, not merely that it matches the Arabic Unicode range.
+ */
+describe('buildBundleMetadata — Arabic name/store fallback (#1857)', () => {
+  const STORE_AR = {
+    name: 'Wady Aljuz',
+    nameAr: 'وادي الجوز',
+    slug: 'wady-aljuz',
+    domain: 'wadyaljuz.com',
+  };
+
+  it('ar locale, no descriptionAr at all: title, description, openGraph and twitter titles use the Arabic bundle + store names, never the English ones', () => {
+    const bundle = makeBundle({ description: null, descriptionAr: null });
+
+    const meta = buildBundleMetadata(bundle, STORE_AR, 'ar');
+
+    expect(meta.title).toBe('صندوق الإفطار');
+    expect(meta.title).not.toContain('Breakfast Box');
+    expect(meta.description).toContain('صندوق الإفطار');
+    expect(meta.description).toContain('وادي الجوز');
+    expect(meta.description).not.toContain('Breakfast Box');
+    expect(meta.description).not.toContain('Wady Aljuz');
+    expect(meta.openGraph?.title).toBe('صندوق الإفطار | وادي الجوز');
+    const twitterTitle = meta.twitter && 'title' in meta.twitter ? meta.twitter.title : undefined;
+    expect(twitterTitle).toBe('صندوق الإفطار | وادي الجوز');
+  });
+
+  it('ar locale, bundle/store have no Arabic name set: falls back to the English name rather than going blank', () => {
+    const bundle = makeBundle({ nameAr: null, description: null, descriptionAr: null });
+    const storeNoAr = { name: 'Wady Aljuz', slug: 'wady-aljuz', domain: 'wadyaljuz.com' };
+
+    const meta = buildBundleMetadata(bundle, storeNoAr, 'ar');
+
+    expect(meta.title).toBe('Breakfast Box');
+    expect(meta.description).toContain('Breakfast Box');
+    expect(meta.description).toContain('Wady Aljuz');
+  });
+
+  it('en locale (same bundle/store data): title, description and titles stay English even though nameAr is set', () => {
+    const bundle = makeBundle({ description: null, descriptionAr: null });
+
+    const meta = buildBundleMetadata(bundle, STORE_AR, 'en');
+
+    expect(meta.title).toBe('Breakfast Box');
+    expect(meta.description).toContain('Breakfast Box');
+    expect(meta.description).toContain('Wady Aljuz');
+    expect(meta.description).not.toContain('صندوق الإفطار');
+    expect(meta.openGraph?.title).toBe('Breakfast Box | Wady Aljuz');
+  });
+});

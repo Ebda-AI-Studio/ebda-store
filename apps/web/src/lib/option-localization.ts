@@ -122,13 +122,15 @@ const AXIS_LABEL: Record<'weight' | 'volume' | 'garment', { en: string; ar: stri
   garment: { en: 'Size', ar: 'المقاس' },
 };
 
-/** Localise an option axis label for BOTH storefront locales. Precedence:
- *  1. VALUE-driven detection wins (units are unambiguous) — a "Size"/"Variant"
- *     axis whose values are "400 Gram / 700 Gram" reads Weight / الوزن, not
- *     "Variant" / الحجم;
- *  2. a MEANINGFUL merchant name for the active locale — generic placeholders
- *     ("Variant", "Option", the old "متغير" default) are ignored so they never
- *     surface;
+/** Localise an option axis label for BOTH storefront locales. Precedence
+ *  (fixed 2026-09-25, issue #657 — "merchant name wins"; value detection
+ *  used to run FIRST and silently overrode a merchant's own meaningful axis
+ *  name, e.g. nameAr='التعبئة' with values '500 جرام' rendered as 'الوزن'):
+ *  1. a MEANINGFUL merchant name for the active locale — generic placeholders
+ *     ("Variant", "Option", the old "متغير" default) and a blank name do NOT
+ *     win, so they fall through to step 2;
+ *  2. VALUE-driven detection (units are unambiguous) — a generic/blank axis
+ *     whose values are "400 Gram / 700 Gram" reads Weight / الوزن;
  *  3. the option-name map (Arabic) / the English name; else a neutral fallback
  *     ("Options" / الخيار). The label is NEVER "متغير" or a bare "Variant". */
 export function localizeOptionName(
@@ -137,17 +139,22 @@ export function localizeOptionName(
   isRtl: boolean,
   values?: string[]
 ): string {
-  const axis = detectAxisFromValues(values);
-  if (axis) return isRtl ? AXIS_LABEL[axis].ar : AXIS_LABEL[axis].en;
-
   if (isRtl) {
     const trimmedAr = nameAr?.trim();
     if (trimmedAr && !GENERIC_AXIS_NAMES.has(trimmedAr.toLowerCase())) return trimmedAr;
+
+    const axis = detectAxisFromValues(values);
+    if (axis) return AXIS_LABEL[axis].ar;
+
     return OPTION_NAME_AR[name.trim().toLowerCase()] ?? 'الخيار';
   }
 
   const trimmedEn = name?.trim();
   if (trimmedEn && !GENERIC_AXIS_NAMES.has(trimmedEn.toLowerCase())) return trimmedEn;
+
+  const axis = detectAxisFromValues(values);
+  if (axis) return AXIS_LABEL[axis].en;
+
   return 'Options';
 }
 

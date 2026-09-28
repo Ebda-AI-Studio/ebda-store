@@ -58,11 +58,17 @@ export async function fetchInitialBundle(
 
 export function buildBundleMetadata(
   bundle: PublicBundleDetail,
-  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'>,
+  store: Pick<ResolvedStore, 'name' | 'nameAr' | 'slug' | 'domain'>,
   locale: StorefrontLocale = 'en'
 ): Metadata {
   const { name: storeName, slug: storeSlug, domain: storeDomain } = store;
-  const title = bundle.name;
+  // Arabic locale reads the merchant's Arabic name when present — else the
+  // English name is what would render (issue #1857: the AR fallback
+  // description interpolated `bundle.name`/`store.name`, i.e. English text,
+  // under `<html lang="ar">`).
+  const localizedName = locale === 'ar' && bundle.nameAr ? bundle.nameAr : bundle.name;
+  const localizedStoreName = locale === 'ar' && store.nameAr ? store.nameAr : storeName;
+  const title = localizedName;
   // Bundles carry no metaDescription*/Aeo* columns (schema.prisma Bundle
   // model), so `pickMetaDescription` always falls through to
   // description/descriptionAr — the locale param is what selects between
@@ -75,21 +81,21 @@ export function buildBundleMetadata(
   const description =
     rawDescription?.slice(0, 160) ||
     (locale === 'ar'
-      ? `تسوق ${bundle.name} من ${storeName}. توصيل سريع في الكويت.`
-      : `Buy ${bundle.name} at ${storeName}. Fast delivery in Kuwait.`);
+      ? `تسوق ${localizedName} من ${localizedStoreName}. توصيل سريع في الكويت.`
+      : `Buy ${localizedName} at ${localizedStoreName}. Fast delivery in Kuwait.`);
   const canonicalUrl = storeAbsoluteUrl(
     { slug: storeSlug, domain: storeDomain },
     `/bundles/${bundle.slug}`
   );
 
-  const ogImages = buildOgImages(bundle.image, storeSlug, storeName, bundle.name);
+  const ogImages = buildOgImages(bundle.image, storeSlug, localizedStoreName, localizedName);
 
   return {
     title,
     description,
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      title: `${title} | ${storeName}`,
+      title: `${title} | ${localizedStoreName}`,
       description,
       type: 'website',
       url: canonicalUrl,
@@ -101,7 +107,7 @@ export function buildBundleMetadata(
     // (the store's home description) instead.
     twitter: {
       card: 'summary_large_image',
-      title: `${title} | ${storeName}`,
+      title: `${title} | ${localizedStoreName}`,
       description,
       ...(ogImages.length ? { images: [ogImages[0].url] } : {}),
     },

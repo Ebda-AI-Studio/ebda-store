@@ -102,3 +102,66 @@ describe('buildProductMetadata — locale threading', () => {
     ).toBe(meta.description);
   });
 });
+
+/**
+ * Issue #1857 — the new Arabic fallback description interpolated the
+ * ENGLISH `product.name`/`store.name` under `<html lang="ar">`
+ * (`تسوق ${product.name} من ${storeName}`). Mutation-resistant: these assert
+ * the Arabic output does NOT contain the English noun, not merely that it
+ * matches the Arabic Unicode range (which the template wrapper alone would
+ * already satisfy).
+ */
+describe('buildProductMetadata — Arabic name/store fallback (#1857)', () => {
+  const STORE_AR = { name: 'Pecannbee', nameAr: 'بيكان بي', slug: 'pecannbee', domain: undefined };
+
+  it('ar locale, no AEO/SEO/descriptionAr copy at all: title, description, openGraph and twitter titles all use the Arabic product + store names, never the English ones', () => {
+    const product = {
+      name: 'School Offer',
+      nameAr: 'عرض المدرسة',
+      slug: 'schools-offer',
+      price: 5000,
+    };
+
+    const meta = buildProductMetadata(product, STORE_AR, 'ar');
+
+    expect(meta.title).toBe('عرض المدرسة');
+    expect(meta.title).not.toContain('School Offer');
+    expect(meta.description).toContain('عرض المدرسة');
+    expect(meta.description).toContain('بيكان بي');
+    expect(meta.description).not.toContain('School Offer');
+    expect(meta.description).not.toContain('Pecannbee');
+    expect(meta.openGraph?.title).toBe('عرض المدرسة | بيكان بي');
+    expect(meta.openGraph?.title).not.toContain('School Offer');
+    expect(meta.openGraph?.title).not.toContain('Pecannbee');
+    const twitterTitle = meta.twitter && 'title' in meta.twitter ? meta.twitter.title : undefined;
+    expect(twitterTitle).toBe('عرض المدرسة | بيكان بي');
+  });
+
+  it('ar locale, product/store have no Arabic name set: falls back to the English name rather than going blank', () => {
+    const product = { name: 'School Offer', slug: 'schools-offer', price: 5000 };
+    const storeNoAr = { name: 'Pecannbee', slug: 'pecannbee', domain: undefined };
+
+    const meta = buildProductMetadata(product, storeNoAr, 'ar');
+
+    expect(meta.title).toBe('School Offer');
+    expect(meta.description).toContain('School Offer');
+    expect(meta.description).toContain('Pecannbee');
+  });
+
+  it('en locale (same product/store data): title, description and titles stay English even though nameAr is set', () => {
+    const product = {
+      name: 'School Offer',
+      nameAr: 'عرض المدرسة',
+      slug: 'schools-offer',
+      price: 5000,
+    };
+
+    const meta = buildProductMetadata(product, STORE_AR, 'en');
+
+    expect(meta.title).toBe('School Offer');
+    expect(meta.description).toContain('School Offer');
+    expect(meta.description).toContain('Pecannbee');
+    expect(meta.description).not.toContain('عرض المدرسة');
+    expect(meta.openGraph?.title).toBe('School Offer | Pecannbee');
+  });
+});

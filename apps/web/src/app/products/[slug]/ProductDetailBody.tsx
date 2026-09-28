@@ -53,6 +53,7 @@ export async function fetchProductDetailLayoutSettings(
 
 interface ProductData {
   name: string;
+  nameAr?: string;
   slug: string;
   description?: string;
   descriptionAr?: string;
@@ -67,11 +68,17 @@ interface ProductData {
 
 export function buildProductMetadata(
   product: ProductData,
-  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'>,
+  store: Pick<ResolvedStore, 'name' | 'nameAr' | 'slug' | 'domain'>,
   locale: StorefrontLocale = 'en'
 ): Metadata {
   const { name: storeName, slug: storeSlug, domain: storeDomain } = store;
-  const title = product.name;
+  // Arabic locale reads the merchant's Arabic name when present — else the
+  // English name is what would render (issue #1857: the new AR fallback
+  // description interpolated `product.name`/`store.name`, i.e. English text,
+  // under `<html lang="ar">`).
+  const localizedName = locale === 'ar' && product.nameAr ? product.nameAr : product.name;
+  const localizedStoreName = locale === 'ar' && store.nameAr ? store.nameAr : storeName;
+  const title = localizedName;
   // AEO > SEO > plain description (truncated to 160 chars for meta tag).
   // The plain-description fallback must match `locale` too — with only the
   // locale threaded into `pickMetaDescription` fixed, a product with no AEO/SEO
@@ -83,8 +90,8 @@ export function buildProductMetadata(
   const description =
     rawDescription?.slice(0, 160) ||
     (locale === 'ar'
-      ? `تسوق ${product.name} من ${storeName}. توصيل سريع في الكويت.`
-      : `Buy ${product.name} at ${storeName}. Fast delivery in Kuwait.`);
+      ? `تسوق ${localizedName} من ${localizedStoreName}. توصيل سريع في الكويت.`
+      : `Buy ${localizedName} at ${localizedStoreName}. Fast delivery in Kuwait.`);
   const ogImage = product.images?.[0]?.url;
   const category = product.categories?.[0]?.category?.name;
   // Platform-path stores need the `/<slug>` prefix (see storeAbsoluteUrl doc
@@ -98,14 +105,14 @@ export function buildProductMetadata(
   // og:image — the product photo when present, else the store-aware OG card
   // (`/og?slug=`, resolved against the layout's metadataBase) so an imageless
   // product still gets the store's branded preview instead of a blank card.
-  const ogImages = buildOgImages(ogImage, storeSlug, storeName, product.name);
+  const ogImages = buildOgImages(ogImage, storeSlug, localizedStoreName, localizedName);
 
   return {
     title,
     description,
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      title: `${title} | ${storeName}`,
+      title: `${title} | ${localizedStoreName}`,
       description,
       type: 'website',
       url: canonicalUrl,
@@ -119,7 +126,7 @@ export function buildProductMetadata(
     // instead of its own. Explicit block here matches `openGraph` exactly.
     twitter: {
       card: 'summary_large_image',
-      title: `${title} | ${storeName}`,
+      title: `${title} | ${localizedStoreName}`,
       description,
       ...(ogImages.length ? { images: [ogImages[0].url] } : {}),
     },

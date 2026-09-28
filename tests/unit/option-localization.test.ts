@@ -47,9 +47,9 @@ describe('localizeOptionName (Arabic)', () => {
 describe('localizeOptionName (English) — same smart logic', () => {
   const EN = false;
 
-  it('weight values → "Weight" even when the axis is the generic "Variant"', () => {
+  it('weight values → "Weight" even when the axis is the generic "Variant"/"Option"', () => {
     expect(localizeOptionName('Variant', null, EN, ['400 Gram', '700 Gram'])).toBe('Weight');
-    expect(localizeOptionName('Size', null, EN, ['1 KG'])).toBe('Weight');
+    expect(localizeOptionName('Option', null, EN, ['1 KG'])).toBe('Weight');
   });
 
   it('volume → "Size", garment letter-sizes → "Size"', () => {
@@ -60,6 +60,37 @@ describe('localizeOptionName (English) — same smart logic', () => {
   it('never surfaces a bare "Variant" — generic + no signal → "Options"', () => {
     expect(localizeOptionName('Variant', null, EN, ['A', 'B'])).toBe('Options');
     expect(localizeOptionName('Option', null, EN, ['A', 'B'])).toBe('Options');
+  });
+});
+
+/**
+ * Issue #657 — "merchant name wins". `detectAxisFromValues` used to run
+ * BEFORE the merchant-name branch, so a merchant axis named e.g.
+ * nameAr='التعبئة' / name='Pack size' with unit-bearing values like
+ * '500 جرام' / '500 Gram' was silently overridden to 'الوزن'/'Weight'. A
+ * MEANINGFUL merchant name (non-blank, not in GENERIC_AXIS_NAMES) must now
+ * win outright; only a blank or generic name falls through to value
+ * detection.
+ */
+describe('localizeOptionName — merchant name wins over value detection (#657)', () => {
+  it('meaningful nameAr + unit-bearing values → nameAr wins (ar locale)', () => {
+    expect(localizeOptionName('Pack size', 'التعبئة', true, ['500 جرام', '1 كجم'])).toBe('التعبئة');
+  });
+
+  it('meaningful English name + grams → English name wins (en locale)', () => {
+    expect(localizeOptionName('Pack size', 'التعبئة', false, ['500 Gram', '1 KG'])).toBe(
+      'Pack size'
+    );
+  });
+
+  it('generic name ("Option", etc.) + grams → value detection still wins → "Weight"/"الوزن"', () => {
+    expect(localizeOptionName('Option', 'الخيار', true, ['500 جرام'])).toBe('الوزن');
+    expect(localizeOptionName('Option', 'الخيار', false, ['500 Gram'])).toBe('Weight');
+  });
+
+  it('blank name + unit-bearing values → value detection wins (name absent is the same as generic)', () => {
+    expect(localizeOptionName('', '', true, ['500 جرام'])).toBe('الوزن');
+    expect(localizeOptionName('', null, false, ['500 Gram'])).toBe('Weight');
   });
 });
 

@@ -84,8 +84,12 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
     ?.defaultLanguage as string | undefined;
   const locale = await resolveStorefrontLocale(storeDefaultLanguage);
+  // Arabic locale reads the merchant's Arabic name when present (issue
+  // #1857) — else this fallback description interpolates the English name
+  // under `<html lang="ar">`.
+  const localizedStoreName = locale === 'ar' && store.nameAr ? store.nameAr : store.name;
   const localizedStoreDescriptionFallback =
-    locale === 'ar' ? `تسوق في ${store.name}` : `Shop at ${store.name}`;
+    locale === 'ar' ? `تسوق في ${localizedStoreName}` : `Shop at ${localizedStoreName}`;
 
   // When the admin has enabled PWA and saved app-name / icons / theme color
   // for the store, the API returns a manifest already shaped for that store.
