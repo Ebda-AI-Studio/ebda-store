@@ -16,6 +16,7 @@ import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { productTextFields } from '../../../../../lib/product-payload';
+import { sanitizeReturnTo } from '../../../../../lib/return-to';
 import { useT } from '@/i18n/useT';
 
 type DiscountType = 'none' | 'percentage' | 'fixed';
@@ -36,16 +37,10 @@ export default function NewProductPage() {
   // Plain products-list URL — the fallback whenever `returnTo` is absent or
   // doesn't point back into this store's product list (open-redirect guard).
   const plainProductsUrl = `/stores/${storeId}/products`;
-  const returnTo = useMemo(() => {
-    const raw = searchParams.get('returnTo');
-    if (!raw) return plainProductsUrl;
-    try {
-      const decoded = decodeURIComponent(raw);
-      return decoded.startsWith(plainProductsUrl) ? decoded : plainProductsUrl;
-    } catch {
-      return plainProductsUrl;
-    }
-  }, [searchParams, plainProductsUrl]);
+  const returnTo = useMemo(
+    () => sanitizeReturnTo(searchParams.get('returnTo'), plainProductsUrl),
+    [searchParams, plainProductsUrl]
+  );
 
   const statuses = [
     { value: 'draft', label: t('statusOptions.draft') },

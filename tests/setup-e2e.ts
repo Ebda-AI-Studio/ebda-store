@@ -28,57 +28,78 @@ import path from 'path';
 import { beforeAll, expect } from 'vitest';
 import { assertNotProd, assertTestPathKnown, isIntegrationTestPath } from './helpers/db-guard';
 
+/**
+ * Extracts the (unquoted) `DATABASE_URL` value from a `.env` file's lines, or
+ * `undefined` if the key is absent. Pulled out of `resolveDatabaseUrlFromEnvFile`
+ * so the line-parsing loop isn't nested inside the file-exists / not-found
+ * branching (#1548).
+ */
+function readDatabaseUrlFromEnvLines(envPath: string): string | undefined {
+  const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    if (key !== 'DATABASE_URL') continue;
+    let value = trimmed.slice(eqIdx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    return value;
+  }
+  return undefined;
+}
+
+/**
+ * Fallback path (#3 of `resolveTestDatabaseUrl`): read `DATABASE_URL` from the
+ * repo `.env` file, guard it, and set it. Warns when nothing usable was found
+ * anywhere, so a developer running against the local placeholder DB knows why.
+ */
+function resolveDatabaseUrlFromEnvFile(): void {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const value = readDatabaseUrlFromEnvLines(envPath);
+    if (value !== undefined) {
+      // Guard: refuse to use the prod DB even when read from .env
+      assertNotProd(value, `.env file (${envPath}) — set TEST_DATABASE_URL to avoid this`);
+      process.env.DATABASE_URL = value;
+    }
+  }
+
+  // At this point DATABASE_URL is either the local placeholder or unset.
+  // Warn so the developer knows they're running without a real DB.
+  if (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('postgresql://test:')) {
+    console.warn(
+      '\n⚠  TEST_DATABASE_URL not set — integration tests will run against the ' +
+        'local placeholder DB. ' +
+        'Set TEST_DATABASE_URL to the staging Neon preview branch (ep-spring-dew-a1nn6819) ' +
+        'for a more representative integration environment. See .env.example.\n'
+    );
+  }
+}
+
 /** Resolve DATABASE_URL for this suite, guarding every candidate. */
 function resolveTestDatabaseUrl(): void {
   // ── 1. TEST_DATABASE_URL — preferred path ──────────────────────────────────
   if (process.env.TEST_DATABASE_URL) {
     assertNotProd(process.env.TEST_DATABASE_URL, 'TEST_DATABASE_URL env var');
     process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+    return;
   }
   // ── 2. DATABASE_URL already set (e.g. CI local postgres service) ───────────
-  else if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('postgresql://test:')) {
+  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('postgresql://test:')) {
     // If it's pointing at prod, refuse loudly instead of silently proceeding.
     assertNotProd(process.env.DATABASE_URL, 'DATABASE_URL env var');
     // Already set to a non-placeholder, non-prod URL — nothing to do.
+    return;
   }
   // ── 3. Fall back to .env file ──────────────────────────────────────────────
-  else {
-    const envPath = path.resolve(process.cwd(), '.env');
-    if (fs.existsSync(envPath)) {
-      const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx === -1) continue;
-        const key = trimmed.slice(0, eqIdx).trim();
-        if (key === 'DATABASE_URL') {
-          let value = trimmed.slice(eqIdx + 1).trim();
-          if (
-            (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
-          ) {
-            value = value.slice(1, -1);
-          }
-          // Guard: refuse to use the prod DB even when read from .env
-          assertNotProd(value, `.env file (${envPath}) — set TEST_DATABASE_URL to avoid this`);
-          process.env.DATABASE_URL = value;
-          break;
-        }
-      }
-    }
-
-    // At this point DATABASE_URL is either the local placeholder or unset.
-    // Warn so the developer knows they're running without a real DB.
-    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('postgresql://test:')) {
-      console.warn(
-        '\n⚠  TEST_DATABASE_URL not set — integration tests will run against the ' +
-          'local placeholder DB. ' +
-          'Set TEST_DATABASE_URL to the staging Neon preview branch (ep-spring-dew-a1nn6819) ' +
-          'for a more representative integration environment. See .env.example.\n'
-      );
-    }
-  }
+  resolveDatabaseUrlFromEnvFile();
 }
 
 /**

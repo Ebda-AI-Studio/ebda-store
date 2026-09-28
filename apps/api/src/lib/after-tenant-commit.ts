@@ -165,8 +165,43 @@ export async function withDeferredWork<T>(
   // work is post-response work by definition and must not sit on the request's
   // latency path.
   onCommitted?.();
-  await drain(scope.tasks, ctx);
+  await trackDrain(scope.tasks, ctx);
   return result;
+}
+
+/**
+ * Every drain currently in flight, so a graceful shutdown can wait for them.
+ * #1601: `gracefulShutdown` (index.ts) called `server.close()` then
+ * `prisma.$disconnect()` with no idea whether any request's deferred work
+ * (return-confirmation emails, R2 cleanup, audit rows) was still running — a
+ * Railway redeploy could silently drop it mid-drain, with `$disconnect()`
+ * pulling the connection out from under an in-progress task.
+ */
+const inFlightDrains = new Set<Promise<void>>();
+
+/** Wraps `drain()` so its promise is tracked in `inFlightDrains` for its whole lifetime. */
+async function trackDrain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<void> {
+  if (tasks.length === 0) return;
+  const p: Promise<void> = drain(tasks, ctx).finally(() => inFlightDrains.delete(p));
+  inFlightDrains.add(p);
+  await p;
+}
+
+/**
+ * Wait for every currently in-flight deferred-work drain to finish, up to
+ * `timeoutMs`. Call this from `gracefulShutdown`, after `server.close()`'s
+ * callback fires (no new requests can start queuing drains) and BEFORE
+ * `prisma.$disconnect()` — draining against a disconnected client would just
+ * turn every in-flight task into a fresh, alerted failure.
+ *
+ * Never rejects: a timeout here means "stop waiting", not "something broke" —
+ * `drain()` itself already swallows every task failure (see its doc comment),
+ * so there is nothing here that would throw besides the race's own timer.
+ */
+export async function awaitDeferredWork(timeoutMs: number): Promise<void> {
+  if (inFlightDrains.size === 0) return;
+  const pending = Promise.all(Array.from(inFlightDrains)).then(() => undefined);
+  await Promise.race([pending, new Promise<void>(resolve => setTimeout(resolve, timeoutMs))]);
 }
 
 /**
@@ -220,9 +255,25 @@ function reportDeferredFailure(name: string, err: unknown, ctx: TenantCommitCont
  * know about, this names any site we missed (or that gets added later) the
  * first time it fires, instead of leaving it in a swallowed `.catch`. It does
  * not change query routing — the P2028 still throws exactly as before.
+ *
+ * #1598: a stray access on a tx that ROLLED BACK (`reason: 'aborted'`) is
+ * downgraded to `logger.debug` with no alert. That request already errored
+ * and every write it made — committed or not — is undone; a P2028 reaching
+ * here on that path is routine noise on the error path, not the silent loss
+ * of committed work this alert exists to catch (a client disconnect does NOT
+ * land here: `request-transaction.ts` deliberately lets that tx commit, so it
+ * reports 'committed' like any other successful request).
  */
 export function installClosedTenantTxAlerting(): void {
-  onClosedTenantTxAccess(({ property, stack }) => {
+  onClosedTenantTxAccess(({ property, stack, reason }) => {
+    if (reason === 'aborted') {
+      logger.debug(
+        { property, stack },
+        '[after-tenant-commit] Prisma call on a ROLLED-BACK tenant transaction — ' +
+          'routine on the error path, no alert'
+      );
+      return;
+    }
     logger.error(
       { property, stack },
       '[after-tenant-commit] Prisma call on a COMMITTED tenant transaction — ' +

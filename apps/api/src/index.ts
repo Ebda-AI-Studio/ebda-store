@@ -43,7 +43,7 @@ import { inngest } from './lib/inngest/client';
 import { inngestFunctions } from './lib/inngest/functions';
 import { serve as inngestServe } from 'inngest/express';
 import { withLeaderLock } from './lib/leader-election';
-import { installClosedTenantTxAlerting } from './lib/after-tenant-commit';
+import { installClosedTenantTxAlerting, awaitDeferredWork } from './lib/after-tenant-commit';
 import logger from './lib/logger';
 
 // Initialize Sentry before anything else
@@ -185,7 +185,13 @@ app.use(
 );
 
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
-import { corsDomainCache, CORS_CACHE_TTL_MS, isPlatformOrigin } from './lib/cors-cache';
+import {
+  corsDomainCache,
+  CORS_CACHE_TTL_MS,
+  CORS_LOOKUP_FAILURE_TTL_MS,
+  decideCorsCache,
+  isPlatformOrigin,
+} from './lib/cors-cache';
 import { buildIdentity } from './lib/build-identity';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 
@@ -259,10 +265,15 @@ app.use(
         }
 
         // Return cached result if still fresh
-        const cached = corsDomainCache.get(hostname);
-        if (cached && cached.expiresAt > Date.now()) {
-          return cached.allowed ? callback(null, true) : callback(corsRejection(origin));
+        const decision = decideCorsCache(corsDomainCache.get(hostname), Date.now());
+        if (decision === 'allow') return callback(null, true);
+        if (decision === 'reject') return callback(corsRejection(origin));
+        if (decision === 'unavailable') {
+          return callback(
+            new AppError(503, 'CORS_LOOKUP_UNAVAILABLE', 'Unable to verify origin at this time')
+          );
         }
+        // decision === 'miss' — fall through to the DB lookup below.
 
         // Async DB lookup — only allow if a store with this custom domain exists
         prisma.store
@@ -288,6 +299,18 @@ app.use(
             // line as redundant would throw away the only record of WHY the
             // lookup failed, which is the entire diagnostic value of a 503.
             logger.error({ err, origin }, 'CORS custom-domain lookup failed');
+            // #1074: a failed lookup used to populate NOTHING, so every
+            // request for this hostname re-hit the already-degraded database
+            // for the whole outage. A short negative cache (5s, far shorter
+            // than the 2min success TTL) bounds that to one query per 5s per
+            // hostname while still surfacing the 503 (never silently
+            // upgrading to `allowed`) and self-healing fast once Neon
+            // recovers.
+            corsDomainCache.set(hostname, {
+              allowed: false,
+              unknown: true,
+              expiresAt: Date.now() + CORS_LOOKUP_FAILURE_TTL_MS,
+            });
             callback(
               new AppError(503, 'CORS_LOOKUP_UNAVAILABLE', 'Unable to verify origin at this time')
             );
@@ -677,6 +700,13 @@ async function gracefulShutdown(signal: string) {
       shippingCarrierService.stopTrackingCron();
       loyaltyAutomationService.stopCron();
       socketService.close();
+      // #1601: no new requests can start after server.close()'s callback
+      // fires, so every deferred-work drain still running belongs to a
+      // request whose response already went out. Wait for them (bounded —
+      // see the 30s force-close timer below) BEFORE disconnecting Prisma;
+      // otherwise a Railway redeploy silently drops in-flight return-
+      // confirmation emails / R2 cleanup / audit rows mid-drain.
+      await awaitDeferredWork(10000);
       await prisma.$disconnect();
       await redis.disconnect();
       await SentryService.close();

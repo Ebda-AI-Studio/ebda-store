@@ -14,7 +14,7 @@ import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { inngest } from '../lib/inngest/client';
-import { stampHumanEdits } from './ai-autofill.service';
+import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
 import { recordSlugRedirect } from './slug-redirect.service';
 
 /**
@@ -800,6 +800,17 @@ export class ProductService {
       .catch(err =>
         logger.warn({ err, productId: product.id }, '[product.create] inngest send failed')
       );
+
+    // #1937: kick the recommendations sweep HERE, synchronously (AWAITED —
+    // never a bare `void`, which would inherit this request's tenant
+    // transaction via AsyncLocalStorage and P2028 the moment it outlives the
+    // response), rather than in the debounced `product.upserted` Inngest
+    // consumer's `op === 'create'` branch. That handler debounces on
+    // productId for 10s and delivers only the LAST event in the window, so a
+    // create-then-quick-edit silently dropped the kick. Doing it once, here,
+    // at the one true creation site removes the dependency on which event
+    // survives debounce entirely. Swallows its own errors internally.
+    await enqueueRecommendationsSweepForNewProduct(storeId, product.id);
 
     return product;
   }

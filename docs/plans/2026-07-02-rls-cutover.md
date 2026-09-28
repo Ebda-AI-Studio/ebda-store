@@ -78,11 +78,47 @@ Ship 1a/1b/1c as **one or two PRs**. Prod is still on the owner role → users s
 
 ## Phase 2 — Staging soak (still no prod change)
 
+**SUPERSEDED (#1975, 2026-09-26) — staging itself is retired.** `ci.yml`
+retired the `TEST_DATABASE_URL` path that pointed at the `ep-spring-dew`
+preview branch "with staging" (see that file's comment on the integration-test
+DB setup), so there is no standing staging `DATABASE_URL` left to point at
+`force_app`. Its replacement is the **CI force_app integration job** (added in
+the same PR series as the RLS-S1..S5 rulings below): it runs the built API as
+`force_app` against a real (ephemeral, per-job) Postgres and the **RLS Payload
+Parity** job diffs owner-vs-force_app storefront payloads. That substitute is
+narrower than the staging soak this section originally specified, on three
+axes:
+
+1. **Inngest/cron writers are unexercised.** The CI job sets
+   `INNGEST_DRY_RUN: 'true'`, which no-ops every Inngest function — so the
+   "Inngest jobs + crons... confirm each still bypasses correctly" bullet
+   below has never actually been run under force_app in CI (#1974).
+2. **No sustained/real traffic volume.** A CI job proves correctness on a
+   fixed, small fixture set once; it says nothing about behavior under the
+   concurrency and data volume of the three live stores.
+3. **No p95 measurement.** The "load-test... confirm... doesn't regress p95"
+   bullet has no CI equivalent at all.
+
+The bullets immediately below are kept as the CHECKLIST of what a staging
+soak was meant to exercise — useful for judging what the CI substitute does
+and does not cover, and for planning a one-off soak against a restored
+production copy (see "Before a second attempt" further down) — not as
+instructions to point a `DATABASE_URL` at a staging environment that no
+longer exists.
+
 - Point a **staging** environment's `DATABASE_URL` at `force_app` (staging DB, non-owner). Run the full app: checkout (exercises `addresses`), payments, refunds, every admin section, the formerly-bare routers, the Inngest jobs + crons (these use `withRlsBypass` — confirm each still bypasses correctly), the Orders PWA.
 - Watch for `permission denied` / empty-result regressions. Any table that 42501s or silently returns empty = a missing policy or a missing context set → back to Phase 1.
 - Load-test one storefront + admin under force_app to confirm the extra interactive-tx wrapping on the newly-wired routers doesn't regress p95.
 
-Exit criteria: full staging pass on force_app, zero permission errors, p95 within budget.
+Exit criteria (ORIGINAL, unexecutable — no staging environment exists):
+full staging pass on force_app, zero permission errors, p95 within budget.
+
+Exit criteria (CURRENT substitute, #1975): the CI force_app integration job
+and the RLS Payload Parity job both green on `main`; the "Before a second
+attempt" checklist below run at least once against a restored production
+copy; Inngest/cron coverage and p95 remain OPEN GAPS to be closed or
+explicitly accepted as a residual before Phase 3, not silently assumed
+covered by a green CI run.
 
 ---
 
@@ -151,5 +187,5 @@ Every contextless reader of a strict table fails silently under `force_app`. The
 
 1. The parity job and the RLS registry test green on `main`.
 2. Run the parity script against a **restored copy of production** (Neon branch, `PARITY_ALLOW_REMOTE=1`) — the fixtures cover the shapes, real stores cover the data.
-3. Admin + Inngest paths are NOT covered by the parity gate (it only drives public endpoints). Staging soak (Phase 2) still has to exercise: bulk-AI jobs, FAQ/how-to admin, stock adjustments post, PO receive, backorder cancel, insights narration, a checkout with a backordered line.
+3. Admin + Inngest paths are NOT covered by the parity gate (it only drives public endpoints). A **staging soak** was the plan's original answer, but staging itself is retired (#1975 — see Phase 2's superseded note above); there is no environment left to run one against. Until a replacement exists (a scripted force_app run against a restored production copy, or a CI job that invokes the cron/sweep entrypoints directly under force_app per #1974's fix idea), this checklist has to be exercised BY HAND against the restored-production-copy parity run in step 2: bulk-AI jobs, FAQ/how-to admin, stock adjustments post, PO receive, backorder cancel, insights narration, a checkout with a backordered line.
 4. Watch for P2025 / "violates row-level security policy" / empty-array regressions in Sentry for the first hour after the flip.

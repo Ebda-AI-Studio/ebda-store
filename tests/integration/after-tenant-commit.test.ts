@@ -280,6 +280,35 @@ describe.skipIf(!hasDb)('post-response work and the tenant transaction', () => {
     expect(reports.length).toBeGreaterThan(0);
     expect(reports[0].property).toBe('store');
     expect(reports[0].stack).toContain('after-tenant-commit.test');
+    // #1598: a tx whose callback RESOLVED (this one did) is 'committed' — the
+    // real defect (silently lost deferred work) the alert exists to catch.
+    expect(reports[0].reason).toBe('committed');
+  });
+
+  it('#1598 — a Prisma call made on a ROLLED-BACK tenant transaction reports reason "aborted"', async () => {
+    const reports: ClosedTenantTxAccess[] = [];
+    onClosedTenantTxAccess(info => {
+      reports.push(info);
+    });
+    try {
+      let detached: Promise<unknown> | undefined;
+      await expect(
+        runInTenantContext(storeId, async () => {
+          detached = (async () => {
+            await new Promise(r => setTimeout(r, 25));
+            return prisma.store.findUnique({ where: { id: storeId }, select: { id: true } });
+          })();
+          throw new Error('deliberate rollback for the #1598 aborted-reason test');
+        })
+      ).rejects.toThrow('deliberate rollback');
+      await expect(detached).rejects.toMatchObject({ code: 'P2028' });
+    } finally {
+      onClosedTenantTxAccess(null);
+    }
+
+    expect(reports.length).toBeGreaterThan(0);
+    expect(reports[0].property).toBe('store');
+    expect(reports[0].reason).toBe('aborted');
   });
 
   it('runs inline (returning its result) when there is no tenant transaction', async () => {

@@ -1,6 +1,13 @@
 import type { Request } from 'express';
 
 /**
+ * The merchant-admin MCP route's shape (`router.post('/:storeSlug', ...)` in
+ * mcp-admin.routes.ts) — exactly one path segment after `/admin/`. Module-level
+ * so it is compiled once, not per request, on this hot (every-mutation) path.
+ */
+const MCP_ADMIN_PATH = /^\/api\/v1\/mcp\/admin\/[^/]+$/;
+
+/**
  * Whether the GLOBAL mutation limiter lets a request past uncounted.
  *
  * Exported and named so it can be executed by a test. Inline, it was a
@@ -84,6 +91,56 @@ export function skipGlobalRateLimit(req: Request): boolean {
     req.path === '/api/v1/inngest' &&
     Boolean(req.header('x-inngest-signature'))
   ) {
+    return true;
+  }
+  // Bypass 5: the merchant-admin MCP surface (`POST /api/v1/mcp/admin/:storeSlug`).
+  //
+  // A first version of this bypass was removed (then this comment block
+  // documented why) because its stated compensating control was false: this
+  // predicate runs app-level, BEFORE the router, so it cannot know whether
+  // the caller presented a valid key, and `merchantMcpLimiter`'s per-key
+  // bucket did not bind an unauthenticated caller either — a made-up
+  // `x-merchant-key` rotated per request minted a fresh bucket every time.
+  //
+  // The bypass is restored NOW that the compensating control is real, not
+  // merely asserted: `mcp-admin.routes.ts` mounts `merchantMcpIpLimiter`
+  // (300/15min, keyed on `ipKeyGenerator(req.ip)` ONLY — nothing the caller
+  // sends can choose or split this bucket) AHEAD of `merchantMcpLimiter`
+  // (120/min, now ALWAYS IP-qualified: `mmcp:${ip}:${fp}`). Both are
+  // Redis-backed (`makeRateLimitStore`) so the caps hold across replicas, not
+  // per-process. A caller with no key, or one rotated per request, is bounded
+  // by the IP-only limiter regardless of what it sends; a merchant with a
+  // real key gets that limiter's 300/15min headroom PLUS their own 120/min
+  // sub-bucket, unaffected by other merchants or probes sharing their IP.
+  // `handleMerchantMcpPost` also rejects an implausibly-shaped key (wrong
+  // prefix/length) before any DB work, so the router's own limiters are the
+  // FIRST cost a garbage credential pays, not the last.
+  //
+  // Exempting this path from the global 200/15min-per-IP mutation cap
+  // therefore gives a legitimate MCP-driven bulk catalogue job real headroom
+  // (it no longer shares a bucket with every other admin-dashboard mutation
+  // from the same office IP) without reopening the hole: an unauthenticated
+  // or credential-rotating caller is still bounded, by a limiter that cannot
+  // be escaped by anything in the request.
+  //
+  // Only the exact admin-MCP path skips. The anonymous, buyer-facing
+  // `/api/v1/mcp/:storeSlug` surface (unauthenticated reads + `place_order`,
+  // mcp.routes.ts) is deliberately NOT exempted here — it has no per-caller
+  // identity, verified OR unverified, to bind any tighter bucket to, so the
+  // IP-wide backstop stays in front of it.
+  //
+  // Matched by a shape, not a bare prefix: the mounted route is
+  // `router.post('/:storeSlug', ...)` (mcp-admin.routes.ts) — exactly ONE
+  // path segment after `/admin/`, nothing further. A bare `.startsWith()`
+  // also matched `/api/v1/mcp/admin/x/../../auth/login` (Node/Express do NOT
+  // resolve `..` segments out of `req.path` — that normalization, if any,
+  // happens upstream at a reverse proxy, which cannot be assumed), which
+  // would have exempted a request TARGETING an entirely different route from
+  // the global cap merely because its literal path started with this
+  // prefix. The regex requires a single `[^/]+` segment and nothing after
+  // it, so neither a lookalike path (`/api/v1/mcp/admin-x/...`,
+  // `/api/v1/mcp-admin/...`) nor a traversal-shaped one satisfies it.
+  if (method === 'POST' && MCP_ADMIN_PATH.test(req.path)) {
     return true;
   }
   return false;

@@ -46,6 +46,24 @@ export async function bustStoreCaches(
   revalidateStorefront({ slug, domain });
 }
 
+/**
+ * Convenience wrapper for callers that only have a `storeId` in scope (the
+ * bulk-AI Inngest sweeps that write FAQs/HowTos/llmsTxt/aboutJson — all
+ * served off the `public:store:*` keys `bustStoreCaches` busts, never off
+ * `public:products:*`). Looks up the slug/domain needed to bust every
+ * `public:store:*` key for this store, then delegates. #1333: those sweeps
+ * previously called `invalidateStoreProductCaches(storeId)`, which busts the
+ * wrong namespace entirely for store-level content.
+ */
+export async function bustStoreCachesById(storeId: string): Promise<void> {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { slug: true, domain: true },
+  });
+  if (!store) return;
+  await bustStoreCaches(storeId, store.slug, store.domain);
+}
+
 interface CreateStoreData {
   name: string;
   slug?: string;

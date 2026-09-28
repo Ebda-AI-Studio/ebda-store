@@ -4,6 +4,7 @@ import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
 import { containsArabic } from '../lib/ai/description-richness';
 import logger from '../lib/logger';
+import { inngest } from '../lib/inngest/client';
 
 /**
  * Diff incoming admin-form values against the stored values and update the
@@ -613,4 +614,65 @@ export async function sweepStore(storeId: string): Promise<{ products: number; f
     }
   }
   return { products: products.length, filled };
+}
+
+/**
+ * Enqueue the store-wide AI recommendations sweep for a newly created
+ * product, so cross-sell suggestions exist without waiting for the next
+ * manual bulk sweep. Coalesces: skip if one is already queued/running for
+ * this store — the sweep is store-wide and smart-skips, so the first job
+ * already covers every new product; don't spawn N near-identical jobs.
+ *
+ * Called directly from `ProductService.create()` — the ONE true creation
+ * site — rather than gated on the `op === 'create'` branch of the debounced
+ * `product.upserted` handler (`ai-autofill-product.ts`). That handler's
+ * Inngest function debounces on `productId` for 10s, and Inngest debounce
+ * delivers only the LAST event in the window: a create followed by a quick
+ * edit inside 10s coalesced into one `op: 'update'` delivery, silently
+ * skipping the kick every time (#1937). Calling this once, synchronously, at
+ * creation removes the dependency on which event survives debounce entirely.
+ */
+export async function enqueueRecommendationsSweepForNewProduct(
+  storeId: string,
+  productId: string
+): Promise<void> {
+  try {
+    const existing = await prisma.bulkAiJob.findFirst({
+      where: { storeId, kind: 'recommendations', status: { in: ['queued', 'running'] } },
+      select: { id: true },
+    });
+    if (existing) {
+      logger.info(
+        { storeId, productId, jobId: existing.id },
+        '[ai-autofill] recommendations sweep already pending, skipping'
+      );
+      return;
+    }
+
+    const job = await prisma.bulkAiJob.create({
+      data: {
+        storeId,
+        userId: null, // system-initiated — no authenticated user context
+        kind: 'recommendations',
+      },
+      select: { id: true },
+    });
+
+    await inngest.send({
+      name: 'bulk-ai/recommendations-requested',
+      data: { jobId: job.id, storeId, force: false },
+    });
+
+    logger.info(
+      { storeId, productId, jobId: job.id },
+      '[ai-autofill] recommendations sweep enqueued for new product'
+    );
+  } catch (err) {
+    // Non-fatal: the product was already created; recommendations will be
+    // generated on the next manual bulk sweep.
+    logger.warn(
+      { err, storeId, productId },
+      '[ai-autofill] failed to enqueue recommendations sweep'
+    );
+  }
 }

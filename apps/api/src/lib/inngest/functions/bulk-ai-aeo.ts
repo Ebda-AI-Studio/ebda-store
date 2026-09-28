@@ -13,6 +13,7 @@ import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { buildMetaAeoPrompt, generateProductMetaAeo } from '../../ai/product-meta-aeo-generator';
 import { invalidateStoreProductCaches } from '../../public-cache';
+import { bustStoreCachesById } from '../../../services/store.service';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -502,8 +503,14 @@ No other text, no markdown code fences — pure JSON only.`;
       // Bust ONCE per sweep, never per item. This file defines THREE separate
       // Inngest functions; an earlier pass inserted the bust before only the LAST
       // completion block in the file, so two of the three sweeps still wrote
-      // product-facing content and invalidated nothing.
-      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
+      // store-facing content and invalidated nothing — and what they invalidated
+      // (invalidateStoreProductCaches, the `public:products:*` prefix) was the
+      // wrong namespace anyway: StoreFaq rows are served off the STORE record's
+      // own `public:store:*` cache keys (public.routes.ts's
+      // fetchStoreFaqsAndHowtos, embedded in the `public:store:<slugOrId>` and
+      // `public:store:resolve:<domain>` payloads), never off `public:products:*`
+      // (#1333).
+      await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
@@ -806,11 +813,10 @@ No markdown, no code fences — pure JSON only.`;
         select: { status: true },
       });
 
-      // Bust ONCE per sweep, never per item. This file defines THREE separate
-      // Inngest functions; an earlier pass inserted the bust before only the LAST
-      // completion block in the file, so two of the three sweeps still wrote
-      // product-facing content and invalidated nothing.
-      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
+      // Bust ONCE per sweep, never per item — see the identical note on the
+      // FAQ sweep above (#1333): StoreHowto rows are served off the STORE
+      // record's own `public:store:*` cache keys, not `public:products:*`.
+      await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
@@ -1269,7 +1275,15 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       // per item — same discipline as bulk-import (a per-row sweep would be an
       // invalidation storm). This also purges the storefront's Next data cache
       // via the tag the public fetches carry.
+      //
+      // This sweep ALSO writes Store.metaDescriptionAeo/metaDescriptionAeoAr
+      // (the store-level meta AEO fields, above), which is served off the
+      // `public:store:*` keys, not `public:products:*` — #1333's audit missed
+      // this site because its product-cache bust IS correct for the product/
+      // category writes; it was simply incomplete for the store-level write
+      // the same run makes. Bust both.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
+      await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

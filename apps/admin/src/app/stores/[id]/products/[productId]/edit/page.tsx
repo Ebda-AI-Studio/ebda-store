@@ -22,6 +22,7 @@ import { AITranslateMissingButton } from '../../../../../../components/AITransla
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
 import { productTextFields } from '../../../../../../lib/product-payload';
+import { sanitizeReturnTo } from '../../../../../../lib/return-to';
 import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/ProductFaqSection';
 import { AiFieldBadge } from './_components/AiFieldBadge';
@@ -83,16 +84,10 @@ export default function EditProductPage() {
   // Plain products-list URL — the fallback whenever `returnTo` is absent or
   // doesn't point back into this store's product list (open-redirect guard).
   const plainProductsUrl = `/stores/${storeId}/products`;
-  const returnTo = useMemo(() => {
-    const raw = searchParams.get('returnTo');
-    if (!raw) return plainProductsUrl;
-    try {
-      const decoded = decodeURIComponent(raw);
-      return decoded.startsWith(plainProductsUrl) ? decoded : plainProductsUrl;
-    } catch {
-      return plainProductsUrl;
-    }
-  }, [searchParams, plainProductsUrl]);
+  const returnTo = useMemo(
+    () => sanitizeReturnTo(searchParams.get('returnTo'), plainProductsUrl),
+    [searchParams, plainProductsUrl]
+  );
 
   const [product, setProduct] = useState<Product | null>(null);
   // Local mirror of the product's AI-provenance map. Kept in state so the

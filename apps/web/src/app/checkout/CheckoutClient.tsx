@@ -16,6 +16,7 @@ import { CheckoutErrorAlert } from './CheckoutErrorAlert';
 import { checkoutBundleErrorCopy } from '../../lib/checkout-bundle-errors';
 import {
   PRODUCT_NO_LONGER_AVAILABLE,
+  pickProductName,
   productUnavailableCopy,
   unavailableProductIds,
 } from '../../lib/product-cart-errors';
@@ -1383,15 +1384,19 @@ export default function CheckoutClient() {
           // each one. The cart line for each id is right here, so the message
           // can say which products rather than making the shopper find them.
           //
-          // `nameAr` falls back to `name`: a merchant may not have translated
-          // every product, and an empty Arabic name would render as a gap in
-          // the list. `productUnavailableCopy` drops blanks and says "Including"
-          // rather than "Remove" when the list is partial, so a name we cannot
-          // resolve never turns the sentence into a false promise.
+          // `pickProductName` falls back to `name` when `nameAr` is untranslated
+          // (empty string, not just missing) — a merchant may not have
+          // translated every product, and an untranslated one should still say
+          // its (English) name rather than resolving to '' and quietly
+          // downgrading the whole message to the partial "Including" framing
+          // (#1805). `productUnavailableCopy` still drops any name that truly
+          // cannot be resolved and says "Including" rather than "Remove" for
+          // that case, so a name we genuinely don't have never turns the
+          // sentence into a false promise.
           const goneNames = goneIds
             .map(id => cartContextItems.find(item => item.productId === id))
             .filter((line): line is NonNullable<typeof line> => Boolean(line))
-            .map(line => (language === 'ar' ? (line.nameAr ?? line.name) : line.name));
+            .map(line => pickProductName(line, language));
           friendly = productUnavailableCopy(t, goneIds.length, goneNames);
           // #1766: pull the server cart so the lines are marked "no longer
           // available" (and out of the total) when the shopper opens the cart.

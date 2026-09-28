@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
+import { resolveUploadErrorMessage } from '@/lib/expense-upload-error';
 import {
   isCashOrBankAccount,
   ALLOWED_CURRENCIES,
@@ -187,7 +188,7 @@ export default function NewExpensePage() {
         const body = await uploadRes.json().catch(() => ({}));
         setOcrStatus('error');
         setOcrMessage(
-          body?.error?.message ?? t('uploadFailedGeneric', { status: uploadRes.status })
+          resolveUploadErrorMessage(body) ?? t('uploadFailedGeneric', { status: uploadRes.status })
         );
         setOcrUploading(false);
         return;

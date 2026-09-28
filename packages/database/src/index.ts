@@ -246,12 +246,27 @@ function isModelDelegate(prop: string, value: unknown): value is object {
  */
 const closedTenantTxs = new WeakSet<object>();
 
+/**
+ * #1598: whether the closed tx's callback RESOLVED (about to COMMIT) or
+ * THREW (about to ROLL BACK). A stray access after a COMMIT is the real
+ * defect this module exists to catch — deferred work silently lost. A stray
+ * access after a ROLLBACK is much less alarming: the request already errored
+ * and everything else it did is undone too, so a P2028 there is inconsequential
+ * noise on the error path, not a silent loss of committed work. Tagged
+ * separately from `closedTenantTxs` (rather than folding the reason into that
+ * WeakSet's value) so the WeakSet's own "has this tx closed" check stays a
+ * single membership test.
+ */
+const closedTenantTxReason = new WeakMap<object, 'committed' | 'aborted'>();
+
 /** What a closed-tenant-tx access reports to the host application. */
 export interface ClosedTenantTxAccess {
   /** The Prisma property that was read (model accessor or raw helper). */
   property: string;
   /** Capture stack of the offending access, so the call site is nameable. */
   stack?: string;
+  /** Whether the transaction was about to commit or had already rolled back. */
+  reason: 'committed' | 'aborted';
 }
 
 let closedTenantTxReporter: ((info: ClosedTenantTxAccess) => void) | null = null;
@@ -271,11 +286,16 @@ export function onClosedTenantTxAccess(
   closedTenantTxReporter = handler;
 }
 
-function reportClosedTenantTxAccess(property: string): void {
+function reportClosedTenantTxAccess(property: string, tx: object): void {
   const reporter = closedTenantTxReporter;
   if (!reporter) return;
+  const reason = closedTenantTxReason.get(tx) ?? 'committed';
   try {
-    reporter({ property, stack: new Error('Prisma call on a committed tenant transaction').stack });
+    reporter({
+      property,
+      reason,
+      stack: new Error('Prisma call on a committed tenant transaction').stack,
+    });
   } catch {
     // A broken reporter must never change the behaviour of the query path.
   }
@@ -388,7 +408,7 @@ export const prisma = new Proxy(basePrisma, {
     if (tx && isProxiedProp(prop)) {
       // Detection only — see `closedTenantTxs`. Routing is unchanged.
       if (closedTenantTxs.has(tx as object)) {
-        reportClosedTenantTxAccess(String(prop));
+        reportClosedTenantTxAccess(String(prop), tx as object);
       }
       return Reflect.get(tx, prop, tx);
     }
@@ -542,12 +562,24 @@ export async function runInTenantContext<T>(
       await applyGucs(tx, { storeId, userId });
       txGucs.set(tx as object, { storeId, userId });
       try {
-        return await tenantStorage.run(tx, fn);
+        const result = await tenantStorage.run(tx, fn);
+        // The callback RESOLVED, so Prisma is about to COMMIT. #1598: tag it
+        // BEFORE the shared `finally` below runs, so a reporter sees
+        // 'committed' — the real defect this module exists to catch.
+        closedTenantTxReason.set(tx as object, 'committed');
+        return result;
+      } catch (err) {
+        // The callback THREW, so Prisma is about to ROLL BACK. A stray access
+        // after this point is a P2028 on the error path, where every other
+        // write this request made is undone too — routine, not a silent loss
+        // of committed work. #1598.
+        closedTenantTxReason.set(tx as object, 'aborted');
+        throw err;
       } finally {
-        // The callback has returned, so Prisma is about to COMMIT: from here
-        // on, any query that reaches this tx throws P2028. Mark it so the
-        // proxy can name the offender instead of leaving a swallowed
-        // rejection. Behaviour is otherwise unchanged.
+        // Either way, the callback has returned/thrown: from here on, any
+        // query that reaches this tx throws P2028. Mark it so the proxy can
+        // name the offender instead of leaving a swallowed rejection.
+        // Behaviour is otherwise unchanged.
         closedTenantTxs.add(tx as object);
       }
     },

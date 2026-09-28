@@ -12,6 +12,7 @@ import { recordUsage } from '../../../services/ai.service';
 import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
+import { bustStoreCachesById } from '../../../services/store.service';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -304,11 +305,11 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
         select: { status: true },
       });
 
-      // Bust ONCE per sweep, never per item. This file defines THREE separate
-      // Inngest functions; an earlier pass inserted the bust before only the LAST
-      // completion block in the file, so two of the three sweeps still wrote
-      // product-facing content and invalidated nothing.
-      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
+      // Bust ONCE per sweep, never per item. `Store.llmsTxt` is served off
+      // the STORE record's own `public:store:*` cache keys, not
+      // `public:products:*` — the product invalidator this used to call
+      // busts the wrong namespace entirely (#1333).
+      await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
@@ -809,14 +810,11 @@ Populate using only the information provided above. For keyCategories, use the c
         select: { status: true },
       });
 
-      // A bulk AI sweep rewrites product-facing content (titles, descriptions,
-      // SEO, translations, tags, categories, image alt, FAQs) with raw Prisma
-      // writes that carry no cache awareness, so the storefront kept serving
-      // the pre-sweep copy until the TTL expired. Bust ONCE at the end, never
-      // per item — same discipline as bulk-import (a per-row sweep would be an
-      // invalidation storm). This also purges the storefront's Next data cache
-      // via the tag the public fetches carry.
-      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
+      // `Store.aboutJson` is served off the STORE record's own
+      // `public:store:*` cache keys, not `public:products:*` — the product
+      // invalidator this used to call busts the wrong namespace entirely
+      // (#1333). Bust ONCE at the end, never per item.
+      await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

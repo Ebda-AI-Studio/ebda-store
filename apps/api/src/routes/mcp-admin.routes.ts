@@ -1,12 +1,14 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { hashMerchantKey } from '../mcp/merchant-auth';
+import { hashMerchantKey, hasPlausibleMerchantKeyShape } from '../mcp/merchant-auth';
 import { featureService } from '../services/feature.service';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { buildMerchantMcpServer } from '../mcp/merchant-mcp-server';
 import { verifyMerchantKey, MERCHANT_MCP_FEATURE, MERCHANT_KEY_HEADER } from '../mcp/merchant-auth';
 import { AppError } from '../middleware/error-handler';
+import { makeRateLimitStore } from '../middleware/security';
+import { redis } from '../services/redis.service';
 import logger from '../lib/logger';
 
 /**
@@ -48,30 +50,76 @@ import logger from '../lib/logger';
 const router = Router();
 
 /**
+ * IP-ONLY backstop, mounted AHEAD of `merchantMcpLimiter` below.
+ *
+ * `merchantMcpLimiterKey` partitions by (IP, key-fingerprint) so two
+ * merchants behind one office IP don't share a budget — but that same
+ * partitioning is what a caller with no real key can exploit: an unverified,
+ * merely-PRESENT `x-merchant-key` still mints a fresh fingerprint sub-bucket
+ * on every request (rotate the value, get a new bucket), so
+ * `merchantMcpLimiter` alone never binds that traffic. This limiter keys on
+ * `ipKeyGenerator(req.ip)` ONLY — nothing the caller sends can choose or
+ * split this bucket — so the global rate-limit bypass this router's path is
+ * exempted from (`skipGlobalRateLimit`'s bypass 5) has a REAL compensating
+ * control behind it, not just the per-key limiter's stated-but-false one.
+ *
+ * 300/15min is sized like `refreshIpLimiter` (security.ts): well above any
+ * legitimate merchant's real traffic (a bulk catalogue job is many POSTs to
+ * the SAME verified key, which `merchantMcpLimiter` below still governs at
+ * 120/min), so this backstop is not the ceiling a normal merchant ever
+ * notices — it exists purely to bound an attacker who has no key at all.
+ */
+/**
+ * Exported separately from the limiter instance so it can be unit-tested
+ * directly — `express-rate-limit` does not expose the raw `keyGenerator` it
+ * was constructed with.
+ */
+export function merchantMcpIpLimiterKey(req: Request): string {
+  return `${ipKeyGenerator(req.ip ?? '')}-mmcp-ip`;
+}
+
+export const merchantMcpIpLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'mmcp-ip'),
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Same availability-over-strictness posture as every other limiter here.
+  passOnStoreError: true,
+  keyGenerator: merchantMcpIpLimiterKey,
+  message: { error: 'Too many requests' },
+});
+router.use(merchantMcpIpLimiter);
+
+/**
  * Separate from `publicLimiter` (300/min/IP) on purpose: a merchant running a
  * bulk catalogue job is not shopper traffic, and sharing a bucket would let
  * one merchant's legitimate batch throttle a storefront — or the reverse.
- * Keyed by key fingerprint where present so two merchants behind one office IP
- * do not share a budget.
+ *
+ * ALWAYS keyed on IP first, with the key fingerprint (or `none` when absent)
+ * as a secondary sub-bucket — `mmcp:${ip}:${fp}` — so this limiter can no
+ * longer be read as "the per-key backstop" on its own: it gives two merchants
+ * behind one office IP separate headroom, but the actual security ceiling
+ * against an unauthenticated/rotating-key caller is `merchantMcpIpLimiter`
+ * above, which that caller cannot escape by changing what it sends.
  */
 export function merchantMcpLimiterKey(req: Request): string {
+  const ip = ipKeyGenerator(req.ip ?? '');
   const presented = req.get(MERCHANT_KEY_HEADER);
   // Never use the credential itself as a bucket key — hash it. A rate-limit
   // store is not a secret store, and the plaintext key would otherwise end
   // up in Redis (and in any dump of it) in clear.
-  if (presented) return `mmcp:${hashMerchantKey(presented).slice(0, 24)}`;
-  // ipKeyGenerator() normalizes IPv6 to its /64 prefix — an unauthenticated
-  // caller cycling the low 64 bits of an IPv6 address would otherwise land in
-  // a fresh bucket on every request, defeating the 120/min cap on this
-  // credential-stuffing surface (matches security.ts's pattern).
-  return `mmcp-ip:${ipKeyGenerator(req.ip ?? '')}`;
+  if (presented) return `mmcp:${ip}:${hashMerchantKey(presented).slice(0, 24)}`;
+  return `mmcp:${ip}:none`;
 }
 
-const merchantMcpLimiter = rateLimit({
+export const merchantMcpLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'mmcp'),
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true,
   keyGenerator: merchantMcpLimiterKey,
   message: { error: 'Too many requests' },
 });
@@ -107,6 +155,16 @@ function adminToolCallLog(req: Request, _res: Response, next: NextFunction): voi
 router.use(adminToolCallLog);
 
 async function handleMerchantMcpPost(req: Request, res: Response): Promise<void> {
+  // Cheap, synchronous shape check FIRST — no DB. Rejects the common
+  // "no credential" / "obviously garbage credential" case before spending a
+  // store-slug resolution + feature lookup on it. `verifyMerchantKey` below
+  // still does the real (DB-backed) check once the store is known; this is a
+  // fast-reject prefilter, not a replacement — the 404 is byte-identical
+  // either way (see verifyMerchantKey's doc comment on why that matters).
+  if (!hasPlausibleMerchantKeyShape(req)) {
+    throw new AppError(404, 'NOT_FOUND', 'Not found');
+  }
+
   const store = await resolveStoreBySlug(req.params.storeSlug); // throws 404 on miss
 
   // Fail closed. `merchant_mcp` is in no plan baseline, so this is OFF for

@@ -13,6 +13,7 @@ import {
   isProductUnavailableError,
   unavailableProductIds,
   productUnavailableCopy,
+  pickProductName,
 } from './product-cart-errors';
 
 const t = (en: string, _ar: string) => en;
@@ -145,5 +146,45 @@ describe('productUnavailableCopy — naming the offending lines', () => {
     // translated, and interpolating one into Arabic copy reads as a
     // mixed-direction fragment.
     expect(copy.indexOf('عباية ذهبية')).toBeGreaterThan(copy.indexOf('يرجى'));
+  });
+});
+
+describe('pickProductName (#1805)', () => {
+  it('picks nameAr in Arabic when it is a real translation', () => {
+    expect(pickProductName({ name: 'Blue Kaftan', nameAr: 'قفطان أزرق' }, 'ar')).toBe('قفطان أزرق');
+  });
+
+  it('picks name in English regardless of nameAr', () => {
+    expect(pickProductName({ name: 'Blue Kaftan', nameAr: 'قفطان أزرق' }, 'en')).toBe(
+      'Blue Kaftan'
+    );
+  });
+
+  it('falls back to name in Arabic when nameAr is an EMPTY STRING — the reported defect', () => {
+    // The admin new-product form seeds nameAr: '' (not null) for an
+    // untranslated product. `nameAr ?? name` only falls back on null/
+    // undefined, so it resolved to '' here — this is the truthiness idiom
+    // OrderSummary.tsx and CartContext.tsx already use, and the one
+    // CheckoutClient.tsx was missing.
+    expect(pickProductName({ name: 'Blue Kaftan', nameAr: '' }, 'ar')).toBe('Blue Kaftan');
+  });
+
+  it('falls back to name in Arabic when nameAr is null or undefined', () => {
+    expect(pickProductName({ name: 'Blue Kaftan', nameAr: null }, 'ar')).toBe('Blue Kaftan');
+    expect(pickProductName({ name: 'Blue Kaftan' }, 'ar')).toBe('Blue Kaftan');
+  });
+
+  it('an untranslated product no longer silently downgrades the whole checkout message to "Including" (integration of the two fixes)', () => {
+    const names = [
+      { name: 'Blue Kaftan', nameAr: 'قفطان أزرق' },
+      { name: 'Gold Abaya', nameAr: '' }, // untranslated
+    ].map(p => pickProductName(p, 'ar'));
+
+    const copy = productUnavailableCopy(tAr, 2, names);
+    // Both names resolved (one Arabic, one English fallback) — the list is
+    // COMPLETE, so the copy says "Remove:", not the weaker "Including:".
+    expect(copy).toMatch(/يرجى إزالة:/);
+    expect(copy).toContain('قفطان أزرق');
+    expect(copy).toContain('Gold Abaya');
   });
 });

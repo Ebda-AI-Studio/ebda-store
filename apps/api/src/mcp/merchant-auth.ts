@@ -117,6 +117,26 @@ function digestsMatch(a: string, b: string): boolean {
 }
 
 /**
+ * Cheap, SYNCHRONOUS shape check only — no DB, no hashing, no crypto compare.
+ * Lets a caller with an obviously-wrong credential (header missing, wrong
+ * prefix, or too short) be rejected before ANY database work — store
+ * resolution, the feature-flag lookup, or the key digest lookup below.
+ * `verifyMerchantKey` still re-checks length itself and does the real
+ * DB-backed verification; this is a fast-reject prefilter, not a substitute.
+ * Mirrors the same posture as bypass 4's HMAC check in
+ * `global-rate-limit-skip.ts`: cheap to run, safe to run before anything
+ * costly, and never the thing that actually grants access.
+ */
+export function hasPlausibleMerchantKeyShape(req: Request): boolean {
+  const presented = req.get(MERCHANT_KEY_HEADER);
+  return (
+    !!presented &&
+    presented.startsWith(MERCHANT_KEY_PREFIX) &&
+    presented.length >= MERCHANT_KEY_PREFIX.length + 8
+  );
+}
+
+/**
  * Verifies the `X-Merchant-Key` header against this store.
  *
  * Throws `AppError(404, 'NOT_FOUND', 'Not found')` on EVERY failure —

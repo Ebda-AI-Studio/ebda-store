@@ -875,10 +875,30 @@
       "id": "authn-mmcp-limiter-ipv6-normalisation",
       "domain": "authn / session",
       "tier": "unit",
-      "why": "the unauthenticated bucket for the merchant-admin MCP rate limiter used the raw req.ip, unlike every other custom keyGenerator in the repo — an IPv6 attacker rotating the low 64 bits of their address gets a fresh 120/min bucket per request, defeating the cap on this credential-stuffing surface",
+      "why": "the IP-only merchant-admin MCP rate limiter (the actual backstop behind the global-limiter bypass) used the raw req.ip, unlike every other custom keyGenerator in the repo — an IPv6 attacker rotating the low 64 bits of their address gets a fresh bucket per request, defeating the cap on this credential-stuffing surface",
       "source": "apps/api/src/routes/mcp-admin.routes.ts",
-      "find": "  return `mmcp-ip:${ipKeyGenerator(req.ip ?? '')}`;",
-      "replace": "  return `mmcp-ip:${req.ip}`;",
+      "find": "export function merchantMcpIpLimiterKey(req: Request): string {\n  return `${ipKeyGenerator(req.ip ?? '')}-mmcp-ip`;\n}",
+      "replace": "export function merchantMcpIpLimiterKey(req: Request): string {\n  return `${req.ip}-mmcp-ip`;\n}",
+      "test": "tests/unit/mcp-admin-limiter-key.test.ts"
+    },
+    {
+      "id": "mmcp-ip-limiter-key-ignores-credential",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "merchantMcpIpLimiterKey is the ONLY genuinely IP-only bucket on the merchant-admin MCP surface, and the global-rate-limit bypass for that path is justified entirely by this key being un-choosable by the caller — if it read the x-merchant-key header at all, a rotating/bogus key would fragment it back into unbounded per-request buckets, exactly the hole #1733 closed",
+      "source": "apps/api/src/routes/mcp-admin.routes.ts",
+      "find": "export function merchantMcpIpLimiterKey(req: Request): string {\n  return `${ipKeyGenerator(req.ip ?? '')}-mmcp-ip`;\n}",
+      "replace": "export function merchantMcpIpLimiterKey(req: Request): string {\n  const presented = req.get(MERCHANT_KEY_HEADER);\n  return `${ipKeyGenerator(req.ip ?? '')}-mmcp-ip-${presented ?? ''}`;\n}",
+      "test": "tests/unit/mcp-admin-limiter-key.test.ts"
+    },
+    {
+      "id": "mmcp-key-always-ip-qualified",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "merchantMcpLimiterKey used to key ONLY on the presented credential's hash when one was present, so the fingerprint sub-bucket carried no ip component at all — a real key presented from any ip landed in the same bucket, which is exactly backwards for the caller-cannot-choose-the-partition property the surrounding limiters depend on",
+      "source": "apps/api/src/routes/mcp-admin.routes.ts",
+      "find": "  if (presented) return `mmcp:${ip}:${hashMerchantKey(presented).slice(0, 24)}`;\n  return `mmcp:${ip}:none`;",
+      "replace": "  if (presented) return `mmcp:${hashMerchantKey(presented).slice(0, 24)}`;\n  return `mmcp-ip:${ip}`;",
       "test": "tests/unit/mcp-admin-limiter-key.test.ts"
     },
     {
@@ -929,6 +949,16 @@
       "source": "apps/api/src/middleware/global-rate-limit-skip.ts",
       "find": "    req.path === '/api/v1/inngest' &&\n    Boolean(req.header('x-inngest-signature'))\n  ) {",
       "replace": "    req.path === '/api/v1/inngest'\n  ) {",
+      "test": "tests/unit/global-rate-limit-skip.test.ts"
+    },
+    {
+      "id": "mcp-admin-bypass-shape-not-prefix",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the merchant-admin MCP global-limit bypass matches req.path with a bare prefix, which also matches a traversal-shaped path like /api/v1/mcp/admin/x/../../auth/login — Node/Express do not resolve .. segments out of req.path, so a request literally targeting a DIFFERENT route could be exempted from the global mutation cap merely by prefixing it this way",
+      "source": "apps/api/src/middleware/global-rate-limit-skip.ts",
+      "find": "const MCP_ADMIN_PATH = /^\\/api\\/v1\\/mcp\\/admin\\/[^/]+$/;",
+      "replace": "const MCP_ADMIN_PATH = /^\\/api\\/v1\\/mcp\\/admin\\//;",
       "test": "tests/unit/global-rate-limit-skip.test.ts"
     },
     {

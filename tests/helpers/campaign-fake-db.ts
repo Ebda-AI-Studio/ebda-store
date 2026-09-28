@@ -174,6 +174,29 @@ export function createFakePrisma(db: FakeDb) {
     newsletterSubscriber: table(() => db.subscribers),
     customer: table(() => db.customers),
     user: table(() => (db.users ??= [])),
+    // #1953: `audienceCount` (campaign.service.ts) is the one raw-SQL query
+    // the campaign code makes — mirrors `buildCampaignAudience`'s exact JS
+    // filter/dedupe (normalized non-empty email, active, not unsubscribed) so
+    // the two never silently disagree on what "reachable" means.
+    $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join('?');
+      if (!sql.includes('FROM newsletter_subscribers') || !sql.includes('COUNT(DISTINCT')) {
+        throw new Error(`FakeDb.$queryRaw: unsupported query: ${sql}`);
+      }
+      const storeId = values[0] as string;
+      const seen = new Set<string>();
+      for (const s of db.subscribers) {
+        if (s.storeId !== storeId) continue;
+        if (s.isActive !== true) continue;
+        if (s.unsubscribedAt !== null && s.unsubscribedAt !== undefined) continue;
+        const email = String(s.email ?? '')
+          .toLowerCase()
+          .trim();
+        if (!email.includes('@')) continue;
+        seen.add(email);
+      }
+      return [{ count: BigInt(seen.size) }];
+    },
   };
 }
 

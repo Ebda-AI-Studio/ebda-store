@@ -4,10 +4,43 @@ import { BoundedMap } from './bounded-map';
 
 // Capped so a pathological stream of unknown domains (e.g. bot traffic
 // probing random hostnames) can never grow the Map without limit.
-export const corsDomainCache = new BoundedMap<string, { allowed: boolean; expiresAt: number }>(
-  5000
-);
+//
+// `unknown: true` marks a NEGATIVE result from a failed lookup (Neon down /
+// pool starved) — distinct from `allowed: false` (a real, resolved
+// non-match). Without it, a failed DB lookup populated nothing, so every
+// subsequent request for that hostname re-issued the same `prisma.store.
+// findFirst` against the already-degraded database for the full outage —
+// this cache exists specifically to avoid that hammering. `unknown` entries
+// use a much shorter TTL (`CORS_LOOKUP_FAILURE_TTL_MS`) than a resolved one,
+// so the outage self-heals within seconds of Neon recovering instead of
+// waiting out the full 2-minute TTL.
+export interface CorsCacheEntry {
+  allowed: boolean;
+  expiresAt: number;
+  unknown?: boolean;
+}
+
+export const corsDomainCache = new BoundedMap<string, CorsCacheEntry>(5000);
 export const CORS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+export const CORS_LOOKUP_FAILURE_TTL_MS = 5 * 1000; // 5 seconds
+
+export type CorsCacheDecision = 'allow' | 'reject' | 'unavailable' | 'miss';
+
+/**
+ * Pure decision over a (possibly absent/expired) cache entry — pulled out of
+ * the CORS origin-check closure in `index.ts` so it can be unit-tested
+ * without booting the Express app. `'unavailable'` is the #1074 case: the
+ * last lookup for this hostname failed (DB outage), so the caller must
+ * answer 503 WITHOUT re-querying, rather than falling through to the DB.
+ */
+export function decideCorsCache(
+  cached: CorsCacheEntry | undefined,
+  now: number
+): CorsCacheDecision {
+  if (!cached || cached.expiresAt <= now) return 'miss';
+  if (cached.unknown) return 'unavailable';
+  return cached.allowed ? 'allow' : 'reject';
+}
 
 /** Bust the CORS cache for a domain (call when a store's domain changes). */
 export function bustCorsCache(domain: string): void {

@@ -19,6 +19,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
+import { invalidateStoreProductCaches } from '../../apps/api/src/lib/public-cache';
 import {
   hasDb,
   buildBundleTestApp,
@@ -67,6 +68,12 @@ describe.skipIf(!hasDb)('public bundle list route', () => {
     });
     await setStock(outOfStockProduct, 0);
 
+    // #1565 gave this route a 120s cache under `public:products:${storeId}:`.
+    // The fixtures above write directly via Prisma (`withRlsBypass`), bypassing
+    // every admin route that would normally bust it on a real write — bust it
+    // ourselves so this test observes what it just seeded, not a prior test's
+    // cached list for the SAME store.
+    await invalidateStoreProductCaches(store.storeId);
     const cart = cartClientFor(app, store.storeId, `session-${suffix}-list`);
     const res = await cart.publicBundles().expect(200);
     const ids = res.body.data.bundles.map((b: { id: string }) => b.id);
@@ -87,6 +94,7 @@ describe.skipIf(!hasDb)('public bundle list route', () => {
       items: [{ productId, quantity: 1 }],
     });
 
+    await invalidateStoreProductCaches(store.storeId); // see the list test's comment above
     const cart = cartClientFor(app, store.storeId, `session-${suffix}-shape`);
     const res = await cart.publicBundles().expect(200);
     const bundle = res.body.data.bundles.find((b: { id: string }) => b.id === bundleId);
@@ -103,5 +111,46 @@ describe.skipIf(!hasDb)('public bundle list route', () => {
     const cart = cartClientFor(app, noFeatureStore.storeId, `session-${suffix}-nofeature`);
     const res = await cart.publicBundles();
     expect(res.status).toBe(403);
+  });
+
+  it('#1565 — the route is actually CACHED: a direct DB deactivation is not reflected until the cache is busted', async () => {
+    // A per-CALL unique suffix, not the shared per-file `suffix` — this test
+    // seeds its own store inline in the test body (not `beforeAll`), and
+    // `vitest.config.ts`'s `retry: 1` re-runs a failed test body against the
+    // same database: a fixture keyed on the shared per-file suffix would trip
+    // a unique-email violation on retry instead of showing the real failure.
+    const callSuffix = `${suffix}-cache-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const cacheStore = await seedBundleStore(callSuffix);
+    const product = await seedProduct(cacheStore.storeId, `${callSuffix}-p`, {
+      price: 200,
+      inventory: 10,
+    });
+    const bundleId = await seedBundle(cacheStore.storeId, `${callSuffix}-bundle`, {
+      name: `Cache Bundle ${callSuffix}`,
+      pricingType: 'fixed_price',
+      pricingValue: 150,
+      items: [{ productId: product, quantity: 1 }],
+    });
+    const cart = cartClientFor(app, cacheStore.storeId, `session-${callSuffix}`);
+
+    // First call: cache miss, populates the cache with the bundle present.
+    const first = await cart.publicBundles().expect(200);
+    expect(first.body.data.bundles.map((b: { id: string }) => b.id)).toContain(bundleId);
+
+    // Deactivate DIRECTLY via Prisma — bypassing every admin route that would
+    // normally bust the cache — and call again with NO invalidation. If the
+    // route were still uncached (the pre-#1565 shape), this would already
+    // reflect the deactivation; the whole point of caching this route is that
+    // it does NOT, for up to the TTL.
+    const { prisma } = await import('@force/database');
+    await prisma.bundle.update({ where: { id: bundleId }, data: { isActive: false } });
+    const second = await cart.publicBundles().expect(200);
+    expect(second.body.data.bundles.map((b: { id: string }) => b.id)).toContain(bundleId);
+
+    // Now bust it — the same call every real bundle write already makes —
+    // and confirm the deactivation is now visible.
+    await invalidateStoreProductCaches(cacheStore.storeId);
+    const third = await cart.publicBundles().expect(200);
+    expect(third.body.data.bundles.map((b: { id: string }) => b.id)).not.toContain(bundleId);
   });
 });

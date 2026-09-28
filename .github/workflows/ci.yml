@@ -584,9 +584,17 @@ jobs:
         # role. Until now the whole integration suite drove an API logged in as
         # the `test` superuser (BYPASSRLS), so no flow was ever proven under
         # enforced RLS except the cross-tenant proof file. The API server below
-        # now runs as force_app, exactly as production will; the test harness
-        # keeps the superuser URL for fixtures and cleanup. This password only
-        # exists inside this disposable per-job container.
+        # now runs as force_app, exactly as production will — for the
+        # SYNCHRONOUS HTTP request/response paths only (#1974). The sibling
+        # "Start API server" step below sets INNGEST_DRY_RUN: 'true', which
+        # no-ops every Inngest function, so async/cron writers under
+        # force_app (order-auto-cancel-unpaid, payment-abandonment-sweep,
+        # stock-reorder-scan, analytics-daily-rollup, audit-log-archive, and
+        # the rest) remain entirely unexercised here — see
+        # docs/plans/2026-07-02-rls-cutover.md's "Before a second attempt"
+        # section for that gap and how it is currently covered (or not). The
+        # test harness keeps the superuser URL for fixtures and cleanup.
+        # This password only exists inside this disposable per-job container.
         run: |
           cat <<'SQL' | npx prisma db execute --url "postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test" --stdin
           ALTER ROLE force_app WITH PASSWORD 'ci-only-force-app-pw' LOGIN;

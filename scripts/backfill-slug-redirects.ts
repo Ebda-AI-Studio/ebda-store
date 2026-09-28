@@ -131,23 +131,16 @@ export interface ComputeCandidatesResult {
 }
 
 /**
- * Pure join: for each sku's historical handles, map every non-current,
+ * Per-SKU pass: for each sku's historical handles, map every non-current,
  * non-live handle to the sku's current live slug. Never guesses — a sku
  * with no live product, or a handle that collides with a currently-live
  * slug, is reported as a conflict instead of redirected.
- *
- * A final cross-sku pass then catches the case where the SAME historical
- * `from` handle was produced for two DIFFERENT skus (e.g. a product was
- * deleted and its handle later reused by a different product). Since slug
- * is unique per store, two skus can never legitimately share a `from` that
- * maps to the same `to` — any duplicate `from` is therefore an ambiguity:
- * applying both candidates would make the upsert on
- * (storeId, entityType, fromSlug) silently keep whichever is written last,
- * 301-ing the old URL to the wrong product. Every candidate sharing that
- * `from` is pulled into `conflicts` instead of written.
  */
-export function computeCandidates(input: ComputeCandidatesInput): ComputeCandidatesResult {
-  const { oldHandlesBySku, currentBySku, liveSlugs } = input;
+function buildCandidatesPerSku(
+  oldHandlesBySku: Map<string, Set<string>>,
+  currentBySku: Map<string, string>,
+  liveSlugs: Set<string>
+): ComputeCandidatesResult {
   const candidates: Candidate[] = [];
   const conflicts: Conflict[] = [];
 
@@ -174,8 +167,21 @@ export function computeCandidates(input: ComputeCandidatesInput): ComputeCandida
     }
   }
 
-  // Cross-sku ambiguity pass: any `from` claimed by more than one candidate
-  // is a conflict, never a write — no exceptions.
+  return { candidates, conflicts };
+}
+
+/**
+ * Cross-sku ambiguity pass: catches the case where the SAME historical
+ * `from` handle was produced for two DIFFERENT skus (e.g. a product was
+ * deleted and its handle later reused by a different product). Since slug
+ * is unique per store, two skus can never legitimately share a `from` that
+ * maps to the same `to` — any duplicate `from` is therefore an ambiguity:
+ * applying both candidates would make the upsert on
+ * (storeId, entityType, fromSlug) silently keep whichever is written last,
+ * 301-ing the old URL to the wrong product. Every candidate sharing that
+ * `from` is pulled OUT of `candidates` and reported in `conflicts` instead.
+ */
+function dropAmbiguousFroms(candidates: Candidate[]): ComputeCandidatesResult {
   const byFrom = new Map<string, Candidate[]>();
   for (const c of candidates) {
     const bucket = byFrom.get(c.from) ?? [];
@@ -184,24 +190,36 @@ export function computeCandidates(input: ComputeCandidatesInput): ComputeCandida
   }
 
   const ambiguousFroms = [...byFrom.keys()].filter(from => byFrom.get(from)!.length > 1).sort();
+  if (ambiguousFroms.length === 0) return { candidates, conflicts: [] };
 
-  if (ambiguousFroms.length > 0) {
-    const ambiguousSet = new Set(ambiguousFroms);
-    const deduped = candidates.filter(c => !ambiguousSet.has(c.from));
-    candidates.length = 0;
-    candidates.push(...deduped);
+  const ambiguousSet = new Set(ambiguousFroms);
+  const deduped = candidates.filter(c => !ambiguousSet.has(c.from));
 
-    for (const from of ambiguousFroms) {
-      const claimants = [...byFrom.get(from)!].sort((a, b) => a.sku.localeCompare(b.sku));
-      const mapping = claimants.map(c => `${c.sku}→${c.to}`).join(', ');
-      conflicts.push({
-        sku: claimants.map(c => c.sku).join(','),
-        message: `ambiguous: handle '${from}' maps to multiple SKUs [${mapping}] — NOT backfilled, needs manual review`,
-      });
-    }
-  }
+  const conflicts: Conflict[] = ambiguousFroms.map(from => {
+    const claimants = [...byFrom.get(from)!].sort((a, b) => a.sku.localeCompare(b.sku));
+    const mapping = claimants.map(c => `${c.sku}→${c.to}`).join(', ');
+    return {
+      sku: claimants.map(c => c.sku).join(','),
+      message: `ambiguous: handle '${from}' maps to multiple SKUs [${mapping}] — NOT backfilled, needs manual review`,
+    };
+  });
 
-  return { candidates, conflicts };
+  return { candidates: deduped, conflicts };
+}
+
+/**
+ * Pure join: see `buildCandidatesPerSku` and `dropAmbiguousFroms` for the two
+ * passes this composes. Never guesses — every skip/exclusion is reported in
+ * `conflicts`, never silently dropped.
+ */
+export function computeCandidates(input: ComputeCandidatesInput): ComputeCandidatesResult {
+  const { oldHandlesBySku, currentBySku, liveSlugs } = input;
+  const perSku = buildCandidatesPerSku(oldHandlesBySku, currentBySku, liveSlugs);
+  const deduped = dropAmbiguousFroms(perSku.candidates);
+  return {
+    candidates: deduped.candidates,
+    conflicts: [...perSku.conflicts, ...deduped.conflicts],
+  };
 }
 
 function parseArgs(argv: string[]): { store: string | undefined; apply: boolean } {
@@ -211,16 +229,21 @@ function parseArgs(argv: string[]): { store: string | undefined; apply: boolean 
   return { store, apply };
 }
 
-async function main() {
-  const { store: storeSelector, apply } = parseArgs(process.argv.slice(2));
+interface TargetStore {
+  id: string;
+  slug: string;
+  domain: string | null;
+  name: string;
+}
 
+/** Resolve `--store` to a real row (by id, slug, or domain). Logs and returns `null` on any failure — the caller aborts. */
+async function resolveTargetStore(storeSelector: string | undefined): Promise<TargetStore | null> {
   if (!storeSelector) {
     // eslint-disable-next-line no-console
     console.error(
       '[backfill-slug-redirects] missing --store <storeId|slug|domain>. Aborting — nothing done.'
     );
-    process.exitCode = 1;
-    return;
+    return null;
   }
 
   const store = await prisma.store.findFirst({
@@ -231,17 +254,27 @@ async function main() {
   if (!store) {
     // eslint-disable-next-line no-console
     console.error(`[backfill-slug-redirects] no store matches "${storeSelector}". Aborting.`);
-    process.exitCode = 1;
-    return;
+    return null;
   }
 
   // eslint-disable-next-line no-console
   console.log(
     `[backfill-slug-redirects] store: ${store.name} (${store.id}) slug=${store.slug} domain=${store.domain ?? '(none)'}`
   );
+  return store;
+}
 
+interface OldHandleScanResult {
+  importJobCount: number;
+  unusableCsvCount: number;
+  skuLessRows: number;
+  oldHandlesBySku: Map<string, Set<string>>;
+}
+
+/** Mines every retained BulkImportJob CSV for this store into sku -> {historical handles}. */
+async function loadOldHandlesBySku(storeId: string): Promise<OldHandleScanResult> {
   const importJobs = await prisma.bulkImportJob.findMany({
-    where: { storeId: store.id },
+    where: { storeId },
     select: { id: true, csvData: true, createdAt: true },
   });
 
@@ -270,8 +303,19 @@ async function main() {
     }
   }
 
+  return { importJobCount: importJobs.length, unusableCsvCount, skuLessRows, oldHandlesBySku };
+}
+
+interface CurrentProductState {
+  liveProductCount: number;
+  currentBySku: Map<string, string>;
+  liveSlugs: Set<string>;
+}
+
+/** The CURRENT live slug + sku for every non-deleted, sku-bearing product — the "answers to now" half of the join. */
+async function loadCurrentProductState(storeId: string): Promise<CurrentProductState> {
   const liveProducts = await prisma.product.findMany({
-    where: { storeId: store.id, sku: { not: null }, deletedAt: null },
+    where: { storeId, sku: { not: null }, deletedAt: null },
     select: { id: true, slug: true, sku: true },
   });
 
@@ -283,24 +327,32 @@ async function main() {
     liveSlugs.add(p.slug);
   }
 
-  const { candidates, conflicts } = computeCandidates({ oldHandlesBySku, currentBySku, liveSlugs });
+  return { liveProductCount: liveProducts.length, currentBySku, liveSlugs };
+}
 
-  // ---- Report ----
+/** Prints the summary + candidate list + conflict list. Pure logging — no state, no writes. */
+function reportResults(
+  scan: OldHandleScanResult,
+  productState: CurrentProductState,
+  result: ComputeCandidatesResult
+): void {
+  const { candidates, conflicts } = result;
+
   // eslint-disable-next-line no-console
   console.log('\n[backfill-slug-redirects] === SUMMARY ===');
   // eslint-disable-next-line no-console
   console.log(
-    `  import jobs scanned: ${importJobs.length} (${unusableCsvCount} unusable — no slug/sku column)`
+    `  import jobs scanned: ${scan.importJobCount} (${scan.unusableCsvCount} unusable — no slug/sku column)`
   );
   // eslint-disable-next-line no-console
-  console.log(`  skus with import history: ${oldHandlesBySku.size}`);
+  console.log(`  skus with import history: ${scan.oldHandlesBySku.size}`);
   // eslint-disable-next-line no-console
-  console.log(`  live products (with sku): ${liveProducts.length}`);
+  console.log(`  live products (with sku): ${productState.liveProductCount}`);
   // eslint-disable-next-line no-console
   console.log(`  candidate redirects: ${candidates.length}`);
   // eslint-disable-next-line no-console
   console.log(
-    `  sku-less import rows (had a slug but no sku — CANNOT be joined, not backfilled): ${skuLessRows}`
+    `  sku-less import rows (had a slug but no sku — CANNOT be joined, not backfilled): ${scan.skuLessRows}`
   );
   // eslint-disable-next-line no-console
   console.log(`  conflicts/skips: ${conflicts.length}`);
@@ -322,6 +374,43 @@ async function main() {
       console.log(`  ${c.message}`);
     }
   }
+}
+
+/** Writes every candidate via `recordSlugRedirect`, batched. Idempotent — safe to re-run. */
+async function applyCandidates(storeId: string, candidates: Candidate[]): Promise<number> {
+  const BATCH_SIZE = 100;
+  let appliedCount = 0;
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const batch = candidates.slice(i, i + BATCH_SIZE);
+    await withTenantContext(storeId, async tx => {
+      for (const c of batch) {
+        await recordSlugRedirect(tx, storeId, SlugEntityType.PRODUCT, c.from, c.to);
+        appliedCount++;
+      }
+    });
+  }
+  return appliedCount;
+}
+
+/** Orchestration only — each phase (resolve store, scan history, load current state, compute, report, apply) is its own named function above. */
+async function main() {
+  const { store: storeSelector, apply } = parseArgs(process.argv.slice(2));
+
+  const store = await resolveTargetStore(storeSelector);
+  if (!store) {
+    process.exitCode = 1;
+    return;
+  }
+
+  const scan = await loadOldHandlesBySku(store.id);
+  const productState = await loadCurrentProductState(store.id);
+  const result = computeCandidates({
+    oldHandlesBySku: scan.oldHandlesBySku,
+    currentBySku: productState.currentBySku,
+    liveSlugs: productState.liveSlugs,
+  });
+
+  reportResults(scan, productState, result);
 
   if (!apply) {
     // eslint-disable-next-line no-console
@@ -329,19 +418,7 @@ async function main() {
     return;
   }
 
-  // ---- Apply ----
-  const BATCH_SIZE = 100;
-  let appliedCount = 0;
-  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-    const batch = candidates.slice(i, i + BATCH_SIZE);
-    await withTenantContext(store.id, async tx => {
-      for (const c of batch) {
-        await recordSlugRedirect(tx, store.id, SlugEntityType.PRODUCT, c.from, c.to);
-        appliedCount++;
-      }
-    });
-  }
-
+  const appliedCount = await applyCandidates(store.id, result.candidates);
   // eslint-disable-next-line no-console
   console.log(`\n[backfill-slug-redirects] APPLIED — ${appliedCount} redirect row(s) written`);
 }

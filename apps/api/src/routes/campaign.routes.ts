@@ -22,7 +22,7 @@ import { ResendService } from '../services/resend.service';
 import { AIService } from '../services/ai.service';
 import {
   CAMPAIGN_STORE_SELECT,
-  buildCampaignAudience,
+  audienceCount,
   campaignDailyCap,
   pickCampaignContent,
   renderCampaignEmail,
@@ -139,15 +139,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/audience', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const [audience, sent24h] = await Promise.all([
-      buildCampaignAudience(storeId),
-      sentInLast24h(storeId),
-    ]);
+    // #1953: count-only — this route never used the actual rows.
+    const [count, sent24h] = await Promise.all([audienceCount(storeId), sentInLast24h(storeId)]);
     const cap = campaignDailyCap();
     res.json({
       success: true,
       data: {
-        count: audience.length,
+        count,
         dailyCap: cap,
         sentLast24h: sent24h,
         remainingToday: Math.max(0, cap - sent24h),
@@ -391,27 +389,30 @@ router.post(
         }
       }
 
-      const [audience, sent24h] = await Promise.all([
-        buildCampaignAudience(storeId),
+      // #1953: count-only — this pre-check never used the actual rows either
+      // (the real materialization happens in the Inngest job, which still
+      // calls buildCampaignAudience for the full rows it needs to send to).
+      const [audienceSize, sent24h] = await Promise.all([
+        audienceCount(storeId),
         sentInLast24h(storeId),
       ]);
-      if (audience.length === 0) {
+      if (audienceSize === 0) {
         throw new AppError(422, 'EMPTY_AUDIENCE', 'No subscribers have opted in yet');
       }
       const remaining = Math.max(0, campaignDailyCap() - sent24h);
       // Checked here for immediate feedback on a send-now; the job re-checks
       // at send time, which is what governs a scheduled campaign.
-      if (!body.scheduledAt && audience.length > remaining) {
+      if (!body.scheduledAt && audienceSize > remaining) {
         throw new AppError(
           422,
           'DAILY_CAP_EXCEEDED',
-          `This campaign would reach ${audience.length} people but only ${remaining} more can be sent in the next 24 hours`
+          `This campaign would reach ${audienceSize} people but only ${remaining} more can be sent in the next 24 hours`
         );
       }
 
       const flipped = await prisma.campaign.updateMany({
         where: { id: campaignId, storeId, status: 'draft' },
-        data: { status: 'scheduled', scheduledAt, recipientCount: audience.length },
+        data: { status: 'scheduled', scheduledAt, recipientCount: audienceSize },
       });
       if (flipped.count === 0) {
         throw new AppError(409, 'CAMPAIGN_NOT_DRAFT', 'This campaign has already been sent');
@@ -447,13 +448,13 @@ router.post(
         storeId,
         resourceType: 'campaign',
         resourceId: campaignId,
-        details: { audience: audience.length, scheduledAt: scheduledAt.toISOString() },
+        details: { audience: audienceSize, scheduledAt: scheduledAt.toISOString() },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
       res.status(202).json({
         success: true,
-        data: { status: 'scheduled', scheduledAt, audience: audience.length },
+        data: { status: 'scheduled', scheduledAt, audience: audienceSize },
       });
     } catch (error) {
       next(error);

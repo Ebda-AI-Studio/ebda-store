@@ -43,7 +43,7 @@ import {
   compareBundleComponents,
   type ResolvedBundle,
 } from '../services/bundle.service';
-import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { invalidateStoreProductCaches, getCached } from '../lib/public-cache';
 
 const router = Router();
 
@@ -707,35 +707,45 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const rows = await prisma.bundle.findMany({
-        where: { storeId, isActive: true },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true },
+      // #1565: was an uncached N+1 on a hot storefront path — one
+      // `findMany` for candidate ids, then one `tryResolveBundle` (its own
+      // `findFirst` with nested product/variant includes) PER candidate, on
+      // every request. Cached under the same `public:products:${storeId}:`
+      // prefix every bundle admin write already busts (`bundle.routes.ts`'s
+      // own create/update/delete handlers call `invalidateStoreProductCaches`
+      // above), so no new invalidation call site is needed. Same 120s TTL and
+      // staleness class as the public product list this mirrors.
+      const bundles = await getCached(`public:products:${storeId}:bundles:list`, 120, async () => {
+        const rows = await prisma.bundle.findMany({
+          where: { storeId, isActive: true },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+
+        // Store-scale bundle counts are small (a merchant hand-curates these
+        // kits), so resolving each candidate through `resolveBundle` — the
+        // one place componentSum/price/available/isPurchasable are computed —
+        // is preferable to duplicating that math in a bulk query here.
+        const resolved = (await Promise.all(rows.map(r => tryResolveBundle(storeId, r.id)))).filter(
+          (b): b is ResolvedBundle => b !== null
+        );
+
+        // Only bundles the storefront may actually sell right now, and never
+        // `pricingType`/`pricingValue` — see the doc comment on
+        // `ResolvedBundle` in bundle.service.ts.
+        return resolved
+          .filter(b => b.isPurchasable)
+          .map(b => ({
+            id: b.id,
+            name: b.name,
+            nameAr: b.nameAr,
+            slug: b.slug,
+            image: b.image,
+            price: b.price,
+            componentSum: b.componentSum,
+            available: b.available,
+          }));
       });
-
-      // Store-scale bundle counts are small (a merchant hand-curates these
-      // kits), so resolving each candidate through `resolveBundle` — the
-      // one place componentSum/price/available/isPurchasable are computed —
-      // is preferable to duplicating that math in a bulk query here.
-      const resolved = (await Promise.all(rows.map(r => tryResolveBundle(storeId, r.id)))).filter(
-        (b): b is ResolvedBundle => b !== null
-      );
-
-      // Only bundles the storefront may actually sell right now, and never
-      // `pricingType`/`pricingValue` — see the doc comment on
-      // `ResolvedBundle` in bundle.service.ts.
-      const bundles = resolved
-        .filter(b => b.isPurchasable)
-        .map(b => ({
-          id: b.id,
-          name: b.name,
-          nameAr: b.nameAr,
-          slug: b.slug,
-          image: b.image,
-          price: b.price,
-          componentSum: b.componentSum,
-          available: b.available,
-        }));
 
       res.json({ success: true, data: { bundles } });
     } catch (error) {
@@ -768,39 +778,47 @@ router.get(
     try {
       const { storeId, slug } = req.params;
 
-      const row = await prisma.bundle.findFirst({
-        where: { storeId, slug },
-        select: { id: true, isActive: true, description: true, descriptionAr: true },
-      });
+      // #1565 — same fix as the list route above: cached under the same
+      // `public:products:${storeId}:` prefix every bundle write already busts.
+      const bundle = await getCached(
+        `public:products:${storeId}:bundles:${slug}`,
+        120,
+        async () => {
+          const row = await prisma.bundle.findFirst({
+            where: { storeId, slug },
+            select: { id: true, isActive: true, description: true, descriptionAr: true },
+          });
 
-      if (!row || !row.isActive) {
-        throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
-      }
+          if (!row || !row.isActive) {
+            throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
+          }
 
-      const resolved = await resolveBundle(prisma, storeId, row.id);
+          const resolved = await resolveBundle(prisma, storeId, row.id);
 
-      // "What's inside" by component NAME only — never per-component
-      // allocated prices (see `ResolvedBundle`'s doc comment on
-      // `pricingType`/`pricingValue`, which this response also omits).
-      const items = await prisma.bundleItem.findMany({
-        where: { bundleId: row.id },
-        select: { product: { select: { name: true, nameAr: true } } },
-      });
+          // "What's inside" by component NAME only — never per-component
+          // allocated prices (see `ResolvedBundle`'s doc comment on
+          // `pricingType`/`pricingValue`, which this response also omits).
+          const items = await prisma.bundleItem.findMany({
+            where: { bundleId: row.id },
+            select: { product: { select: { name: true, nameAr: true } } },
+          });
 
-      const bundle = {
-        id: resolved.id,
-        name: resolved.name,
-        nameAr: resolved.nameAr,
-        slug: resolved.slug,
-        image: resolved.image,
-        description: row.description,
-        descriptionAr: row.descriptionAr,
-        price: resolved.price,
-        componentSum: resolved.componentSum,
-        available: resolved.available,
-        isPurchasable: resolved.isPurchasable,
-        componentNames: items.map(i => ({ name: i.product.name, nameAr: i.product.nameAr })),
-      };
+          return {
+            id: resolved.id,
+            name: resolved.name,
+            nameAr: resolved.nameAr,
+            slug: resolved.slug,
+            image: resolved.image,
+            description: row.description,
+            descriptionAr: row.descriptionAr,
+            price: resolved.price,
+            componentSum: resolved.componentSum,
+            available: resolved.available,
+            isPurchasable: resolved.isPurchasable,
+            componentNames: items.map(i => ({ name: i.product.name, nameAr: i.product.nameAr })),
+          };
+        }
+      );
 
       res.json({ success: true, data: { bundle } });
     } catch (error) {

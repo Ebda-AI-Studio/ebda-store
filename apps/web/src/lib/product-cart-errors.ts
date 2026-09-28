@@ -36,6 +36,25 @@ export function isProductUnavailableError(
 }
 
 /**
+ * Locale-pick a product's display name for this copy — same truthiness idiom
+ * `OrderSummary.tsx` and `CartContext.tsx` already use (`language === 'ar' &&
+ * p.nameAr ? p.nameAr : p.name`), pulled out so it is directly testable and so
+ * this call site cannot drift back to `nameAr ?? name`. `??` only falls back
+ * on null/undefined — an untranslated product's `nameAr` is `''` (the admin
+ * new-product form seeds it that way), so `??` resolved to `''` for an
+ * Arabic-language shopper. `productUnavailableCopy`'s own blank filter then
+ * silently downgraded the message from "Remove: A, B" to the weaker,
+ * partial-sounding "Including: A" even though B's ENGLISH name was right
+ * there and equally sayable in an Arabic sentence (#1805).
+ */
+export function pickProductName(
+  product: { name: string; nameAr?: string | null },
+  language: string
+): string {
+  return language === 'ar' && product.nameAr ? product.nameAr : product.name;
+}
+
+/**
  * The offending product ids, if the API sent them.
  *
  * Defensive because `details` crosses a network boundary: it is typed on the

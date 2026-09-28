@@ -137,6 +137,60 @@ describe('the global mutation limiter skips signed Inngest step callbacks', () =
   });
 });
 
+describe('the global mutation limiter skips the merchant-admin MCP surface (#1733, restored)', () => {
+  // This predicate runs app-level, BEFORE the router that calls
+  // `verifyMerchantKey` — so it cannot tell a merchant from a prober by
+  // itself. The bypass is safe here ONLY because `mcp-admin.routes.ts` now
+  // mounts a genuinely IP-only backstop (`merchantMcpIpLimiter`, see
+  // `mcp-admin-limiter-key.test.ts`) ahead of the per-key limiter — this
+  // suite only proves the PATH/METHOD MATCH is exact; the actual bucket
+  // mechanics are proven where the limiters are defined.
+  const mcpReq = (opts: { key?: string; path?: string; method?: string } = {}): Request =>
+    req({
+      method: opts.method ?? 'POST',
+      path: opts.path ?? '/api/v1/mcp/admin/pecannbee',
+      header: (name: string) => (name.toLowerCase() === 'x-merchant-key' ? opts.key : undefined),
+    });
+
+  it('lets POST /api/v1/mcp/admin/:storeSlug past uncounted, with or without a credential', () => {
+    expect(skipGlobalRateLimit(mcpReq())).toBe(true);
+    expect(skipGlobalRateLimit(mcpReq({ key: 'fwbm_whatever' }))).toBe(true);
+  });
+
+  it('does not open the bypass to lookalike paths', () => {
+    // The negative control. A prefix match without the trailing slash inside
+    // 'admin/' would let a similarly-named but DIFFERENT path through too.
+    for (const path of [
+      '/api/v1/mcp/admin-x/pecannbee',
+      '/api/v1/mcp-admin/pecannbee',
+      '/api/v1/mcp/adminx',
+      '/mcp/admin/pecannbee',
+      '/api/v2/mcp/admin/pecannbee',
+      '/api/v1/mcp/admin/pecannbee/../../auth/login',
+    ]) {
+      expect(skipGlobalRateLimit(mcpReq({ path, key: 'fwbm_whatever' })), path).toBe(false);
+    }
+  });
+
+  it('does not extend the bypass to other mutating methods on that path', () => {
+    for (const method of ['PUT', 'PATCH', 'DELETE']) {
+      expect(skipGlobalRateLimit(mcpReq({ method, key: 'fwbm_whatever' })), method).toBe(false);
+    }
+    // GET already bypasses via bypass 2 (safe methods), not this branch.
+    expect(skipGlobalRateLimit(mcpReq({ method: 'GET' }))).toBe(true);
+  });
+
+  it('does NOT extend the bypass to the anonymous buyer-facing /mcp/:storeSlug surface (no per-caller identity, verified or not, to bind a tighter bucket to)', () => {
+    expect(skipGlobalRateLimit(req({ path: '/api/v1/mcp/pecannbee' }))).toBe(false);
+  });
+
+  it('still counts every other mutation', () => {
+    for (const path of ['/api/v1/orders', '/api/v1/stores/s1/cart/items']) {
+      expect(skipGlobalRateLimit(req({ path })), `${path} must stay counted`).toBe(false);
+    }
+  });
+});
+
 describe('req.path at app-level really is the full mounted path', () => {
   it('is /api/v1/auth/refresh, not /refresh', async () => {
     // The bypass matches a literal string, so it is only correct if Express

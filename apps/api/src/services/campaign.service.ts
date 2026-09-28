@@ -75,6 +75,32 @@ export function normalizeEmail(email: string): string {
  * (Ruling EC-1). `storeId` is filtered explicitly as well as by RLS, because
  * production connects as a BYPASSRLS role.
  */
+/**
+ * The SIZE of `buildCampaignAudience`'s result, without loading every row.
+ * #1953: `GET /campaigns/audience` and the `/send` pre-check both called
+ * `buildCampaignAudience` and used only `.length`, so every subscriber row
+ * (email/id/language) was fetched and JS-deduped just to answer a count.
+ *
+ * Not a bare `prisma.newsletterSubscriber.count(...)`: `@@unique([storeId,
+ * email])` is on the RAW string, not a normalized one, so two rows can exist
+ * for the same address in different casing/whitespace (the reason
+ * `buildCampaignAudience` dedupes with `normalizeEmail` in JS) — a plain
+ * count would overcount that case. This mirrors the exact same reachable
+ * definition (normalized non-empty email, deduped) in one raw aggregate
+ * instead of materializing every row.
+ */
+export async function audienceCount(storeId: string): Promise<number> {
+  const rows = await prisma.$queryRaw<{ count: bigint }[]>`
+    SELECT COUNT(DISTINCT LOWER(TRIM(email))) AS count
+    FROM newsletter_subscribers
+    WHERE store_id = ${storeId}
+      AND is_active = true
+      AND unsubscribed_at IS NULL
+      AND email LIKE '%@%'
+  `;
+  return Number(rows[0]?.count ?? 0);
+}
+
 export async function buildCampaignAudience(storeId: string): Promise<AudienceMember[]> {
   const rows = await prisma.newsletterSubscriber.findMany({
     where: { storeId, isActive: true, unsubscribedAt: null },

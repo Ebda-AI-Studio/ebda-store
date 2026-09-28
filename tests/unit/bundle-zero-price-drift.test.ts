@@ -238,6 +238,11 @@ vi.mock('@api/middleware/security', () => ({
 }));
 vi.mock('@api/lib/public-cache', () => ({
   invalidateStoreProductCaches: vi.fn().mockResolvedValue(undefined),
+  // #1565 wrapped the public bundle routes in getCached. Pass through as an
+  // always-miss cache (call fetchFn, return its result) so this file's
+  // per-request drift scenarios are observed on every call, not served stale
+  // from a real cache the mock would otherwise need to model.
+  getCached: vi.fn((_key: string, _ttl: number, fetchFn: () => unknown) => fetchFn()),
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

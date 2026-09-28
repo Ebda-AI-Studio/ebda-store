@@ -26,6 +26,7 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 import {
+  audienceCount,
   buildCampaignAudience,
   pickCampaignContent,
   resolveRecipientLocale,
@@ -92,6 +93,42 @@ describe('buildCampaignAudience — consent only', () => {
     const spy = vi.spyOn(holder.prisma.customer, 'findMany');
     expect(await buildCampaignAudience(STORE_A)).toEqual([]);
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('audienceCount — #1953, mirrors buildCampaignAudience without materializing every row', () => {
+  it('matches buildCampaignAudience.length for every scenario the audience builder covers', async () => {
+    db.subscribers.push(
+      subscriberRow(STORE_A, 'yes@a.test'),
+      subscriberRow(STORE_A, 'inactive@a.test', { isActive: false }),
+      subscriberRow(STORE_A, 'unsub@a.test', { unsubscribedAt: new Date() }),
+      subscriberRow(STORE_A, 'half@a.test', { isActive: true, unsubscribedAt: new Date() }),
+      subscriberRow(STORE_A, 'Dup@A.test'),
+      subscriberRow(STORE_A, ' dup@a.test '),
+      subscriberRow(STORE_A, 'not-an-email'),
+      subscriberRow(STORE_B, 'theirs@b.test')
+    );
+
+    const [audience, count] = await Promise.all([
+      buildCampaignAudience(STORE_A),
+      audienceCount(STORE_A),
+    ]);
+
+    expect(count).toBe(audience.length);
+    expect(count).toBe(2); // yes@a.test, dup@a.test (deduped)
+  });
+
+  it('is tenant-scoped, same as buildCampaignAudience', async () => {
+    db.subscribers.push(
+      subscriberRow(STORE_A, 'mine@a.test'),
+      subscriberRow(STORE_B, 'theirs@b.test')
+    );
+    expect(await audienceCount(STORE_A)).toBe(1);
+    expect(await audienceCount(STORE_B)).toBe(1);
+  });
+
+  it('is 0 for a store with no reachable subscribers', async () => {
+    expect(await audienceCount(STORE_A)).toBe(0);
   });
 });
 

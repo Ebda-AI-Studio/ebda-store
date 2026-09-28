@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@force/database';
 import { fillProductFields, isAutopilotEnabled } from '../../../services/ai-autofill.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -8,10 +8,27 @@ import { inngest } from '../client';
  * Reacts to product.upserted events and runs AI autofill on the product.
  *
  * Gated by a per-store aiAutopilot toggle (default ON) so merchants can
- * disable automated fills without touching code. On create events the
- * function also kicks the recommendations sweep for the new product so
- * cross-sell suggestions are generated immediately rather than waiting
- * for the next manual bulk sweep.
+ * disable automated fills without touching code.
+ *
+ * #1937: this function used to ALSO kick the recommendations sweep on
+ * `op === 'create'`. That kick now happens synchronously at the one true
+ * creation site (`ProductService.create()` →
+ * `enqueueRecommendationsSweepForNewProduct`), because this handler's
+ * `debounce: { key: 'event.data.productId', period: '10s' }` delivers only
+ * the LAST event in its window — a create followed by a quick edit inside
+ * 10s coalesced into one `op: 'update'` delivery, silently skipping the kick
+ * every time. See `enqueueRecommendationsSweepForNewProduct`'s doc comment.
+ *
+ * Residual, reported not fixed: `changedFields` has the same debounce-
+ * coalescing gap (an earlier event's changed fields are lost if a later
+ * event in the same 10s window supersedes it), so a debounced-away field
+ * rename can leave a dependent AI-owned sibling field stale until the 3-day
+ * stale-refresh sweep (`refreshStale`) catches it up. Forcing every debounced
+ * run to `changedFields: []` would not fix this — it would regress the
+ * common, NOT-coalesced single-edit case (the vast majority of saves), which
+ * correctly refreshes a stale sibling today via its real `changedFields`.
+ * There is no way to recover a coalesced-away event's data inside this
+ * handler; the sweep already bounds the staleness window.
  *
  * Multiple functions may listen to product.upserted (e.g. product-meta-sync
  * for the Meta Catalog bot) — Inngest runs all registered listeners in
@@ -55,58 +72,6 @@ export const aiAutofillProduct: InngestFunction.Any = inngest.createFunction(
         { storeId, productId, op, filled: result.filled },
         '[ai-autofill] product filled'
       );
-
-      if (op === 'create') {
-        // Kick the AI recommendations sweep for the new product so cross-sell
-        // suggestions are ready without waiting for a manual bulk sweep.
-        // We create a system-initiated bulkAiJob (userId: null — no HTTP context)
-        // and fire the same event the admin route uses, scoped with force:true
-        // so it processes this newly-added product even if it already appeared
-        // in a prior catalogue sweep.
-        try {
-          // Coalesce: a bulk import fires one create event per product. The
-          // recommendations sweep is store-wide and smart-skips, so the first
-          // job already covers every new product — don't spawn N near-identical
-          // jobs. Skip if one is already queued/running for this store.
-          const existing = await prisma.bulkAiJob.findFirst({
-            where: { storeId, kind: 'recommendations', status: { in: ['queued', 'running'] } },
-            select: { id: true },
-          });
-          if (existing) {
-            logger.info(
-              { storeId, productId, jobId: existing.id },
-              '[ai-autofill] recommendations sweep already pending, skipping'
-            );
-            return;
-          }
-
-          const job = await prisma.bulkAiJob.create({
-            data: {
-              storeId,
-              userId: null, // system-initiated — no authenticated user context
-              kind: 'recommendations',
-            },
-            select: { id: true },
-          });
-
-          await inngest.send({
-            name: 'bulk-ai/recommendations-requested',
-            data: { jobId: job.id, storeId, force: false },
-          });
-
-          logger.info(
-            { storeId, productId, jobId: job.id },
-            '[ai-autofill] recommendations sweep enqueued for new product'
-          );
-        } catch (err) {
-          // Non-fatal: autofill already succeeded; recommendations will be
-          // generated on the next manual bulk sweep.
-          logger.warn(
-            { err, storeId, productId },
-            '[ai-autofill] failed to enqueue recommendations sweep'
-          );
-        }
-      }
     }); // end runInTenantContext
   }
 );

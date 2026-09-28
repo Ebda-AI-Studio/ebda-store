@@ -43,6 +43,10 @@ describe('ProductService.update slug redirect capture', () => {
 
   afterAll(async () => {
     await prisma.slugRedirect.deleteMany({ where: { storeId: STORE } });
+    // #1937: ProductService.create() now also enqueues a `recommendations`
+    // BulkAiJob synchronously (see ai-autofill.service.ts) — clean it up like
+    // every other row this suite creates.
+    await prisma.bulkAiJob.deleteMany({ where: { storeId: STORE } });
     await prisma.product.deleteMany({ where: { storeId: STORE } });
     await prisma.store.deleteMany({ where: { id: STORE } });
     await prisma.user.deleteMany({ where: { id: userId } });

@@ -43,6 +43,7 @@ import {
   hasDeferralScope,
   installClosedTenantTxAlerting,
   withDeferredWork,
+  awaitDeferredWork,
 } from '@api/lib/after-tenant-commit';
 
 const STORE_ID = '11111111-1111-1111-1111-111111111111';
@@ -163,17 +164,70 @@ describe('withDeferredWork — inside a request transaction', () => {
   });
 });
 
+describe('awaitDeferredWork — graceful shutdown drain (#1601)', () => {
+  it('resolves immediately when nothing is in flight', async () => {
+    const start = Date.now();
+    await awaitDeferredWork(5000);
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+
+  it('waits for an in-flight drain to finish before resolving (mutation-proof: an un-tracked drain would let this resolve BEFORE the task runs)', async () => {
+    const order: string[] = [];
+    let releaseTask: () => void;
+    const gate = new Promise<void>(resolve => {
+      releaseTask = resolve;
+    });
+
+    const requestPromise = withDeferredWork({ storeId: STORE_ID }, async () => {
+      void deferAfterTenantCommit('slow-shutdown-task', async () => {
+        await gate;
+        order.push('task-finished');
+      });
+    });
+
+    // Let the request's own await chain run far enough to start the drain
+    // and register it in the in-flight set (a macrotask tick is enough here
+    // since nothing else is queued).
+    await new Promise(resolve => setImmediate(resolve));
+
+    const shutdownWait = awaitDeferredWork(5000).then(() => {
+      order.push('shutdown-wait-resolved');
+    });
+
+    releaseTask!();
+    await shutdownWait;
+    await requestPromise;
+
+    expect(order).toEqual(['task-finished', 'shutdown-wait-resolved']);
+  });
+
+  it('gives up after timeoutMs instead of waiting forever on a hung task', async () => {
+    const neverResolves = new Promise<void>(() => undefined);
+    void withDeferredWork({ storeId: STORE_ID }, async () => {
+      void deferAfterTenantCommit('hung-task', async () => {
+        await neverResolves;
+      });
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    const start = Date.now();
+    await awaitDeferredWork(30);
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
+});
+
 describe('installClosedTenantTxAlerting', () => {
-  it('registers a reporter that logs at error level and alerts', () => {
+  it('registers a reporter that logs at error level and alerts for a COMMITTED tx (#1598)', () => {
     installClosedTenantTxAlerting();
 
     expect(onClosedTenantTxAccessMock).toHaveBeenCalledTimes(1);
     const reporter = onClosedTenantTxAccessMock.mock.calls[0][0] as (info: {
       property: string;
       stack?: string;
+      reason: 'committed' | 'aborted';
     }) => void;
 
-    reporter({ property: 'store', stack: 'Error\n    at somewhere' });
+    reporter({ property: 'store', stack: 'Error\n    at somewhere', reason: 'committed' });
 
     expect(loggerMock.error).toHaveBeenCalledTimes(1);
     expect(sendAlertMock).toHaveBeenCalledTimes(1);
@@ -182,5 +236,21 @@ describe('installClosedTenantTxAlerting', () => {
       source: 'after-tenant-commit.closed_tx_access',
       context: expect.objectContaining({ property: 'store' }),
     });
+  });
+
+  it('downgrades an ABORTED (rolled-back) tx access to a debug log with no alert (#1598)', () => {
+    installClosedTenantTxAlerting();
+
+    const reporter = onClosedTenantTxAccessMock.mock.calls[0][0] as (info: {
+      property: string;
+      stack?: string;
+      reason: 'committed' | 'aborted';
+    }) => void;
+
+    reporter({ property: 'order', stack: 'Error\n    at somewhere', reason: 'aborted' });
+
+    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(sendAlertMock).not.toHaveBeenCalled();
+    expect(loggerMock.debug).toHaveBeenCalledTimes(1);
   });
 });
