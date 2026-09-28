@@ -26,7 +26,8 @@ import {
 } from '../../templates/shared/section-typography';
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
-import { resolveColor, checkMinimumOrder } from '@force/shared';
+import { formatTaxRowLabel } from '../../lib/tax-display';
+import { resolveColor, checkMinimumOrder, computeOrderTax } from '@force/shared';
 
 export default function CartClient() {
   const {
@@ -358,7 +359,25 @@ export default function CartClient() {
       ? 0
       : shippingFee
     : 0;
-  const total = subtotal - discount + shipping;
+  // VAT — same formula the API charges at order creation (computeOrderTax,
+  // ruling M3-6 in docs/RULINGS.md): the taxable base is subtotal net of
+  // discount. `taxRatePercent` is already zeroed by the API for a disabled
+  // store, so `tax = 0` and the summary renders byte-identically to before.
+  // `includedInPrice` selects the same extraction branch order creation
+  // uses, and that amount is informational only — NOT added to `total`.
+  const taxRatePercent = store.taxRatePercent ?? 0;
+  const taxIncludedInPrice = !!store.taxIncludedInPrice;
+  const tax = computeOrderTax(subtotal, discount, taxRatePercent / 100, taxIncludedInPrice);
+  const total = subtotal - discount + shipping + (taxIncludedInPrice ? 0 : tax);
+  // Label for the fallback (non-themed) summary below — the themed
+  // `T.OrderSummary` computes its own copy of this via useOrderSummaryBase.
+  const taxLabel = formatTaxRowLabel(
+    tax,
+    taxRatePercent,
+    taxIncludedInPrice,
+    language === 'ar',
+    localize
+  );
   const cartCount = itemCount;
   const { components: T } = useTemplateComponents();
 
@@ -758,6 +777,9 @@ export default function CartClient() {
                         // "Calculated at checkout" label instead of a
                         // misleading "Free".
                         shippingPending
+                        tax={tax}
+                        taxRatePercent={taxRatePercent}
+                        taxIncludedInPrice={taxIncludedInPrice}
                         total={total}
                         currency={store.currency}
                         isRtl={language === 'ar'}
@@ -998,6 +1020,25 @@ export default function CartClient() {
                                 )}
                               </span>
                             </div>
+                            {tax > 0 && taxLabel && !taxIncludedInPrice && (
+                              <div className="flex justify-between text-sm">
+                                <span
+                                  className={`${summaryFontWeight} text-muted-foreground`}
+                                  style={{
+                                    ...cartZoneStyle(cartLabelZone),
+                                    ...summaryLabelStyle,
+                                  }}
+                                >
+                                  {taxLabel}
+                                </span>
+                                <span
+                                  className="font-bold text-foreground"
+                                  style={cartZoneStyle(cartPriceZone)}
+                                >
+                                  {formatPrice(tax)}
+                                </span>
+                              </div>
+                            )}
                             <div className="border-t border-border pt-3">
                               <div className="flex justify-between">
                                 <span
@@ -1020,6 +1061,17 @@ export default function CartClient() {
                                 </span>
                               </div>
                             </div>
+                            {/* Tax already inside the listed price is
+                                informational only \u2014 a muted caption below
+                                Total, never a row in the summed amount
+                                column (scoped-audit follow-up: an inclusive
+                                amount printed there implied it was added
+                                twice). */}
+                            {tax > 0 && taxLabel && taxIncludedInPrice && (
+                              <p className="text-xs text-muted-foreground">
+                                {taxLabel} {'\u2014'} {formatPrice(tax)}
+                              </p>
+                            )}
                           </div>
 
                           {/* Below-minimum notice */}

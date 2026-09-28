@@ -204,4 +204,66 @@ describe('order payment posts a balanced journal entry', () => {
     expect(dr).toBe(cr);
     expect(dr).toBe(5750);
   });
+
+  it('books revenue NET of VAT when the order was charged tax-inclusive', async () => {
+    // An inclusive-VAT store (ruling M3-7): the 5.000 listed price already
+    // contains 5% VAT, so `tax` (238) is EXTRACTED from `subtotal` and `total`
+    // does not add it again. Crediting the gross 5000 to revenue on top of
+    // CR Tax 238 + CR Shipping 500 would put CR 238 over DR Cash = total, and
+    // postEntry would throw "Journal lines unbalanced" — every paid order of
+    // such a store would retry, dead-letter and never reach the books.
+    const order = await prisma.order.create({
+      data: {
+        storeId,
+        orderNumber: `INCL-${Date.now()}`,
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        subtotal: 5000,
+        tax: 238, // 5000 − 5000/1.05, rounded
+        taxIncludedInPrice: true,
+        shipping: 500,
+        discount: 0,
+        total: 5500, // subtotal + shipping — the VAT is already inside subtotal
+        currency: 'KWD',
+        shippingAddress: {},
+        billingAddress: {},
+        items: {
+          create: [
+            {
+              productId,
+              productName: 'Sale Test Product',
+              quantity: 1,
+              price: 5000,
+              total: 5000,
+              costPrice: 3000,
+            },
+          ],
+        },
+        payments: {
+          create: [{ provider: 'tap', status: 'completed', amount: 5500, paidAt: new Date() }],
+        },
+      },
+    });
+
+    await expect(postOrderPaymentJournal({ orderId: order.id })).resolves.toBeUndefined();
+
+    const cashSales = await prisma.journalEntry.findFirst({
+      where: { storeId, source: 'order', sourceId: order.id },
+      include: { lines: true },
+    });
+    expect(cashSales).toBeDefined();
+    // DR Cash 5500 (what the customer actually paid)
+    expect(cashSales!.lines.find(l => l.debit === 5500)).toBeDefined();
+    // CR Sales Revenue 4762 — the gross 5000 LESS the 238 of VAT inside it
+    expect(cashSales!.lines.find(l => l.credit === 4762)).toBeDefined();
+    // CR Tax Payable 238 — still owed to the authority, booked once
+    expect(cashSales!.lines.find(l => l.credit === 238)).toBeDefined();
+    // CR Shipping Income 500
+    expect(cashSales!.lines.find(l => l.credit === 500)).toBeDefined();
+
+    const dr = cashSales!.lines.reduce((s, l) => s + l.debit, 0);
+    const cr = cashSales!.lines.reduce((s, l) => s + l.credit, 0);
+    expect(dr).toBe(cr);
+    expect(dr).toBe(5500);
+  });
 });

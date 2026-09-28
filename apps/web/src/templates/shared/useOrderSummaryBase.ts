@@ -11,6 +11,7 @@
 
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { formatTaxRowLabel } from '../../lib/tax-display';
 import type { OrderSummaryProps } from '../types';
 
 export interface OrderSummaryBaseResult {
@@ -25,6 +26,9 @@ export interface OrderSummaryBaseResult {
   labelColorStyle: React.CSSProperties | undefined;
   /** Inline style for total elements when a custom total colour is set */
   totalColorStyle: React.CSSProperties | undefined;
+  /** "VAT (5%)" / "Incl. VAT (5%)", bilingual. Undefined when there's no
+   *  tax to show (rate 0, tax disabled, or `tax` is 0) — render nothing. */
+  taxLabel: string | undefined;
 }
 
 /**
@@ -38,9 +42,19 @@ export function useOrderSummaryBase({
   ctaLabelAr,
   summaryColors,
   isRtl: isRtlProp,
+  tax,
+  taxRatePercent,
+  taxIncludedInPrice,
 }: Pick<
   OrderSummaryProps,
-  'currency' | 'ctaLabel' | 'ctaLabelAr' | 'summaryColors' | 'isRtl'
+  | 'currency'
+  | 'ctaLabel'
+  | 'ctaLabelAr'
+  | 'summaryColors'
+  | 'isRtl'
+  | 'tax'
+  | 'taxRatePercent'
+  | 'taxIncludedInPrice'
 >): OrderSummaryBaseResult {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { localize } = useNumerals();
@@ -53,5 +67,12 @@ export function useOrderSummaryBase({
     summaryLabelBold: summaryColors?.bold !== false,
     labelColorStyle: summaryColors?.labelColor ? { color: summaryColors.labelColor } : undefined,
     totalColorStyle: summaryColors?.totalColor ? { color: summaryColors.totalColor } : undefined,
+    taxLabel: formatTaxRowLabel(
+      tax ?? 0,
+      taxRatePercent ?? 0,
+      !!taxIncludedInPrice,
+      isRtl,
+      localize
+    ),
   };
 }

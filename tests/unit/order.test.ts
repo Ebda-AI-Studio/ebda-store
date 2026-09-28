@@ -1064,6 +1064,14 @@ describe('OrderService', () => {
     // #193 (owner decision): the manual-order path levies VAT after the coupon
     // discount too. 5000 goods − 10% coupon (500) = 4500 × 5% = 225, not 250.
     it('levies VAT on the subtotal net of the coupon discount', async () => {
+      // resolveActiveTaxRate gates the charge on taxEnabled + the `tax`
+      // feature too, since ruling M3-9 — an active rate row alone is no
+      // longer enough (the global mock's `isFeatureEnabled` already
+      // resolves true; only taxEnabled needs setting here).
+      vi.mocked(prisma.store.findUnique).mockResolvedValue({
+        name: 'Test Store',
+        taxEnabled: true,
+      } as any);
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([{ rate: 5 }] as any);
       vi.mocked(prisma.coupon.findFirst).mockResolvedValue({
         id: 'coupon-vat',

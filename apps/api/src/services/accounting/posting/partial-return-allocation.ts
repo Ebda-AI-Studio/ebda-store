@@ -40,7 +40,11 @@ export interface AllocationResult<L extends AllocationLine> {
   discountThis: number;
   /** This return's share of the order-level tax. */
   taxThis: number;
-  /** DR Sales Returns — gross less the discount share. */
+  /**
+   * DR Sales Returns — the revenue actually being taken back, which is net of
+   * both the discount share and (for a tax-inclusive order) the tax share,
+   * mirroring what the sale credited to revenue.
+   */
   revenueDebit: number;
   /**
    * CR Cash — what the customer is actually owed back for these lines, and
@@ -58,6 +62,14 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
   discount: number;
   /** Order-level tax in fils. */
   tax: number;
+  /**
+   * `Order.taxIncludedInPrice` — was `tax` already inside the line prices when
+   * the order was charged (ruling M3-7)? Default `false` (exclusive: the
+   * customer paid the line price PLUS its tax share). Pass the order's own
+   * persisted flag, never the store's current switch: it can be flipped
+   * between the sale and the return.
+   */
+  taxIncludedInPrice?: boolean;
   /** Every line on the order. */
   lines: L[];
   /** Quantity per orderItemId already returned by PRIOR completed returns. */
@@ -65,7 +77,7 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
   /** The lines this return is claiming. */
   requested: Array<{ orderItemId: string; quantity: number }>;
 }): AllocationResult<L> {
-  const { subtotal, discount, tax, lines, prevQty, requested } = input;
+  const { subtotal, discount, tax, taxIncludedInPrice = false, lines, prevQty, requested } = input;
 
   // `claimed` runs cumulatively so duplicate orderItemIds in one payload
   // cannot double-count against the same line's remainder.
@@ -101,8 +113,24 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
     entitled(discount, cumGross) - entitled(discount, prevGross),
     curGross
   );
-  const taxThis = entitled(tax, cumGross) - entitled(tax, prevGross);
-  const revenueDebit = curGross - discountThis;
+  // The line value the customer is being credited for, less their discount
+  // share. Which SIDE of it the tax sits on is the only thing the two tax
+  // conventions disagree about, and both keep the adjustment balanced
+  // (revenueDebit + taxThis === cashCredit):
+  //   exclusive — the line price carried no tax, so the customer is owed that
+  //     price PLUS its tax share, and the whole price was revenue.
+  //   inclusive — the tax was already inside the line price, so the customer
+  //     is owed that price and NO MORE (adding taxThis on top refunds the VAT
+  //     a second time), and the revenue the sale booked was the price LESS
+  //     its tax share.
+  const netOfDiscount = curGross - discountThis;
+  // An inclusive share comes OUT of the line value, so it cannot exceed it —
+  // clamped so a rounding edge can never produce a negative revenue debit
+  // (which partial-return-posting would drop, unbalancing the entry).
+  const taxThis = taxIncludedInPrice
+    ? Math.min(entitled(tax, cumGross) - entitled(tax, prevGross), netOfDiscount)
+    : entitled(tax, cumGross) - entitled(tax, prevGross);
+  const revenueDebit = taxIncludedInPrice ? netOfDiscount - taxThis : netOfDiscount;
   const cashCredit = revenueDebit + taxThis;
 
   return { prevGross, curGross, discountThis, taxThis, revenueDebit, cashCredit, returnedLines };

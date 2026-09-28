@@ -94,6 +94,12 @@ export function buildFixture({ encryptionKey, scenarios }) {
         status: 'active',
         currency: 'KWD',
         settings: {},
+        // The 'vat' store's tax_rates row (below) only actually charges/
+        // shows VAT once resolveActiveTaxRate's taxEnabled gate is on too
+        // (ruling M3-9) — the 'tax' feature itself is already on by the
+        // default 'starter' plan baseline (PLAN_BASELINE.starter includes
+        // 'tax'), so this is the one flag this fixture needs to flip.
+        ...(key === 'vat' ? { tax_enabled: true } : {}),
         updated_at: ts,
       })
     );

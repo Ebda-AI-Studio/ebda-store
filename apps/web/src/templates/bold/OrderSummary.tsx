@@ -12,6 +12,8 @@ export default function BoldOrderSummary({
   freeShipping = false,
   shippingPending = false,
   tax = 0,
+  taxRatePercent = 0,
+  taxIncludedInPrice = false,
   total,
   currency = 'KWD',
   isRtl: isRtlProp,
@@ -26,8 +28,17 @@ export default function BoldOrderSummary({
   typography,
   summaryColors,
 }: OrderSummaryProps) {
-  const { isRtl, fmt, ctaText, summaryLabelBold, labelColorStyle, totalColorStyle } =
-    useOrderSummaryBase({ currency, ctaLabel, ctaLabelAr, summaryColors, isRtl: isRtlProp });
+  const { isRtl, fmt, ctaText, summaryLabelBold, labelColorStyle, totalColorStyle, taxLabel } =
+    useOrderSummaryBase({
+      currency,
+      ctaLabel,
+      ctaLabelAr,
+      summaryColors,
+      isRtl: isRtlProp,
+      tax,
+      taxRatePercent,
+      taxIncludedInPrice,
+    });
 
   return (
     <aside
@@ -82,13 +93,13 @@ export default function BoldOrderSummary({
             )}
           </dd>
         </div>
-        {tax > 0 && (
+        {tax > 0 && !taxIncludedInPrice && (
           <div className="flex items-center justify-between">
             <dt
               className="font-bold uppercase tracking-wider text-muted-foreground"
               style={typography?.label}
             >
-              {isRtl ? 'الضريبة' : 'Tax'}
+              {taxLabel}
             </dt>
             <dd className="font-black text-foreground tabular-nums" style={typography?.price}>
               {fmt(tax)}
@@ -110,6 +121,11 @@ export default function BoldOrderSummary({
           </dd>
         </div>
       </dl>
+      {tax > 0 && taxIncludedInPrice && (
+        <p className="px-5 pt-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          {taxLabel} {'\u2014'} {fmt(tax)}
+        </p>
+      )}
       {children && <div className="border-t-2 border-foreground p-5">{children}</div>}
       {ctaDisabled && ctaBlockedMessage && (
         <p className="border-t-2 border-warning bg-warning/10 px-5 py-3 text-xs font-bold uppercase tracking-wide text-warning">

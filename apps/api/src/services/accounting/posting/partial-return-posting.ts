@@ -205,6 +205,7 @@ export async function postPartialReturnJournal(
     subtotal: order.subtotal,
     discount: order.discount,
     tax: order.tax,
+    taxIncludedInPrice: order.taxIncludedInPrice,
     lines: order.items,
     prevQty,
     requested: items,

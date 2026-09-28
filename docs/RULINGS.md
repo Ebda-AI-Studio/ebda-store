@@ -2010,6 +2010,130 @@ P2002 backstop into a 25P02 abort of the whole step, so it was not done. The RLS
 old and the new form see the row. Cost if wrong: none beyond the pre-existing posture, which this
 change neither widens nor narrows.
 
+**Ruling M3-6 — the checkout VAT line deferred by M3-3 is now shipped (owner decision, 2026-09-26).**
+`computeOrderTax` moved from `apps/api/src/lib/order-tax.ts` into `@force/shared` (the API re-exports
+it) so the checkout/cart summary and order creation share one formula rather than two that could
+drift. The public store payload (`/stores/:slugOrId`, `/store/resolve`) now carries
+`taxRatePercent`, read via the same active `TaxRate` row order creation charges against
+(`resolveActiveTaxRatePercent`, a new single resolver `order.service.ts`'s two call sites now use
+too, replacing their own duplicate queries). The checkout `OrderSummary` and all 5 themed cart
+summaries render "VAT (R%)" when tax is exclusive (added to `total`) and "Incl. VAT (R%)" when the
+listed price already includes it (informational only, never added to `total`). Disabled or a 0%
+rate — all 3 live stores today — renders nothing, byte-identical to before this line existed. Cost
+if wrong: verified by a wide subtotal/discount/rate parity sweep (incl. rounding edges) and
+mutation-checked render tests for the disabled/exclusive/inclusive states across every theme, plus
+the buy-flow parity harness against `origin/main` — but not against a live store with tax actually
+enabled, since none exists to test against (per the owner, 2026-09-25, not re-measured here).
+
+**Ruling M3-7 — the scoped audit blocked M3-6 on P1=1, P2=4; this closes the P1 and three of the
+four P2s (2026-09-26).** P1: M3-6's "informational only, never added to `total`" line was true of the
+STOREFRONT and false of the CHARGE — `order.service.ts` never read `taxIncludedInPrice` and always
+added tax on top, so an inclusive-VAT store would be shown "Incl. VAT" and charged as if it were
+exclusive, the exact display-versus-charge gap M3-3 was about. `computeOrderTax` gained a 4th
+argument, `includedInPrice`, that EXTRACTS tax from an already-tax-inclusive base
+(`base − base / (1 + rate)`) instead of adding it; both `order.service.ts` call sites and the
+storefront now derive `tax` and `total` from the identical flag, so M3-6's claim is true on both
+sides as of this ruling. No live store has inclusive VAT with an active rate, so nothing charged
+today changes — proven by the buy-flow-parity harness against `origin/main`.
+
+P2 (fixed): `taxRatePercent` ignored `Store.taxEnabled` and the `tax` feature, so a merchant who
+flips "Enable tax" off (which only PATCHes `taxEnabled` — existing `TaxRate` rows keep
+`isActive: true`) still saw a VAT line on their own storefront. `resolveDisplayTaxRatePercent` now
+gates on both, matching `TaxService.calculateTax`'s existing gate. The CHARGE resolver
+(`resolveActiveTaxRate`) deliberately stays UNGATED — order creation charging a disabled-but-still-
+active rate is a pre-existing gap this ruling does not close, because (a) changing what a merchant
+is paid needs its own owner ruling, and (b) the buy-flow-parity fixture's VAT store has `taxEnabled`
+defaulting to `false` with an active rate, so gating the charge would itself change a charged amount
+against `origin/main` — the one thing this whole batch promised not to do. Cost if wrong: a merchant
+with tax disabled but an old active rate row is still charged VAT server-side while their storefront
+correctly shows none — a display-matches-merchant-intent gap, not a display-versus-charge gap.
+
+P2 (fixed): the cart's non-themed fallback summary (rendered before the theme chunk loads, or
+permanently if it fails to) had no VAT row despite `total` already including tax — the 6th cart path
+of the "every render path" claim, missed the first time. It now renders the same row/caption the
+other 6 paths do.
+
+P2 (fixed): the inclusive-VAT row printed its amount in the same summed column as
+Subtotal/Shipping/Total, so a `total` that correctly excluded it read as an on-screen arithmetic
+error. All 7 render paths now show the inclusive case as a muted caption after Total
+("Incl. VAT (5%) — KWD 1.000"), never a row in the amount column.
+
+P2 (not filed, fixed anyway): `resolveActiveTaxRate`/`resolveDisplayTaxRatePercent`'s rate query had
+no `ORDER BY`, so a store with more than one active rate could show a different rate than it
+charged. Both now order `priority desc, createdAt asc, id asc` and `take: 1` — free to add while
+already rewriting the resolver, no live-store or fixture behaviour change (every fixture has exactly
+one active rate).
+
+**Ruling M3-8 — the ACCOUNTING consumers learn the inclusive convention too (PR review, 2026-09-26).**
+M3-7 taught order creation and all 7 storefront render paths that an inclusive `tax` is already
+inside `subtotal`/`total`; it did not tell the two places that read `order.tax` afterwards, and
+half of that convention is worse than none. `postOrderPaymentJournal` posted DR Cash = `total`
+against CR revenue (`subtotal − discount`) + CR tax + CR shipping, so the credits exceeded the
+debits by exactly `order.tax` and `postEntry` threw `Journal lines unbalanced` — inside an Inngest
+function, so every paid order of an inclusive-VAT store with accounting on would retry, dead-letter
+and never reach the books. `allocatePartialReturn` computed `cashCredit = revenueDebit + taxThis`,
+refunding VAT on top of a gross line price the VAT was already inside.
+
+The convention is now **frozen onto the order** as `Order.taxIncludedInPrice`
+(`20260927130000_order_tax_included_in_price`, `false` for every existing row = the exclusive
+convention they were charged under), not re-read from `Store.taxIncludedInPrice`: a merchant can
+flip that switch at any time, and a refund allocated months later must read the money the way it
+was charged. Revenue is now booked net of VAT under either convention, and an inclusive partial
+return credits the line value and no more. Cost if wrong: unchanged for every order today — no live
+store has inclusive VAT with an active rate (M3-7) and the column defaults to the old behaviour —
+verified by a balanced-entry integration test on an inclusive order and inclusive allocation tests
+(single return and a full telescoping sweep).
+
+Known residual, NOT fixed here: the invoice PDF (`invoice.service.ts`) still prints `tax` as a
+summed row between Subtotal and Total, so an inclusive order's invoice reads as an arithmetic
+error — the same P2 the storefront closed by moving the inclusive case to a caption after Total.
+Display-only; no money moves wrong.
+
+**Ruling M3-9 — overrides M3-7's accepted residual: the CHARGE now uses the SAME gate as the
+DISPLAY (owner decision, 2026-09-26, on a production read-only check: 0 rows in `tax_rates` and
+`taxEnabled: false` on all 3 live stores).** M3-7 left the charge resolver (`resolveActiveTaxRate`,
+used by order creation) deliberately ungated, reasoning that a merchant with tax disabled but an old
+active `TaxRate` row would still be charged VAT server-side while their storefront correctly showed
+none — accepted as a residual because gating the charge would have changed a charged amount against
+the buy-flow-parity fixture's VAT-store scenario (whose `taxEnabled` defaulted to `false`). The
+production check makes the trade-off unnecessary: no live store is in the state the old reasoning
+protected, so there is nothing left to protect by leaving the gap open, and leaving it open is
+strictly worse (it is the exact display-versus-charge gap this whole PR exists to close, just
+inverted — the storefront now UNDER-promises what the customer is charged instead of over-promising
+it, when a merchant's stale rate row and disabled toggle disagree).
+
+`resolveActiveTaxRate` (`apps/api/src/lib/order-tax.ts`) is now the ONE resolver both
+`order.service.ts` (both call sites) and `public.routes.ts` (both call sites) use — there is no
+longer a second, differently-gated function for either side to call by mistake. It gates on BOTH
+`Store.taxEnabled` and the `tax` feature, matching `TaxService.calculateTax`'s existing gate, and
+keeps M3-7's deterministic `ORDER BY`. The buy-flow-parity fixture's `vat` store (
+`scripts/buy-flow-parity/lib/fixture.mjs`) now sets `tax_enabled: true` explicitly — its `tax_rates`
+row alone was never sufficient once the charge is gated, and without the fixture update the
+`vat-store-mf-pct-coupon` scenario would have started charging (and showing) 0% VAT on `origin/main`
+comparison runs, silently losing VAT coverage rather than proving it. The `tax` feature itself needed
+no fixture change — `PLAN_BASELINE.starter` already includes `'tax'`, and the fixture's stores take
+the schema's `starter` plan default with no override row.
+
+Cost if wrong: none identified — every live store's `taxRatePercent` is already 0 under the OLD
+ungated charge (no active rate exists to charge in the first place), so gating it changes nothing
+observable in production; the only behaviour this changes is the buy-flow-parity fixture's synthetic
+VAT store, which is deliberately re-enabled by the same commit. Verified: `tests/unit/order-tax-
+resolver-gating.test.ts` (mutation-checked: taxEnabled=false + active rate → 0 both charged and
+displayed; taxEnabled=true + feature on + active rate → the real rate both charged and displayed;
+plus a source-assertion that no second resolver exists and both files' call sites read from this
+one), and the buy-flow-parity harness against `origin/main` post-fixture-update: 16 scenarios ran,
+1 clean `PASS` (`area-not-deliverable`, which never reaches order creation), 15 `DIFF` — every one
+of the 30 diffs across those 15 scenarios is the SAME added field, `db.orders[0].tax_included_in_price`
+/ `taxIncludedInPrice` in the order-shaped HTTP responses, `∅ (absent)` on `origin/main` → `false` on
+this head. That field is M3-8's `Order.taxIncludedInPrice` column, not this ruling's own change —
+`origin/main` predates that migration entirely, so its schema has no such column to compare against,
+and every order (on any store, taxed or not) now carries it. Confirmed by scanning
+`result.json` directly rather than trusting the harness's own exit code (piped through `tail`, which
+reports `tail`'s exit status, not `run.mjs`'s — the harness's own convention is exit 1 on any DIFF):
+zero of the 30 diffs touch `tax`, `total`, `subtotal`, `discount`, `shipping`, `status`, or any other
+field, on the VAT-store scenario or any other. Nothing charged changed; the field itself was already
+proven correct by M3-8's own tests.
+
 ---
 
 **Ruling MCP-2 — denied-write audits coalesce to one row per (store, ip, tool)

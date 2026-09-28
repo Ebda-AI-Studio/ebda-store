@@ -6,6 +6,7 @@ import { Button, Input } from '@force/ui';
 import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { formatTaxRowLabel } from '../../lib/tax-display';
 import { BundleLine } from '../../components/BundleLine';
 import type { CheckoutCartItem, CheckoutCartBundle, Coupon } from './types';
 
@@ -67,6 +68,16 @@ interface OrderSummaryProps {
    *  at order creation. */
   promotionDiscount?: number;
   shipping: number;
+  /** VAT amount in fils, computed via `computeOrderTax` (same formula the
+   *  API charges at order creation — ruling M3-3 in docs/RULINGS.md). 0
+   *  for a store with no active tax rate — renders nothing. */
+  tax: number;
+  /** The store's active VAT rate as a percentage (e.g. 5 for 5%), used only
+   *  to label the row ("VAT (5%)"). */
+  taxRatePercent: number;
+  /** When true, `tax` is already included in `subtotal` — the row renders
+   *  as an informational "Incl. VAT (5%)" note and is NOT part of `total`. */
+  taxIncludedInPrice: boolean;
   total: number;
   freeShipping: boolean;
   couponCode: string;
@@ -92,6 +103,9 @@ export function OrderSummary({
   discount,
   promotionDiscount = 0,
   shipping,
+  tax,
+  taxRatePercent,
+  taxIncludedInPrice,
   total,
   freeShipping,
   couponCode,
@@ -108,6 +122,7 @@ export function OrderSummary({
   const { t, isRtl } = useLanguage();
   const { localize } = useNumerals();
   const formatPrice = useLocalePrice();
+  const taxLabel = formatTaxRowLabel(tax, taxRatePercent, taxIncludedInPrice, isRtl, localize);
   const summaryLabelBold = summaryColors?.bold !== false;
   const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
   const labelColorStyle = summaryColors?.labelColor
@@ -438,6 +453,19 @@ export function OrderSummary({
                     )}
             </span>
           </div>
+          {tax > 0 && taxLabel && !taxIncludedInPrice && (
+            <div className="flex justify-between text-sm">
+              <span
+                className={`${summaryFontWeight} text-muted-foreground`}
+                style={{ ...typography?.label, ...labelColorStyle }}
+              >
+                {taxLabel}
+              </span>
+              <span className="font-medium tabular-nums" style={typography?.price}>
+                {formatPrice(tax)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between border-t pt-3">
             <span
               className={`text-lg ${summaryFontWeight} text-foreground`}
@@ -452,6 +480,15 @@ export function OrderSummary({
               {formatPrice(total)}
             </span>
           </div>
+          {/* Tax already inside the listed price is informational only — a
+              muted caption below Total, never a row in the summed amount
+              column (a `total` that doesn't add it up would otherwise look
+              like an on-screen arithmetic error). */}
+          {tax > 0 && taxLabel && taxIncludedInPrice && (
+            <p className="text-xs text-muted-foreground">
+              {taxLabel} {'\u2014'} {formatPrice(tax)}
+            </p>
+          )}
           {wallet && wallet.enabled && wallet.applied > 0 && (
             <>
               <div className="flex justify-between text-sm">

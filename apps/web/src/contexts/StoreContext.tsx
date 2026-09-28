@@ -137,6 +137,9 @@ export interface StoreData {
    * customer understands they're not paying tax on top at checkout. */
   taxEnabled?: boolean;
   taxIncludedInPrice?: boolean;
+  /** The store's active VAT rate as a percentage (e.g. 5 for 5%). See
+   *  `ResolvedStore.taxRatePercent` in lib/store-resolver.ts. */
+  taxRatePercent?: number;
   enabledFeatures?: string[];
   /**
    * Slugs of CMS pages the merchant has explicitly disabled

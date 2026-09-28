@@ -1287,6 +1287,18 @@ model Order {
   paymentStatus         OrderPaymentStatus @default(unpaid) @map("payment_status")
   subtotal              Int
   tax                   Int                @default(0)
+  // Did the store's listed prices ALREADY contain `tax` when this order was
+  // placed? (ruling M3-7.)
+  //   false (the default, and every order placed before this column existed)
+  //     — EXCLUSIVE: `tax` sits on top of `subtotal` inside `total`.
+  //   true — INCLUSIVE: `subtotal` is gross, `tax` is the portion extracted
+  //     out of it, and `total` does NOT add it again.
+  // Persisted per-order rather than re-read from `Store.taxIncludedInPrice`
+  // because the merchant can flip that switch at any time: months later the
+  // GL posting and the refund allocator must still read THIS order's money
+  // the way it was charged. Every `order.tax` consumer honours it — see
+  // services/accounting/posting/{order-posting,partial-return-allocation}.ts.
+  taxIncludedInPrice    Boolean            @default(false) @map("tax_included_in_price")
   shipping              Int                @default(0)
   discount              Int                @default(0)
   total                 Int

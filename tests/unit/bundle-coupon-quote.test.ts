@@ -410,6 +410,15 @@ describe('coupon on a cart containing a bundle — quote must equal charge', () 
   // 22000 fils of goods (10000 loose + 12000 box) with a 1000-fils coupon, so
   // at 5% the tax is 5% of 21000 = 1050 — not 5% of 22000 = 1100 as before.
   it('a VAT store charges tax on the subtotal net of the discount', async () => {
+    // resolveActiveTaxRate gates the charge on taxEnabled + the `tax`
+    // feature too, since ruling M3-9 — an active rate row alone is no
+    // longer enough (the global mock's `isFeatureEnabled` already
+    // resolves true; only taxEnabled needs setting here).
+    mockPrisma.store.findUnique.mockResolvedValue({
+      name: 'Test Store',
+      settings: null,
+      taxEnabled: true,
+    });
     mockPrisma.taxRate.findMany.mockResolvedValue([{ rate: 5 }]);
     setCart([LOOSE_LINE], 1);
 

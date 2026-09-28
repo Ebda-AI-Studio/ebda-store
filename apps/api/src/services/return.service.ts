@@ -1084,12 +1084,13 @@ export class ReturnService {
     }
     const order = await prisma.order.findFirst({
       where: { id: orderId, storeId },
-      select: { subtotal: true, discount: true, tax: true },
+      select: { subtotal: true, discount: true, tax: true, taxIncludedInPrice: true },
     });
     const alloc = allocatePartialReturn({
       subtotal: order?.subtotal ?? 0,
       discount: order?.discount ?? 0,
       tax: order?.tax ?? 0,
+      taxIncludedInPrice: order?.taxIncludedInPrice ?? false,
       lines: orderLines,
       prevQty,
       requested: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),
@@ -1250,8 +1251,11 @@ export class ReturnService {
       if (partial.cashCredit > refundableRemaining) {
         // STRICTLY greater. Equality is not a contradiction, it is the normal
         // final piece: the allocator telescopes, so every return's cashCredit
-        // over an order sums to exactly subtotal - discount + tax, while
-        // payment.amount is that plus shipping. Before the last piece,
+        // over an order sums to exactly the goods the customer paid for
+        // (subtotal - discount + tax, or just subtotal - discount when the tax
+        // was already inside the listed prices), while payment.amount is that
+        // plus shipping — the relation holds under either tax convention
+        // (ruling M3-7). Before the last piece,
         // refundableRemaining is therefore shipping + cashCredit_final, and
         // `>=` reduces to rejecting whenever shipping <= 0. Order.shipping
         // defaults to 0 and free delivery / store pickup is the norm for
@@ -1326,7 +1330,14 @@ export class ReturnService {
       }),
       prisma.order.findFirst({
         where: { id: orderId, storeId },
-        select: { subtotal: true, discount: true, tax: true, shipping: true, walletAmount: true },
+        select: {
+          subtotal: true,
+          discount: true,
+          tax: true,
+          taxIncludedInPrice: true,
+          shipping: true,
+          walletAmount: true,
+        },
       }),
     ]);
     const prevQty = new Map<string, number>();
@@ -1339,6 +1350,7 @@ export class ReturnService {
       subtotal: order?.subtotal ?? 0,
       discount: order?.discount ?? 0,
       tax: order?.tax ?? 0,
+      taxIncludedInPrice: order?.taxIncludedInPrice ?? false,
       lines: orderLines,
       prevQty,
       requested: items.map(i => ({ orderItemId: i.orderItemId, quantity: i.quantity })),

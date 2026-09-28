@@ -23,7 +23,7 @@ export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
  * Posts TWO entries (atomic per-entry, separate idempotency keys):
  *   1. Cash/revenue entry  (sourceId = orderId)
  *      DR Cash[provider]          total
- *      CR Sales Revenue (net)     subtotal - discount
+ *      CR Sales Revenue (net)     subtotal - discount [- tax, if tax-inclusive]
  *      CR Tax Payable             tax (if > 0)
  *      CR Shipping Income         shipping (if > 0)
  *
@@ -107,7 +107,16 @@ export async function postOrderPaymentJournal(args: {
   const inventoryAccountId = await getSystemAccountIdByCode(order.storeId, '1200', client);
 
   // --- Cash / revenue entry ---
-  const netRevenue = order.subtotal - order.discount;
+  // Revenue is booked NET of VAT, whichever convention the order was charged
+  // under (`order.taxIncludedInPrice`, frozen at sale time — ruling M3-7):
+  //   exclusive — `tax` was added on top of `subtotal`, so `subtotal - discount`
+  //     is already net and DR Cash (`total`) covers revenue + tax + shipping.
+  //   inclusive — `subtotal` is GROSS and `total` deliberately does NOT add
+  //     `tax` again, so the VAT portion has to come OUT of revenue. Crediting
+  //     the gross here would put CR over DR by exactly `order.tax` and
+  //     postEntry would reject the whole entry ("Journal lines unbalanced"),
+  //     dead-lettering every paid order of an inclusive-VAT store.
+  const netRevenue = order.subtotal - order.discount - (order.taxIncludedInPrice ? order.tax : 0);
   // Discount lever, for the revenue lineMemo below. `order.discount` (used
   // for netRevenue above) already reconciles couponDiscount + promotionDiscount
   // + loyaltyDiscount — this only labels WHICH lever fired, it doesn't change

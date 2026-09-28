@@ -12,5 +12,6 @@ export * from './schemas/campaign';
 export * from './data/kuwait-areas';
 export * from './bundle-pricing';
 export * from './order-lines';
+export * from './order-tax';
 export * from './order-action-visibility';
 export * from './order-status-transitions';

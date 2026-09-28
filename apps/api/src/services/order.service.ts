@@ -27,7 +27,7 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
-import { computeOrderTax } from '../lib/order-tax';
+import { computeOrderTax, resolveActiveTaxRate } from '../lib/order-tax';
 import {
   invalidateStoreProductCachesAfterOrder,
   invalidateCustomersCache,
@@ -560,8 +560,8 @@ export class OrderService {
 
     // Resolve the store's configured tax rate. The tax itself is computed
     // below, once the discount is known — VAT is levied after discount (#193).
-    const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
-    const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
+    const activeTax = await resolveActiveTaxRate(storeId);
+    const taxRate = activeTax.ratePercent / 100;
 
     // Resolve shipping for the order's delivery area. Until now this was
     // hardcoded to 0 — the storefront cart/checkout calls
@@ -749,8 +749,13 @@ export class OrderService {
     }
 
     const discount = primaryDiscount + loyaltyDiscount;
-    const tax = computeOrderTax(subtotal, discount, taxRate);
-    const total = Math.max(0, subtotal + tax + shipping - discount);
+    const tax = computeOrderTax(subtotal, discount, taxRate, activeTax.includedInPrice);
+    // Tax already inside the listed price is NOT added again — the customer
+    // paid it as part of `subtotal` (ruling M3-6, docs/RULINGS.md).
+    const total = Math.max(
+      0,
+      subtotal + (activeTax.includedInPrice ? 0 : tax) + shipping - discount
+    );
 
     // Customer wallet (D1). Resolved on the SERVER from the real balance; the
     // debit itself happens inside the order transaction below and re-checks the
@@ -1112,6 +1117,11 @@ export class OrderService {
           walletAmount,
           subtotal,
           tax,
+          // Which convention `tax` was charged under, frozen onto the order.
+          // Every consumer of `order.tax` (GL posting, refund allocation) must
+          // know whether it is inside `subtotal`/`total` or on top of them, and
+          // the store-level switch it came from can be flipped afterwards.
+          taxIncludedInPrice: activeTax.includedInPrice,
           shipping,
           discount,
           // Persist the coupon fields ONLY when the coupon actually applied.
@@ -2084,8 +2094,8 @@ export class OrderService {
 
     // Tax: same store-level resolution as the public checkout path, levied
     // after the coupon discount below (#193).
-    const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
-    const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;
+    const activeTax = await resolveActiveTaxRate(storeId);
+    const taxRate = activeTax.ratePercent / 100;
 
     // Shipping: try to resolve via ShippingService; fall back to 0 on
     // error (same defensive posture as public checkout).
@@ -2165,8 +2175,12 @@ export class OrderService {
       couponCode = appliedCoupon.code;
     }
 
-    const tax = computeOrderTax(subtotal, couponDiscount, taxRate);
-    const total = Math.max(0, subtotal + tax + shipping - couponDiscount);
+    const tax = computeOrderTax(subtotal, couponDiscount, taxRate, activeTax.includedInPrice);
+    // Tax already inside the listed price is NOT added again (ruling M3-6).
+    const total = Math.max(
+      0,
+      subtotal + (activeTax.includedInPrice ? 0 : tax) + shipping - couponDiscount
+    );
     const orderNumber = generateOrderNumber();
 
     // Create the order + items in one transaction. Inventory is NOT
@@ -2238,6 +2252,9 @@ export class OrderService {
           paymentStatus: 'unpaid',
           subtotal,
           tax,
+          // See the public checkout path above — the convention `tax` was
+          // charged under travels with the order, not with the store.
+          taxIncludedInPrice: activeTax.includedInPrice,
           shipping,
           discount: couponDiscount,
           total,

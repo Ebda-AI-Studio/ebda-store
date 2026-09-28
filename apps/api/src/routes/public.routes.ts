@@ -30,6 +30,7 @@ import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
 import { listPurchasableBundles, describeBundleContents } from '../services/bundle.service';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
+import { resolveActiveTaxRate } from '../lib/order-tax';
 import { publicStoreSettings } from '../lib/public-store-settings';
 import { verifyReviewToken } from '../lib/review-token';
 import { inngest } from '../lib/inngest/client';
@@ -1513,6 +1514,13 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         ...store,
         marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
         settings: publicStoreSettings(store.settings),
+        // The checkout/cart tax line needs the rate, not just the
+        // enabled/included booleans already on the Store row. Gated on
+        // `taxEnabled` + the `tax` feature (ruling M3-9, docs/RULINGS.md) —
+        // the SAME resolver order creation charges against, so a merchant
+        // with tax off is never shown a VAT line NOR charged one, even if
+        // old TaxRate rows are still `isActive: true`.
+        taxRatePercent: (await resolveActiveTaxRate(store.id)).ratePercent,
         ...(await fetchStoreFaqsAndHowtos(store.id)),
       };
 
@@ -1704,6 +1712,8 @@ router.get(
           ...store,
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
           settings: publicStoreSettings(store.settings),
+          // Keep in lock-step with the /stores/:slugOrId select above.
+          taxRatePercent: (await resolveActiveTaxRate(store.id)).ratePercent,
           ...(await fetchStoreFaqsAndHowtos(store.id)),
         };
 

@@ -905,6 +905,13 @@ export interface OrderSummaryProps {
    */
   shippingPending?: boolean;
   tax?: number;
+  /** The store's active VAT rate as a percentage (e.g. 5 for 5%) — used to
+   *  label the `tax` row ("VAT (5%)"). Ignored when `tax` is 0. */
+  taxRatePercent?: number;
+  /** When true, `tax` is already included in `subtotal`/prices — the row
+   *  renders as an informational "Incl. VAT (5%)" note instead of an
+   *  added line, and `total` must NOT include it again. Default false. */
+  taxIncludedInPrice?: boolean;
   total: number;
   currency?: string;
   isRtl?: boolean;

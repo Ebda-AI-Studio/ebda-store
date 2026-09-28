@@ -29,12 +29,13 @@ const SUBTOTAL = 25_000;
 function alloc(
   requested: Array<{ orderItemId: string; quantity: number }>,
   prev: Array<[string, number]> = [],
-  money = { discount: 0, tax: 0 }
+  money: { discount: number; tax: number; taxIncludedInPrice?: boolean } = { discount: 0, tax: 0 }
 ) {
   return allocatePartialReturn({
     subtotal: SUBTOTAL,
     discount: money.discount,
     tax: money.tax,
+    taxIncludedInPrice: money.taxIncludedInPrice,
     lines: LINES,
     prevQty: new Map(prev),
     requested,
@@ -131,6 +132,46 @@ describe('allocatePartialReturn', () => {
       { discount: 5_000, tax: 1_250 }
     );
     expect(r.cashCredit).toBe(SUBTOTAL - 5_000 + 1_250);
+  });
+
+  it('does NOT add the tax share back on a tax-INCLUSIVE order', () => {
+    // Same order as the pro-rata case above, but the store's listed prices
+    // already contained the VAT (ruling M3-7): `subtotal` is gross and the
+    // customer never paid `tax` on top of it. Crediting revenueDebit + taxThis
+    // would hand back 500 fils of VAT the customer was never charged
+    // separately — the order's own `taxIncludedInPrice` is what distinguishes
+    // the two, so an inclusive order refunds the line value and no more.
+    const r = alloc([{ orderItemId: 'oi-1', quantity: 1 }], [], {
+      discount: 5_000,
+      tax: 1_250,
+      taxIncludedInPrice: true,
+    });
+    expect(r.discountThis).toBe(2_000); // unchanged — discount is convention-agnostic
+    expect(r.taxThis).toBe(500); // unchanged — still 40% of the VAT
+    expect(r.cashCredit).toBe(8_000); // the gross line value less its discount share
+    expect(r.revenueDebit).toBe(7_500); // 8.000 − 500 of VAT that was inside it
+    // The GL adjustment must still balance: DR revenue + DR tax = CR cash.
+    expect(r.revenueDebit + r.taxThis).toBe(r.cashCredit);
+  });
+
+  it('a full tax-INCLUSIVE return credits the order once, VAT included', () => {
+    // The exclusive counterpart above sums to `subtotal − discount + tax`.
+    // Inclusive, the tax is already inside `subtotal`, so the same sweep must
+    // stop at `subtotal − discount` — anything more refunds the VAT twice.
+    const money = { discount: 5_000, tax: 1_250, taxIncludedInPrice: true };
+    const first = alloc([{ orderItemId: 'oi-1', quantity: 1 }], [], money);
+    const second = alloc([{ orderItemId: 'oi-1', quantity: 1 }], [['oi-1', 1]], money);
+    const third = alloc(
+      [{ orderItemId: 'oi-2', quantity: 1 }],
+      [
+        ['oi-1', 2],
+        ['oi-2', 0],
+      ],
+      money
+    );
+
+    expect(first.taxThis + second.taxThis + third.taxThis).toBe(money.tax);
+    expect(first.cashCredit + second.cashCredit + third.cashCredit).toBe(SUBTOTAL - money.discount);
   });
 
   it('treats a zero subtotal as no allocation rather than dividing by it', () => {

@@ -104,6 +104,15 @@ export interface ResolvedStore {
   // added on top at checkout. taxEnabled is mirrored for parity.
   taxEnabled?: boolean;
   taxIncludedInPrice?: boolean;
+  /**
+   * The store's active VAT rate as a percentage (e.g. 5 for 5%) — zeroed
+   * unless the merchant has tax actually turned on (`resolveActiveTaxRate`,
+   * apps/api/src/lib/order-tax.ts — the ONE resolver order creation charges
+   * against too, ruling M3-9, docs/RULINGS.md), so the checkout/cart tax
+   * line never renders for a disabled store, and the charge agrees.
+   * 0/undefined for a store with no active tax rate.
+   */
+  taxRatePercent?: number;
 
   // Return policy — powers hasMerchantReturnPolicy in Product JSON-LD.
   // NULL/undefined means the merchant never declared one, and the storefront
@@ -401,6 +410,8 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
         typeof storeData.taxIncludedInPrice === 'boolean'
           ? storeData.taxIncludedInPrice
           : undefined,
+      taxRatePercent:
+        typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -560,6 +571,8 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
         typeof storeData.taxIncludedInPrice === 'boolean'
           ? storeData.taxIncludedInPrice
           : undefined,
+      taxRatePercent:
+        typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -885,6 +898,8 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
         typeof storeData.taxIncludedInPrice === 'boolean'
           ? storeData.taxIncludedInPrice
           : undefined,
+      taxRatePercent:
+        typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,

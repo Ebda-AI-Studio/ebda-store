@@ -26,6 +26,7 @@ import {
   findGovernorateByArea,
   resolveColor,
   checkMinimumOrder,
+  computeOrderTax,
   type CheckoutDeliverySettings,
 } from '@force/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
@@ -958,7 +959,19 @@ export default function CheckoutClient() {
 
   const discount = primaryDiscount + loyaltyDiscount;
   const shipping = freeShipping ? 0 : shippingCost;
-  const total = Math.max(0, subtotal - discount + shipping);
+  // VAT — the SAME formula the API charges at order creation
+  // (computeOrderTax, ruling M3-9 in docs/RULINGS.md): the taxable base is
+  // subtotal net of discount. `taxRatePercent` is already zeroed by the API
+  // for a disabled store (resolveActiveTaxRate — the ONE resolver order
+  // creation charges against too, since M3-9), so `tax = 0` and the
+  // summary renders byte-identically to before this line existed. When
+  // the store's prices already include VAT, `includedInPrice` selects
+  // EXTRACTION (the same branch order creation uses) and the amount is
+  // informational only — NOT added to `total`.
+  const taxRatePercent = store?.taxRatePercent ?? 0;
+  const taxIncludedInPrice = !!store?.taxIncludedInPrice;
+  const tax = computeOrderTax(subtotal, discount, taxRatePercent / 100, taxIncludedInPrice);
+  const total = Math.max(0, subtotal - discount + shipping + (taxIncludedInPrice ? 0 : tax));
   // Display estimate of the wallet portion; the server re-resolves it.
   const walletApplied =
     walletSpendable && useWalletBalance && wallet ? Math.min(wallet.balance, total) : 0;
@@ -2070,6 +2083,9 @@ export default function CheckoutClient() {
               discount={discount}
               promotionDiscount={promotionAppliedDiscount}
               shipping={shipping}
+              tax={tax}
+              taxRatePercent={taxRatePercent}
+              taxIncludedInPrice={taxIncludedInPrice}
               total={total}
               freeShipping={freeShipping}
               couponCode={couponCode}

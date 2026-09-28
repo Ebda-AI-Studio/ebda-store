@@ -12,6 +12,8 @@ export default function ClassicOrderSummary({
   freeShipping = false,
   shippingPending = false,
   tax = 0,
+  taxRatePercent = 0,
+  taxIncludedInPrice = false,
   total,
   currency = 'KWD',
   isRtl: isRtlProp,
@@ -26,8 +28,17 @@ export default function ClassicOrderSummary({
   typography,
   summaryColors,
 }: OrderSummaryProps) {
-  const { isRtl, fmt, ctaText, summaryLabelBold, labelColorStyle, totalColorStyle } =
-    useOrderSummaryBase({ currency, ctaLabel, ctaLabelAr, summaryColors, isRtl: isRtlProp });
+  const { isRtl, fmt, ctaText, summaryLabelBold, labelColorStyle, totalColorStyle, taxLabel } =
+    useOrderSummaryBase({
+      currency,
+      ctaLabel,
+      ctaLabelAr,
+      summaryColors,
+      isRtl: isRtlProp,
+      tax,
+      taxRatePercent,
+      taxIncludedInPrice,
+    });
 
   return (
     <aside
@@ -80,10 +91,10 @@ export default function ClassicOrderSummary({
             )}
           </dd>
         </div>
-        {tax > 0 && (
+        {tax > 0 && !taxIncludedInPrice && (
           <div className="flex items-center justify-between">
             <dt className="text-muted-foreground" style={typography?.label}>
-              {isRtl ? 'الضريبة' : 'Tax'}
+              {taxLabel}
             </dt>
             <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
               {fmt(tax)}
@@ -105,6 +116,11 @@ export default function ClassicOrderSummary({
           </dd>
         </div>
       </dl>
+      {tax > 0 && taxIncludedInPrice && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {taxLabel} {'\u2014'} {fmt(tax)}
+        </p>
+      )}
       {children && <div className="mt-6">{children}</div>}
       {ctaDisabled && ctaBlockedMessage && (
         <p className="mt-4 border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
