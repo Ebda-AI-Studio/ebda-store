@@ -1,4 +1,5 @@
 import { DbClient, SlugEntityType, prisma } from '@force/database';
+import { BoundedMap } from '../lib/bounded-map';
 
 /**
  * Record a slug rename so the old URL 301s to the new one.
@@ -59,4 +60,41 @@ export async function resolveSlugRedirect(
     current = row.toSlug;
   }
   return current;
+}
+
+/**
+ * Short in-process cache in front of `resolveSlugRedirect` for the public
+ * `GET /public/redirects/resolve` endpoint (#904).
+ *
+ * The storefront calls that endpoint on every product/blog 404, and 404s are
+ * what crawlers and scanners hit in volume: up to 3 chain-walk queries per
+ * miss, uncached, on an unauthenticated surface. Both answers are cached —
+ * a MISS (null) is the common case and the one worth absorbing.
+ *
+ * Staleness class: BOUNDED. A redirect recorded by a rename becomes visible
+ * within REDIRECT_CACHE_TTL_MS; until then the old slug keeps its 404 (the
+ * pre-redirect behaviour). A slug that is live again never reaches this path
+ * — the storefront only asks after its own product lookup missed. In-memory
+ * (bounded-map), per API instance, because the Redis TTL floor is 120s.
+ */
+export const REDIRECT_CACHE_TTL_MS = 60_000;
+const redirectCache = new BoundedMap<string, { toSlug: string | null; expiresAt: number }>(5000);
+
+export async function resolveSlugRedirectCached(
+  storeId: string,
+  entityType: SlugEntityType,
+  slug: string,
+  now: number = Date.now()
+): Promise<string | null> {
+  const key = `${storeId}:${entityType}:${slug}`;
+  const hit = redirectCache.get(key);
+  if (hit && hit.expiresAt > now) return hit.toSlug;
+  const toSlug = await resolveSlugRedirect(storeId, entityType, slug);
+  redirectCache.set(key, { toSlug, expiresAt: now + REDIRECT_CACHE_TTL_MS });
+  return toSlug;
+}
+
+/** Test seam: forget every cached resolution. */
+export function clearSlugRedirectCache(): void {
+  redirectCache.clear();
 }

@@ -35,10 +35,18 @@ export type CustomBadgePosition = DiscountBadgePosition;
  * Deliberately NOT the discount badge's 'bottom-left' default: a store that
  * configures neither badge must get them in two DIFFERENT corners, so the
  * out-of-the-box experience is "both visible", not "one suppressed by the
- * mutex below". Bottom-right is also the only corner free of the platform's
- * own overlays in both reading directions — the OOS ribbon, the NEW chip and
- * the BrandPill all sit at the LOGICAL top-start (physical top-left in LTR,
- * physical top-right in RTL), and the wishlist heart shares that corner.
+ * mutex below".
+ *
+ * NO corner is free of platform overlays on every surface — an earlier version
+ * of this comment claimed bottom-right was, and it is not (#1609/#1611): the
+ * carousel's quick-add (+) sits at bottom-end, the five theme cards show a
+ * full-width Add-to-Cart band along the bottom on mobile, and the wishlist
+ * heart is top-start on the Pecannbee card but top-end on elegant. The owner's
+ * decision (#1994): the overlays stay put and the chip moves — `resolveCardBadges`
+ * (via `avoidReservedCorner` in badge-collision.ts) shifts it off a reserved
+ * top corner and lifts a bottom chip above the CTA band / quick-add. The chip
+ * is also `pointer-events-none`, so in the one documented compound residual
+ * (see `bottomCornerClass`) a tap still reaches the control underneath.
  */
 export const CUSTOM_BADGE_DEFAULT_POSITION: CustomBadgePosition = 'bottom-right';
 
@@ -167,6 +175,24 @@ export type BadgeBottomOverlay = 'none' | 'end' | 'both';
 export function getCustomBadgeColor(color: string | undefined, theme?: StoreTheme): string {
   const resolved = color && theme ? resolveColor(color, theme) : undefined;
   return resolved ?? 'hsl(var(--primary))';
+}
+
+/**
+ * Text colour for the custom chip, paired with `getCustomBadgeColor` (#1614).
+ *
+ * When the chip falls back to the theme primary, its text must be the theme's
+ * PAIRED foreground — `--primary-foreground` exists precisely so a store with
+ * a light primary (cream, pastel) still gets readable text on it; hardcoded
+ * white on a pale primary was ~1.2:1. The NEW chip already pairs them this way.
+ *
+ * A merchant-picked colour keeps white, exactly as before: choosing a
+ * contrast-aware foreground for an arbitrary hex is a design decision (it
+ * would flip white text to black on mid-tone reds, changing live cards), so
+ * it is not made here.
+ */
+export function getCustomBadgeTextColor(color: string | undefined, theme?: StoreTheme): string {
+  const resolved = color && theme ? resolveColor(color, theme) : undefined;
+  return resolved ? '#ffffff' : 'hsl(var(--primary-foreground))';
 }
 
 /** Minimal product shape the custom badge needs. */

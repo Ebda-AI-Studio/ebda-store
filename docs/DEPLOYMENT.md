@@ -230,7 +230,7 @@ Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/
 ### Monitoring
 
 - [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB/ORDERS as CF Workers Builds env vars / GitHub repo variables)
-- [ ] Set SENTRY_AUTH_TOKEN (+ SENTRY_ORG / SENTRY_PROJECT) for web/admin/orders builds to get source maps + releases uploaded (optional — builds succeed without it, just with minified stack traces)
+- [ ] Add the `SENTRY_AUTH_TOKEN` repo secret (+ `SENTRY_ORG` / `SENTRY_PROJECT_{WEB,ADMIN,ORDERS}` repo variables) — `cf-deploy.yml` already passes them to the web/admin/orders builds; see docs/ENVIRONMENT.md "Sentry build-time config" (optional — deploys succeed without it, just with minified stack traces)
 - [ ] Enable Railway metrics alerts
 - [ ] Confirm Neon compute usage alerts are configured in the Neon dashboard
 
@@ -375,7 +375,7 @@ Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 - **Admin** (`apps/admin`) — same shape. Env: `NEXT_PUBLIC_SENTRY_DSN_ADMIN` as a GitHub repo variable, consumed by `cf-deploy.yml`.
 - **Orders** (`apps/orders`) — **added 2026-07-02 (audit H1)**. Client-only via `instrumentation-client.ts` (no server-side Sentry — Orders has no `instrumentation.ts`). Env: `NEXT_PUBLIC_SENTRY_DSN_ORDERS` as a GitHub repo variable for the `cf-deploy.yml` Cloudflare build. Previously this app had ZERO error capture — a crash in the fulfillment UI store staff use was invisible.
 - **No-op when DSN missing** (graceful in dev / preview / pre-account-creation).
-- **Source maps + releases (added 2026-07-02, audit H2)**: web/admin/orders `next.config.js` are now wrapped in `withSentryConfig`. Upload only activates when `SENTRY_AUTH_TOKEN` (+ optional `SENTRY_ORG`/`SENTRY_PROJECT`) is set — omitted everywhere today, so this is a no-op until configured in the CF Workers Builds env. Before this, every Sentry issue from web/admin arrived with minified/obfuscated stack traces and no release association.
+- **Source maps + releases (added 2026-07-02, audit H2)**: web/admin/orders `next.config.js` are now wrapped in `withSentryConfig`. Upload only activates when `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`/`SENTRY_PROJECT_*`) is set; `cf-deploy.yml` wires them in (2026-09-25) and warns on every deploy until the secret exists — see docs/ENVIRONMENT.md. Before this, every Sentry issue from web/admin arrived with minified/obfuscated stack traces and no release association.
 - **Sample rates**: storefront `tracesSampleRate=0.1` in prod (high traffic), admin `1.0` (low volume, every trace is signal). Session replays fire only on errors, not on healthy sessions.
 - **Cloudflare Workers target — storefront only (2026-07-02):** the standard `@sentry/nextjs` server SDK can't run on Workers (and `cf-build.sh` moves `instrumentation.ts` aside for the CF build regardless — see `docs/migration/cloudflare-preview-workers.md`). `apps/web/sentry-worker-entry.ts` wraps the OpenNext Worker's fetch handler with `@sentry/cloudflare`'s `Sentry.withSentry(...)` so SSR/RSC errors ARE captured on `store.force-ai.co` too. The DSN reaches the Worker as a runtime var `SENTRY_DSN` (`cf-deploy.yml` → `wrangler deploy --var SENTRY_DSN:<value>`, sourced from the same `NEXT_PUBLIC_SENTRY_DSN_WEB` repo variable; omitted → clean no-op). `apps/admin` and `apps/orders` do NOT have this yet — follow-up, same pattern.
 

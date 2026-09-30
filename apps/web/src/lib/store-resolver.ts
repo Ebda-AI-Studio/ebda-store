@@ -789,6 +789,17 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  * a 429/5xx/network failure raises `StoreTemporarilyUnavailableError` rather
  * than 404ing a store that exists.
  */
+/**
+ * True only for a store that actually resolved: not the demo sentinel and not
+ * the transient-failure fallback (which spreads DEFAULT_STORE, id 'demo').
+ * Metadata that names a URL (a canonical) must be gated on this (#1855):
+ * `storeAbsoluteUrl` of the sentinel is `https://store.force-ai.co/demo`, so
+ * an API blip told Google a merchant's page duplicated the demo store.
+ */
+export function isResolvedStore(store: ResolvedStore): boolean {
+  return !store.transientResolveFailure && store.id !== 'demo';
+}
+
 export async function getStoreByTenantParam(rawTenant: string): Promise<ResolvedStore> {
   // Decoded HERE, once, for every tenant-store route: middleware percent-
   // encodes the `slug:` colon into the rewrite path, and Next hands the page

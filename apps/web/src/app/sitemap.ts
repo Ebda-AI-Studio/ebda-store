@@ -32,26 +32,63 @@ type ProductEntry = {
   createdAt?: string;
 };
 
-async function fetchStores(): Promise<StoreListEntry[]> {
+const STORE_LIST_PAGE_SIZE = 100;
+const STORE_LIST_MAX_PAGES = 50;
+
+/**
+ * Page through the public store list. Both early exits are LOGGED (#1815):
+ * the page ceiling and a mid-pagination failure used to return a short list
+ * silently, and every downstream drop count was computed from that short
+ * list, so "did any store vanish?" had no truthful answer in the logs.
+ * `storesNeverFetched` is the number of stores the API reported that this
+ * render never received (an estimate from `totalPages`, exact to one page).
+ */
+async function fetchStores(): Promise<{
+  stores: StoreListEntry[];
+  storesNeverFetched: number;
+}> {
   const stores: StoreListEntry[] = [];
   let page = 1;
-  const limit = 100;
+  let totalPages = 1;
   while (true) {
-    const res = await fetch(`${API_URL}/public/stores?page=${page}&limit=${limit}`, {
+    const res = await fetch(`${API_URL}/public/stores?page=${page}&limit=${STORE_LIST_PAGE_SIZE}`, {
       next: { revalidate: 3600 },
       headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) break;
+    if (!res.ok) {
+      console.error('sitemap: store list fetch failed mid-pagination', {
+        page,
+        status: res.status,
+        fetchedSoFar: stores.length,
+      });
+      // Page 1 failing means we know nothing about the total; a later page
+      // failing leaves the remaining pages' stores unfetched.
+      return {
+        stores,
+        storesNeverFetched:
+          page === 1 ? 0 : Math.max(0, totalPages * STORE_LIST_PAGE_SIZE - stores.length),
+      };
+    }
     const data = await res.json();
     const batch: StoreListEntry[] = data?.data ?? [];
     stores.push(...batch.map(s => ({ id: s.id, slug: s.slug, createdAt: s.createdAt })));
-    const totalPages = data?.pagination?.totalPages ?? 1;
+    totalPages = data?.pagination?.totalPages ?? 1;
     if (page >= totalPages) break;
-    page += 1;
     // Hard cap so a runaway DB can't blow the sitemap timeout.
-    if (page > 50) break;
+    if (page >= STORE_LIST_MAX_PAGES) {
+      console.error('sitemap: store list page ceiling hit', {
+        fetchedPages: STORE_LIST_MAX_PAGES,
+        fetched: stores.length,
+        totalPages,
+      });
+      return {
+        stores,
+        storesNeverFetched: Math.max(0, totalPages * STORE_LIST_PAGE_SIZE - stores.length),
+      };
+    }
+    page += 1;
   }
-  return stores;
+  return { stores, storesNeverFetched: 0 };
 }
 
 /**
@@ -106,7 +143,14 @@ async function fetchProducts(storeId: string, maxPages: number): Promise<Product
     );
     if (!res.ok) break;
     const data = await res.json();
-    products.push(...(data?.data?.products ?? []));
+    // Keep only the three fields the sitemap reads (#1290). The API returns
+    // the full storefront payload (descriptions, images, variants, store) —
+    // retaining it for up to 200 stores x 300 products is what pushes a
+    // master render toward the Worker's 128 MB isolate limit.
+    const batch: ProductEntry[] = data?.data?.products ?? [];
+    for (const p of batch) {
+      products.push({ slug: p.slug, updatedAt: p.updatedAt, createdAt: p.createdAt });
+    }
     const totalPages = data?.data?.meta?.totalPages ?? 1;
     if (page >= totalPages) break;
     if (page === maxPages && totalPages > maxPages) {
@@ -143,7 +187,8 @@ async function fetchBundles(storeId: string): Promise<BundleEntry[]> {
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return data?.data?.bundles ?? [];
+    const bundles: BundleEntry[] = data?.data?.bundles ?? [];
+    return bundles.map(b => ({ slug: b.slug })); // slug is all the sitemap reads (#1290)
   } catch {
     return [];
   }
@@ -240,28 +285,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Master sitemap: platform path. Covers every store under /<slug>/...
+  //
+  // The platform root itself is NOT listed (#1543): `${siteUrl}/` 307s to the
+  // Force AI company site (HomePageBody's demo-store redirect), and a
+  // sitemap URL that redirects is reported by GSC as "Page with redirect".
   const siteUrl = getSiteUrl();
-  const apex: MetadataRoute.Sitemap = [
-    {
-      url: `${siteUrl}/`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.5,
-    },
-  ];
 
   let stores: StoreListEntry[] = [];
+  let storesNeverFetched = 0;
   try {
-    stores = await fetchStores();
+    ({ stores, storesNeverFetched } = await fetchStores());
   } catch (error) {
     console.error('sitemap: failed to fetch stores', error);
-    return apex;
+    return [];
   }
 
   // Bounded fan-out. `fetchStores()` pages up to 50x100 = 5000 stores, and one
   // subrequest per store in a single Worker invocation would blow Cloudflare's
   // 1000-subrequest ceiling as the platform grows — the render would throw past
-  // it and the `apex` fallback below is declared too late to save it. Cap the
+  // it and fail the whole render. Cap the
   // per-render fan-out and emit the remaining stores with their static pages
   // only (their 11 static pages still get indexed; their catalogs don't
   // contribute product URLs to this render) — a promise the 50k clamp used to
@@ -270,12 +312,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // pass now, so this is true again. Chunked rather than one Promise.all so we
   // also stop opening 200 sockets at once against the API.
   //
-  // Subrequest budget (worst case): 50 store-list pages + 1 host resolve +
-  // 200 stores x (3 product pages + 1 unpaginated bundle-list request) =
-  // 851, under the 1000 ceiling — less headroom than before bundles (was
-  // 651), still safely bounded. The bundle-list request is unpaginated per
-  // store (see fetchBundles) rather than getting its own PAGES_PER_STORE
-  // knob, so it doesn't compound the way product pagination would.
+  // Subrequest budget (worst case, #1271): 50 store-list pages + 1 host
+  // resolve + 200 stores x (3 product pages + 1 unpaginated bundle-list
+  // request) = 851 fetch() calls. That is NOT the whole bill: Cloudflare
+  // counts calls to its own services via bindings as subrequests too
+  // (developers.cloudflare.com/workers/platform/limits/#subrequests), and
+  // every one of these fetches carries `next.revalidate`, so OpenNext's R2
+  // incremental cache adds a get (+ a put on a cold/expired entry) and the
+  // Durable-Object tag cache a lookup per fetch — roughly 4 x 851 ≈ 3,400 on
+  // a fully cold render. The ceiling this is measured against is the Workers
+  // Paid default of 10,000 per invocation (raised from 1,000 on 2026-02-11;
+  // no `limits.subrequests` override in wrangler.jsonc). Memory is bounded
+  // separately: fetchProducts keeps only slug/updatedAt/createdAt per product.
+  // A store whose fan-out throws (e.g. a subrequest-limit error) degrades to
+  // static pages only and is COUNTED in the log below, never silently.
   const MAX_STORES_WITH_PRODUCTS = 200;
   const PRODUCT_PAGES_PER_STORE = 3; // x100 = up to 300 product URLs per store
   const FANOUT_CHUNK = 20;
@@ -301,6 +351,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
+  let fanoutFailures = 0;
   const productResults: Array<{
     store: StoreListEntry;
     products: ProductEntry[];
@@ -313,10 +364,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         chunk.map(store =>
           Promise.all([fetchProducts(store.id, PRODUCT_PAGES_PER_STORE), fetchBundles(store.id)])
             .then(([products, bundles]) => ({ store, products, bundles }))
-            .catch(() => ({ store, products: [] as ProductEntry[], bundles: [] as BundleEntry[] }))
+            .catch(() => {
+              fanoutFailures += 1;
+              return { store, products: [] as ProductEntry[], bundles: [] as BundleEntry[] };
+            })
         )
       ))
     );
+  }
+  if (fanoutFailures > 0) {
+    console.error('sitemap: product fan-out failed for some stores — static pages only', {
+      failedStores: fanoutFailures,
+      attempted: withProducts.length,
+    });
   }
   for (const store of withoutProducts) {
     productResults.push({ store, products: [], bundles: [] });
@@ -396,7 +456,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // has already submitted to GSC (verified against next@16.2.6's
   // metadata-route loader; Next generates no sitemap index file).
   const SITEMAP_URL_LIMIT = 50_000;
-  const entries = [...apex, ...perTenant];
+  const entries = perTenant;
   if (entries.length > SITEMAP_URL_LIMIT) {
     // Report how many stores got NOTHING, not just the total.
     //
@@ -405,7 +465,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // fully dropped only once even the cheap 11-per-store pass overflows —
     // which is the point past which the sitemap genuinely cannot represent the
     // platform and sharding is the real answer.
-    const staticBudget = Math.max(0, SITEMAP_URL_LIMIT - apex.length);
+    const staticBudget = SITEMAP_URL_LIMIT;
     const storesFullyDropped = Math.max(
       0,
       productResults.length - Math.floor(staticBudget / STORE_STATIC_PAGES.length)
@@ -415,6 +475,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       emitted: SITEMAP_URL_LIMIT,
       stores: stores.length,
       storesFullyDropped,
+      // Stores the API reported but fetchStores() never received — see its
+      // own error log for why. Absent from `stores` above entirely.
+      storesNeverFetched,
       catalogUrlsDropped: Math.min(catalogPages.length, entries.length - SITEMAP_URL_LIMIT),
     });
     return entries.slice(0, SITEMAP_URL_LIMIT);

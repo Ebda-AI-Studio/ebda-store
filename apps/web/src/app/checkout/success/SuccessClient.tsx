@@ -10,6 +10,7 @@ import { MinimalChrome } from '../../../components';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
+import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
@@ -42,7 +43,6 @@ function SuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);
   const [paymentState, setPaymentState] = useState<PaymentState>(isCod ? 'cod' : 'verifying');
-  const [pixelFired, setPixelFired] = useState(false);
 
   useEffect(() => {
     // Clear cart on successful checkout
@@ -91,15 +91,21 @@ function SuccessContent() {
           // (committed) or online orders the provider reported paid. Don't
           // attribute revenue for a pending/failed gateway return.
           const confirmed = isCod || fetchedOrder.paymentStatus === 'paid';
-          if (confirmed && !pixelFired) {
-            setPixelFired(true);
-            trackPurchase({
-              orderId: fetchedOrder.id,
-              contentIds: fetchedOrder.items.map(item => item.productId),
-              numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
-              value: fetchedOrder.total / 1000,
-              currency: 'KWD',
-            });
+          // Once per ORDER, not per mount: a refresh or a re-opened success
+          // link must not report the sale again (#1346). The order is marked
+          // only when a pixel library actually received it — before marketing
+          // consent none is loaded, and the reload after "Accept" must still
+          // report the sale.
+          if (confirmed) {
+            firePurchasePixelOnce(fetchedOrder.id, () =>
+              trackPurchase({
+                orderId: fetchedOrder.id,
+                contentIds: fetchedOrder.items.map(item => item.productId),
+                numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
+                value: fetchedOrder.total / 1000,
+                currency: 'KWD',
+              })
+            );
           }
         }
       } catch {

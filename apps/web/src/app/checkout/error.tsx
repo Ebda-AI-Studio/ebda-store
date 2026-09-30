@@ -1,6 +1,7 @@
 'use client';
 
 import { MinimalChrome, RouteErrorFallback } from '../../components';
+import { useBareErrorFallback } from '../../components/RouteErrorFallback';
 
 // Checkout renders inside MinimalChrome (no nav/footer distraction), not
 // the full ShopChrome — matches CheckoutClient.tsx's own chrome choice so
@@ -15,9 +16,9 @@ export default function CheckoutError({
 }) {
   // Forwarded for the same reason as the PLP/PDP boundaries — see cart/error.tsx
   // for why this route cannot show the retry body today.
-  return (
-    <MinimalChrome>
-      <RouteErrorFallback error={error} reset={reset} />
-    </MinimalChrome>
-  );
+  const fallback = <RouteErrorFallback error={error} reset={reset} />;
+  // Unresolved store during a transient: no chrome, whose links would lead
+  // off the store (#1843 — see useBareErrorFallback).
+  const bare = useBareErrorFallback(error);
+  return bare ? fallback : <MinimalChrome>{fallback}</MinimalChrome>;
 }

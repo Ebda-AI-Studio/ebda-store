@@ -164,7 +164,7 @@ describe('sitemap fan-out', () => {
   it('master branch clamps the document at the 50,000-URL protocol limit, loudly', async () => {
     hostRef.host = 'store.test';
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    // 5000 stores x 11 static pages + apex = 55,001 URLs before products.
+    // 5000 stores x 11 static pages = 55,000 URLs before products.
     const stores = Array.from({ length: 5000 }, (_, i) => ({
       id: `store-${i}`,
       slug: `slug-${i}`,
@@ -176,7 +176,7 @@ describe('sitemap fan-out', () => {
     expect(entries).toHaveLength(50_000);
     expect(error).toHaveBeenCalledWith(
       expect.stringContaining('50k-URL protocol limit'),
-      expect.objectContaining({ total: 55_001 })
+      expect.objectContaining({ total: 55_000 })
     );
   });
 
@@ -243,9 +243,9 @@ describe('sitemap fan-out', () => {
       expect.objectContaining({ storesFullyDropped: expect.any(Number) })
     );
     const payload = error.mock.calls.at(-1)?.[1] as { storesFullyDropped: number };
-    // 5000 stores x 11 = 55,000 static URLs + 1 apex; the budget fits 4545
-    // whole stores, so 455 get nothing.
-    expect(payload.storesFullyDropped).toBeGreaterThan(0);
+    // 5000 stores x 11 = 55,000 static URLs; the budget fits 4545 whole
+    // stores, so 455 get nothing.
+    expect(payload.storesFullyDropped).toBe(455);
   });
 });
 
@@ -288,9 +288,9 @@ describe('sitemap platform-branch subrequest budget', () => {
     expect(perStore('s2')).toBe(4);
   });
 
-  it('re-derives the documented worst case: 851 of the 1000 ceiling, 149 spare', async () => {
+  it('re-derives the documented worst case: 851 fetches, ~3,400 subrequests of the 10,000 ceiling', async () => {
     // The three caps `sitemap.ts` declares, and the measured per-store cost.
-    const MAX_STORE_LIST_PAGES = 50; // fetchStores(): `if (page > 50) break`
+    const MAX_STORE_LIST_PAGES = 50; // fetchStores(): STORE_LIST_MAX_PAGES
     const HOST_RESOLVE = 1;
     const MAX_STORES_WITH_PRODUCTS = 200;
     const PER_STORE_SUBREQUESTS = 4; // 3 product pages + 1 bundle list
@@ -299,9 +299,113 @@ describe('sitemap platform-branch subrequest budget', () => {
       MAX_STORE_LIST_PAGES + HOST_RESOLVE + MAX_STORES_WITH_PRODUCTS * PER_STORE_SUBREQUESTS;
 
     expect(worstCase).toBe(851);
-    expect(1000 - worstCase).toBe(149);
+    // #1271: binding calls count as subrequests. Each cached fetch also costs
+    // an R2 get + put (cold) and a tag-cache lookup: <= 4 subrequests per
+    // fetch. Workers Paid default ceiling is 10,000 per invocation.
+    const PER_FETCH_WITH_CACHE = 4;
+    expect(worstCase * PER_FETCH_WITH_CACHE).toBe(3404);
+    expect(worstCase * PER_FETCH_WITH_CACHE).toBeLessThan(10_000);
     // Before bundles, the same arithmetic gave 651 — the comment's stated
     // "was" figure.
     expect(MAX_STORE_LIST_PAGES + HOST_RESOLVE + MAX_STORES_WITH_PRODUCTS * 3).toBe(651);
+  });
+});
+
+describe('sitemap — master-branch contract fixes', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const twoStores = [
+    { id: 's1', slug: 'one', createdAt: '2024-01-01T00:00:00.000Z' },
+    { id: 's2', slug: 'two', createdAt: '2024-01-02T00:00:00.000Z' },
+  ];
+
+  // #1543
+  it('does not list the platform root, which 307s to the company site', async () => {
+    hostRef.host = 'store.test';
+    installFetchMock({ tenant: null, stores: twoStores, productCounts: {} });
+    const entries = await sitemap();
+    expect(entries.map(e => e.url)).not.toContain('https://store.test/');
+    expect(entries.map(e => e.url)).toContain('https://store.test/one');
+  });
+
+  // #1815 (a)
+  it('logs the store-list page ceiling and counts the stores never fetched', async () => {
+    hostRef.host = 'store.test';
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // 5,200 stores → 52 pages; the ceiling stops at 50.
+    const stores = Array.from({ length: 5200 }, (_, i) => ({
+      id: `store-${i}`,
+      slug: `slug-${i}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, i)).toISOString(),
+    }));
+    installFetchMock({ tenant: null, stores, productCounts: {} });
+
+    await sitemap();
+
+    expect(error).toHaveBeenCalledWith(
+      'sitemap: store list page ceiling hit',
+      expect.objectContaining({ fetchedPages: 50, fetched: 5000, totalPages: 52 })
+    );
+    const clamp = error.mock.calls.find(c => String(c[0]).includes('50k-URL protocol limit'));
+    expect(clamp?.[1]).toEqual(expect.objectContaining({ storesNeverFetched: 200 }));
+  });
+
+  // #1815 (b)
+  it('logs a mid-pagination store-list failure instead of shipping a short sitemap silently', async () => {
+    hostRef.host = 'store.test';
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stores = Array.from({ length: 250 }, (_, i) => ({
+      id: `store-${i}`,
+      slug: `slug-${i}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, i)).toISOString(),
+    }));
+    const fetchMock = installFetchMock({ tenant: null, stores, productCounts: {} });
+    const real = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/public/stores') && url.searchParams.get('page') === '2') {
+        return { ok: false, status: 503, json: async () => ({}) } as never;
+      }
+      return real(input);
+    });
+
+    const entries = await sitemap();
+
+    expect(entries.some(e => e.url === 'https://store.test/slug-0')).toBe(true);
+    expect(error).toHaveBeenCalledWith(
+      'sitemap: store list fetch failed mid-pagination',
+      expect.objectContaining({ page: 2, status: 503, fetchedSoFar: 100 })
+    );
+  });
+
+  // #1271
+  it('counts stores whose product fan-out threw instead of dropping them silently', async () => {
+    hostRef.host = 'store.test';
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = installFetchMock({
+      tenant: null,
+      stores: twoStores,
+      productCounts: { s1: 1, s2: 1 },
+    });
+    const real = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/public/products') && url.searchParams.get('storeId') === 's2') {
+        throw new Error('Too many subrequests.');
+      }
+      return real(input);
+    });
+
+    const entries = await sitemap();
+
+    // The failed store keeps its static pages.
+    expect(entries.some(e => e.url === 'https://store.test/two')).toBe(true);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('product fan-out failed'),
+      expect.objectContaining({ failedStores: 1, attempted: 2 })
+    );
   });
 });

@@ -179,7 +179,24 @@ jobs:
           EOF
           echo "wrote apps/web/.env.production.local"
       - name: Build for Cloudflare (OpenNext)
-        run: bash scripts/cf-build.sh web
+        # Source maps: withSentryConfig (apps/web/next.config.js) uploads the
+        # browser + server maps for release = GITHUB_SHA during `next build`,
+        # then deletes them so they are never served. Without the token it
+        # skips with a warning, and a failed upload only warns (errorHandler):
+        # this step can never fail the deploy because of Sentry.
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_WEB || 'force-web' }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::SENTRY_AUTH_TOKEN secret is not set: web source maps will NOT be uploaded and Sentry stack traces stay minified. See docs/ENVIRONMENT.md (Sentry build-time config)."
+          elif [ -z "$SENTRY_PROJECT" ] || { [ -z "$SENTRY_ORG" ] && [ "${SENTRY_AUTH_TOKEN#sntrys_}" = "$SENTRY_AUTH_TOKEN" ]; }; then
+            echo "::warning::SENTRY_AUTH_TOKEN is set but SENTRY_ORG / SENTRY_PROJECT is missing: the web upload will fail and be skipped. See docs/ENVIRONMENT.md."
+          else
+            echo "Sentry source map upload enabled: org=${SENTRY_ORG:-<from token>} project=$SENTRY_PROJECT release=$GITHUB_SHA"
+          fi
+          bash scripts/cf-build.sh web
       - name: Ensure R2 cache bucket
         # Only when the OpenNext cache is enabled. Idempotent — ignores the
         # "already exists" error so reruns are safe.
@@ -194,11 +211,15 @@ jobs:
         # public in the client bundle) runtime var. Reuses the SAME repo
         # variable as client Sentry, so no new secret to provision. Omitted
         # entirely when unset → sentry-worker-entry.ts no-ops cleanly.
+        #
+        # SENTRY_RELEASE: @sentry/cloudflare reads `env.SENTRY_RELEASE` as the
+        # event release, so Worker (SSR/RSC) events carry the SAME commit SHA
+        # the client bundle reports and the source-map upload is keyed on.
         env:
           SENTRY_DSN_WEB: ${{ vars.NEXT_PUBLIC_SENTRY_DSN_WEB }}
         run: |
           if [ -n "$SENTRY_DSN_WEB" ]; then
-            npx wrangler deploy --var "SENTRY_DSN:${SENTRY_DSN_WEB}"
+            npx wrangler deploy --var "SENTRY_DSN:${SENTRY_DSN_WEB}" --var "SENTRY_RELEASE:${GITHUB_SHA}"
           else
             npx wrangler deploy
           fi
@@ -248,7 +269,24 @@ jobs:
           EOF
           echo "wrote apps/admin/.env.production.local"
       - name: Build for Cloudflare (OpenNext)
-        run: bash scripts/cf-build.sh admin
+        # Source maps: withSentryConfig (apps/admin/next.config.js) uploads the
+        # browser + server maps for release = GITHUB_SHA during `next build`,
+        # then deletes them so they are never served. Without the token it
+        # skips with a warning, and a failed upload only warns (errorHandler):
+        # this step can never fail the deploy because of Sentry.
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_ADMIN }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::SENTRY_AUTH_TOKEN secret is not set: admin source maps will NOT be uploaded and Sentry stack traces stay minified. See docs/ENVIRONMENT.md (Sentry build-time config)."
+          elif [ -z "$SENTRY_PROJECT" ] || { [ -z "$SENTRY_ORG" ] && [ "${SENTRY_AUTH_TOKEN#sntrys_}" = "$SENTRY_AUTH_TOKEN" ]; }; then
+            echo "::warning::SENTRY_AUTH_TOKEN is set but SENTRY_ORG / SENTRY_PROJECT is missing: the admin upload will fail and be skipped. See docs/ENVIRONMENT.md."
+          else
+            echo "Sentry source map upload enabled: org=${SENTRY_ORG:-<from token>} project=$SENTRY_PROJECT release=$GITHUB_SHA"
+          fi
+          bash scripts/cf-build.sh admin
       - name: Deploy worker
         working-directory: apps/admin
         run: npx wrangler deploy
@@ -298,7 +336,24 @@ jobs:
           EOF
           echo "wrote apps/orders/.env.production.local"
       - name: Build for Cloudflare (OpenNext)
-        run: bash scripts/cf-build.sh orders
+        # Source maps: withSentryConfig (apps/orders/next.config.js) uploads the
+        # browser + server maps for release = GITHUB_SHA during `next build`,
+        # then deletes them so they are never served. Without the token it
+        # skips with a warning, and a failed upload only warns (errorHandler):
+        # this step can never fail the deploy because of Sentry.
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_ORDERS }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::SENTRY_AUTH_TOKEN secret is not set: orders source maps will NOT be uploaded and Sentry stack traces stay minified. See docs/ENVIRONMENT.md (Sentry build-time config)."
+          elif [ -z "$SENTRY_PROJECT" ] || { [ -z "$SENTRY_ORG" ] && [ "${SENTRY_AUTH_TOKEN#sntrys_}" = "$SENTRY_AUTH_TOKEN" ]; }; then
+            echo "::warning::SENTRY_AUTH_TOKEN is set but SENTRY_ORG / SENTRY_PROJECT is missing: the orders upload will fail and be skipped. See docs/ENVIRONMENT.md."
+          else
+            echo "Sentry source map upload enabled: org=${SENTRY_ORG:-<from token>} project=$SENTRY_PROJECT release=$GITHUB_SHA"
+          fi
+          bash scripts/cf-build.sh orders
       - name: Deploy worker
         working-directory: apps/orders
         run: npx wrangler deploy

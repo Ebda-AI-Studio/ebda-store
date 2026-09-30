@@ -31,7 +31,7 @@ import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from './discount-badge';
-import { getCustomBadgeColor, resolveCardBadges } from './custom-badge';
+import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -135,6 +135,10 @@ export function ProductCarousel({
   // whether quick-add will actually render for THIS product.
   const discountBadgeColor = getDiscountBadgeColor(cardDefaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(cardDefaults?.customBadge?.color, store.theme);
+  const customBadgeTextColor = getCustomBadgeTextColor(
+    cardDefaults?.customBadge?.color,
+    store.theme
+  );
   // Build CTA extra classes for inline carousel CTA buttons.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
     .filter(Boolean)
@@ -405,8 +409,10 @@ export function ProductCarousel({
                   <div
                     className={cn(
                       'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
-                      shape.radius,
-                      dedupInnerFrame ? '' : styles.card
+                      dedupInnerFrame ? '' : styles.card,
+                      // LAST: the merchant's cardShape radius must beat the
+                      // pack's rounded-* under tailwind-merge (#665).
+                      shape.radius
                     )}
                   >
                     <Link
@@ -508,7 +514,7 @@ export function ProductCarousel({
                         {onSale && discountBadgeAllowed && discountBadgeText && (
                           <span
                             className={cn(
-                              'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
+                              'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
                               discountBadgePositionCls
                             )}
                             style={{ backgroundColor: discountBadgeColor }}
@@ -522,10 +528,13 @@ export function ProductCarousel({
                         {customBadgeText && (
                           <span
                             className={cn(
-                              'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]',
+                              'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]',
                               customBadgePositionCls
                             )}
-                            style={{ backgroundColor: customBadgeColor }}
+                            style={{
+                              backgroundColor: customBadgeColor,
+                              color: customBadgeTextColor,
+                            }}
                           >
                             {customBadgeText}
                           </span>

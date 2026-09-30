@@ -1,5 +1,6 @@
 const path = require('path');
-const { withSentryConfig } = require('@sentry/nextjs');
+// `@sentry/nextjs/config`: the root-entry export is deprecated (removed in v11).
+const { withSentryConfig } = require('@sentry/nextjs/config');
 
 // Cloudflare/OpenNext build target detection (mirrors apps/web). Set
 // OPEN_NEXT_CLOUDFLARE=1 in the Cloudflare build; CF_PAGES is auto-set by CF.
@@ -98,8 +99,9 @@ const nextConfig = {
 // and a release is created, matching apps/web + apps/admin (audit 2026-07-02
 // H1/H2). Same conservative behavior: the Sentry bundler plugin no-ops the
 // upload (warns, doesn't fail the build) whenever SENTRY_AUTH_TOKEN is unset,
-// so CI/local/Cloudflare builds are unaffected unless the token is explicitly
-// configured. See apps/web/next.config.js for the full rationale.
+// and `errorHandler` turns a failed upload into a warning. cf-deploy.yml
+// supplies the token when the repo secret exists. See apps/web/next.config.js
+// for the full rationale.
 module.exports = withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
@@ -107,4 +109,18 @@ module.exports = withSentryConfig(nextConfig, {
   silent: true,
   widenClientFileUpload: true,
   telemetry: false,
+  sourcemaps: {
+    // Browser .map files are generated for the upload, then DELETED from
+    // .next/static (and their sourceMappingURL comments stripped) before
+    // OpenNext copies the assets, so they are never served publicly. This is
+    // the SDK default for Turbopack builds; pinned here so a future SDK
+    // default change cannot start publishing our source. Deletion runs with
+    // or without an auth token.
+    deleteSourcemapsAfterUpload: true,
+  },
+  // A failed release/upload (bad or expired token, Sentry outage) must never
+  // fail a production deploy: warn and ship the build without symbolication.
+  errorHandler: err => {
+    console.warn('[sentry] source map upload failed, continuing the build:', err.message);
+  },
 });

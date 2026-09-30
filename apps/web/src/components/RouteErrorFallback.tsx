@@ -1,10 +1,10 @@
 'use client';
 
-import { startTransition } from 'react';
+import { useRef, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useLanguage } from '../contexts/LanguageContext';
-import { useIsPlatform, useStoreUrl } from '../contexts/StoreContext';
+import { useLanguage, translations } from '../contexts/LanguageContext';
+import { useStore, useIsPlatform, useStoreUrl } from '../contexts/StoreContext';
 import { isStoreTemporarilyUnavailable } from '../lib/store-unavailable';
 
 interface RouteErrorFallbackProps {
@@ -50,11 +50,37 @@ interface RouteErrorFallbackProps {
  * BEFORE the root one, so a copy that lives only in `app/error.tsx` never
  * reaches the three routes a shopper is most likely to land on.
  */
+/**
+ * Should a segment boundary render the fallback WITHOUT its ShopChrome /
+ * MinimalChrome? (#1843)
+ *
+ * Yes exactly when the store could not be resolved for a transient reason AND
+ * the client is holding the unresolved sentinel (`id: 'demo'`). That sentinel
+ * makes `useStoreUrl` drop the `/<slug>` prefix, so the chrome's logo and nav
+ * would point at `/`, `/products`, ... on the platform host — and
+ * `store.force-ai.co/` 307s to the Force AI company site. Ruling SR-7
+ * suppressed the fallback's own "Go Home" link for this reason; the chrome
+ * around it emitted the same links. Without chrome the page matches the root
+ * `app/error.tsx` boundary: the retry copy and "Try Again", nothing that can
+ * walk the shopper off their store. When the store DID resolve (the layout
+ * got it, the page's own fetch failed) the chrome's links are correct and it
+ * stays.
+ */
+export function useBareErrorFallback(error: Error & { digest?: string }): boolean {
+  const { store } = useStore();
+  return isStoreTemporarilyUnavailable(error) && store.id === 'demo';
+}
+
+/** Ignore Try Again clicks this soon after the previous one (#1842). */
+const RETRY_COOLDOWN_MS = 2000;
+
 export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
   const { t } = useLanguage();
   const storeUrl = useStoreUrl();
   const isPlatform = useIsPlatform();
   const router = useRouter();
+  const [isRetrying, startTransition] = useTransition();
+  const lastRetryAt = useRef(0);
 
   /**
    * "Try Again" must actually retry.
@@ -72,11 +98,22 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
    * below), so without the refresh the retry page is a dead end during exactly
    * the outage it exists to survive. Mirrors Next's own `retry`.
    */
-  const retry = () =>
+  //
+  // Each click is a fresh server render that re-resolves the store against an
+  // API which, on the transient branch, is by definition already busy (#1842).
+  // So the button is disabled while the refresh is in flight (useTransition's
+  // pending flag — the bare `startTransition` import had none, so a click gave
+  // no feedback and invited repeats) and clicks within RETRY_COOLDOWN_MS of the
+  // last are ignored.
+  const retry = () => {
+    const now = Date.now();
+    if (isRetrying || now - lastRetryAt.current < RETRY_COOLDOWN_MS) return;
+    lastRetryAt.current = now;
     startTransition(() => {
       router.refresh();
       reset();
     });
+  };
 
   // `digest` is the only channel that survives to the client: Next replaces a
   // server error's MESSAGE with a generic string in production but forwards a
@@ -154,9 +191,11 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
       <div className="flex gap-3">
         <button
           onClick={retry}
-          className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          disabled={isRetrying}
+          aria-busy={isRetrying}
+          className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70"
         >
-          {t('Try Again', 'حاول مرة أخرى')}
+          {isRetrying ? t('Retrying…', translations['Retrying…']) : t('Try Again', 'حاول مرة أخرى')}
         </button>
         {/* "Go Home" is suppressed during a transient ONLY on a platform host.
             We do not know which store this is there — `getStore()` fell back

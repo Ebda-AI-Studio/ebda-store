@@ -22,7 +22,11 @@ import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions'
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
-import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
+import {
+  getCustomBadgeColor,
+  getCustomBadgeTextColor,
+  resolveCardBadges,
+} from '../shared/custom-badge';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
@@ -133,6 +137,7 @@ function BoldProductCard({
   // quick-add CTA always renders.
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const customBadgeTextColor = getCustomBadgeTextColor(defaults?.customBadge?.color, store.theme);
   const {
     customBadgeText,
     discountBadgeAllowed,
@@ -288,7 +293,7 @@ function BoldProductCard({
           {discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-none px-3 py-1.5 text-xs font-black tracking-wider text-white',
+                'pointer-events-none absolute z-10 rounded-none px-3 py-1.5 text-xs font-black tracking-wider text-white',
                 discountBadgePositionCls
               )}
               style={{ backgroundColor: discountBadgeColor }}
@@ -302,10 +307,10 @@ function BoldProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-none px-3 py-1.5 text-xs font-black tracking-wider text-white',
+                'pointer-events-none absolute z-10 rounded-none px-3 py-1.5 text-xs font-black tracking-wider text-white',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor }}
+              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
             >
               {customBadgeText}
             </span>

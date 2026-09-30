@@ -57,7 +57,7 @@ export async function generateMetadata({
 }: {
   params: Promise<StoreLayoutParams>;
 }): Promise<Metadata> {
-  const { tenant } = await params;
+  const { tenant, locale } = await params;
   const store = await getStoreByTenantParam(tenant);
 
   // Custom-domain detection from the ROUTE PARAM instead of the `host`
@@ -66,7 +66,7 @@ export async function generateMetadata({
   // both, so the prefix check is a complete, unambiguous signal.
   const isOnCustomDomain = !tenant.startsWith('slug:');
 
-  return buildStorefrontMetadata(store, isOnCustomDomain);
+  return buildStorefrontMetadata(store, isOnCustomDomain, localeFromRouteParam(locale));
 }
 
 export default async function StoreLayout({

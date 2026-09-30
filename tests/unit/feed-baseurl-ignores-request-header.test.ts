@@ -91,7 +91,10 @@ vi.mock('@api/services/cart.service', () => ({ CartService: {} }));
 vi.mock('@api/services/order.service', () => ({ OrderService: {} }));
 vi.mock('@api/services/invoice.service', () => ({ InvoiceService: {} }));
 vi.mock('@api/services/email.service', () => ({ EmailService: {} }));
-vi.mock('@api/services/slug-redirect.service', () => ({ resolveSlugRedirect: vi.fn() }));
+vi.mock('@api/services/slug-redirect.service', () => ({
+  resolveSlugRedirect: vi.fn(),
+  resolveSlugRedirectCached: vi.fn(),
+}));
 vi.mock('@api/services/view-ingest.service', () => ({ recordProductView: vi.fn() }));
 vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },

@@ -58,10 +58,10 @@ export function StoreMaintenance() {
 
   return (
     <>
-      {/* Robots noindex — don't let search engines index a maintenance page
-          as the store's canonical content. */}
-      <meta name="robots" content="noindex,nofollow" />
-
+      {/* No in-body robots <meta>: under React 18 it stays in <body>, where
+          crawlers ignore it. The real noindex is in <head>:
+          buildStorefrontMetadata sets robots noindex for a suspended store
+          (lib/storefront-metadata.ts), via app/layout.tsx::generateMetadata. */}
       <div
         lang={language}
         dir={isRtl ? 'rtl' : 'ltr'}

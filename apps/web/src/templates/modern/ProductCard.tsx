@@ -21,7 +21,11 @@ import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
-import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
+import {
+  getCustomBadgeColor,
+  getCustomBadgeTextColor,
+  resolveCardBadges,
+} from '../shared/custom-badge';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
@@ -149,6 +153,7 @@ function ModernProductCard({
   // the bottom band the mobile quick-add CTA always renders.
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const customBadgeTextColor = getCustomBadgeTextColor(defaults?.customBadge?.color, store.theme);
   const {
     customBadgeText,
     discountBadgeAllowed,
@@ -295,7 +300,7 @@ function ModernProductCard({
           {discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
                 discountBadgePositionCls
               )}
               style={{ backgroundColor: discountBadgeColor }}
@@ -309,10 +314,10 @@ function ModernProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor }}
+              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
             >
               {customBadgeText}
             </span>

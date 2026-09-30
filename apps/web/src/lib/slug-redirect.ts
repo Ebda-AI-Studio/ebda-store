@@ -22,7 +22,10 @@ export async function fetchSlugRedirect(
     const res = await fetch(
       `${API_URL}/public/redirects/resolve?type=${type}&slug=${encodeURIComponent(slug)}`,
       {
-        cache: 'no-store',
+        // A found redirect is cached 60s like the sibling product fetch (#904);
+        // Next only caches 200s, so misses are absorbed API-side instead
+        // (resolveSlugRedirectCached). Keyed per store via the headers.
+        next: { revalidate: 60 },
         headers: {
           'X-Store-ID': store.id,
           ...(store.domain ? { 'x-store-domain': store.domain } : {}),

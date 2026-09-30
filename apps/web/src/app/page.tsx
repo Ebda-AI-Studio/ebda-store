@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getStore, getStoreOrNotFound } from '../lib/store-resolver';
+import { getStore, getStoreOrNotFound, isResolvedStore } from '../lib/store-resolver';
 import { storeAbsoluteUrl } from '../lib/structured-data';
 import { HomePageBody } from './HomePageBody';
 
@@ -11,6 +11,8 @@ import { HomePageBody } from './HomePageBody';
 // that canonical belongs: the actual home route.
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getStore();
+  // No canonical for an unresolved store (#1855) — it would name the demo store.
+  if (!isResolvedStore(store)) return {};
   return { alternates: { canonical: storeAbsoluteUrl(store, '') } };
 }
 

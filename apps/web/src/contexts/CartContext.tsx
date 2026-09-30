@@ -97,6 +97,10 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 // store's items). Namespacing by store.id isolates each store's cached cart.
 // `legacy` is the old flat key, kept only so we can purge it post-migration.
 const LEGACY_CART_STORAGE_KEY = 'force-store-cart';
+/** Bundle lines' pre-paint cache, beside the items key (#1563). */
+export function bundlesStorageKeyFor(cartStorageKey: string): string {
+  return `${cartStorageKey}:bundles`;
+}
 function cartStorageKeyFor(storeId: string | undefined): string {
   return storeId && storeId !== 'demo' ? `force-store-cart:${storeId}` : LEGACY_CART_STORAGE_KEY;
 }
@@ -148,6 +152,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
           setItems(parsed as CartItem[]);
+        }
+      }
+      // Bundles pre-paint too (#1563) — a bundle-only cart showed "Your cart
+      // is empty" until GET /public/cart landed. Separate key so the items
+      // key keeps its array shape for readLocalCart + the guest migration.
+      const savedBundles = localStorage.getItem(bundlesStorageKeyFor(cartStorageKey));
+      if (savedBundles) {
+        const parsed = JSON.parse(savedBundles);
+        if (Array.isArray(parsed)) {
+          setBundles(parsed as CartBundle[]);
         }
       }
     } catch {
@@ -229,10 +243,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!isReady) return;
     try {
       localStorage.setItem(cartStorageKey, JSON.stringify(items));
+      localStorage.setItem(bundlesStorageKeyFor(cartStorageKey), JSON.stringify(bundles));
     } catch {
       // Quota exceeded or storage disabled -- non-fatal.
     }
-  }, [items, isReady, cartStorageKey]);
+  }, [items, bundles, isReady, cartStorageKey]);
 
   const addItem = useCallback(
     async (

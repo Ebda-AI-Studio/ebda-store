@@ -8,6 +8,57 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ---
 
+## 2026-09-25 — OTHER-O2
+
+Context: OTHER-O2 batch (storefront/orders lower-severity issues + Sentry source maps), branch
+`fix/p2-other-o2-storefront`.
+
+**Ruling O2-1 — #1271: the `/public/products` field projection is not added; the sitemap budget is
+re-derived instead.** Verified against Cloudflare's limits page (2026-09-25): binding calls (R2, DO)
+count as subrequests, but the Workers Paid ceiling is 10,000 per invocation since 2026-02-11, not
+1,000. Worst case is 851 fetches ≈ 3,400 subrequests with cache ops; memory is bounded by the new
+per-product projection in `sitemap.ts` (#1290), and a store whose fan-out throws is now logged. A
+`fields=` projection would change the `public:products:*` cache key contract that ProductsClient /
+SearchClient read, for a cost only reachable at ~200 stores (3 live today, each ≤ 3 product pages).
+Cost if wrong: at ~200 stores a cold master-sitemap render issues ~600 full-payload product queries
+against the API; Redis (120s) and the fetch cache (1h) absorb repeats.
+
+**Ruling O2-2 — #1842: no server-side negative cache for transient store-resolve failures.** The
+client fix (Try Again disabled while pending + 2s cooldown) removes the click amplifier. A 5-15s
+in-process "store unavailable" sentinel would extend every single blip to that window for every
+shopper on the isolate, including after the API has recovered. Cost if wrong: N shoppers on the
+retry page still produce up to N resolve calls per 2s during an outage, bounded by
+`storeResolveLimiter`.
+
+**Ruling O2-3 — amends SR-7 (#1843).** SR-7 said "Try Again" was the only non-retry control on the
+transient page; that held for the root boundary only — ShopChrome / MinimalChrome around the
+segment boundaries emitted the same prefix-less links. The segment boundaries now render the
+fallback without chrome when the error is the transient AND the client holds the unresolved
+sentinel (`useBareErrorFallback`). When the store did resolve, the chrome stays: its links are
+correct. Cost if wrong: during a transient the PLP/PDP/cart/checkout retry page shows no header,
+matching the root boundary.
+
+**Ruling O2-4 — #1201: `www.google.com` is added to `connect-src` only, not `script-src`.** The Ads
+conversion runtime loads from `www.googleadservices.com` / `googleads.g.doubleclick.net` (both
+added to script-src and connect-src); www.google.com hosts JSONP endpoints that are a known CSP
+bypass gadget, and no documented Ads script is served from it. Not verified against a live store
+with Google Ads enabled — none of the three live stores has it on. Cost if wrong: a remarketing
+sub-request from www.google.com is CSP-blocked and shows up as a console violation.
+
+**Ruling O2-5 — #1563: the cart empty state is not gated on `cartIsReady`.** Bundles now pre-paint
+from localStorage exactly like loose items, which closes the reported gap. Gating the empty state
+would replace the instant "Your cart is empty" that every genuinely empty cart on the 3 live stores
+shows today with a blank wait for GET /public/cart (seconds on a cold API). Cost if wrong: a device
+with no cached cart (cleared storage, first visit on a new device) still flashes "empty" before a
+server-only cart arrives — the same as loose items always have.
+
+**Ruling O2-6 — #1614: a merchant-picked custom-badge colour keeps white text.** Only the primary
+fallback now uses `--primary-foreground`. A contrast-computed foreground would flip pecannbee's live
+red "عرض" chip (the only live custom badge) from white to black text. Cost if wrong: a merchant who
+picks a pale hex still gets low-contrast white text until the ColorField warns about contrast.
+
+---
+
 ## 2026-09-25 — P2 batch M4 + D1 (inventory, accounting, tax)
 
 Branch `fix/p2-m4-d1-inventory-accounting`.

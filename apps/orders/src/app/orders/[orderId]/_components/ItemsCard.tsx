@@ -92,7 +92,10 @@ export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
           {t.detail.items}
         </h2>
         <span className="text-xs text-muted-foreground">
-          {fmt(t.detail.itemCount, { count: items.length })}
+          {/* Display ROWS, not raw OrderItems (#1566): a bundle box is one row,
+              so the header must agree with the list and "View all (n)" below.
+              Same fix as the admin twin's ItemsCard (P2-g). */}
+          {fmt(t.detail.itemCount, { count: totalRows })}
         </span>
       </div>
 

@@ -291,13 +291,24 @@ export function organizationJsonLd(store: ResolvedStore, locale: StorefrontLocal
   // becomes a PropertyValue instead of a raw spread — valid schema.org,
   // still fully consumable by an LLM reading the JSON-LD, and no information
   // lost versus the previous raw-spread shape.
+  //
+  // Only primitives and arrays of primitives are published (#1892): aboutJson
+  // rows written before the API-side schema can hold nested objects, which
+  // String() turned into "[object Object]" (and null into "null") in the
+  // public JSON-LD. Anything else is skipped rather than serialised.
+  const isPrimitive = (v: unknown): v is string | number | boolean =>
+    typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
   const additionalProperty = Object.entries(aboutJson)
-    .filter(([key, value]) => key !== 'location' && key !== 'region' && value !== undefined)
-    .map(([key, value]) => ({
-      '@type': 'PropertyValue',
-      name: key,
-      value: Array.isArray(value) ? value.join(', ') : String(value),
-    }));
+    .filter(([key]) => key !== 'location' && key !== 'region')
+    .flatMap(([key, value]) => {
+      if (isPrimitive(value)) {
+        return [{ '@type': 'PropertyValue', name: key, value: String(value) }];
+      }
+      if (Array.isArray(value) && value.length > 0 && value.every(isPrimitive)) {
+        return [{ '@type': 'PropertyValue', name: key, value: value.join(', ') }];
+      }
+      return [];
+    });
 
   return {
     '@context': 'https://schema.org',

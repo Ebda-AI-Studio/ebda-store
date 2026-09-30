@@ -10,6 +10,8 @@
  * JSX (the root vitest config runs in a `node` environment, no DOM).
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { groupItemsForFulfilment, previewRows, bundleDisplayName } from './ItemsCard';
 import type { OrderLineItem } from '@/lib/orders';
 
@@ -200,5 +202,19 @@ describe('bundleDisplayName — Arabic locale renders bundleNameAr', () => {
 
   it('falls back to the English snapshot in ar when no Arabic name was captured', () => {
     expect(bundleDisplayName({ name: 'Ramadan Box', nameAr: null }, 'ar')).toBe('Ramadan Box');
+  });
+});
+
+/**
+ * #1566 — the header count must be display rows, like the admin twin (P2-g).
+ * The root vitest config has no DOM, so — like the admin ItemsCard test —
+ * this asserts on the component source.
+ */
+describe('ItemsCard header count agrees with the "View all" button', () => {
+  const source = readFileSync(join(__dirname, 'ItemsCard.tsx'), 'utf8');
+
+  it('the itemCount header is wired to totalRows, not items.length', () => {
+    expect(source).toContain('fmt(t.detail.itemCount, { count: totalRows })');
+    expect(source).not.toContain('fmt(t.detail.itemCount, { count: items.length })');
   });
 });

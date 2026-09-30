@@ -39,11 +39,7 @@ export function BundleCard({ bundle }: BundleCardProps) {
   const displayName = pickBundleName(bundle, language);
   const savings = bundle.componentSum - bundle.price;
 
-  const handleAddToCart = async (e: React.MouseEvent) => {
-    // The whole card is a Link to the bundle detail page — stop the click
-    // from navigating when the shopper meant to add-to-cart instead.
-    e.preventDefault();
-    e.stopPropagation();
+  const handleAddToCart = async () => {
     setIsAdding(true);
     const added = await addBundle(bundle.id, 1);
     setIsAdding(false);
@@ -57,11 +53,15 @@ export function BundleCard({ bundle }: BundleCardProps) {
     });
   };
 
+  // The card is a positioned container, NOT one big <Link> (#1557): a
+  // <button> nested in an <a> is invalid HTML, folds "Add to Cart" into the
+  // link's accessible name, and on Safari/Firefox a tap on the disabled
+  // (loading) button bubbled to the anchor and navigated mid-add. The title
+  // link is stretched over the card (`after:inset-0`) so the whole tile still
+  // opens the bundle, and the button sits above that overlay as a sibling —
+  // the same shape as PecannbeeProductCard. Visually unchanged.
   return (
-    <Link
-      href={storeUrl(`/bundles/${bundle.slug}`)}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-primary/30 hover:shadow-lg"
-    >
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-primary/30 hover:shadow-lg">
       <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
         {bundle.image ? (
           <Image
@@ -84,7 +84,14 @@ export function BundleCard({ bundle }: BundleCardProps) {
         <span className="inline-flex w-fit items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
           {t('Bundle', 'باقة')}
         </span>
-        <h3 className="line-clamp-2 text-base font-semibold text-foreground">{displayName}</h3>
+        <h3 className="line-clamp-2 text-base font-semibold text-foreground">
+          <Link
+            href={storeUrl(`/bundles/${bundle.slug}`)}
+            className="after:absolute after:inset-0 after:content-['']"
+          >
+            {displayName}
+          </Link>
+        </h3>
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-bold text-primary tabular-nums">
@@ -96,11 +103,16 @@ export function BundleCard({ bundle }: BundleCardProps) {
               </span>
             )}
           </div>
-          <Button size="sm" onClick={handleAddToCart} isLoading={isAdding}>
+          <Button
+            size="sm"
+            onClick={handleAddToCart}
+            isLoading={isAdding}
+            className="relative z-10"
+          >
             {t('Add to Cart', translations['Add to Cart'])}
           </Button>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

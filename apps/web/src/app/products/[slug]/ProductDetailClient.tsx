@@ -35,7 +35,11 @@ import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { SpecTable } from '../../../templates/shared/SpecTable';
 import { OosImageDim, OutOfStockRibbon } from '../../../templates/shared/ProductCardCta';
-import { getCustomBadgeColor, resolveCardBadges } from '../../../templates/shared/custom-badge';
+import {
+  getCustomBadgeColor,
+  getCustomBadgeTextColor,
+  resolveCardBadges,
+} from '../../../templates/shared/custom-badge';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
@@ -526,6 +530,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     resolvedLayout?.productCardDefaults?.customBadge?.color,
     store.theme
   );
+  const pdpCustomBadgeTextColor = getCustomBadgeTextColor(
+    resolvedLayout?.productCardDefaults?.customBadge?.color,
+    store.theme
+  );
 
   return (
     <ShopChrome layout={resolvedLayout}>
@@ -692,7 +700,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     instead of the badge silently reverting to the primary
                     token here. */}
                 {pdpCustomBadgeText && (
-                  <Badge className="text-white" style={{ backgroundColor: pdpCustomBadgeColor }}>
+                  <Badge
+                    className="text-white"
+                    style={{ backgroundColor: pdpCustomBadgeColor, color: pdpCustomBadgeTextColor }}
+                  >
                     {pdpCustomBadgeText}
                   </Badge>
                 )}

@@ -68,6 +68,18 @@ describe('buildBundleMetadata — locale threading', () => {
   });
 });
 
+describe('Arabic fallback description names (#1857)', () => {
+  it('uses the Arabic bundle and store names', () => {
+    const meta = buildBundleMetadata(
+      { ...makeBundle(), nameAr: 'صندوق رمضان', description: null, descriptionAr: null } as never,
+      { ...STORE, nameAr: 'بيكان بي' },
+      'ar'
+    );
+    expect(meta.description).toContain('صندوق رمضان');
+    expect(meta.description).toContain('بيكان بي');
+  });
+});
+
 /**
  * Issue #1857, bundle half — the Arabic fallback description interpolated
  * the ENGLISH `bundle.name`/`store.name` (`تسوق ${bundle.name} من

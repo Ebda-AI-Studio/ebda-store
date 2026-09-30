@@ -32,7 +32,7 @@ import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
-import { getCustomBadgeColor, resolveCardBadges } from './custom-badge';
+import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
@@ -197,6 +197,7 @@ function PecannbeeProductCardImpl({
   // one, is top-end); there is no compare button on this card.
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const customBadgeTextColor = getCustomBadgeTextColor(defaults?.customBadge?.color, store.theme);
   const {
     customBadgeText,
     discountBadgeAllowed,
@@ -248,8 +249,10 @@ function PecannbeeProductCardImpl({
         'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
         sizeCap || 'md:max-w-[200px]',
         frameCls,
-        shape.radius,
-        styles.card
+        styles.card,
+        // LAST so the merchant's explicit cardShape radius beats the pack's
+        // own rounded-* (modern's `rounded-2xl`) under tailwind-merge (#665).
+        shape.radius
       )}
       style={
         showCardFrame && cardFrameColor && store.theme
@@ -396,7 +399,7 @@ function PecannbeeProductCardImpl({
           {onSale && discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
                 discountBadgePositionCls
               )}
               style={{ backgroundColor: discountBadgeColor }}
@@ -411,10 +414,10 @@ function PecannbeeProductCardImpl({
           {customBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor }}
+              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
             >
               {customBadgeText}
             </span>

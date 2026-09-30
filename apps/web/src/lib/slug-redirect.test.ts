@@ -23,7 +23,7 @@ describe('fetchSlugRedirect', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/public/redirects/resolve?type=product&slug=old-handle'),
       expect.objectContaining({
-        cache: 'no-store',
+        next: { revalidate: 60 },
         headers: expect.objectContaining({ 'X-Store-ID': 'store-1' }),
       })
     );

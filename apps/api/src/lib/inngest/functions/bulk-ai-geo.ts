@@ -7,6 +7,7 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
+import { normalizeBrandFacts } from '../../ai/brand-facts';
 import { rethrowAsAppError } from '../../ai/gemini-errors';
 import { recordUsage } from '../../../services/ai.service';
 import { AppError } from '../../../middleware/error-handler';
@@ -750,10 +751,13 @@ Populate using only the information provided above. For keyCategories, use the c
               false
             );
             const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
-            const parsed = JSON.parse(raw);
+            // Allowlisted keys in their expected shapes only (#1892) — never
+            // the model's raw object, whose nested values published
+            // "[object Object]" into the Organization JSON-LD.
+            const facts = normalizeBrandFacts(JSON.parse(raw));
 
-            if (parsed && typeof parsed === 'object') {
-              await prisma.store.update({ where: { id: storeId }, data: { aboutJson: parsed } });
+            if (facts) {
+              await prisma.store.update({ where: { id: storeId }, data: { aboutJson: facts } });
               filled++;
             } else {
               skipped++;

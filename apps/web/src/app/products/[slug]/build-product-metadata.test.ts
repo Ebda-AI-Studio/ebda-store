@@ -103,6 +103,25 @@ describe('buildProductMetadata — locale threading', () => {
   });
 });
 
+describe('Arabic fallback description names (#1857)', () => {
+  it('uses the Arabic product and store names, not the English ones', () => {
+    const meta = buildProductMetadata(
+      { name: 'School Offer', nameAr: 'عرض المدارس', slug: 'school-offer', price: 5000 },
+      { ...STORE, nameAr: 'بيكان بي' },
+      'ar'
+    );
+    expect(meta.description).toContain('عرض المدارس');
+    expect(meta.description).toContain('بيكان بي');
+    expect(meta.description).not.toContain('School Offer');
+    expect(meta.description).not.toContain('Pecannbee');
+  });
+
+  it('falls back to the English names when no Arabic ones exist', () => {
+    const meta = buildProductMetadata({ name: 'School Offer', slug: 's', price: 1 }, STORE, 'ar');
+    expect(meta.description).toContain('School Offer');
+  });
+});
+
 /**
  * Issue #1857 — the new Arabic fallback description interpolated the
  * ENGLISH `product.name`/`store.name` under `<html lang="ar">`

@@ -7,7 +7,7 @@ import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma, SlugEntityType } from '@force/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
-import { resolveSlugRedirect } from '../services/slug-redirect.service';
+import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
 import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireFeature } from '../middleware/feature-gate';
@@ -444,7 +444,8 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
     }
 
     const storeId = await getStoreIdFromRequest(req);
-    const toSlug = await resolveSlugRedirect(storeId, entityType, slug);
+    // Cached 60s, hits AND misses (#904) — see resolveSlugRedirectCached.
+    const toSlug = await resolveSlugRedirectCached(storeId, entityType, slug);
     if (!toSlug) {
       res.status(404).json({ error: 'not found' });
       return;

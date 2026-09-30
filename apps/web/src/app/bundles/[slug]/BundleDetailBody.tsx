@@ -58,16 +58,17 @@ export async function fetchInitialBundle(
 
 export function buildBundleMetadata(
   bundle: PublicBundleDetail,
-  store: Pick<ResolvedStore, 'name' | 'nameAr' | 'slug' | 'domain'>,
+  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'> & { nameAr?: string | null },
   locale: StorefrontLocale = 'en'
 ): Metadata {
   const { name: storeName, slug: storeSlug, domain: storeDomain } = store;
   // Arabic locale reads the merchant's Arabic name when present — else the
   // English name is what would render (issue #1857: the AR fallback
   // description interpolated `bundle.name`/`store.name`, i.e. English text,
-  // under `<html lang="ar">`).
-  const localizedName = locale === 'ar' && bundle.nameAr ? bundle.nameAr : bundle.name;
-  const localizedStoreName = locale === 'ar' && store.nameAr ? store.nameAr : storeName;
+  // under `<html lang="ar">`). A blank/whitespace-only Arabic name falls back
+  // to the English one rather than rendering an empty title.
+  const localizedName = locale === 'ar' ? bundle.nameAr?.trim() || bundle.name : bundle.name;
+  const localizedStoreName = locale === 'ar' ? store.nameAr?.trim() || storeName : storeName;
   const title = localizedName;
   // Bundles carry no metaDescription*/Aeo* columns (schema.prisma Bundle
   // model), so `pickMetaDescription` always falls through to

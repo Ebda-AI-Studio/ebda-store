@@ -55,6 +55,17 @@ No changes to the sitemap/robots.txt/structured-data guidance above are needed f
 >   limit — Google rejects/truncates anything larger). Hitting the clamp logs
 >   `sitemap: master sitemap exceeds the 50k-URL protocol limit`, with
 >   `storesFullyDropped` and `catalogUrlsDropped` in the payload.
+> - **The store list itself can come back short, and now says so (2026-09-25,
+>   #1815).** `fetchStores()` stops at 50 pages (5,000 stores) and logs
+>   `sitemap: store list page ceiling hit`; a non-2xx page mid-pagination logs
+>   `sitemap: store list fetch failed mid-pagination`. Both used to be silent,
+>   so the clamp's `storesFullyDropped` undercounted — its payload now also
+>   carries `storesNeverFetched`. A store whose product fan-out throws keeps
+>   its static pages and is counted in
+>   `sitemap: product fan-out failed for some stores — static pages only`.
+> - **The platform root is not in the master sitemap (2026-09-25, #1543).**
+>   `store.force-ai.co/` 307s to `force-ai.co`; GSC would report it as "Page
+>   with redirect". Per-store roots (`/<slug>`) are listed as before.
 > - **What the clamp drops, and in what order.** Every store's 11 static pages
 >   are emitted FIRST, in one bounded pass; product and bundle URLs are
 >   appended after. This degrades catalog DEPTH, but "degrades" understates

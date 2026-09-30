@@ -13,7 +13,11 @@ import { cn, CartIcon } from '@force/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import { getDiscountBadgeColor } from '../../templates/shared/discount-badge';
-import { getCustomBadgeColor, resolveCardBadges } from '../../templates/shared/custom-badge';
+import {
+  getCustomBadgeColor,
+  getCustomBadgeTextColor,
+  resolveCardBadges,
+} from '../../templates/shared/custom-badge';
 
 interface ProductListItemProps {
   product: Product;
@@ -83,6 +87,7 @@ export function ProductListItem({
   // button and CTA render inline in the content row, not over the image).
   const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const customBadgeTextColor = getCustomBadgeTextColor(defaults?.customBadge?.color, store.theme);
   const {
     customBadgeText,
     discountBadgeAllowed,
@@ -129,7 +134,7 @@ export function ProductListItem({
           discountBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-full px-2 py-0.5 text-xs font-bold uppercase text-white',
+                'pointer-events-none absolute z-10 rounded-full px-2 py-0.5 text-xs font-bold uppercase text-white',
                 discountBadgePositionCls
               )}
               style={{ backgroundColor: discountBadgeColor }}
@@ -144,10 +149,10 @@ export function ProductListItem({
         {customBadgeText && (
           <span
             className={cn(
-              'absolute z-10 rounded-full px-2 py-0.5 text-xs font-bold uppercase text-white',
+              'pointer-events-none absolute z-10 rounded-full px-2 py-0.5 text-xs font-bold uppercase text-white',
               customBadgePositionCls
             )}
-            style={{ backgroundColor: customBadgeColor }}
+            style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
           >
             {customBadgeText}
           </span>

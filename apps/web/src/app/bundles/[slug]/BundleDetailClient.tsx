@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -46,6 +46,9 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
   const slug = params?.slug as string;
 
   const [bundle, setBundle] = useState<PublicBundleDetail | null>(initialBundle ?? null);
+  const bundleRef = useRef(bundle);
+  const initialSlug = initialBundle?.slug;
+  bundleRef.current = bundle;
   const [isLoading, setIsLoading] = useState(!initialBundle);
   const [notFound, setNotFound] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -61,8 +64,15 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
   // Mirrors ProductDetailClient's own client-side re-fetch: `initialBundle`
   // covers the first (server) render, this covers client-side navigation
   // between bundle slugs without a full page reload.
+  //
+  // (#1556) The server already rendered `initialBundle` for this slug, so the
+  // first mount does NOT re-fetch — re-fetching tore the SSR'd page (and its
+  // LCP image) down to a skeleton on every view, like ProductDetailClient's
+  // own initial-data guard avoids. And only an explicit unsuccessful answer
+  // means "not found": a network error keeps whatever bundle is on screen.
   useEffect(() => {
     if (!store?.id || store.id === 'demo' || !slug) return;
+    if (initialSlug === slug) return;
     let cancelled = false;
     (async () => {
       setIsLoading(true);
@@ -77,9 +87,14 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
           setNotFound(true);
         }
       } catch {
+        // Transient failure: keep the bundle on screen when it IS this slug;
+        // only with nothing valid to show is the not-found body honest.
         if (!cancelled) {
-          setBundle(null);
-          setNotFound(true);
+          const keep = bundleRef.current?.slug === slug;
+          if (!keep) {
+            setBundle(null);
+            setNotFound(true);
+          }
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -88,7 +103,7 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
     return () => {
       cancelled = true;
     };
-  }, [slug, store?.id]);
+  }, [slug, store?.id, initialSlug]);
 
   if (isLoading) {
     return (

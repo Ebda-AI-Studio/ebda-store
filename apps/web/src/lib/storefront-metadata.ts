@@ -18,7 +18,17 @@ import { resolveStoreOgImage } from './seo/og-image';
  * reads the `[tenant]` route param) — that detection stays with each
  * caller and is passed in already-resolved.
  */
-export function buildStorefrontMetadata(store: ResolvedStore, isOnCustomDomain: boolean): Metadata {
+export function buildStorefrontMetadata(
+  store: ResolvedStore,
+  isOnCustomDomain: boolean,
+  /**
+   * The request's resolved locale — the SAME value that picked `<html lang>`
+   * (#1856). Callers pass `resolveStorefrontLocale()` (legacy tree) or
+   * `localeFromRouteParam()` (tenant tree). Omitted → the store default,
+   * the previous behaviour.
+   */
+  locale?: 'en' | 'ar'
+): Metadata {
   const siteUrl = getSiteUrl(store);
 
   // Honour the admin's `defaultLanguage` setting when picking which SEO copy
@@ -30,7 +40,9 @@ export function buildStorefrontMetadata(store: ResolvedStore, isOnCustomDomain: 
     | 'en'
     | 'ar'
     | undefined;
-  const preferAr = defaultLanguage === 'ar';
+  // The cookie-aware request locale wins, so the root <meta name="description">
+  // / og:locale can no longer disagree with the page's own <html lang> (#1856).
+  const preferAr = (locale ?? defaultLanguage) === 'ar';
   const localizedTitle = preferAr ? store.metaTitleAr || store.metaTitle : store.metaTitle;
   const localizedDescription = pickMetaDescription(store, preferAr ? 'ar' : 'en');
   const localizedStoreName = preferAr && store.nameAr ? store.nameAr : store.name;

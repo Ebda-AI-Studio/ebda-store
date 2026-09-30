@@ -53,7 +53,7 @@ export async function fetchProductDetailLayoutSettings(
 
 interface ProductData {
   name: string;
-  nameAr?: string;
+  nameAr?: string | null;
   slug: string;
   description?: string;
   descriptionAr?: string;
@@ -68,16 +68,17 @@ interface ProductData {
 
 export function buildProductMetadata(
   product: ProductData,
-  store: Pick<ResolvedStore, 'name' | 'nameAr' | 'slug' | 'domain'>,
+  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'> & { nameAr?: string | null },
   locale: StorefrontLocale = 'en'
 ): Metadata {
   const { name: storeName, slug: storeSlug, domain: storeDomain } = store;
   // Arabic locale reads the merchant's Arabic name when present — else the
   // English name is what would render (issue #1857: the new AR fallback
   // description interpolated `product.name`/`store.name`, i.e. English text,
-  // under `<html lang="ar">`).
-  const localizedName = locale === 'ar' && product.nameAr ? product.nameAr : product.name;
-  const localizedStoreName = locale === 'ar' && store.nameAr ? store.nameAr : storeName;
+  // under `<html lang="ar">`). A blank/whitespace-only Arabic name falls back
+  // to the English one rather than rendering an empty title.
+  const localizedName = locale === 'ar' ? product.nameAr?.trim() || product.name : product.name;
+  const localizedStoreName = locale === 'ar' ? store.nameAr?.trim() || storeName : storeName;
   const title = localizedName;
   // AEO > SEO > plain description (truncated to 160 chars for meta tag).
   // The plain-description fallback must match `locale` too — with only the

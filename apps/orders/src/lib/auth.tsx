@@ -116,10 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Re-check on every navigation, /login included (#1814): the login page's
-  // own "already signed in → go straight to orders" effect below is what
-  // turns a check that resolves here into a redirect, but that only ever
-  // gets a chance to fire if the check actually runs on this route.
+  // Re-check on every navigation, /login included (#1814, correcting the
+  // once-per-mount guard #1802 briefly added here): the login page's own
+  // "already signed in → go straight to orders" effect below is what turns a
+  // check that resolves here into a redirect, but that only ever gets a
+  // chance to fire if the check actually runs on this route. checkAuth is
+  // now bounded by checkSessionWithMountRetries's own retry ladder (see
+  // above), so re-running it per navigation no longer risks the throttle
+  // races #1802 was written to avoid.
   useEffect(() => {
     checkAuth();
   }, [checkAuth, pathname]);

@@ -254,6 +254,15 @@ export const translations = {
     'تم إلغاء اشتراكك. لن تصلك رسائل تسويقية منا بعد الآن.',
   'This unsubscribe link is invalid.': 'رابط إلغاء الاشتراك هذا غير صالح.',
   'Something went wrong. Please try again later.': 'حدث خطأ ما. يرجى المحاولة مرة أخرى لاحقاً.',
+
+  // Platform-host 404 (PlatformNotFound — store.force-ai.co/<unknown>).
+  'This page doesn’t exist': 'هذه الصفحة غير موجودة',
+  'The store you’re looking for may have moved, or the link may be wrong.':
+    'ربما انتقل المتجر الذي تبحث عنه، أو قد يكون الرابط غير صحيح.',
+  'Go to Force AI': 'الانتقال إلى Force AI',
+
+  // Route error fallback — Try Again while the refresh is in flight.
+  'Retrying…': 'جارٍ إعادة المحاولة…',
 } as const;
 
 export type TranslationKey = keyof typeof translations;

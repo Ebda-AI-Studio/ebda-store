@@ -138,8 +138,17 @@ async function fetchStoreByHost(host: string): Promise<PublicStore | null> {
   }
 }
 
-/** Fetch categories for a store (uses X-Store-ID header pattern). */
-async function fetchCategories(storeId: string): Promise<PublicCategory[]> {
+/**
+ * Fetch categories for a store (uses X-Store-ID header pattern).
+ *
+ * Returns `null` when the API could not be asked (non-2xx, network error,
+ * unparseable body) and `[]` only when the store genuinely has no categories.
+ * The two MUST stay distinct (#1853): `fixCategoryLinks` treats an empty set
+ * as "every /categories/ link is dead" and deletes those lines, so collapsing
+ * a transient 429/5xx into `[]` gutted a merchant's own llms.txt and the CDN
+ * then held the damaged copy for up to a day.
+ */
+async function fetchCategories(storeId: string): Promise<PublicCategory[] | null> {
   try {
     const res = await fetch(`${API_URL}/public/categories`, {
       next: { revalidate: 600 },
@@ -148,11 +157,11 @@ async function fetchCategories(storeId: string): Promise<PublicCategory[]> {
         'X-Store-ID': storeId,
       },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const json = await res.json();
-    return Array.isArray(json?.data?.categories) ? json.data.categories : [];
+    return Array.isArray(json?.data?.categories) ? json.data.categories : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -196,7 +205,7 @@ async function fetchProducts(storeId: string): Promise<PublicProduct[]> {
 // Body builders
 // ---------------------------------------------------------------------------
 
-function buildPlatformBody(stores: PublicStore[]): string {
+export function buildPlatformBody(stores: PublicStore[]): string {
   const storeLines = stores
     .map(s => {
       const desc = s.description?.trim() || 'Kuwait-based merchant on Force AI Store.';
@@ -223,7 +232,7 @@ Every store follows the same URL pattern:
 - \`/<slug>\` — store homepage (JSON-LD: Store, ItemList of featured products, BreadcrumbList)
 - \`/<slug>/products\` — full catalogue (JSON-LD: ItemList, BreadcrumbList)
 - \`/<slug>/categories\` — category browse
-- \`/<slug>/categories/<cat>\` — products in a category (JSON-LD: ItemList, BreadcrumbList)
+- \`/<slug>/products?category=<cat>\` — products in a category (JSON-LD: ItemList, BreadcrumbList)
 - \`/<slug>/products/<product-slug>\` — product detail (JSON-LD: Product with price, availability, image)
 - \`/<slug>/about\` — about the merchant (JSON-LD: AboutPage, Organization)
 - \`/<slug>/contact\` — contact info (JSON-LD: ContactPage, PostalAddress, ContactPoint)
@@ -251,7 +260,7 @@ export function buildPerStoreBody(
   products: PublicProduct[],
   totalProducts: number
 ): string {
-  const base = store.domain ? `https://${store.domain}` : `https://store.force-ai.co/${store.slug}`;
+  const base = storeBaseUrl(store);
 
   // `/products?category=<slug>` is the storefront's ACTUAL category-browse
   // URL (see `ProductsPageBody.tsx`'s `?category=` query param) — there is
@@ -261,7 +270,7 @@ export function buildPerStoreBody(
   // half of that fix (rewriting/dropping dead links in the AI-generated
   // override text this function's output can be replaced by).
   const catLines = categories
-    .map(c => `- [${c.name}](${base}/products?category=${c.slug})`)
+    .map(c => `- [${c.name}](${base}/products?category=${encodeURIComponent(c.slug)})`)
     .join('\n');
 
   const prodLines = products
@@ -280,6 +289,51 @@ export function buildPerStoreBody(
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
   const storeDesc = store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`;
 
+  return `# ${storeTitle}
+
+> ${storeDesc}
+
+## Contact
+
+${contactLines}
+
+## Categories (${categories.length})
+
+${catLines || '_No active categories._'}
+
+## Products (${totalProducts} total, showing ${products.length})
+
+${prodLines || '_No active products._'}${buildAgentSections(store, base)}
+
+## For AI agents
+
+- Each product page has full JSON-LD \`Product\` schema with name, image, description, price, availability, currency (KWD)
+- Each category page has \`ItemList\` schema enumerating products
+- Sitemap for this store: ${base}/sitemap.xml (subset of the platform sitemap)
+- Inventory updates in real time — re-crawl daily for fresh availability
+
+## Platform
+
+This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
+Force AI. See https://store.force-ai.co/llms.txt for the
+platform-wide index.
+`;
+}
+
+/** Public origin the store's links are rooted at (custom domain or platform path). */
+function storeBaseUrl(store: PublicStore): string {
+  return store.domain ? `https://${store.domain}` : `https://store.force-ai.co/${store.slug}`;
+}
+
+/**
+ * The generated discovery sections (product feed + agentic-checkout MCP
+ * contract). Shared by the auto-built body AND appended to a stored
+ * `store.llmsTxt` override (#1667): the override is AI-written by the GEO
+ * sweep and knows nothing about MCP or `x-agent-key`, and this file is the
+ * only place an agent can learn either — so the contract must render on
+ * every per-store body, not only the auto-built one.
+ */
+function buildAgentSections(store: PublicStore, base: string): string {
   // agent_feed is in every paid plan baseline (AI-first policy, 2026-07-21),
   // so this now advertises the feed on essentially every storefront. Still
   // conditional: a super-admin StoreFeature override can disable it for a
@@ -337,35 +391,7 @@ export function buildPerStoreBody(
     ? `\n\n## Agentic checkout (MCP)\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Read tools (no credential): search_products, get_product, get_store_info, view_cart, get_order_status\n${mcpWriteLine}${discoveryLines}`
     : '';
 
-  return `# ${storeTitle}
-
-> ${storeDesc}
-
-## Contact
-
-${contactLines}
-
-## Categories (${categories.length})
-
-${catLines || '_No active categories._'}
-
-## Products (${totalProducts} total, showing ${products.length})
-
-${prodLines || '_No active products._'}${feedSection}${mcpSection}
-
-## For AI agents
-
-- Each product page has full JSON-LD \`Product\` schema with name, image, description, price, availability, currency (KWD)
-- Each category page has \`ItemList\` schema enumerating products
-- Sitemap for this store: ${base}/sitemap.xml (subset of the platform sitemap)
-- Inventory updates in real time — re-crawl daily for fresh availability
-
-## Platform
-
-This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
-Force AI. See https://store.force-ai.co/llms.txt for the
-platform-wide index.
-`;
+  return `${feedSection}${mcpSection}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -394,17 +420,28 @@ platform-wide index.
  */
 export function fixCategoryLinks(body: string, categories: Array<{ slug: string }>): string {
   const validSlugs = new Set(categories.map(c => c.slug));
-  const categoryLinkPattern = /\/categories\/([a-z0-9-]+)/gi;
+  // The platform's real slug charset (#1854): ASCII + the Arabic block, as
+  // SLUG_STRIP in @force/shared mints them, raw OR percent-encoded. An
+  // ASCII-only class missed a fully-Arabic slug entirely (dead link served)
+  // and captured only the ASCII prefix of a mixed one (valid line dropped).
+  const categoryLinkPattern = /\/categories\/((?:[a-z0-9\u0600-\u06FF-]|%[0-9a-f]{2})+)/gi;
+  const decodeSlug = (raw: string): string => {
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw; // malformed escape — compare as-is (will not match a real slug)
+    }
+  };
 
   return body
     .split('\n')
     .map(line => {
       const matches = [...line.matchAll(categoryLinkPattern)];
       if (matches.length === 0) return line;
-      if (!matches.every(m => validSlugs.has(m[1]))) return null;
+      if (!matches.every(m => validSlugs.has(decodeSlug(m[1])))) return null;
       return line.replace(
         categoryLinkPattern,
-        (_match, slug: string) => `/products?category=${slug}`
+        (_match, slug: string) => `/products?category=${encodeURIComponent(decodeSlug(slug))}`
       );
     })
     .filter((line): line is string => line !== null)
@@ -421,27 +458,41 @@ export function fixCategoryLinks(body: string, categories: Array<{ slug: string 
  * otherwise enumerate categories + products. Shared by the platform-path
  * (slug) and custom-domain branches so both render identically.
  */
-async function perStoreResponse(store: PublicStore, viaCookie: boolean): Promise<Response> {
+// Exported for fix-category-links.test.ts, which calls this directly rather
+// than through GET(). `viaCookie` defaults to false (URL/Host-resolved, the
+// shared-cacheable path) for those single-arg call sites; GET() below always
+// passes it explicitly.
+export async function perStoreResponse(store: PublicStore, viaCookie = false): Promise<Response> {
   // The public store endpoint always includes id, so this should never fall
   // back to slug — but we guard anyway.
   const storeId: string = store.id || store.slug;
 
   // Categories are needed either way now: to validate/rewrite the merchant
-  // override's links, or to build the auto-generated body.
+  // override's links, or to build the auto-generated body. `null` = the API
+  // could not be asked (#1853) — distinct from a store with no categories.
   const categories = await fetchCategories(storeId);
 
   // Merchant-provided / AI-generated body short-circuits the product/category
   // auto-build. Set by the bulk-ai-llms-txt sweep, or hand-edited from the
-  // admin SEO page.
+  // admin SEO page. The generated feed + MCP discovery sections are still
+  // appended (#1667) unless the stored text already carries the MCP heading.
   let body: string;
   if (store.llmsTxt && store.llmsTxt.trim()) {
     body = store.llmsTxt;
+    if (!body.includes('## Agentic checkout (MCP)')) {
+      const agentSections = buildAgentSections(store, storeBaseUrl(store));
+      if (agentSections) body = `${body.trimEnd()}${agentSections}\n`;
+    }
   } else {
     const products = await fetchProducts(storeId);
-    body = buildPerStoreBody(store, categories, products, products.length);
+    body = buildPerStoreBody(store, categories ?? [], products, products.length);
   }
 
-  body = fixCategoryLinks(body, categories);
+  // Only sanitize against a category set we actually fetched: an empty set
+  // makes fixCategoryLinks drop every /categories/ line, so running it after
+  // a failed fetch deletes valid content. Serve the body as-is instead, on a
+  // short edge TTL so the next request retries (#1853).
+  if (categories !== null) body = fixCategoryLinks(body, categories);
 
   return new Response(body, {
     status: 200,
@@ -457,10 +508,16 @@ async function perStoreResponse(store: PublicStore, viaCookie: boolean): Promise
       // `s-maxage` is what authorizes a shared cache to store it at all — so
       // a cookie-resolved response drops shared-cacheability entirely
       // instead. A URL slug segment or custom-domain Host stays
-      // public+s-maxage (scoped-audit P2 on PR #1942).
+      // public+s-maxage (scoped-audit P2 on PR #1942). Independently, a
+      // categories-API failure (#1853) still gets the short public retry TTL
+      // rather than the long one — but only on the shared-cacheable path;
+      // the cookie-resolved path is never shared-cached at all, so that
+      // distinction doesn't apply to it.
       'Cache-Control': viaCookie
         ? 'private, max-age=600'
-        : 'public, s-maxage=600, stale-while-revalidate=86400',
+        : categories === null
+          ? 'public, s-maxage=60'
+          : 'public, s-maxage=600, stale-while-revalidate=86400',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },
   });

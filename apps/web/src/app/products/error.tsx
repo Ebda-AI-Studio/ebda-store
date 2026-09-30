@@ -1,6 +1,7 @@
 'use client';
 
 import { ShopChrome, RouteErrorFallback } from '../../components';
+import { useBareErrorFallback } from '../../components/RouteErrorFallback';
 
 export default function ProductsListError({
   error,
@@ -13,9 +14,9 @@ export default function ProductsListError({
   // and RouteErrorFallback selects the "we're busy, try again" body from
   // `error.digest`. Dropping it renders the generic "something went wrong"
   // copy for a store that is merely rate limited.
-  return (
-    <ShopChrome>
-      <RouteErrorFallback error={error} reset={reset} />
-    </ShopChrome>
-  );
+  const fallback = <RouteErrorFallback error={error} reset={reset} />;
+  // Unresolved store during a transient: no chrome, whose links would lead
+  // off the store (#1843 — see useBareErrorFallback).
+  const bare = useBareErrorFallback(error);
+  return bare ? fallback : <ShopChrome>{fallback}</ShopChrome>;
 }

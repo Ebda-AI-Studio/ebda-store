@@ -87,7 +87,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   // Arabic locale reads the merchant's Arabic name when present (issue
   // #1857) — else this fallback description interpolates the English name
   // under `<html lang="ar">`.
-  const localizedStoreName = locale === 'ar' && store.nameAr ? store.nameAr : store.name;
+  const localizedStoreName = locale === 'ar' ? store.nameAr?.trim() || store.name : store.name;
   const localizedStoreDescriptionFallback =
     locale === 'ar' ? `تسوق في ${localizedStoreName}` : `Shop at ${localizedStoreName}`;
 

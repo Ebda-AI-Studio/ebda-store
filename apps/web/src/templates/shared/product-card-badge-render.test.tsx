@@ -155,7 +155,7 @@ function render(
  */
 function stripBadgeChip(html: string): { stripped: string; chips: string[] } {
   const chipRe = new RegExp(
-    `<span[^>]*style="background-color:${BADGE_COLOR}"[^>]*>[^<]*</span>`,
+    `<span[^>]*style="background-color:${BADGE_COLOR}[^"]*"[^>]*>[^<]*</span>`,
     'g'
   );
   const chips = html.match(chipRe) ?? [];
@@ -447,6 +447,83 @@ describe('custom badge — out of stock on the two non-grid paths', () => {
     const oos = { ...ON_SALE, inventory: 0 };
     expect(renderListItem({ ...oos, ...LABEL })).toBe(renderListItem(oos));
   });
+});
+
+// ── #1614 / #1611 — chip text colour and tap-through, on all 8 card paths ───
+
+const ALL_PATHS: Array<
+  [string, (p: Record<string, unknown>, o?: { layout?: StoreLayoutSettings }) => string]
+> = [
+  ...CARDS.map(
+    ([name, Card]) =>
+      [
+        name,
+        (p: Record<string, unknown>, o?: { layout?: StoreLayoutSettings }) => render(Card, p, o),
+      ] as [string, (p: Record<string, unknown>, o?: { layout?: StoreLayoutSettings }) => string]
+  ),
+  ['shared/ProductCarousel', renderCarousel],
+  ['app/products/ProductListItem', renderListItem],
+];
+
+/** The custom chip's opening tag: the only span whose text is the label. */
+function chipTag(html: string): string {
+  const m = html.match(/<span[^>]*>Offer<\/span>/);
+  expect(m, 'custom chip not rendered').not.toBeNull();
+  return m![0];
+}
+
+describe.each(ALL_PATHS)('custom badge colours + tap-through — %s', (_name, renderPath) => {
+  it('no merchant colour: primary background with the PAIRED primary-foreground text', () => {
+    const tag = chipTag(renderPath({ ...NO_SALE, ...LABEL }));
+    expect(tag).toContain('background-color:hsl(var(--primary))');
+    expect(tag).toContain('color:hsl(var(--primary-foreground))');
+  });
+
+  it('merchant colour: keeps white text, exactly as before', () => {
+    const tag = chipTag(
+      renderPath({ ...NO_SALE, ...LABEL }, { layout: layoutWith({ color: BADGE_COLOR }) })
+    );
+    expect(tag).toContain(`background-color:${BADGE_COLOR}`);
+    expect(tag).toContain('color:#ffffff');
+  });
+
+  it('the chip never swallows a tap meant for the card control underneath', () => {
+    expect(chipTag(renderPath({ ...NO_SALE, ...LABEL }))).toContain('pointer-events-none');
+  });
+
+  it('neither does the corner discount chip (minimal renders it inline, not as a chip)', () => {
+    const html = renderPath(ON_SALE);
+    const m = html.match(/<span[^>]*>-38%<\/span>/);
+    if (_name === 'minimal/ProductCard') return;
+    expect(m, 'discount chip not rendered').not.toBeNull();
+    expect(m![0]).toContain('pointer-events-none');
+  });
+});
+
+// ── #665 — a merchant cardShape radius beats the pack's own rounded-* ───────
+
+describe('cardShape radius vs the modern pack (tailwind-merge order)', () => {
+  it.each([
+    ['PecannbeeProductCard', () => PecannbeeProductCard],
+    ['ProductCarousel', () => ProductCarousel],
+  ] as const)(
+    '%s: circle cardShape renders rounded-full, not the pack rounded-2xl',
+    (name, get) => {
+      storeState.layout = undefined;
+      languageState.language = 'en';
+      const Comp = get();
+      const props =
+        name === 'ProductCarousel'
+          ? { products: [NO_SALE], pack: 'modern', cardShape: 'circle', currency: 'KWD' }
+          : { product: NO_SALE, pack: 'modern', cardShape: 'circle', currency: 'KWD' };
+      const html = renderToStaticMarkup(React.createElement(Comp as never, props as never));
+      // The card frame is the element that carries the modern pack's border.
+      const frame = html.match(/class="[^"]*border-primary\/15[^"]*"/);
+      expect(frame, 'modern card frame not found').not.toBeNull();
+      expect(frame![0]).toContain('rounded-full');
+      expect(frame![0]).not.toContain('rounded-2xl');
+    }
+  );
 });
 
 // ── 6. Heart / quick-add collision avoidance, on the REAL wiring ───────────

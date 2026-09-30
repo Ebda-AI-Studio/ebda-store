@@ -91,6 +91,28 @@ describe('organizationJsonLd', () => {
     expect(node).not.toHaveProperty('languages');
   });
 
+  it('never publishes "[object Object]" or "null" for a non-primitive aboutJson value (#1892)', () => {
+    const node = organizationJsonLd(
+      makeStore({
+        aboutJson: {
+          currency: 'KWD',
+          contactMethods: [{ type: 'email', value: 'x@y.com' }],
+          address: { city: 'Kuwait City' },
+          fax: null,
+          languages: ['Arabic', 'English'],
+        },
+      }),
+      'en'
+    );
+    const json = JSON.stringify(node);
+    expect(json).not.toContain('[object Object]');
+    expect(json).not.toContain('"null"');
+    expect(node.additionalProperty).toEqual([
+      { '@type': 'PropertyValue', name: 'currency', value: 'KWD' },
+      { '@type': 'PropertyValue', name: 'languages', value: 'Arabic, English' },
+    ]);
+  });
+
   it('omits additionalProperty entirely when there is no aboutJson', () => {
     const node = organizationJsonLd(makeStore(), 'en');
     expect(node).not.toHaveProperty('additionalProperty');

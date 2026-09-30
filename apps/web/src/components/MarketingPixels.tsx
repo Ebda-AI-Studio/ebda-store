@@ -21,6 +21,15 @@ function isValidPixelId(id: string | undefined): id is string {
 }
 
 /**
+ * Google Ads conversion target for `trackPurchase` (#1200). `trackPurchase`
+ * is a bare function called from the checkout success page with no access to
+ * store config, so the mounted pixel component publishes the validated
+ * `AW-<id>/<label>` here. Null whenever Ads is off, the label is missing or
+ * invalid, or consent / the feature is not granted.
+ */
+let googleAdsSendTo: string | null = null;
+
+/**
  * Marketing Pixels Component
  *
  * Injects all configured marketing pixels into the page.
@@ -75,6 +84,22 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
     }
   }, [pathname, searchParams, pixels, allowFire]);
 
+  const adsConversionId = pixels.googleAds?.conversionId;
+  const adsConversionLabel = pixels.googleAds?.conversionLabel;
+  const adsEnabled = pixels.googleAds?.enabled === true;
+  useEffect(() => {
+    googleAdsSendTo =
+      allowFire &&
+      adsEnabled &&
+      isValidPixelId(adsConversionId) &&
+      isValidPixelId(adsConversionLabel)
+        ? `${adsConversionId}/${adsConversionLabel}`
+        : null;
+    return () => {
+      googleAdsSendTo = null;
+    };
+  }, [allowFire, adsEnabled, adsConversionId, adsConversionLabel]);
+
   if (!allowFire) return null;
 
   // Validate all pixel IDs before rendering
@@ -124,12 +149,16 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
           {/* gtag.js loader. The config call below pushes into window.dataLayer,
               but NOTHING drains that queue unless the Google tag library is on
               the page — and the only loader was inside the GA4 block above. So
-              a merchant running Google Ads WITHOUT GA4 (and without GTM) had
-              conversions silently never reported: gtag() existed, the config
-              landed, no library ever shipped it. Emitted only when GA4 is off,
-              because when GA4 is on its loader already provides the library and
-              a second copy would be redundant. */}
-          {!validGA4 && !validGTM && (
+              a merchant running Google Ads WITHOUT GA4 had conversions silently
+              never reported: gtag() existed, the config landed, no library ever
+              shipped it. Emitted only when GA4 is off, because when GA4 is on
+              its loader already provides the SAME library. GTM is NOT a
+              substitute (#1203): gtm.js is a container runtime that only runs
+              the tags configured inside the merchant's container — it neither
+              defines window.gtag nor interprets a pushed gtag('config','AW-…').
+              gtag.js and gtm.js share window.dataLayer and are supported side
+              by side. */}
+          {!validGA4 && (
             <Script
               id="gads-lib"
               src={`https://www.googletagmanager.com/gtag/js?id=${pixels.googleAds!.conversionId}`}
@@ -137,7 +166,10 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
             />
           )}
           <Script id="gads-config" strategy="afterInteractive">
-            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('config','${
+            {/* gtag('js', …) is part of Google's documented Ads snippet (#1202);
+                with GA4 off this block is the library's only bootstrap. A second
+                'js' call when GA4 is also on is harmless. */}
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${
               pixels.googleAds!.conversionId
             }')`}
           </Script>
@@ -354,6 +386,15 @@ export function trackInitiateCheckout(params: {
  * when posting to Meta and TikTok. Both platforms deduplicate on this pair so
  * only one conversion is counted even if both the browser pixel and the server
  * event arrive.
+ *
+ * Returns whether ANY pixel library was on the page to receive the event.
+ * Every call below is optional-chained and silently no-ops when its global is
+ * absent — which is the normal state before marketing consent, because the
+ * root layout only renders the pixel provider once consent is granted. The
+ * success page records "this order was reported" only on `true`, so a visit
+ * with no pixels loaded (consent not yet given, blocked scripts) leaves the
+ * order reportable on the next load. The Google Ads conversion needs `gtag`
+ * too, so `googleAdsSendTo` alone never counts as a fire.
  */
 export function trackPurchase(params: {
   orderId: string;
@@ -361,9 +402,10 @@ export function trackPurchase(params: {
   numItems: number;
   value: number;
   currency?: string;
-}) {
-  if (typeof window === 'undefined') return;
+}): boolean {
+  if (typeof window === 'undefined') return false;
   const w = window as TrackingWindow;
+  const anyTrackerPresent = Boolean(w.fbq || w.ttq || w.snaptr || w.gtag || w.twq || w.pintrk);
 
   // eventID = orderId enables Meta CAPI deduplication (server event uses same id).
   w.fbq?.(
@@ -401,8 +443,23 @@ export function trackPurchase(params: {
     value: params.value,
   });
 
+  // Google Ads attributes a conversion to a conversion ACTION only via an
+  // explicit `conversion` event with `send_to: 'AW-<id>/<label>'` (#1200) —
+  // the GA4 `purchase` event above is not an Ads conversion. transaction_id
+  // lets Ads de-duplicate a repeat fire of the same order.
+  if (googleAdsSendTo) {
+    w.gtag?.('event', 'conversion', {
+      send_to: googleAdsSendTo,
+      value: params.value,
+      currency: params.currency || 'KWD',
+      transaction_id: params.orderId,
+    });
+  }
+
   w.twq?.('track', 'Purchase', { value: params.value, num_items: params.numItems });
   w.pintrk?.('track', 'checkout', { value: params.value, order_id: params.orderId });
+
+  return anyTrackerPresent;
 }
 
 /**

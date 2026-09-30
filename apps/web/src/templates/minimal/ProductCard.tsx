@@ -30,7 +30,11 @@ import {
   isProductNew,
 } from '../shared/ProductCardCta';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
-import { getCustomBadgeColor, resolveCardBadges } from '../shared/custom-badge';
+import {
+  getCustomBadgeColor,
+  getCustomBadgeTextColor,
+  resolveCardBadges,
+} from '../shared/custom-badge';
 import { cn } from '@force/ui';
 
 /**
@@ -141,6 +145,7 @@ function MinimalProductCard({
   // corner arm of the mutex from firing and stealing the discount text. The
   // OOS suppression arm still applies.
   const customBadgeColor = getCustomBadgeColor(defaults?.customBadge?.color, store.theme);
+  const customBadgeTextColor = getCustomBadgeTextColor(defaults?.customBadge?.color, store.theme);
   const { customBadgeText, customBadgePositionCls } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
@@ -231,10 +236,10 @@ function MinimalProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'absolute z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white',
+                'pointer-events-none absolute z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white',
                 customBadgePositionCls
               )}
-              style={{ backgroundColor: customBadgeColor }}
+              style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
             >
               {customBadgeText}
             </span>

@@ -21,6 +21,7 @@ import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
 import { TypographyProbe } from '../components/TypographyProbe';
 import { AffiliateTracker } from '../components/AffiliateTracker';
 import { StoreMaintenance } from '../components/StoreMaintenance';
+import { resolveStorefrontLocale } from '../lib/seo/resolve-locale';
 import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
@@ -101,7 +102,12 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   }
 
-  return buildStorefrontMetadata(store, isOnCustomDomain);
+  // Same cookie-then-store-default decision RootLayout uses for <html lang>.
+  const locale = await resolveStorefrontLocale(
+    (store.settings as Record<string, unknown> | undefined)?.defaultLanguage as string | undefined
+  );
+
+  return buildStorefrontMetadata(store, isOnCustomDomain, locale);
 }
 
 /**

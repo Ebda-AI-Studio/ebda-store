@@ -1,5 +1,6 @@
 const path = require('path');
-const { withSentryConfig } = require('@sentry/nextjs');
+// `@sentry/nextjs/config`: the root-entry export is deprecated (removed in v11).
+const { withSentryConfig } = require('@sentry/nextjs/config');
 
 // Cloudflare/OpenNext build target detection. Set OPEN_NEXT_CLOUDFLARE=1 in the
 // Cloudflare build; CF_PAGES is auto-set by Cloudflare Pages. Default (Vercel/
@@ -122,7 +123,11 @@ const nextConfig = {
               // pulls additional scripts (jsonp sync) from api.onesignal.com.
               // 'unsafe-eval' is required by the v16 page SDK's runtime
               // (documented at https://documentation.onesignal.com/docs/web-push-csp).
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com",
+              // Google Ads (#1201): gtag.js with an AW- config loads its
+              // conversion runtime from www.googleadservices.com and
+              // googleads.g.doubleclick.net; without them the Ads tag loads
+              // and every conversion is silently CSP-blocked.
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com",
               // OneSignal v16 page SDK pulls a stylesheet from
               // https://onesignal.com/sdks/... at runtime — that's the
               // bare apex, not cdn., so include it explicitly.
@@ -132,8 +137,10 @@ const nextConfig = {
               // OneSignal subscriptions + websocket telemetry: *.onesignal.com.
               // forcemediakw.com is the marketing-site origin: storefront's
               // maintenance page + bare-root redirect can trigger a browser
-              // preconnect to it.
-              "connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://*.facebook.com https://*.tiktok.com wss://store-api.forcemediakw.com wss://api.force-ai.co wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://forcemediakw.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
+              // preconnect to it. googleadservices / googleads.g.doubleclick /
+              // www.google.com: Google Ads conversion beacons (fetch/sendBeacon
+              // transport), see script-src above.
+              "connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://store-api.forcemediakw.com wss://api.force-ai.co wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://forcemediakw.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
               // Required so /OneSignalSDKWorker.js can register as a service
               // worker — Push API mandates same-origin worker scripts.
               "worker-src 'self' blob:",
@@ -185,13 +192,15 @@ const nextConfig = {
 //
 // Conservative + reversible: the Sentry bundler plugin no-ops the upload (logs
 // a warning, does NOT fail the build) whenever `authToken` is absent — see
-// @sentry/bundler-plugin-core's `!options.authToken` guard. That means local
-// dev, CI (`ci.yml`'s `npm run build` step has no SENTRY_AUTH_TOKEN), and the
-// Cloudflare Workers build (`cf-deploy.yml` doesn't set it either) all build
-// exactly as before: no source maps uploaded, no release created, zero risk of
-// a new build failure. Set SENTRY_AUTH_TOKEN (+ optionally SENTRY_ORG /
-// SENTRY_PROJECT) wherever you want uploads to actually happen (e.g. Vercel
-// prod env) to get the benefit.
+// @sentry/bundler-plugin-core's `!options.authToken` guard — and `errorHandler`
+// below downgrades a failed upload to a warning. Local dev and CI
+// (`ci.yml`'s `npm run build` has no SENTRY_AUTH_TOKEN) build exactly as
+// before. `cf-deploy.yml` passes SENTRY_AUTH_TOKEN (repo secret) +
+// SENTRY_ORG / SENTRY_PROJECT (repo variables) into the OpenNext build, so
+// production deploys upload the maps once the secret exists. The release name
+// is the commit SHA (the plugin reads GITHUB_SHA in Actions), which is the
+// same value it injects into the client bundle as the event `release`.
+// Setup: docs/ENVIRONMENT.md "Sentry build-time config".
 module.exports = withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
@@ -199,4 +208,18 @@ module.exports = withSentryConfig(nextConfig, {
   silent: true,
   widenClientFileUpload: true,
   telemetry: false,
+  sourcemaps: {
+    // Browser .map files are generated for the upload, then DELETED from
+    // .next/static (and their sourceMappingURL comments stripped) before
+    // OpenNext copies the assets, so they are never served publicly. This is
+    // the SDK default for Turbopack builds; pinned here so a future SDK
+    // default change cannot start publishing our source. Deletion runs with
+    // or without an auth token.
+    deleteSourcemapsAfterUpload: true,
+  },
+  // A failed release/upload (bad or expired token, Sentry outage) must never
+  // fail a production deploy: warn and ship the build without symbolication.
+  errorHandler: err => {
+    console.warn('[sentry] source map upload failed, continuing the build:', err.message);
+  },
 });
