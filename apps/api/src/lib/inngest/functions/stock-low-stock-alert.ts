@@ -220,8 +220,18 @@ export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFun
       );
     }
 
+    // Named fields, not `...scanResult`: the scan result carries the owner's
+    // raw `recipientEmail` (issue 2392).
     logger.info(
-      { storeId, requestedBy, ...scanResult, emailed },
+      {
+        storeId,
+        requestedBy,
+        alerted: scanResult.alertedProducts.length,
+        cleared: scanResult.clearedCount,
+        skipped: scanResult.skippedCount,
+        recipient: maskEmail(scanResult.recipientEmail),
+        emailed,
+      },
       'stock-low-stock-alert-on-demand completed'
     );
 

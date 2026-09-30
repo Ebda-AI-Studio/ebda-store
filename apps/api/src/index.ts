@@ -40,7 +40,7 @@ import { shippingCarrierService } from './services/shipping-carrier.service';
 import { loyaltyAutomationService } from './services/loyalty-automation.service';
 import { AuthService } from './services/auth.service';
 import { SentryService } from './services/sentry.service';
-import { sendAlert, awaitInFlightAlerts } from './services/alerts.service';
+import { sendAlert, awaitInFlightAlerts, ALERT_SEND_DEADLINE_MS } from './services/alerts.service';
 import { inngest } from './lib/inngest/client';
 import { inngestFunctions } from './lib/inngest/functions';
 import { serve as inngestServe } from 'inngest/express';
@@ -749,8 +749,10 @@ async function gracefulShutdown(signal: string) {
       // Issue 2387: detached alert sends (`void sendAlert(...)`, the
       // orphaned-invoice page) — including any a drain above just fired —
       // finish before Redis is disconnected and the process exits. Bounded:
-      // a send is a lock plus a 5s-capped Telegram POST.
-      await awaitInFlightAlerts(6000);
+      // every tracked send settles within ALERT_SEND_DEADLINE_MS of its start
+      // (a hard deadline over lock + POST + body read, issue 2393), so this
+      // drain never waits on a send that can no longer finish.
+      await awaitInFlightAlerts(ALERT_SEND_DEADLINE_MS);
       await prisma.$disconnect();
       await redis.disconnect();
       await SentryService.close();

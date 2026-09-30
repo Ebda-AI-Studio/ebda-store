@@ -178,10 +178,39 @@ function throttleKey(level: AlertLevel, title: string, storeId?: string): string
  *   - 'failed'      → Telegram API rejected or fetch errored (logged)
  */
 export function sendAlert(opts: AlertOptions): Promise<AlertOutcome> {
-  const p: Promise<AlertOutcome> = deliverAlert(opts).finally(() => inFlightAlerts.delete(p));
+  // Hard deadline on the WHOLE send (throttle lock + POST + body read), so a
+  // tracked entry can never outlive it (issue 2393): a Redis or Telegram call
+  // that never settles resolves as 'failed' here and leaves the set, instead
+  // of pinning `opts` for the life of the process and eating the full
+  // shutdown drain window on every SIGTERM.
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<AlertOutcome>(resolve => {
+    deadline = setTimeout(() => {
+      logger.error(
+        { level: opts.level, title: opts.title, deadlineMs: ALERT_SEND_DEADLINE_MS },
+        'alerts.service: send exceeded its deadline; abandoned'
+      );
+      resolve('failed');
+    }, ALERT_SEND_DEADLINE_MS);
+    deadline.unref?.();
+  });
+  const p: Promise<AlertOutcome> = Promise.race([deliverAlert(opts), timedOut]).finally(() => {
+    clearTimeout(deadline);
+    inFlightAlerts.delete(p);
+  });
   inFlightAlerts.add(p);
   return p;
 }
+
+/** Telegram request cap: connect + headers + body read, one AbortController. */
+const TELEGRAM_TIMEOUT_MS = 5000;
+
+/**
+ * Upper bound on one `sendAlert`, lock included. `gracefulShutdown` drains
+ * with exactly this budget, so every send tracked at SIGTERM has settled (or
+ * been abandoned) by the time the drain returns.
+ */
+export const ALERT_SEND_DEADLINE_MS = 6000;
 
 type AlertOutcome = 'sent' | 'throttled' | 'skipped' | 'failed';
 
@@ -257,30 +286,39 @@ async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
   try {
     // Telegram occasionally hangs on the connection — cap with a 5s
     // timeout so a P0 alert path doesn't block on a flaky network.
+    // The abort stays armed through the error-body read too (issue 2393): a
+    // non-2xx whose body stalls after the headers is the same hang.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: config.telegramAlertChatId,
+          text,
+          disable_web_page_preview: true,
+        }),
+        signal: controller.signal,
+      });
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: config.telegramAlertChatId,
-        text,
-        disable_web_page_preview: true,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      logger.error(
-        { status: res.status, level: opts.level, title: opts.title, detail: detail.slice(0, 500) },
-        'alerts.service: Telegram sendMessage rejected'
-      );
-      return 'failed';
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        logger.error(
+          {
+            status: res.status,
+            level: opts.level,
+            title: opts.title,
+            detail: detail.slice(0, 500),
+          },
+          'alerts.service: Telegram sendMessage rejected'
+        );
+        return 'failed';
+      }
+      return 'sent';
+    } finally {
+      clearTimeout(timer);
     }
-    return 'sent';
   } catch (err) {
     logger.error(
       { err, level: opts.level, title: opts.title },

@@ -319,6 +319,60 @@ describe('awaitInFlightAlerts — graceful-shutdown drain', () => {
     expect(Date.now() - t0).toBeLessThan(1000);
   });
 
+  // Issue 2393: the abort timer was cleared before the error-body read, so a
+  // non-2xx whose body stalls hung the send forever — and the in-flight set
+  // then held it (and its opts) for the life of the process.
+  describe('every tracked send is time-bounded (issue 2393)', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    async function setIsEmpty(awaitInFlightAlerts: (ms: number) => Promise<void>) {
+      let done = false;
+      void awaitInFlightAlerts(60_000).then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(0);
+      return done;
+    }
+
+    it('a non-2xx whose body never arrives is aborted at the Telegram cap', async () => {
+      mockState.acquireLockMock.mockResolvedValueOnce(true);
+      mockState.fetchMock.mockImplementationOnce(
+        async (_url: string, init: { signal: AbortSignal }) => ({
+          ok: false,
+          status: 502,
+          // Headers arrived; the body stalls until the request is aborted.
+          text: () =>
+            new Promise<string>((_r, reject) =>
+              init.signal.addEventListener('abort', () => reject(new Error('aborted')))
+            ),
+        })
+      );
+      const { sendAlert, awaitInFlightAlerts } = await loadService();
+      let outcome: string | undefined;
+      void sendAlert({ level: 'p1', title: 'stall' }).then(o => (outcome = o));
+
+      await vi.advanceTimersByTimeAsync(5001); // < ALERT_SEND_DEADLINE_MS
+      expect(outcome).toBe('failed');
+      expect(await setIsEmpty(awaitInFlightAlerts)).toBe(true);
+    });
+
+    it('a send that never settles at all (lock or fetch) is abandoned at the deadline', async () => {
+      mockState.acquireLockMock.mockReturnValueOnce(new Promise<boolean>(() => undefined));
+      const { sendAlert, awaitInFlightAlerts, ALERT_SEND_DEADLINE_MS } = await loadService();
+      let outcome: string | undefined;
+      void sendAlert({ level: 'p1', title: 'redis-hang' }).then(o => (outcome = o));
+
+      await vi.advanceTimersByTimeAsync(ALERT_SEND_DEADLINE_MS - 1);
+      expect(outcome).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(outcome).toBe('failed');
+      expect(await setIsEmpty(awaitInFlightAlerts)).toBe(true);
+      expect(mockState.loggerError).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'redis-hang' }),
+        expect.stringContaining('deadline')
+      );
+    });
+  });
+
   it('returns immediately when nothing is in flight', async () => {
     const { awaitInFlightAlerts } = await loadService();
     await expect(awaitInFlightAlerts(10_000)).resolves.toBeUndefined();
@@ -331,7 +385,7 @@ describe('gracefulShutdown wiring (issue 2387)', () => {
     const { join } = await import('node:path');
     const src = readFileSync(join(__dirname, '../../apps/api/src/index.ts'), 'utf8');
     const body = src.slice(src.indexOf('async function gracefulShutdown'));
-    const drain = body.indexOf('await awaitInFlightAlerts(');
+    const drain = body.indexOf('await awaitInFlightAlerts(ALERT_SEND_DEADLINE_MS)');
     const disconnect = body.indexOf('await redis.disconnect()');
     expect(drain).toBeGreaterThan(-1);
     expect(disconnect).toBeGreaterThan(drain);

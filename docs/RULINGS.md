@@ -4790,7 +4790,14 @@ and transaction id. **Superseded in part (issue 2387):** `sendAlert` now tracks 
 flight and `gracefulShutdown` awaits them (`awaitInFlightAlerts(6000)`, after `awaitDeferredWork`,
 before `redis.disconnect()`), so a SIGTERM no longer drops this page or any other detached
 `void sendAlert(...)`. Residual: a hard kill (SIGKILL, OOM, the 30s force-exit timer) still loses an
-in-flight page; the error log line remains the record.
+in-flight page; the error log line remains the record. **Amended (issue 2393):** the "5s-capped
+POST" did not cap the whole send — the abort timer was cleared before a non-2xx's error body was
+read, so a stalled body hung the send forever and the in-flight set held it (and its `opts`) for
+the life of the process, eating the full drain on every SIGTERM. The abort now stays armed through
+the body read, and `sendAlert` races every send against a hard `ALERT_SEND_DEADLINE_MS` (6s, lock +
+POST + body) that resolves it `failed`, logs, and drops it from the set. The drain uses that same
+constant, so every send tracked at SIGTERM has settled or been abandoned when it returns
+(`tests/unit/alerts.test.ts`, both halves mutation-proven).
 
 **Ruling BF-2b — one shape predicate per queue, shared by reader, replayer and processor (issues
 2371, 2374).** `isQueuedEmail` / `isQueuedSms` check every field the sender and the list route
@@ -4878,11 +4885,26 @@ poller sender, and the WhatsApp bridge's hand-rolled `.slice(-4)`). All now go t
 is not a `mask*` / `redact*` / `hash*` call, literal, `.length` or boolean (mutation-proven, with
 ten positive and eight negative controls). Not taken: a pino `formatters.log` backstop that masks
 by key at runtime — it would re-mask already-masked values lossily and hide the call sites instead
-of fixing them. Out of the gate's reach: spread properties (`{ ...ctx }`, 27 today; the payment, refund,
-AI and campaign ones were read and carry ids, counts and status only — the rest were not audited) and opaque third-party response bodies (`body: json` from iCarry,
-OneSignal, WBS, Unifonic's error body; carrier webhook `payload`), whose content is not visible
-statically. Cost if wrong: a provider that echoes the recipient in an error body writes it to the
-drain in the clear on that failure path.
+of fixing them. **Amended (issues 2392, 2394) — the gate is now complete over the shapes a syntax
+walk can see.** It missed a `...scanResult` spread carrying the owner email
+(`stock-low-stock-alert.ts` on-demand twin — now named, masked fields), calls through a bound level
+function (`request-logger.ts`, `revalidate-storefront.ts`), and every tree but apps/api. It now
+walks apps/{api,web,orders,admin}/src and packages/{shared,database,ui}; resolves aliases
+(`const l = logger`, `logger.child(…)`, `logger.warn.bind(logger)`, either branch of a conditional,
+a binding annotated `Logger`, `this.<alias>`), element access (`logger[level]`) and `.child({…})`
+bindings; checks interpolated and concatenated messages and bare positional values; and fails on
+any `{ ...spread }` in a log object that is not in its `REVIEWED_SPREADS` list (13 today, each read
+and resolved through the type checker to ids, counts and status only — the list also fails on a
+stale entry, so it stays exact). Two dev-seed `console.log`s that printed the admin / load-test
+email were rewritten. Every real-file shape was mutation-proven (a field injected into the
+request-logger and revalidate objects, a restored `...scanResult`, an interpolated email in an
+apps/web file: each goes red). Out of the gate's reach: opaque third-party response bodies
+(`body: json` from iCarry, OneSignal, WBS, Unifonic's error body; carrier webhook `payload`), and
+the CONTENT of two `Record<string, unknown>` spreads (`logContext` in request-transaction,
+`a.context` in unbooked-refund-alert) — the gate pins the spread site, not what a future caller puts
+in the record; both callers were read. Cost if wrong: a provider that echoes the recipient in an
+error body, or a new caller that puts a contact into one of those two records, writes it to the
+drain in the clear on that path.
 
 **Ruling ALR-1 — the alert throttle fails open on a throw, locally (issue 2384).** `sendAlert`
 wraps `redis.acquireLock` and treats a throw (Redis connected but rejecting writes) as "slot

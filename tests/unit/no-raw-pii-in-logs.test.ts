@@ -1,90 +1,256 @@
 /**
- * No logger call in apps/api may receive a raw email address or phone number.
+ * No log call anywhere in the monorepo may receive a raw email address or
+ * phone number.
  *
- * Application logs ship to the off-platform log drain (Axiom, 30-day
- * retention). Issue 2390: PR 2388 masked the SMS recipient with `maskPhone`,
- * but its email twin (`email-queue.service.ts` logging `to` on every send) and
- * nine other sites (account lockout, socket connect/disconnect, provisioning,
- * invoice email, contact form, low-stock recipient, alert poller sender, the
- * WhatsApp bridge's hand-rolled `.slice(-4)`) still wrote the raw value.
+ * Application logs ship off-platform: apps/api to the Axiom drain (30-day
+ * retention), apps/web / apps/orders / apps/admin server code to Cloudflare
+ * Workers logs. Issue 2390: PR 2388 masked the SMS recipient with `maskPhone`,
+ * but fourteen sibling fields still wrote the raw value. Issues 2392 / 2394:
+ * the first gate still missed a `...scanResult` spread carrying the owner
+ * email, calls through a bound level function (`const log =
+ * logger.warn.bind(logger); log({ … })`), and the whole of apps/web + orders.
  *
- * This walks every non-test .ts file under apps/api/src with the TypeScript
- * AST and inspects each object-literal argument (nested literals included) of
- * a `logger.*` / `log.*` / `console.*` call. A property is PII-shaped when its
- * KEY names a contact (`to`, `from`, `cc`, `recipient`, `*email`, `*phone`,
- * `*mobile`) or its VALUE is an identifier / member ending in one
- * (`{ id: user.email }`). A PII-shaped property passes only when its value is
- * a call to a `mask*` / `redact*` / `hash*` helper, a literal, a `.length`, or
- * a boolean (`!!x`, `typeof x`).
+ * This walks every non-test .ts/.tsx file under apps/{api,web,orders,admin}/src
+ * and packages/{shared,database,ui} with the TypeScript AST. A LOG CALL is:
+ *   - `<logger>.<level>(…)` or `<logger>[level](…)`, where `<logger>` is
+ *     `logger` / `log` / `console` (optionally as a member: `this.log`,
+ *     `req.log`), a local alias of one (`const l = logger`, `const l =
+ *     logger.child(…)`), or a binding annotated `Logger`;
+ *   - `<logger>.child({…})` — child bindings are written on every line;
+ *   - `fn(…)` where `fn` is bound to a level function (`logger.warn`,
+ *     `logger.warn.bind(logger)`, either branch of a conditional).
+ * Every argument of a log call is inspected:
+ *   - object literals (nested included): a property is PII-shaped when its KEY
+ *     names a contact (`to`, `from`, `cc`, `recipient`, `*email`, `*phone`,
+ *     `*mobile`) or its VALUE is an identifier / member ending in one
+ *     (`{ id: user.email }`). It passes only when the value is a `mask*` /
+ *     `redact*` / `hash*` call, a literal, a `.length`, or a boolean.
+ *   - spreads (`{ ...ctx }`): their content is not visible to a syntax walk, so
+ *     every spread in a log object must be listed in REVIEWED_SPREADS with the
+ *     reason it carries no contact. A new spread fails until someone reads it;
+ *     a listed spread that no longer exists fails too, so the list stays exact.
+ *   - template / concatenated messages: every interpolated expression is held
+ *     to the same rule (`` `sent to ${email}` `` fails).
+ *   - bare positional values (`console.log('x', user.email)`).
  *
- * Out of scope (Ruling LOG-PII-1): spread properties (`{ ...ctx }`) and opaque
- * third-party response bodies (`body: json`) — their content is not visible
- * statically.
+ * Out of reach (Ruling LOG-PII-1): opaque third-party response bodies
+ * (`body: json`) whose content is decided by the provider.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
 
-const API_SRC = join(__dirname, '../../apps/api/src');
+const REPO = join(__dirname, '../..');
+const ROOTS = [
+  'apps/api/src',
+  'apps/web/src',
+  'apps/orders/src',
+  'apps/admin/src',
+  'packages/shared/src',
+  'packages/database/src',
+  'packages/database/prisma',
+  'packages/database/scripts',
+  'packages/ui/src',
+];
 
 const LEVELS = new Set(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'log']);
 const RECEIVER = /(^|\.)(logger|log|console)$/i;
+const LOGGER_TYPE = /(^|\.)(\w*Logger)$/;
 const PII_KEY =
   /^(to|from|cc|bcc|replyTo|recipients?)$|(email|phone|mobile|msisdn)(address|number)?$/i;
 const PII_LEAF = /(email|phone|mobile|msisdn)(address|number)?$/i;
 const SAFE_CALL = /^(mask|redact|hash)/i;
 
+/**
+ * Every spread inside a log object, keyed `<repo path>|<spread expression>`,
+ * with the reason it carries no raw contact. Read the spread source before
+ * adding a line.
+ */
+const REVIEWED_SPREADS: Record<string, string> = {
+  'apps/api/src/lib/inngest/functions/accounting-post-refund-journal.ts|partialResult':
+    'postPartialReturnJournal → { posted: number; skipped?: string }',
+  'apps/api/src/lib/inngest/functions/ai-autofill-sweep.ts|res':
+    'sweepStore → { products: number; filled: number }',
+  'apps/api/src/lib/inngest/functions/analytics-daily-rollup.ts|result':
+    'RollupResult → cohortRows / funnelDays / rfmCustomers counts',
+  'apps/api/src/lib/inngest/functions/campaign-send.ts|result':
+    'BatchResult → sent / failed / skipped counts, cancelled / deferred flags',
+  'apps/api/src/lib/inngest/functions/gsc-ingest.ts|result':
+    "RunGscIngestResult → { skipped?: 'no_domain' | 'no_access'; date }",
+  'apps/api/src/lib/inngest/functions/stock-deadstock-scan.ts|result':
+    'DeadstockScanResult → scanned / flagged / expiredCount',
+  'apps/api/src/lib/inngest/functions/stock-reorder-scan.ts|result':
+    'ReorderScanResult → scanned / suggested / expiredCount',
+  'apps/api/src/lib/inngest/functions/warehouse-reconcile-sweep.ts|result':
+    'backfillReconcileAll → { skusReconciled; skusFailed }',
+  'apps/api/src/middleware/request-transaction.ts|logContext':
+    'Record<string, unknown>; its only caller (tenant-context.ts) passes { storeId, userId } / { userId, storeId, middleware }',
+  'apps/api/src/routes/payment.routes.ts|rollbackContext': '{ orderId; storeId; sessionId } | null',
+  'apps/api/src/services/ai.service.ts|ctx': '{ storeId: string; kind: string }',
+  'apps/api/src/services/payment-providers/orphaned-invoice-alert.ts|o':
+    'OrphanedProviderInvoice → storeId, orderId, orderNumber, provider, transactionId, amount, currency, source',
+  'apps/api/src/services/payment-providers/unbooked-refund-alert.ts|a.context':
+    'Record<string, unknown>; the four callers in payment.factory.ts pass payment / order / claim / refund ids and fils amounts only',
+};
+
 function walk(dir: string): string[] {
+  if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap(name => {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) return name === 'node_modules' ? [] : walk(p);
-    return /\.ts$/.test(name) && !/\.(test|spec|d)\.ts$/.test(name) ? [p] : [];
+    if (statSync(p).isDirectory())
+      return name === 'node_modules' || name === '__tests__' || name === '.next' ? [] : walk(p);
+    return /\.tsx?$/.test(name) && !/\.(test|spec|d)\.tsx?$/.test(name) ? [p] : [];
   });
+}
+
+function unwrap(e: ts.Expression): ts.Expression {
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAsExpression(e) ||
+    ts.isNonNullExpression(e) ||
+    ts.isSatisfiesExpression(e) ||
+    ts.isAwaitExpression(e)
+  )
+    e = e.expression;
+  return e;
 }
 
 /** The trailing name of an expression: `user.email` → `email`, `to` → `to`. */
 function leafName(e: ts.Expression): string | null {
+  e = unwrap(e);
   if (ts.isIdentifier(e)) return e.text;
   if (ts.isPropertyAccessExpression(e)) return e.name.text;
-  if (ts.isNonNullExpression(e) || ts.isParenthesizedExpression(e) || ts.isAsExpression(e))
-    return leafName(e.expression);
+  if (ts.isElementAccessExpression(e) && ts.isStringLiteralLike(e.argumentExpression))
+    return e.argumentExpression.text;
   return null;
 }
 
-function isSafeValue(e: ts.Expression): boolean {
-  if (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e))
-    return isSafeValue(e.expression);
-  if (ts.isCallExpression(e)) {
-    const name = leafName(e.expression);
-    return name !== null && SAFE_CALL.test(name);
-  }
-  if (
-    ts.isStringLiteral(e) ||
-    ts.isNumericLiteral(e) ||
-    ts.isNoSubstitutionTemplateLiteral(e) ||
-    e.kind === ts.SyntaxKind.TrueKeyword ||
-    e.kind === ts.SyntaxKind.FalseKeyword ||
-    e.kind === ts.SyntaxKind.NullKeyword ||
-    ts.isTypeOfExpression(e)
-  )
-    return true;
-  if (ts.isPrefixUnaryExpression(e) && e.operator === ts.SyntaxKind.ExclamationToken) return true;
-  if (ts.isPropertyAccessExpression(e) && e.name.text === 'length') return true;
-  if (ts.isTemplateExpression(e))
-    return e.templateSpans.every(s => {
-      const n = leafName(s.expression);
-      return n === null || !PII_LEAF.test(n) || isSafeValue(s.expression);
-    });
-  return false;
+/** An interpolated / positional value: PII-shaped by its name alone. */
+function piiNamed(e: ts.Expression): boolean {
+  const leaf = leafName(e);
+  return leaf !== null && (PII_LEAF.test(leaf) || PII_KEY.test(leaf));
 }
 
-export function findRawPiiLogFields(source: string, file = 'input.ts'): string[] {
-  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-  const out: string[] = [];
+export function scanLogCalls(
+  source: string,
+  file = 'input.ts'
+): { violations: string[]; spreads: string[] } {
+  const sf = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+  const violations: string[] = [];
+  const spreads: string[] = [];
+  const loggerAliases = new Set<string>();
+  const levelFns = new Set<string>();
+
+  const at = (n: ts.Node) => `${file}:${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1}`;
+
+  const isLoggerRef = (e: ts.Expression): boolean => {
+    e = unwrap(e);
+    if (ts.isIdentifier(e) && loggerAliases.has(e.text)) return true;
+    if (
+      ts.isPropertyAccessExpression(e) &&
+      e.expression.kind === ts.SyntaxKind.ThisKeyword &&
+      loggerAliases.has(e.name.text)
+    )
+      return true;
+    if (ts.isCallExpression(e) && ts.isPropertyAccessExpression(e.expression))
+      return e.expression.name.text === 'child' && isLoggerRef(e.expression.expression);
+    if (!ts.isIdentifier(e) && !ts.isPropertyAccessExpression(e)) return false;
+    return RECEIVER.test(e.getText(sf));
+  };
+
+  /** `logger.warn`, `logger.warn.bind(logger)`, `logger[lvl]`, `a ? b : c`. */
+  const isLevelFn = (e: ts.Expression): boolean => {
+    e = unwrap(e);
+    if (ts.isConditionalExpression(e)) return isLevelFn(e.whenTrue) || isLevelFn(e.whenFalse);
+    if (ts.isIdentifier(e)) return levelFns.has(e.text);
+    if (
+      ts.isCallExpression(e) &&
+      ts.isPropertyAccessExpression(e.expression) &&
+      e.expression.name.text === 'bind'
+    )
+      return isLevelFn(e.expression.expression);
+    if (ts.isPropertyAccessExpression(e))
+      return LEVELS.has(e.name.text) && isLoggerRef(e.expression);
+    if (ts.isElementAccessExpression(e)) return isLoggerRef(e.expression);
+    return false;
+  };
+
+  const isLoggerValue = (e: ts.Expression): boolean => {
+    e = unwrap(e);
+    if (ts.isConditionalExpression(e))
+      return isLoggerValue(e.whenTrue) || isLoggerValue(e.whenFalse);
+    return isLoggerRef(e);
+  };
+
+  // Pass 1: aliases. Repeat to a fixpoint so `const a = logger; const b = a.child()` resolves.
+  const collect = (n: ts.Node) => {
+    if (
+      (ts.isVariableDeclaration(n) || ts.isParameter(n) || ts.isPropertyDeclaration(n)) &&
+      ts.isIdentifier(n.name)
+    ) {
+      const name = n.name.text;
+      if (n.type && LOGGER_TYPE.test(n.type.getText(sf))) loggerAliases.add(name);
+      if (n.initializer) {
+        if (isLoggerValue(n.initializer)) loggerAliases.add(name);
+        else if (isLevelFn(n.initializer)) levelFns.add(name);
+      }
+    }
+    ts.forEachChild(n, collect);
+  };
+  let size = -1;
+  while (size !== loggerAliases.size + levelFns.size) {
+    size = loggerAliases.size + levelFns.size;
+    collect(sf);
+  }
+
+  const flag = (n: ts.Node, what: string) => violations.push(`${at(n)} ${what}`);
+
+  const isSafeValue = (e: ts.Expression): boolean => {
+    e = unwrap(e);
+    if (ts.isCallExpression(e)) {
+      const name = leafName(e.expression);
+      return name !== null && SAFE_CALL.test(name);
+    }
+    if (
+      ts.isStringLiteral(e) ||
+      ts.isNumericLiteral(e) ||
+      ts.isNoSubstitutionTemplateLiteral(e) ||
+      e.kind === ts.SyntaxKind.TrueKeyword ||
+      e.kind === ts.SyntaxKind.FalseKeyword ||
+      e.kind === ts.SyntaxKind.NullKeyword ||
+      ts.isTypeOfExpression(e)
+    )
+      return true;
+    if (ts.isPrefixUnaryExpression(e) && e.operator === ts.SyntaxKind.ExclamationToken) return true;
+    if (ts.isPropertyAccessExpression(e) && e.name.text === 'length') return true;
+    if (ts.isTemplateExpression(e))
+      return e.templateSpans.every(s => !piiNamed(s.expression) || isSafeValue(s.expression));
+    return false;
+  };
 
   const checkObject = (obj: ts.ObjectLiteralExpression) => {
     for (const p of obj.properties) {
+      if (ts.isSpreadAssignment(p)) {
+        // An inline literal (`...(x ? { a } : {})`) is visible: check it.
+        const branches = (e: ts.Expression): ts.Expression[] => {
+          const u = unwrap(e);
+          return ts.isConditionalExpression(u)
+            ? [...branches(u.whenTrue), ...branches(u.whenFalse)]
+            : [u];
+        };
+        const parts = branches(p.expression);
+        if (parts.every(ts.isObjectLiteralExpression))
+          parts.forEach(b => checkObject(b as ts.ObjectLiteralExpression));
+        else spreads.push(`${file}|${p.expression.getText(sf)}`);
+        continue;
+      }
       let key: string;
       let value: ts.Expression;
       if (ts.isShorthandPropertyAssignment(p)) {
@@ -94,45 +260,96 @@ export function findRawPiiLogFields(source: string, file = 'input.ts'): string[]
         key = p.name.getText(sf).replace(/^['"`]|['"`]$/g, '');
         value = p.initializer;
       } else continue;
-      if (ts.isObjectLiteralExpression(value)) {
-        checkObject(value);
+      if (ts.isObjectLiteralExpression(unwrap(value))) {
+        checkObject(unwrap(value) as ts.ObjectLiteralExpression);
         continue;
       }
       const leaf = leafName(value);
       const piiShaped = PII_KEY.test(key) || (leaf !== null && PII_LEAF.test(leaf));
-      if (piiShaped && !isSafeValue(value)) {
-        const { line } = sf.getLineAndCharacterOfPosition(p.getStart(sf));
-        out.push(`${file}:${line + 1} ${key}: ${value.getText(sf)}`);
+      if (piiShaped && !isSafeValue(value)) flag(p, `${key}: ${value.getText(sf)}`);
+      else if (!piiShaped) checkMessage(value);
+    }
+  };
+
+  /** A message or a nested value: interpolations and concatenations. */
+  const checkMessage = (e: ts.Expression) => {
+    e = unwrap(e);
+    if (ts.isTemplateExpression(e)) {
+      for (const s of e.templateSpans)
+        if (piiNamed(s.expression) && !isSafeValue(s.expression))
+          flag(s.expression, `\${${s.expression.getText(sf)}}`);
+    } else if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      for (const side of [e.left, e.right]) {
+        const u = unwrap(side);
+        if (ts.isBinaryExpression(u) || ts.isTemplateExpression(u)) checkMessage(u);
+        else if (piiNamed(u) && !isSafeValue(u)) flag(u, `+ ${u.getText(sf)}`);
       }
     }
   };
 
+  const checkArg = (a: ts.Expression) => {
+    const u = unwrap(a);
+    if (ts.isObjectLiteralExpression(u)) checkObject(u);
+    else if (ts.isTemplateExpression(u) || ts.isBinaryExpression(u)) checkMessage(u);
+    else if (piiNamed(u) && !isSafeValue(u)) flag(u, u.getText(sf));
+  };
+
+  const isLogCall = (n: ts.CallExpression): boolean => {
+    const callee = unwrap(n.expression);
+    if (ts.isIdentifier(callee)) return levelFns.has(callee.text);
+    if (ts.isPropertyAccessExpression(callee))
+      return (
+        (LEVELS.has(callee.name.text) || callee.name.text === 'child') &&
+        isLoggerRef(callee.expression)
+      );
+    if (ts.isElementAccessExpression(callee)) return isLoggerRef(callee.expression);
+    return false;
+  };
+
   const visit = (n: ts.Node) => {
-    if (
-      ts.isCallExpression(n) &&
-      ts.isPropertyAccessExpression(n.expression) &&
-      LEVELS.has(n.expression.name.text) &&
-      RECEIVER.test(n.expression.expression.getText(sf))
-    ) {
-      for (const a of n.arguments) if (ts.isObjectLiteralExpression(a)) checkObject(a);
-    }
+    if (ts.isCallExpression(n) && isLogCall(n)) n.arguments.forEach(checkArg);
     ts.forEachChild(n, visit);
   };
   visit(sf);
-  return out;
+  return { violations, spreads };
 }
 
-describe('no raw email / phone in apps/api logger calls (issue 2390)', () => {
-  it('every logger field carrying an email or phone is masked', () => {
-    const files = walk(API_SRC);
-    expect(files.length).toBeGreaterThan(300); // positive control: the walk found the tree
-    const violations = files.flatMap(f =>
-      findRawPiiLogFields(readFileSync(f, 'utf8'), relative(API_SRC, f))
-    );
-    expect(violations).toEqual([]);
+export function findRawPiiLogFields(source: string, file = 'input.ts'): string[] {
+  const { violations, spreads } = scanLogCalls(source, file);
+  return [...violations, ...spreads.map(s => `unreviewed spread ${s}`)];
+}
+
+describe('no raw email / phone in any log call (issues 2390, 2392, 2394)', () => {
+  const files = ROOTS.flatMap(r => walk(join(REPO, r)));
+  const results = files.map(f => scanLogCalls(readFileSync(f, 'utf8'), relative(REPO, f)));
+
+  it('walks every app and package tree', () => {
+    // Positive control: each root that exists contributed files.
+    for (const r of ['apps/api/src', 'apps/web/src', 'apps/orders/src', 'apps/admin/src'])
+      expect(
+        files.some(f => relative(REPO, f).startsWith(r)),
+        r
+      ).toBe(true);
+    expect(files.length).toBeGreaterThan(900);
   });
 
-  // Positive controls: the scanner must actually flag the shapes the issue names.
+  it('every log field / message carrying an email or phone is masked', () => {
+    expect(results.flatMap(r => r.violations)).toEqual([]);
+  });
+
+  it('every spread inside a log object has been reviewed', () => {
+    const seen = new Set(results.flatMap(r => r.spreads));
+    expect(
+      [...seen].filter(s => !(s in REVIEWED_SPREADS)),
+      'unreviewed'
+    ).toEqual([]);
+    expect(
+      Object.keys(REVIEWED_SPREADS).filter(s => !seen.has(s)),
+      'stale REVIEWED_SPREADS entries'
+    ).toEqual([]);
+  });
+
+  // Positive controls: the scanner must actually flag the shapes the issues name.
   it.each([
     [`logger.info({ emailId: e.id, to: email.options.to }, 'sent')`],
     [`logger.error({ err, orderId, to }, 'failed')`],
@@ -144,6 +361,30 @@ describe('no raw email / phone in apps/api logger calls (issue 2390)', () => {
     [`logger.info({ meta: { phone: p } }, 'x')`],
     [`this.log.info({ to }, 'x')`],
     [`console.error({ phone: sms.recipientPhone })`],
+    // issue 2392: a spread is unreviewed until listed
+    [`logger.info({ storeId, ...scanResult, emailed }, 'done')`],
+    // issue 2394: bound / aliased / child / request-scoped loggers
+    [`const logFn = ok ? logger.info.bind(logger) : logger.warn.bind(logger); logFn({ to }, 'x')`],
+    [
+      `const log = dead ? logger.error.bind(logger) : logger.warn.bind(logger); log({ to: c.email })`,
+    ],
+    [`const warn = logger.warn; warn({ email })`],
+    [`const l = logger.child({ storeId }); l.info({ email }, 'x')`],
+    [`const a = logger; const b = a.child({}); b.warn({ phone }, 'x')`],
+    [`function f(l: Logger) { l.info({ email }, 'x') }`],
+    [
+      `class S { constructor(private readonly jobs: pino.Logger) {} m() { this.jobs.info({ phone }) } }`,
+    ],
+    [`req.log.info({ email: req.body.email }, 'x')`],
+    [`logger[level]({ to }, 'x')`],
+    [`logger.child({ customerEmail })`],
+    // issue 2394: interpolated / concatenated messages and positional values
+    [`logger.info(\`sent to \${email}\`)`],
+    [`logger.info({ orderId }, \`receipt to \${order.customerEmail}\`)`],
+    [`console.log('[otp] sent to ' + phone)`],
+    [`console.warn('x', user.email)`],
+    [`logger.info({ msg: \`to \${to}\` })`],
+    [`logger.info({ id, ...(dup ? { email } : {}) }, 'x')`],
   ])('flags %s', src => {
     expect(findRawPiiLogFields(src)).toHaveLength(1);
   });
@@ -157,6 +398,13 @@ describe('no raw email / phone in apps/api logger calls (issue 2390)', () => {
     [`logger.info({ from: \`\${m.width}x\${m.height}\` }, 'x')`],
     [`logger.info({ recipientPhoneHash }, 'x')`],
     [`cache.set({ email })`],
+    [`const fmt = logger.info; other({ email })`],
+    [`logger.info(\`sent to \${maskEmail(email)}\`)`],
+    [`logger.info(\`sent \${count} emails\`)`],
+    [`console.log('sent ' + n + ' emails')`],
+    [`const logFn = logger.info.bind(logger); logFn({ storeId }, 'request')`],
+    [`toast.error(\`\${email} is taken\`)`],
+    [`logger.info({ id, ...(dup ? { spent: n } : {}) }, 'x')`],
   ])('passes %s', src => {
     expect(findRawPiiLogFields(src)).toEqual([]);
   });

@@ -268,7 +268,7 @@ async function seedSuperAdmin() {
     },
   });
 
-  console.log(`Created super admin: ${admin.email}`);
+  console.log(`Created super admin (${admin.id})`);
   return admin;
 }
 

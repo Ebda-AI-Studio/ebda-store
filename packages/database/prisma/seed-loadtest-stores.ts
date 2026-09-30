@@ -241,7 +241,7 @@ function buildLoadtestProducts(storeIndex: number) {
 // ============================================
 
 async function seedLoadtestUser() {
-  console.log(`Ensuring load-test user exists: ${LOADTEST_USER_EMAIL}`);
+  console.log('Ensuring the load-test super-admin user exists');
 
   const existing = await prisma.user.findFirst({
     where: { email: LOADTEST_USER_EMAIL, storeId: null },
