@@ -6,7 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { HelpTip } from '@/components/HelpTip';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPatch } from '@/lib/api';
-import { textFieldValue } from '@/lib/form-text';
+import { numericFieldValue, textFieldValue } from '@/lib/form-text';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,8 +106,14 @@ export default function NewSupplierPage() {
       phone: textFieldValue(phone.trim(), intent),
       email: textFieldValue(email.trim(), intent),
       paymentTerms,
-      customTermsDays:
-        paymentTerms === 'custom' && customTermsDays ? parseInt(customTermsDays) : undefined,
+      // Only meaningful for custom terms. On update, switching AWAY from
+      // custom sends null so the stale day count is cleared (issue 2262) —
+      // `cond ? n : undefined` dropped the key and kept it forever.
+      customTermsDays: numericFieldValue(
+        paymentTerms === 'custom' ? customTermsDays : '',
+        intent,
+        v => parseInt(v, 10)
+      ),
       leadTimeDays: leadTimeDays ? parseInt(leadTimeDays) : 7,
       notes: textFieldValue(notes.trim(), intent),
       notesAr: textFieldValue(notesAr.trim(), intent),

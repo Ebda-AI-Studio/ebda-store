@@ -149,7 +149,14 @@ describe('the workflow captures the parser status instead of dying on it', () =>
       workflow.indexOf('Verify the deployed build is THIS commit'),
       workflow.indexOf('notify-failure:')
     );
-    const assignments = step.split('\n').filter(l => /^\s+[a-z_]+=\$\(/.test(l));
+    // The admission probe that follows the verify step moved into
+    // scripts/guest-checkout-admission-probe.sh (issue 2191) — it runs under
+    // the same `set -e`, so its substitutions are held to the same rule.
+    const probe = readFileSync(
+      new URL('../../scripts/guest-checkout-admission-probe.sh', import.meta.url),
+      'utf8'
+    );
+    const assignments = `${step}\n${probe}`.split('\n').filter(l => /^\s+[a-z_]+=\$\(/.test(l));
     expect(assignments.length).toBeGreaterThanOrEqual(3);
     for (const a of assignments) {
       expect(a, `unguarded substitution under bash -e: ${a.trim().slice(0, 60)}`).toMatch(/\|\|/);

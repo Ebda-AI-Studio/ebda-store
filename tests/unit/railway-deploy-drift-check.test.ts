@@ -127,6 +127,7 @@ function runCompare(repoDir: string, healthBody: string, extraEnv: Record<string
       DRIFT_STALE_MINUTES: compareStep!.env!.DRIFT_STALE_MINUTES,
       DRIFT_MAX_BEHIND: compareStep!.env!.DRIFT_MAX_BEHIND,
       DEPLOY_PATHS: compareStep!.env!.DEPLOY_PATHS,
+      DRIFT_HEALTH_RETRY_SECS: '0',
       ...extraEnv,
     },
   });
@@ -158,23 +159,28 @@ describe('railway-deploy-drift-check.yml Compare step', () => {
     expect(r.stdout + r.stderr).toMatch(/Railway deploy drift/);
   });
 
-  it('does NOT fail when /health reports commit: null (unknown, not failure)', () => {
+  // Issue 2205: the unknown states used to warn and exit 0 — a blind
+  // monitor reporting green. They now alert, worded as UNKNOWN (not drift).
+  it('ALERTS (as blind, not drift) when /health reports commit: null', () => {
     const { dir } = repoWithHistory();
     const r = runCompare(dir, JSON.stringify({ commit: null }));
-    expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(r.stdout).toMatch(/unknown, not drift/);
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/monitor is BLIND/);
+    expect(r.stdout + r.stderr).not.toMatch(/Railway deploy drift:/);
   });
 
-  it('does NOT fail when /health is unreachable (empty body)', () => {
+  it('ALERTS when /health is unreachable (empty body) on every attempt', () => {
     const { dir } = repoWithHistory();
     const r = runCompare(dir, '');
-    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/could not read .* \(unreachable after 3 attempts\)/);
   });
 
-  it('does NOT fail on an unparseable body', () => {
+  it('ALERTS on a body that is never JSON (e.g. a load-balancer error page)', () => {
     const { dir } = repoWithHistory();
     const r = runCompare(dir, 'not json');
-    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/unparseable after 3 attempts/);
   });
 
   it('passes when main is ahead only by commits OUTSIDE the deploy paths, however old', () => {

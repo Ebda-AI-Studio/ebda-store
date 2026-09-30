@@ -59,7 +59,8 @@ deps) — dated reports live in `docs/audits/`.
   succeed or not — `agent.write.denied` / `agent.write.failed` carry the caller
   ip and user agent, and a completed agent order's `payment.created` row carries
   both as well. `agent.write.denied` is coalesced to at most one row per
-  (store, ip, tool) per 60s (`DENIAL_COALESCE_WINDOW_SECONDS`, #1644 / #1649,
+  (store, ip, tool, credential) per 60s — up to five per (store, ip, tool), one
+  per credential outcome, because the alert classifier partitions on it (`DENIAL_COALESCE_WINDOW_SECONDS`, #1644 / #1649,
   owner ruling 2026-09-25) rather than one row per refused request — an
   unauthenticated caller could otherwise open a fresh interactive transaction
   per attempt at `publicLimiter`'s 300/min/IP ceiling. The FIRST denial in a
@@ -139,8 +140,13 @@ survives its mutation, i.e. if a test would pass with the control deleted.
 
 **Scope, precisely:** this per-defence record proves query-level guards — a
 `WHERE storeId` clause, a permission check, a CAS on a claim column — mostly
-at the `unit` tier (one `integration`-tier entry, `password-reset-bumps-
-token-version`, runs against a real Postgres in CI). For **tenant/RLS**
+at the `unit` tier. Three `integration`-tier entries run against a real,
+migrated Postgres in the same CI job: `password-reset-bumps-token-version`
+(`tests/integration/refresh-token-rotation.test.ts`), `money-wallet-row-lock`
+(`tests/integration/customer-wallet.test.ts`) and
+`money-loyalty-reversal-index` (`tests/integration/partial-unique-indexes.test.ts`)
+— the per-entry dependency reasoning is in `mutation-testing.yml`'s services
+comment, which a unit test keeps in step with the spec. For **tenant/RLS**
 specifically, it covers 7 such query-level guards; it does **not** cover the
 session-GUC mechanism itself (`runInTenantContext` / `app.current_store_id` /
 `app.current_user_id`, `apps/api/src/middleware/tenant-context.ts`) — that

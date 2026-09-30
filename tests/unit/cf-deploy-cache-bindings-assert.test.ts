@@ -6,13 +6,16 @@
  * exited 1. The escape hatch for a bad cache rollout became a way to lose the
  * ability to deploy the storefront at all.
  *
- * This extracts the REAL step script from the workflow and runs it against
+ * The step now runs scripts/assert-cf-cache-bindings.sh (shared with ci.yml's
+ * cf-build-check, issues 2089/2152/2154). This runs that REAL script against
  * fixture wrangler.jsonc / open-next.config.ts files shaped exactly like
- * cf-setup-local.sh's two branches, for both values of OPENNEXT_CACHE.
+ * cf-setup-local.sh's two branches. Issue 2240 narrowed #1300: an explicit
+ * 'false' is still the escape hatch, but an UNSET or mistyped OPENNEXT_CACHE
+ * now fails instead of silently deploying the no-op cache.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
@@ -56,19 +59,20 @@ function runAssert(opennextCache: string, wrangler: string, config: string) {
   writeFileSync(join(appDir, 'wrangler.jsonc'), wrangler);
   writeFileSync(join(appDir, 'open-next.config.ts'), config);
 
-  const scriptPath = join(dir, 'assert.sh');
-  writeFileSync(scriptPath, `#!/usr/bin/env bash\nset -euo pipefail\n${assertStep!.run}\n`);
+  mkdirSync(join(dir, 'scripts'));
+  const scriptPath = join(dir, 'scripts', 'assert-cf-cache-bindings.sh');
+  copyFileSync(join(__dirname, '../../scripts/assert-cf-cache-bindings.sh'), scriptPath);
 
-  return spawnSync('bash', [scriptPath], {
-    cwd: appDir,
+  return spawnSync('bash', [scriptPath, 'web'], {
+    cwd: dir,
     encoding: 'utf8',
     env: { ...process.env, OPENNEXT_CACHE: opennextCache },
   });
 }
 
 describe('cf-deploy.yml "Assert the generated worker config" step', () => {
-  it('the step was found (guards against a rename silently disabling this suite)', () => {
-    expect(assertStep?.run).toBeTruthy();
+  it('the step was found and runs the shared script (guards against a rename silently disabling this suite)', () => {
+    expect(assertStep?.run?.trim()).toBe('bash scripts/assert-cf-cache-bindings.sh web');
   });
 
   it('passes when OPENNEXT_CACHE=true and the cache bindings are present', () => {
@@ -82,12 +86,10 @@ describe('cf-deploy.yml "Assert the generated worker config" step', () => {
     expect(r.stdout + r.stderr).toMatch(/NO tag-cache binding/);
   });
 
-  it('#1300: passes when OPENNEXT_CACHE is UNSET and the config is the documented empty fallback', () => {
+  it('issue 2240: FAILS when OPENNEXT_CACHE is UNSET — a lost variable must not silently deploy the no-op cache', () => {
     const r = runAssert('', EMPTY_WRANGLER, EMPTY_CONFIG);
-    expect(
-      r.status,
-      `must not fail the whole web deploy on the documented, "ZERO risk" fallback: ${r.stdout}${r.stderr}`
-    ).toBe(0);
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/must be exactly 'true'/);
   });
 
   it('#1300: passes when OPENNEXT_CACHE=false explicitly and the config is the empty fallback', () => {
@@ -96,8 +98,8 @@ describe('cf-deploy.yml "Assert the generated worker config" step', () => {
   });
 
   it('still fails when OPENNEXT_CACHE is off but the generator wrongly emitted cache bindings anyway', () => {
-    const r = runAssert('', CACHED_WRANGLER, EMPTY_CONFIG);
+    const r = runAssert('false', CACHED_WRANGLER, EMPTY_CONFIG);
     expect(r.status).toBe(1);
-    expect(r.stdout + r.stderr).toMatch(/did not produce the documented empty-cache fallback/);
+    expect(r.stdout + r.stderr).toMatch(/expected the empty-cache config/);
   });
 });

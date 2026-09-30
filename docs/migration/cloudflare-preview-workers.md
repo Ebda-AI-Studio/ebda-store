@@ -54,7 +54,11 @@ bash scripts/cf-build.sh web && (cd apps/web && npx wrangler deploy)
 >   stale). `scripts/cf-build.sh` now also runs in CI (`ci.yml`'s
 >   `cf-build-check` job, gated on package.json/lockfile/adapter-config
 >   changes) — audit-followup #1632 — not just at deploy time
->   (`cf-deploy.yml`).
+>   (`cf-deploy.yml`). Both paths run `scripts/cf-setup-local.sh` FIRST, so the
+>   committed config is only a local-dev fallback: what CI builds and what
+>   deploys is the GENERATED config, checked by `scripts/assert-cf-cache-bindings.sh`
+>   in both places (issues 2089/2152/2154). CI does not reproduce the deploy's
+>   NEXT*PUBLIC*\* `.env.production.local` write.
 
 **Committed** (zero Vercel impact, mirrors web's #314 shape):
 

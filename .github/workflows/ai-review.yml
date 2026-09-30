@@ -17,7 +17,16 @@ jobs:
     name: Claude PR review
     # Skip the remediation bot's own PRs — the remediation GATE's review-score IS the review,
     # so re-running AI Review here would double-review bot fixes (branches: remediate/*).
-    if: ${{ !startsWith(github.head_ref, 'remediate/') }}
+    #
+    # Also skip Dependabot's PRs (issue 2254). .github/dependabot.yml opens a
+    # weekly github-actions bump, and a Dependabot-triggered run gets the
+    # Dependabot secret store (no CLAUDE_CODE_OAUTH_TOKEN) and a read-only
+    # GITHUB_TOKEN — so the review could never authenticate, and every bump
+    # would be a weekly red tick nobody can act on. Keyed on the PR AUTHOR,
+    # not github.actor, so a human re-running the job does not change it. A
+    # skipped job reports as success for branch protection. What still reviews
+    # an action bump: the SHA-pin check in ci.yml and a human merge.
+    if: ${{ !startsWith(github.head_ref, 'remediate/') && github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
     steps:
@@ -215,31 +224,37 @@ jobs:
             echo "$WF_NEW" | sed 's/^/::warning::  /'
           fi
 
-          # `git add -u` + an explicit new-file list, never `git add -A`:
-          # a blanket add sweeps untracked files the fix never intended —
-          # nested repos, local scratch, anything a tool dropped in the
-          # workspace. Tracked modifications are what the fix actually made;
-          # genuinely new files are added by name, and listed in the log so
-          # the commit's contents are reviewable from the job output.
+          # `git add -u` (tracked edits) + a DENYLIST-bounded new-file sweep.
           #
-          # No path restriction (#1758): the auto-fix's own allowedTools
-          # (Read/Grep/Glob/Edit/Write) are not scoped to apps/packages/tests/
-          # docs/scripts/.zap — a new file it created anywhere else
-          # (.github/ai-review/*.mjs, .husky/**, a new root config) was
-          # silently neither staged nor mentioned in the log.
+          # History: the new-file pathspec once named exactly six roots (apps
+          # packages tests docs scripts .zap), so a fix creating
+          # .github/ai-review/*.mjs, .husky/** or a new root config was
+          # silently neither staged nor logged (#1758). It became "everything
+          # untracked minus workflows" — which is `git add -A` by another name:
+          # this step runs `claude -p` with Write, so a plan/notes file the
+          # agent drops at the repo root got committed to the contributor's PR
+          # as "[ai-fix]" (issue 2102).
+          #
+          # Now: everything `--exclude-standard` does not ignore (.gitignore
+          # already bounds .env*, .claude/, *.log, tmp/), MINUS new workflow
+          # files (WF_NEW above warns about those) and MINUS the scratch shapes
+          # a code fix never legitimately creates: a new root-level *.md (docs
+          # live under docs/), and *.orig / *.rej / *.bak / *.tmp merge and
+          # editor leftovers anywhere. Residual hazard, stated plainly: any
+          # OTHER stray file the agent writes outside those shapes is still
+          # staged — the log below lists every new file, so it is reviewable in
+          # the job output and in the pushed commit.
+          #
+          # NUL-delimited (-z / xargs -0): a new path containing a space used
+          # to word-split, abort this step under `set -e` and lose the staged
+          # fix with it (the #1768 failure class).
           git add -u
-          # Exclusion-based, not a hardcoded root list (#1758): the old
-          # pathspec named exactly six roots (apps packages tests docs
-          # scripts .zap), so a new file anywhere else — .github/ai-review/*.mjs,
-          # .husky/**, a new root-level config — was silently never staged
-          # and never mentioned. New workflow files are the one deliberate
-          # exclusion (WF_NEW above already warns about them); everything
-          # else the fix created gets staged, wherever it landed.
-          NEW_FILES="$(git ls-files --others --exclude-standard -- . ':!.github/workflows/**')"
+          NEW_FILES_PATHSPEC=(. ':(exclude).github/workflows/**' ':(exclude,glob)*.md' ':(exclude,glob)**/*.orig' ':(exclude,glob)**/*.rej' ':(exclude,glob)**/*.bak' ':(exclude,glob)**/*.tmp')
+          NEW_FILES="$(git ls-files --others --exclude-standard -- "${NEW_FILES_PATHSPEC[@]}")"
           if [ -n "$NEW_FILES" ]; then
             echo "Auto-fix created new file(s):"
             echo "$NEW_FILES" | sed 's/^/  /'
-            echo "$NEW_FILES" | xargs -r git add --
+            git ls-files -z --others --exclude-standard -- "${NEW_FILES_PATHSPEC[@]}" | xargs -0 -r git add --
           fi
 
           if git diff --cached --quiet; then

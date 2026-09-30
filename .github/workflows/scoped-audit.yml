@@ -22,6 +22,14 @@ permissions:
 jobs:
   scoped-audit:
     name: Blast-radius scoped audit (Opus)
+    # Not on Dependabot's PRs (issue 2254): a Dependabot-triggered run has no
+    # CLAUDE_CODE_OAUTH_TOKEN (Dependabot secret store) and a read-only
+    # GITHUB_TOKEN, so audit.mjs would take its did-not-run path every week —
+    # a red tick plus a Telegram "scoped-audit did not run" alert on a PR that
+    # only bumps a pinned action SHA. That is an expected no-op, not a masked
+    # failure; skipping it here keeps the did-not-run alert meaning something.
+    # Keyed on the PR author, not github.actor (a human re-run keeps it).
+    if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
     steps:

@@ -16,6 +16,12 @@
  * later `git restore --staged --worktree -- $WF_CHANGED` fail on a path git
  * never staged, aborting the whole restore atomically and losing the
  * already-staged non-workflow fix with it.
+ *
+ * Issue 2102: the #1758 fix swung to "every untracked file minus workflows",
+ * i.e. `git add -A` by another name — a scratch/plan file the agent drops at
+ * the repo root was committed to the contributor's PR. And `echo | xargs`
+ * still word-split, so a new path with a space aborted the step. The sweep is
+ * now denylist-bounded and NUL-delimited; this suite runs the REAL lines.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -33,10 +39,24 @@ import path from 'node:path';
 const ROOT = path.resolve(__dirname, '../..');
 const WORKFLOW = readFileSync(path.join(ROOT, '.github/workflows/ai-review.yml'), 'utf8');
 
-/** Pull the exact `VAR="$(...)"` assignment line for `name` out of the workflow. */
+/** Pull the exact `VAR=...` assignment line for `name` out of the workflow. */
 function extractAssignment(name: string): string {
-  const line = WORKFLOW.split('\n').find(l => l.trim().startsWith(`${name}="$(`));
+  const line = WORKFLOW.split('\n').find(
+    l => l.trim().startsWith(`${name}="$(`) || l.trim().startsWith(`${name}=(`)
+  );
   expect(line, `${name} assignment moved in ai-review.yml — re-point this test`).toBeTruthy();
+  return line!.trim();
+}
+
+/** The workflow's own staging command for new files (the NUL-delimited add). */
+function extractNewFilesAdd(): string {
+  const line = WORKFLOW.split('\n').find(l =>
+    /git ls-files -z .*\| xargs -0 -r git add --/.test(l)
+  );
+  expect(
+    line,
+    'the NUL-delimited new-file add moved in ai-review.yml — re-point this test'
+  ).toBeTruthy();
   return line!.trim();
 }
 
@@ -67,15 +87,25 @@ function runStagingLogic(cwd: string): {
     extractAssignment('WF_CHANGED'),
     extractAssignment('WF_NEW'),
     'git add -u',
+    extractAssignment('NEW_FILES_PATHSPEC'),
     extractAssignment('NEW_FILES'),
-    'if [ -n "$NEW_FILES" ]; then echo "$NEW_FILES" | xargs -r git add --; fi',
+    `if [ -n "$NEW_FILES" ]; then ${extractNewFilesAdd()}; fi`,
     'printf "WF_CHANGED_START\\n%s\\nWF_CHANGED_END\\n" "$WF_CHANGED"',
     'printf "WF_NEW_START\\n%s\\nWF_NEW_END\\n" "$WF_NEW"',
     'printf "NEW_FILES_START\\n%s\\nNEW_FILES_END\\n" "$NEW_FILES"',
   ].join('\n');
-  const scriptPath = path.join(cwd, '__staging.sh');
+  // OUTSIDE the scratch repo (issue 2102): written inside it, the harness's
+  // own script was itself an untracked file the sweep staged — the fixture
+  // was exercising the very hazard the suite should catch.
+  const scriptDir = mkdtempSync(path.join(tmpdir(), 'ai-review-staging-script-'));
+  const scriptPath = path.join(scriptDir, 'staging.sh');
   writeFileSync(scriptPath, script);
-  const out = execFileSync('bash', [scriptPath], { cwd, encoding: 'utf8', env: CLEAN_GIT_ENV });
+  let out: string;
+  try {
+    out = execFileSync('bash', [scriptPath], { cwd, encoding: 'utf8', env: CLEAN_GIT_ENV });
+  } finally {
+    rmSync(scriptDir, { recursive: true, force: true });
+  }
   const section = (name: string) =>
     (out.match(new RegExp(`${name}_START\\n([\\s\\S]*?)\\n${name}_END`)) ?? ['', ''])[1]
       .split('\n')
@@ -153,5 +183,32 @@ describe('ai-review auto-fix file staging (#1758, #1768)', () => {
     // the tracked edit) rather than a no-op.
     const staged = git(dir, 'diff', '--cached', '--name-only').trim();
     expect(staged).not.toContain('.github/workflows/existing.yml');
+  });
+
+  it('does NOT stage agent scratch: a new root-level *.md or a merge/editor leftover (issue 2102)', () => {
+    writeFileSync(path.join(dir, 'PLAN.md'), '# scratch plan\n');
+    writeFileSync(path.join(dir, 'apps/tracked.ts.orig'), 'x');
+    writeFileSync(path.join(dir, 'apps/tracked.ts.rej'), 'x');
+    mkdirSync(path.join(dir, 'docs'), { recursive: true });
+    writeFileSync(path.join(dir, 'docs/new-runbook.md'), '# real doc\n');
+    const { newFiles } = runStagingLogic(dir);
+    const staged = git(dir, 'diff', '--cached', '--name-only').trim().split('\n');
+    for (const scratch of ['PLAN.md', 'apps/tracked.ts.orig', 'apps/tracked.ts.rej']) {
+      expect(newFiles).not.toContain(scratch);
+      expect(staged).not.toContain(scratch);
+    }
+    // A markdown file under docs/ is a legitimate fix artefact and IS staged.
+    expect(staged).toContain('docs/new-runbook.md');
+    // The harness's own script is not in the repo, so it cannot be swept.
+    expect(staged.some(f => f.includes('staging'))).toBe(false);
+  });
+
+  it('stages a new path containing a space without aborting the step (issue 2102 / #1768 class)', () => {
+    mkdirSync(path.join(dir, 'apps/with space'), { recursive: true });
+    writeFileSync(path.join(dir, 'apps/with space/new file.ts'), 'export {};\n');
+    const { newFiles } = runStagingLogic(dir);
+    expect(newFiles).toContain('apps/with space/new file.ts');
+    const staged = git(dir, 'diff', '--cached', '--name-only').trim().split('\n');
+    expect(staged).toContain('apps/with space/new file.ts');
   });
 });

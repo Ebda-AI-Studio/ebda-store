@@ -35,7 +35,11 @@ import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/c
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
-import { collectReferencedR2Keys } from '../apps/api/src/lib/r2-references';
+import {
+  collectReferencedR2Keys,
+  type R2ReferenceDb,
+  type R2ReferenceRunner,
+} from '../apps/api/src/lib/r2-references';
 
 interface R2Object {
   key: string;
@@ -123,15 +127,79 @@ function urlToKey(
  * fails until it is.
  */
 async function collectReferencedKeys(
-  prisma: PrismaClient,
+  run: R2ReferenceRunner,
   publicBase: string,
   endpoint: string,
   bucket: string
 ): Promise<Set<string>> {
   return collectReferencedR2Keys({
-    run: fn => fn(prisma),
+    run,
     toKey: url => urlToKey(url, publicBase, endpoint, bucket),
   });
+}
+
+/**
+ * The same privilege the weekly sweep uses (`withRlsBypass`,
+ * r2-orphan-sweep.ts), rebuilt on this script's own client so it does not pull
+ * in the API. This is the only delete-capable collector, and it used to read
+ * the registry with a bare client — no tenant context, no bypass (issue 2251).
+ * Harmless while production connects as the table owner; the moment the
+ * Phase 3 force_app cutover flips DATABASE_URL, a contextless read of a STRICT
+ * table returns zero rows, every blog cover / expense receipt / stock-adjustment
+ * photo / how-to image reads as an orphan, and `--apply` deletes them from R2
+ * irreversibly. One transaction per page, like the sweep.
+ */
+export function rlsBypassRunner(prisma: Pick<PrismaClient, '$transaction'>): R2ReferenceRunner {
+  return fn =>
+    prisma.$transaction(
+      async tx => {
+        await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+        // Reset a stale session-level store id so old-style policies
+        // (`current_store_id() IS NULL`) allow all rows too — same as
+        // withRlsBypass in @force/database.
+        await tx.$executeRaw`SET LOCAL app.current_store_id = ''`;
+        return fn(tx as unknown as R2ReferenceDb);
+      },
+      { maxWait: 10_000, timeout: 30_000 }
+    );
+}
+
+/**
+ * Registry tables whose RLS policy is STRICT — no contextless allowance, so a
+ * read without the bypass sees nothing (the pinned list is STRICT_TABLES in
+ * tests/integration/rls-force-app.test.ts; tests/unit/r2-orphan-classify.test.ts
+ * keeps this in step with it and the registry).
+ */
+export const STRICT_R2_TABLES = ['blog_posts', 'expenses', 'stock_adjustments', 'store_howtos'];
+
+/**
+ * Last line before an irreversible delete (issue 2251): through the SAME
+ * runner the collection used, every STRICT registered table must show rows
+ * whenever the catalog (pg_class.reltuples, which RLS does not filter) says it
+ * has any. Zero visible rows over a non-empty table means the read was
+ * filtered, the referenced set is incomplete, and every key those rows point
+ * to would be deleted as an "orphan". Refuse instead.
+ */
+export async function assertStrictTablesVisible(
+  run: R2ReferenceRunner,
+  catalog: R2ReferenceDb
+): Promise<void> {
+  for (const table of STRICT_R2_TABLES) {
+    const [seen] = await run(db =>
+      db.$queryRawUnsafe<Array<{ n: number }>>(`SELECT count(*)::int AS n FROM "${table}"`)
+    );
+    const [est] = await catalog.$queryRawUnsafe<Array<{ n: number }>>(
+      `SELECT GREATEST(c.reltuples, 0)::int AS n FROM pg_class c WHERE c.oid = $1::regclass`,
+      `public.${table}`
+    );
+    if ((seen?.n ?? 0) === 0 && (est?.n ?? 0) > 0) {
+      throw new Error(
+        `REFUSING --apply: "${table}" shows 0 rows to the collector while the catalog estimates ` +
+          `${est!.n}. RLS is filtering the registry read, so its R2 references are missing and ` +
+          `would be deleted as orphans. Check the connection role / app.bypass_rls.`
+      );
+    }
+  }
 }
 
 /**
@@ -238,7 +306,8 @@ async function audit(): Promise<AuditResult> {
   const prisma = new PrismaClient();
   try {
     console.log('Collecting referenced keys from database...');
-    const referenced = await collectReferencedKeys(prisma, publicBase, endpoint, bucket);
+    const run = rlsBypassRunner(prisma);
+    const referenced = await collectReferencedKeys(run, publicBase, endpoint, bucket);
     console.log(`Found ${referenced.size} referenced keys in database.`);
 
     const { orphans, orphanBytes, totalBytes, skippedRecent } = classifyOrphans(
@@ -249,6 +318,7 @@ async function audit(): Promise<AuditResult> {
     );
 
     if (apply && orphans.length > 0) {
+      await assertStrictTablesVisible(run, prisma);
       console.log(
         `\n--apply set: deleting ${orphans.length} orphan keys (min-age ${minAgeHours}h)…`
       );

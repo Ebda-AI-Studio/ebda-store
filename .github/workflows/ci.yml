@@ -387,14 +387,34 @@ jobs:
   # bundle a `next` minor bump actually ships. Gated on `changes.outputs.cf`
   # (package.json/lockfile/adapter-config changes only) so an unrelated PR
   # doesn't pay for 3 extra OpenNext builds.
+  #
+  # It builds the config that DEPLOYS, not the committed one (issues 2089/
+  # 2152/2154): cf-deploy.yml runs scripts/cf-setup-local.sh first, which
+  # overwrites apps/<app>/{open-next.config.ts,wrangler.jsonc} and, for web
+  # with OPENNEXT_CACHE=true, adds the DO tag cache/queue + R2 incremental
+  # cache and a generated cache-worker-entry.ts. This job runs the same
+  # generator and the same assertion (scripts/assert-cf-cache-bindings.sh),
+  # so an adapter bump that breaks the DO/tag-cache overrides fails HERE, not
+  # at deploy on main. Keep the two in lockstep. Not reproduced: the
+  # NEXT_PUBLIC_* .env.production.local write — this build inlines only
+  # NEXT_PUBLIC_API_URL, which moves no adapter surface.
+  #
+  # Budget (issue 2155), by this file's own sizing rule (see `build`): the
+  # deploy path gives ONE app's install + build + deploy 25 min on this
+  # runner, so a leg gets 45; `max-parallel: 1` serializes the three legs so
+  # three concurrent Next+OpenNext builds cannot OOM a 4 GiB guest that is
+  # also running build/unit/integration/e2e. Never add this matrix to branch
+  # protection's required checks: it is conditionally skipped (see the
+  # paths-ignore trap at the top of this file).
   cf-build-check:
     name: Cloudflare Worker Build Check (${{ matrix.app }})
     if: needs.changes.outputs.code == 'true' && needs.changes.outputs.cf == 'true'
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 20
+    timeout-minutes: 45
     needs: [lint, typecheck, changes]
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         app: [web, admin, orders]
     steps:
@@ -434,6 +454,18 @@ jobs:
 
       - name: Build shared package
         run: npm run build -w packages/shared
+
+      - name: Generate the ${{ matrix.app }} worker config (same generator as cf-deploy)
+        env:
+          OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
+          # The pinned adapter + wrangler are already installed by `npm ci`.
+          CF_SETUP_SKIP_DEPS: '1'
+        run: bash scripts/cf-setup-local.sh ${{ matrix.app }}
+
+      - name: Assert the generated config matches OPENNEXT_CACHE (same assertion as cf-deploy)
+        env:
+          OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
+        run: bash scripts/assert-cf-cache-bindings.sh ${{ matrix.app }}
 
       - name: Build ${{ matrix.app }} for Cloudflare (OpenNext adapter)
         run: bash scripts/cf-build.sh ${{ matrix.app }}
@@ -998,7 +1030,15 @@ jobs:
           SQL
 
       - name: Run force_app cross-tenant RLS proof
-        run: npx vitest run tests/integration/rls-force-app.test.ts --reporter=verbose
+        # --retry=0, DELIBERATELY (issue 2101) — the one DB-backed tier that
+        # does NOT opt into the integration/e2e `--retry=1`. This is a security
+        # assertion against a local Postgres service container, not a
+        # network-flaky HTTP suite: an RLS proof that passes only on its second
+        # attempt is a real signal (an order-dependent GUC leak, a policy that
+        # holds only on a warm connection), and a retry would turn it green.
+        # Explicit so it cannot drift silently; pinned by
+        # tests/unit/vitest-retry-by-tier.test.ts.
+        run: npx vitest run tests/integration/rls-force-app.test.ts --reporter=verbose --retry=0
         env:
           # The whole point of this job: every prisma.* call in
           # rls-force-app.test.ts authenticates as force_app, not a superuser.

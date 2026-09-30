@@ -56,8 +56,9 @@ const tier = args.find(a => a.startsWith('--tier='))?.slice(7) ?? 'unit';
 // TRUNCATE docs/security/defence-mutation-record.md to just the selected
 // rows, and --write with a partial --tier (the unit-only default) silently
 // DROPS every integration-tier entry from it — exactly the failure mode that
-// let a real integration-tier entry (password-reset-bumps-token-version) go
-// unrun by every CI invocation while the record still claimed a clean scope.
+// let a real integration-tier entry (password-reset-bumps-token-version, the
+// first of the three there are now) go unrun by every CI invocation while the
+// record still claimed a clean scope.
 if (WRITE && only) {
   console.error(
     '--write refuses a partial --only selection — it would truncate the committed record to just these ids. Run without --write to preview a subset, or drop --only to write the full spec.'
@@ -66,7 +67,9 @@ if (WRITE && only) {
 }
 if (WRITE && tier !== 'all') {
   console.error(
-    `--write refuses tier='${tier}' — it would silently drop every other tier's entries from the committed record. Pass --tier=all.`
+    `--write refuses tier='${tier}' — it would silently drop every other tier's entries from the committed record. ` +
+      `Run: DATABASE_URL=<migrated Postgres> npm run test:defence-mutations -- --write --tier=all ` +
+      `(the integration-tier defences need a real, migrated database — without one they score ERROR, not KILLED).`
   );
   process.exit(2);
 }

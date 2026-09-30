@@ -18,6 +18,8 @@ import {
   locationCommentMarker,
   findMarkedComment,
   groupCommentsByIssue,
+  buildLocationCommentBody,
+  LOCATION_COMMENT_MAX_CHARS,
   // @ts-expect-error - plain .mjs script, no types
 } from '../../.github/scoped-audit/followup-filing.mjs';
 // @ts-expect-error - plain .mjs script, no types
@@ -809,5 +811,53 @@ describe('location fingerprint dedup (#116)', () => {
     // three-part markers are read back under the current two-part key.
     expect(fingerprints.get('security|a.ts')).toBe(11);
     expect(fingerprints.has('x|y')).toBe(false); // the PR's marker is ignored
+  });
+});
+
+describe('location comment body (issue 2206)', () => {
+  const marker = '<!-- audit-cmt:reliability|a.ts|pr-1 -->';
+  const base = { prUrl: 'https://x/pull/1', headSha: 'abcdef0123456789', marker };
+
+  it('renders every finding, the footer and the marker last', () => {
+    const body = buildLocationCommentBody({
+      ...base,
+      findings: [
+        { severity: 'P2', title: 'one', detail: 'd1' },
+        { severity: 'P2', title: 'two', detail: 'd2' },
+      ],
+    });
+    expect(body).toContain('**P2** — one');
+    expect(body).toContain('**P2** — two');
+    expect(body).toContain('latest audit commit: abcdef01');
+    expect(body.endsWith(marker)).toBe(true);
+  });
+
+  it("stays under GitHub's comment limit and KEEPS the upsert marker when the findings do not fit", () => {
+    const huge = 'x'.repeat(40_000);
+    const body = buildLocationCommentBody({
+      ...base,
+      findings: [
+        { severity: 'P2', title: 'a', detail: huge },
+        { severity: 'P2', title: 'b', detail: huge },
+      ],
+    });
+    expect(body.length).toBeLessThanOrEqual(LOCATION_COMMENT_MAX_CHARS);
+    expect(LOCATION_COMMENT_MAX_CHARS).toBeLessThan(65_536);
+    // Without the marker the next run would POST a duplicate instead of editing.
+    expect(body.endsWith(marker)).toBe(true);
+    expect(body).toMatch(/truncated/);
+  });
+
+  it('audit.mjs checks both location-comment writes instead of logging success unconditionally', () => {
+    const src = readFileSync(
+      new URL('../../.github/scoped-audit/audit.mjs', import.meta.url),
+      'utf8'
+    );
+    expect(src).toMatch(/const resp = prior\s*\?\s*await gh\('PATCH'/);
+    expect(src).toMatch(/if \(!resp\.ok\)/);
+    // No bare, unchecked awaited write to the comments endpoints remains.
+    expect(src).not.toMatch(
+      /^\s*await gh\('(PATCH|POST)', `\/repos\/\$\{owner\}\/\$\{repo\}\/issues\/(comments|\$\{group)/m
+    );
   });
 });

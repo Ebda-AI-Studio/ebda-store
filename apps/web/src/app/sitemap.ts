@@ -229,6 +229,76 @@ async function fetchBundles(storeId: string): Promise<BundleEntry[]> {
 }
 
 /**
+ * The custom-domain branch of `sitemap()`: ONE store's URLs, rooted at its
+ * own host (see `sitemap()`'s doc comment for why). Extracted unchanged from
+ * `sitemap()` (issue 1549) — tests/unit/sitemap-fanout.test.ts covers both
+ * branches.
+ */
+async function buildTenantSitemap(
+  requestHost: string,
+  storeId: string,
+  now: Date
+): Promise<MetadataRoute.Sitemap> {
+  const base = `https://${requestHost}`;
+  // Single store, own domain: up to 10 pages x 100 = 1000 product URLs,
+  // plus 1 unpaginated bundle-list request (see fetchBundles) — 12
+  // subrequests worst case, nowhere near any Worker limit.
+  const [products, bundles] = await Promise.all([
+    // No catch (#2127): a products outage must 5xx this merchant's own
+    // sitemap, not publish it with every product URL missing.
+    fetchProducts(storeId, 10),
+    fetchBundles(storeId),
+  ]);
+  const entries: MetadataRoute.Sitemap = [];
+  for (const page of STORE_STATIC_PAGES) {
+    entries.push({
+      url: `${base}${page.path || '/'}`,
+      lastModified: now,
+      changeFrequency: page.freq,
+      priority: page.priority,
+    });
+  }
+  for (const product of products) {
+    entries.push({
+      url: `${base}/products/${product.slug}`,
+      lastModified: product.updatedAt
+        ? new Date(product.updatedAt)
+        : product.createdAt
+          ? new Date(product.createdAt)
+          : now,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    });
+  }
+  // No `updatedAt` on the bundle-list response (it's the pre-filtered,
+  // customer-facing shape — see PublicBundle) — `now` is an acceptable
+  // freshness signal for a merchant-curated set this small.
+  //
+  // The `/bundles` index itself is NOT in `STORE_STATIC_PAGES` (unlike
+  // `/products`/`/categories`, which every store has) — it 404s for a
+  // store without the `bundles` feature (see `BundlesPageBody`'s
+  // 403-means-404 treatment), so it's only listed when `bundles` is
+  // non-empty, exactly like the ShopChrome nav entry's own gating.
+  if (bundles.length > 0) {
+    entries.push({
+      url: `${base}/bundles`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    });
+  }
+  for (const bundle of bundles) {
+    entries.push({
+      url: `${base}/bundles/${bundle.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    });
+  }
+  return entries;
+}
+
+/**
  * Sitemap with host-aware tenant fan-out.
  *
  * The same Next.js sitemap route serves three different audiences
@@ -260,65 +330,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // through to the master sitemap on a non-match (platform path,
   // preview deploys, etc.).
   const tenant = await resolveStoreByHost(requestHost);
-  if (tenant) {
-    const base = `https://${requestHost}`;
-    // Single store, own domain: up to 10 pages x 100 = 1000 product URLs,
-    // plus 1 unpaginated bundle-list request (see fetchBundles) — 12
-    // subrequests worst case, nowhere near any Worker limit.
-    const [products, bundles] = await Promise.all([
-      // No catch (#2127): a products outage must 5xx this merchant's own
-      // sitemap, not publish it with every product URL missing.
-      fetchProducts(tenant.id, 10),
-      fetchBundles(tenant.id),
-    ]);
-    const entries: MetadataRoute.Sitemap = [];
-    for (const page of STORE_STATIC_PAGES) {
-      entries.push({
-        url: `${base}${page.path || '/'}`,
-        lastModified: now,
-        changeFrequency: page.freq,
-        priority: page.priority,
-      });
-    }
-    for (const product of products) {
-      entries.push({
-        url: `${base}/products/${product.slug}`,
-        lastModified: product.updatedAt
-          ? new Date(product.updatedAt)
-          : product.createdAt
-            ? new Date(product.createdAt)
-            : now,
-        changeFrequency: 'weekly',
-        priority: 0.7,
-      });
-    }
-    // No `updatedAt` on the bundle-list response (it's the pre-filtered,
-    // customer-facing shape — see PublicBundle) — `now` is an acceptable
-    // freshness signal for a merchant-curated set this small.
-    //
-    // The `/bundles` index itself is NOT in `STORE_STATIC_PAGES` (unlike
-    // `/products`/`/categories`, which every store has) — it 404s for a
-    // store without the `bundles` feature (see `BundlesPageBody`'s
-    // 403-means-404 treatment), so it's only listed when `bundles` is
-    // non-empty, exactly like the ShopChrome nav entry's own gating.
-    if (bundles.length > 0) {
-      entries.push({
-        url: `${base}/bundles`,
-        lastModified: now,
-        changeFrequency: 'weekly',
-        priority: 0.6,
-      });
-    }
-    for (const bundle of bundles) {
-      entries.push({
-        url: `${base}/bundles/${bundle.slug}`,
-        lastModified: now,
-        changeFrequency: 'weekly',
-        priority: 0.6,
-      });
-    }
-    return entries;
-  }
+  if (tenant) return buildTenantSitemap(requestHost, tenant.id, now);
 
   // Master sitemap: platform path. Covers every store under /<slug>/...
   //

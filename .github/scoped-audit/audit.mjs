@@ -31,6 +31,7 @@ import {
   locationCommentMarker,
   findMarkedComment,
   groupCommentsByIssue,
+  buildLocationCommentBody,
 } from './followup-filing.mjs';
 import { fetchAllPages } from './gh-paginate.mjs';
 import { nonRunExitCode, auditExitCode, auditVerdict, NON_RUN_REASONS } from './gate-policy.mjs';
@@ -550,18 +551,13 @@ async function fileFollowupIssues(followups) {
 
   for (const group of groups) {
     const marker = locationCommentMarker({ fingerprint: group.fingerprint, pr: PR_NUMBER });
-    const body = [
-      `**Also reported at this location** by the scoped-audit gate:`,
-      '',
-      ...group.findings.flatMap(f => [
-        `**${f.severity}** — ${f.title || 'untitled'}`,
-        '',
-        f.detail || '(no detail)',
-        '',
-      ]),
-      `_PR: ${PR_URL} — latest audit commit: ${HEAD_SHA ? HEAD_SHA.slice(0, 8) : 'unknown'}_`,
+    // Size-capped (issue 2206): an over-limit body is rejected by GitHub.
+    const body = buildLocationCommentBody({
+      findings: group.findings,
+      prUrl: PR_URL,
+      headSha: HEAD_SHA,
       marker,
-    ].join('\n');
+    });
 
     try {
       const { items, complete } = await fetchAllPages({
@@ -581,12 +577,24 @@ async function fileFollowupIssues(followups) {
         continue;
       }
 
+      // Both writes CHECK the response (issue 2206). gh() only logs a non-ok
+      // status and never throws, so these used to print success over a
+      // rejected write — the same #1453 class the issue-filing write above
+      // already handles — and the finding was tracked nowhere.
       const prior = findMarkedComment(items, marker);
-      if (prior) {
-        await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body });
+      const resp = prior
+        ? await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body })
+        : await gh('POST', `/repos/${owner}/${repo}/issues/${group.issueNumber}/comments`, {
+            body,
+          });
+      if (!resp.ok) {
+        console.log(
+          `::warning::scoped-audit could not ${prior ? 'update' : 'post'} its location comment on ` +
+            `#${group.issueNumber} (HTTP ${resp.status}). The finding is still in the PR comment.`
+        );
+      } else if (prior) {
         console.log(`scoped-audit: updated its existing location comment on #${group.issueNumber}`);
       } else {
-        await gh('POST', `/repos/${owner}/${repo}/issues/${group.issueNumber}/comments`, { body });
         console.log(
           `scoped-audit: commented on #${group.issueNumber} instead of filing a duplicate`
         );

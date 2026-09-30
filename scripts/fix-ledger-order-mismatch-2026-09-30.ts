@@ -19,6 +19,9 @@
  *      stock on each of the order's three lines (return_stock rows at
  *      2026-07-09 16:32:04, goods were delivered). Only apply after the
  *      merchant confirms the counts; it writes an `adjustment` history row.
+ *      It REFUSES if any of the three is a variant product (products.inventory
+ *      is not a variant product's stock), and busts the product caches after
+ *      commit.
  *
  *   B. ORD-1778670342233-50212B65 (f64fd62c-…) — refunded (by status, May 16;
  *      paymentStatus was left at 'paid'), but JE-2026-000018 (5.000 KWD) books
@@ -38,6 +41,7 @@
 import { prisma, withRlsBypass, type Prisma } from '@force/database';
 import { reverseEntry } from '../apps/api/src/services/accounting/journal.service';
 import { postRefundJournal } from '../apps/api/src/services/accounting/posting/refund-posting';
+import { invalidateStoreProductCaches } from '../apps/api/src/lib/public-cache';
 
 const EXECUTE = process.argv.includes('--execute');
 const FIX_STOCK = process.argv.includes('--fix-stock');
@@ -134,12 +138,40 @@ async function checkCaseB() {
     refuse(`case B sale totals ${t.debit}/${t.credit}`);
 }
 
+/**
+ * --fix-stock writes `products.inventory`, which is stock ONLY for a product
+ * with no variants (docs/architecture/inventory-model.md — a product-scoped
+ * write aimed at a variant product must fail loud). For a variant product the
+ * decrement would move no real stock while writing a history row claiming it
+ * did, and the phantom units would still be sitting on the variant rows
+ * (issue 2273). So every target is checked here — in the dry run too — and
+ * the script refuses on any variant, exactly as it refuses on every other
+ * precondition it did not audit.
+ */
+async function checkPhantomStockTargets() {
+  for (const s of CASE_A.phantomStock) {
+    const p = await withRlsBypass(tx =>
+      tx.product.findFirst({
+        where: { id: s.productId, storeId: STORE_ID },
+        select: { id: true, hasVariants: true, _count: { select: { variants: true } } },
+      })
+    );
+    if (!p) refuse(`case A stock: product ${s.name} not found`);
+    if (p.hasVariants || p._count.variants > 0)
+      refuse(
+        `case A stock: ${s.name} is a VARIANT product (${p._count.variants} variant row(s)) — ` +
+          `products.inventory is not its stock; the correction must target the variant row. Not applying.`
+      );
+  }
+}
+
 async function main() {
   console.log(
     `[fix-ledger] mode: ${EXECUTE ? 'EXECUTE' : 'DRY RUN'}${FIX_STOCK ? ' + stock' : ''}`
   );
   const a = await checkCaseA();
   await checkCaseB();
+  if (FIX_STOCK) await checkPhantomStockTargets();
   console.log('[fix-ledger] preconditions hold for both cases.');
   console.log(
     `[fix-ledger] A: would reverse ${CASE_A.wrongReversalEntryNumber} (re-books the ${CASE_A.amount / 1000} KWD sale of ${CASE_A.orderNumber})`
@@ -180,9 +212,15 @@ async function main() {
 
     if (FIX_STOCK) {
       for (const s of CASE_A.phantomStock) {
+        // Re-checked under the row lock: a variant added between the
+        // precondition check and here must still refuse (issue 2273).
         const [p] = await tx.$queryRaw<Array<{ inventory: number }>>`
-          SELECT inventory FROM public.products WHERE id = ${s.productId} AND store_id = ${STORE_ID} FOR UPDATE`;
-        if (!p) refuse(`product ${s.name} not found`);
+          SELECT inventory FROM public.products p
+          WHERE p.id = ${s.productId} AND p.store_id = ${STORE_ID}
+            AND p.has_variants = false
+            AND NOT EXISTS (SELECT 1 FROM public.product_variants v WHERE v.product_id = p.id)
+          FOR UPDATE`;
+        if (!p) refuse(`product ${s.name} not found, or it has variants`);
         await tx.product.update({
           where: { id: s.productId },
           data: { inventory: { decrement: s.qty } },
@@ -200,11 +238,16 @@ async function main() {
           },
         });
       }
-      console.log(
-        '[fix-ledger] A: phantom stock removed (storefront caches refresh on their TTL).'
-      );
+      console.log('[fix-ledger] A: phantom stock removed.');
     }
   });
+  if (FIX_STOCK) {
+    // AFTER the commit, not inside it: a purge that ran before COMMIT could be
+    // refilled from the old rows. Without it the storefront kept showing the
+    // phantom units until the product cache TTL expired (issue 2273).
+    await invalidateStoreProductCaches(STORE_ID);
+    console.log('[fix-ledger] A: storefront product caches invalidated.');
+  }
   console.log('[fix-ledger] done.');
 }
 

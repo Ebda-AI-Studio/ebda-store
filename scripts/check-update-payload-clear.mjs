@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * CI gate — an UPDATE payload may never send `X || undefined`.
+ * CI gate — an UPDATE payload may never send `X || undefined` (or its
+ * ternary spelling, `cond ? X : undefined`).
  *
  * The defect class this closes: an admin form that maps an emptied input to
  * `undefined` inside the body of an `apiPut` / `apiPatch` produces a payload
@@ -60,12 +61,27 @@ function calleeName(node) {
   return null;
 }
 
+const isUndefinedIdent = node => ts.isIdentifier(node) && node.text === 'undefined';
+
+/**
+ * The two spellings of "emptied input → key dropped":
+ *   `x || undefined`
+ *   `cond ? x : undefined`  (or `cond ? undefined : x`) — issue 2262: the
+ *   supplier form's `customTermsDays: custom && days ? parseInt(days) :
+ *   undefined` passed this gate while leaving a stale value on every edit
+ *   away from custom terms.
+ */
 function isOrUndefined(node) {
-  return (
+  if (
     ts.isBinaryExpression(node) &&
     node.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
-    ts.isIdentifier(node.right) &&
-    node.right.text === 'undefined'
+    isUndefinedIdent(node.right)
+  ) {
+    return true;
+  }
+  return (
+    ts.isConditionalExpression(node) &&
+    (isUndefinedIdent(node.whenFalse) || isUndefinedIdent(node.whenTrue))
   );
 }
 

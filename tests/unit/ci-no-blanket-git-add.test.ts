@@ -128,10 +128,15 @@ describe('ai-review auto-fix survives a workflow-file edit', () => {
     // .husky/, a new root config) was silently neither staged nor logged.
     // It must also exclude new workflow files specifically — those are
     // reported separately (WF_NEW) and can never be pushed by this token.
+    // The pathspec lives in NEW_FILES_PATHSPEC since issue 2102 (a denylist
+    // of scratch shapes alongside the workflow exclusion).
     const newFilesLine = src.split('\n').find(l => l.includes('git ls-files --others'));
     expect(newFilesLine, 'NEW_FILES line not found').toBeTruthy();
     expect(newFilesLine).not.toMatch(/-- apps packages tests docs scripts \.zap/);
-    expect(newFilesLine).toMatch(/:!\.github\/workflows/);
+    const specLine = src.split('\n').find(l => l.trim().startsWith('NEW_FILES_PATHSPEC=('));
+    expect(specLine, 'NEW_FILES_PATHSPEC not found').toBeTruthy();
+    expect(specLine).toMatch(/:\((?:exclude)[^)]*\)\.github\/workflows/);
+    expect(specLine).not.toMatch(/ apps packages tests docs scripts \.zap/);
 
     // WF_CHANGED/WF_NEW must be computed BEFORE `git add -u`, so a
     // subsequent `git status --porcelain` read of the same paths (used by

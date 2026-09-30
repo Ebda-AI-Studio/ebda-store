@@ -122,7 +122,7 @@ export interface AgentDenialRow {
   /**
    * `details.count` — how many actual denial ATTEMPTS this one row stands in
    * for (#1644 / #1649, 2026-09-25: `auditAgentWrite` coalesces repeat
-   * denials from the same store/ip/tool within a 60s window onto one row
+   * denials from the same store/ip/tool/credential within a 60s window onto one row
    * rather than opening a transaction per attempt). Absent/1 for a row that
    * was never coalesced — every threshold below must weight by this, not by
    * row count, or a real flood undercounts by however many attempts were
@@ -197,7 +197,7 @@ function countDistinctIps(rows: AgentDenialRow[]): number {
 /**
  * Sum of ATTEMPTS a set of rows represents, not the row count — a coalesced
  * row's `details.count` (#1644 / #1649) can stand in for many denials from
- * the same store/ip/tool within one minute. Every threshold below must
+ * the same store/ip/tool/credential within one minute. Every threshold below must
  * weight by this or a real flood undercounts by however much was coalesced
  * and can stop crossing the threshold it exists to catch. A row with no
  * `count` (never coalesced, or produced before this change) weighs 1, so

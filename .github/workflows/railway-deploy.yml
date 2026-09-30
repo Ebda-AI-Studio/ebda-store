@@ -300,59 +300,15 @@ jobs:
       - name: Verify guest checkout is still admitted
         env:
           API_BASE: ${{ vars.RAILWAY_API_BASE || 'https://api.force-ai.co' }}
-        # Bounded retry (#1535), matching the shape of "Verify the deployed
-        # build is THIS commit" above: that step already reasons that the
-        # verdict must come from the whole polling window, never a single
-        # poll — this probe fired exactly one curl and treated any non-404 as
-        # fatal. paymentLimiter (apps/api/src/middleware/security.ts) is
-        # keyed by IP with a shared self-hosted runner IP behind it, so a 429
-        # RATE_LIMITED is reachable on a healthy deploy; a transient 502/504
-        # during the post-deploy replica swap is too. Both are retry-worthy.
-        # CSRF_* stays an immediate hard fail: a CSRF lockout is deterministic
-        # and does not benefit from retrying.
-        run: |
-          set -euo pipefail
-          probe_args=(-s -m 20 -X POST "$API_BASE/api/v1/payments/create" -H 'Content-Type: application/json' -H 'X-Session-ID: deploy-admission-probe' -d '{"orderId":"00000000-0000-0000-0000-000000000000","provider":"tap"}')
-
-          for i in $(seq 1 5); do
-            body=$(mktemp) || body="${RUNNER_TEMP:-/tmp}/admission-probe.json"
-            code=$(curl "${probe_args[@]}" -o "$body" -w '%{http_code}') || code=000
-            err=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s)?.error?.code ?? ""))}catch{process.exit(3)}})' < "$body" 2>/dev/null) || err='__UNPARSEABLE__'
-            echo "attempt $i: status=$code error_code=${err:-<none>}"
-
-            if [ "$code" = "404" ]; then
-              echo "Guest checkout admitted: cleared CSRF and reached business logic."
-              exit 0
-            fi
-
-            # Status-code retry check BEFORE the error-code switch below: an
-            # infra-level 000/429/5xx is exactly the case whose body is NOT
-            # our app's JSON error shape (a load balancer error page, or no
-            # body at all on a connection failure), so it reads as
-            # __UNPARSEABLE__ — checking that case first would treat the most
-            # realistic transient failures as fatal, defeating the retry.
-            case "$code" in
-              000 | 429 | 5??)
-                echo "retry-worthy: status=$code error_code=${err:-<none>} — waiting 5s"
-                sleep 5
-                continue ;;
-            esac
-
-            case "$err" in
-              CSRF_*)
-                echo "::error::Guest checkout is locked out again: POST /payments/create returned $code $err for a cookieless request. This is the 2026-09-03 regression. Do not leave this deploy serving."
-                exit 1 ;;
-              __UNPARSEABLE__)
-                echo "::error::$API_BASE/api/v1/payments/create returned $code with a body this probe could not parse, so admission could not be verified. A broken check is not a healthy deploy."
-                exit 1 ;;
-            esac
-
-            echo "::error::Expected 404 NOT_FOUND for a non-existent order (proving the request cleared CSRF and reached business logic), got $code ${err:-<none>}. Admission is unverified."
-            exit 1
-          done
-
-          echo "::error::Guest checkout admission never reached a verifiable state after 5 attempts (last: status=$code error_code=${err:-<none>}) — likely still rate-limited or a persistent 5xx. Admission is unverified."
-          exit 1
+          PROBE_SESSION_ID: deploy-admission-probe
+        # Bounded retry (#1535): paymentLimiter (apps/api/src/middleware/
+        # security.ts) is keyed by IP with a shared self-hosted runner IP
+        # behind it, so a 429 RATE_LIMITED is reachable on a healthy deploy; a
+        # transient 502/504 during the post-deploy replica swap is too. Both
+        # are retried; CSRF_* stays an immediate hard fail. The probe lives in
+        # ONE script shared with the hourly job below (issue 2191) — two
+        # inline copies had already drifted (only this one retried).
+        run: bash scripts/guest-checkout-admission-probe.sh
 
   # Same probe as the deploy job's "Verify guest checkout is still admitted"
   # step, but INDEPENDENT of the RAILWAY_ACTIONS_DEPLOY gate and of any push
@@ -366,43 +322,73 @@ jobs:
   # guest checkout) had NO monitor for as long as that stayed true. A probe
   # that only fires from inside a job gated on a switch that isn't flipped
   # yet is a probe that has never actually run.
+  #
+  # Sequenced AFTER `deploy` (issue 2176). On workflow_dispatch both jobs used
+  # to start together, so the probe fired while `railway up` was swapping
+  # replicas — a 502 or the old build answering read as a CSRF-lockout page.
+  # `needs: deploy` + `!cancelled()` runs it once deploy has finished, whatever
+  # its result: on the hourly cron (and pre-cutover) deploy is SKIPPED, which
+  # `!cancelled()` still lets through; after a failed deploy the probe still
+  # measures whatever is live, which is exactly what it is for.
+  #
+  # Runner (issue 2191): it stays on the repo's runner expression. Cloud
+  # minutes are billing-blocked for this org (runner-health-check.yml header),
+  # so `ubuntu-latest` would fail in ~3s every hour and alert nobody. A run
+  # that never starts because the self-hosted runner is offline is covered
+  # OUTSIDE GitHub Actions by ~/.claude/scripts/ci-runner-guard.sh (launchd,
+  # every 30 min, Telegram) — the dead-man's switch for every scheduled job
+  # here. Ruling CI-PROBE-1 in docs/RULINGS.md.
   guest-checkout-probe:
     name: Guest checkout admission probe (scheduled)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: deploy
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    timeout-minutes: 3
+    # 5 bounded attempts x (20s curl + 5s wait) + checkout/setup-node.
+    timeout-minutes: 5
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
+        if: vars.USE_SELF_HOSTED == 'true'
+      # Sparse: the probe script is the only file this job reads.
+      - name: Checkout the probe script
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: scripts/guest-checkout-admission-probe.sh
+          sparse-checkout-cone-mode: false
+
       # The self-hosted runner has no node on the Actions shell PATH — the
-      # probe's response-parsing step below is `node -e ...`, which would
-      # die with "command not found" (exit 127) without this.
+      # probe parses the response body with `node -e`, which would die with
+      # "command not found" (exit 127) without this.
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
 
+      # The SAME script the deploy job's step runs — including its bounded
+      # retry on 000/429/5xx, so a lone rate-limit or replica-swap 502 no
+      # longer pages "CSRF lockout" on the hourly run (issue 2191).
       - name: Verify guest checkout is still admitted
         env:
           API_BASE: ${{ vars.RAILWAY_API_BASE || 'https://api.force-ai.co' }}
-        run: |
-          set -euo pipefail
-          body=$(mktemp) || body="${RUNNER_TEMP:-/tmp}/admission-probe.json"
-          probe_args=(-s -m 20 -o "$body" -w '%{http_code}' -X POST "$API_BASE/api/v1/payments/create" -H 'Content-Type: application/json' -H 'X-Session-ID: scheduled-admission-probe' -d '{"orderId":"00000000-0000-0000-0000-000000000000","provider":"tap"}')
-          code=$(curl "${probe_args[@]}") || code=000
-          err=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s)?.error?.code ?? ""))}catch{process.exit(3)}})' < "$body" 2>/dev/null) || err='__UNPARSEABLE__'
-          echo "status=$code error_code=${err:-<none>}"
-          case "$err" in
-            CSRF_*)
-              echo "::error::Guest checkout is locked out again: POST /payments/create returned $code $err for a cookieless request. This is the 2026-09-03 regression. Do not leave this deploy serving."
-              exit 1 ;;
-            __UNPARSEABLE__)
-              echo "::error::$API_BASE/api/v1/payments/create returned $code with a body this probe could not parse, so admission could not be verified. A broken check is not a healthy deploy."
-              exit 1 ;;
-          esac
-          if [ "$code" != "404" ]; then
-            echo "::error::Expected 404 NOT_FOUND for a non-existent order (proving the request cleared CSRF and reached business logic), got $code. Admission is unverified."
-            exit 1
-          fi
-          echo "Guest checkout admitted: cleared CSRF and reached business logic."
+          PROBE_SESSION_ID: scheduled-admission-probe
+        run: bash scripts/guest-checkout-admission-probe.sh
 
       - name: Telegram alert on failure
         if: failure()

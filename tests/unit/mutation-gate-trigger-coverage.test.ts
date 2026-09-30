@@ -65,6 +65,55 @@ describe('defence-mutation gate triggers on everything it measures', () => {
     ).toEqual([]);
   });
 
+  it("every spec entry's TEST is covered by a trigger path too (issues 2175/2188)", () => {
+    // --tier=all rests three verdicts on tests/integration/* files. A PR that
+    // weakens the guarding test is as much a change to the defence as one
+    // that edits its source — and used to match no glob at all.
+    const spec = JSON.parse(
+      readFileSync(path.join(ROOT, 'docs/security/defence-mutations.json'), 'utf8')
+    ) as { defences: Array<{ id: string; test: string }> };
+
+    const uncovered = spec.defences
+      .filter(d => !paths.some(g => globMatches(g, d.test)))
+      .map(d => `${d.test}  (defence: ${d.id})`);
+
+    expect(
+      [...new Set(uncovered)],
+      'these guarding tests can change without the mutation gate running — add a glob to .github/workflows/mutation-testing.yml'
+    ).toEqual([]);
+  });
+
+  it('the job provisioning comment names EVERY integration-tier defence (issues 2184/2187)', () => {
+    // The Postgres-only services block is justified entry by entry. An
+    // integration-tier defence added to the spec without being reasoned about
+    // there is exactly how "the one integration-tier defence" went stale
+    // while three ran.
+    const spec = JSON.parse(
+      readFileSync(path.join(ROOT, 'docs/security/defence-mutations.json'), 'utf8')
+    ) as { defences: Array<{ id: string; tier?: string; test: string }> };
+    const mut = readFileSync(path.join(ROOT, '.github/workflows/mutation-testing.yml'), 'utf8');
+    const services = mut.slice(
+      mut.indexOf('Postgres only, no Redis'),
+      mut.indexOf('    services:')
+    );
+    expect(
+      services.length,
+      'the services justification comment moved — re-point this test'
+    ).toBeGreaterThan(100);
+
+    const integration = spec.defences.filter(d => d.tier === 'integration');
+    expect(integration.length).toBeGreaterThan(0);
+    for (const d of integration) {
+      expect(
+        services,
+        `${d.id} is integration-tier but the services comment never reasons about it`
+      ).toContain(d.id);
+    }
+    expect(mut, 'a stale singular "the one integration-tier" claim is back').not.toMatch(
+      /the one integration-tier/
+    );
+  });
+
   it('covers the harness the run itself depends on', () => {
     // The runner, the spec, the record it diffs, and the vitest resolution it
     // executes through. A change to any of these changes what the gate

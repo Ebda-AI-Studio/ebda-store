@@ -151,4 +151,31 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
     expect(line, '.zap/rules.tsv no longer has a 10055 row').toBeTruthy();
     expect(line).toContain('IGNORE');
   });
+
+  // Issue 2100: `.zap/rules.tsv` globally IGNOREs 10063 ("Permissions-Policy
+  // not set") for static chunks. The IGNORE has no URL scope, so it also hides
+  // the header going missing from the HTML routes that DO carry it — this is
+  // the deterministic gate that replaced the one-off production curl.
+  it.each(CONFIGS.filter(c => existsSync(join(ROOT, c))))(
+    '%s declares a Permissions-Policy that denies geolocation/microphone/camera (ZAP 10063 is IGNOREd)',
+    config => {
+      const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
+      const m = /key:\s*'Permissions-Policy',\s*value:\s*'([^']*)'/.exec(src);
+      expect(
+        m,
+        `${config} no longer emits a Permissions-Policy header. ZAP rule 10063 is IGNOREd in ` +
+          `.zap/rules.tsv, so the nightly scan will NOT report this.`
+      ).toBeTruthy();
+      for (const feature of ['geolocation=()', 'microphone=()', 'camera=()']) {
+        expect(m![1], `${config}: Permissions-Policy lost \`${feature}\``).toContain(feature);
+      }
+    }
+  );
+
+  it('the 10063 suppression that makes the Permissions-Policy floor load-bearing is still in place', () => {
+    const rules = readFileSync(join(ROOT, '.zap/rules.tsv'), 'utf8');
+    const line = rules.split('\n').find(l => l.startsWith('10063\t'));
+    expect(line, '.zap/rules.tsv no longer has a 10063 row').toBeTruthy();
+    expect(line).toContain('csp-directive-floor.test.ts');
+  });
 });

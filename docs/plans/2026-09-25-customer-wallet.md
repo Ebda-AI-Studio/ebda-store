@@ -214,7 +214,8 @@ Storefront (copy through `LanguageContext` `t(en, ar)`):
   erasure forfeit + note scrub, export.
 - Feature gate: routes 403 with the feature off (integration).
 - Defence mutations (unit tier): remove the no-negative check → red; remove the
-  idempotency re-check → red. Recorded via `npm run test:defence-mutations -- --write`.
+  idempotency re-check → red. Recorded via `DATABASE_URL=<migrated Postgres> npm run test:defence-mutations -- --write --tier=all`
+  (`--write` refuses any partial tier since #1233/#1262 — see issue 2192).
 
 ## Rulings
 

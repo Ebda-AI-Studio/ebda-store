@@ -80,6 +80,17 @@ It also holds the explicit, reasoned list of `authenticate`d `/public` routes
 whatever its role check, so any new one must be added there with its reason.
 It cannot see authorization done inside a handler body.
 
+**The `/stores/public` twin (issue 2121).** A `'/public/:storeId/…'` path
+declared on a router mounted at bare `/stores` resolves to
+`/api/v1/stores/public/…`. That shape is exempt from BOTH controls too —
+`csrfProtection`'s `includes('/public/')` and the storefront allowlist
+`^/api/v1/stores/public/…` in `restrictPlatformOnlyOrigins` — so it is
+treated exactly like `/public`: no admin guard may appear under it, and its
+authenticated routes (wallet balance/history, carrier tracking — all
+read-only with in-handler ownership) are on the same reasoned list. The
+guard walks both prefixes; `csrf-admin-route-not-at-stores-public` in the
+defence-mutation record proves it goes red.
+
 ---
 
 ## JWT lifetime contract

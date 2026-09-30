@@ -9,8 +9,13 @@
  *
  * The static checks alone would pass a script that never runs, so the detect
  * step's own `run:` block is extracted from the workflow and EXECUTED here,
- * against a throwaway git repo, with a stub `gh` standing in for the
- * last-successful-run lookup. Each case reads the step's real GITHUB_OUTPUT.
+ * against a throwaway git repo, with a stub `curl` standing in for the
+ * last-successful-run REST lookup. Each case reads the step's real
+ * GITHUB_OUTPUT.
+ *
+ * Issue 2240: the lookup used the gh CLI, which nothing asserted exists on the
+ * self-hosted runner — its absence silently deployed all three apps on every
+ * push. It is now a curl REST call, and the stub below has NO gh on PATH.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -62,10 +67,13 @@ describe('cf-deploy detect: static shape', () => {
   it('does not diff against HEAD~1 / HEAD^ / github.event.before', () => {
     const code = codeLines(detectScript()).join('\n');
     expect(code).not.toMatch(/HEAD~|HEAD\^|event\.before/);
-    // …and does look up the last successful run of THIS workflow on main.
-    expect(code).toMatch(/gh run list[\s\S]*--workflow cf-deploy\.yml/);
-    expect(code).toMatch(/--branch main/);
-    expect(code).toMatch(/--status success/);
+    // …and does look up the last successful run of THIS workflow on main,
+    // over REST with curl — never the gh CLI (issue 2240).
+    expect(code).toMatch(
+      /actions\/workflows\/cf-deploy\.yml\/runs\?branch=main&status=success&per_page=1/
+    );
+    expect(code).toMatch(/curl -sSf/);
+    expect(code).not.toMatch(/(^|[\s;|&(])gh\s/m);
   });
 
   it('checks out full history and may read Actions runs', () => {
@@ -118,9 +126,10 @@ describe('cf-deploy detect: behaviour (script executed against a real git repo)'
     commit('c0', 'README.md');
     commit('c1-admin', 'apps/admin/page.tsx'); // the merge whose run was CANCELLED
     commit('c2-web', 'apps/web/page.tsx'); // the merge whose run survived
-    // Stub gh: prints $GH_STUB_OUT, exits $GH_STUB_EXIT, and records that it ran.
+    // Stub curl: prints $GH_STUB_OUT, exits $GH_STUB_EXIT, records that it
+    // ran. There is deliberately NO gh on this PATH (issue 2240).
     fs.writeFileSync(
-      path.join(bin, 'gh'),
+      path.join(bin, 'curl'),
       '#!/usr/bin/env bash\ntouch "$GH_STUB_CALLED"\nprintf "%s" "${GH_STUB_OUT:-}"\nexit "${GH_STUB_EXIT:-0}"\n',
       { mode: 0o755 }
     );
@@ -142,10 +151,16 @@ describe('cf-deploy detect: behaviour (script executed against a real git repo)'
         ...CLEAN_GIT_ENV,
         PATH: `${bin}${path.delimiter}${process.env.PATH}`,
         GITHUB_OUTPUT: out,
+        GITHUB_STEP_SUMMARY: `${out}.summary`,
         GITHUB_REPOSITORY: 'ForceAI-KW/force-website-builder',
         GH_TOKEN: 'stub',
         EVENT_NAME: opts.event ?? 'push',
-        GH_STUB_OUT: opts.ghOut ?? '',
+        // The REST response shape: one run carrying head_sha (plus a
+        // head_commit.id that must NOT be mistaken for it).
+        GH_STUB_OUT:
+          opts.ghOut === undefined || opts.ghOut === ''
+            ? '{"total_count":0,"workflow_runs":[]}'
+            : `{"total_count":1,"workflow_runs":[{"id":1,"head_sha":"${opts.ghOut}","head_commit":{"id":"${'e'.repeat(40)}"}}]}`,
         GH_STUB_EXIT: String(opts.ghExit ?? 0),
         GH_STUB_CALLED: called,
       },
@@ -158,7 +173,10 @@ describe('cf-deploy detect: behaviour (script executed against a real git repo)'
         .filter(Boolean)
         .map(l => l.split('=') as [string, string])
     );
-    return { outputs, ghCalled: fs.existsSync(called), log: res.stdout };
+    const summary = fs.existsSync(`${out}.summary`)
+      ? fs.readFileSync(`${out}.summary`, 'utf8')
+      : '';
+    return { outputs, ghCalled: fs.existsSync(called), log: res.stdout, summary };
   }
 
   const ALL = { web: 'true', admin: 'true', orders: 'true' };
@@ -176,10 +194,17 @@ describe('cf-deploy detect: behaviour (script executed against a real git repo)'
     expect(outputs).toEqual({ web: 'true', admin: 'false', orders: 'false' });
   });
 
-  it('FAIL SAFE: the last-success lookup failing deploys everything', () => {
-    const { outputs, ghCalled } = run({ ghExit: 1 });
+  it('FAIL SAFE: the last-success lookup failing deploys everything — and says so in the step summary', () => {
+    const { outputs, ghCalled, summary } = run({ ghExit: 22 });
     expect(ghCalled).toBe(true);
     expect(outputs).toEqual(ALL);
+    // Issue 2240: a persistent fallback must be visible without opening the log.
+    expect(summary).toMatch(/deploying ALL three — last-success lookup failed/);
+  });
+
+  it('records the resolved diff base in the step summary', () => {
+    const { summary } = run({ ghOut: sha['c1-admin'] });
+    expect(summary).toContain(`diff base ${sha['c1-admin']}`);
   });
 
   it('FAIL SAFE: no previous successful run deploys everything', () => {

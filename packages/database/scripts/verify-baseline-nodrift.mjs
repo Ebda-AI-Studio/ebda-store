@@ -40,6 +40,26 @@ export function isGated(s) {
   return GATED_STORE_SLUGS.has(s.slug) || GATED_STORE_IDS.has(s.id);
 }
 
+/**
+ * Which pinned stores the query did NOT return (issue 2219). An empty result
+ * — a PITR restore onto a branch with different ids, a renamed slug, or the
+ * script pointed at a fresh/seed database — used to skip the loop and print
+ * PASS having compared nothing. Every pin must resolve, or the run is BROKEN,
+ * not clean.
+ */
+export function missingGatedStores(stores) {
+  const missing = [];
+  for (const id of GATED_STORE_IDS) {
+    if (!stores.some(s => s.id === id)) missing.push(`id ${id}`);
+  }
+  for (const slug of GATED_STORE_SLUGS) {
+    if (!stores.some(s => s.slug === slug)) missing.push(`slug ${slug}`);
+  }
+  return missing;
+}
+
+export const GATED_STORE_COUNT = GATED_STORE_IDS.size + GATED_STORE_SLUGS.size;
+
 // DB access lives behind this guard (not at module load) so the pure
 // functions above (canonical/deepEqual/isGated) can be imported and unit
 // tested without a live database connection.
@@ -56,6 +76,17 @@ async function main() {
     },
     select: { id: true, slug: true, template: true, layoutSettings: true },
   });
+
+  const missing = missingGatedStores(stores);
+  if (missing.length > 0) {
+    await prisma.$disconnect();
+    console.error(
+      `\nBROKEN RUN: the gate resolved ${GATED_STORE_COUNT - missing.length} of ${GATED_STORE_COUNT} ` +
+        `pinned stores (missing: ${missing.join(', ')}). A pass here would have compared nothing — ` +
+        `check DATABASE_URL (a restored branch or seed DB?) and the pinned ids/slugs.`
+    );
+    process.exit(1);
+  }
 
   let failed = false;
   const failedStores = [];

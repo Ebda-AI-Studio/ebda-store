@@ -6,9 +6,15 @@
  * during the post-deploy replica swap — both used to fire notify-failure and
  * invite an unnecessary rollback of a release that actually shipped fine.
  *
- * This extracts the REAL "Verify guest checkout is still admitted" step
- * script from the workflow (not a reimplementation) and runs it against a
- * stateful curl stub, so the retry-vs-fatal classification is proven.
+ * This runs the REAL probe (scripts/guest-checkout-admission-probe.sh — not
+ * a reimplementation) against a stateful curl stub, so the retry-vs-fatal
+ * classification is proven.
+ *
+ * Issue 2191: the hourly `guest-checkout-probe` job carried a second, inline
+ * copy of this probe that never got the retry, and this suite only extracted
+ * the deploy job's copy — so the copy that runs 24x/day against production
+ * was the untested one. Both workflow steps now call the one script, and the
+ * last block below fails if either grows an inline curl again.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
@@ -22,10 +28,10 @@ type Job = { steps?: Step[] };
 type Workflow = { jobs?: Record<string, Job> };
 
 const WF_PATH = join(__dirname, '../../.github/workflows/railway-deploy.yml');
+const SCRIPT_PATH = join(__dirname, '../../scripts/guest-checkout-admission-probe.sh');
 const doc = yaml.load(readFileSync(WF_PATH, 'utf8')) as Workflow;
-const probeStep = doc.jobs?.deploy?.steps?.find(
-  s => s.name === 'Verify guest checkout is still admitted'
-);
+const probeStepIn = (job: string) =>
+  doc.jobs?.[job]?.steps?.find(s => s.name === 'Verify guest checkout is still admitted');
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -70,13 +76,7 @@ node -e '
   writeFileSync(join(binDir, 'curl'), curlStub);
   chmodSync(join(binDir, 'curl'), 0o755);
 
-  // Fast retries in the test — no need to actually wait 5s per attempt.
-  const script = (probeStep!.run as string).replace(/sleep 5/g, 'sleep 0.01');
-  const scriptPath = join(dir, 'probe.sh');
-  writeFileSync(scriptPath, `#!/usr/bin/env bash\n${script}\n`);
-  chmodSync(scriptPath, 0o755);
-
-  return spawnSync('bash', [scriptPath], {
+  return spawnSync('bash', [SCRIPT_PATH], {
     cwd: dir,
     encoding: 'utf8',
     env: {
@@ -84,6 +84,8 @@ node -e '
       PATH: `${binDir}:${process.env.PATH}`,
       API_BASE: 'http://x',
       RUNNER_TEMP: dir,
+      // Fast retries in the test — no need to actually wait 5s per attempt.
+      PROBE_SLEEP_SECS: '0.01',
     },
   });
 }
@@ -95,10 +97,6 @@ const csrf = { code: '403', body: JSON.stringify({ error: { code: 'CSRF_MISSING'
 const connFailed = { code: '000', body: '' };
 
 describe('railway-deploy.yml admission probe retry', () => {
-  it('the step was found (guards against a rename silently disabling this suite)', () => {
-    expect(probeStep?.run).toBeTruthy();
-  });
-
   it('passes immediately on a 404', () => {
     const r = runProbe([notFound]);
     expect(r.status, r.stdout + r.stderr).toBe(0);
@@ -149,5 +147,27 @@ describe('railway-deploy.yml admission probe retry', () => {
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/attempt 1:/);
     expect(r.stdout).not.toMatch(/attempt 2:/);
+  });
+});
+
+describe('railway-deploy.yml: both admission probes are the ONE script (issue 2191)', () => {
+  it.each(['deploy', 'guest-checkout-probe'])(
+    '%s job calls scripts/guest-checkout-admission-probe.sh and carries no inline probe',
+    job => {
+      const step = probeStepIn(job);
+      expect(step?.run, `${job}: probe step renamed or removed`).toBeTruthy();
+      expect(step!.run!.trim()).toBe('bash scripts/guest-checkout-admission-probe.sh');
+      expect(step!.env?.API_BASE).toBeTruthy();
+    }
+  );
+
+  it('the hourly probe runs AFTER deploy, never racing it on workflow_dispatch (issue 2176)', () => {
+    const job = doc.jobs?.['guest-checkout-probe'] as Job & {
+      needs?: string | string[];
+      if?: string;
+    };
+    expect([job.needs].flat()).toContain('deploy');
+    // A skipped deploy (the hourly cron, pre-cutover) must not skip the probe.
+    expect(job.if).toMatch(/!cancelled\(\)/);
   });
 });

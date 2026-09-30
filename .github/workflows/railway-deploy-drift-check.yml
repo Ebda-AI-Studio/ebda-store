@@ -32,6 +32,10 @@ name: Railway deploy drift check
 #      could never fire on the case this workflow exists for (scoped audit,
 #      PR 1978). The age bound must exceed a normal deploy (the deploy job's
 #      own timeout is 30 min), hence 90.
+#   4. UNKNOWN, alerted as unknown (issue 2205): /health unreachable or not
+#      JSON after 3 attempts, or answering with `commit: null`. Neither is
+#      drift, but either one blinds this monitor — and a blind monitor that
+#      exits 0 is a green square over the exact stall it was built to catch.
 #
 # NOT gated on RAILWAY_ACTIONS_DEPLOY. It used to be — `if: vars.RAILWAY_
 # ACTIONS_DEPLOY == 'true'` — which made it blind to the one failure its
@@ -61,7 +65,8 @@ jobs:
     # other job. Cheap (two HTTP calls), so a 30-min schedule is not a
     # meaningful load on the 2-runner pool.
     runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 2
+    # 3 x (10s curl + 10s wait) for an unreachable /health, plus checkout.
+    timeout-minutes: 4
     steps:
       - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
         # Inline, not a local composite action: a `uses: ./.github/actions/...`
@@ -133,23 +138,43 @@ jobs:
           MAIN_SHA="$(git rev-parse HEAD)"
           echo "origin/main: $MAIN_SHA"
 
-          resp="$(curl -sS -m 10 "$RAILWAY_HEALTH_URL" || true)"
-          if [ -z "$resp" ]; then
-            echo "::warning::could not reach $RAILWAY_HEALTH_URL — not a deploy-drift finding, a reachability one; leaving it to the deploy job's own verify step."
-            exit 0
-          fi
+          # What is live. The two UNKNOWN answers used to warn and exit 0
+          #    (scoped audit on PR 1978, issue 2205): a `::warning::` on a
+          #    scheduled run nobody watches is indistinguishable from success,
+          #    and railway-deploy.yml's GIT_COMMIT_SHA stamp is deliberately
+          #    non-fatal — so a drifted Railway CLI would leave /health at
+          #    `commit: null` forever and this monitor green forever, blind to
+          #    the stall it exists to catch. Unknown is still not DRIFT, and the
+          #    alerts say so; but a monitor that cannot see is itself a finding.
+          #    Unreachable/unparseable is retried first (a single blip is not an
+          #    outage); `commit: null` is deterministic, so it is not.
+          LIVE_SHA=''
+          health_state=unreachable
+          for attempt in $(seq 1 "${DRIFT_HEALTH_ATTEMPTS:-3}"); do
+            resp="$(curl -sS -m 10 "$RAILWAY_HEALTH_URL" || true)"
+            health_state="$(node -e "
+              try {
+                const d = JSON.parse(process.argv[1]);
+                process.stdout.write(typeof d.commit === 'string' && d.commit ? 'commit:' + d.commit : 'nocommit');
+              } catch { process.stdout.write('unparseable'); }
+            " "$resp")"
+            [ -z "$resp" ] && health_state=unreachable
+            case "$health_state" in
+              commit:*) LIVE_SHA="${health_state#commit:}"; break ;;
+              nocommit) break ;;
+            esac
+            echo "::warning::/health attempt $attempt: $health_state"
+            sleep "${DRIFT_HEALTH_RETRY_SECS:-10}"
+          done
 
-          LIVE_SHA="$(node -e "
-            try {
-              const d = JSON.parse(process.argv[1]);
-              process.stdout.write(typeof d.commit === 'string' ? d.commit : '');
-            } catch { /* unparseable body — treated as unknown below, not a drift */ }
-          " "$resp")"
-
-          if [ -z "$LIVE_SHA" ]; then
-            echo "::warning::/health did not report a commit (unparseable body, or commit: null) — unknown, not drift. See CLAUDE.md: commit: null means the build was not told, which is unknown, not failure."
-            exit 0
-          fi
+          case "$health_state" in
+            unreachable | unparseable)
+              alert "Railway drift check could not read $RAILWAY_HEALTH_URL (${health_state} after ${DRIFT_HEALTH_ATTEMPTS:-3} attempts). Not a deploy-drift finding — the API /health endpoint is down or not returning JSON, so neither the API nor this monitor can be vouched for."
+              ;;
+            nocommit)
+              alert "Railway drift monitor is BLIND: /health answers but reports no commit (commit: null). The live build is UNKNOWN, not drifted — but until the commit stamp is restored this check cannot detect a stalled or diverged deploy. Check railway-deploy.yml's 'railway variable set GIT_COMMIT_SHA' step / RAILWAY_GIT_COMMIT_SHA."
+              ;;
+          esac
 
           echo "live commit: $LIVE_SHA"
 

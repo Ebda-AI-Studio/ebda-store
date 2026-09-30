@@ -10,9 +10,13 @@ app; a change to `packages/**` or the CF tooling rebuilds all three; a manual
 (2026-09-30).** The workflow's concurrency group cancels a superseded run, so two
 back-to-back merges used to strand the first merge's app changes: its run was
 cancelled and the next run diffed only its own commit (#2218's admin changes were
-lost that way). `detect` now asks `gh run list --workflow cf-deploy.yml --branch
-main --status success --limit 1` for the base, so every commit since the last
-green deploy is covered however many runs were cancelled or failed in between.
+lost that way). `detect` now asks the Actions REST API
+(`GET /repos/{repo}/actions/workflows/cf-deploy.yml/runs?branch=main&status=success&per_page=1`,
+with `curl` — not the `gh` CLI, which nothing guaranteed was on the self-hosted
+runner and whose absence silently deployed all three on every push, issue 2240)
+for the base, so every commit since the last green deploy is covered however many
+runs were cancelled or failed in between. The resolved base, or the reason it fell
+back to deploying all three, is written to the run's step summary.
 One sha is enough: a run is `success` only if every deploy job it did not skip
 succeeded, and a job is skipped only when its app did not change — so after a
 green run every app is current as of that sha. **Fail safe = deploy:** a lookup
@@ -21,7 +25,16 @@ three, and so does re-running the run that is already the last success. The one
 deliberate no-op: re-running an OLDER run whose commit is already contained in the
 last success deploys nothing (it would roll production back) — to redeploy `main`
 use `workflow_dispatch`; to roll back use `wrangler rollback` or
-`scripts/rollback.sh`.
+`scripts/rollback.sh`. **Run history cannot see an out-of-band `wrangler rollback`
+/ `wrangler versions deploy`** (issue 2241): the rolled-back worker stays on its old
+version until a later commit touches its paths, with every run green. After such a
+rollback, once `main` is fixed, redeploy with `gh workflow run cf-deploy.yml`
+(dispatch deploys all three) — never rely on the next push.
+
+**The storefront's cache mode must be explicit (issue 2240).** `OPENNEXT_CACHE`
+must be exactly `true` or `false`; `scripts/assert-cf-cache-bindings.sh` fails the
+web deploy (and CI's `cf-build-check`) on an unset or mistyped value, which used to
+deploy the empty-cache config — a no-op `revalidateTag` — behind a green tick.
 
 | App                        | Worker serves                                                                                       |
 | -------------------------- | --------------------------------------------------------------------------------------------------- |

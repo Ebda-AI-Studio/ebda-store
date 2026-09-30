@@ -136,9 +136,20 @@ beforeAll(async () => {
   routes = collect((apiRoutes as unknown as { stack: Layer[] }).stack, '', markers);
 }, 60_000);
 
-const isPublic = (p: string) => p === '/public' || p.startsWith('/public/');
+/**
+ * The CSRF skip is `req.path.includes('/public/')` and the platform-origin
+ * allowlist admits `^/api/v1/stores/public/…` at any depth, so BOTH controls
+ * are off one prefix deeper too: a `'/public/:storeId/…'` route declared on a
+ * router mounted at bare `'/stores'` (wallet, shipping, coupons, carrier
+ * tracking…) resolves to `/stores/public/…`. The guard covered only the
+ * `/public` mount until issue 2121; a future admin route at
+ * `'/public/:storeId/payouts'` under `'/stores'` would have re-opened #1993
+ * with this suite green.
+ */
+const PUBLIC_PREFIXES = ['/public', '/stores/public'];
+const isPublic = (p: string) => PUBLIC_PREFIXES.some(x => p === x || p.startsWith(`${x}/`));
 
-describe('#1993 — no admin route is reachable under /api/v1/public', () => {
+describe('#1993 — no admin route is reachable under /api/v1/public or /api/v1/stores/public', () => {
   it('the walker actually sees the router table (positive control)', () => {
     // Without this, an empty walk would pass the assertion below vacuously.
     expect(routes.length).toBeGreaterThan(200);
@@ -149,6 +160,30 @@ describe('#1993 — no admin route is reachable under /api/v1/public', () => {
     expect(payouts!.adminGuards).toEqual(
       expect.arrayContaining(['requireStoreAccess', 'authorize(store_admin,super_admin)'])
     );
+  });
+
+  it('the walker classifies the /stores/public twin as public too (issue 2121 positive control)', () => {
+    const twin = routes.filter(r => r.path.startsWith('/stores/public/') && isPublic(r.path));
+    // shipping, coupons, promotions, wallet, carrier tracking… all live here.
+    expect(twin.length).toBeGreaterThan(5);
+  });
+
+  it('an admin route declared at /public/:storeId/… on a /stores-mounted router is REPORTED (issue 2121)', async () => {
+    const { Router } = await import('express');
+    const { authenticate, authorize } = await import('@api/middleware/auth');
+    const storesRouter = Router();
+    storesRouter.post(
+      '/public/:storeId/payouts',
+      authenticate,
+      authorize('store_admin', 'super_admin'),
+      markers.requireStoreAccess as never,
+      (_req, res) => res.end()
+    );
+    const api = Router();
+    api.use('/stores', storesRouter);
+    const found = collect((api as unknown as { stack: Layer[] }).stack, '', markers);
+    const leaks = found.filter(r => isPublic(r.path) && r.adminGuards.length > 0);
+    expect(leaks.map(r => r.path)).toEqual(['/stores/public/:storeId/payouts']);
   });
 
   it('no /public route carries authorize(staff role) or requireStoreAccess', () => {
@@ -249,6 +284,14 @@ describe('authenticated /public routes are an explicit, reasoned list', () => {
     'GET /public/:storeId/loyalty/my-transactions': 'customer reads own history (read-only)',
     'POST /public/:storeId/loyalty/join':
       'customer opts into the store loyalty programme — idempotent, no money moves, acts only on the caller; accepted residual: a lured shopper can be enrolled',
+    // The /stores/public twin (issue 2121) — resolved from '/public/:storeId/…'
+    // paths declared on routers mounted at bare '/stores'.
+    'GET /stores/public/:storeId/wallet':
+      "customer reads own wallet balance (read-only; requireCustomer scopes it to the caller's own customer id)",
+    'GET /stores/public/:storeId/wallet/transactions':
+      'customer reads own wallet history (read-only; requireCustomer scopes it to the caller; merchant notes/actor stripped)',
+    'GET /stores/public/:storeId/orders/:orderId/tracking':
+      'read-only tracking; in-handler check confines a customer to their own order and an admin to their own store (#1814)',
   };
 
   it('no other /public route is authenticated', () => {

@@ -276,22 +276,9 @@ export function buildPerStoreBody(
   // merchant-override text; see `fixCategoryLinks` below for the second
   // half of that fix (rewriting/dropping dead links in the AI-generated
   // override text this function's output can be replaced by).
-  const catLines = categories
-    .map(c => `- [${c.name}](${base}/products?category=${encodeURIComponent(c.slug)})`)
-    .join('\n');
-
-  const prodLines = products
-    .map(p => {
-      const price = typeof p.price === 'number' ? (p.price / 1000).toFixed(3) : '—';
-      return `- [${p.name}](${base}/products/${p.slug}) — ${price} KWD`;
-    })
-    .join('\n');
-
-  const contactParts: string[] = [`- Website: ${base}`];
-  if (store.email) contactParts.push(`- Email: ${store.email}`);
-  if (store.phone) contactParts.push(`- Phone: ${store.phone}`);
-  if (store.address) contactParts.push(`- Address: ${store.address}`);
-  const contactLines = contactParts.join('\n');
+  const catLines = categoryLines(categories, base);
+  const prodLines = productLines(products, base);
+  const contactLines = storeContactLines(store, base);
 
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
   const storeDesc = store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`;
@@ -325,6 +312,32 @@ This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
 Force AI. See https://store.force-ai.co/llms.txt for the
 platform-wide index.
 `;
+}
+
+/** `- [name](url)` per category (issue 1810: extracted from buildPerStoreBody unchanged). */
+function categoryLines(categories: PublicCategory[], base: string): string {
+  return categories
+    .map(c => `- [${c.name}](${base}/products?category=${encodeURIComponent(c.slug)})`)
+    .join('\n');
+}
+
+/** `- [name](url) — price KWD` per product; an unknown price renders as `—`, never 0. */
+function productLines(products: PublicProduct[], base: string): string {
+  return products
+    .map(p => {
+      const price = typeof p.price === 'number' ? (p.price / 1000).toFixed(3) : '—';
+      return `- [${p.name}](${base}/products/${p.slug}) — ${price} KWD`;
+    })
+    .join('\n');
+}
+
+/** Website always; email/phone/address only when the store has them. */
+function storeContactLines(store: PublicStore, base: string): string {
+  const contactParts: string[] = [`- Website: ${base}`];
+  if (store.email) contactParts.push(`- Email: ${store.email}`);
+  if (store.phone) contactParts.push(`- Phone: ${store.phone}`);
+  if (store.address) contactParts.push(`- Address: ${store.address}`);
+  return contactParts.join('\n');
 }
 
 /** Public origin the store's links are rooted at (custom domain or platform path). */

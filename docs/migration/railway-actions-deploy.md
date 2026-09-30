@@ -56,6 +56,10 @@ to that variable's loss — it alerts on Telegram and fails when:
    more than **90 minutes** ago or more than **10** of them are waiting. This is the
    stalled-pipeline case: a pipeline that stopped deploying leaves the live commit
    permanently an ancestor of `main`, which the check used to accept forever.
+4. it cannot see (issue 2205): `/health` is unreachable or not JSON after 3 attempts, or
+   answers with `commit: null`. Neither is drift and the alert says so — but both used to
+   warn and exit 0, and the commit stamp is deliberately non-fatal, so a broken stamp
+   would have left this monitor green and blind forever.
 
 Commits outside the deploy paths never trigger a deploy, so they are never "undeployed".
 `/health` reports the live commit whichever pipeline deployed it (Railway's own
@@ -174,6 +178,17 @@ this variable, so it keeps baking the LAST Actions-set commit into the build and
 the `null` a rolled-back cutover should read as. Delete it from the service
 (`railway variable delete GIT_COMMIT_SHA --service <service> --environment <environment>`,
 or via the dashboard) as part of the rollback.
+
+## The hourly probe: one script, sequenced after deploy (issue 2176 / 2191)
+
+Both admission probes — the deploy job's post-deploy step and the hourly
+`guest-checkout-probe` job — run `scripts/guest-checkout-admission-probe.sh`, so the
+bounded retry on `000`/`429`/`5xx` covers the copy that runs 24x/day against production
+too (it had been left as a single-curl inline copy). The probe job `needs: deploy` with
+`!cancelled()`, so a `workflow_dispatch` no longer fires it mid-swap; on the cron the
+deploy job is skipped and the probe still runs. It stays on the repo's runner expression:
+cloud minutes are billing-blocked, and a run that never starts on an offline self-hosted
+runner is caught outside Actions by `ci-runner-guard.sh` (Ruling CI-PROBE-1).
 
 ## Concurrency: the hourly probe has its own group (2026-09-30)
 

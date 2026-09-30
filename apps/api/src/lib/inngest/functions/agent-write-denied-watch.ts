@@ -210,7 +210,7 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
         ipAddress: r.ipAddress,
         tool: typeof details.tool === 'string' ? details.tool : null,
         // `auditAgentWrite` coalesces repeat denials from the same
-        // store/ip/tool within a 60s window onto one row carrying
+        // store/ip/tool/credential within a 60s window onto one row carrying
         // `details.count` (#1644 / #1649) — absent/invalid means this row was
         // never coalesced, i.e. it stands for exactly one attempt.
         count:

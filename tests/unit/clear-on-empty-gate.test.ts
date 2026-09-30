@@ -55,6 +55,23 @@ describe('clear-on-empty gate — FAILS on a reintroduced violation', () => {
     expect(findClearGateViolations(src, 'a.tsx')).toHaveLength(2);
   });
 
+  it('issue 2262: flags the ternary spelling `cond ? x : undefined` (and the mirrored form)', () => {
+    const src = `
+      apiPatch(url, {
+        customTermsDays: terms === 'custom' && days ? parseInt(days) : undefined,
+        leadTime: hasLead ? undefined : lead,
+      });
+    `;
+    const found = findClearGateViolations(src, 'a.tsx');
+    expect(found).toHaveLength(2);
+    expect(found[0].snippet).toContain(': undefined');
+  });
+
+  it('issue 2262: a ternary with no undefined branch is not flagged', () => {
+    const src = `apiPatch(url, { customTermsDays: custom ? parseInt(days) : null });`;
+    expect(findClearGateViolations(src, 'a.tsx')).toEqual([]);
+  });
+
   it('flags it however deeply nested in the body', () => {
     const src = `apiPut(url, { a: { b: { c: { d: v || undefined } } } });`;
     expect(findClearGateViolations(src, 'a.tsx')).toHaveLength(1);

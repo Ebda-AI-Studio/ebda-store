@@ -238,6 +238,45 @@ export function groupCommentsByIssue(toComment, resolveSameRun = () => undefined
 }
 
 /**
+ * GitHub rejects an issue comment body over 65,536 characters. A location
+ * comment concatenates EVERY grouped finding's full detail with no bound, and
+ * grouping by location puts more findings into one comment — so the limit is
+ * reachable, and a rejected write used to be logged as a success (issue 2206).
+ * Cap below the limit with room for the footer and marker.
+ */
+export const LOCATION_COMMENT_MAX_CHARS = 60_000;
+
+/**
+ * The body of a location comment: every finding at this location in this run,
+ * then the PR footer and the upsert marker. The marker is ALWAYS last and
+ * always kept — a truncated body that lost it would be re-posted, not edited,
+ * on the next run. Over the cap, finding text is cut and the cut is SAID.
+ */
+export function buildLocationCommentBody({ findings, prUrl, headSha, marker }) {
+  const head = [`**Also reported at this location** by the scoped-audit gate:`, ''];
+  const blocks = findings.flatMap(f => [
+    `**${f.severity}** — ${f.title || 'untitled'}`,
+    '',
+    f.detail || '(no detail)',
+    '',
+  ]);
+  const tail = [
+    `_PR: ${prUrl} — latest audit commit: ${headSha ? headSha.slice(0, 8) : 'unknown'}_`,
+    marker,
+  ];
+  let middle = blocks.join('\n');
+  const fixed = head.join('\n').length + tail.join('\n').length + 2;
+  const budget = LOCATION_COMMENT_MAX_CHARS - fixed;
+  if (middle.length > budget) {
+    const note =
+      "\n\n_…truncated: this location's findings exceed GitHub's comment size limit. " +
+      'The PR comment carries every finding in full._\n';
+    middle = middle.slice(0, Math.max(0, budget - note.length)) + note;
+  }
+  return [...head, middle, ...tail].join('\n');
+}
+
+/**
  * Severities that become tracked issues.
  *
  * P3 is reported on the pull request and nowhere else. It is not a lesser bug

@@ -75,3 +75,23 @@ required check) instead of 0. A recovered P0/P1 still reads BLOCKED and exits
 
 1. Before this, a truncated review rendered `PASSED` and a green tick on
    exactly the largest PRs (scoped audit, PR 1978).
+
+## Location comments are size-capped and their writes are checked (issue 2206)
+
+A location comment carries every finding grouped at one location. It is capped
+at `LOCATION_COMMENT_MAX_CHARS` (60,000, under GitHub's 65,536 limit) by
+`buildLocationCommentBody` in `followup-filing.mjs`; an over-long body is cut
+with a visible "truncated" note and always keeps its upsert marker. Both the
+PATCH and the POST now check the response: a rejected write logs a
+`::warning::` naming the issue and HTTP status instead of claiming success. The
+PR comment still carries every finding in full either way.
+
+## Dependabot PRs are not audited (issue 2254)
+
+`scoped-audit.yml` and `ai-review.yml` skip PRs authored by `dependabot[bot]`
+(the weekly github-actions bumps from `.github/dependabot.yml`). A
+Dependabot-triggered run has no `CLAUDE_CODE_OAUTH_TOKEN` and a read-only
+`GITHUB_TOKEN`, so the audit could only ever take its did-not-run path: a red
+tick and a false "scoped-audit did not run" Telegram alert every week. A
+skipped job reports as success, so a "did not run" alert still means a real
+failure on a PR the gate should have audited.

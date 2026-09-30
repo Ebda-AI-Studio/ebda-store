@@ -7,9 +7,19 @@
  * so this test is self-contained and keeps working after that file is
  * deleted.
  *
- * Heuristic (matches the admin i18n audit heuristic):
- *   - JSX text node:      />\s*[A-Za-z][A-Za-z ,.'!?:()&/-]{2,}\s*</
- *   - Chrome attribute:   /\b(placeholder|title|aria-label|label|alt)="[^"]{2,}"/
+ * Heuristic — tests/helpers/admin-i18n-heuristic.ts, TWO tiers:
+ *   - STRICT (the original B2 audit heuristic): a JSX text node of plain
+ *     letters/punctuation, and a double-quoted chrome attribute. Hard fail.
+ *   - WIDENED (issue 2182 — the guard used to advertise coverage it could
+ *     not enforce): text with digits/→/—/%, `title={'…'}`, capitalised
+ *     ternary literals, and `header:`/`label:`-style props. A ratchet: a hit
+ *     must be allowlisted or in admin-i18n-known-debt.json, the snapshot of
+ *     what those shapes found on 2026-10-01. New ones fail; the debt only
+ *     shrinks (delete an entry when its string is translated).
+ * NOT enforced even now: template literals, text between two
+ * interpolations (`{n} rows`), lower-case ternary literals, and every admin
+ * file NOT in the list below. "This file is guarded" means exactly the
+ * shapes above.
  *
  * A hit is allowed through only if its exact inner text is in ALLOWLIST
  * below, with a reason. Every allowlisted entry is one of:
@@ -36,6 +46,11 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import {
+  findHardcodedHits as findStrictHits,
+  findWidenedHits,
+} from '../helpers/admin-i18n-heuristic';
+import KNOWN_DEBT from './admin-i18n-known-debt.json';
 
 const ADMIN_SRC = resolve(__dirname, '../../apps/admin/src');
 
@@ -228,43 +243,7 @@ const ALLOWLIST = new Set<string>([
   'row.active ? (',
 ]);
 
-const JSX_TEXT_REGEX = />\s*([A-Za-z][A-Za-z ,.'!?:()&/-]{2,}?)\s*</g;
-const CHROME_ATTR_REGEX = /\b(?:placeholder|title|aria-label|label|alt)="([^"]{2,})"/g;
-
-function findHardcodedHits(source: string): string[] {
-  const hits: string[] = [];
-  let match: RegExpExecArray | null;
-
-  // Collapse ALL whitespace runs (including newlines) to a single space
-  // before matching (#1934). JSX_TEXT_REGEX's capture class excludes `\n`,
-  // so a hardcoded English paragraph wrapped across multiple lines — the
-  // dominant real-world shape of prettier-formatted JSX text, not the
-  // single-line case this guard was written against — could not match at
-  // all. Normalizing whitespace first collapses the wrap onto one line
-  // without changing which characters count as text.
-  const normalized = source.replace(/\s+/g, ' ');
-
-  JSX_TEXT_REGEX.lastIndex = 0;
-  while ((match = JSX_TEXT_REGEX.exec(normalized))) {
-    // Collapsing whitespace can pad a short standalone-line value (a 2-letter
-    // avatar badge like "SA" on its own line) with the single space that used
-    // to be a newline, pushing it past the regex's own 3-char minimum by
-    // whitespace alone rather than real content. Trim before checking length
-    // so that padding can never count as content the un-collapsed source
-    // never had.
-    const inner = match[1].trim();
-    if (inner.length < 3) continue;
-    if (!ALLOWLIST.has(inner)) hits.push(`[text] ${inner}`);
-  }
-
-  CHROME_ATTR_REGEX.lastIndex = 0;
-  while ((match = CHROME_ATTR_REGEX.exec(normalized))) {
-    const inner = match[1];
-    if (!ALLOWLIST.has(inner)) hits.push(`[attr] ${inner}`);
-  }
-
-  return hits;
-}
+const findHardcodedHits = (source: string) => findStrictHits(source, ALLOWLIST);
 
 describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)', () => {
   it('flags a hardcoded English paragraph wrapped across several lines', () => {
@@ -301,5 +280,64 @@ describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
     const hits = findHardcodedHits(source);
 
     expect(hits, `hardcoded strings found in ${relativePath}:\n${hits.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('widened tier catches the shapes STRICT is blind to (issue 2182)', () => {
+  const none = new Set<string>();
+  it.each([
+    [
+      'text with an arrow',
+      '<p className="x">You can find entry IDs in Finance → Journal.</p>',
+      '[text+]',
+    ],
+    ['text with a digit', '<span>Import 3 files</span>', '[text+]'],
+    [
+      'attribute written as an expression',
+      `<button title={'Turn off backorder'} />`,
+      '[attr-expr]',
+    ],
+    [
+      'capitalised ternary literal',
+      `{receiving ? 'Receiving…' : tDetail('receiveButton')}`,
+      '[ternary]',
+    ],
+    [
+      'ternary inside an attribute',
+      `title={on ? 'Turn off backorder' : 'Allow backorder'}`,
+      '[ternary]',
+    ],
+    ['chrome-named object property', `const cols = [{ header: 'Product', key: 'p' }];`, '[prop]'],
+  ])('%s', (_label, src, tag) => {
+    const hits = findWidenedHits(src, none);
+    expect(
+      hits.some(h => h.startsWith(tag)),
+      hits.join('\n')
+    ).toBe(true);
+  });
+
+  it('a translated call site is clean in every tier', () => {
+    const src = `<p>{t('hint')}</p><button title={t('x')} />{busy ? t('a') : t('b')}`;
+    expect(findHardcodedHits(src)).toEqual([]);
+    expect(findWidenedHits(src, none)).toEqual([]);
+  });
+});
+
+describe('admin i18n: widened-shape ratchet over the 81 files (issue 2182)', () => {
+  const debt = KNOWN_DEBT as Record<string, string[]>;
+
+  it('known debt only names covered files', () => {
+    const covered = new Set<string>(B2_FILES);
+    expect(Object.keys(debt).filter(f => !covered.has(f))).toEqual([]);
+  });
+
+  it.each(B2_FILES)('%s adds no NEW widened-shape hardcoded string', relativePath => {
+    const source = readFileSync(resolve(ADMIN_SRC, relativePath), 'utf8');
+    const known = new Set(debt[relativePath] ?? []);
+    const fresh = findWidenedHits(source, ALLOWLIST).filter(h => !known.has(h));
+    expect(
+      fresh,
+      `new hardcoded string(s) in ${relativePath} — translate them (en + ar), or allowlist with a reason:\n${fresh.join('\n')}`
+    ).toEqual([]);
   });
 });

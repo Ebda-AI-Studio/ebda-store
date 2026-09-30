@@ -46,7 +46,14 @@ export async function createSupplier(input: CreateSupplierInput): Promise<Suppli
 export type UpdateSupplierInput = Partial<
   Omit<
     CreateSupplierInput,
-    'storeId' | 'nameAr' | 'contactName' | 'phone' | 'email' | 'notes' | 'notesAr'
+    | 'storeId'
+    | 'nameAr'
+    | 'contactName'
+    | 'phone'
+    | 'email'
+    | 'notes'
+    | 'notesAr'
+    | 'customTermsDays'
   >
 > & {
   nameAr?: string | null;
@@ -55,6 +62,8 @@ export type UpdateSupplierInput = Partial<
   email?: string | null;
   notes?: string | null;
   notesAr?: string | null;
+  /** null clears custom terms when the supplier moves to a standard term. */
+  customTermsDays?: number | null;
   isActive?: boolean;
 };
 

@@ -87,7 +87,14 @@ space. Free space left: 17 MB` plus `docker failed with exit code 2`. The
   self-hosted runner disk space — filed as its own follow-up; it is not fixed
   by anything in `.zap/rules.tsv`.** A `concurrency` group was added to
   `zap-baseline.yml` so a stale queued run no longer competes with a fresh one
-  for the same runner.
+  for the same runner. Since issue 2099 that cancellation is **not** silent:
+  `notify-failure` fires on `cancelled` too, with a distinct "DID NOT RUN"
+  message, and the group is keyed on the event so a manual dispatch and the
+  nightly cannot cancel each other. `cancelled` in `gh run list` therefore
+  still means "no scan that night" — it alerts, it is not an expected outcome.
+  Since issue 2100 the 10063 IGNORE is backed by a deterministic gate:
+  `tests/unit/csp-directive-floor.test.ts` pins `Permissions-Policy` on all
+  three `next.config.js` files.
 
 - **Real WARN-NEW findings, checked against production 2026-09-25:**
 

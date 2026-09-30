@@ -116,6 +116,24 @@ const CUSTOMER = {
   avatar: null,
 };
 
+// FILE-LEVEL reset (issue 2124). Only two describes cleared their mocks, so
+// the rest (addresses/wallet RLS brackets, CRM scrub, token revocation, the
+// W-7 erasure-scope suite) inherited whatever the PREVIOUS describe left in
+// the mock call history: W-7's `invocationCallOrder[0]` read a call made by
+// an earlier describe's last test. Every describe passed in file order and
+// FAILED run alone (`-t 'erasure scope'`), which also meant the two erasure
+// defences in defence-mutations.json were "KILLED" against a baseline that
+// only held by coincidence. This runs before each describe's own beforeEach.
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockPrisma.user.findUnique.mockResolvedValue(CUSTOMER);
+  mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockPrisma));
+  mockPrisma.oneSignalSubscription.findMany.mockResolvedValue([]);
+  mockPrisma.customer.findMany.mockResolvedValue([]);
+  mockPrisma.customerWallet.findMany.mockResolvedValue([]);
+  sendMock.mockResolvedValue({ ids: ['evt-1'] });
+});
+
 describe('AuthService.eraseAccount — third-party propagation', () => {
   beforeEach(() => {
     vi.clearAllMocks();

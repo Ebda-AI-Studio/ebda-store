@@ -27,8 +27,13 @@ permissions:
 # still waiting for a runner) is stale the moment a newer one is dispatched, so
 # let the newer one cancel it instead of the two competing for the same
 # starved runner.
+#
+# Keyed on the event too (issue 2099), so a manual verification dispatch and
+# the nightly cron can never cancel each other. A run this group cancels is
+# NOT silent: notify-failure below fires on `cancelled` as well as `failure`,
+# and says the scan never ran — a cancelled DAST is a night with no scan.
 concurrency:
-  group: zap-baseline-${{ github.ref }}
+  group: zap-baseline-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -150,7 +155,14 @@ jobs:
     runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs: [zap]
-    if: always() && failure()
+    # failure() is FALSE for a cancelled run (issue 2099): with the
+    # concurrency group above cancelling a starved, still-queued nightly, the
+    # old `always() && failure()` turned the DAST's main failure mode into
+    # silence — no scan, no report, no alert, every night. Residual: when the
+    # self-hosted runner itself is starved or offline this job needs that same
+    # runner, so the alert of last resort is ci-runner-guard.sh on the Mac
+    # (runner-health-check.yml header), not this job.
+    if: always() && (failure() || cancelled())
     steps:
       # The delivery channel that replaces the issue. Mirrors
       # lighthouse-nightly.yml:69 — the claim that "this repo's CI standard
@@ -163,13 +175,21 @@ jobs:
           TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
+          ZAP_RESULT: ${{ needs.zap.result }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
             echo "telegram secrets not configured — skipping alert"
             exit 0
           fi
-          MSG=$(printf '🔴 *ZAP baseline DAST FAILED* — %s\nA new alert appeared, or the scan errored. Report is attached to the run as an artifact.\n[view run](https://github.com/%s/actions/runs/%s)' \
-            "$REPO" "$REPO" "$RUN_ID")
+          # Two different nights, two different messages: a scan that FOUND
+          # something vs a scan that never ran (cancelled/superseded/starved).
+          if [ "$ZAP_RESULT" = "failure" ]; then
+            MSG=$(printf '🔴 *ZAP baseline DAST FAILED* — %s\nA new alert appeared, or the scan errored. Report is attached to the run as an artifact.\n[view run](https://github.com/%s/actions/runs/%s)' \
+              "$REPO" "$REPO" "$RUN_ID")
+          else
+            MSG=$(printf '⚠️ *ZAP baseline DAST DID NOT RUN* — %s (result: %s)\nThe scan was cancelled or never got a runner, so there is NO scan for this night — not a clean one. Check the self-hosted runner (disk, queue).\n[view run](https://github.com/%s/actions/runs/%s)' \
+              "$REPO" "$ZAP_RESULT" "$REPO" "$RUN_ID")
+          fi
           curl -sS -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \

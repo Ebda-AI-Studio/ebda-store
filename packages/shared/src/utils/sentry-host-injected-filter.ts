@@ -16,12 +16,22 @@
  * it does not break the storefront; reporting it only buries real errors.
  *
  * The filter is deliberately narrow so it can never hide a bug of ours:
- *   1. the user agent must be an iOS host app that injects scripts
- *      (Chrome/Firefox/Edge for iOS, Facebook/Instagram in-app browsers), AND
+ *   1. the user agent must be an iOS browser that injects WKUserScripts —
+ *      Chrome/Firefox/Edge for iOS (`CriOS`/`FxiOS`/`EdgiOS`, tokens only
+ *      ever sent on iOS). The evidence is 100% `CriOS`; FxiOS/EdgiOS share
+ *      the same WKUserScript mechanism. Facebook/Instagram in-app browsers
+ *      (`FBAN`/`FBIOS`/`Instagram`) are deliberately NOT here (issue 2008):
+ *      no event evidenced them, and link-in-bio traffic through those apps
+ *      is the widest-reach mobile surface of a Kuwait storefront — silencing
+ *      it would hide our own inline-script errors from exactly those users;
  *   2. EVERY frame must be attributed to a page path — none may come from a
- *      script file (`*.js`/`*.mjs`/`*.cjs` — every chunk we ship).
- * An inline-script error of ours on Safari, Android or desktop still reports,
- * and so does anything with even one frame in a shipped chunk.
+ *      script file (`*.js`/`*.mjs`/`*.cjs` — every chunk we ship); AND
+ *   3. EVERY frame must sit past line MIN_INJECTED_LINENO. The served HTML is
+ *      11-12 lines, so an error in one of OUR inline scripts is attributed
+ *      to a line no higher than that; the injected script's frames were all
+ *      at 190-464. A frame with no line number keeps the event.
+ * An inline-script error of ours still reports on every browser, and so does
+ * anything with even one frame in a shipped chunk.
  */
 
 // Minimal structural slice of a Sentry event — avoids importing SDK types
@@ -29,12 +39,21 @@
 interface FrameLike {
   filename?: string;
   abs_path?: string;
+  lineno?: number;
 }
 interface EventLike {
   exception?: { values?: Array<{ stacktrace?: { frames?: FrameLike[] } }> };
 }
 
-const HOST_INJECTING_UA = /\b(CriOS|FxiOS|EdgiOS|FBAN|FBIOS|Instagram)\b/;
+const HOST_INJECTING_UA = /\b(CriOS|FxiOS|EdgiOS)\//;
+
+/**
+ * Lowest line an injected-script frame may sit on. Our served documents are
+ * ~12 lines (Ruling SN-1); the injected frames were at 190-464. 100 leaves a
+ * wide margin on both sides — a document of ours would have to grow 8x before
+ * one of its inline errors could be mistaken for the host's.
+ */
+const MIN_INJECTED_LINENO = 100;
 
 function isScriptFileFrame(frame: FrameLike): boolean {
   const name = frame.filename || frame.abs_path || '';
@@ -54,5 +73,10 @@ export function isHostInjectedScriptEvent(event: EventLike, userAgent: string): 
   if (!HOST_INJECTING_UA.test(userAgent)) return false;
   const frames = (event.exception?.values ?? []).flatMap(v => v.stacktrace?.frames ?? []);
   if (frames.length === 0) return false;
-  return frames.every(frame => !isScriptFileFrame(frame));
+  return frames.every(
+    frame =>
+      !isScriptFileFrame(frame) &&
+      typeof frame.lineno === 'number' &&
+      frame.lineno > MIN_INJECTED_LINENO
+  );
 }

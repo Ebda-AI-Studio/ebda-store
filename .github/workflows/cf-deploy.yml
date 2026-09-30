@@ -80,6 +80,13 @@ jobs:
   # success and redeploys whatever that run failed to ship (over-deploy, never
   # under-deploy).
   #
+  # The one thing the induction CANNOT see (issue 2241): a change made OUTSIDE
+  # this workflow — `npx wrangler rollback` / `wrangler versions deploy` from a
+  # laptop. Run history still says "every app is at S", so the rolled-back app
+  # stays on its old version until a later commit happens to touch its paths.
+  # After an out-of-band rollback, redeploy with `gh workflow run cf-deploy.yml`
+  # (dispatch deploys all three) once main is fixed — docs/ROLLBACK.md path A.
+  #
   # FAIL SAFE = DEPLOY. Lookup error, no prior success, an unknown / pruned sha,
   # or a base that is not an ancestor of HEAD (history rewrite) → deploy all
   # three. Re-running the run that is already the last success (base == HEAD)
@@ -146,20 +153,36 @@ jobs:
           deploy_all() {
             printf 'web=true\nadmin=true\norders=true\n' >> "$GITHUB_OUTPUT"
             echo "→ deploying all three: $1"
+            # The step summary, not just the log (issue 2240): a persistent
+            # fallback here over-deploys every app on every push with a green
+            # tick, so its reason has to be visible without opening the job.
+            echo "cf-deploy detect: deploying ALL three — $1" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
           }
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             deploy_all "workflow_dispatch"
             exit 0
           fi
 
-          # The current run is in_progress, so it can never be its own base.
-          if ! base="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cf-deploy.yml \
-                --branch main --status success --limit 1 \
-                --json headSha --jq '.[0].headSha // empty')"; then
+          # The last SUCCESSFUL run of this workflow on main, via the REST API
+          # with curl (issue 2240) — NOT the gh CLI. gh was an unasserted
+          # dependency of this self-hosted job (the umbra guest has shipped
+          # without it before — runner-health-check.yml), and its absence took
+          # the fail-safe branch below on EVERY push: all three apps rebuilt
+          # and redeployed forever behind a green tick. curl is already a hard
+          # dependency of every job here; the JSON is read with grep/sed
+          # because this job has no setup-node. The current run is
+          # in_progress, so it can never be its own base.
+          api="${GITHUB_API_URL:-https://api.github.com}/repos/$GITHUB_REPOSITORY/actions/workflows/cf-deploy.yml/runs?branch=main&status=success&per_page=1"
+          if ! resp="$(curl -sSf -m 20 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api")"; then
             echo "::warning::could not look up the last successful cf-deploy run — deploying all three (fail safe)"
             deploy_all "last-success lookup failed"
             exit 0
           fi
+          # Only workflow_runs[] carry `head_sha` (head_commit uses `id`), and
+          # per_page=1 returns at most one run. The here-string feeds grep the
+          # whole body, so nothing downstream closes the pipe early.
+          base="$(grep -o '"head_sha"[[:space:]]*:[[:space:]]*"[0-9a-f]\{40\}"' <<<"$resp" | sed -n '1s/.*"\([0-9a-f]\{40\}\)"$/\1/p' || true)"
+          echo "cf-deploy detect: diff base ${base:-<none>} (last successful cf-deploy on main)" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
           head="$(git rev-parse HEAD)"
           if ! [[ "$base" =~ ^[0-9a-f]{40}$ ]]; then
             deploy_all "no previous successful run on main (got '${base}')"
@@ -260,49 +283,16 @@ jobs:
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
         run: bash scripts/cf-setup-local.sh web
       - name: Assert the generated worker config matches OPENNEXT_CACHE
-        working-directory: apps/web
         env:
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
-        # cf-setup-local.sh REWRITES open-next.config.ts and wrangler.jsonc from
-        # scratch on every deploy, and its no-cache branch silently drops the tag
-        # cache, the R2 incremental cache and their bindings. When that happens
-        # revalidateTag resolves to the library's "dummy" no-op: every purge
-        # returns success, logs nothing, invalidates nothing, and merchants wait
-        # out the fetch TTL after each save while the pipeline stays green. That
-        # is precisely how a D1 tag cache was committed, documented as REQUIRED
-        # and never deployed. Fail loudly instead of deploying a silent no-op.
-        #
-        # Mode-aware (#1300), not an unconditional assert: cf-setup-local.sh's
-        # own else-branch writes `defineCloudflareConfig({})` and a
-        # wrangler.jsonc with no r2_buckets/durable_objects when OPENNEXT_CACHE
-        # is unset/false — its own comment calls that "DEFAULT = empty config =
-        # current behaviour, ZERO risk". An unconditional assert on the three
-        # cache tokens made that documented, intended fallback fail the ENTIRE
-        # web deploy job the moment the variable was unset, misspelled, or
-        # deliberately flipped off — turning the one escape hatch for a bad
-        # cache rollout into a way to lose the ability to deploy the storefront
-        # at all. Each branch below still catches a generator that silently
-        # drops or wrongly adds bindings for the mode that's actually active.
-        run: |
-          if [ "$OPENNEXT_CACHE" = "true" ]; then
-            grep -q 'NEXT_TAG_CACHE' wrangler.jsonc \
-              || { echo "::error::OPENNEXT_CACHE=true but generated wrangler.jsonc has NO tag-cache binding — revalidateTag would be a silent no-op. Check scripts/cf-setup-local.sh"; exit 1; }
-            grep -q 'NEXT_INC_CACHE_R2_BUCKET' wrangler.jsonc \
-              || { echo "::error::OPENNEXT_CACHE=true but generated wrangler.jsonc has NO incremental-cache binding — ISR/SSG pages would revalidate from origin on every isolate"; exit 1; }
-            grep -q 'tagCache' open-next.config.ts \
-              || { echo "::error::OPENNEXT_CACHE=true but generated open-next.config.ts declares no tagCache override — revalidateTag resolves to the dummy no-op"; exit 1; }
-            echo "cache bindings present in the config that will actually deploy"
-          else
-            if grep -qE 'r2_buckets|durable_objects' wrangler.jsonc; then
-              echo "::error::OPENNEXT_CACHE is not 'true' but generated wrangler.jsonc still carries cache bindings — the generator did not produce the documented empty-cache fallback. Check scripts/cf-setup-local.sh"
-              exit 1
-            fi
-            if grep -q 'tagCache' open-next.config.ts; then
-              echo "::error::OPENNEXT_CACHE is not 'true' but generated open-next.config.ts still declares a tagCache override — the generator did not produce the documented empty-cache fallback."
-              exit 1
-            fi
-            echo "empty-cache fallback config present, as documented for OPENNEXT_CACHE unset/false"
-          fi
+        # cf-setup-local.sh REWRITES open-next.config.ts and wrangler.jsonc on
+        # every deploy, and its no-cache branch silently drops the tag cache —
+        # revalidateTag then no-ops while the pipeline stays green. The
+        # assertion is ONE script shared with ci.yml's cf-build-check (issues
+        # 2089/2152/2154). Mode-aware (#1300): 'false' is the documented
+        # escape hatch and passes; since issue 2240 an UNSET or mistyped
+        # OPENNEXT_CACHE fails here instead of deploying the no-op silently.
+        run: bash scripts/assert-cf-cache-bindings.sh web
       - name: Write storefront public env (.env.production.local)
         # NEXT_PUBLIC_* are BUILD-TIME inlined; public values → repo variables,
         # with prod defaults so a missing var still builds.

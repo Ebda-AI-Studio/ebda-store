@@ -101,7 +101,19 @@ export function allocateBundlePrice(lines: BundleLine[], bundlePrice: number): A
     return { ...l, unitAllocated: unit, totalAllocated: unit * l.quantity };
   });
 
-  let residual = bundlePrice - out.reduce((s, l) => s + l.totalAllocated, 0);
+  distributeResidual(out, raw, bundlePrice - out.reduce((s, l) => s + l.totalAllocated, 0));
+  return out;
+}
+
+/**
+ * Hand the integer residual left by the floor pass back out, largest
+ * fractional remainder first, in closed-form ROUNDS (see the comment in the
+ * body). Mutates `out` in place. Extracted from `allocateBundlePrice`
+ * unchanged (issue 1809) — the equivalence suite
+ * (tests/unit/bundle-allocation-equivalence.test.ts) pins it.
+ */
+function distributeResidual(out: AllocatedLine[], raw: number[], initialResidual: number): void {
+  let residual = initialResidual;
 
   // Largest fractional remainder first. Adding 1 to a unit adds `quantity` to
   // that line, so only lines that fit inside the residual are eligible.
@@ -187,7 +199,6 @@ export function allocateBundlePrice(lines: BundleLine[], bundlePrice: number): A
     }
     residual -= rounds * consumedPerRound;
   }
-  return out;
 }
 
 /**

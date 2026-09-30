@@ -19,7 +19,7 @@
 # ## The cost of a global IGNORE
 #
 # rules.tsv has no URL scoping, so each line also hides the NOT-yet-accepted
-# variant of its own class. Two are worth naming:
+# variant of its own class. Four are worth naming:
 #
 #   10055 also covers the "CSP directives with no default-src fallback" finding
 #         that was FIXED in the 2026-07-15 PR. Suppressing the id hides a
@@ -27,6 +27,16 @@
 #         pins base-uri/object-src/form-action directly on the three configs —
 #         that test, not the scan, is now what guards it.
 #   10202 hides any future form-post surface that genuinely lacks a token.
+#   10063 is accepted for static JS/CSS chunks, but also hides Permissions-
+#         Policy vanishing from the HTML routes that carry it. The same
+#         csp-directive-floor.test.ts pins the header on all three configs
+#         (issue 2100) — the test, not the scan, guards the HTML routes.
+#   10044 is accepted for ONE known redirect (the store apex 307, whose body is
+#         the public 404 markup), but also hides a future redirect that
+#         serialises session or PII into its body. No deterministic gate can
+#         pin a runtime redirect body at the unit tier; this is an accepted
+#         residual (Ruling ZAP-10044 in docs/RULINGS.md), bounded by its
+#         review-by date.
 #
 # ## Removal plan
 #
@@ -55,6 +65,6 @@
 10202	IGNORE	Anti-CSRF tokens - double-submit cookie + X-CSRF-Token header, not a hidden form field; review-by:2027-03-31
 
 # ── Added 2026-09-25 (#1748 — see docs/security/zap-triage-2026-07-15.md "Follow-up 2026-09-25") ──
-10063	IGNORE	Permissions-Policy missing on static JS/CSS chunks - decided in the 2026-07-15 triage ("meaningless on static assets - not added") but never encoded here, so the accepted gap re-failed every night since -I was removed 2026-09-11. HTML routes carry it (verified against production 2026-09-25); review-by:2027-03-31
+10063	IGNORE	Permissions-Policy missing on static JS/CSS chunks - decided in the 2026-07-15 triage ("meaningless on static assets - not added") but never encoded here, so the accepted gap re-failed every night since -I was removed 2026-09-11. HTML routes carry it (verified against production 2026-09-25) and tests/unit/csp-directive-floor.test.ts now pins it on all three configs so this global IGNORE cannot hide its loss; review-by:2027-03-31
 10109	IGNORE	Modern Web Application - ZAP's own alert text: "This is an informational alert and so no changes are required."; review-by:2027-03-31
 10044	IGNORE	Big Redirect (potential info leak) - the store.force-ai.co apex 307 body is the public 404 page's static markup (no PII, no auth/session data), rendered because Next.js's redirect() from the not-found boundary still serializes the RSC payload; verified against production 2026-09-25; review-by:2027-03-31

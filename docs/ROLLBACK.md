@@ -19,6 +19,13 @@ npx wrangler versions list          # find the good version id
 npx wrangler versions deploy <version-id>@100
 ```
 
+> ⚠️ **A `wrangler rollback` / `wrangler versions deploy` is invisible to `cf-deploy.yml`**
+> (issue 2241). Per-app detection diffs from the last SUCCESSFUL run's sha and assumes every
+> worker is current as of it, so the rolled-back worker stays pinned to the old version until
+> some later commit happens to touch its paths — with every run green. Once `main` is fixed,
+> redeploy explicitly with `gh workflow run cf-deploy.yml` (dispatch deploys all three);
+> never rely on the next push.
+
 Railway API fast-path:
 
 ```bash

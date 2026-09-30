@@ -559,10 +559,13 @@ storefront loads is 51 lines (Playwright WebKit + Chromium, iPhone profile, the 
 home → category tile → logo/back, x6: no pageerror, 23 JS responses, none ≥190 lines, none defining
 `Ok`/`Qk`/`Nk`/`Pk`). The line:col positions are identical across FWB releases two weeks apart
 (2214be88 → ad17d6e4) while the Closure-style names change with the Chrome version (152 `Nk`/`Pk`,
-154 `Ok`/`Qk`). `isHostInjectedScriptEvent` (`@force/shared`) drops an event only when the UA is an
-iOS host app AND no frame comes from a script file. Cost if wrong: a genuine recursion in an inline
-script of ours, seen only by Chrome-for-iOS users, would go unreported — Safari/Android/desktop
-still report it, and any frame in a shipped chunk keeps the event.
+154 `Ok`/`Qk`). `isHostInjectedScriptEvent` (`@force/shared`) drops an event only when the UA is
+Chrome/Firefox/Edge for iOS (`CriOS`/`FxiOS`/`EdgiOS` — NOT the Facebook/Instagram in-app
+browsers, which no event evidenced; narrowed in issue 2008), AND no frame comes from a script file,
+AND every frame sits past line 100 (the served HTML is ~12 lines, the injected frames 190-464).
+Cost if wrong: a genuine recursion in an inline script of ours that happens to sit past line 100
+of the document, seen only by Chrome/Firefox/Edge-for-iOS users, would go unreported — every other
+browser still reports it, and any frame in a shipped chunk or at a document-sized line keeps it.
 
 **Ruling SN-2 — FORCE-API-28 (cart P2003 `cart_items_cart_id_fkey`) needs no new change.** All 3
 events are 2026-08-31 16:15-16:53 UTC; #1108 (2dd34917, 19:56 UTC the same day) moved addItem onto
@@ -2338,9 +2341,9 @@ proven correct by M3-8's own tests.
 
 ---
 
-**Ruling MCP-2 — denied-write audits coalesce to one row per (store, ip, tool)
-per minute, and the count is kept, not dropped (#1644 / #1649, owner decision
-2026-09-25).**
+**Ruling MCP-2 — denied-write audits coalesce to one row per (store, ip, tool,
+credential) per minute, and the count is kept, not dropped (#1644 / #1649, owner
+decision 2026-09-25; key wording corrected in issue 2149).**
 
 Every refused MCP write (`add_to_cart` / `place_order` with no or a wrong
 `x-agent-key`) opened its OWN interactive `runInTenantContext` transaction —
@@ -2359,8 +2362,9 @@ with no record of how many attempts each row stood for, which could push
 real attack rate and silently mute the alert the thresholds exist to fire.
 Ahmad ruled the same day that the fix ships only WITH the count preserved.
 
-This version: the FIRST denial in a (store, ip, tool) 60s window
-(`DENIAL_COALESCE_WINDOW_SECONDS`) still writes a durable row through
+This version: the FIRST denial in a (store, ip, tool, credential) 60s window
+(`DENIAL_COALESCE_WINDOW_SECONDS`; key built by `denialCoalesceKey`,
+`apps/api/src/mcp/agent-auth.ts`) still writes a durable row through
 `runInTenantContext`, exactly as before, and remembers the row's id in Redis.
 Every REPEAT in that window costs one plain, non-transactional
 `prisma.auditLog.update()` bumping that row's `details.count` — never a new
@@ -2375,6 +2379,19 @@ value) degrades to exactly today's per-attempt behaviour: one row per denial,
 same as before this change. `agent.write.failed` (an AUTHORISED write that
 then threw) is never coalesced — it requires credential possession, so it is
 already bounded by who holds a key, not by an anonymous caller's request rate.
+
+`credential` is part of the key on purpose: `classifyAgentDenials` PARTITIONS on
+`details.credential` (`none` / `invalid` / …), so the coalescing key must be at
+least as fine-grained as that partition — a coarser (store, ip, tool) key sums
+attempts from different classifier buckets under whichever credential arrived
+last (49 `invalid` + 1 `none` would become `credential: 'none', count: 50`, an
+`info` anonymous flood instead of the p1 `integration_broken`), which
+`tests/unit/agent-denial-coalesce.test.ts` pins. The bound is therefore at most
+one row per (store, ip, tool, credential) per 60s — up to five per (store, ip,
+tool), since `AgentCredentialOutcome` has five values; size the per-IP
+transaction and `audit_logs` growth ceilings from that. Cost if wrong: a change
+written against the old three-part wording would drop `credential` from the key
+and bring back exactly the misclassification the test pins.
 
 `classifyAgentDenials` (`agent-denial-alerts.ts`) and the watcher
 (`agent-write-denied-watch.ts`) were updated to weigh a row by its
@@ -2633,7 +2650,10 @@ erroneous reversal (JE-2026-000020) with the standard `reverseEntry`.** No row i
 edited or deleted. The re-booked sale carries source id `…:reversal:reversal`,
 which `postRefundJournal` does not look for. Cost if wrong: if that one order is
 ever genuinely refunded, its 9.500 KWD sale stays booked until reversed by hand.
-Script: `scripts/fix-ledger-order-mismatch-2026-09-30.ts` — NOT RUN, awaits Ahmad.
+Script: `scripts/fix-ledger-order-mismatch-2026-09-30.ts` — NOT RUN, awaits Ahmad. Its optional
+`--fix-stock` step refuses (dry run included) if any of the three products has a variant, and re-checks
+that under the row lock: `products.inventory` is not a variant product's stock (issue 2273). It busts the
+storefront product caches after commit rather than waiting out the TTL.
 
 **Ruling AP-5 — backorder line cancel still fires a WHOLE-order `order/refunded`
 (not changed here).** `cancelBackorder` passes `restoreInventory: false` but no
@@ -3271,3 +3291,48 @@ can be a deliberate "show nothing in Arabic", and changing it would change what 
 storefronts render. That is a look change, not a bug fix, under the batch's standing rule. Cost if
 wrong: a merchant who cleared an Arabic section field by accident sees an empty heading in Arabic
 instead of the English one until they fill it in.
+
+## Backlog batch g-ci-scripts-other (2026-10-01)
+
+**Ruling CI-PROBE-1 — the hourly guest-checkout probe stays on the repo's runner expression, not
+`ubuntu-latest` (issue 2191).** Cloud Actions minutes are billing-blocked for this org
+(`runner-health-check.yml` header: a hosted job fails in ~3s with 0 steps), so pinning the probe to
+`ubuntu-latest` would turn it into an hourly red that alerts nobody. A run that never starts because
+the self-hosted runner is offline is detected outside GitHub Actions by `ci-runner-guard.sh`
+(launchd, every 30 min, Telegram). The retry half of 2191 is fixed: both probe copies are now one
+script. Cost if wrong: if `ci-runner-guard.sh` itself stops, a dead runner silences this probe and
+every other scheduled job until someone opens the Actions tab.
+
+**Ruling ZAP-10044 — the global `10044 IGNORE` (Big Redirect) stays, with no deterministic gate behind
+it (issue 2100).** It is accepted for one known redirect — the `store.force-ai.co` apex 307, whose body is
+the public 404 markup Next.js serialises from the not-found boundary. What a redirect body contains is a
+runtime property of Next's rendering, not something a unit test can read from config, and narrowing the
+suppression needs URL scoping `rules.tsv` does not have. The 10063 half of the same issue IS gated
+(`csp-directive-floor.test.ts` pins Permissions-Policy on all three configs). Cost if wrong: a future
+redirect that serialises session or PII data into its body is not reported by the nightly scan until the
+row's review-by date (2027-03-31) forces it to be re-examined.
+
+**Ruling DEP-1 — next-intl 4.14.2 and its four new transitive packages stay (issue 1631); provenance
+recorded here, not assumed.** The bump (#1629) added `@eloqnt/config`, `@eloqnt/format-json`,
+`@eloqnt/format-po` (all 0.1.0, first published 2026-08-26) and `po-parser@2.2.0` to the production
+tree. Checked 2026-10-01 (`npm view`): all four are published by the SAME sole maintainer as
+next-intl itself (`amann <jan@amann.me>`); `po-parser` carries an SLSA provenance attestation and
+links `github.com/amannn/po-parser`, the `@eloqnt/*` packages carry neither; none has an install
+script (`hasInstallScript` absent in package-lock.json); all MIT. They are imported only by
+next-intl's `extractor/` module (message extraction), which `apps/admin/next.config.js` does not
+enable — `createNextIntlPlugin('./src/i18n/request.ts')` only — so they are shipped-but-unexecuted
+by the admin build. Holding next-intl at 4.13.3 would re-open the advisories #1629 cleared.
+Cost if wrong: a compromise of the next-intl author's npm account could ship through any of the
+five packages; the `@eloqnt/*` three have no attestation to detect a registry-side substitution.
+
+**Ruling I18N-G1 — the widened admin-i18n shapes ship as a RATCHET over 66 recorded strings, not as a
+hard fail (issue 2182).** Widening the guard (text with digits/→/—, `title={'…'}`, capitalised ternary
+literals, `header:`/`label:` props) surfaced 66 hardcoded English strings across 15 of the 81 covered
+files. They are recorded in `tests/unit/admin-i18n-known-debt.json`; any NEW string in those shapes
+fails, and the debt can only shrink. Translating them here would collide on
+`apps/admin/src/i18n/messages/{en,ar}.json` with the parallel admin lane already fixing issues 2180,
+2181 and 2183 (bank-reconciliation, purchase-order headers, stock adjustments/inventory — about half
+the debt). The guard's docstring now states exactly which shapes are enforced and which are not
+(template literals, text between two interpolations, lower-case ternary literals, files outside the
+list). Cost if wrong: the 66 strings keep rendering in English on an Arabic admin until someone
+translates them and deletes their debt entries.

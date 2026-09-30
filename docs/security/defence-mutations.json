@@ -1362,6 +1362,16 @@
       "test": "tests/unit/public-mount-admin-route-guard.test.ts"
     },
     {
+      "id": "csrf-admin-route-not-at-stores-public",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "an admin router reachable under /stores/public — the twin of /public that csrfProtection (path includes '/public/') and restrictPlatformOnlyOrigins' storefront allowlist both exempt; the mount guard used to walk only /public (issue 2121)",
+      "source": "apps/api/src/routes/index.ts",
+      "find": "router.use('/public', publicAffiliateRoutes);",
+      "replace": "router.use('/public', publicAffiliateRoutes);\nrouter.use('/stores/public', aiRoutes);",
+      "test": "tests/unit/public-mount-admin-route-guard.test.ts"
+    },
+    {
       "id": "erasure-merchant-scope-own-store-only",
       "domain": "erasure",
       "tier": "unit",

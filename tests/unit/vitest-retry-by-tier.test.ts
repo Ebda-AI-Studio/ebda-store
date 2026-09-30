@@ -59,4 +59,19 @@ describe('vitest retry is scoped by tier, not a global default', () => {
         'explicitly rather than relying on a global default'
     ).toMatch(/--retry=1/);
   });
+
+  it('the force_app RLS proof is an explicit, deliberate no-retry tier (issue 2101)', () => {
+    // ci.yml names FOUR tiers (unit / integration / RLS proof / e2e). The RLS
+    // proof used to inherit retry 0 silently when the policy moved retries to
+    // the call site; it is now explicit so neither direction can drift.
+    const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+    const rlsRun = ci
+      .split('\n')
+      .find(l => l.includes('vitest run tests/integration/rls-force-app.test.ts'));
+    expect(rlsRun, "ci.yml's RLS proof command moved — re-point this test").toBeTruthy();
+    expect(
+      rlsRun,
+      'the RLS proof must declare --retry=0: a security assertion that only passes on retry is a finding'
+    ).toMatch(/--retry=0(\s|$)/);
+  });
 });

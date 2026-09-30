@@ -42,6 +42,9 @@ export const updateSchema = createSchema.partial().extend({
   email: z.string().email().nullable().optional(),
   notes: z.string().nullable().optional(),
   notesAr: z.string().nullable().optional(),
+  // null clears custom terms when the supplier moves to a standard term
+  // (issue 2262); the admin form sends it via numericFieldValue(…, 'update').
+  customTermsDays: z.number().int().min(1).max(365).nullable().optional(),
   isActive: z.boolean().optional(),
 });
 

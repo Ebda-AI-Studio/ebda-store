@@ -120,6 +120,12 @@ on:
       # #2037: the exception-safe scoped RLS bypass used by erasure.
       - 'apps/api/src/lib/scoped-rls-bypass.ts'
       - 'tests/unit/**'
+      # --tier=all runs the integration-tier defences too (issues 2175/2188):
+      # their verdicts rest on tests/integration/*.test.ts files, so a PR that
+      # weakens one of those tests must re-run the gate. mutation-gate-trigger-
+      # coverage.test.ts asserts every spec entry's TEST, not just its source,
+      # is reachable from this list.
+      - 'tests/integration/**'
       # The artifact itself: a PR that hand-edits the record must re-run the
       # gate, or the staleness check it exists to enforce never fires.
       - 'docs/security/defence-mutation-record.md'
@@ -217,9 +223,9 @@ jobs:
   # money/payment/refund, consent, erasure). It is cheap (~1-2 min for all 78
   # defences, measured 2026-09-25) and gates on a SURVIVED defence, so it runs
   # on every PR that touches a defended source or the spec itself. Runs
-  # --tier=all (unit AND the one integration-tier entry) in this SAME job —
-  # a Postgres service is enough (see below); no separate integration job or
-  # schedule is needed for a single defence this cheap.
+  # --tier=all (unit AND the integration-tier entries — three today, named in
+  # the services comment below) in this SAME job; a Postgres service is enough
+  # (see below), so no separate integration job or schedule is needed.
   defence-mutations:
     name: Defence mutation record
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
@@ -229,12 +235,26 @@ jobs:
     # to 20) even after the postgres service + --tier=all integration-tier
     # defence below were added, since those only add work, not headroom.
     timeout-minutes: 30
-    # Postgres only, no Redis: the one integration-tier defence
-    # (password-reset-bumps-token-version, tests/integration/refresh-token-rotation.test.ts)
-    # drives AuthService directly against Prisma — no HTTP layer, and it
-    # fail-opens on a missing Redis client (see that test file's header).
-    # Verified locally (2026-09-25) against a real Postgres: the full
-    # --tier=all run needs nothing else — no API server, no Redis.
+    # Postgres only, no Redis, no API server. The spec has THREE
+    # integration-tier defences (issues 2184/2187 — this comment used to say
+    # "the one"); tests/unit/mutation-gate-trigger-coverage.test.ts fails if
+    # an integration-tier id is added to docs/security/defence-mutations.json
+    # without being named and reasoned about here:
+    #   - password-reset-bumps-token-version (tests/integration/refresh-token-
+    #     rotation.test.ts): drives AuthService directly against Prisma, no
+    #     HTTP layer; fail-opens on a missing Redis client.
+    #   - money-wallet-row-lock (tests/integration/customer-wallet.test.ts):
+    #     drives WalletService/OrderService/CartService/ReturnService/
+    #     StoreService and the order-refunded Inngest handler IN-PROCESS
+    #     against Prisma — no HTTP, no API server, no seed (it builds its own
+    #     fixtures). redis.service falls back to in-memory when REDIS_URL is
+    #     unset ("[REDIS] Failed to connect, using in-memory fallback").
+    #   - money-loyalty-reversal-index (tests/integration/partial-unique-
+    #     indexes.test.ts): needs only the migrated schema (it reads
+    #     pg_indexes and exercises the partial unique index).
+    # Measured, not assumed: run 36667422016 (2026-09-30) scored all three
+    # KILLED in this exact environment. If one ever scores ERROR here, the
+    # environment is short a dependency — provision it; do not drop the tier.
     services:
       postgres:
         image: postgres:16-alpine
@@ -347,7 +367,7 @@ jobs:
       # --tier=all is REQUIRED, not a default: the script now refuses --write
       # on anything less (#1233/#1262) because a partial-tier write silently
       # DROPS the other tiers' entries from the committed record — which is
-      # exactly how the integration-tier entry here went unrun by every CI
+      # exactly how an integration-tier entry here went unrun by every CI
       # invocation while the record still claimed a clean scope.
       - name: Run the defence mutation record
         run: npm run test:defence-mutations -- --write --tier=all
@@ -363,4 +383,4 @@ jobs:
       - name: Fail if the committed record is stale
         run: |
           git diff --exit-code -- docs/security/defence-mutation-record.md \
-            || { echo "::error::docs/security/defence-mutation-record.md is stale — re-run 'npm run test:defence-mutations -- --write --tier=all' (a DATABASE_URL is needed for the one integration-tier entry) and commit it"; exit 1; }
+            || { echo "::error::docs/security/defence-mutation-record.md is stale — re-run 'npm run test:defence-mutations -- --write --tier=all' (a migrated Postgres DATABASE_URL is needed for the integration-tier entries) and commit it"; exit 1; }
