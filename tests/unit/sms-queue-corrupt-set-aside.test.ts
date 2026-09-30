@@ -185,4 +185,64 @@ describe('sms queue set-aside (issue 2353)', () => {
     expect(alert.context).toEqual({ bytes: 14, list: 'sms:queue' });
     expect(JSON.stringify(alert)).not.toContain('attempts');
   });
+
+  // Issue 2385: once the LPUSH lands the entry IS parked. A failed LTRIM or
+  // EXPIRE used to be read as a failed park, so the entry was also put back on
+  // the live queue — a duplicate per tick, with the cap and TTL never applied.
+  it.each([
+    ['ltrim', 'ltrim' as const],
+    ['expire', 'expire' as const],
+  ])('a rejected %s after a landed park is still parked — no put-back', async (_n, cmd) => {
+    h.client.rpop.mockResolvedValueOnce('{"attempts":0}');
+    h.client[cmd].mockRejectedValueOnce(new Error('connection reset'));
+    await smsQueue.processQueue();
+    expect(h.client.lpush).toHaveBeenCalledTimes(1);
+    expect(h.client.lpush).toHaveBeenCalledWith('sms:failed:corrupt', '{"attempts":0}');
+    expect(h.client.lpush).not.toHaveBeenCalledWith('sms:queue', expect.anything());
+    expect(h.sendAlert).not.toHaveBeenCalled();
+  });
+
+  it('replay: a rejected ltrim after a landed park counts skipped, not kept', async () => {
+    h.client.llen.mockResolvedValueOnce(1);
+    h.client.rpop.mockResolvedValueOnce('{"broken":');
+    h.client.ltrim.mockRejectedValueOnce(new Error('connection reset'));
+    const res = await smsQueue.retryFailed();
+    expect(res).toEqual({ retried: 0, skipped: 1, kept: 0 });
+    expect(h.client.lpush).toHaveBeenCalledTimes(1);
+    expect(h.client.lpush).not.toHaveBeenCalledWith('sms:failed', expect.anything());
+  });
+
+  // Issue 2382: the provider accepted the SMS, then the NotificationLog
+  // upsert (the idempotency record) threw. Retrying would find no 'sent' row
+  // and text the customer again — the post-send failure is log-only.
+  it.each([
+    ['first attempt', 0],
+    ['last attempt', 2],
+  ])('a failed post-send log write never re-sends (%s)', async (_n, attempts) => {
+    vi.useFakeTimers();
+    try {
+      h.client.rpop.mockResolvedValueOnce(JSON.stringify(sms('p', { attempts })));
+      h.notificationLog.upsert.mockRejectedValueOnce(new Error('statement timeout'));
+      await smsQueue.processQueue();
+      await vi.runAllTimersAsync();
+      expect(h.sendSms).toHaveBeenCalledTimes(1);
+      expect(h.client.lpush).not.toHaveBeenCalled();
+      expect(h.notificationLog.upsert).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a failed provider send still retries (nothing was sent)', async () => {
+    vi.useFakeTimers();
+    try {
+      h.client.rpop.mockResolvedValueOnce(JSON.stringify(sms('q', { attempts: 0 })));
+      h.sendSms.mockRejectedValueOnce(new Error('503'));
+      await smsQueue.processQueue();
+      await vi.runAllTimersAsync();
+      expect(h.client.lpush).toHaveBeenCalledWith('sms:queue', expect.stringContaining('"id":"q"'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

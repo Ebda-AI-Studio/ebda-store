@@ -411,7 +411,7 @@ Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 - **Code**: `apps/api/src/services/alerts.service.ts` exports `sendAlert({ level, scope, store?, source, title, body?, context? })`
 - **Levels**: `p0` (wake someone now) / `p1` (degraded, morning fine) / `info`
 - **Scope-aware headers**: `[P0 PLATFORM]` vs `[P0 STORE]` so the operator sees scope at a glance; store-scoped alerts name the merchant in the body.
-- **Throttle**: Redis-keyed per `sha1(level + title + storeId?)`, 5-min TTL — flapping events can't fan out 100 messages, and per-store throttling prevents store A's flaps from suppressing store B's genuinely-new alerts.
+- **Throttle**: Redis-keyed per `sha1(level + title + storeId?)`, 5-min TTL — flapping events can't fan out 100 messages, and per-store throttling prevents store A's flaps from suppressing store B's genuinely-new alerts. The throttle **fails open**: Redis down, or connected but rejecting writes (OOM / MISCONF / read-only — the `SET NX` throws), sends the alert unthrottled, so `sendAlert` never rejects (issue 2384 — the dead-letter `unreadable_lost` P1s fire in exactly that state).
 - **Graceful no-op**: missing env vars = single warn at boot, every send returns `'skipped'`
 - **Wired call sites**:
   - `process.on('uncaughtException')` in `apps/api/src/index.ts` → P0 platform

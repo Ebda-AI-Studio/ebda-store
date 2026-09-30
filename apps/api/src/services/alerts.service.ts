@@ -199,9 +199,23 @@ export async function sendAlert(
   // Per-(level, title, storeId?) Redis throttle. acquireLock returns
   // true when the key didn't exist (we got the slot), false when held.
   // Fail-open when Redis is unavailable so a Redis outage doesn't
-  // suppress alerts about the Redis outage itself.
+  // suppress alerts about the Redis outage itself. That includes a Redis
+  // that is CONNECTED but rejecting writes (OOM, MISCONF, read-only):
+  // acquireLock only short-circuits on "not connected", so its SET NX
+  // throws — and that is exactly the state the dead-letter `lost` P1s
+  // fire in (issue 2384). Fail-open stays local to the alert throttle;
+  // acquireLock's other callers (cron leader locks) need fail-closed.
   const lockName = throttleKey(opts.level, opts.title, opts.store?.id);
-  const slot = await redis.acquireLock(lockName, THROTTLE_TTL_SECONDS);
+  let slot: boolean;
+  try {
+    slot = await redis.acquireLock(lockName, THROTTLE_TTL_SECONDS);
+  } catch (err) {
+    logger.warn(
+      { err, level: opts.level, source: opts.source },
+      'alerts.service: throttle lock threw; sending unthrottled'
+    );
+    slot = true;
+  }
   if (!slot) {
     return 'throttled';
   }

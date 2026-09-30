@@ -185,6 +185,12 @@ class SmsQueueService {
     sms.lastAttempt = new Date().toISOString();
 
     const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
+    // Set once the provider has accepted the message (issue 2382). Anything
+    // that throws after that point must NOT retry or dead-letter: the
+    // idempotency row below is what the retry would look for, and it is the
+    // write that just failed — a retry would text the customer (and spend the
+    // merchant's SMS credit) a second time.
+    let sentMessageId: string | undefined;
 
     try {
       // Idempotency check — INSIDE the try (issue 2371): a throw here (a DB
@@ -212,6 +218,7 @@ class SmsQueueService {
       const result = await withCircuitBreaker(breakerKey, async () => {
         return smsService.sendSms(sms.config, sms.recipientPhone, sms.messageText);
       });
+      sentMessageId = result.messageId;
 
       // Log success
       await prisma.notificationLog.upsert({
@@ -238,6 +245,16 @@ class SmsQueueService {
         '[SMS QUEUE] SMS sent'
       );
     } catch (error) {
+      if (sentMessageId !== undefined) {
+        // Delivered; only the NotificationLog write failed. Log-only: the
+        // row is missing from the admin log, which is far cheaper than a
+        // duplicate text. No phone/text in the log (PII).
+        logger.error(
+          { err: error, smsId: sms.id, messageId: sentMessageId, event: sms.event },
+          '[SMS QUEUE] SMS sent but NotificationLog write failed — not retried (would double-send)'
+        );
+        return;
+      }
       sms.error = error instanceof Error ? error.message : 'Unknown error';
 
       if (sms.attempts < sms.maxAttempts) {

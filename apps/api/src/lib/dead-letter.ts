@@ -16,10 +16,32 @@ interface ListClient {
   expire(key: string, seconds: number): Promise<unknown>;
 }
 
-export async function parkCorrupt(client: ListClient, key: string, raw: string): Promise<void> {
+type ErrorLog = { error: (obj: object, msg: string) => void };
+
+/**
+ * Only the LPUSH decides the outcome (issue 2385): once it lands the entry is
+ * durably set aside, which is the whole point of the park. LTRIM + EXPIRE are
+ * best-effort — the next write to the list re-applies both. Treating a failed
+ * trim as a failed park put the entry back on the live queue while it was
+ * ALSO in the set-aside list, so every tick added a duplicate and the cap/TTL
+ * never applied (unbounded, non-expiring raw customer payloads).
+ */
+export async function parkCorrupt(
+  client: ListClient,
+  key: string,
+  raw: string,
+  log: ErrorLog
+): Promise<void> {
   await client.lpush(key, raw);
-  await client.ltrim(key, 0, CORRUPT_CAP - 1);
-  await client.expire(key, CORRUPT_TTL_S);
+  try {
+    await client.ltrim(key, 0, CORRUPT_CAP - 1);
+    await client.expire(key, CORRUPT_TTL_S);
+  } catch (err) {
+    log.error(
+      { err, list: key },
+      '[dead-letter] set-aside bound (LTRIM/EXPIRE) failed — entry parked; next write re-applies it'
+    );
+  }
 }
 
 export type SetAsideOutcome = 'parked' | 'requeued' | 'lost';
@@ -39,10 +61,10 @@ export async function setAsideUnreadable(
   client: ListClient,
   keys: { corrupt: string; queue: string },
   raw: string,
-  log: { error: (obj: object, msg: string) => void }
+  log: ErrorLog
 ): Promise<SetAsideOutcome> {
   try {
-    await parkCorrupt(client, keys.corrupt, raw);
+    await parkCorrupt(client, keys.corrupt, raw, log);
     log.error(
       { bytes: raw.length, list: keys.corrupt },
       '[dead-letter] unreadable entry set aside'
@@ -112,7 +134,7 @@ export async function replayDeadLetters<T extends { attempts: number; error?: st
   client: ReplayClient,
   keys: { failed: string; corrupt: string; queue: string },
   isValid: (parsed: unknown) => parsed is T,
-  log: { error: (obj: object, msg: string) => void }
+  log: ErrorLog
 ): Promise<ReplayResult> {
   const out: ReplayResult = { retried: 0, skipped: 0, kept: 0, lost: 0 };
 
@@ -150,7 +172,7 @@ export async function replayDeadLetters<T extends { attempts: number; error?: st
       entry = parsed;
     } catch {
       try {
-        await parkCorrupt(client, keys.corrupt, raw);
+        await parkCorrupt(client, keys.corrupt, raw, log);
         out.skipped++;
         log.error(
           { bytes: raw.length, list: keys.corrupt },

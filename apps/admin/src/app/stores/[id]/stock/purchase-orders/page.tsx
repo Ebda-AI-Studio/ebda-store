@@ -29,10 +29,10 @@ interface PurchaseOrder {
 
 const STATUS_CLASSES: Record<string, string> = {
   draft: 'bg-muted text-foreground',
-  sent: 'bg-blue-100 text-blue-700',
-  partial: 'bg-amber-100 text-amber-700',
-  received: 'bg-green-100 text-green-700',
-  cancelled: 'bg-red-100 text-red-700',
+  sent: 'bg-info/10 text-info-ink',
+  partial: 'bg-warning/10 text-warning-ink',
+  received: 'bg-success/10 text-success-ink',
+  cancelled: 'bg-destructive/10 text-destructive-ink',
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────

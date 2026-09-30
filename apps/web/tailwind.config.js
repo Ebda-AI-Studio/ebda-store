@@ -2,6 +2,12 @@
 module.exports = {
   darkMode: 'class',
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}', '../../packages/ui/src/**/*.{js,ts,jsx,tsx}'],
+  // `text-gray-700` was emitted into this bundle only because @force/ui's Label
+  // used it (issue 2380 moved Label to `text-foreground`). Nothing in apps/web
+  // renders Label, but merchant-authored HTML could carry the class, so it is
+  // kept: the storefront stylesheet may only GROW from a shared-package change,
+  // never lose a rule (pecannbee must not change; Ruling YWA-TXT-1).
+  safelist: ['text-gray-700'],
   theme: {
     extend: {
       colors: {
@@ -35,6 +41,13 @@ module.exports = {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
+          // `-ink` (text on the card) is its own token in admin/orders, where
+          // the role colour fails AA. The storefront has no such token and its
+          // look must not change (Ruling YWA-TXT-1), so here it is the SAME
+          // declaration as DEFAULT — @force/ui form errors use `text-destructive-ink`
+          // and stay pixel-identical on every store, per-store overrides included
+          // (issue 2380).
+          ink: 'hsl(var(--destructive))',
         },
         success: {
           DEFAULT: 'hsl(var(--success))',

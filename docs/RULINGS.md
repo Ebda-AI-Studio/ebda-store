@@ -4834,3 +4834,46 @@ is the grey-pill text, because `muted-foreground` is 4.32:1 on a solid `bg-muted
 PRE-EXISTING `bg-muted … text-muted-foreground` pairs elsewhere in admin were not rewritten here and
 are not gated yet (4.32:1, a marginal AA miss in light only; fine in dark). Cost if wrong: grey
 secondary text on those pills stays just under AA in the light theme.
+
+**Ruling BF-2d — a post-send failure never re-sends; a landed park is a park (issues 2382, 2385).**
+SMS: `sendSms` records the provider's `messageId` the moment the send returns; a throw after that
+(the `NotificationLog` upsert — the very idempotency row a retry looks for) is logged with the
+message id and NOT retried or dead-lettered, because the retry would text the customer and spend
+the merchant's credit twice. The pre-write reservation (`status: 'sending'` before dispatch) the
+audit also offered was not taken: it needs a new status value every admin reader must learn, for no
+gain over the flag on the retry path. Email is OUT of this class: nothing after a successful send
+can throw (a log line only), so there is no post-send write to fail; a provider that accepts a
+message and then times out is provider-side ambiguity, not this defect. Dead letters:
+`parkCorrupt`'s LPUSH alone decides the outcome; LTRIM + EXPIRE are best-effort (logged, re-applied
+by the next write). A failed trim used to be read as a failed park, so the entry was also put back
+on the live queue — one duplicate per tick, the cap and TTL never applied. Cost if wrong: a
+set-aside list whose trim keeps failing can exceed 200 entries / miss its TTL until one write's
+trim lands (logged each time); an SMS whose log write failed is missing from the admin log (the
+text did go out, the error log carries its message id).
+
+**Ruling ALR-1 — the alert throttle fails open on a throw, locally (issue 2384).** `sendAlert`
+wraps `redis.acquireLock` and treats a throw (Redis connected but rejecting writes) as "slot
+acquired", so the `unreadable_lost` and orphaned-invoice P1s are delivered in the Redis state that
+raises them, and `sendAlert` keeps its "never throws" contract for every awaiting caller. The fix is
+NOT in `acquireLock`: its other callers (cron leader locks, bulk sweeps) need fail-closed — failing
+open there means two concurrent runs. Cost if wrong: during a Redis write fault, a flapping alert is
+not deduplicated and can repeat once per event until Redis recovers.
+
+**Ruling ADM-GREY-2 — the contrast gate scopes by render surface; raw palette text on a themed
+surface is banned (issues 2380, 2381).** `@force/ui` was exempt as a directory, yet admin compiles
+it and renders `<Label>` (text-gray-700: ~1.8:1 on the dark card) on six surfaces. The gate now
+runs the full admin/orders checks over every ui component that app imports, with that app's tokens.
+It found three more: the error line of `Input`, `Select`, `Textarea` (`text-destructive`, 4.38:1
+light / 3.72:1 dark on the admin card) — now `text-destructive-ink`. Storefront stays
+pixel-identical (Ruling YWA-TXT-1): apps/web renders no `Label`, and its tailwind config maps
+`destructive.ink` to the SAME `hsl(var(--destructive))` declaration (per-store overrides included)
+and safelists `text-gray-700`, so the compiled storefront CSS only gains one rule. Proven by a
+screenshot diff of six live pecannbee pages (home, product, cart, checkout; ar + en) with the ui
+form error states injected, 390px + 1280px, light + dark: 0 differing pixels in 24/24 pairs, with
+a positive control (a recoloured ink rule) differing in 24/24. The bank-reconciliation panel's
+`bg-white`→`bg-card` regression (green-800 on the dark card, 2.66:1) and the whole panel, plus the
+expense and purchase-order status maps, moved to role `-ink` pairs. Residual: ~186 admin/orders
+class strings carry raw chromatic text (`text-red-600`, …) with no background in the same string;
+their surface is inherited, so a static gate cannot tell a light-tint parent from the themed card —
+not gated, not rewritten here. Cost if wrong: some of those read below AA in the dark theme until
+migrated.

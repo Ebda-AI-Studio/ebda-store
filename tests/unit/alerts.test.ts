@@ -131,6 +131,23 @@ describe('sendAlert — configured', () => {
     expect(mockState.fetchMock).not.toHaveBeenCalled();
   });
 
+  // Issue 2384: a Redis that is connected but rejecting writes (OOM,
+  // MISCONF, read-only) makes the throttle SET NX throw. That is the state
+  // the dead-letter `unreadable_lost` P1 fires in, so the throttle must
+  // fail open — the alert still goes out, and sendAlert never rejects.
+  it('fails open and still POSTs when the throttle SET rejects', async () => {
+    mockState.acquireLockMock.mockRejectedValueOnce(
+      new Error('OOM command not allowed when used memory > maxmemory')
+    );
+    mockState.fetchMock.mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }));
+
+    const { sendAlert } = await loadService();
+    const result = await sendAlert({ level: 'p1', title: 'Unreadable queued SMS lost' });
+
+    expect(result).toBe('sent');
+    expect(mockState.fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('returns failed when Telegram rejects (non-2xx)', async () => {
     mockState.acquireLockMock.mockResolvedValueOnce(true);
     mockState.fetchMock.mockResolvedValueOnce(

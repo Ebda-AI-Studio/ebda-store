@@ -4,6 +4,7 @@
  */
 
 import logger from '../lib/logger';
+import { maskPhone } from '../lib/pii-mask';
 
 const UNIFONIC_BASE = 'https://el.cloud.unifonic.com/rest';
 const UNIFONIC_API = `${UNIFONIC_BASE}/SMS/messages`;
@@ -127,7 +128,7 @@ class SmsService {
     if (!response.ok) {
       const text = await response.text().catch(() => '');
       logger.error(
-        { status: response.status, body: text, to },
+        { status: response.status, body: text, to: maskPhone(to) },
         '[SMS] Unifonic API request failed'
       );
       throw new Error(`Unifonic API error: ${response.status} ${response.statusText}`);
@@ -137,7 +138,7 @@ class SmsService {
 
     if (!result.success) {
       logger.error(
-        { errorCode: result.errorCode, message: result.message, to },
+        { errorCode: result.errorCode, message: result.message, to: maskPhone(to) },
         '[SMS] Unifonic API returned failure'
       );
       throw new Error(`Unifonic error ${result.errorCode}: ${result.message}`);
@@ -147,7 +148,10 @@ class SmsService {
       throw new Error('Unifonic API did not return a messageId');
     }
 
-    logger.info({ messageId: result.data.messageId, to }, '[SMS] SMS sent successfully');
+    logger.info(
+      { messageId: result.data.messageId, to: maskPhone(to) },
+      '[SMS] SMS sent successfully'
+    );
 
     return { messageId: result.data.messageId };
   }

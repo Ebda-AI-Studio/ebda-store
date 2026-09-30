@@ -34,10 +34,10 @@ const kwd = filsToKwd;
 
 const STATUS_BADGE: Record<ExpenseStatus, string> = {
   draft: 'bg-muted text-foreground',
-  pending: 'bg-amber-100 text-amber-700',
-  approved: 'bg-blue-100 text-blue-700',
-  posted: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
+  pending: 'bg-warning/10 text-warning-ink',
+  approved: 'bg-info/10 text-info-ink',
+  posted: 'bg-success/10 text-success-ink',
+  rejected: 'bg-destructive/10 text-destructive-ink',
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────

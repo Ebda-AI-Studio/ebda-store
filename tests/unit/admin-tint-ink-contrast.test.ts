@@ -18,10 +18,20 @@
  *      and `text-muted-ink` for text on a SOLID `bg-muted` (the grey pill).
  *      Gradient stops (`from-neutral-800`) are exempt: they paint swatches.
  *
- * Scope (issues 2341, 2342, 2349): admin and orders get all four; the
+ *  (5) no raw chromatic text (`text-green-800`) in the same class string as a
+ *      THEMED surface (`bg-card`, `bg-background`, `bg-popover`): the surface
+ *      turns dark and the fixed text does not — green-800 on the dark card is
+ *      2.66:1 (issue 2381). Raw text on a raw LIGHT tint (`bg-green-100
+ *      text-green-700`) is theme-blind but readable, so it is not flagged here.
+ *
+ * Scope (issues 2341, 2342, 2349, 2380): admin and orders get all five; the
  * storefront (apps/web) and packages/ui get (3) only — a class that emits no
  * CSS is a bug on any surface, but re-colouring storefront text is a visible
  * change the owner has not approved (pecannbee must not change; Ruling YWA-TXT-1).
+ * EXCEPT: a packages/ui component that admin or orders imports renders on that
+ * app's surface, so it gets all five, measured with that app's tokens (issue
+ * 2380 — the source-directory scope reported green on `<Label>`'s text-gray-700
+ * while it rendered in the admin dark theme at ~1.8:1).
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
@@ -114,10 +124,17 @@ function droppedForms(cls: string): string[] {
 const RAW_NEUTRAL =
   /(?<![\w-])((?:[\w-]+:)*(?:text|bg|border|divide|ring|placeholder|outline|fill|stroke)-(?:gray|slate|zinc|neutral|stone)-\d+(?:\/\d+)?)(?![\w/-])/g;
 
+const RAW_CHROMATIC_TEXT =
+  /(?<![\w-])((?:[\w-]+:)*text-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d+(?:\/\d+)?)(?![\w/-])/g;
+const THEMED_SURFACE = /(?<![\w:-])bg-(?:card|background|popover)(?![\w/-])/;
+
 function bannedForms(cls: string): string[] {
   const out = droppedForms(cls);
   for (const m of cls.matchAll(RAW_NEUTRAL))
     out.push(`raw neutral palette utility (use a semantic token): ${m[1]}`);
+  if (THEMED_SURFACE.test(cls))
+    for (const m of cls.matchAll(RAW_CHROMATIC_TEXT))
+      out.push(`raw palette text on a themed surface (use a role -ink): ${m[1]}`);
   const arb = new RegExp(`\\S*\\[hsl\\(var\\(--(${ROLES.join('|')})\\)\\)\\]\\S*`, 'g');
   for (const m of cls.matchAll(arb)) out.push(`arbitrary-value role colour: ${m[0]}`);
   return out;
@@ -296,6 +313,9 @@ describe('the contrast detector (controls)', () => {
     ['2372 raw gray under a dark: variant', `'bg-muted dark:bg-gray-800'`],
     ['2372 raw slate pill', `'bg-slate-100 text-slate-600'`],
     ['2372 raw gray hover', `'text-muted-ink hover:bg-gray-100'`],
+    ['2381 raw green on the themed card', `'border-green-200 bg-card text-green-800'`],
+    ['2381 raw text on the page background', `'bg-background text-red-700'`],
+    ['2380 the old @force/ui Label', `'text-sm font-medium text-gray-700'`],
   ])('flags %s', (_name, src) => {
     expect(problems(src).length).toBeGreaterThan(0);
   });
@@ -310,6 +330,9 @@ describe('the contrast detector (controls)', () => {
     [`'text-primary hover:underline'`], // brand links: Ruling YWA-TXT-1
     [`'bg-muted text-muted-ink border-border'`], // the grey pill, issue 2372
     [`'bg-gradient-to-br from-neutral-800 to-neutral-900'`], // a swatch, not text
+    [`'bg-green-100 text-green-700'`], // forced light tint: theme-blind but readable
+    [`'border-success/30 bg-success/10 text-success-ink'`], // the 2381 fix
+    [`'text-sm font-medium text-foreground'`], // the 2380 fix
   ])('passes %s', src => {
     expect(problems(src)).toEqual([]);
   });
@@ -338,5 +361,78 @@ for (const app of APPS) {
         expect(offenders).toEqual([]);
       }
     );
+  });
+}
+
+/**
+ * Issue 2380: packages/ui is exempt from (4)/(5) as a directory, but admin and
+ * orders compile it (admin's tailwind content glob includes packages/ui) and
+ * render the components they import on their own themed surfaces. Scope by
+ * RENDER SURFACE: every ui component file an app imports gets that app's full
+ * gate, measured with that app's tokens. Storefront-only components
+ * (ProductBadge, Rating) stay exempt under Ruling YWA-TXT-1.
+ */
+const UI = APPS.find(a => a.name === 'ui')!;
+const uiExports = (file: string): string[] => {
+  const src = readFileSync(file, 'utf8');
+  const names = [
+    ...[...src.matchAll(/export\s+(?:const|function|class)\s+(\w+)/g)].map(m => m[1]),
+    ...[...src.matchAll(/export\s*\{([^}]*)\}/g)].flatMap(m =>
+      m[1].split(',').map(n =>
+        n
+          .trim()
+          .split(/\s+as\s+/)
+          .pop()!
+          .trim()
+      )
+    ),
+  ];
+  return names.filter(Boolean);
+};
+const importedFromUi = (root: string): Set<string> =>
+  new Set(
+    sourceFiles(root).flatMap(f =>
+      [
+        ...readFileSync(f, 'utf8').matchAll(
+          /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'@force\/ui'/g
+        ),
+      ].flatMap(m =>
+        m[1].split(',').map(n =>
+          n
+            .trim()
+            .replace(/^type\s+/, '')
+            .split(/\s+as\s+/)[0]
+            .trim()
+        )
+      )
+    )
+  );
+
+for (const app of APPS.filter(a => a.css)) {
+  const token = tokensFrom(join(app.root, app.css!));
+  const used = importedFromUi(app.root);
+  const rendered = sourceFiles(UI.root).filter(f => uiExports(f).some(n => used.has(n)));
+  describe(`${app.name}: the packages/ui components it renders (issue 2380)`, () => {
+    // Control: admin imports Button and Label, so the scan cannot be vacuous
+    // there. Orders imports nothing from @force/ui today (0 files is correct).
+    it('finds the components it imports (control)', () => {
+      if (app.name === 'admin') {
+        expect(rendered.some(f => f.endsWith('Button.tsx'))).toBe(true);
+        expect(rendered.some(f => f.endsWith('Label.tsx'))).toBe(true);
+      } else if (used.size > 0) {
+        expect(rendered.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("every imported ui component passes this app's full gate", () => {
+      const offenders = rendered.flatMap(f =>
+        classStrings(readFileSync(f, 'utf8')).flatMap(cls =>
+          [...contrastProblems(cls, token), ...bannedForms(cls)].map(
+            p => `${f.slice(UI.root.length + 1)} — ${p} — ${cls}`
+          )
+        )
+      );
+      expect(offenders).toEqual([]);
+    });
   });
 }

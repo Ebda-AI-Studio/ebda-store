@@ -74,9 +74,9 @@ function fmt(iso: string | null): string {
 }
 
 const MATCH_BADGE: Record<MatchStatus, string> = {
-  unmatched: 'bg-red-100 text-red-700',
-  auto_matched: 'bg-green-100 text-green-700',
-  manual_matched: 'bg-blue-100 text-blue-700',
+  unmatched: 'bg-destructive/10 text-destructive-ink',
+  auto_matched: 'bg-success/10 text-success-ink',
+  manual_matched: 'bg-info/10 text-info-ink',
   ignored: 'bg-muted text-muted-ink',
 };
 
@@ -302,13 +302,13 @@ export default function StatementDetailPage() {
         </div>
 
         {autoMatchMsg && (
-          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          <div className="rounded-lg border border-info/30 bg-info/10 px-4 py-3 text-sm text-info-ink">
             {autoMatchMsg}
           </div>
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
             {error}
           </div>
         )}
@@ -343,7 +343,9 @@ export default function StatementDetailPage() {
         {difference && (
           <div
             className={`rounded-xl border p-4 shadow-sm ${
-              difference.isReconciled ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+              difference.isReconciled
+                ? 'border-success/40 bg-card'
+                : 'border-destructive/40 bg-card'
             }`}
           >
             <div className="flex items-center justify-between mb-3">
@@ -351,8 +353,8 @@ export default function StatementDetailPage() {
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   difference.isReconciled
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
+                    ? 'bg-success/10 text-success-ink'
+                    : 'bg-destructive/10 text-destructive-ink'
                 }`}
               >
                 {difference.isReconciled ? t('difference.reconciled') : t('difference.mismatch')}
@@ -382,16 +384,22 @@ export default function StatementDetailPage() {
               <div
                 className={`rounded-lg border p-3 shadow-sm ${
                   difference.isReconciled
-                    ? 'border-green-200 bg-green-100'
-                    : 'border-red-200 bg-red-100'
+                    ? 'border-success/30 bg-success/10'
+                    : 'border-destructive/30 bg-destructive/10'
                 }`}
               >
-                <p className="text-xs text-muted-foreground leading-tight">
+                {/* muted-foreground is 4.35:1 on the light 10% success tint (under
+                    AA); the role ink is the measured pair (issue 2381). */}
+                <p
+                  className={`text-xs leading-tight ${
+                    difference.isReconciled ? 'text-success-ink' : 'text-destructive-ink'
+                  }`}
+                >
                   {t('difference.delta')}
                 </p>
                 <p
                   className={`mt-1 text-lg font-bold font-mono ${
-                    difference.isReconciled ? 'text-green-700' : 'text-red-700'
+                    difference.isReconciled ? 'text-success-ink' : 'text-destructive-ink'
                   }`}
                 >
                   {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
@@ -403,26 +411,26 @@ export default function StatementDetailPage() {
             {/* Where breakdown */}
             {!difference.isReconciled && (
               <div className="mb-4 grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-                  <p className="text-xs font-medium text-amber-700">
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
+                  <p className="text-xs font-medium text-warning-ink">
                     {t('difference.unmatchedBankSide')}
                   </p>
-                  <p className="mt-0.5 text-sm font-semibold text-amber-900 font-mono">
+                  <p className="mt-0.5 text-sm font-semibold text-warning-ink font-mono">
                     KWD {kwd(difference.unmatchedBankFils)}
                   </p>
-                  <p className="mt-0.5 text-xs text-amber-600">
+                  <p className="mt-0.5 text-xs text-warning-ink">
                     {summary?.unmatched ?? 0} {t('difference.bankLines')}
                   </p>
                 </div>
-                <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
-                  <p className="text-xs font-medium text-purple-700">
+                <div className="rounded-lg border border-info/30 bg-info/10 p-3">
+                  <p className="text-xs font-medium text-info-ink">
                     {t('difference.unmatchedLedgerSide')}
                   </p>
-                  <p className="mt-0.5 text-sm font-semibold text-purple-900 font-mono">
+                  <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
                     {difference.unmatchedLedgerFils < 0 ? '−' : ''}KWD{' '}
                     {kwd(Math.abs(difference.unmatchedLedgerFils))}
                   </p>
-                  <p className="mt-0.5 text-xs text-purple-600">
+                  <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}
                   </p>
                 </div>
@@ -433,13 +441,13 @@ export default function StatementDetailPage() {
             <div
               className={`rounded-lg border p-3 text-sm ${
                 difference.isReconciled
-                  ? 'border-green-200 bg-card text-green-800'
-                  : 'border-amber-200 bg-amber-50 text-amber-800'
+                  ? 'border-success/30 bg-success/10 text-success-ink'
+                  : 'border-warning/30 bg-warning/10 text-warning-ink'
               }`}
             >
               <p className="font-medium mb-0.5">{t('difference.suggestedAction')}</p>
               <p>{difference.suggestedActionEn}</p>
-              <p className="mt-1 text-xs opacity-70 text-right" dir="rtl">
+              <p className="mt-1 text-xs text-right" dir="rtl">
                 {difference.suggestedActionAr}
               </p>
             </div>
@@ -507,7 +515,7 @@ export default function StatementDetailPage() {
                     </td>
                     <td className="px-3 py-2.5">
                       <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tx.direction === 'debit' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tx.direction === 'debit' ? 'bg-destructive/10 text-destructive-ink' : 'bg-success/10 text-success-ink'}`}
                       >
                         {tx.direction === 'debit' ? tx_t('debit') : tx_t('credit')}
                       </span>
@@ -559,7 +567,7 @@ export default function StatementDetailPage() {
                           <button
                             onClick={() => handleAction(tx.id, 'unmatch')}
                             disabled={actionLoading === tx.id}
-                            className="rounded px-1.5 py-0.5 text-xs font-medium text-amber-600 hover:bg-amber-50 disabled:opacity-40"
+                            className="rounded px-1.5 py-0.5 text-xs font-medium text-warning-ink hover:bg-warning/10 disabled:opacity-40"
                           >
                             {actionLoading === tx.id ? '…' : tx_t('unmatch')}
                           </button>
