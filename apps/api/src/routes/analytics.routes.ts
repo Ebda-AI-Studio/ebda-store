@@ -5,6 +5,8 @@ import { AnalyticsService } from '../services/analytics.service';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
 import logger from '../lib/logger';
+import { z } from 'zod';
+import { analyticsPeriodSchema } from '@force/shared';
 
 const router = Router({ mergeParams: true });
 
@@ -31,8 +33,11 @@ router.get(
       const { storeId } = req.params;
       const dateRange = parseDateRange(req);
 
+      // GL cards follow the period picker like every other widget on the
+      // page. Month-to-date only when the caller sends no range.
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const glFrom = dateRange?.startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
+      const glTo = dateRange?.endDate ?? now;
 
       // 2026-05-21: switched Promise.all -> Promise.allSettled so a single
       // failing sub-query (e.g. GL queries breaking when a store has no
@@ -41,7 +46,7 @@ router.get(
       // surface the real cause without needing to bisect.
       const [statsRes, glRes, stockRes] = await Promise.allSettled([
         AnalyticsService.getDashboardStats(storeId, dateRange),
-        AnalyticsService.glRevenueWindow(storeId, monthStart, now),
+        AnalyticsService.glRevenueWindow(storeId, glFrom, glTo),
         AnalyticsService.stockSnapshot(storeId),
       ]);
       if (statsRes.status === 'rejected') {
@@ -69,6 +74,18 @@ router.get(
 );
 
 // GET /stores/:storeId/analytics/sales - Get sales chart data
+//
+// `period` is validated against the shared preset enum (an unknown value is a
+// 422, not a silent fall-through to daily buckets). The bucket size is picked
+// from the range length; `tzOffset` is the viewer's UTC offset in minutes
+// (east-positive) so buckets are the viewer's calendar days.
+const salesQuerySchema = z.object({
+  period: analyticsPeriodSchema.optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  tzOffset: z.coerce.number().int().min(-840).max(840).default(0),
+});
+
 router.get(
   '/sales',
   authenticate,
@@ -77,18 +94,31 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { period } = req.query;
-      const dateRange = parseDateRange(req);
+      const parsed = salesQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
+        return;
+      }
+      const { period, startDate, endDate, tzOffset } = parsed.data;
+      const dateRange = startDate && endDate ? { startDate, endDate } : undefined;
 
-      const salesData = await AnalyticsService.getSalesChart(
+      const { sales, granularity } = await AnalyticsService.getSalesChart(
         storeId,
-        period as 'day' | 'week' | 'month' | 'year',
-        dateRange
+        period,
+        dateRange,
+        tzOffset
       );
 
       res.json({
         success: true,
-        data: { sales: salesData },
+        data: { sales, granularity },
       });
     } catch (error) {
       next(error);
@@ -329,13 +359,17 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const dateRange = parseDateRange(req);
 
+      // GL gross profit follows an explicit range when one is sent;
+      // month-to-date otherwise.
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const glFrom = dateRange?.startDate ?? new Date(now.getFullYear(), now.getMonth(), 1);
+      const glTo = dateRange?.endDate ?? now;
 
       const [performance, glThisMonth] = await Promise.all([
         AnalyticsService.getPerformanceSummary(storeId),
-        AnalyticsService.glRevenueWindow(storeId, monthStart, now),
+        AnalyticsService.glRevenueWindow(storeId, glFrom, glTo),
       ]);
 
       res.json({
@@ -363,8 +397,21 @@ router.get(
       const now = new Date();
       const defaultFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      const from = req.query.from ? new Date(req.query.from as string) : defaultFrom;
-      const to = req.query.to ? new Date(req.query.to as string) : now;
+      // Same `startDate`/`endDate` names as every other analytics endpoint —
+      // the admin always sent those, but this route read only `from`/`to`, so
+      // the chart ignored the period picker and was always the last 30 days.
+      // `from`/`to` stay accepted as aliases for any older caller.
+      const range = parseDateRange(req);
+      const from =
+        range?.startDate ?? (req.query.from ? new Date(req.query.from as string) : defaultFrom);
+      const to = range?.endDate ?? (req.query.to ? new Date(req.query.to as string) : now);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        res.status(422).json({
+          success: false,
+          error: { code: 'validation_failed', message: 'Invalid date range.' },
+        });
+        return;
+      }
 
       const trend = await AnalyticsService.cashflowTrend(storeId, from, to);
 

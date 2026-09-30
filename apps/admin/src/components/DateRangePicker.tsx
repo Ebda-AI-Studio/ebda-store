@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useT } from '@/i18n/useT';
+import { ANALYTICS_PERIOD_PRESETS } from '@force/shared';
 import type { Period, ResolvedDateRange } from '../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../app/stores/[id]/analytics/_components/types';
 
@@ -14,17 +15,9 @@ interface DateRangePickerProps {
   exclude?: Period[];
 }
 
-const PRESET_ORDER: Period[] = [
-  'today',
-  'yesterday',
-  'last_7',
-  'last_30',
-  'last_90',
-  'this_month',
-  'last_month',
-  'this_year',
-  'custom',
-];
+// The shared list is the one checklist the API enum and the
+// `analytics.periodsSubtitle.*` i18n keys are tested against.
+const PRESET_ORDER: Period[] = [...ANALYTICS_PERIOD_PRESETS];
 
 const PRESET_LABELS: Record<Period, { en: string; ar: string }> = {
   today: { en: 'Today', ar: 'اليوم' },

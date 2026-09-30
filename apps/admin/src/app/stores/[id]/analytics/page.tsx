@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../components/DateRangePicker';
+import { Alert } from '../../../../components/Alert';
 import { AnalyticsSkeleton } from './_components/AnalyticsSkeleton';
 import { AnalyticsStatsGrid } from './_components/AnalyticsStatsGrid';
 import { CashflowChart } from './_components/CashflowChart';
@@ -21,6 +22,8 @@ export default function AnalyticsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const tPage = useT('analytics.page');
+  const tPeriods = useT('analytics.periodsSubtitle');
+  const tErrors = useT('analytics.errors');
 
   const [period, setPeriod] = useState<Period>('this_month');
   const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
@@ -32,11 +35,15 @@ export default function AnalyticsPage() {
     stockSnapshot,
     cashflow,
     salesData,
+    salesGranularity,
     topProducts,
     recentOrders,
     lowStockProducts,
     isLoading,
+    error,
+    refetch,
   } = useAnalytics({ storeId, period, customRange });
+  const periodLabel = tPeriods(period);
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
@@ -53,17 +60,38 @@ export default function AnalyticsPage() {
         <AnalyticsSkeleton />
       ) : (
         <>
+          {/* A failed call is surfaced, never rendered as an empty widget. */}
+          {error !== null && (
+            <Alert
+              variant="destructive"
+              compact
+              className="mb-6"
+              title={tErrors('loadFailedTitle')}
+              description={error || tErrors('loadFailedBody')}
+              action={
+                <button
+                  type="button"
+                  onClick={refetch}
+                  className="text-xs font-medium underline underline-offset-2 cursor-pointer"
+                >
+                  {tErrors('retry')}
+                </button>
+              }
+            />
+          )}
+
           <AnalyticsStatsGrid stats={stats} />
 
           {/* GL KPI cards — sourced from journal_lines, refund-aware */}
           {gl && (
             <div className="mt-6">
-              <GlKpiCards gl={gl} />
+              <GlKpiCards gl={gl} periodLabel={periodLabel} />
             </div>
           )}
 
           <RevenueChart
             salesData={salesData}
+            granularity={salesGranularity}
             period={period}
             chartType={chartType}
             onChartTypeChange={setChartType}
@@ -73,7 +101,7 @@ export default function AnalyticsPage() {
           {(stockSnapshot || cashflow.length > 0) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               {stockSnapshot && <InventorySnapshotCard snapshot={stockSnapshot} />}
-              <CashflowChart data={cashflow} />
+              <CashflowChart data={cashflow} periodLabel={periodLabel} />
             </div>
           )}
 

@@ -31,8 +31,13 @@ export function GscTrendChart({ trend }: GscTrendChartProps) {
           const impressionsHeight = (point.impressions / maxImpressions) * 100;
           const clicksHeight = point.impressions > 0 ? (point.clicks / maxImpressions) * 100 : 0;
           return (
-            <div key={point.date} className="flex-1 flex flex-col items-center gap-1 group">
+            <div
+              key={point.date}
+              data-chart-column
+              className="flex-1 h-full flex flex-col justify-end items-center gap-1 group"
+            >
               <div
+                data-chart-bar
                 className="relative w-full bg-primary/20 rounded-t transition-all"
                 style={{ height: `${Math.max(impressionsHeight, 2)}%` }}
                 title={`${point.date}: ${point.impressions.toLocaleString()} ${t('impressions')}, ${point.clicks.toLocaleString()} ${t('clicks')}, ${formatPercent(point.ctr)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.position)}`}

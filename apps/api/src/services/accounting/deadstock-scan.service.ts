@@ -7,11 +7,17 @@
  *
  * Algorithm (per spec Part 3.2):
  *   1. Expire old open flags (>30 days, status='expired').
- *   2. List active products with trackInventory=true, inventory>0, costPrice>0.
- *   3. For each product: compute daysSinceSale + stockValueFils.
- *   4. Flag if daysSinceSale >= 90 AND stockValueFils >= 50000.
+ *   2. List active products with trackInventory=true and stock on hand.
+ *   3. For each product: compute daysSinceSale + stockValueFils (null when the
+ *      product has no cost price — value UNKNOWN, not zero).
+ *   4. Flag if daysSinceSale >= 90 AND (stockValueFils >= 50000 OR value unknown).
+ *      A product without a cost price used to be skipped entirely, which made
+ *      the scan blind on every store that never entered costs (2026-09-30
+ *      audit: pecannbee 0/210, palora 0/22) while the page said "No dead stock".
  *   5. Batch-call Gemini for bilingual clearance copy (max 20/call).
- *   6. findFirst+create/update DeadStockFlag rows (Prisma null-variant quirk).
+ *   6. Refresh the product's existing OPEN flag, or create one. Keyed on the
+ *      open flag, not on scannedAt: keying on the per-run timestamp inserted a
+ *      new open flag every weekly run (5 open cards for 1 product in prod).
  *
  * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
  * Inngest jobs (no tenant GUC in context) can read deadstock_flags, products,
@@ -20,10 +26,11 @@
  */
 
 import { prisma, withRlsBypass, Prisma } from '@force/database';
-import { effectiveInventory } from '../../lib/effective-inventory';
+import { activeVariants, effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { AppError } from '../../middleware/error-handler';
+import { withSavepointOn } from '../../lib/savepoint';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -45,8 +52,9 @@ interface DeadstockCandidate {
   nameAr: string | null;
   daysSinceSale: number;
   stockOnHand: number;
-  stockValueFils: number;
-  costPrice: number;
+  /** null = the product has no cost price, so its value is unknown. */
+  stockValueFils: number | null;
+  costPrice: number | null;
 }
 
 interface GeminiClearanceItem {
@@ -120,6 +128,49 @@ function daysSince(lastSaleAt: Date | undefined): number {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: variant-aware stock value (fils), or null when unknown
+// ---------------------------------------------------------------------------
+
+const knownCost = (c: number | null | undefined): number | null =>
+  typeof c === 'number' && c > 0 ? c : null;
+
+/**
+ * Stock value of a dead-stock candidate — the JS twin of `STOCK_VALUE_SQL`
+ * (lib/effective-inventory-sql.ts), which the finance dashboard, analytics
+ * snapshot and inventory page value stock with: a variant product is valued
+ * per ACTIVE variant at that variant's own cost, falling back to the parent's.
+ * Valuing the variant sum at the parent's cost alone mis-valued every variant
+ * product whose cost lives on its variants (ruling AP-10).
+ *
+ * Differs from the SQL twin in ONE place, on purpose (ruling AN-2): a stocked
+ * unit with no cost anywhere makes the value `null` (unknown), not a 0 that
+ * would silently fail the value threshold.
+ */
+export function deadStockValueFils(product: {
+  inventory: number;
+  costPrice: number | null;
+  variants?: Array<{ inventory: number; isActive?: boolean; costPrice?: number | null }> | null;
+}): number | null {
+  const parentCost = knownCost(product.costPrice);
+  const variants = product.variants ?? [];
+  if (variants.length === 0) {
+    return parentCost === null ? null : Math.round(product.inventory * parentCost);
+  }
+  let total = 0;
+  for (const v of activeVariants(variants)) {
+    const qty = v.inventory ?? 0;
+    const cost = knownCost(v.costPrice) ?? parentCost;
+    if (cost === null) {
+      // Only a unit actually on hand makes the value unknown.
+      if (qty > 0) return null;
+      continue;
+    }
+    total += qty * cost;
+  }
+  return Math.round(total);
+}
+
+// ---------------------------------------------------------------------------
 // Helper: build Gemini prompt for a chunk of candidates
 // ---------------------------------------------------------------------------
 
@@ -174,7 +225,8 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
     const expired = Number(expiredResult);
 
     // -------------------------------------------------------------------------
-    // Step 2: List active products with trackInventory=true, inventory>0, costPrice>0
+    // Step 2: List active products with trackInventory=true and stock on hand.
+    // No costPrice filter: a product without a cost is valued as unknown below.
     // -------------------------------------------------------------------------
     const products = await tx.product.findMany({
       where: {
@@ -189,7 +241,6 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
           { variants: { none: {} }, inventory: { gt: 0 } },
           { variants: { some: { isActive: true, inventory: { gt: 0 } } } },
         ],
-        costPrice: { gt: 0 },
       },
       select: {
         id: true,
@@ -199,7 +250,9 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         costPrice: true,
         // For a variant product the on-hand quantity is the variant sum;
         // `inventory` is unused for one. See lib/effective-inventory.ts.
-        variants: { select: { inventory: true, isActive: true } },
+        // `costPrice` per variant: a variant is valued at its own cost
+        // (deadStockValueFils — the STOCK_VALUE_SQL rule).
+        variants: { select: { inventory: true, isActive: true, costPrice: true } },
       },
     });
 
@@ -222,10 +275,12 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
       // 0 (or a negative) stock-on-hand for the entire variant catalogue, so
       // no variant product could ever clear the dead-stock value threshold.
       const onHand = effectiveInventory(product);
-      const stockValueFils = Math.round(onHand * (product.costPrice ?? 0));
+      const hasCost = typeof product.costPrice === 'number' && product.costPrice > 0;
+      const stockValueFils = deadStockValueFils(product);
 
       if (days < DEADSTOCK_DAYS_THRESHOLD) continue;
-      if (stockValueFils < DEADSTOCK_VALUE_FILS_THRESHOLD) continue;
+      // The value threshold can only be applied when the value is known.
+      if (stockValueFils !== null && stockValueFils < DEADSTOCK_VALUE_FILS_THRESHOLD) continue;
 
       collected.push({
         productId: product.id,
@@ -234,7 +289,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         daysSinceSale: days,
         stockOnHand: onHand,
         stockValueFils,
-        costPrice: product.costPrice ?? 0,
+        costPrice: hasCost ? product.costPrice : null,
       });
     }
 
@@ -296,9 +351,11 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   // --- Phase 3: upsert DeadStockFlag rows in a SHORT RLS-bypass tx ------------
   // DB writes only — no network, so this stays well under the 30s timeout.
   //
-  // Prisma's compound-unique where clause doesn't support null members in the
-  // generated type (variantId: string is required). Use findFirst+create/update
-  // to handle null variantId correctly — same pattern as reorder-scan.service.ts.
+  // One OPEN flag per product: find the product's open flag (newest first, in
+  // case duplicates from before this fix still exist) and refresh it —
+  // including scannedAt — else create one. Each candidate runs in its own
+  // SAVEPOINT so one failed write rolls back only itself instead of aborting
+  // the whole transaction (every later statement would otherwise fail 25P02).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rowsUpserted = await withRlsBypass(async (tx: any) => {
     let upserted = 0;
@@ -311,39 +368,45 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
       };
 
       try {
-        const existing = await tx.deadStockFlag.findFirst({
-          where: {
-            storeId,
-            productId: candidate.productId,
-            variantId: null,
-            scannedAt: scanStartedAt,
-          },
-          select: { id: true },
-        });
-
-        const payload = {
-          daysSinceSale: candidate.daysSinceSale,
-          stockOnHand: candidate.stockOnHand,
-          stockValueFils: candidate.stockValueFils,
-          suggestedDiscountBps: Math.round(copy.discountPercent * 100),
-          clearanceCopyEn: copy.copyEn,
-          clearanceCopyAr: copy.copyAr ?? undefined,
-          status: 'open' as const,
-        };
-
-        if (existing) {
-          await tx.deadStockFlag.update({ where: { id: existing.id }, data: payload });
-        } else {
-          await tx.deadStockFlag.create({
-            data: {
+        await withSavepointOn(tx, async () => {
+          const existing = await tx.deadStockFlag.findFirst({
+            where: {
               storeId,
               productId: candidate.productId,
               variantId: null,
-              scannedAt: scanStartedAt,
-              ...payload,
+              status: 'open',
             },
+            orderBy: { scannedAt: 'desc' },
+            select: { id: true },
           });
-        }
+
+          const payload = {
+            daysSinceSale: candidate.daysSinceSale,
+            stockOnHand: candidate.stockOnHand,
+            stockValueFils: candidate.stockValueFils,
+            suggestedDiscountBps: Math.round(copy.discountPercent * 100),
+            clearanceCopyEn: copy.copyEn,
+            clearanceCopyAr: copy.copyAr ?? undefined,
+            status: 'open' as const,
+          };
+
+          if (existing) {
+            await tx.deadStockFlag.update({
+              where: { id: existing.id },
+              data: { ...payload, scannedAt: scanStartedAt },
+            });
+          } else {
+            await tx.deadStockFlag.create({
+              data: {
+                storeId,
+                productId: candidate.productId,
+                variantId: null,
+                scannedAt: scanStartedAt,
+                ...payload,
+              },
+            });
+          }
+        });
         upserted += 1;
       } catch (err) {
         logger.error(

@@ -24,6 +24,8 @@ const OWNER = '00000000-0000-0000-0000-0000000000ff';
 let storeId: string;
 let deadProductId: string;
 let freshProductId: string;
+let costlessProductId: string;
+let variantProductId: string;
 
 beforeAll(async () => {
   await prisma.user.upsert({
@@ -80,6 +82,47 @@ beforeAll(async () => {
     },
   });
   freshProductId = fresh.id;
+
+  // Costless product: in stock, never sold, NO cost price. Before 2026-09-30
+  // the scan filtered on costPrice > 0 and never saw it, which made the scan
+  // blind on stores that never entered costs. It must be flagged with an
+  // UNKNOWN (null) stock value — not skipped, and not valued at 0.
+  const costless = await prisma.product.create({
+    data: {
+      storeId,
+      name: 'Costless Product',
+      slug: `costless-${Date.now()}`,
+      price: 4000,
+      inventory: 12,
+      trackInventory: true,
+      status: 'active',
+    },
+  });
+  costlessProductId = costless.id;
+
+  // Variant product: the cost lives on the variants, the parent has none.
+  // Valued per active variant at the variant's own cost (STOCK_VALUE_SQL rule,
+  // ruling AP-10): 10×3000 + 10×4000 = 70000. The disabled variant is not
+  // stock. Valuing at the parent cost alone made this "unknown".
+  const variantProduct = await prisma.product.create({
+    data: {
+      storeId,
+      name: 'Variant Product',
+      slug: `variant-${Date.now()}`,
+      price: 9000,
+      inventory: 0,
+      trackInventory: true,
+      status: 'active',
+      variants: {
+        create: [
+          { title: 'S', price: 9000, inventory: 10, costPrice: 3000 },
+          { title: 'M', price: 9000, inventory: 10, costPrice: 4000 },
+          { title: 'L', price: 9000, inventory: 50, costPrice: 9000, isActive: false },
+        ],
+      },
+    },
+  });
+  variantProductId = variantProduct.id;
 
   // Seed a recent paid order for the fresh product (7 days ago — well within 90d threshold).
   const recentDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -142,6 +185,44 @@ describe('deadstock scan', () => {
     // Fresh product (recent sale) MUST NOT be flagged.
     const freshFlag = allFlags.find(f => f.productId === freshProductId);
     expect(freshFlag).toBeUndefined();
+  });
+
+  it('flags a never-sold product with no cost price, value unknown (null)', async () => {
+    const flags = await prisma.deadStockFlag.findMany({
+      where: { storeId, productId: costlessProductId },
+    });
+    expect(flags).toHaveLength(1);
+    expect(flags[0].status).toBe('open');
+    expect(flags[0].stockValueFils).toBeNull();
+    expect(flags[0].stockOnHand).toBe(12);
+  });
+
+  it("values a variant product at each active variant's own cost", async () => {
+    const flags = await prisma.deadStockFlag.findMany({
+      where: { storeId, productId: variantProductId },
+    });
+    expect(flags).toHaveLength(1);
+    expect(flags[0].stockOnHand).toBe(20);
+    expect(flags[0].stockValueFils).toBe(70_000);
+  });
+
+  it("re-running refreshes each product's ONE open flag instead of adding another", async () => {
+    // Before 2026-09-30 the lookup keyed on the per-run scannedAt, so every
+    // weekly run inserted another open flag (5 open cards for 1 product live).
+    const openFor = (productId: string) =>
+      prisma.deadStockFlag.findMany({ where: { storeId, productId, status: 'open' } });
+    const before = await openFor(deadProductId);
+    expect(before).toHaveLength(1);
+
+    await new Promise(r => setTimeout(r, 5)); // distinct scannedAt
+    await runDeadstockScan(storeId);
+    await runDeadstockScan(storeId);
+
+    const after = await openFor(deadProductId);
+    expect(after).toHaveLength(1);
+    expect(after[0].id).toBe(before[0].id);
+    expect(after[0].scannedAt.getTime()).toBeGreaterThan(before[0].scannedAt.getTime());
+    expect(await openFor(costlessProductId)).toHaveLength(1);
   });
 
   it('result shape includes flagged count', async () => {

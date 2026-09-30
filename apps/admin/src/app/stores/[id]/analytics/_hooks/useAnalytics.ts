@@ -11,6 +11,7 @@ import type {
   RecentOrder,
   ResolvedDateRange,
   SalesData,
+  SalesGranularity,
   StockSnapshot,
   TopProduct,
 } from '../_components/types';
@@ -30,8 +31,13 @@ interface DashboardResponseData {
 
 /**
  * Fans out analytics endpoints in parallel and exposes the combined loading
- * state. Dashboard now returns gl + stock alongside operational stats.
- * Cashflow is fetched separately (last 30 days, independent of period selector).
+ * state. Dashboard returns gl + stock alongside operational stats. Every
+ * range-aware endpoint (dashboard incl. GL, sales, top products, cashflow)
+ * gets the same `startDate`/`endDate` pair from the period picker.
+ *
+ * `error` carries the first failed call's message. Before it existed a failed
+ * call left its widget at the initial empty state, which read as "no sales
+ * yet" instead of "this did not load" (2026-09-30 audit, finding 8).
  */
 export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -39,14 +45,17 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
   const [stockSnapshot, setStockSnapshot] = useState<StockSnapshot | null>(null);
   const [cashflow, setCashflow] = useState<CashflowPoint[]>([]);
   const [salesData, setSalesData] = useState<SalesData[]>([]);
+  const [salesGranularity, setSalesGranularity] = useState<SalesGranularity>('day');
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAnalytics = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
+    setError(null);
 
     try {
       const basePath = `/api/v1/stores/${storeId}/analytics`;
@@ -55,6 +64,9 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
       // ResolvedDateRange passed from the picker.
       const range = period === 'custom' && customRange ? customRange : resolveDateRange(period);
       const rangeQs = `startDate=${range.startDate.toISOString()}&endDate=${range.endDate.toISOString()}`;
+      // Viewer's UTC offset (east-positive minutes) so the sales buckets are
+      // the same calendar days the preset was resolved in.
+      const tzOffset = -new Date().getTimezoneOffset();
 
       const [
         dashboardResult,
@@ -65,7 +77,9 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
         cashflowResult,
       ] = await Promise.all([
         apiGet<DashboardResponseData>(`${basePath}/dashboard?${rangeQs}`),
-        apiGet<{ sales: SalesData[] }>(`${basePath}/sales?period=${period}&${rangeQs}`),
+        apiGet<{ sales: SalesData[]; granularity?: SalesGranularity }>(
+          `${basePath}/sales?period=${period}&${rangeQs}&tzOffset=${tzOffset}`
+        ),
         apiGet<{ products: TopProduct[] }>(`${basePath}/top-products?limit=5&${rangeQs}`),
         apiGet<{ orders: RecentOrder[] }>(`${basePath}/recent-orders?limit=5`),
         apiGet<{ products: LowStockProduct[] }>(`${basePath}/low-stock?threshold=10`),
@@ -79,6 +93,7 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
       }
       if (salesResult.data) {
         setSalesData(salesResult.data.sales);
+        setSalesGranularity(salesResult.data.granularity ?? 'day');
       }
       if (productsResult.data) {
         setTopProducts(productsResult.data.products);
@@ -92,8 +107,21 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
       if (cashflowResult.data) {
         setCashflow(cashflowResult.data.trend ?? []);
       }
-    } catch (error) {
-      console.error('Failed to fetch analytics:', error);
+
+      const failed = [
+        dashboardResult,
+        salesResult,
+        productsResult,
+        ordersResult,
+        stockResult,
+        cashflowResult,
+      ].find(r => r.error);
+      // `''` (a failure with no message) is still an error: the page renders its
+      // own translated fallback. Only `null` means "everything loaded".
+      if (failed?.error) setError(failed.error.message ?? '');
+    } catch (err) {
+      console.error('Failed to fetch analytics:', err);
+      setError(err instanceof Error ? err.message : '');
     } finally {
       setIsLoading(false);
     }
@@ -109,9 +137,12 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
     stockSnapshot,
     cashflow,
     salesData,
+    salesGranularity,
     topProducts,
     recentOrders,
     lowStockProducts,
     isLoading,
+    error,
+    refetch: fetchAnalytics,
   };
 }

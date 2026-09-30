@@ -21,6 +21,9 @@ const EMPTY_SUMMARY: AnswerEngineSummary = {
 export function useAnswerEngineSummary({ storeId, enabled }: UseAnswerEngineSummaryArgs) {
   const [summary, setSummary] = useState<AnswerEngineSummary>(EMPTY_SUMMARY);
   const [isLoading, setIsLoading] = useState(true);
+  // Failed load's message (`''` = failed without one). A 403/500 used to be
+  // logged and swallowed, so it rendered as "no data" (2026-09-30 audit).
+  const [error, setError] = useState<string | null>(null);
 
   const fetchSummary = useCallback(async () => {
     if (!storeId || !enabled) {
@@ -28,13 +31,16 @@ export function useAnswerEngineSummary({ storeId, enabled }: UseAnswerEngineSumm
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
-      const { data } = await apiGet<AnswerEngineSummary>(
+      const { data, error: apiError } = await apiGet<AnswerEngineSummary>(
         `/api/v1/stores/${storeId}/answer-engine/summary`
       );
       if (data) setSummary(data);
-    } catch (error) {
-      console.error('Failed to fetch answer-engine summary:', error);
+      if (apiError) setError(apiError.message ?? '');
+    } catch (err) {
+      console.error('Failed to fetch answer-engine summary:', err);
+      setError(err instanceof Error ? err.message : '');
     } finally {
       setIsLoading(false);
     }
@@ -44,5 +50,5 @@ export function useAnswerEngineSummary({ storeId, enabled }: UseAnswerEngineSumm
     fetchSummary();
   }, [fetchSummary]);
 
-  return { summary, isLoading, refetch: fetchSummary };
+  return { summary, isLoading, error, refetch: fetchSummary };
 }

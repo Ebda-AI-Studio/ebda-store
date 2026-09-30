@@ -8,6 +8,7 @@ import { abandonedCartService } from '../services/abandoned-cart.service';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { tenantContext } from '../middleware/tenant-context';
+import { GUEST_CHECKOUT_LOOKBACK_DAYS, storeTakesGuestOrders } from '../lib/guest-checkout';
 
 const router = Router();
 
@@ -53,11 +54,20 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const stats = await abandonedCartService.getStats(storeId);
+      const [stats, guestCheckout] = await Promise.all([
+        abandonedCartService.getStats(storeId),
+        // Guest carts are never recorded (no contact to recover them by), so
+        // on a store that takes guest orders these counts are not tracked —
+        // the page says so instead of showing 0.
+        storeTakesGuestOrders(
+          storeId,
+          new Date(Date.now() - GUEST_CHECKOUT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
+        ),
+      ]);
 
       res.json({
         success: true,
-        data: { stats },
+        data: { stats, guestCheckout },
       });
     } catch (error) {
       next(error);

@@ -55,3 +55,15 @@ It uses your phone's built-in barcode scanning where available, and falls back t
 For large reconciliations, Enterprise stores can upload a CSV with SKU or Barcode plus a new quantity (absolute) or a delta (signed +/−) to adjust hundreds of products at once, with a preview before applying. (Stock → Bulk adjustments.)
 
 للمطابقات الكبيرة، تستطيع المتاجر المؤسسية رفع ملف CSV يحتوي على رمز المنتج أو الباركود مع كمية جديدة (مطلقة) أو تغيير (موجب/سالب) لتعديل مئات المنتجات دفعةً واحدة، مع معاينة قبل التطبيق. (المخزون → التعديلات المجمّعة.)
+
+---
+
+## Dead stock & reorder suggestions — البضاعة الراكدة واقتراحات إعادة الطلب
+
+**Dead stock** (Stock → Dead Stock) is refreshed weekly. A product is flagged when it is in stock, has not sold for 90 days or more, and its stock is worth at least KWD 50 at cost. A product with **no cost price** is still flagged — its value shows as **Unknown (no cost price)**, and a note at the top counts how many flagged products need a cost price. Add cost prices on the product page so the scan can value them. A product that has never sold shows **Never sold**.
+
+**Reorder suggestions** (Stock → Reorder Suggestions) are refreshed daily. Each product has **one** open suggestion (or one open dead-stock card) at a time: each scan updates it with the latest numbers instead of adding another. Dismissing it closes it; if the product still qualifies, the next scan opens a new one.
+
+**البضاعة الراكدة** (المخزون ← البضاعة الراكدة) تُحدَّث أسبوعياً. يُحدَّد المنتج عندما يكون متوفراً في المخزون ولم يُبَع منذ 90 يوماً أو أكثر وتبلغ قيمة مخزونه بسعر التكلفة 50 د.ك على الأقل. المنتج **الذي ليس له سعر تكلفة** يُحدَّد أيضاً — تظهر قيمته **غير معروفة (لا يوجد سعر تكلفة)**، ويعرض تنبيه في أعلى الصفحة عدد المنتجات المحدَّدة التي تحتاج إلى سعر تكلفة. أضف أسعار التكلفة من صفحة المنتج ليتمكن الفحص من تقييمها. المنتج الذي لم يُبَع أبداً يظهر **لم يُبَع أبداً**.
+
+**اقتراحات إعادة الطلب** (المخزون ← اقتراحات إعادة الطلب) تُحدَّث يومياً. لكل منتج اقتراح مفتوح **واحد** (أو بطاقة بضاعة راكدة مفتوحة واحدة) في كل مرة: كل فحص يحدّثه بأحدث الأرقام بدلاً من إضافة اقتراح جديد. تجاهله يغلقه؛ وإذا ظل المنتج مستوفياً للشروط، يفتح الفحص التالي اقتراحاً جديداً.

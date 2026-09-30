@@ -2499,6 +2499,85 @@ separate product decision. Cost if wrong: a cart whose every loose line is delet
 "Your cart is empty" screen rather than the refusal copy, because the summary no longer lists
 unorderable lines.
 
+## 2026-09-30 — Analytics batch 1 (branch `fix/analytics-batch-1`, PR #2220)
+
+Context: `force-website-builder-audit-analytics-2026-09-30.md` findings 1, 2, 5, 6, 8, 9, plus the
+owner decision of 2026-09-30 (no guest contact capture at checkout; payment abandonments stays off
+on pecannbee).
+
+**Ruling AN-1 — on a store that takes guest orders, a 0 from an `abandoned_carts`-derived metric
+renders "not tracked for guest checkout"; a non-zero count renders as a number labelled
+"registered customers only".** Abandoned carts are recorded only with a customer contact, so a 0 on
+such a store says nothing about shoppers (pecannbee: 0 checkouts started vs 55 completed in 30d).
+"Takes guest orders" = at least one order with `customer_id IS NULL` in the surface's window (90d
+for abandoned-cart stats). A non-zero count is real, just partial, so it is kept rather than hidden.
+Cost if wrong: a mixed store (e.g. wady-aljuz, 5/41 orders registered) shows a registered-only
+undercount next to all-customer figures; the label is the only guard against reading it as total.
+
+**Ruling AN-2 — dead-stock flags for products with no cost price store `stock_value_fils = NULL`
+and are flagged on the 90-day rule alone.** The value threshold (KWD 50) cannot be applied to an
+unknown value; skipping them made the scan blind on stores that never entered costs, and storing 0
+would be a false value. Cost if wrong: a store with many cheap, slow products and no costs sees more
+flags than the value threshold would allow once costs are entered.
+
+**Ruling AN-3 — duplicate open scan rows are cleaned by marking older duplicates `expired`
+(script, not run), never by deleting.** Reversible, and uses the status the scans' own 30-day
+expiry already writes. Cost if wrong: expired history carries ~4.9k extra rows until any retention
+job removes them.
+
+**Ruling AN-4 — accepted residual: the Chromium bar-height layer of
+`tests/unit/analytics-bar-charts-render.test.tsx` SKIPS in the CI unit job (no browser installed).**
+The static layer (bar column carries `h-full justify-end`) still runs in CI; the pixel layer runs
+locally with `CHROMIUM_PATH` and was mutation-proven there (measured 0px without `h-full`). Cost if
+wrong: a future layout change that keeps both classes but still collapses the bars would pass CI.
+
+**Ruling AN-5 — `conversionRate` means ONE thing: orders per product view (the /analytics KPI,
+ruling AP-8). The insights dashboard's orders÷carts figure is renamed `cartToOrderRate` and
+labelled "Cart → order".** Merging main put two different rates under the same field name: the
+analytics `conversionRate` (orders / product views, `conversionRateBasis:
+'orders_per_product_view'`) and this branch's `yesterdayFunnel.conversionRate` (orders / carts
+created). Both are useful and both come from `funnel_snapshots`, so neither was dropped; the
+cart-based one takes the name `funnel-report.service.ts` already uses for it (`rates.cartToOrder`),
+and the admin card label changes from "Conversion" to "Cart → order" / «من السلة إلى الطلب». The
+analytics field keeps its name because the MCP `admin_get_dashboard` tool and swagger already
+publish it. Asserted in `tests/unit/insights-routes-contract.test.ts` (the dashboard payload has
+`cartToOrderRate` and no `conversionRate`). Cost if wrong: a merchant compares "Cart → order" on
+Insights with "Conversion rate" from the API/MCP and still expects them to match — they measure
+different denominators by design.
+
+**Ruling AN-6 — insights repeat-purchase groups buyers with `customerKeyOf`; this branch's
+`guestKey` (`GUEST:sha256("<email>:<phone>")`) import is removed.** Main deleted `guestKey` from
+the RFM rollup in favour of `customerKeyOf` + `rfmKeyFor` (ruling AP-12). The repeat-purchase rate
+now groups exactly as the Customers page and RFM do: user id, else lowercased (untrimmed) email,
+else phone. Behaviour change: a guest who reuses an email with a new phone is ONE buyer (was two);
+an email differing only by surrounding whitespace is now TWO (was one) — the Customers-page rule,
+kept for URL stability. Cost if wrong: a store whose guests type emails with stray spaces sees a
+slightly lower repeat rate than the old key gave.
+
+**Ruling AN-7 — one unknown-state pattern across the analytics surfaces: never a 0 for a figure we
+cannot compute. A KPI card shows the word "Unknown" plus a one-line reason (and a fix link where one
+exists); a dense table cell or a rate shows "—" with the reason next to it.** Main's profit card
+(`AnalyticsStatsGrid`: "Unknown" + "cost price missing on N items" + "Add cost prices") is the card
+form; this branch's insights rates/products "—" and dead-stock "Unknown (no cost price)" are the
+table form. The GL Gross-profit card (`GlKpiCards`, AP-11's open residual) joins the card form: when
+the period has GL revenue but zero COGS it shows "Unknown" with "no cost of goods was booked" instead
+of repeating revenue. Residual: GL Net income is still shown when COGS is 0 (other expenses make it a
+real, if COGS-less, figure). Cost if wrong: a store that genuinely sells zero-cost goods (services,
+digital) sees "Unknown" gross profit where revenue would have been correct.
+
+**Ruling AN-8 — dead-stock value is variant-aware (closes AP-10's left sibling).** Main's
+`STOCK_VALUE_SQL` values each active variant at its own cost, falling back to the parent's; this
+branch's scan multiplied the variant sum by the parent cost. `deadStockValueFils` is its JS twin,
+differing only where AN-2 requires: an on-hand unit with no cost anywhere makes the value `null`,
+not 0. The open-row dedupe (one open flag per product) is unchanged. Asserted in
+`tests/integration/accounting/deadstock-scan.test.ts` (variant costs 3000/4000 × 10 → 70000; the
+disabled variant excluded). Cost if wrong: none beyond AP-10's — the two valuation paths can drift
+if one is edited without the other.
+
+GL cards + cashflow after the merge: `glRevenueWindow` reads main's corrected `profitAndLoss`
+(period-filtered) with this branch's `startDate`/`endDate` window; `cashflowTrend` keeps main's
+`status IN ('posted','reversed')` refund dedupe and receives this branch's picker range.
+
 ## 2026-09-30 — accounting + profit batch (branch `fix/accounting-profit-batch`)
 
 Audit: `force-website-builder-audit-accounting-mcp-2026-09-30.md` findings 1–6.

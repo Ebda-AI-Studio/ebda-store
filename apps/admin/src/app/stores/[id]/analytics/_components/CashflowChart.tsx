@@ -6,21 +6,23 @@ import { formatCurrency } from './types';
 
 interface CashflowChartProps {
   data: CashflowPoint[];
+  /** Label of the selected period (the chart follows the page's picker). */
+  periodLabel: string;
 }
 
 /**
  * Minimal inline SVG bar chart showing daily net cash movement (DR - CR on
- * cash accounts 1000/1010/1020/1030) over the last 30 days.
+ * cash accounts 1000/1010/1020/1030) over the selected period.
  * Bars above baseline = net inflow; below = net outflow.
  */
-export function CashflowChart({ data }: CashflowChartProps) {
+export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
   const t = useT('analytics.cashflow');
 
   if (data.length === 0) {
     return (
       <div className="bg-card rounded-xl border p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-foreground mb-1">{t('title')}</h2>
-        <p className="text-sm text-muted-foreground mb-4">{t('last30')}</p>
+        <p className="text-sm text-muted-foreground mb-4">{periodLabel}</p>
         <p className="text-sm text-muted-foreground text-center py-8">—</p>
       </div>
     );
@@ -36,7 +38,7 @@ export function CashflowChart({ data }: CashflowChartProps) {
   return (
     <div className="bg-card rounded-xl border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-1">{t('title')}</h2>
-      <p className="text-sm text-muted-foreground mb-4">{t('last30')}</p>
+      <p className="text-sm text-muted-foreground mb-4">{periodLabel}</p>
 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label={t('netDaily')} role="img">
         {/* Zero line */}

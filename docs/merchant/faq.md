@@ -170,6 +170,24 @@ No. Guest checkout is enabled by default — customers can complete an order wit
 
 من «التحليلات → كلمات البحث». تشوف أكثر العبارات اللي بحث عنها العملاء في آخر 30 يوم — مفيد لاكتشاف منتجات تحتاجها ما هي موجودة.
 
+### Why do abandoned carts or "checkouts started" say "Not tracked for guest checkout"? — لماذا تظهر «غير متتبَّع للدفع كضيف»؟
+
+Abandoned-cart recovery needs a way to reach the shopper, so a cart is only recorded when it belongs to a signed-in customer with an email or phone. Guest checkout does not capture a contact before the order is placed, so guest carts are never recorded. On a store that takes guest orders, Abandoned Carts and the funnel's **Checkouts Started** / **Abandoned** show **Not tracked for guest checkout** instead of a misleading 0. Where some carts do belong to signed-in customers, the numbers are shown and labelled **Registered customers only**.
+
+استرجاع السلات المتروكة يحتاج وسيلة للتواصل مع العميل، لذلك تُسجَّل السلة فقط إذا كانت لعميل مسجَّل الدخول لديه بريد أو رقم هاتف. الدفع كضيف لا يحفظ وسيلة تواصل قبل إتمام الطلب، فلا تُسجَّل سلات الضيوف. في المتجر الذي يستقبل طلبات ضيوف، تعرض صفحة السلات المتروكة وخانتا **عمليات دفع بدأت** و**مهجورة** في القمع عبارة **غير متتبَّع للدفع كضيف** بدلاً من 0 مضلِّل. وإذا كانت بعض السلات لعملاء مسجَّلين، تظهر الأرقام مع عبارة **العملاء المسجَّلون فقط**.
+
+### Why do Insights and Analytics show different conversion numbers? — لماذا تختلف أرقام التحويل بين «الرؤى» و«التحليلات»؟
+
+They measure different steps. **Analytics → Conversion rate** is orders per product view. **Insights → Yesterday's funnel → Cart → order** is orders per cart created. A shopper who views, adds to cart and buys counts in both, but the denominators differ, so the numbers are not expected to match.
+
+يقيسان خطوتين مختلفتين. **التحليلات ← معدل التحويل** هو عدد الطلبات لكل مشاهدة منتج. أما **الرؤى ← مسار الشراء أمس ← من السلة إلى الطلب** فهو عدد الطلبات لكل سلة أُنشئت. المقام مختلف، لذلك لا يُتوقَّع أن يتطابق الرقمان.
+
+### Why does Gross profit (GL) say "Unknown"? — لماذا يظهر إجمالي الربح (دفتر الأستاذ) «غير معروف»؟
+
+Gross profit is revenue minus the cost of the goods sold. When no cost was booked for the period — the products sold had no cost price — the figure would just repeat revenue, so it shows **Unknown** instead. Add cost prices to your products (and variants); orders placed after that book their cost automatically.
+
+إجمالي الربح هو الإيرادات ناقص تكلفة البضاعة المباعة. إذا لم تُسجَّل أي تكلفة للفترة — لأن المنتجات المباعة بلا سعر تكلفة — فسيكرر الرقم الإيرادات فقط، لذلك يظهر **غير معروف**. أضف أسعار التكلفة لمنتجاتك (وخياراتها)؛ الطلبات التي تأتي بعد ذلك تُسجِّل تكلفتها تلقائياً.
+
 ---
 
 ## Technical

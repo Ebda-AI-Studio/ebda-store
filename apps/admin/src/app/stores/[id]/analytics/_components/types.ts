@@ -1,3 +1,7 @@
+import type { AnalyticsPeriod, SalesGranularity } from '@force/shared';
+
+export type { SalesGranularity };
+
 export interface DashboardStats {
   totalRevenue: number;
   totalOrders: number;
@@ -87,26 +91,15 @@ export interface CashflowPoint {
 }
 
 /**
- * 9-preset date period union. Expanded 2026-05-21 (Ahmad: "add this every
- * date part in the code to give me the freedom of choosing"). Backend
- * accepts startDate/endDate explicitly, so frontend resolves the preset
- * to concrete dates before calling the API. Custom = caller-provided
- * date pair.
+ * 9-preset date period union (+ 3 legacy values kept for back-compat with
+ * saved URL params / state). Expanded 2026-05-21 (Ahmad: "add this every
+ * date part in the code to give me the freedom of choosing"). The single
+ * definition lives in `@force/shared` (`ANALYTICS_PERIODS`) so the API's
+ * Zod enum and the `analytics.periodsSubtitle.*` i18n keys are checked
+ * against the same list. Backend accepts startDate/endDate explicitly, so
+ * the frontend resolves the preset to concrete dates before calling the API.
  */
-export type Period =
-  | 'today'
-  | 'yesterday'
-  | 'last_7'
-  | 'last_30'
-  | 'last_90'
-  | 'this_month'
-  | 'last_month'
-  | 'this_year'
-  | 'custom'
-  // legacy values kept for back-compat with saved URL params / state
-  | 'week'
-  | 'month'
-  | 'year';
+export type Period = AnalyticsPeriod;
 
 export interface ResolvedDateRange {
   startDate: Date;
@@ -200,10 +193,16 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
-/** Short month+day format used on chart axis labels. */
-export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+/**
+ * Chart axis label for a sales bucket key. Keys are already the viewer's
+ * calendar day/month (`YYYY-MM-DD` / `YYYY-MM`), so they are formatted in UTC —
+ * formatting them in the local zone shifted every label back a day west of UTC.
+ */
+export function formatDate(date: string, granularity: SalesGranularity = 'day'): string {
+  return new Date(date).toLocaleDateString(
+    'en-US',
+    granularity === 'month'
+      ? { month: 'short', year: 'numeric', timeZone: 'UTC' }
+      : { month: 'short', day: 'numeric', timeZone: 'UTC' }
+  );
 }

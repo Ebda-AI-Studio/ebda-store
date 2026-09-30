@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { ErrorState } from '../../../../components/ErrorState';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { usePaymentAbandonments } from './_hooks/usePaymentAbandonments';
@@ -19,14 +20,26 @@ export default function PaymentAbandonmentsPage() {
   const storeId = params?.id as string;
   const { isEnabled } = useFeatures();
   const t = useT('paymentAbandonments.page');
+  const tError = useT('components.errorState');
 
   const featureEnabled = isEnabled('payment_abandonment');
 
   const [localFrom, setLocalFrom] = useState('');
   const [localTo, setLocalTo] = useState('');
 
-  const { stats, records, meta, page, dateFrom, dateTo, loading, setPage, applyDateFilter } =
-    usePaymentAbandonments({ storeId, enabled: featureEnabled });
+  const {
+    stats,
+    records,
+    meta,
+    page,
+    dateFrom,
+    dateTo,
+    loading,
+    error,
+    retry,
+    setPage,
+    applyDateFilter,
+  } = usePaymentAbandonments({ storeId, enabled: featureEnabled });
 
   if (gate) return gate;
 
@@ -36,6 +49,8 @@ export default function PaymentAbandonmentsPage() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
+      ) : error !== null ? (
+        <ErrorState message={error || tError('loadFailed')} onRetry={retry} />
       ) : (
         <div className="space-y-6">
           <AbandonmentStatsGrid stats={stats} />

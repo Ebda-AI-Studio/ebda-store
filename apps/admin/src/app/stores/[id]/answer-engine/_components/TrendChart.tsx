@@ -10,7 +10,8 @@ interface TrendChartProps {
 /**
  * Minimal pure-CSS bar chart, no chart library — mirrors the
  * `SimpleBarChart` in `stores/[id]/analytics/_components/RevenueChart.tsx`
- * exactly (zero-dep, native `title` tooltip, SSR-safe).
+ * exactly (zero-dep, native `title` tooltip, SSR-safe), including its layout
+ * contract: the bar column needs `h-full justify-end` or every bar is 0px.
  */
 export function TrendChart({ trend }: TrendChartProps) {
   const t = useT('answerEngine.page');
@@ -28,8 +29,13 @@ export function TrendChart({ trend }: TrendChartProps) {
         {trend.map(point => {
           const height = maxRate > 0 ? (point.citedRate / maxRate) * 100 : 0;
           return (
-            <div key={point.weekStart} className="flex-1 flex flex-col items-center gap-1 group">
+            <div
+              key={point.weekStart}
+              data-chart-column
+              className="flex-1 h-full flex flex-col justify-end items-center gap-1 group"
+            >
               <div
+                data-chart-bar
                 className="w-full bg-primary rounded-t transition-all group-hover:bg-primary/90"
                 style={{ height: `${Math.max(height, 2)}%` }}
                 title={`${point.weekStart}: ${formatPercent(point.citedRate)} (${point.citedCount}/${point.totalChecks})`}

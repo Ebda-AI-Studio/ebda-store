@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { ErrorState } from '../../../../components/ErrorState';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useAnswerEngineSummary } from './_hooks/useAnswerEngineSummary';
 import { useGscDashboard } from './_hooks/useGscDashboard';
@@ -32,9 +33,20 @@ export default function AnswerEnginePage() {
   const storeId = params?.id as string;
   const t = useT('answerEngine.page');
 
-  const { summary, isLoading } = useAnswerEngineSummary({ storeId, enabled: featureEnabled });
-  const { gsc, isLoading: gscLoading } = useGscDashboard({ storeId, enabled: featureEnabled });
+  const {
+    summary,
+    isLoading,
+    error: summaryError,
+    refetch: refetchSummary,
+  } = useAnswerEngineSummary({ storeId, enabled: featureEnabled });
+  const {
+    gsc,
+    isLoading: gscLoading,
+    error: gscError,
+    refetch: refetchGsc,
+  } = useGscDashboard({ storeId, enabled: featureEnabled });
   const tGsc = useT('answerEngine.gsc');
+  const tError = useT('components.errorState');
 
   if (gate) return gate;
 
@@ -42,6 +54,8 @@ export default function AnswerEnginePage() {
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       {isLoading ? (
         <AnswerEngineSkeleton />
+      ) : summaryError !== null ? (
+        <ErrorState message={summaryError || tError('loadFailed')} onRetry={refetchSummary} />
       ) : (
         <div className="space-y-6">
           {summary.lastRunAt && (
@@ -62,6 +76,9 @@ export default function AnswerEnginePage() {
             </h2>
             {gscLoading ? (
               <GscSectionSkeleton />
+            ) : gscError !== null ? (
+              // An error is not "not connected" — show it, with a retry.
+              <ErrorState message={gscError || tError('loadFailed')} onRetry={refetchGsc} />
             ) : gsc.hasData && gsc.totals ? (
               <div className="space-y-6">
                 <GscTotalsCards totals={gsc.totals} />

@@ -2014,7 +2014,16 @@
     "periodsSubtitle": {
       "week": "Last 7 days",
       "month": "This month",
-      "year": "This year"
+      "year": "This year",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last_7": "Last 7 days",
+      "last_30": "Last 30 days",
+      "last_90": "Last 90 days",
+      "this_month": "This month",
+      "last_month": "Last month",
+      "this_year": "This year",
+      "custom": "Custom range"
     },
     "stats": {
       "totalRevenue": "Total Revenue",
@@ -2033,7 +2042,13 @@
       "revenue": "Revenue",
       "orders": "Orders",
       "numberOfOrders": "Number of Orders",
-      "max": "Max"
+      "max": "Max",
+      "noSales": "No sales in this period",
+      "granularity": {
+        "day": "daily",
+        "week": "weekly",
+        "month": "monthly"
+      }
     },
     "topProducts": {
       "title": "Top Products",
@@ -2068,7 +2083,10 @@
       "revenue": "Revenue (GL)",
       "cogs": "COGS (GL)",
       "grossProfit": "Gross profit (GL)",
-      "netIncome": "Net income (GL)"
+      "netIncome": "Net income (GL)",
+      "grossProfitUnknown": "Unknown",
+      "noCogsBooked": "No cost of goods was booked for this period, so gross profit cannot be told apart from revenue. Cost is booked for orders whose products had a cost price when sold.",
+      "window": "General-ledger figures for: {period}"
     },
     "inventorySnapshot": {
       "title": "Inventory snapshot",
@@ -2079,8 +2097,12 @@
     },
     "cashflow": {
       "title": "Cashflow",
-      "netDaily": "Net daily movement",
-      "last30": "Last 30 days"
+      "netDaily": "Net daily movement"
+    },
+    "errors": {
+      "loadFailedTitle": "Some analytics could not be loaded",
+      "loadFailedBody": "A request failed. The figures below may be incomplete.",
+      "retry": "Retry"
     }
   },
   "settings": {
@@ -5548,7 +5570,8 @@
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
-      "defaultRetry": "Try Again"
+      "defaultRetry": "Try Again",
+      "loadFailed": "Could not load this data. Please try again."
     },
     "languageSwitcher": {
       "ariaLabel": "Language"
@@ -5718,6 +5741,11 @@
       },
       "autoFixedLabel": "Auto-fixed:",
       "pickedTextWarning": "Picked text {ratio} : 1 — AA needs {min} : 1"
+    },
+    "guestCheckout": {
+      "notTracked": "Not tracked for guest checkout",
+      "registeredOnly": "Registered customers only",
+      "checkoutsTableNote": "Checkouts started are not tracked for guest checkout — those days show “—” instead of 0."
     }
   },
   "finance": {
@@ -6372,7 +6400,7 @@
       "description": "Slow-moving SKUs with AI-suggested clearance.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
-      "empty": "No dead stock detected.",
+      "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days and is worth at least KWD 50 at cost — or has no cost price set, in which case its value is shown as unknown.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
       "explainer": "We'll flag products with 0 sales in 90 days and stock value above KWD 50, with AI-generated bilingual clearance copy and suggested discount %.",
       "notify": "Notify me when ready",
@@ -6381,8 +6409,11 @@
         "stockValue": "Stock value",
         "suggestedDiscount": "Suggested discount",
         "runClearance": "Run Clearance",
-        "dismiss": "Dismiss"
-      }
+        "dismiss": "Dismiss",
+        "valueUnknown": "Unknown (no cost price)",
+        "neverSold": "Never sold"
+      },
+      "valueUnknownBanner": "{count, plural, one {# flagged product has} other {# flagged products have}} no cost price, so the stock value is unknown. Add cost prices on the product page to value them."
     },
     "warehouses": {
       "title": "Warehouses",
@@ -6459,13 +6490,15 @@
       "aov": "Average Order Value",
       "mrr30d": "30-day Revenue",
       "repeatPurchase": "Repeat Purchase Rate",
-      "repeatPurchaseHint": "of customers re-ordered",
       "topSegment": "Top Segment",
       "topSkus": "Top 5 SKUs (last 7 days)",
-      "yesterdayFunnel": "Yesterday's Conversion",
+      "yesterdayFunnel": "Yesterday's funnel",
       "aiCallout": "AI:",
       "noDataYet": "Insights will populate after the first nightly rollup at 02:00 KW.",
-      "asOf": "As of"
+      "asOf": "As of",
+      "repeatPurchaseBasis": "of {count, plural, one {# buyer} other {# buyers}} re-ordered (last 30 days)",
+      "repeatPurchaseUnknown": "No identifiable buyers in the last 30 days",
+      "cartToOrder": "Cart → order"
     },
     "cohorts": {
       "title": "Customer Cohorts",
@@ -6524,7 +6557,7 @@
     },
     "products": {
       "title": "Product Velocity",
-      "description": "Top-selling SKUs ranked by recent velocity + average selling price + on-hand stock.",
+      "description": "Top-selling SKUs from the last 30 days, ranked by units sold, with average selling price and on-hand stock.",
       "rank": "#",
       "sku": "SKU",
       "name": "Name",
@@ -6534,7 +6567,9 @@
       "velocityUnit": "units/day",
       "asp": "ASP",
       "stockOnHand": "Stock",
-      "costPrice": "Cost"
+      "costPrice": "Cost",
+      "empty": "No paid sales in the last 30 days yet.",
+      "loadFailed": "Could not load product velocity."
     }
   },
   "webhookEvents": {

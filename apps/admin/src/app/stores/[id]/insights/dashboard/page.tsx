@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,11 @@ interface YesterdayFunnel {
   cartsCreated: number;
   checkoutsStarted: number;
   ordersCompleted: number;
-  conversionRate: number;
+  /**
+   * ordersCompleted / cartsCreated; null when no cart was created (unknown).
+   * Cart→order — not the /analytics `conversionRate` (orders per product view).
+   */
+  cartToOrderRate: number | null;
 }
 
 interface TopSegment {
@@ -36,9 +41,13 @@ interface TopSegment {
 interface InsightsDashboard {
   aov: { thisPeriodFils: number; lastPeriodFils: number };
   mrr30d: number;
-  repeatPurchaseRate: number;
+  /** Fraction 0..1 over identifiable buyers (customer or guest contact); null = unknown. */
+  repeatPurchaseRate: number | null;
+  repeatPurchaseBuyers?: number;
   topSegment: TopSegment | null;
   topSkus: TopSku[];
+  /** Store took guest orders in the last 30d — funnel checkouts miss guest carts. */
+  guestCheckout?: boolean;
   yesterdayFunnel: YesterdayFunnel | null;
   // ISO date of the snapshot powering the velocity panel. Mirrors the
   // computedAt/snapshot date shown on the segments / cohorts / funnel panels.
@@ -53,8 +62,9 @@ function kwd(fils: number | null | undefined): string {
   return (fils / 1000).toFixed(3);
 }
 
+// Unknown (null) renders as "—", never as a false 0.0%.
 function pct(val: number | null | undefined): string {
-  if (typeof val !== 'number' || !Number.isFinite(val)) return '0.0%';
+  if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
   return (val * 100).toFixed(1) + '%';
 }
 
@@ -74,6 +84,8 @@ export default function InsightsDashboardPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.dashboard');
+  const tFunnel = useT('insights.funnel');
+  const tGuest = useT('components.guestCheckout');
   const locale = useLocale();
 
   const [data, setData] = useState<InsightsDashboard | null>(null);
@@ -192,7 +204,11 @@ export default function InsightsDashboardPage() {
               {t('repeatPurchase')}
             </p>
             <p className="text-2xl font-semibold font-mono">{pct(data.repeatPurchaseRate)}</p>
-            <p className="text-xs text-muted-foreground">{t('repeatPurchaseHint')}</p>
+            <p className="text-xs text-muted-foreground">
+              {data.repeatPurchaseRate === null
+                ? t('repeatPurchaseUnknown')
+                : t('repeatPurchaseBasis', { count: data.repeatPurchaseBuyers ?? 0 })}
+            </p>
           </div>
 
           {/* Top segment */}
@@ -222,24 +238,40 @@ export default function InsightsDashboardPage() {
             <h2 className="text-base font-semibold mb-3">{t('yesterdayFunnel')}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: 'Carts', value: data.yesterdayFunnel.cartsCreated },
-                { label: 'Checkouts', value: data.yesterdayFunnel.checkoutsStarted },
-                { label: 'Completed', value: data.yesterdayFunnel.ordersCompleted },
+                { label: tFunnel('carts'), value: data.yesterdayFunnel.cartsCreated },
                 {
-                  label: 'Conversion',
-                  value: pct(data.yesterdayFunnel.conversionRate),
+                  label: tFunnel('checkouts'),
+                  // abandoned_carts cannot see guest carts: 0 here on a
+                  // guest-checkout store is "not tracked", not 0.
+                  value: isUntrackedForGuests(
+                    data.yesterdayFunnel.checkoutsStarted,
+                    data.guestCheckout
+                  )
+                    ? null
+                    : data.yesterdayFunnel.checkoutsStarted,
+                },
+                { label: tFunnel('completed'), value: data.yesterdayFunnel.ordersCompleted },
+                {
+                  label: t('cartToOrder'),
+                  value: pct(data.yesterdayFunnel.cartToOrderRate),
                   highlight: true,
                 },
               ].map(step => (
                 <div key={step.label} className="rounded-lg border border-border p-3 space-y-0.5">
                   <p className="text-xs text-muted-foreground">{step.label}</p>
-                  <p
-                    className={`text-xl font-semibold font-mono ${
-                      step.highlight ? 'text-primary' : ''
-                    }`}
-                  >
-                    {step.value}
-                  </p>
+                  {step.value === null ? (
+                    <p className="text-xs font-medium text-muted-foreground pt-1">
+                      {tGuest('notTracked')}
+                    </p>
+                  ) : (
+                    <p
+                      className={`text-xl font-semibold font-mono ${
+                        step.highlight ? 'text-primary' : ''
+                      }`}
+                    >
+                      {step.value}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

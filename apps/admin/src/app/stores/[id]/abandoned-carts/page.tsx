@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { ErrorState } from '../../../../components/ErrorState';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { AbandonedCartsTable } from './_components/AbandonedCartsTable';
 import { RecoveryCampaignForm } from './_components/RecoveryCampaignForm';
@@ -20,17 +21,21 @@ export default function AbandonedCartsPage() {
 
   const tPage = useT('abandonedCarts.page');
   const tEmpty = useT('abandonedCarts.featureDisabled');
+  const tError = useT('components.errorState');
 
   const featureEnabled = isEnabled('abandoned_cart');
 
   const {
     stats,
+    guestCheckout,
     config,
     records,
     meta,
     statusFilter,
     page,
     loading,
+    error,
+    retry,
     savingConfig,
     patchConfig,
     saveConfig,
@@ -57,9 +62,11 @@ export default function AbandonedCartsPage() {
           <h2 className="text-xl font-semibold text-foreground mb-2">{tEmpty('title')}</h2>
           <p className="text-muted-foreground max-w-md">{tEmpty('description')}</p>
         </div>
+      ) : error !== null ? (
+        <ErrorState message={error || tError('loadFailed')} onRetry={retry} />
       ) : (
         <div className="space-y-6">
-          <StatsGrid stats={stats} />
+          <StatsGrid stats={stats} guestCheckout={guestCheckout} />
 
           <RecoveryCampaignForm
             config={config}

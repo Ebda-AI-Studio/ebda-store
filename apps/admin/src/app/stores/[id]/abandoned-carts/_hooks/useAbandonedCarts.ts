@@ -28,6 +28,7 @@ export function useAbandonedCarts({ storeId, enabled }: UseAbandonedCartsArgs) {
   const toast = useToast();
   const tMessages = useT('abandonedCarts.messages');
   const [stats, setStats] = useState<AbandonedCartStats | null>(null);
+  const [guestCheckout, setGuestCheckout] = useState(false);
   const [config, setConfig] = useState<AbandonedCartConfig>(DEFAULT_CONFIG);
   const [records, setRecords] = useState<AbandonedCartRecord[]>([]);
   const [meta, setMeta] = useState<ListMeta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
@@ -35,34 +36,48 @@ export function useAbandonedCarts({ storeId, enabled }: UseAbandonedCartsArgs) {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
+  // First failed load's message (`''` = failed without one). A failed call
+  // used to leave stats at 0 and the table empty — indistinguishable from
+  // "no abandoned carts" (2026-09-30 audit, finding 8).
+  const [error, setError] = useState<string | null>(null);
+  const noteError = useCallback((e: { message?: string } | null | undefined) => {
+    if (e) setError(prev => prev ?? e.message ?? '');
+  }, []);
 
   const fetchStats = useCallback(async () => {
-    const { data } = await apiGet<{ stats: AbandonedCartStats }>(
-      `/api/v1/stores/${storeId}/abandoned-carts/stats`
-    );
+    const { data, error: apiError } = await apiGet<{
+      stats: AbandonedCartStats;
+      guestCheckout?: boolean;
+    }>(`/api/v1/stores/${storeId}/abandoned-carts/stats`);
+    noteError(apiError);
     if (data?.stats) setStats(data.stats);
-  }, [storeId]);
+    setGuestCheckout(data?.guestCheckout === true);
+  }, [storeId, noteError]);
 
   const fetchConfig = useCallback(async () => {
-    const { data } = await apiGet<{ config: AbandonedCartConfig }>(
+    const { data, error: apiError } = await apiGet<{ config: AbandonedCartConfig }>(
       `/api/v1/stores/${storeId}/abandoned-carts/config`
     );
+    noteError(apiError);
     if (data?.config) setConfig({ ...DEFAULT_CONFIG, ...data.config });
-  }, [storeId]);
+  }, [storeId, noteError]);
 
   const fetchCarts = useCallback(async () => {
     const qs = new URLSearchParams({ page: String(page), limit: '20' });
     if (statusFilter !== 'all') qs.set('status', statusFilter);
-    const { data } = await apiGet<{ records: AbandonedCartRecord[]; meta: ListMeta }>(
-      `/api/v1/stores/${storeId}/abandoned-carts?${qs}`
-    );
+    const { data, error: apiError } = await apiGet<{
+      records: AbandonedCartRecord[];
+      meta: ListMeta;
+    }>(`/api/v1/stores/${storeId}/abandoned-carts?${qs}`);
+    noteError(apiError);
     if (data) {
       setRecords(data.records || []);
       setMeta(data.meta || { total: 0, page: 1, limit: 20, totalPages: 1 });
     }
-  }, [storeId, page, statusFilter]);
+  }, [storeId, page, statusFilter, noteError]);
 
   // Initial load: fetch everything once per store when feature is enabled.
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     if (!enabled) {
       setLoading(false);
@@ -70,6 +85,7 @@ export function useAbandonedCarts({ storeId, enabled }: UseAbandonedCartsArgs) {
     }
     let cancelled = false;
     setLoading(true);
+    setError(null);
     Promise.all([fetchStats(), fetchConfig(), fetchCarts()]).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -77,7 +93,9 @@ export function useAbandonedCarts({ storeId, enabled }: UseAbandonedCartsArgs) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, enabled]);
+  }, [storeId, enabled, reloadKey]);
+
+  const retry = useCallback(() => setReloadKey(k => k + 1), []);
 
   // Re-fetch just the list when the filter or page changes post-load.
   useEffect(() => {
@@ -114,12 +132,15 @@ export function useAbandonedCarts({ storeId, enabled }: UseAbandonedCartsArgs) {
 
   return {
     stats,
+    guestCheckout,
     config,
     records,
     meta,
     statusFilter,
     page,
     loading,
+    error,
+    retry,
     savingConfig,
     patchConfig,
     saveConfig,

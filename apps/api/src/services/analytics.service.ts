@@ -3,6 +3,7 @@ import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
+import { pickSalesGranularity, type AnalyticsPeriod, type SalesGranularity } from '@force/shared';
 
 // ==========================================
 // Simple cache-aside helper for analytics queries (60s TTL).
@@ -97,6 +98,23 @@ interface SalesData {
   date: string;
   revenue: number;
   orders: number;
+}
+
+/** First instant (UTC clock) of the bucket containing `d`. Monday-start weeks. */
+export function salesBucketStart(d: Date, granularity: SalesGranularity): Date {
+  const day = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  if (granularity === 'day') return day;
+  if (granularity === 'week') {
+    day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+    return day;
+  }
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
+
+/** Chart key for a bucket start: `YYYY-MM-DD` (day/week) or `YYYY-MM` (month). */
+export function salesBucketKey(d: Date, granularity: SalesGranularity): string {
+  const iso = salesBucketStart(d, granularity).toISOString();
+  return granularity === 'month' ? iso.slice(0, 7) : iso.slice(0, 10);
 }
 
 interface TopProduct {
@@ -356,49 +374,63 @@ export class AnalyticsService {
   }
 
   /**
-   * Get sales data for chart
+   * Sales chart buckets (revenue + order count) for a date range.
+   *
+   * The bucket size comes from the LENGTH of the range (`pickSalesGranularity`),
+   * never from the preset name: a 9-preset picker made `period` a free-form
+   * string, and every value outside the old day|week|month|year switch fell
+   * through to daily grouping — `this_year` sent ~270 daily bars.
+   *
+   * `tzOffsetMinutes` is the viewer's UTC offset (east-positive, e.g. +180 for
+   * Kuwait). The admin resolves presets to local midnight, so bucketing by UTC
+   * day put a phantom leading bucket for the previous UTC day in front of every
+   * range. Buckets are computed on `created_at + offset`, so a key such as
+   * `2026-09-01` is the viewer's calendar day. Weeks start on Monday (Postgres
+   * `date_trunc('week')`). Keys: `YYYY-MM-DD` for day/week buckets (the bucket's
+   * first day), `YYYY-MM` for month buckets.
    */
   static async getSalesChart(
     storeId: string,
-    period: 'day' | 'week' | 'month' | 'year' = 'month',
-    dateRange?: DateRange
-  ): Promise<SalesData[]> {
+    period: AnalyticsPeriod | 'day' | undefined,
+    dateRange?: DateRange,
+    tzOffsetMinutes = 0
+  ): Promise<{ sales: SalesData[]; granularity: SalesGranularity }> {
     const now = new Date();
     let startDate: Date;
-    let groupBy: 'day' | 'month' = 'day';
+    let endDate: Date;
 
-    switch (period) {
-      case 'day':
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        groupBy = 'day';
-        break;
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        groupBy = 'day';
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        groupBy = 'day';
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        groupBy = 'month';
-        break;
-      default:
-        startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
-        groupBy = 'day';
+    if (dateRange) {
+      startDate = dateRange.startDate;
+      endDate = dateRange.endDate;
+    } else {
+      // Legacy callers that send only a period name (no explicit range).
+      endDate = now;
+      switch (period) {
+        case 'day':
+        case 'today':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case 'week':
+        case 'last_7':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'year':
+        case 'this_year':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
     }
 
-    const endDate = dateRange?.endDate || now;
+    const granularity = pickSalesGranularity(startDate, endDate);
+    const offsetMs = tzOffsetMinutes * 60 * 1000;
 
-    // Aggregate revenue and order count per period at the database level
-    // instead of fetching all individual order rows into JS memory.
-    const truncUnit = groupBy === 'day' ? 'day' : 'month';
     const aggregated = await prisma.$queryRaw<
       Array<{ period: Date; revenue: number; orders: bigint }>
     >`
       SELECT
-        date_trunc(${truncUnit}, "created_at") AS period,
+        date_trunc(${granularity}, "created_at" + (${tzOffsetMinutes}::int * interval '1 minute')) AS period,
         COALESCE(SUM(total), 0) AS revenue,
         COUNT(*)::bigint AS orders
       FROM public.orders
@@ -411,44 +443,28 @@ export class AnalyticsService {
     `;
 
     const salesMap = new Map<string, { revenue: number; orders: number }>();
-
-    aggregated.forEach(row => {
-      const date = new Date(row.period);
-      let key: string;
-      if (groupBy === 'day') {
-        key = date.toISOString().split('T')[0];
-      } else {
-        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      }
-      salesMap.set(key, {
+    for (const row of aggregated) {
+      salesMap.set(salesBucketKey(new Date(row.period), granularity), {
         revenue: Number(row.revenue),
         orders: Number(row.orders),
       });
-    });
-
-    // Fill in missing dates
-    const result: SalesData[] = [];
-    const current = new Date(startDate);
-
-    while (current <= endDate) {
-      let key: string;
-      if (groupBy === 'day') {
-        key = current.toISOString().split('T')[0];
-        current.setDate(current.getDate() + 1);
-      } else {
-        key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
-        current.setMonth(current.getMonth() + 1);
-      }
-
-      const data = salesMap.get(key) || { revenue: 0, orders: 0 };
-      result.push({
-        date: key,
-        revenue: data.revenue,
-        orders: data.orders,
-      });
     }
 
-    return result;
+    // Zero-fill every bucket the range touches, walking in the viewer's
+    // shifted clock so the keys line up with the SQL buckets above.
+    const result: SalesData[] = [];
+    const shiftedEnd = new Date(endDate.getTime() + offsetMs);
+    const cursor = salesBucketStart(new Date(startDate.getTime() + offsetMs), granularity);
+    while (cursor <= shiftedEnd) {
+      const key = salesBucketKey(cursor, granularity);
+      const data = salesMap.get(key) ?? { revenue: 0, orders: 0 };
+      result.push({ date: key, revenue: data.revenue, orders: data.orders });
+      if (granularity === 'day') cursor.setUTCDate(cursor.getUTCDate() + 1);
+      else if (granularity === 'week') cursor.setUTCDate(cursor.getUTCDate() + 7);
+      else cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+
+    return { sales: result, granularity };
   }
 
   /**

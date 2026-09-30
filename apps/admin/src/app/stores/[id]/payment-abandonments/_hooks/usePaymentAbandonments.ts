@@ -66,31 +66,41 @@ export function usePaymentAbandonments({ storeId, enabled }: UsePaymentAbandonme
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [loading, setLoading] = useState(true);
+  // First failed load's message (`''` = failed without one). Ignoring it
+  // rendered a 403/500 as zero stats + an empty table (2026-09-30 audit).
+  const [error, setError] = useState<string | null>(null);
+  const noteError = useCallback((e: { message?: string } | null | undefined) => {
+    if (e) setError(prev => prev ?? e.message ?? '');
+  }, []);
 
   const fetchStats = useCallback(async () => {
     // apiGet already unwraps the { success, data } envelope, so `data` IS the
     // stats payload — do not unwrap a second time (the double-unwrap silently
     // dropped real rows; see fwb-apiget-double-unwrap).
-    const { data } = await apiGet<AbandonmentStats>(
+    const { data, error: apiError } = await apiGet<AbandonmentStats>(
       `/api/v1/stores/${storeId}/payment-abandonments/stats`
     );
+    noteError(apiError);
     if (data) setStats(data);
-  }, [storeId]);
+  }, [storeId, noteError]);
 
   const fetchList = useCallback(async () => {
     const qs = new URLSearchParams({ page: String(page), limit: '25' });
     if (dateFrom) qs.set('from', dateFrom);
     if (dateTo) qs.set('to', dateTo);
-    const { data } = await apiGet<{ abandoners: AbandonmentRecord[]; meta: ListMeta }>(
-      `/api/v1/stores/${storeId}/payment-abandonments?${qs}`
-    );
+    const { data, error: apiError } = await apiGet<{
+      abandoners: AbandonmentRecord[];
+      meta: ListMeta;
+    }>(`/api/v1/stores/${storeId}/payment-abandonments?${qs}`);
+    noteError(apiError);
     if (data) {
       setRecords(data.abandoners ?? []);
       setMeta(data.meta ?? { total: 0, page: 1, limit: 25, totalPages: 1 });
     }
-  }, [storeId, page, dateFrom, dateTo]);
+  }, [storeId, page, dateFrom, dateTo, noteError]);
 
   // Initial load when feature is enabled
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     if (!enabled) {
       setLoading(false);
@@ -98,6 +108,7 @@ export function usePaymentAbandonments({ storeId, enabled }: UsePaymentAbandonme
     }
     let cancelled = false;
     setLoading(true);
+    setError(null);
     Promise.all([fetchStats(), fetchList()]).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -105,7 +116,9 @@ export function usePaymentAbandonments({ storeId, enabled }: UsePaymentAbandonme
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, enabled]);
+  }, [storeId, enabled, reloadKey]);
+
+  const retry = useCallback(() => setReloadKey(k => k + 1), []);
 
   // Re-fetch list when page or date filter changes
   useEffect(() => {
@@ -128,6 +141,8 @@ export function usePaymentAbandonments({ storeId, enabled }: UsePaymentAbandonme
     dateFrom,
     dateTo,
     loading,
+    error,
+    retry,
     setPage,
     applyDateFilter,
   };

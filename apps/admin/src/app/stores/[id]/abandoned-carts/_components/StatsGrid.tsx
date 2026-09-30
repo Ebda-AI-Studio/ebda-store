@@ -2,19 +2,30 @@
 
 import { useT } from '@/i18n/useT';
 import { filsToKwd } from '@/lib/format';
+import { isUntrackedForGuests } from '@/lib/guest-checkout';
 import type { AbandonedCartStats } from './types';
 
 interface StatCardProps {
   label: string;
   value: string | number;
   sub?: string;
+  /** Render `value` as an explanatory note rather than a figure. */
+  muted?: boolean;
 }
 
-function StatCard({ label, value, sub }: StatCardProps) {
+function StatCard({ label, value, sub, muted }: StatCardProps) {
   return (
     <div className="bg-card rounded-xl border border-border p-5">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+      <p
+        className={
+          typeof value === 'string' && muted
+            ? 'mt-1 text-sm font-medium text-muted-foreground'
+            : 'mt-1 text-2xl font-bold text-foreground'
+        }
+      >
+        {value}
+      </p>
       {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
@@ -22,6 +33,8 @@ function StatCard({ label, value, sub }: StatCardProps) {
 
 interface StatsGridProps {
   stats: AbandonedCartStats | null;
+  /** The store takes guest orders — guest carts are never recorded. */
+  guestCheckout?: boolean;
 }
 
 const formatKwd = filsToKwd;
@@ -30,17 +43,33 @@ const formatKwd = filsToKwd;
  * Four-column summary cards at the top of the abandoned carts page.
  * Pure presentational component — receives already-fetched stats.
  */
-export function StatsGrid({ stats }: StatsGridProps) {
+export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
   const t = useT('abandonedCarts.stats');
+  const tGuest = useT('components.guestCheckout');
 
+  // Nothing recorded on a guest-checkout store = not tracked, not "0".
+  if (isUntrackedForGuests(stats?.totalAbandoned ?? 0, guestCheckout)) {
+    const note = tGuest('notTracked');
+    return (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label={t('totalAbandoned')} value={note} muted />
+        <StatCard label={t('recovered')} value={note} muted />
+        <StatCard label={t('recoveryRate')} value={note} muted />
+        <StatCard label={t('recoveredRevenue')} value={note} muted />
+      </div>
+    );
+  }
+
+  const sub = guestCheckout ? tGuest('registeredOnly') : undefined;
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard label={t('totalAbandoned')} value={stats?.totalAbandoned ?? 0} />
-      <StatCard label={t('recovered')} value={stats?.totalRecovered ?? 0} />
-      <StatCard label={t('recoveryRate')} value={`${stats?.recoveryRate ?? 0}%`} />
+      <StatCard label={t('totalAbandoned')} value={stats?.totalAbandoned ?? 0} sub={sub} />
+      <StatCard label={t('recovered')} value={stats?.totalRecovered ?? 0} sub={sub} />
+      <StatCard label={t('recoveryRate')} value={`${stats?.recoveryRate ?? 0}%`} sub={sub} />
       <StatCard
         label={t('recoveredRevenue')}
         value={t('kwdValue', { amount: formatKwd(stats?.recoveredRevenue ?? 0) })}
+        sub={sub}
       />
     </div>
   );

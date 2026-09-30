@@ -3720,7 +3720,7 @@ model DeadStockFlag {
   variantId            String?             @map("variant_id")
   daysSinceSale        Int                 @map("days_since_sale")
   stockOnHand          Int                 @map("stock_on_hand")
-  stockValueFils       Int                 @map("stock_value_fils")
+  stockValueFils       Int?                @map("stock_value_fils")
   suggestedDiscountBps Int                 @map("suggested_discount_bps")
   clearanceCopyEn      String              @map("clearance_copy_en")
   clearanceCopyAr      String?             @map("clearance_copy_ar")

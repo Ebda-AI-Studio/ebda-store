@@ -6,38 +6,22 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ProductVelocityRow {
-  rank: number;
-  productId: string;
-  sku: string | null;
-  name: string;
-  nameAr: string | null;
-  unitsSold7d: number;
-  unitsSold30d: number;
-  velocityPerDay: number;
-  avgSellingPriceFils: number;
-  stockOnHand: number | null;
-  costPriceFils: number | null;
-}
-
-interface ProductsData {
-  products: ProductVelocityRow[];
-}
+import { ErrorState } from '@/components/ErrorState';
+// Contract shared with apps/api/src/routes/insights.routes.ts — the page was
+// once built against six fields the route never returned, so every column
+// rendered blank or 0 (2026-09-30 audit, finding 2).
+import type { ProductVelocityResponse, ProductVelocityRow } from '@force/shared';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// Unknown (null) renders as "—", never as a fabricated 0.
 function kwd(fils: number | null | undefined): string {
-  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '0.000';
+  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '—';
   return (fils / 1000).toFixed(3);
 }
 
-// 2026-05-21: same defensive helper as insights/dashboard. row.velocityPerDay
-// is null for SKUs with no rollup yet → array .map crashes the page.
 function num(v: number | null | undefined, digits = 2): string {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return (0).toFixed(digits);
+  if (typeof v !== 'number' || !Number.isFinite(v)) return '—';
   return v.toFixed(digits);
 }
 
@@ -49,23 +33,25 @@ export default function InsightsProductsPage() {
   const storeId = params?.id as string;
   const t = useT('insights.products');
 
-  const [data, setData] = useState<ProductsData | null>(null);
+  const [data, setData] = useState<ProductVelocityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
-    apiGet<ProductsData>(`/api/v1/stores/${storeId}/insights/products?perPage=50`)
+    setError(null);
+    apiGet<ProductVelocityResponse>(`/api/v1/stores/${storeId}/insights/products?perPage=50`)
       .then(({ data: d, error: apiError }) => {
-        if (apiError) setError(apiError.message);
+        if (apiError) setError(apiError.message ?? '');
         else if (d) setData(d);
       })
-      .catch(() => setError('Failed to load product velocity data'));
-  }, [storeId]);
+      .catch(() => setError(''));
+  }, [storeId, reloadKey]);
 
-  if (error) {
+  if (error !== null) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
+        <ErrorState message={error || t('loadFailed')} onRetry={() => setReloadKey(k => k + 1)} />
       </AdminLayout>
     );
   }
@@ -99,7 +85,7 @@ export default function InsightsProductsPage() {
       primaryOnMobile: true,
       cell: row => (
         <>
-          <span className="font-medium">{row.name}</span>
+          <span className="font-medium">{row.name ?? '—'}</span>
           {row.nameAr && (
             <span className="ms-2 text-xs text-muted-foreground" dir="rtl">
               {row.nameAr}
@@ -131,7 +117,13 @@ export default function InsightsProductsPage() {
     {
       header: t('asp'),
       alignEnd: true,
-      cell: row => <span className="font-mono">{kwd(row.avgSellingPriceFils)}</span>,
+      cell: row => (
+        <span
+          className={`font-mono ${row.avgSellingPriceFils === null ? 'text-muted-foreground' : ''}`}
+        >
+          {kwd(row.avgSellingPriceFils)}
+        </span>
+      ),
     },
     {
       header: t('stockOnHand'),
@@ -152,9 +144,7 @@ export default function InsightsProductsPage() {
       alignEnd: true,
       hideOnMobile: true,
       cell: row => (
-        <span className="font-mono text-muted-foreground">
-          {row.costPriceFils !== null ? kwd(row.costPriceFils) : '—'}
-        </span>
+        <span className="font-mono text-muted-foreground">{kwd(row.costPriceFils)}</span>
       ),
     },
   ];
@@ -169,8 +159,7 @@ export default function InsightsProductsPage() {
           onRowClick={row => router.push(`/stores/${storeId}/products/${row.productId}`)}
           emptyState={
             <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
-              No product velocity data yet. Insights populate after the first nightly rollup at
-              02:00 KW.
+              {t('empty')}
             </div>
           }
         />

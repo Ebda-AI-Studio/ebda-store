@@ -9,7 +9,7 @@
  *   GET  /:storeId/insights/cohorts                      — full cohort retention matrix + narration
  *   GET  /:storeId/insights/funnel?window=7|30|90        — funnel snapshots + narration
  *   GET  /:storeId/insights/segments                     — RFM segment counts + revenue + actions + narration
- *   GET  /:storeId/insights/products?perPage=50          — top SKU velocity ranking
+ *   GET  /:storeId/insights/products?perPage=50          — top SKUs by 30d units sold (contract: @force/shared productVelocityResponseSchema)
  *   GET  /:storeId/insights/customers/:customerId/rfm    — single customer RFM snapshot
  *   POST /:storeId/insights/rollup/run-now               — super_admin: trigger on-demand rollup (202)
  */
@@ -22,7 +22,15 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { generateInsightNarration } from '../services/accounting/insights-narration.service';
 import { inngest } from '../lib/inngest/client';
+import { EFFECTIVE_STOCK_SELECT, effectiveInventory } from '../lib/effective-inventory';
+import { storeTakesGuestOrders } from '../lib/guest-checkout';
+import { customerKeyOf } from '../lib/customer-key';
 import { listFunnelSnapshots } from '../services/accounting/funnel-report.service';
+import {
+  PRODUCT_VELOCITY_WINDOW_DAYS,
+  type ProductVelocityResponse,
+  type ProductVelocityRow,
+} from '@force/shared';
 
 const router = Router({ mergeParams: true });
 
@@ -60,6 +68,29 @@ const SEGMENT_ACTIONS: Record<RfmSegment, { en: string; ar: string }> = {
     ar: 'شغّل حملة فرصة أخيرة؛ إذا لم يستجيبوا، أوقف إرسال الرسائل إليهم.',
   },
 };
+
+/**
+ * Repeat-purchase rate (fraction 0..1) over a set of paid orders. Buyers are
+ * keyed by `customerKeyOf` — the ONE grouping the Customers page and the RFM
+ * rollup also use (user id, else lowercased guest email, else guest phone).
+ * Guest orders with no contact at all are skipped.
+ * Returns `repeatPurchaseRate: null` when no buyer is identifiable.
+ */
+export function computeRepeatPurchase(
+  orders: Array<{ customerId: string | null; shippingAddress: unknown }>
+): { repeatPurchaseRate: number | null; identifiedBuyers: number } {
+  const ordersPerBuyer = new Map<string, number>();
+  for (const o of orders) {
+    const key = customerKeyOf(o);
+    if (!key) continue;
+    ordersPerBuyer.set(key, (ordersPerBuyer.get(key) ?? 0) + 1);
+  }
+  const identifiedBuyers = ordersPerBuyer.size;
+  if (identifiedBuyers === 0) return { repeatPurchaseRate: null, identifiedBuyers };
+  let repeat = 0;
+  for (const n of ordersPerBuyer.values()) if (n >= 2) repeat += 1;
+  return { repeatPurchaseRate: repeat / identifiedBuyers, identifiedBuyers };
+}
 
 // ---------------------------------------------------------------------------
 // GET /:storeId/insights/dashboard
@@ -160,35 +191,27 @@ router.get(
         : [];
       const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
-      // Repeat purchase rate = customers with ≥2 paid orders in last 30d / total customers with ≥1 order
-      const [repeatBuyers, totalBuyers] = await runInTenantContext(storeId, () =>
-        Promise.all([
-          prisma.order.groupBy({
-            by: ['customerId'],
-            where: {
-              storeId,
-              paymentStatus: 'paid',
-              customerId: { not: null },
-              createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-            },
-            having: { customerId: { _count: { gte: 2 } } },
-            _count: { customerId: true },
-          }),
-          prisma.order.groupBy({
-            by: ['customerId'],
-            where: {
-              storeId,
-              paymentStatus: 'paid',
-              customerId: { not: null },
-              createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-            },
-            _count: { customerId: true },
-          }),
-        ])
+      // Repeat purchase rate over the last 30d = buyers with ≥2 paid orders /
+      // buyers with ≥1. A buyer is the registered customer, or — for a guest
+      // checkout — `customerKeyOf` (lowercased email, else phone), the ONE key the
+      // Customers page and RFM rollup use. Filtering on
+      // `customerId: { not: null }` read 0% on every guest-checkout store (all
+      // of pecannbee's orders are guest). `null` = unknown (no identifiable
+      // buyer in the window), which the page renders as "—", never as 0%.
+      const recentBuyerOrders = await runInTenantContext(storeId, () =>
+        prisma.order.findMany({
+          where: {
+            storeId,
+            paymentStatus: 'paid',
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          },
+          select: { customerId: true, shippingAddress: true },
+        })
       );
-
-      const repeatPurchaseRate =
-        totalBuyers.length > 0 ? Math.round((repeatBuyers.length / totalBuyers.length) * 100) : 0;
+      const { repeatPurchaseRate, identifiedBuyers } = computeRepeatPurchase(recentBuyerOrders);
+      // Same 30d window: does this store take guest orders? (funnel
+      // "checkouts" cannot count guest carts — see lib/guest-checkout.ts)
+      const guestCheckout = recentBuyerOrders.some(o => o.customerId === null);
 
       // Window length used to derive a per-day velocity from the 7d unit sums.
       const TOP_SKU_WINDOW_DAYS = 7;
@@ -205,6 +228,7 @@ router.get(
           mrr30d: orderStats._sum?.total ?? 0,
           orderCount30d: orderStats._count,
           repeatPurchaseRate,
+          repeatPurchaseBuyers: identifiedBuyers,
           // Page contract: topSegment is an object (segment/count/revenue) — the
           // page calls `topSegment.segment.replace(...)`, so a bare string here
           // would throw. Null when the store has no RFM snapshot rows.
@@ -228,7 +252,22 @@ router.get(
               velocity: unitsSold7d / TOP_SKU_WINDOW_DAYS,
             };
           }),
-          yesterdayFunnel: yesterdayFunnel ?? null,
+          guestCheckout,
+          yesterdayFunnel: yesterdayFunnel
+            ? {
+                ...yesterdayFunnel,
+                // FunnelSnapshot has no rate column — the page read a
+                // `conversionRate` that never existed and always showed 0.0%.
+                // Derived here as cart→order; null (unknown) when no cart was
+                // created that day. Deliberately NOT named `conversionRate`:
+                // that name is the /analytics orders-per-product-view rate
+                // (ruling AN-5), and one name must mean one metric.
+                cartToOrderRate:
+                  yesterdayFunnel.cartsCreated > 0
+                    ? yesterdayFunnel.ordersCompleted / yesterdayFunnel.cartsCreated
+                    : null,
+              }
+            : null,
           // As-of timestamp for the velocity panel. The top-SKU velocity is
           // computed live from the trailing 7d order window at request time,
           // so "as of" is the moment this response was assembled. Mirrors the
@@ -312,13 +351,21 @@ router.get(
       }
       const { window: days } = parsed.data;
 
-      const [funnelDays, narration] = await Promise.all([
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+      const [funnelDays, narration, guestCheckout] = await Promise.all([
         // Shared with the merchant MCP `admin_get_funnel` tool.
         runInTenantContext(storeId, () => listFunnelSnapshots(storeId, days)),
         generateInsightNarration(storeId, 'funnel'),
+        // checkoutsStarted / ordersAbandoned come from abandoned_carts, which
+        // cannot see guest carts — flag it so the page shows "not tracked for
+        // guest checkout" instead of a false 0.
+        runInTenantContext(storeId, () => storeTakesGuestOrders(storeId, since)),
       ]);
 
-      res.json({ data: { days: funnelDays, narration: narration ?? undefined } });
+      res.json({
+        data: { days: funnelDays, guestCheckout, narration: narration ?? undefined },
+      });
     } catch (err) {
       next(err);
     }
@@ -403,48 +450,83 @@ router.get(
       }
       const { perPage } = parsed.data;
 
-      // Aggregate OrderItem revenue + units sold (all time)
-      const topItems = await runInTenantContext(storeId, () =>
+      // Ranked by units sold in the trailing 30 days (paid orders) — the
+      // "recent velocity" the page promises. The previous all-time revenue
+      // ranking returned none of the fields the page reads (sold 7d/30d,
+      // velocity, ASP, stock, cost), so every one rendered blank or 0.
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const since30d = new Date(now - PRODUCT_VELOCITY_WINDOW_DAYS * DAY_MS);
+      const since7d = new Date(now - 7 * DAY_MS);
+
+      const top30d = await runInTenantContext(storeId, () =>
         prisma.orderItem.groupBy({
           by: ['productId'],
-          where: { order: { storeId, paymentStatus: 'paid' } },
+          where: { order: { storeId, paymentStatus: 'paid', createdAt: { gte: since30d } } },
           _sum: { total: true, quantity: true },
-          orderBy: { _sum: { total: 'desc' } },
+          orderBy: [{ _sum: { quantity: 'desc' } }, { productId: 'asc' }],
           take: perPage,
         })
       );
 
-      const productIds = topItems.map(s => s.productId);
-      const products = productIds.length
+      const productIds = top30d.map(s => s.productId);
+      const [sold7dRows, products] = productIds.length
         ? await runInTenantContext(storeId, () =>
-            prisma.product.findMany({
-              where: { id: { in: productIds } },
-              select: {
-                id: true,
-                name: true,
-                nameAr: true,
-                sku: true,
-                inventory: true,
-                status: true,
-              },
-            })
+            Promise.all([
+              prisma.orderItem.groupBy({
+                by: ['productId'],
+                where: {
+                  productId: { in: productIds },
+                  order: { storeId, paymentStatus: 'paid', createdAt: { gte: since7d } },
+                },
+                _sum: { quantity: true },
+              }),
+              prisma.product.findMany({
+                where: { id: { in: productIds }, storeId },
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  sku: true,
+                  costPrice: true,
+                  // Variant-aware stock — never `product.inventory` directly
+                  // (docs/architecture/inventory-model.md).
+                  ...EFFECTIVE_STOCK_SELECT,
+                },
+              }),
+            ])
           )
-        : [];
-      const productMap = Object.fromEntries(products.map(p => [p.id, p]));
+        : [[], []];
 
-      const ranked = topItems.map((s, index) => ({
-        rank: index + 1,
-        productId: s.productId,
-        name: productMap[s.productId]?.name ?? null,
-        nameAr: productMap[s.productId]?.nameAr ?? null,
-        sku: productMap[s.productId]?.sku ?? null,
-        inventory: productMap[s.productId]?.inventory ?? null,
-        status: productMap[s.productId]?.status ?? null,
-        revenue: Number(s._sum?.total ?? 0),
-        unitsSold: s._sum?.quantity ?? 0,
-      }));
+      const sold7d = new Map(sold7dRows.map(r => [r.productId, r._sum?.quantity ?? 0]));
+      const productMap = new Map(products.map(p => [p.id, p]));
 
-      res.json({ data: { products: ranked } });
+      const ranked: ProductVelocityRow[] = top30d.map((s, index) => {
+        const product = productMap.get(s.productId);
+        const units30d = s._sum?.quantity ?? 0;
+        const revenue30d = Number(s._sum?.total ?? 0);
+        return {
+          rank: index + 1,
+          productId: s.productId,
+          name: product?.name ?? null,
+          nameAr: product?.nameAr ?? null,
+          sku: product?.sku ?? null,
+          unitsSold7d: sold7d.get(s.productId) ?? 0,
+          unitsSold30d: units30d,
+          velocityPerDay: units30d / PRODUCT_VELOCITY_WINDOW_DAYS,
+          avgSellingPriceFils: units30d > 0 ? Math.round(revenue30d / units30d) : null,
+          // Unknown (null), not 0, when the product is untracked or gone.
+          stockOnHand:
+            product && product.trackInventory !== false ? effectiveInventory(product) : null,
+          costPriceFils: product?.costPrice ?? null,
+        };
+      });
+
+      const body: ProductVelocityResponse = {
+        windowDays: PRODUCT_VELOCITY_WINDOW_DAYS,
+        products: ranked,
+      };
+      res.json({ data: body });
     } catch (err) {
       next(err);
     }

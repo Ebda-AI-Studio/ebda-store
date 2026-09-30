@@ -21,7 +21,8 @@ interface DeadStockFlag {
   productId: string;
   daysSinceSale: number;
   stockOnHand: number;
-  stockValueFils: number;
+  /** null = the product has no cost price, so its value is unknown. */
+  stockValueFils: number | null;
   suggestedDiscountBps: number;
   clearanceCopyEn: string;
   clearanceCopyAr: string | null;
@@ -37,6 +38,9 @@ interface ListMeta {
   total: number;
   totalPages: number;
 }
+
+/** The scan records "no paid sale ever" as 9999 days. */
+const NEVER_SOLD_DAYS = 9999;
 
 // ─── Flag card ────────────────────────────────────────────────────────────────
 
@@ -93,12 +97,18 @@ function FlagCard({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
         <div>
           <span className="text-muted-foreground">
-            {t('card.daysSinceSale', { days: item.daysSinceSale })}
+            {item.daysSinceSale >= NEVER_SOLD_DAYS
+              ? t('card.neverSold')
+              : t('card.daysSinceSale', { days: item.daysSinceSale })}
           </span>
         </div>
         <div>
           <span className="text-muted-foreground">{t('card.stockValue')}: </span>
-          <span className="font-medium font-mono">{formatPrice(item.stockValueFils)}</span>
+          {item.stockValueFils === null ? (
+            <span className="font-medium text-muted-foreground">{t('card.valueUnknown')}</span>
+          ) : (
+            <span className="font-medium font-mono">{formatPrice(item.stockValueFils)}</span>
+          )}
         </div>
         <div>
           <span className="text-muted-foreground">{t('card.suggestedDiscount')}: </span>
@@ -145,6 +155,7 @@ export default function DeadstockPage() {
   const [error, setError] = useState<string | null>(null);
   const [rescanning, setRescanning] = useState(false);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
+  const [valueUnknownCount, setValueUnknownCount] = useState(0);
 
   const load = useCallback(
     async (page = 1) => {
@@ -153,6 +164,7 @@ export default function DeadstockPage() {
       const { data, error: apiError } = await apiGet<{
         data: DeadStockFlag[];
         meta: ListMeta;
+        valueUnknownCount?: number;
       }>(`/api/v1/stores/${storeId}/stock/deadstock-flags?status=open&page=${page}&perPage=20`);
       setLoading(false);
       if (apiError) {
@@ -162,6 +174,7 @@ export default function DeadstockPage() {
       if (data) {
         setItems(data.data);
         setMeta(data.meta);
+        setValueUnknownCount(data.valueUnknownCount ?? 0);
         if (data.data.length > 0) {
           setLastScanned(data.data[0].scannedAt);
         }
@@ -236,6 +249,13 @@ export default function DeadstockPage() {
         {!loading && !error && items.length === 0 && (
           <div className="rounded-xl border border-border bg-muted/10 p-6 text-center">
             <p className="text-sm text-muted-foreground">{t('empty')}</p>
+          </div>
+        )}
+
+        {/* Flags whose product has no cost price — value unknown */}
+        {!loading && !error && valueUnknownCount > 0 && (
+          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+            {t('valueUnknownBanner', { count: valueUnknownCount })}
           </div>
         )}
 

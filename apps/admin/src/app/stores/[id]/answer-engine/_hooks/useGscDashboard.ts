@@ -23,6 +23,9 @@ const EMPTY_GSC_DASHBOARD: GscDashboard = {
 export function useGscDashboard({ storeId, enabled }: UseGscDashboardArgs) {
   const [gsc, setGsc] = useState<GscDashboard>(EMPTY_GSC_DASHBOARD);
   const [isLoading, setIsLoading] = useState(true);
+  // Failed load's message (`''` = failed without one). A 403/500 used to be
+  // logged and swallowed, so it rendered as "no data" (2026-09-30 audit).
+  const [error, setError] = useState<string | null>(null);
 
   const fetchGsc = useCallback(async () => {
     if (!storeId || !enabled) {
@@ -30,11 +33,16 @@ export function useGscDashboard({ storeId, enabled }: UseGscDashboardArgs) {
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
-      const { data } = await apiGet<GscDashboard>(`/api/v1/stores/${storeId}/answer-engine/gsc`);
+      const { data, error: apiError } = await apiGet<GscDashboard>(
+        `/api/v1/stores/${storeId}/answer-engine/gsc`
+      );
       if (data) setGsc(data);
-    } catch (error) {
-      console.error('Failed to fetch GSC dashboard:', error);
+      if (apiError) setError(apiError.message ?? '');
+    } catch (err) {
+      console.error('Failed to fetch GSC dashboard:', err);
+      setError(err instanceof Error ? err.message : '');
     } finally {
       setIsLoading(false);
     }
@@ -44,5 +52,5 @@ export function useGscDashboard({ storeId, enabled }: UseGscDashboardArgs) {
     fetchGsc();
   }, [fetchGsc]);
 
-  return { gsc, isLoading, refetch: fetchGsc };
+  return { gsc, isLoading, error, refetch: fetchGsc };
 }

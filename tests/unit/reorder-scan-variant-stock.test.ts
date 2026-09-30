@@ -12,6 +12,8 @@ const upserted: Array<{ productId: string; onHand: number }> = [];
 
 const tx = {
   $executeRaw: vi.fn(async () => 0),
+  // Each candidate's write runs inside SAVEPOINT / RELEASE (withSavepointOn).
+  $executeRawUnsafe: vi.fn(async () => 0),
   $queryRaw: vi.fn(async () => [{ total: 0n }]),
   product: { findMany },
   purchaseOrderItem: {

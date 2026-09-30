@@ -9,6 +9,7 @@ import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,8 @@ interface FunnelDay {
 
 interface FunnelData {
   days: FunnelDay[];
+  /** Store takes guest orders: checkouts/abandoned (from abandoned_carts) miss guest carts. */
+  guestCheckout?: boolean;
   narration?: { en: string; ar: string } | null;
 }
 
@@ -44,6 +47,7 @@ export default function InsightsFunnelPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.funnel');
+  const tGuest = useT('components.guestCheckout');
   const tc = useT('common');
   const locale = useLocale();
 
@@ -92,16 +96,28 @@ export default function InsightsFunnelPage() {
     }
   );
 
-  const steps = totals
+  const guestCheckout = data?.guestCheckout === true;
+  // "Checkouts started" comes from abandoned_carts, which cannot see guest
+  // carts: on a guest-checkout store a 0 there is "not tracked", not 0.
+  const checkoutsUntracked = totals
+    ? isUntrackedForGuests(totals.checkoutsStarted, guestCheckout)
+    : false;
+  const abandonedUntracked = totals
+    ? isUntrackedForGuests(totals.ordersAbandoned, guestCheckout)
+    : false;
+
+  // value null = not tracked; the next step's drop-off is measured from the
+  // last step that WAS tracked.
+  const steps: Array<{ label: string; value: number | null }> = totals
     ? [
         { label: t('views'), value: totals.productViews || 0 },
         { label: t('carts'), value: totals.cartsCreated },
-        { label: t('checkouts'), value: totals.checkoutsStarted },
+        { label: t('checkouts'), value: checkoutsUntracked ? null : totals.checkoutsStarted },
         { label: t('completed'), value: totals.ordersCompleted },
       ]
     : [];
 
-  const maxStep = steps.reduce((m, s) => Math.max(m, s.value), 1) || 1;
+  const maxStep = steps.reduce((m, s) => Math.max(m, s.value ?? 0), 1) || 1;
 
   // Locale-aware AI narration body (#1933) — see segments/page.tsx.
   const narration = pickNarration(data?.narration, locale);
@@ -130,7 +146,16 @@ export default function InsightsFunnelPage() {
     {
       header: t('checkouts'),
       alignEnd: true,
-      cell: day => <span className="font-mono">{day.checkoutsStarted}</span>,
+      cell: day => {
+        const untracked = isUntrackedForGuests(day.checkoutsStarted, guestCheckout);
+        return untracked ? (
+          <span className="font-mono text-muted-foreground" title={tGuest('notTracked')}>
+            —
+          </span>
+        ) : (
+          <span className="font-mono">{day.checkoutsStarted}</span>
+        );
+      },
     },
     {
       header: t('completed'),
@@ -185,21 +210,32 @@ export default function InsightsFunnelPage() {
               <h2 className="text-base font-semibold mb-3">{t('overviewTitle')}</h2>
               <div className="space-y-3">
                 {steps.map((step, i) => {
-                  const prevValue = i > 0 ? steps[i - 1].value : null;
-                  const barWidth = maxStep > 0 ? (step.value / maxStep) * 100 : 0;
+                  const prevValue =
+                    steps
+                      .slice(0, i)
+                      .reverse()
+                      .find(s => s.value !== null)?.value ?? null;
+                  const barWidth =
+                    step.value !== null && maxStep > 0 ? (step.value / maxStep) * 100 : 0;
                   return (
                     <div key={step.label}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium">{step.label}</span>
                         <div className="flex items-center gap-3">
-                          {prevValue !== null && (
+                          {prevValue !== null && step.value !== null && (
                             <span className="text-xs text-red-500">
                               {dropoff(prevValue, step.value)}
                             </span>
                           )}
-                          <span className="font-mono font-semibold">
-                            {step.value.toLocaleString()}
-                          </span>
+                          {step.value === null ? (
+                            <span className="text-xs text-muted-foreground">
+                              {tGuest('notTracked')}
+                            </span>
+                          ) : (
+                            <span className="font-mono font-semibold">
+                              {step.value.toLocaleString()}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="h-8 rounded-md bg-muted overflow-hidden">
@@ -230,10 +266,21 @@ export default function InsightsFunnelPage() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('abandoned')}
                   </p>
-                  <p className="text-2xl font-semibold font-mono text-amber-600">
-                    {totals.ordersAbandoned}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{t('abandonedUnit')}</p>
+                  {abandonedUntracked ? (
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {tGuest('notTracked')}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-semibold font-mono text-amber-600">
+                        {totals.ordersAbandoned}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('abandonedUnit')}
+                        {guestCheckout && ` · ${tGuest('registeredOnly')}`}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -241,6 +288,9 @@ export default function InsightsFunnelPage() {
             {/* Daily trend table */}
             <section>
               <h2 className="text-base font-semibold mb-3">{t('dailyBreakdownTitle')}</h2>
+              {checkoutsUntracked && (
+                <p className="mb-2 text-xs text-muted-foreground">{tGuest('checkoutsTableNote')}</p>
+              )}
               <DataTable<FunnelDay>
                 columns={dailyColumns}
                 rows={sortedDays}

@@ -13,7 +13,10 @@
  *   4. Compute projectedStock = onHand + onOrder - backlog - demandDuringLead.
  *   5. Stage candidate when projectedStock < minQty.
  *   6. Batch-call Gemini for bilingual reasoning (max 20 candidates per call).
- *   7. Upsert ReorderSuggestion rows keyed on (storeId, productId, variantId, scannedAt).
+ *   7. Refresh the item's existing OPEN suggestion (scannedAt included), else
+ *      create one. Keying on the per-run scannedAt inserted a new open row on
+ *      every daily run: 4156 open suggestions for 143 items in prod (audit
+ *      2026-09-30, finding 6).
  *
  * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
  * Inngest jobs (no tenant GUC in context) can read reorder_suggestions,
@@ -25,6 +28,7 @@ import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
+import { withSavepointOn } from '../../lib/savepoint';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -428,46 +432,52 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       };
 
       try {
-        // Prisma's compound-unique where clause doesn't support null members
-        // (the generated type requires variantId: string). Use findFirst +
-        // create/update to handle the null-variantId case correctly.
-        const existing = await tx.reorderSuggestion.findFirst({
-          where: {
-            storeId,
-            productId: candidate.productId,
-            variantId: null,
-            scannedAt: scanStartedAt,
-          },
-          select: { id: true },
-        });
-
-        const payload = {
-          suggestedQty: candidate.suggestedQty,
-          velocity7d: candidate.velocity7d,
-          velocity28d: candidate.velocity28d,
-          onHand: candidate.onHand,
-          onOrder: candidate.onOrder,
-          openBacklog: candidate.openBacklog,
-          urgencyDays: candidate.urgencyDays,
-          supplierId: candidate.supplierId,
-          reasoningEn: reasoning.reasoningEn,
-          reasoningAr: reasoning.reasoningAr ?? undefined,
-          status: 'open' as const,
-        };
-
-        if (existing) {
-          await tx.reorderSuggestion.update({ where: { id: existing.id }, data: payload });
-        } else {
-          await tx.reorderSuggestion.create({
-            data: {
+        // One OPEN suggestion per item: refresh it (newest first, in case
+        // pre-fix duplicates still exist) or create one. Own SAVEPOINT per
+        // candidate so a failed write cannot abort the rest of the batch.
+        await withSavepointOn(tx, async () => {
+          const existing = await tx.reorderSuggestion.findFirst({
+            where: {
               storeId,
               productId: candidate.productId,
               variantId: null,
-              scannedAt: scanStartedAt,
-              ...payload,
+              status: 'open',
             },
+            orderBy: { scannedAt: 'desc' },
+            select: { id: true },
           });
-        }
+
+          const payload = {
+            suggestedQty: candidate.suggestedQty,
+            velocity7d: candidate.velocity7d,
+            velocity28d: candidate.velocity28d,
+            onHand: candidate.onHand,
+            onOrder: candidate.onOrder,
+            openBacklog: candidate.openBacklog,
+            urgencyDays: candidate.urgencyDays,
+            supplierId: candidate.supplierId,
+            reasoningEn: reasoning.reasoningEn,
+            reasoningAr: reasoning.reasoningAr ?? undefined,
+            status: 'open' as const,
+          };
+
+          if (existing) {
+            await tx.reorderSuggestion.update({
+              where: { id: existing.id },
+              data: { ...payload, scannedAt: scanStartedAt },
+            });
+          } else {
+            await tx.reorderSuggestion.create({
+              data: {
+                storeId,
+                productId: candidate.productId,
+                variantId: null,
+                scannedAt: scanStartedAt,
+                ...payload,
+              },
+            });
+          }
+        });
         upserted += 1;
       } catch (err) {
         logger.error(

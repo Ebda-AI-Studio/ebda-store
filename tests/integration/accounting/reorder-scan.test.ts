@@ -154,20 +154,39 @@ describe('reorder scan', () => {
     expect(lowStockSug!.onHand).toBe(2);
   });
 
-  it('idempotent — re-running does not duplicate same-day suggestions', async () => {
-    const before = await prisma.reorderSuggestion.count({ where: { storeId } });
+  it("re-running refreshes the item's ONE open suggestion instead of adding another", async () => {
+    // Before 2026-09-30 the upsert looked the row up by the per-run scannedAt,
+    // so every daily run inserted a new open suggestion for the same item —
+    // 4156 open suggestions for 143 items on a live store. The scan must now
+    // find the item's existing OPEN suggestion and refresh it (scannedAt too).
+    const openFor = () =>
+      prisma.reorderSuggestion.findMany({
+        where: { storeId, productId: lowStockProductId, status: 'open' },
+      });
 
-    // scannedAt is set to `new Date()` inside each runReorderScan call.
-    // Each call gets its own timestamp so a new row IS created per call — that
-    // is by design (a daily cron creates one snapshot per run).
-    // The idempotency guarantee is within a single call: the findFirst + create/update
-    // guard prevents duplicates for the SAME scannedAt timestamp.
-    // Re-running adds at most 1 new suggestion per product (same product, new timestamp).
+    const before = await openFor();
+    expect(before).toHaveLength(1);
+
+    await new Promise(r => setTimeout(r, 5)); // distinct scannedAt
     await runReorderScan(storeId);
-    const after = await prisma.reorderSuggestion.count({ where: { storeId } });
+    await runReorderScan(storeId);
 
-    // At most +1 new row per candidate product (the low-stock product) per re-run.
-    expect(after).toBeLessThanOrEqual(before + 2);
-    expect(after).toBeGreaterThanOrEqual(before); // never removes rows
+    const after = await openFor();
+    expect(after).toHaveLength(1);
+    expect(after[0].id).toBe(before[0].id);
+    expect(after[0].scannedAt.getTime()).toBeGreaterThan(before[0].scannedAt.getTime());
+  });
+
+  it('a dismissed suggestion is not reopened — the next run creates a fresh open one', async () => {
+    await prisma.reorderSuggestion.updateMany({
+      where: { storeId, productId: lowStockProductId, status: 'open' },
+      data: { status: 'dismissed' },
+    });
+    await runReorderScan(storeId);
+    const rows = await prisma.reorderSuggestion.findMany({
+      where: { storeId, productId: lowStockProductId },
+    });
+    expect(rows.filter(r => r.status === 'dismissed')).toHaveLength(1);
+    expect(rows.filter(r => r.status === 'open')).toHaveLength(1);
   });
 });
