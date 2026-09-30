@@ -40,7 +40,7 @@ import { shippingCarrierService } from './services/shipping-carrier.service';
 import { loyaltyAutomationService } from './services/loyalty-automation.service';
 import { AuthService } from './services/auth.service';
 import { SentryService } from './services/sentry.service';
-import { sendAlert } from './services/alerts.service';
+import { sendAlert, awaitInFlightAlerts } from './services/alerts.service';
 import { inngest } from './lib/inngest/client';
 import { inngestFunctions } from './lib/inngest/functions';
 import { serve as inngestServe } from 'inngest/express';
@@ -746,6 +746,11 @@ async function gracefulShutdown(signal: string) {
       // otherwise a Railway redeploy silently drops in-flight return-
       // confirmation emails / R2 cleanup / audit rows mid-drain.
       await awaitDeferredWork(10000);
+      // Issue 2387: detached alert sends (`void sendAlert(...)`, the
+      // orphaned-invoice page) — including any a drain above just fired —
+      // finish before Redis is disconnected and the process exits. Bounded:
+      // a send is a lock plus a 5s-capped Telegram POST.
+      await awaitInFlightAlerts(6000);
       await prisma.$disconnect();
       await redis.disconnect();
       await SentryService.close();

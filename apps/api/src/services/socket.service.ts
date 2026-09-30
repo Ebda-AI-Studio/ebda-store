@@ -7,6 +7,7 @@ import { isPlatformOrigin } from '../lib/cors-cache';
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
+import { maskEmail } from '../lib/pii-mask';
 import { AppError } from '../middleware/error-handler';
 // UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline
 // the interface here to avoid a circular dependency
@@ -212,7 +213,7 @@ class SocketService {
     // Add socket to user's sockets
     this.addUserSocket(user.userId, socket.id);
 
-    logger.info({ email: user.email, socketId: socket.id }, 'User connected');
+    logger.info({ email: maskEmail(user.email), socketId: socket.id }, 'User connected');
 
     // Join user's room
     socket.join(`user:${user.userId}`);
@@ -255,7 +256,7 @@ class SocketService {
     socket.on('disconnect', () => {
       this.removeUserSocket(user.userId, socket.id);
       this.removeAllStoreSockets(socket.id);
-      logger.info({ email: user.email, socketId: socket.id }, 'User disconnected');
+      logger.info({ email: maskEmail(user.email), socketId: socket.id }, 'User disconnected');
     });
 
     // Handle errors

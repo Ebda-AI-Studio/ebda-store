@@ -3,6 +3,7 @@ import { prisma, runInTenantContext } from '@force/database';
 import { InvoiceService } from '../../../services/invoice.service';
 import { EmailService } from '../../../services/email.service';
 import logger from '../../logger';
+import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
 
 /**
@@ -55,7 +56,7 @@ export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
           orderLocale
         );
       } catch (err) {
-        logger.error({ err, orderId, to }, 'Invoice email send failed');
+        logger.error({ err, orderId, to: maskEmail(to) }, 'Invoice email send failed');
         throw err;
       }
     });

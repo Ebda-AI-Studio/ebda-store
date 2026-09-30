@@ -4786,7 +4786,11 @@ from the database that just failed and hold it for the POST; `sendAlert` touches
 detached promise is safe. The per-order title stays (per-incident, like the unbooked-refund alert).
 Pinned by `tests/unit/orphaned-invoice-alert.test.ts` (mutation-proven). Cost if wrong: a process
 that exits within the ~5s send window loses that page — the error log line still names the provider
-and transaction id.
+and transaction id. **Superseded in part (issue 2387):** `sendAlert` now tracks every send in
+flight and `gracefulShutdown` awaits them (`awaitInFlightAlerts(6000)`, after `awaitDeferredWork`,
+before `redis.disconnect()`), so a SIGTERM no longer drops this page or any other detached
+`void sendAlert(...)`. Residual: a hard kill (SIGKILL, OOM, the 30s force-exit timer) still loses an
+in-flight page; the error log line remains the record.
 
 **Ruling BF-2b — one shape predicate per queue, shared by reader, replayer and processor (issues
 2371, 2374).** `isQueuedEmail` / `isQueuedSms` check every field the sender and the list route
@@ -4850,6 +4854,35 @@ on the live queue — one duplicate per tick, the cap and TTL never applied. Cos
 set-aside list whose trim keeps failing can exceed 200 entries / miss its TTL until one write's
 trim lands (logged each time); an SMS whose log write failed is missing from the admin log (the
 text did go out, the error log carries its message id).
+
+**Ruling BF-2e — an accepted SMS without a message id is a sent SMS (issue 2389).** BF-2d's class
+("a failure raised after the provider took the message") also covered a failure we raised
+ourselves: Unifonic answering 2xx with `success: true` (accepted, will be delivered and billed) but
+no `data.messageId` made `sendSms` throw, and the queue retried an accepted message up to
+`maxAttempts` times. `sendSms` now returns `{ messageId: null }` with a warning, and the queue
+writes the `sent` NotificationLog row with `providerMessageId` null (the column was already
+nullable; no admin surface renders it). A 2xx whose body cannot be parsed at all stays retryable:
+we cannot tell `success: true` from `false`, which is BF-2d's provider-ambiguity carve-out, not
+this defect. Pinned by `tests/unit/sms-accepted-without-id.test.ts` (mutation-proven) and a queue
+case in `tests/unit/sms-queue-corrupt-set-aside.test.ts`. Cost if wrong: an SMS Unifonic accepted
+but later failed to deliver is recorded as sent with no id to trace it by.
+
+**Ruling LOG-PII-1 — recipient identifiers reach the log drain only masked; the gate is static and
+named-field only (issue 2390).** PR 2388 masked the SMS recipient; fourteen sibling log fields in ten
+`apps/api` files still carried a raw email or phone (email queue `to`, invoice email, contact form,
+low-stock recipient, account lockout ×2, auth ×3, provisioning, socket connect/disconnect, alert
+poller sender, and the WhatsApp bridge's hand-rolled `.slice(-4)`). All now go through
+`maskEmail` / `maskEmailList` (new, for `EmailOptions.to: string | string[]`) / `maskPhone`.
+`tests/unit/no-raw-pii-in-logs.test.ts` walks every `apps/api/src` file's AST and fails on any
+`logger.*` / `log.*` / `console.*` object field whose key or value names a contact and whose value
+is not a `mask*` / `redact*` / `hash*` call, literal, `.length` or boolean (mutation-proven, with
+ten positive and eight negative controls). Not taken: a pino `formatters.log` backstop that masks
+by key at runtime — it would re-mask already-masked values lossily and hide the call sites instead
+of fixing them. Out of the gate's reach: spread properties (`{ ...ctx }`, 27 today; the payment, refund,
+AI and campaign ones were read and carry ids, counts and status only — the rest were not audited) and opaque third-party response bodies (`body: json` from iCarry,
+OneSignal, WBS, Unifonic's error body; carrier webhook `payload`), whose content is not visible
+statically. Cost if wrong: a provider that echoes the recipient in an error body writes it to the
+drain in the clear on that failure path.
 
 **Ruling ALR-1 — the alert throttle fails open on a throw, locally (issue 2384).** `sendAlert`
 wraps `redis.acquireLock` and treats a throw (Redis connected but rejecting writes) as "slot

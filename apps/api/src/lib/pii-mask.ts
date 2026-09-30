@@ -1,8 +1,12 @@
 /**
- * Contact masking for surfaces whose output leaves the platform — the
- * merchant MCP tools feed a third-party LLM's context, so a customer's
- * contact details are masked there by default even though the merchant may
- * see them in full on the dashboard.
+ * Contact masking for surfaces whose output leaves the platform:
+ *  - the merchant MCP tools feed a third-party LLM's context, so a customer's
+ *    contact details are masked there by default even though the merchant may
+ *    see them in full on the dashboard;
+ *  - application logs ship to the off-platform log drain (Axiom, 30-day
+ *    retention), so every email / phone / recipient field passed to a logger
+ *    call goes through these helpers (issue 2390). Enforced by
+ *    tests/unit/no-raw-pii-in-logs.test.ts.
  *
  * Enough survives for the merchant to recognise a customer ("the one ending
  * 1234 at gmail"), not enough to contact them from a transcript.
@@ -34,6 +38,17 @@ export function maskEmail(email: string | null | undefined): string | null {
   const at = email.lastIndexOf('@');
   if (at <= 0) return '***';
   return `${email.slice(0, 1)}***${email.slice(at)}`;
+}
+
+/**
+ * A recipient field that may be one address or a list (`EmailOptions.to`).
+ * Each address is masked with `maskEmail`. Empty/nullish input returns null.
+ */
+export function maskEmailList(
+  to: string | readonly string[] | null | undefined
+): string | (string | null)[] | null {
+  if (Array.isArray(to)) return to.map(maskEmail);
+  return maskEmail(to as string | null | undefined);
 }
 
 /**

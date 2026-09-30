@@ -1,6 +1,7 @@
 import type { InngestFunction } from 'inngest';
 import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
+import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
 import {
   runLowStockScan,
@@ -121,7 +122,7 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
             logger.info(
               {
                 storeId: store.id,
-                recipient: scan.recipientEmail,
+                recipient: maskEmail(scan.recipientEmail),
                 count: scan.alertedProducts.length,
               },
               'stock-low-stock-alert: digest email sent'

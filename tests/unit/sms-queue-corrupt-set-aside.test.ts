@@ -233,6 +233,27 @@ describe('sms queue set-aside (issue 2353)', () => {
     }
   });
 
+  // Issue 2389: accepted without a provider id — recorded as sent (id null),
+  // never retried.
+  it('an accepted send with no messageId is logged sent and never re-sent', async () => {
+    vi.useFakeTimers();
+    try {
+      h.client.rpop.mockResolvedValueOnce(JSON.stringify(sms('n', { attempts: 0 })));
+      h.sendSms.mockResolvedValueOnce({ messageId: null } as unknown as { messageId: string });
+      await smsQueue.processQueue();
+      await vi.runAllTimersAsync();
+      expect(h.sendSms).toHaveBeenCalledTimes(1);
+      expect(h.client.lpush).not.toHaveBeenCalled();
+      expect(h.notificationLog.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ status: 'sent', providerMessageId: null }),
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a failed provider send still retries (nothing was sent)', async () => {
     vi.useFakeTimers();
     try {

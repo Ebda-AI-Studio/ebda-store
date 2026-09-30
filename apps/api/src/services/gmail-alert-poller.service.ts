@@ -1,5 +1,6 @@
 import { ImapFlow } from 'imapflow';
 import logger from '../lib/logger';
+import { maskEmail } from '../lib/pii-mask';
 import { sendAlert } from './alerts.service';
 
 /**
@@ -289,7 +290,7 @@ export async function pollGmailAlerts(): Promise<PollResult> {
               await client.messageFlagsAdd(String(uid), ['\\Seen']);
               result.skipped++;
               logger.info(
-                { from: fromAddr, subject: subject.slice(0, 80), source },
+                { from: maskEmail(fromAddr), subject: subject.slice(0, 80), source },
                 'gmail-alert-poller: skipped noise (sender or subject pattern)'
               );
               continue;

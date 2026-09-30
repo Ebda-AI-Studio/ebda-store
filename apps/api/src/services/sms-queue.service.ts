@@ -190,7 +190,9 @@ class SmsQueueService {
     // idempotency row below is what the retry would look for, and it is the
     // write that just failed — a retry would text the customer (and spend the
     // merchant's SMS credit) a second time.
-    let sentMessageId: string | undefined;
+    // undefined = the provider has not accepted the SMS; string | null = it
+    // has (null: accepted without a messageId, issue 2389).
+    let sentMessageId: string | null | undefined;
 
     try {
       // Idempotency check — INSIDE the try (issue 2371): a throw here (a DB

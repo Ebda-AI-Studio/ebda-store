@@ -282,3 +282,58 @@ describe('sendAlert — configured', () => {
     expect(body.text).not.toContain('store=');
   });
 });
+
+// Issue 2387: detached sends (`void sendAlert(...)`, the orphaned-invoice
+// page) were dropped on SIGTERM — gracefulShutdown disconnected Redis and
+// exited with the Telegram POST still in flight. It now awaits them.
+describe('awaitInFlightAlerts — graceful-shutdown drain', () => {
+  beforeEach(() => {
+    mockState.configValue.telegramBotToken = 'test-token';
+    mockState.configValue.telegramAlertChatId = '-1001234567890';
+  });
+
+  it('waits for a detached send that is still in flight', async () => {
+    mockState.acquireLockMock.mockResolvedValueOnce(true);
+    let release!: (r: Response) => void;
+    mockState.fetchMock.mockReturnValueOnce(new Promise<Response>(r => (release = r)));
+
+    const { sendAlert, awaitInFlightAlerts } = await loadService();
+    let delivered = false;
+    void sendAlert({ level: 'p1', title: 'orphan' }).then(() => (delivered = true));
+
+    const drained = awaitInFlightAlerts(5000);
+    await new Promise(r => setTimeout(r, 20));
+    expect(delivered).toBe(false);
+    release(new Response('{"ok":true}', { status: 200 }));
+    await drained;
+    expect(delivered).toBe(true);
+  });
+
+  it('is bounded: a send that never settles does not hold shutdown past the timeout', async () => {
+    mockState.acquireLockMock.mockResolvedValueOnce(true);
+    mockState.fetchMock.mockReturnValueOnce(new Promise<Response>(() => undefined));
+    const { sendAlert, awaitInFlightAlerts } = await loadService();
+    void sendAlert({ level: 'p1', title: 'hang' });
+    const t0 = Date.now();
+    await awaitInFlightAlerts(30);
+    expect(Date.now() - t0).toBeLessThan(1000);
+  });
+
+  it('returns immediately when nothing is in flight', async () => {
+    const { awaitInFlightAlerts } = await loadService();
+    await expect(awaitInFlightAlerts(10_000)).resolves.toBeUndefined();
+  });
+});
+
+describe('gracefulShutdown wiring (issue 2387)', () => {
+  it('drains in-flight alerts before Redis is disconnected', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(join(__dirname, '../../apps/api/src/index.ts'), 'utf8');
+    const body = src.slice(src.indexOf('async function gracefulShutdown'));
+    const drain = body.indexOf('await awaitInFlightAlerts(');
+    const disconnect = body.indexOf('await redis.disconnect()');
+    expect(drain).toBeGreaterThan(-1);
+    expect(disconnect).toBeGreaterThan(drain);
+  });
+});

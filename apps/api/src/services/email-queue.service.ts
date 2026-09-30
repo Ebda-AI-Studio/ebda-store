@@ -8,6 +8,7 @@ import { redis } from './redis.service';
 import { EmailService, EmailOptions } from './email.service';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
+import { maskEmailList } from '../lib/pii-mask';
 import { sendAlert } from './alerts.service';
 import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-letter';
 
@@ -177,7 +178,10 @@ class EmailQueueService {
         }
       });
 
-      logger.info({ emailId: email.id, to: email.options.to }, '[EMAIL QUEUE] Sent email');
+      logger.info(
+        { emailId: email.id, to: maskEmailList(email.options.to) },
+        '[EMAIL QUEUE] Sent email'
+      );
     } catch (error) {
       email.error = error instanceof Error ? error.message : 'Unknown error';
 

@@ -7,6 +7,7 @@ import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
+import { maskEmail } from '../lib/pii-mask';
 import { redis } from './redis.service';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -324,13 +325,13 @@ export class AuthService {
           (existingUser.language as 'en' | 'ar' | undefined) ?? undefined
         ).catch(err =>
           logger.error(
-            { err, email: existingUser.email },
+            { err, email: maskEmail(existingUser.email) },
             'Failed to send duplicate-registration notice'
           )
         );
       } else {
         logger.info(
-          { email: existingUser.email },
+          { email: maskEmail(existingUser.email) },
           'Skipping duplicate-registration notice — admin account'
         );
       }
@@ -431,7 +432,7 @@ export class AuthService {
       // Admin accounts (no storeId) skip the branded email path — they
       // don't belong to a store and verification flow is admin-only.
       logger.info(
-        { userId, email },
+        { userId, email: maskEmail(email) },
         'Skipping branded verification email — no storeId (admin account)'
       );
     }

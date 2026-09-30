@@ -35,6 +35,7 @@ import {
   isOrderable,
 } from '../lib/effective-inventory';
 import logger from '../lib/logger';
+import { maskPhone } from '../lib/pii-mask';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 import { AppError } from '../middleware/error-handler';
 import { CustomerAddressService } from '../services/customer-address.service';
@@ -1050,7 +1051,7 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     logger.info(
       {
         storeId: store.id,
-        customerPhone: customerPhone.slice(-4),
+        customerPhone: maskPhone(customerPhone),
         totalFils,
         items: items.length,
         paymentMethod,

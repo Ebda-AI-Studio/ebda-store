@@ -109,7 +109,11 @@ class SmsService {
   /**
    * Send an SMS via Unifonic REST API
    */
-  async sendSms(config: SmsConfig, to: string, message: string): Promise<{ messageId: string }> {
+  async sendSms(
+    config: SmsConfig,
+    to: string,
+    message: string
+  ): Promise<{ messageId: string | null }> {
     const body = new URLSearchParams({
       AppSid: config.appSid,
       SenderID: config.senderId,
@@ -144,16 +148,22 @@ class SmsService {
       throw new Error(`Unifonic error ${result.errorCode}: ${result.message}`);
     }
 
-    if (!result.data?.messageId) {
-      throw new Error('Unifonic API did not return a messageId');
+    // `success: true` means Unifonic ACCEPTED the message — it will be
+    // delivered and billed. A missing messageId is a reporting gap, not a
+    // failed send: throwing here made the queue retry an accepted message up
+    // to maxAttempts times (a real text and a real credit each, issue 2389).
+    // Report it as sent with an unknown (null) provider id instead.
+    const messageId = result.data?.messageId || null;
+    if (messageId === null) {
+      logger.warn(
+        { to: maskPhone(to) },
+        '[SMS] Unifonic accepted the SMS but returned no messageId — recorded as sent, id unknown'
+      );
+    } else {
+      logger.info({ messageId, to: maskPhone(to) }, '[SMS] SMS sent successfully');
     }
 
-    logger.info(
-      { messageId: result.data.messageId, to: maskPhone(to) },
-      '[SMS] SMS sent successfully'
-    );
-
-    return { messageId: result.data.messageId };
+    return { messageId };
   }
 }
 

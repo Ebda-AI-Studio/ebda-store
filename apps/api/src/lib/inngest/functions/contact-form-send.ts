@@ -1,6 +1,7 @@
 import type { InngestFunction } from 'inngest';
 import { EmailService } from '../../../services/email.service';
 import logger from '../../logger';
+import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
 
 /**
@@ -41,7 +42,7 @@ export const contactFormSend: InngestFunction.Any = inngest.createFunction(
       try {
         await EmailService.sendContactForm({ name, email, subject, message });
       } catch (err) {
-        logger.error({ err, email }, '[CONTACT] notification email failed');
+        logger.error({ err, email: maskEmail(email) }, '[CONTACT] notification email failed');
         throw err; // let Inngest retry; alerts-failure-watch pages after the final one.
       }
     });

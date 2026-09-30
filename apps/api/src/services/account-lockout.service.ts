@@ -6,6 +6,7 @@
 import { redis } from './redis.service';
 import { prisma } from '@force/database';
 import logger from '../lib/logger';
+import { maskEmail } from '../lib/pii-mask';
 
 export interface LockoutConfig {
   maxAttempts: number;
@@ -158,7 +159,7 @@ class AccountLockoutService {
       memoryStore.set(key, data);
     }
 
-    logger.warn({ email }, 'Account locked due to too many failed attempts');
+    logger.warn({ email: maskEmail(email) }, 'Account locked due to too many failed attempts');
   }
 
   /**
@@ -174,7 +175,7 @@ class AccountLockoutService {
       memoryStore.delete(key);
     }
 
-    logger.info({ email }, 'Account unlocked');
+    logger.info({ email: maskEmail(email) }, 'Account unlocked');
   }
 
   /**

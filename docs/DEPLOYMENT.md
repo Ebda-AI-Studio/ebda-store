@@ -430,6 +430,7 @@ Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). With
 - **Provider**: **Axiom** free tier — 500 GB ingest/month, **30-day retention** (verified 2026-05-15)
 - **Dataset**: `force-api-railway`
 - **Transport**: `@axiomhq/pino` in `apps/api/src/lib/logger.ts` — pino multi-transport sends every log line to stdout AND Axiom in parallel (Railway logs UI keeps working untouched)
+- **PII**: log lines ship off-platform, so recipient emails and phone numbers are logged only masked (`maskEmail` / `maskEmailList` / `maskPhone` from `apps/api/src/lib/pii-mask.ts`, issue 2390) — grep a support case by the masked form (`a***@gmail.com`, `****5678`) plus the email/SMS id, not the full address. `tests/unit/no-raw-pii-in-logs.test.ts` fails on a new raw field.
 - **Env vars (Railway)**:
   - `AXIOM_TOKEN` — API token with **Ingest** scope, from `app.axiom.co` → Settings → API tokens
   - `AXIOM_DATASET` — dataset name, currently `force-api-railway`

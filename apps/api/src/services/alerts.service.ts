@@ -177,9 +177,40 @@ function throttleKey(level: AlertLevel, title: string, storeId?: string): string
  *   - 'skipped'     → channel not configured
  *   - 'failed'      → Telegram API rejected or fetch errored (logged)
  */
-export async function sendAlert(
-  opts: AlertOptions
-): Promise<'sent' | 'throttled' | 'skipped' | 'failed'> {
+export function sendAlert(opts: AlertOptions): Promise<AlertOutcome> {
+  const p: Promise<AlertOutcome> = deliverAlert(opts).finally(() => inFlightAlerts.delete(p));
+  inFlightAlerts.add(p);
+  return p;
+}
+
+type AlertOutcome = 'sent' | 'throttled' | 'skipped' | 'failed';
+
+/**
+ * Every send still in flight, so a graceful shutdown can wait for them
+ * (issue 2387). Most call sites DETACH the send (`void sendAlert(...)`, the
+ * orphaned-invoice page, the queue dead-letter pages): nothing awaits them, so
+ * on SIGTERM `redis.disconnect()` killed an in-flight throttle lock and
+ * `process.exit(0)` cut the Telegram POST — and the incidents that page are
+ * exactly the ones followed by a Railway restart. Tracking here, at the one
+ * function every page goes through, covers every detached caller at once.
+ */
+const inFlightAlerts = new Set<Promise<AlertOutcome>>();
+
+/**
+ * Wait for every in-flight alert send to settle, up to `timeoutMs`. Call from
+ * `gracefulShutdown` BEFORE `redis.disconnect()` (the throttle lock needs it).
+ * Never rejects: `deliverAlert` itself never rejects, and a timeout means
+ * "stop waiting".
+ */
+export async function awaitInFlightAlerts(timeoutMs: number): Promise<void> {
+  if (inFlightAlerts.size === 0) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const pending = Promise.allSettled(Array.from(inFlightAlerts)).then(() => undefined);
+  await Promise.race([pending, new Promise<void>(r => (timer = setTimeout(r, timeoutMs)))]);
+  clearTimeout(timer);
+}
+
+async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
   if (!isConfigured()) {
     emitBootWarningOnce('TELEGRAM_BOT_TOKEN or TELEGRAM_ALERT_CHAT_ID missing');
     return 'skipped';

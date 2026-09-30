@@ -7,6 +7,7 @@ import { EmailService } from './email.service';
 import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
+import { maskEmail } from '../lib/pii-mask';
 import { slugifyWithFallback } from '@force/shared';
 
 // ==========================================
@@ -259,7 +260,10 @@ export class ProvisioningService {
         email: ownerEmail,
         name: ownerName,
       }).catch(err =>
-        logger.error({ err, email: ownerEmail }, 'Failed to send welcome email during provisioning')
+        logger.error(
+          { err, email: maskEmail(ownerEmail) },
+          'Failed to send welcome email during provisioning'
+        )
       );
     }
 
