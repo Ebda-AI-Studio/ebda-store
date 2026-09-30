@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { useToast } from '@force/ui';
 import { formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,6 +42,25 @@ export default function StockDashboardPage() {
   const router = useRouter();
   const t = useT('stock.dashboard');
   const tc = useT('common');
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [lowStockScanning, setLowStockScanning] = useState(false);
+
+  // On-demand low-stock digest (mirrors the reorder/deadstock "Re-scan now").
+  // The scan claims each product atomically, so a double click or an overlap
+  // with the 6-hourly cron cannot email the same digest twice.
+  async function handleLowStockScan() {
+    if (lowStockScanning) return;
+    setLowStockScanning(true);
+    const { error: apiError } = await apiPost(
+      `/api/v1/stores/${storeId}/stock/low-stock-scan/run-now`,
+      {}
+    );
+    setLowStockScanning(false);
+    if (apiError) toastError(t('lowStockScanFailed'), apiError.message || '');
+    else toastSuccess(t('lowStockScanQueued'));
+  }
 
   const [dashboard, setDashboard] = useState<FinanceDashboard | null>(null);
   const [onHandCount, setOnHandCount] = useState<number | null>(null);
@@ -183,6 +204,18 @@ export default function StockDashboardPage() {
 
   return (
     <AdminLayout title={t('title')}>
+      {isSuperAdmin && (
+        <div className="mb-4 flex justify-end max-w-5xl">
+          <button
+            type="button"
+            onClick={handleLowStockScan}
+            disabled={lowStockScanning}
+            className="px-3 py-1.5 rounded border border-border text-sm text-foreground disabled:opacity-60 hover:bg-muted/40 transition-colors"
+          >
+            {lowStockScanning ? tc('loading') : t('lowStockScanNow')}
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl">
         {kpis.map(kpi => {
           const card = (

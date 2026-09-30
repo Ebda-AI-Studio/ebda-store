@@ -65,8 +65,14 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
       categoryNames: ['Kitchen & Dining', 'Home Decor'],
       productNames: ['Handmade Ceramic Mug'],
     },
+    // URL shape must match bulk-ai-geo.ts's prompt (`${storeUrl}/products?
+    // category=${c.slug}`) — apps/web has no `/categories/[slug]` route, so
+    // the old `/categories/<slug>` shape below 404'd on every store that ran
+    // this sweep (A4-2, 2026-09-22 AEO audit; see bulk-ai-geo.ts's comment).
+    // A golden fixture asserting the dead shape would let that regression
+    // pass this eval gate again.
     output:
-      '# Wady Aljuz\n\n> Kuwait-based online store for handmade home goods.\n\n## Store pages\n- Home: https://store.force-ai.co/wady-aljuz\n\n## Product categories\n- Kitchen & Dining: https://store.force-ai.co/wady-aljuz/categories/kitchen-dining\n- Home Decor: https://store.force-ai.co/wady-aljuz/categories/home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency KWD, ships within Kuwait.',
+      '# Wady Aljuz\n\n> Kuwait-based online store for handmade home goods.\n\n## Store pages\n- Home: https://store.force-ai.co/wady-aljuz\n\n## Product categories\n- Kitchen & Dining: https://store.force-ai.co/wady-aljuz/products?category=kitchen-dining\n- Home Decor: https://store.force-ai.co/wady-aljuz/products?category=home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency KWD, ships within Kuwait.',
   },
   {
     id: 'citation-copy-mug',

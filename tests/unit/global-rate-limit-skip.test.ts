@@ -93,6 +93,29 @@ describe('the global mutation limiter skips the refresh route', () => {
     process.env.VITEST = 'true';
     expect(skipGlobalRateLimit(req({ path: '/api/v1/orders' }))).toBe(true);
   });
+
+  // Regression for #1793: the bypass used a raw `===`, so a client/proxy
+  // that normalizes case or appends a trailing slash missed it — those
+  // refresh calls stayed counted against the shared IP-wide mutation cap,
+  // the exact defect this bypass exists to end.
+  it('matches the refresh path case-insensitively', () => {
+    expect(skipGlobalRateLimit(req({ path: '/API/V1/AUTH/REFRESH' }))).toBe(true);
+    expect(skipGlobalRateLimit(req({ path: '/Api/V1/Auth/Refresh' }))).toBe(true);
+  });
+
+  it('matches the refresh path with ONE trailing slash', () => {
+    expect(skipGlobalRateLimit(req({ path: '/api/v1/auth/refresh/' }))).toBe(true);
+  });
+
+  it('still does not open the bypass to a lookalike, even case-varied', () => {
+    for (const path of [
+      '/API/V1/AUTH/REFRESHX',
+      '/api/v1/auth/refresh//',
+      '/api/v2/AUTH/refresh',
+    ]) {
+      expect(skipGlobalRateLimit(req({ path })), `${path} must stay counted`).toBe(false);
+    }
+  });
 });
 
 describe('the global mutation limiter skips signed Inngest step callbacks', () => {

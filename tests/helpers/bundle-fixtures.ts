@@ -30,6 +30,7 @@ import { OrderService } from '@api/services/order.service';
 import { ReturnService } from '@api/services/return.service';
 import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
+import { invalidateStoreProductCaches, invalidateStoreBundlesCache } from '@api/lib/public-cache';
 
 /** True when a real (non-placeholder) DATABASE_URL is configured. Gate every describe block on this — mirrors the convention already used across tests/integration. */
 export const hasDb =
@@ -223,7 +224,21 @@ export interface SeedBundleOptions {
   expiresAt?: Date | null;
 }
 
-/** Seeds a bundle (+ its BundleItem rows) directly, bypassing the admin route's allocatability check — tests that need an allocatable price should pick round numbers (this mirrors how bundle.service's own tests construct fixtures). */
+/**
+ * Seeds a bundle (+ its BundleItem rows) directly, bypassing the admin
+ * route's allocatability check — tests that need an allocatable price
+ * should pick round numbers (this mirrors how bundle.service's own tests
+ * construct fixtures).
+ *
+ * Busts the same caches the real POST /:storeId/bundles route does
+ * (`invalidateStoreProductCaches` + `invalidateStoreBundlesCache`) — this
+ * write bypasses that route entirely, so nothing else would. Skipping this
+ * is exactly the bug the public-bundle-list cache (#1565) exposed: a store
+ * shared across `it()` blocks in the same `describe` (the common pattern in
+ * this suite) caches its public bundle list on the FIRST request, and every
+ * bundle seeded directly into the DB afterwards — never going through a
+ * cache-busting route — stayed invisible until the 120s TTL expired.
+ */
 export async function seedBundle(
   storeId: string,
   suffix: string,
@@ -251,12 +266,25 @@ export async function seedBundle(
       },
     })
   );
+  await invalidateStoreProductCaches(storeId);
+  await invalidateStoreBundlesCache(storeId);
   return bundle.id;
 }
 
-/** Directly sets a product's `inventory` column (variant-less products only — see docs/architecture/inventory-model.md for the variant case). */
+/**
+ * Directly sets a product's `inventory` column (variant-less products only
+ * — see docs/architecture/inventory-model.md for the variant case).
+ *
+ * Busts the product/bundle caches the same way the real stock-write paths
+ * now do (InventoryService, stock-adjustment/purchase-order services,
+ * barcode-scan) — see the doc comment on `seedBundle` above for why a
+ * direct-DB test write needs this too.
+ */
 export async function setStock(productId: string, inventory: number): Promise<void> {
-  await withRlsBypass(tx => tx.product.update({ where: { id: productId }, data: { inventory } }));
+  const product = await withRlsBypass(tx =>
+    tx.product.update({ where: { id: productId }, data: { inventory } })
+  );
+  await invalidateStoreProductCaches(product.storeId);
 }
 
 /** `resolveBundle` against the real `prisma` client — useful for asserting the cross-tenant 404 directly at the service layer, alongside the route-level assertions. */
@@ -521,5 +549,38 @@ export function returnsClientFor(app: Express, storeId: string, customerId: stri
   return {
     create: (body: unknown) =>
       request(app).post(base).set('Authorization', `Bearer ${token}`).send(body),
+  };
+}
+
+/**
+ * A real access-token JWT for a `store_admin`, shaped like
+ * `customerAccessTokenFor` above but with the role `bundle.routes.ts`'s
+ * `adminMiddleware` (`authorize('store_admin', 'super_admin')`) requires. A
+ * freshly-seeded owner's `tokenVersion` is `0`, matching `tv: 0` here —
+ * pass the STORE'S `ownerId` (`seedBundleStore`'s `FixtureStore.ownerId`),
+ * since `requireStoreAccess` checks `store_admin` against `store.ownerId`.
+ */
+export function storeAdminAccessTokenFor(userId: string): string {
+  return jwt.sign(
+    { userId, email: `${userId}@example.test`, role: 'store_admin', tv: 0 },
+    config.jwtSecret,
+    { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
+  );
+}
+
+/**
+ * Bound HTTP client for a store's admin bundle CRUD, against
+ * `buildBundleTestApp()` — exercises the REAL POST/PUT `/:storeId/bundles`
+ * routes (including their cache-invalidation calls), unlike `seedBundle`
+ * above which writes directly to the DB.
+ */
+export function adminBundleClientFor(app: Express, store: FixtureStore) {
+  const token = storeAdminAccessTokenFor(store.ownerId);
+  const base = `/api/v1/stores/${store.storeId}/bundles`;
+  return {
+    create: (body: unknown) =>
+      request(app).post(base).set('Authorization', `Bearer ${token}`).send(body),
+    update: (id: string, body: unknown) =>
+      request(app).put(`${base}/${id}`).set('Authorization', `Bearer ${token}`).send(body),
   };
 }

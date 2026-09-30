@@ -7,6 +7,7 @@ import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
+import { bustStoreCachesById } from '../../../services/store.service';
 
 /**
  * Catalogue-wide SEO sweep. Fills missing SEO meta on the store row,
@@ -452,6 +453,13 @@ const bulkAiSeoFn = inngest.createFunction(
       // invalidation storm). This also purges the storefront's Next data cache
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
+      // This sweep can also write STORE fields directly (metaTitle/
+      // metaDescription for SEO; llmsTxt/aboutJson/storeFaq/storeHowto for
+      // AEO/GEO) -- invalidateStoreProductCaches only busts the
+      // product/category caches, never the store RECORD's own
+      // public:store:<id> cache, so the storefront kept serving the
+      // pre-sweep store data until that key's TTL expired.
+      await step.run('bust-store-cache', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

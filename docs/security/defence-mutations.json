@@ -5,7 +5,7 @@
       "id": "r2-cleanup-isstillreferenced-rls-bypass",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "isStillReferenced's 11-probe global orphan-existence check runs on the ambient tenant-scoped client instead of an explicit RLS-bypass one — latent only because production's role already has BYPASSRLS, but at the documented RLS cutover this silently narrows to one store, so a still-referenced cross-tenant row reads as orphaned and its R2 object is irreversibly deleted",
+      "why": "isStillReferenced's registry-wide global orphan-existence check runs on the ambient tenant-scoped client instead of an explicit RLS-bypass one — latent only because production's role already has BYPASSRLS, but at the documented RLS cutover this silently narrows to one store, so a still-referenced cross-tenant row reads as orphaned and its R2 object is irreversibly deleted",
       "source": "apps/api/src/services/r2-cleanup.service.ts",
       "find": "import { withRlsBypass } from '@force/database';",
       "replace": "import { prisma as withRlsBypassScopeEscapeHatch } from '@force/database';\nconst withRlsBypass = (fn: (tx: any) => any) => fn(withRlsBypassScopeEscapeHatch);",
@@ -927,7 +927,7 @@
       "tier": "unit",
       "why": "/auth/refresh falls back into the global 200/15min per-IP mutation counter it shares with every order and cart write, so a NAT'd office rate-limits its own sessions one layer above the per-user bucket",
       "source": "apps/api/src/middleware/global-rate-limit-skip.ts",
-      "find": "  if (method === 'POST' && req.path === '/api/v1/auth/refresh') {",
+      "find": "  if (method === 'POST' && req.path.toLowerCase().replace(/\\/$/, '') === '/api/v1/auth/refresh') {",
       "replace": "  if (false) {",
       "test": "tests/unit/global-rate-limit-skip.test.ts"
     },
@@ -1087,7 +1087,7 @@
       "tier": "unit",
       "why": "an unresolvable masked field is silently dropped instead of refusing the save, erasing a notification provider secret",
       "source": "apps/api/src/services/notification-config.service.ts",
-      "find": "        } else {\n          throw new Error(\n            `NOTIFICATION_CREDENTIALS_UNRESOLVED: re-enter the ${channel} credentials — the saved value for \"${key}\" could not be read, and saving now would erase it.`\n          );\n        }",
+      "find": "        } else {\n          // Same shape as shipping-carrier.service.ts's sibling guard — a\n          // plain Error here turned into error-handler.ts's generic 500\n          // \"Internal server error\" instead of this actionable 400.\n          throw new AppError(\n            400,\n            'NOTIFICATION_CREDENTIALS_UNRESOLVED',\n            `Re-enter the ${channel} credentials: the saved value for \"${key}\" could not be read, and saving now would erase it.`\n          );\n        }",
       "replace": "        }",
       "test": "tests/unit/notification-credentials-merge.test.ts"
     },

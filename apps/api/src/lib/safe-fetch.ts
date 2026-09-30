@@ -108,9 +108,16 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
   try {
     addrs = await dns.lookup(host, { all: true });
   } catch {
-    throw new Error('SSRF_BLOCKED: host does not resolve');
+    // The lookup itself failed (NXDOMAIN, resolver timeout/unreachable) —
+    // distinct from a lookup that SUCCEEDED with zero records, which used to
+    // share this exact message and made the two indistinguishable from a
+    // carrier-connectivity log line ("is this DNS being flaky, or is the
+    // configured host simply wrong").
+    throw new Error('SSRF_BLOCKED: DNS_UNRESOLVED: host lookup failed');
   }
-  if (addrs.length === 0) throw new Error('SSRF_BLOCKED: host does not resolve');
+  if (addrs.length === 0) {
+    throw new Error('SSRF_BLOCKED: DNS_UNRESOLVED: host resolved to no addresses');
+  }
   for (const { address } of addrs) {
     if (isBlockedIp(address)) throw new Error('SSRF_BLOCKED: host resolves to a private address');
   }

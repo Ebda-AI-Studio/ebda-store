@@ -24,13 +24,19 @@ const router = Router();
  * cheap edge half: it rejects an obviously-wrong value while the merchant is
  * still looking at the form, instead of silently storing it and failing later.
  */
-const carrierConfigSchema = z.object({
+export const carrierConfigSchema = z.object({
   enabled: z.boolean(),
   isDefault: z.boolean().optional(),
   credentials: z.record(z.string(), z.string()).refine(
     creds => {
       const baseUrl = creds.baseUrl?.trim();
       if (!baseUrl) return true;
+      // An unchanged field resubmits the `****` mask maskCredentials()
+      // emitted (preserveMaskedCredentials merges it back to the real
+      // stored value AFTER this parse) — validating that as a URL runs
+      // `new URL('****')`, which throws, and would 400 a save the
+      // merchant made no baseUrl edit in at all.
+      if (baseUrl.includes('****')) return true;
       try {
         const u = new URL(baseUrl);
         return u.protocol === 'https:' || u.protocol === 'http:';

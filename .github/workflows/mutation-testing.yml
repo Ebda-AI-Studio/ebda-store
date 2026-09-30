@@ -90,11 +90,13 @@ on:
       - 'apps/api/src/services/shipping-carrier.service.ts'
       - 'apps/api/src/services/notification-config.service.ts'
       # r2-cleanup.service.ts's isStillReferenced holds the RLS-bypass guard
-      # on its 11-probe global orphan-existence check (#1599) — without it,
+      # on its registry-wide global orphan-existence check (#1599) — without it,
       # the documented Phase 3 RLS cutover silently narrows the check to one
       # store and an R2 delete of a still-referenced cross-tenant object
       # becomes irreversible.
       - 'apps/api/src/services/r2-cleanup.service.ts'
+      # ...and that check's column set + SQL now live in the shared registry.
+      - 'apps/api/src/lib/r2-references.ts'
       - 'apps/api/src/lib/inngest/functions/order-refunded.ts'
       # Affiliate commission claim guards (#618): a duplicate Inngest delivery
       # credits or debits the affiliate twice without them.

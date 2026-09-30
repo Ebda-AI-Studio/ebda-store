@@ -138,6 +138,14 @@ export function refreshAccessToken(): Promise<string | null> {
     // is unreliable). On all other browsers send an empty body and let the
     // server read from req.cookies.refresh_token instead.
     const ios = isIosWebkit();
+    // On iOS with no locally stored refresh token there is nothing to
+    // exchange (the cookie can't be trusted there either) — every caller
+    // that reaches this function (checkAuth's direct refreshSession() path
+    // included, not just the refreshToken() callback) skips the doomed
+    // network round-trip instead of hitting /auth/refresh only to be
+    // rejected. This was previously checked only inside the unused
+    // refreshToken() callback, so checkAuth's own refresh path missed it.
+    if (ios && !localStorage.getItem('refreshToken')) return null;
     const storedRefreshToken = ios ? localStorage.getItem('refreshToken') : null;
 
     try {

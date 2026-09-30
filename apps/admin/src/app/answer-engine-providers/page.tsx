@@ -28,9 +28,9 @@ import { useT } from '../../i18n/useT';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-type PaidEngine = 'perplexity' | 'openai';
+export type PaidEngine = 'perplexity' | 'openai';
 
-interface ProviderConfig {
+export interface ProviderConfig {
   engine: PaidEngine;
   enabled: boolean;
   apiKeyMasked: string | null;
@@ -38,7 +38,7 @@ interface ProviderConfig {
 
 // ── Row: one paid engine ─────────────────────────────────────────────────
 
-function ProviderRow({
+export function ProviderRow({
   config,
   onSaved,
 }: {
@@ -66,7 +66,12 @@ function ProviderRow({
     // Send the field verbatim — if the admin never touched it, it still
     // contains the masked sentinel and the API leaves the stored key alone.
     // A genuinely new value (no `****`) is encrypted and replaces it.
-    const { data, error } = await apiPut<ProviderConfig>(
+    // The route wraps its response as `{ config }` (mirrors the plural GET's
+    // `{ configs }`, already unwrapped correctly below at setConfigs(data.
+    // configs)) — apiPut's generic type param must match that shape, or TS
+    // silently believes `data` IS the ProviderConfig when it is really
+    // `{ config: ProviderConfig }` one level up.
+    const { data, error } = await apiPut<{ config: ProviderConfig }>(
       `/api/v1/admin/answer-engine/providers/${config.engine}`,
       // clear-gate-allow: the provider API has no clear form for a stored key
       // — `upsertBodySchema` is `z.string().min(1).optional()` (no null) and
@@ -80,7 +85,7 @@ function ProviderRow({
       setMessage(t('saveFailed', { message: error?.message || t('genericError') }));
       return;
     }
-    onSaved(data);
+    onSaved(data.config);
     setMessage(t('saved'));
   };
 

@@ -6076,7 +6076,10 @@
       "reorderSuggestions": "Reorder suggestions",
       "deadStockCount": "Dead stock SKUs",
       "viewAll": "View all",
-      "couldntLoad": "Couldn't load"
+      "couldntLoad": "Couldn't load",
+      "lowStockScanNow": "Send low-stock alert now",
+      "lowStockScanQueued": "Low-stock scan queued — the owner is emailed if any product newly dropped low",
+      "lowStockScanFailed": "Couldn't start the low-stock scan"
     },
     "inventory": {
       "title": "Inventory",

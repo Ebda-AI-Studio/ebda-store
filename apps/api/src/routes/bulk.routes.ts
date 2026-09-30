@@ -10,6 +10,7 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { tenantContext } from '../middleware/tenant-context';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 
 const router = Router();
 
@@ -441,6 +442,12 @@ router.post(
 
       const result = await BulkService.bulkDelete(storeId, productIds, permanent);
 
+      // A deleted product must stop being listed/purchasable (and drop out
+      // of any bundle's componentSum-derived availability) immediately, not
+      // after the cache TTL — same class of gap the other bundle write
+      // paths had.
+      await invalidateStoreProductCaches(storeId);
+
       // Audit log
       await auditLog({
         action: 'bulk.delete',
@@ -485,6 +492,10 @@ router.post(
         productIds,
         status as ProductStatus
       );
+
+      // A status flip (active ↔ draft/archived) changes what the storefront
+      // and any owning bundle may list — same class of gap as bulk delete.
+      await invalidateStoreProductCaches(storeId);
 
       // Audit log
       await auditLog({

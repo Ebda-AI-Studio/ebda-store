@@ -68,14 +68,51 @@ function jobs(): Job[] {
     });
 }
 
-/** `run:` lines only — a `uses:` action brings its own runtime. */
+/**
+ * `run:` lines only — a `uses:` action brings its own runtime.
+ *
+ * #1813: the old `/^\s{8,}\S/` catch-all (meant to also catch a multi-line
+ * `run: |` block's CONTINUATION lines) matched any line at 8+ indent,
+ * including a step's `with:` block — e.g. `setup-node`'s own
+ * `with:\n  node-version: 20`, whose "node-version" contains the word
+ * "node" and whose value line sits at 10 spaces. That treated setup-node's
+ * OWN config as "a command that needs node", which happened not to flip
+ * this gate's pass/fail today (the job it appeared in already has
+ * setup-node), but made the detection itself unreliable for any future job
+ * shaped the same way. Track multi-line `run: |`/`run: >` blocks by
+ * indentation explicitly instead of guessing from indent alone.
+ */
 function runLinesNeedingNode(job: Job): string[] {
-  return job.lines.filter(l => {
-    const isRun = /^\s+(?:-\s+)?run:\s*\S/.test(l) || /^\s{8,}\S/.test(l);
-    if (!isRun) return false;
-    if (/^\s*#/.test(l.trim())) return false;
-    return NEEDS_NODE.test(l) && !/^\s*#/.test(l);
-  });
+  const matches: string[] = [];
+  let blockIndent = -1; // -1 = not inside a multi-line run: block
+
+  for (const l of job.lines) {
+    if (/^\s*#/.test(l.trim())) continue;
+
+    // Start (or single-line form) of a `run:` step.
+    const blockStart = /^(\s+)(?:-\s+)?run:\s*[|>][+-]?\s*$/.exec(l);
+    if (blockStart) {
+      blockIndent = blockStart[1].length;
+      continue; // the `run: |` line itself carries no command text
+    }
+    if (/^\s+(?:-\s+)?run:\s*\S/.test(l)) {
+      blockIndent = -1; // single-line run: — no block follows
+      if (NEEDS_NODE.test(l)) matches.push(l);
+      continue;
+    }
+
+    if (blockIndent >= 0) {
+      if (l.trim() === '') continue; // blank line inside the block
+      const indent = /^(\s*)\S/.exec(l)?.[1].length ?? 0;
+      if (indent > blockIndent) {
+        if (NEEDS_NODE.test(l)) matches.push(l);
+        continue;
+      }
+      blockIndent = -1; // dedented back to step level — block ended
+    }
+  }
+
+  return matches;
 }
 
 function installsNode(job: Job): boolean {
@@ -106,6 +143,20 @@ describe('every job that runs node installs node', () => {
     const all = jobs();
     expect(all.length).toBeGreaterThan(20);
     expect(all.filter(j => runLinesNeedingNode(j).length > 0).length).toBeGreaterThan(5);
+  });
+
+  it("does not count setup-node's own `with: node-version:` line as a command needing node (#1813)", () => {
+    const zap = jobs().find(
+      j =>
+        j.file === 'zap-baseline.yml' && j.lines.some(l => /uses:\s*actions\/setup-node@/.test(l))
+    );
+    expect(zap, 'expected to find the zap-baseline job with setup-node').toBeDefined();
+    const needing = runLinesNeedingNode(zap!);
+    expect(needing.some(l => /node-version:/.test(l))).toBe(false);
+    // The real command line is still detected.
+    expect(needing.some(l => /run:\s*node scripts\/check-zap-review-dates\.mjs/.test(l))).toBe(
+      true
+    );
   });
 
   it('zap-baseline installs node — it is the job that was broken', () => {

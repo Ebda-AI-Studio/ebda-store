@@ -381,136 +381,127 @@ export function SimpleVariantsForm({
       </div>
 
       <div className="space-y-3">
-        {rows.map(row => (
-          <div key={row.rowId} className="rounded-lg border border-border bg-background p-3">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor={`variant-name-${row.rowId}`}
-                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                >
-                  {t('colName')}
-                </label>
-                <Input
-                  id={`variant-name-${row.rowId}`}
-                  value={row.value}
-                  onChange={e => updateRow(row.rowId, { value: e.target.value })}
-                  placeholder={t('namePlaceholder')}
-                  disabled={multiAxis}
-                />
+        {rows.map((row, idx) => {
+          // Every row repeated its 6 column labels in full — visually a
+          // wall of "Name / Name (Arabic) / Price / Compare-at / Cost /
+          // Stock" text before every single variant, all after the first
+          // row said it once already. The label stays for the input's
+          // accessible name (still `htmlFor`-linked, screen readers still
+          // read it per row) — only the SIGHTED repetition goes, via
+          // `sr-only` on every row after the first.
+          const labelClass =
+            idx === 0 ? 'mb-1 block text-[11px] font-medium text-muted-foreground' : 'sr-only';
+          return (
+            <div key={row.rowId} className="rounded-lg border border-border bg-background p-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label htmlFor={`variant-name-${row.rowId}`} className={labelClass}>
+                    {t('colName')}
+                  </label>
+                  <Input
+                    id={`variant-name-${row.rowId}`}
+                    value={row.value}
+                    onChange={e => updateRow(row.rowId, { value: e.target.value })}
+                    placeholder={t('namePlaceholder')}
+                    disabled={multiAxis}
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`variant-name-ar-${row.rowId}`} className={labelClass}>
+                    {t('colNameAr')}
+                  </label>
+                  <Input
+                    id={`variant-name-ar-${row.rowId}`}
+                    value={row.valueAr}
+                    onChange={e => updateRow(row.rowId, { valueAr: e.target.value })}
+                    placeholder={t('nameArPlaceholder')}
+                    dir="rtl"
+                    lang="ar"
+                    disabled={multiAxis}
+                  />
+                </div>
               </div>
-              <div>
-                <label
-                  htmlFor={`variant-name-ar-${row.rowId}`}
-                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                >
-                  {t('colNameAr')}
-                </label>
-                <Input
-                  id={`variant-name-ar-${row.rowId}`}
-                  value={row.valueAr}
-                  onChange={e => updateRow(row.rowId, { valueAr: e.target.value })}
-                  placeholder={t('nameArPlaceholder')}
-                  dir="rtl"
-                  lang="ar"
-                  disabled={multiAxis}
-                />
-              </div>
-            </div>
 
-            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_120px_auto]">
-              <div>
-                <label
-                  htmlFor={`variant-price-${row.rowId}`}
-                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                >
-                  {t('colPrice')}
-                </label>
-                <Input
-                  id={`variant-price-${row.rowId}`}
-                  type="number"
-                  step="0.001"
-                  value={row.priceKwd}
-                  onChange={e => updateRow(row.rowId, { priceKwd: e.target.value })}
-                  placeholder="0.000"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`variant-compare-at-${row.rowId}`}
-                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                >
-                  {t('colCompareAt')}
-                </label>
-                <Input
-                  id={`variant-compare-at-${row.rowId}`}
-                  type="number"
-                  step="0.001"
-                  value={row.compareAtKwd}
-                  onChange={e => updateRow(row.rowId, { compareAtKwd: e.target.value })}
-                  placeholder="—"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`variant-cost-${row.rowId}`}
-                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                >
-                  {t('colCost')}
-                </label>
-                <Input
-                  id={`variant-cost-${row.rowId}`}
-                  type="number"
-                  step="0.001"
-                  value={row.costKwd}
-                  onChange={e => updateRow(row.rowId, { costKwd: e.target.value })}
-                  placeholder="—"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={`variant-stock-${row.rowId}`}
-                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
-                >
-                  {t('colStock')}
-                </label>
-                <Input
-                  id={`variant-stock-${row.rowId}`}
-                  type="number"
-                  value={row.inventory}
-                  onChange={e => updateRow(row.rowId, { inventory: e.target.value })}
-                />
-              </div>
-              <div>
-                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                  {t('colImage')}
-                </span>
-                <ImageUpload
-                  value={row.imageUrl || undefined}
-                  onUpload={url => updateRow(row.rowId, { imageUrl: url })}
-                  onRemove={() => updateRow(row.rowId, { imageUrl: '' })}
-                  folder="products"
-                  storeId={storeId}
-                  recommendedSizeHint={recommendedSizeTextForTemplate(
-                    'productPrimary',
-                    storeTemplate
-                  )}
-                />
-              </div>
-              <div className="flex items-end justify-end pb-1">
-                <button
-                  type="button"
-                  onClick={() => removeRow(row.rowId)}
-                  disabled={rows.length === 1 && !row.variantId}
-                  className="text-sm text-destructive hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground/50"
-                  aria-label={t('removeRow')}
-                >
-                  {t('removeRow')}
-                </button>
+              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_120px_auto]">
+                <div>
+                  <label htmlFor={`variant-price-${row.rowId}`} className={labelClass}>
+                    {t('colPrice')}
+                  </label>
+                  <Input
+                    id={`variant-price-${row.rowId}`}
+                    type="number"
+                    step="0.001"
+                    value={row.priceKwd}
+                    onChange={e => updateRow(row.rowId, { priceKwd: e.target.value })}
+                    placeholder="0.000"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`variant-compare-at-${row.rowId}`} className={labelClass}>
+                    {t('colCompareAt')}
+                  </label>
+                  <Input
+                    id={`variant-compare-at-${row.rowId}`}
+                    type="number"
+                    step="0.001"
+                    value={row.compareAtKwd}
+                    onChange={e => updateRow(row.rowId, { compareAtKwd: e.target.value })}
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`variant-cost-${row.rowId}`} className={labelClass}>
+                    {t('colCost')}
+                  </label>
+                  <Input
+                    id={`variant-cost-${row.rowId}`}
+                    type="number"
+                    step="0.001"
+                    value={row.costKwd}
+                    onChange={e => updateRow(row.rowId, { costKwd: e.target.value })}
+                    placeholder="—"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`variant-stock-${row.rowId}`} className={labelClass}>
+                    {t('colStock')}
+                  </label>
+                  <Input
+                    id={`variant-stock-${row.rowId}`}
+                    type="number"
+                    value={row.inventory}
+                    onChange={e => updateRow(row.rowId, { inventory: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <span className={labelClass}>{t('colImage')}</span>
+                  <ImageUpload
+                    value={row.imageUrl || undefined}
+                    onUpload={url => updateRow(row.rowId, { imageUrl: url })}
+                    onRemove={() => updateRow(row.rowId, { imageUrl: '' })}
+                    folder="products"
+                    storeId={storeId}
+                    recommendedSizeHint={recommendedSizeTextForTemplate(
+                      'productPrimary',
+                      storeTemplate
+                    )}
+                  />
+                </div>
+                <div className="flex items-end justify-end pb-1">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(row.rowId)}
+                    disabled={rows.length === 1 && !row.variantId}
+                    className="text-sm text-destructive hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground/50"
+                    aria-label={t('removeRow')}
+                  >
+                    {t('removeRow')}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

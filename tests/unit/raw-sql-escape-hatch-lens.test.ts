@@ -173,6 +173,10 @@ const UNSAFE_INTERPOLATION_ALLOWED: Record<string, string> = {
   'apps/api/src/services/accounting/bank-reconcile.service.ts':
     "the unmatched-ledger query's ${periodStart ? ... : ''} ternary chooses between two fixed " +
     'SQL fragments; periodStart itself is bound as $4, never interpolated',
+  'apps/api/src/lib/r2-references.ts':
+    'table/column identifiers come from the R2_REFERENCE_COLUMNS module constant (checked against ' +
+    'schema.prisma by tests/unit/r2-reference-registry.test.ts) and are double-quote-escaped; the ' +
+    'URL, R2 key, cursor and page size are bound as $1/$2, never interpolated',
 };
 
 /** Files permitted to call `Prisma.raw`, with why the argument is not user text. */

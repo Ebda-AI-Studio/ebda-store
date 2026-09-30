@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error-handler';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { WarehouseService } from './warehouse.service';
 import { ON_HAND_SQL } from '../lib/effective-inventory-sql';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 
 interface InventoryAdjustment {
@@ -333,6 +334,12 @@ export class InventoryService {
       }),
     ]);
 
+    // Stock changed — every product/bundle cache keyed on availability
+    // must clear (see the class-wide fix on this defect: a bundle's
+    // isPurchasable/componentSum depend on component product stock, and
+    // this write path bypassed the cache entirely before).
+    await invalidateStoreProductCaches(storeId);
+
     const result = {
       product: {
         id: updatedProduct.id,
@@ -493,6 +500,10 @@ export class InventoryService {
       }),
     ]);
 
+    // Stock changed for every product in `plans` — one invalidation for the
+    // whole store covers them all (see the same note in adjustInventory).
+    await invalidateStoreProductCaches(storeId);
+
     // Back-in-stock notifications fire AFTER the transaction commits
     // so a notification doesn't go out for a write that later got
     // rolled back. Same fire-and-forget contract as adjustInventory.
@@ -562,6 +573,9 @@ export class InventoryService {
         },
       }),
     ]);
+
+    // Stock changed — see the same cache-invalidation note in adjustInventory above.
+    await invalidateStoreProductCaches(storeId);
 
     const result = {
       product: {
@@ -793,6 +807,10 @@ export class InventoryService {
         },
       }),
     ]);
+
+    // Same class-wide cache bust as adjustInventory/setInventory. This method
+    // has no caller today; whoever revives it must not inherit stale stock.
+    await invalidateStoreProductCaches(storeId);
   }
 
   /**
@@ -833,6 +851,10 @@ export class InventoryService {
         },
       }),
     ]);
+
+    // Same class-wide cache bust as adjustInventory/setInventory. This method
+    // has no caller today; whoever revives it must not inherit stale stock.
+    await invalidateStoreProductCaches(storeId);
   }
 
   // Helper: Determine stock status

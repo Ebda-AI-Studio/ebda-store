@@ -99,6 +99,12 @@ interface DataTableProps<T> {
    *  the mobile card layout (handy for inherently card-like data like
    *  store cards). */
   alwaysCards?: boolean;
+  /** Accessible name for the desktop `<table>` (e.g. "Orders", "Products") —
+   *  read by a screen reader before the column headers, since a bare
+   *  `<table>` with no visible `<caption>` otherwise announces as an
+   *  unnamed table. Every caller should pass one; optional only so this
+   *  stays a non-breaking addition for existing callers. */
+  ariaLabel?: string;
 }
 
 /**
@@ -133,6 +139,7 @@ export function DataTable<T>({
   emptyState,
   onRowClick,
   alwaysCards = false,
+  ariaLabel,
 }: DataTableProps<T>) {
   // Called unconditionally, before the early return below, per the rules of
   // hooks — this is also why the decision can't just live in a plain `if`.
@@ -158,12 +165,13 @@ export function DataTable<T>({
       {/* Desktop table */}
       {showDesktopTable && (
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" aria-label={ariaLabel}>
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 {columns.map((c, i) => (
                   <th
                     key={i}
+                    scope="col"
                     className={`px-4 py-3 font-medium ${
                       c.alignEnd ? 'text-end' : 'text-start'
                     } ${c.className ?? ''}`}

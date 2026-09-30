@@ -24,6 +24,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
+import logger from '../lib/logger';
 import {
   computeBundlePrice,
   isAllocatable,
@@ -43,7 +44,15 @@ import {
   compareBundleComponents,
   type ResolvedBundle,
 } from '../services/bundle.service';
-import { invalidateStoreProductCaches, getCached } from '../lib/public-cache';
+import {
+  invalidateStoreProductCaches,
+  invalidateStoreBundlesCache,
+  bundlesCacheKey,
+  getCached,
+} from '../lib/public-cache';
+
+/** Most bundles the public storefront list serves (newest first). */
+export const PUBLIC_BUNDLE_LIST_CAP = 200;
 
 const router = Router();
 
@@ -524,6 +533,7 @@ router.post(
       // — a new bundle must invalidate it the same way a new product does,
       // or it silently won't appear in the feed for up to the cache TTL.
       await invalidateStoreProductCaches(storeId);
+      await invalidateStoreBundlesCache(storeId);
       res.status(201).json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);
@@ -637,6 +647,7 @@ router.put(
       const bundle = await resolveBundle(prisma, storeId, id);
       // See the POST handler above — the same feed-cache invalidation gap.
       await invalidateStoreProductCaches(storeId);
+      await invalidateStoreBundlesCache(storeId);
       res.json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);
@@ -676,6 +687,7 @@ router.delete(
       // a deactivated bundle must stop being purchasable there too, not just
       // in `resolveBundle`'s live-read callers.
       await invalidateStoreProductCaches(storeId);
+      await invalidateStoreBundlesCache(storeId);
 
       res.json({
         success: true,
@@ -708,24 +720,37 @@ router.get(
       const { storeId } = req.params;
 
       // #1565: was an uncached N+1 on a hot storefront path — one
-      // `findMany` for candidate ids, then one `tryResolveBundle` (its own
-      // `findFirst` with nested product/variant includes) PER candidate, on
-      // every request. Cached under the same `public:products:${storeId}:`
-      // prefix every bundle admin write already busts (`bundle.routes.ts`'s
-      // own create/update/delete handlers call `invalidateStoreProductCaches`
-      // above), so no new invalidation call site is needed. Same 120s TTL and
+      // `findMany` for candidate ids, then one `tryResolveBundle` PER
+      // candidate, on every request. Cached under its own
+      // `bundlesCacheKey`, which `invalidateStoreProductCaches` also clears
+      // (so every product/stock write busts it — a bundle's price and
+      // availability derive from its components) and which every bundle
+      // write busts via `invalidateStoreBundlesCache`. Same 120s TTL and
       // staleness class as the public product list this mirrors.
-      const bundles = await getCached(`public:products:${storeId}:bundles:list`, 120, async () => {
-        const rows = await prisma.bundle.findMany({
+      const bundles = await getCached(bundlesCacheKey(storeId), 120, async () => {
+        const candidates = await prisma.bundle.findMany({
           where: { storeId, isActive: true },
           orderBy: { createdAt: 'desc' },
+          // Store-scale bundle counts are small (a merchant hand-curates
+          // these kits) — this caps the pathological case (a bulk-import
+          // bug, or a store scripted well past "hand-curated") from turning
+          // one storefront request into an unbounded fan-out of
+          // `tryResolveBundle` calls below. One row past the cap is fetched
+          // so a store that hits it is LOGGED rather than silently truncated.
+          take: PUBLIC_BUNDLE_LIST_CAP + 1,
           select: { id: true },
         });
+        if (candidates.length > PUBLIC_BUNDLE_LIST_CAP) {
+          logger.warn(
+            { storeId, cap: PUBLIC_BUNDLE_LIST_CAP },
+            'public bundle list truncated: store has more active bundles than the cap'
+          );
+        }
+        const rows = candidates.slice(0, PUBLIC_BUNDLE_LIST_CAP);
 
-        // Store-scale bundle counts are small (a merchant hand-curates these
-        // kits), so resolving each candidate through `resolveBundle` — the
-        // one place componentSum/price/available/isPurchasable are computed —
-        // is preferable to duplicating that math in a bulk query here.
+        // Resolving each candidate through `resolveBundle` — the one place
+        // componentSum/price/available/isPurchasable are computed — is
+        // preferable to duplicating that math in a bulk query here.
         const resolved = (await Promise.all(rows.map(r => tryResolveBundle(storeId, r.id)))).filter(
           (b): b is ResolvedBundle => b !== null
         );

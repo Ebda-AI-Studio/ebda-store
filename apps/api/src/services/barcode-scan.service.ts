@@ -14,6 +14,7 @@
 import { prisma, runInTenantContext, Prisma } from '@force/database';
 import { InventoryService } from './inventory.service';
 import { createAdjustment, postAdjustment } from './accounting/stock-adjustment.service';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 
@@ -202,6 +203,11 @@ export async function receiveByBarcode(
         },
       }),
     ]);
+
+    // Variant path writes `productVariant.inventory` directly — it never
+    // goes through InventoryService.adjustInventory (product-only), so it
+    // needs its own cache bust the same way that service's now does.
+    await invalidateStoreProductCaches(storeId);
 
     return {
       productId: lookup.productId,

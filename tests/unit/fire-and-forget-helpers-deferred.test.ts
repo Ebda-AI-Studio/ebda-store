@@ -5,8 +5,8 @@
  * lives inside the helper rather than at each of the ~20 call sites (a fix in
  * the shared component sweeps every caller, including future ones):
  *
- *  - `deleteR2ObjectIfOrphan` (r2-cleanup.service) — ELEVEN Prisma reads via
- *    `isStillReferenced`, called `void`-style from product / variant /
+ *  - `deleteR2ObjectIfOrphan` (r2-cleanup.service) — a Prisma read (then
+ *    eleven, now one registry-built statement) via `isStillReferenced`, called `void`-style from product / variant /
  *    category / page / blog / store / typography / layout save paths, most of
  *    which DO run under `tenantContext`. Every one of those reads died on the
  *    committed transaction and was swallowed as "[r2-cleanup] failed to
@@ -25,16 +25,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoisted(() => {
-  const findFirst = vi.fn().mockResolvedValue(null);
   return {
     prismaMock: {
-      productImage: { findFirst },
-      productVariant: { findFirst },
-      category: { findFirst },
-      storePage: { findFirst },
-      blogPost: { findFirst },
-      store: { findFirst },
-      user: { findFirst },
+      // isStillReferenced's single registry-built probe (lib/r2-references.ts).
+      $queryRawUnsafe: vi.fn().mockResolvedValue([{ referenced: false }]),
       affiliateEvent: { create: vi.fn().mockResolvedValue({ id: 'evt-1' }) },
     },
     runInTenantContextMock: vi.fn(
@@ -54,7 +48,7 @@ vi.mock('@force/database', () => ({
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),
   hasTenantContext: vi.fn(() => false),
-  // #1599: isStillReferenced now runs its 11 probes through `withRlsBypass`,
+  // #1599: isStillReferenced now runs its probe through `withRlsBypass`,
   // not the bare `prisma` export — this file's concern is COMMIT-TIMING (the
   // header docstring), not RLS routing (that has its own dedicated coverage
   // in tests/unit/r2-cleanup-rls-bypass.test.ts), so this just runs the
@@ -84,7 +78,7 @@ const OUR_URL = 'https://cdn.example.com/stores/x/hero.png';
 beforeEach(() => {
   vi.clearAllMocks();
   storageMock.isAvailable.mockReturnValue(true);
-  prismaMock.productImage.findFirst.mockResolvedValue(null);
+  prismaMock.$queryRawUnsafe.mockResolvedValue([{ referenced: false }]);
   prismaMock.affiliateEvent.create.mockResolvedValue({ id: 'evt-1' });
   runInTenantContextMock.mockImplementation(
     async (_storeId: string | undefined, fn: () => Promise<unknown>) => fn()
@@ -95,11 +89,11 @@ describe('deleteR2ObjectIfOrphan', () => {
   it('makes no Prisma call while the request transaction is open, then runs after it commits', async () => {
     await withDeferredWork({ storeId: STORE_ID }, async () => {
       await deleteR2ObjectIfOrphan(OUR_URL);
-      expect(prismaMock.productImage.findFirst).not.toHaveBeenCalled();
+      expect(prismaMock.$queryRawUnsafe).not.toHaveBeenCalled();
       expect(storageMock.delete).not.toHaveBeenCalled();
     });
 
-    expect(prismaMock.productImage.findFirst).toHaveBeenCalled();
+    expect(prismaMock.$queryRawUnsafe).toHaveBeenCalled();
     expect(storageMock.delete).toHaveBeenCalledWith('stores/x/hero.png');
   });
 

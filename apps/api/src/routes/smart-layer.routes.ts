@@ -14,6 +14,7 @@
  *   GET  /:storeId/finance/anomalies                     — paginated, filter by severity + acknowledged
  *   POST /:storeId/finance/anomalies/:id/acknowledge     — mark acknowledged
  *   POST /:storeId/stock/reorder-scan/run-now            — super_admin: fire on-demand scan
+ *   POST /:storeId/stock/low-stock-scan/run-now          — super_admin: fire on-demand scan
  *   POST /:storeId/stock/deadstock-scan/run-now          — super_admin: fire on-demand scan
  */
 
@@ -105,7 +106,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const po = await runInTenantContext(req.params.storeId, () =>
-        createPoFromSuggestion(req.params.id, req.params.storeId, (req as any).user?.id)
+        createPoFromSuggestion(req.params.id, req.params.storeId, req.user?.userId)
       );
       res.json({ data: { poId: po.id } });
     } catch (err) {
@@ -129,7 +130,7 @@ router.post(
           where: { id: req.params.id, storeId: req.params.storeId, status: 'open' },
           data: {
             status: 'dismissed',
-            dismissedBy: (req as any).user?.id ?? null,
+            dismissedBy: req.user?.userId ?? null,
             dismissedAt: new Date(),
           },
         })
@@ -228,7 +229,7 @@ router.post(
           where: { id: req.params.id, storeId: req.params.storeId, status: 'open' },
           data: {
             status: 'dismissed',
-            dismissedBy: (req as any).user?.id ?? null,
+            dismissedBy: req.user?.userId ?? null,
             dismissedAt: new Date(),
           },
         })
@@ -315,7 +316,7 @@ router.post(
           where: { id: req.params.id, storeId: req.params.storeId, acknowledged: false },
           data: {
             acknowledged: true,
-            acknowledgedBy: (req as any).user?.id ?? null,
+            acknowledgedBy: req.user?.userId ?? null,
             acknowledgedAt: new Date(),
           },
         })
@@ -339,7 +340,35 @@ router.post(
     try {
       await inngest.send({
         name: 'stock/reorder-scan-requested',
-        data: { storeId: req.params.storeId, requestedBy: (req as any).user?.id },
+        data: { storeId: req.params.storeId, requestedBy: req.user?.userId },
+      });
+      res.status(202).json({ data: { queued: true } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /:storeId/stock/low-stock-scan/run-now ─────────────────────────────
+//
+// Mirrors reorder-scan/run-now above. `stockLowStockAlertOnDemand`
+// (lib/inngest/functions/stock-low-stock-alert.ts) has listened for
+// `stock/low-stock-scan-requested` since it was written, but nothing ever
+// sent that event — the on-demand scan the function's own doc comment
+// describes ("Fired by the admin 'Scan now' button") was unreachable. The
+// button now lives on the admin stock dashboard (stock/dashboard/page.tsx).
+
+router.post(
+  '/:storeId/stock/low-stock-scan/run-now',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await inngest.send({
+        name: 'stock/low-stock-scan-requested',
+        data: { storeId: req.params.storeId, requestedBy: req.user?.userId },
       });
       res.status(202).json({ data: { queued: true } });
     } catch (err) {
@@ -360,7 +389,7 @@ router.post(
     try {
       await inngest.send({
         name: 'stock/deadstock-scan-requested',
-        data: { storeId: req.params.storeId, requestedBy: (req as any).user?.id },
+        data: { storeId: req.params.storeId, requestedBy: req.user?.userId },
       });
       res.status(202).json({ data: { queued: true } });
     } catch (err) {

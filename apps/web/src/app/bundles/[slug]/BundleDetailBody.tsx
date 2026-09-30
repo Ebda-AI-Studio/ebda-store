@@ -39,7 +39,7 @@ export async function fetchInitialBundle(
   const response = await fetch(
     `${API_URL}/stores/public/${encodeURIComponent(storeId)}/bundles/${encodeURIComponent(slug)}`,
     {
-      next: { revalidate: 60, tags: [`products:${store.id}`] },
+      next: { revalidate: 60, tags: [`products:${store.id}`, `bundles:${store.id}`] },
       headers: {
         'Content-Type': 'application/json',
         'X-Store-ID': store.id,

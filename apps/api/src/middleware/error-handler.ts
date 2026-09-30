@@ -48,7 +48,22 @@ export function clientErrorStatus(err: unknown): number | undefined {
   return undefined;
 }
 
-export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
+export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): void {
+  // A response has already gone out (a genuine real send — request-
+  // transaction.ts's buffered lane flips its lane to 'flushing' the moment
+  // it does, at which point ITS res.end override forwards every further
+  // call straight to Express's real res.end instead of re-capturing it).
+  // Every branch below ends in res.status().json(), which calls res.end()
+  // again — on an already-ended response that throws (or corrupts the
+  // stream) instead of doing anything useful. Delegate to Express's
+  // built-in final handler, the same way Express's own docs say a custom
+  // error handler must when headersSent is true.
+  if (res.headersSent) {
+    logger.error({ err, path: req.originalUrl }, 'Error after headers were already sent');
+    next(err);
+    return;
+  }
+
   // Correlation id (set by the `requestId` middleware in security.ts). Returned
   // to the client on server-side (5xx) errors so support can map a customer's
   // report to the full server-side detail WITHOUT exposing any internals.

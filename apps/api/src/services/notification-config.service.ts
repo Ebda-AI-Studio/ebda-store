@@ -4,6 +4,7 @@ import { encryption } from './encryption.service';
 import { smsService } from './sms.service';
 import type { SmsConfig } from './sms.service';
 import logger from '../lib/logger';
+import { AppError } from '../middleware/error-handler';
 
 // ==========================================
 // Notification Config Service
@@ -178,8 +179,13 @@ class NotificationConfigService {
         if (typeof storedVal === 'string' && storedVal.length > 0) {
           out[key] = storedVal;
         } else {
-          throw new Error(
-            `NOTIFICATION_CREDENTIALS_UNRESOLVED: re-enter the ${channel} credentials — the saved value for "${key}" could not be read, and saving now would erase it.`
+          // Same shape as shipping-carrier.service.ts's sibling guard — a
+          // plain Error here turned into error-handler.ts's generic 500
+          // "Internal server error" instead of this actionable 400.
+          throw new AppError(
+            400,
+            'NOTIFICATION_CREDENTIALS_UNRESOLVED',
+            `Re-enter the ${channel} credentials: the saved value for "${key}" could not be read, and saving now would erase it.`
           );
         }
       } else {

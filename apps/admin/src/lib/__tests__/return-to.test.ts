@@ -44,4 +44,19 @@ describe('sanitizeReturnTo', () => {
     expect(sanitizeReturnTo('/stores/s2/products', BASE)).toBe(BASE);
     expect(sanitizeReturnTo('//evil.example.com', BASE)).toBe(BASE);
   });
+
+  // Ported from the o3 batch's regression suite (#669/#670) when main's
+  // sanitizeReturnTo superseded its identical resolveReturnTo.
+  it('does not double-decode a raw value carrying an encoded percent sign', () => {
+    // A category filter literally named "50% off", round-tripped through one
+    // encode/decode cycle already by the time this function sees it.
+    const raw = `${BASE}?category=50%25+off`;
+    expect(sanitizeReturnTo(raw, BASE)).toBe(raw);
+  });
+
+  it('does not throw on a raw value with an invalid percent-escape', () => {
+    const raw = `${BASE}?q=50%+off`;
+    expect(() => sanitizeReturnTo(raw, BASE)).not.toThrow();
+    expect(sanitizeReturnTo(raw, BASE)).toBe(raw);
+  });
 });

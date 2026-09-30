@@ -5,7 +5,8 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { config } from '../../../config';
-import { urlToR2Key, collectUrlsFromJson } from '../../../services/r2-cleanup.service';
+import { urlToR2Key } from '../../../services/r2-cleanup.service';
+import { collectReferencedR2Keys } from '../../r2-references';
 
 /**
  * Weekly R2 orphan sweep — cron 0 4 * * 0 (Sunday 04:00 UTC).
@@ -79,87 +80,24 @@ async function listAllObjects(client: S3Client, bucket: string): Promise<R2Obj[]
 }
 
 /**
- * Walk every image-bearing column in the schema and return the complete
- * set of R2 keys that are currently referenced by at least one live row.
+ * Every R2 key currently referenced by at least one live row.
  *
- * MUST mirror the reference set in:
- *   - scripts/r2-orphan-audit.ts  collectReferencedKeys()
- *   - apps/api/src/services/r2-cleanup.service.ts  isStillReferenced()
+ * The column set is the shared registry `R2_REFERENCE_COLUMNS`
+ * (lib/r2-references.ts) — the same one scripts/r2-orphan-audit.ts and
+ * r2-cleanup.service.ts `isStillReferenced()` read, so the three can no
+ * longer drift. (They did: none of the three hand-written lists read
+ * `Store.pwaSettings`, so every live PWA icon looked like an orphan.)
  *
- * Keep these three in sync when a new image column is added.
- *
- * Tables covered: productImage.url, productVariant.imageUrl,
- * category.image, storePage.coverImage, blogPost.coverImage,
- * store.(logo|logoAr|heroImage|ogImage|favicon|layoutSettings JSON),
- * user.avatar.
- *
- * Each table is queried in its own withRlsBypass call so a slow table
+ * Each page of each table runs in its own withRlsBypass call so a slow table
  * doesn't hold a single massive transaction open across the whole sweep.
  * withRlsBypass is required on a cron path (no HTTP tenant context) so
  * FORCE RLS policies don't filter cross-tenant rows to zero.
  */
 async function collectReferencedKeys(): Promise<Set<string>> {
-  const keys = new Set<string>();
-
-  const add = (url: string | null | undefined): void => {
-    const key = urlToR2Key(url);
-    if (key) keys.add(key);
-  };
-
-  // Store brand images + layoutSettings JSON
-  const stores = await withRlsBypass(tx =>
-    tx.store.findMany({
-      select: {
-        logo: true,
-        logoAr: true,
-        favicon: true,
-        heroImage: true,
-        ogImage: true,
-        layoutSettings: true,
-      },
-    })
-  );
-  for (const s of stores) {
-    add(s.logo);
-    add(s.logoAr);
-    add(s.favicon);
-    add(s.heroImage);
-    add(s.ogImage);
-    // layoutSettings JSON may embed slide/banner image URLs
-    for (const url of collectUrlsFromJson(s.layoutSettings)) add(url);
-  }
-
-  // Store CMS pages: cover image
-  const pages = await withRlsBypass(tx => tx.storePage.findMany({ select: { coverImage: true } }));
-  for (const p of pages) add(p.coverImage);
-
-  // Blog posts: cover image
-  const blogPosts = await withRlsBypass(tx =>
-    tx.blogPost.findMany({ select: { coverImage: true } })
-  );
-  for (const b of blogPosts) add(b.coverImage);
-
-  // Categories: cover image
-  const categories = await withRlsBypass(tx => tx.category.findMany({ select: { image: true } }));
-  for (const c of categories) add(c.image);
-
-  // Product gallery images
-  const productImages = await withRlsBypass(tx =>
-    tx.productImage.findMany({ select: { url: true } })
-  );
-  for (const pi of productImages) add(pi.url);
-
-  // Product variant images
-  const variants = await withRlsBypass(tx =>
-    tx.productVariant.findMany({ select: { imageUrl: true } })
-  );
-  for (const v of variants) add(v.imageUrl);
-
-  // User avatars
-  const users = await withRlsBypass(tx => tx.user.findMany({ select: { avatar: true } }));
-  for (const u of users) add(u.avatar);
-
-  return keys;
+  return collectReferencedR2Keys({
+    run: fn => withRlsBypass(tx => fn(tx)),
+    toKey: urlToR2Key,
+  });
 }
 
 export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(

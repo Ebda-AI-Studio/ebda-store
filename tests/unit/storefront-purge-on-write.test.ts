@@ -84,11 +84,11 @@ describe('storefront purge on product/category writes', () => {
 describe('storefront purge volume', () => {
   beforeEach(() => revalidateSpy.mockClear());
 
-  it('a product write sends exactly ONE purge carrying both tags', async () => {
+  it('a product write sends exactly ONE purge carrying every tag', async () => {
     await invalidateStoreProductCaches(STORE);
     expect(revalidateSpy).toHaveBeenCalledTimes(1);
     expect(revalidateSpy.mock.calls[0][0]).toEqual({
-      tags: [`products:${STORE}`, `categories:${STORE}`],
+      tags: [`products:${STORE}`, `categories:${STORE}`, `bundles:${STORE}`],
     });
   });
 
@@ -158,5 +158,70 @@ describe('the order path uses the coalesced bust (#1220)', () => {
     const body = src.slice(start, src.indexOf('\n}\n', start));
     expect(body).toContain('invalidateStoreProductCachesAfterOrder(storeId)');
     expect(body).not.toMatch(/invalidateStoreProductCaches\(/);
+  });
+});
+
+describe('the bundles:<storeId> purge tag matches a storefront fetch', () => {
+  // `invalidateStoreBundlesCache` and the product purge both send
+  // `bundles:<storeId>`. revalidateTag on a tag no fetch carries is a silent
+  // no-op, so the storefront's bundle list and bundle PDP must carry it.
+  it.each([
+    'apps/web/src/app/bundles/BundlesPageBody.tsx',
+    'apps/web/src/app/bundles/[slug]/BundleDetailBody.tsx',
+  ])('%s tags its fetch bundles:<storeId>', async rel => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.resolve(__dirname, '../..', rel), 'utf8');
+    expect(src).toContain('`bundles:${store.id}`');
+  });
+});
+
+describe('every InventoryService stock writer busts the product caches', () => {
+  // Enumerated from inventory.service.ts: every method that writes
+  // `inventory`. reduceOnSale/returnToStock have no caller today, but a
+  // revived caller must not inherit the pre-fix stale-stock bug.
+  it.each([
+    'adjustInventory',
+    'bulkAdjustInventory',
+    'setInventory',
+    'reduceOnSale',
+    'returnToStock',
+  ])('%s calls invalidateStoreProductCaches', async method => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/services/inventory.service.ts'),
+      'utf8'
+    );
+    const start = src.indexOf(`static async ${method}(`);
+    expect(start).toBeGreaterThan(-1);
+    const next = src.indexOf('static async ', start + 1);
+    const body = src.slice(start, next === -1 ? undefined : next);
+    expect(body).toContain('invalidateStoreProductCaches(storeId)');
+  });
+
+  it('the list above is every method that writes inventory', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/services/inventory.service.ts'),
+      'utf8'
+    );
+    const methods = [...src.matchAll(/static async (\w+)\(/g)].map(m => m[1]!);
+    const writers = methods.filter(name => {
+      const start = src.indexOf(`static async ${name}(`);
+      const next = src.indexOf('static async ', start + 1);
+      const body = src.slice(start, next === -1 ? undefined : next);
+      return /data:\s*\{[^}]*\binventory\b/.test(body);
+    });
+    expect(writers.sort()).toEqual(
+      [
+        'adjustInventory',
+        'bulkAdjustInventory',
+        'setInventory',
+        'reduceOnSale',
+        'returnToStock',
+      ].sort()
+    );
   });
 });

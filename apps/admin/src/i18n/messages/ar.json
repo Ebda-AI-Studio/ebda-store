@@ -6076,7 +6076,10 @@
       "reorderSuggestions": "اقتراحات إعادة الطلب",
       "deadStockCount": "أصناف البضاعة الراكدة",
       "viewAll": "عرض الكل",
-      "couldntLoad": "تعذّر التحميل"
+      "couldntLoad": "تعذّر التحميل",
+      "lowStockScanNow": "إرسال تنبيه المخزون المنخفض الآن",
+      "lowStockScanQueued": "تمت جدولة فحص المخزون المنخفض — سيُرسل بريد للمالك إذا انخفض مخزون أي منتج حديثًا",
+      "lowStockScanFailed": "تعذّر بدء فحص المخزون المنخفض"
     },
     "inventory": {
       "title": "الجرد",

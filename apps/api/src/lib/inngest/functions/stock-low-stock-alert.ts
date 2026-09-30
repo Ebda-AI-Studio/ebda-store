@@ -2,7 +2,10 @@ import type { InngestFunction } from 'inngest';
 import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
-import { runLowStockScan } from '../../../services/inventory/low-stock-scan.service';
+import {
+  runLowStockScan,
+  commitLowStockAlertSentinels,
+} from '../../../services/inventory/low-stock-scan.service';
 import { EmailService } from '../../../services/email.service';
 import { featureService } from '../../../services/feature.service';
 import { config } from '../../../config';
@@ -125,6 +128,17 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
             );
           });
           emailed = true;
+          // Mark these products alerted ONLY now that the digest actually
+          // sent — see the comment on runLowStockScan's writeSentinels
+          // call. A separate memoized step: if it throws (a transient Redis
+          // blip) Inngest retries just this step, without re-sending the
+          // email the customer already received.
+          await step.run(`commit-sentinels-${store.id}`, () =>
+            commitLowStockAlertSentinels(
+              store.id,
+              scan.alertedProducts.map((p: { productId: string }) => p.productId)
+            )
+          );
         }
       }
 
@@ -146,7 +160,11 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
 /**
  * Event-triggered on-demand low-stock scan.
  *
- * Fired by the admin "Scan now" button (super_admin only).
+ * Fired by the "Send low-stock alert now" button on the admin stock
+ * dashboard (super_admin only) via POST /:storeId/stock/low-stock-scan/run-now.
+ * Overlapping runs (a double click, or the 6-hourly cron mid-scan) cannot
+ * send the same digest twice: runLowStockScan claims each product with a
+ * short SET NX before it enters a digest.
  * Event: `stock/low-stock-scan-requested` with data: { storeId, requestedBy? }
  */
 export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFunction(
@@ -191,6 +209,14 @@ export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFun
         });
         emailed = true;
       });
+      // Mark alerted only now that the digest actually sent — see the
+      // comment on runLowStockScan's writeSentinels call.
+      await step.run('commit-sentinels', () =>
+        commitLowStockAlertSentinels(
+          storeId,
+          scanResult.alertedProducts.map((p: { productId: string }) => p.productId)
+        )
+      );
     }
 
     logger.info(

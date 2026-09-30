@@ -35,6 +35,7 @@ import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/c
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { collectReferencedR2Keys } from '../apps/api/src/lib/r2-references';
 
 interface R2Object {
   key: string;
@@ -113,9 +114,13 @@ function urlToKey(
 }
 
 /**
- * Walk every column in the schema that may store an R2 URL and return the
- * full set of referenced keys. New image-bearing columns must be added here
- * to avoid false-positive orphans.
+ * Every R2 key referenced by any live row. The column set is the shared
+ * registry `R2_REFERENCE_COLUMNS` (apps/api/src/lib/r2-references.ts), the
+ * same one the weekly sweep and the per-URL cleanup read. It used to be a
+ * hand-written list here that never read `Store.pwaSettings` — so `--apply`
+ * would have deleted every live PWA icon and favicon. A new URL-bearing
+ * column is added to the registry, and tests/unit/r2-reference-registry.test.ts
+ * fails until it is.
  */
 async function collectReferencedKeys(
   prisma: PrismaClient,
@@ -123,85 +128,10 @@ async function collectReferencedKeys(
   endpoint: string,
   bucket: string
 ): Promise<Set<string>> {
-  const keys = new Set<string>();
-  const add = (url: string | null | undefined) => {
-    if (!url) return;
-    const key = urlToKey(url, publicBase, endpoint, bucket);
-    if (key) keys.add(key);
-  };
-
-  // Stores: logos + favicon + hero image + og image
-  const stores = await prisma.store.findMany({
-    select: { logo: true, logoAr: true, favicon: true, heroImage: true, ogImage: true },
+  return collectReferencedR2Keys({
+    run: fn => fn(prisma),
+    toKey: url => urlToKey(url, publicBase, endpoint, bucket),
   });
-  for (const s of stores) {
-    add(s.logo);
-    add(s.logoAr);
-    add(s.favicon);
-    add(s.heroImage);
-    add(s.ogImage);
-  }
-
-  // Store layoutSettings JSON may carry slide images. Decode best-effort.
-  const layoutRows = await prisma.store.findMany({ select: { layoutSettings: true } });
-  for (const row of layoutRows) {
-    walkJsonForUrls(row.layoutSettings, add);
-  }
-
-  // Store CMS pages: cover image
-  const pages = await prisma.storePage.findMany({ select: { coverImage: true } });
-  for (const p of pages) add(p.coverImage);
-
-  // Categories: cover image
-  const categories = await prisma.category.findMany({ select: { image: true } });
-  for (const c of categories) add(c.image);
-
-  // Product images (the main gallery)
-  const productImages = await prisma.productImage.findMany({ select: { url: true } });
-  for (const pi of productImages) add(pi.url);
-
-  // Product variants: per-variant image (Group H — landed in this batch)
-  // The column is added by Group H's migration; guard against running before
-  // that migration applies by using a try/catch on the query.
-  try {
-    const variants = await prisma.productVariant.findMany({ select: { imageUrl: true } });
-    for (const v of variants) add(v.imageUrl);
-  } catch {
-    // imageUrl column not present yet — nothing to do.
-  }
-
-  // Blog posts: cover image. Without this, an --apply run would falsely
-  // delete blog covers that are genuinely referenced. MUST be included.
-  const blogPosts = await prisma.blogPost.findMany({ select: { coverImage: true } });
-  for (const b of blogPosts) add(b.coverImage);
-
-  // Users: avatar (used by both customers and admins)
-  const users = await prisma.user.findMany({ select: { avatar: true } });
-  for (const u of users) add(u.avatar);
-
-  return keys;
-}
-
-/**
- * Recursively walk a JSON value looking for string fields that look like
- * R2 URLs. Used for blob columns (Store.layoutSettings, marketingPixels,
- * etc.) where image URLs may be nested arbitrarily.
- */
-function walkJsonForUrls(value: unknown, visit: (url: string) => void): void {
-  if (value == null) return;
-  if (typeof value === 'string') {
-    if (value.startsWith('http://') || value.startsWith('https://')) visit(value);
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) walkJsonForUrls(item, visit);
-    return;
-  }
-  if (typeof value === 'object') {
-    for (const v of Object.values(value as Record<string, unknown>)) {
-      walkJsonForUrls(v, visit);
-    }
-  }
 }
 
 /**

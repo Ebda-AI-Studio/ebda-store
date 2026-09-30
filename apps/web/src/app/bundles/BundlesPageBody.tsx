@@ -44,7 +44,7 @@ async function fetchBundles(store: {
     const response = await fetch(
       `${API_URL}/stores/public/${encodeURIComponent(store.id)}/bundles`,
       {
-        next: { revalidate: 60, tags: [`products:${store.id}`] },
+        next: { revalidate: 60, tags: [`products:${store.id}`, `bundles:${store.id}`] },
         headers,
       }
     );

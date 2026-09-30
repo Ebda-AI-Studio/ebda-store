@@ -85,7 +85,7 @@ Scope: `all` tier, 151 defence(s). 151 killed, 0 not killed.
 | origin-blog-admin-read-stays-denied<br>the ADMIN single-post blog read (drafts included) is put back on the storefront allow-list, handing a merchant origin a credentialed cross-origin read of another tenant's unpublished posts | `apps/api/src/middleware/security.ts` | `  /^\/api\/v1\/stores\/[^/]+\/orders\/[^/]+\/timeline\/?$/,` → `  /^\/api\/v1\/stores\/[^/]+\/blog\/[^/]` | **KILLED** |
 | orders-throttle-not-logout<br>the THIRD frontend collapses a 429 back into a sign-out and wipes the only copy of its refresh token — an installed iOS PWA where localStorage is the sole store | `apps/orders/src/lib/api.ts` | `      if (res.status === 429) throw new RefreshThrottledError();` → `(removed)` | **KILLED** |
 | orders-throttle-escapes-its-catch<br>the orders client re-swallows the throttle in its blanket catch, so the credential clear fires anyway | `apps/orders/src/lib/api.ts` | `      if (error instanceof RefreshThrottledError) throw error;` → `(removed)` | **KILLED** |
-| refresh-skips-global-mutation-bucket<br>/auth/refresh falls back into the global 200/15min per-IP mutation counter it shares with every order and cart write, so a NAT'd office rate-limits its own sessions one layer above the per-user bucket | `apps/api/src/middleware/global-rate-limit-skip.ts` | `  if (method === 'POST' && req.path === '/api/v1/auth/refresh') {` → `  if (false) {` | **KILLED** |
+| refresh-skips-global-mutation-bucket<br>/auth/refresh falls back into the global 200/15min per-IP mutation counter it shares with every order and cart write, so a NAT'd office rate-limits its own sessions one layer above the per-user bucket | `apps/api/src/middleware/global-rate-limit-skip.ts` | `  if (method === 'POST' && req.path.toLowerCase().replace(/\/$/, '') =` → `  if (false) {` | **KILLED** |
 | inngest-bypass-requires-signature-header<br>the Inngest step-callback bypass stops checking for x-inngest-signature, so ANY unauthenticated POST to /api/v1/inngest skips the global 200/15min per-IP mutation counter, not just Inngest Cloud's signed traffic | `apps/api/src/middleware/global-rate-limit-skip.ts` | `    req.path === '/api/v1/inngest' &&
     Boolean(req.header('x-innges` → `    req.path === '/api/v1/inngest'
   ) {` | **KILLED** |
@@ -158,8 +158,7 @@ Scope: `all` tier, 151 defence(s). 151 killed, 0 not killed.
       throw new Er` → `(removed)` | **KILLED** |
 | notification-merge-base-not-cached<br>same defect class as carrier-merge-base-not-cached, against provider secrets (e.g. Unifonic appSid): the merge base comes from a 300s cache | `apps/api/src/services/notification-config.service.ts` | `          const current = await prisma.notificationConfig.findUnique({` → `          const current = await this.get` | **KILLED** |
 | notification-masked-field-refuses-drop<br>an unresolvable masked field is silently dropped instead of refusing the save, erasing a notification provider secret | `apps/api/src/services/notification-config.service.ts` | `        } else {
-          throw new Error(
-            `NOTIFICATION_` → `        }` | **KILLED** |
+          // Same shape as shipping-carrier.service.t` → `        }` | **KILLED** |
 
 ## csrf / session
 
@@ -312,7 +311,7 @@ Scope: `all` tier, 151 defence(s). 151 killed, 0 not killed.
 
 | Defence | Source | Mutation | Verdict |
 | --- | --- | --- | --- |
-| r2-cleanup-isstillreferenced-rls-bypass<br>isStillReferenced's 11-probe global orphan-existence check runs on the ambient tenant-scoped client instead of an explicit RLS-bypass one — latent only because production's role already has BYPASSRLS, but at the documented RLS cutover this silently narrows to one store, so a still-referenced cross-tenant row reads as orphaned and its R2 object is irreversibly deleted | `apps/api/src/services/r2-cleanup.service.ts` | `import { withRlsBypass } from '@force/database';` → `import { prisma as withRlsBypassScopeEsc` | **KILLED** |
+| r2-cleanup-isstillreferenced-rls-bypass<br>isStillReferenced's registry-wide global orphan-existence check runs on the ambient tenant-scoped client instead of an explicit RLS-bypass one — latent only because production's role already has BYPASSRLS, but at the documented RLS cutover this silently narrows to one store, so a still-referenced cross-tenant row reads as orphaned and its R2 object is irreversibly deleted | `apps/api/src/services/r2-cleanup.service.ts` | `import { withRlsBypass } from '@force/database';` → `import { prisma as withRlsBypassScopeEsc` | **KILLED** |
 | tenant-deadstock-clearance-coupon<br>clearance coupon minted from another store's dead-stock flag | `apps/api/src/services/accounting/deadstock-scan.service.ts` | `    where: { id: flagId, storeId },` → `    where: { id: flagId },` | **KILLED** |
 | tenant-po-from-suggestion<br>purchase order raised against another store's reorder suggestion | `apps/api/src/services/accounting/purchase-order.service.ts` | `    where: { id: suggestionId, storeId },` → `    where: { id: suggestionId },` | **KILLED** |
 | tenant-stock-adjustment-guard-context<br>the cross-tenant product/variant ownership guard runs outside any tenant context on a context-less router — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read | `apps/api/src/services/accounting/stock-adjustment.service.ts` | `  await runInTenantContext(input.storeId, () =>` → `  await ((_s: string, fn: () => unknown)` | **KILLED** |

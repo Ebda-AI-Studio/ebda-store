@@ -102,7 +102,10 @@ describe('notification credentials merge — a masked resubmit must never erase 
         enabled: true,
         credentials: { appSid: '****', senderId: 'FORCE' },
       })
-    ).rejects.toThrow('NOTIFICATION_CREDENTIALS_UNRESOLVED');
+      // #1865: an AppError now, same shape as the carrier sibling guard
+      // (carrier-credentials-merge.test.ts) — the code lives on `.code`,
+      // not embedded in the message string.
+    ).rejects.toMatchObject({ code: 'NOTIFICATION_CREDENTIALS_UNRESOLVED', statusCode: 400 });
 
     expect(upsert).not.toHaveBeenCalled();
   });

@@ -601,6 +601,13 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
       // completion block in the file, so two of the three sweeps still wrote
       // product-facing content and invalidated nothing.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
+      // This sweep can also write STORE fields directly (metaTitle/
+      // metaDescription for SEO; llmsTxt/aboutJson/storeFaq/storeHowto for
+      // AEO/GEO) -- invalidateStoreProductCaches only busts the
+      // product/category caches, never the store RECORD's own
+      // public:store:<id> cache, so the storefront kept serving the
+      // pre-sweep store data until that key's TTL expired.
+      await step.run('bust-store-cache', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

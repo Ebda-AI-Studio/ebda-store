@@ -81,6 +81,17 @@ interface DeferredTask {
 
 interface DeferralScope {
   tasks: DeferredTask[];
+  ctx: TenantCommitContext;
+  /**
+   * Set once this scope's `tasks` array has had its one and only chance to
+   * be read — either `drain()` spliced it (`'drained'`) or the transaction
+   * rolled back and it was cleared (`'rolledback'`). A call that arrives
+   * after either — from a fire-and-forget promise created inside the
+   * handler that outlived it, the exact anti-pattern this module exists to
+   * close — would otherwise push into an array nothing will ever read again
+   * and silently vanish.
+   */
+  closed?: 'drained' | 'rolledback';
 }
 
 export interface TenantCommitContext {
@@ -112,6 +123,38 @@ export function deferAfterTenantCommit<T>(name: string, run: () => Promise<T>): 
   if (!scope) {
     return run();
   }
+  if (scope.closed) {
+    // This call arrived from a promise that outlived the request it was
+    // queued from (a fire-and-forget started inside the handler, still
+    // resolving after `withDeferredWork` already returned) — report it
+    // exactly like a stray Prisma call on a closed transaction
+    // (`installClosedTenantTxAlerting`) rather than silently push into an
+    // array nobody will ever read again.
+    const ctx = scope.ctx;
+    logger.error(
+      { task: name, storeId: ctx.storeId, scopeState: scope.closed },
+      `[after-tenant-commit] deferAfterTenantCommit called after its scope already ${scope.closed} — ` +
+        'the caller outlived its request'
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: `after-tenant-commit.late.${name}`,
+      title: `Deferred work queued after ${scope.closed}: ${name}`,
+      body: `${name} was queued via deferAfterTenantCommit after its request's scope already ${scope.closed}.`,
+      context: { task: name, storeId: ctx.storeId, scopeState: scope.closed },
+    }).catch(() => undefined);
+    if (scope.closed === 'rolledback') {
+      // The rows this work would react to no longer exist — dropping it is
+      // the SAME decision the on-time rollback path already makes.
+      return Promise.resolve(null);
+    }
+    // Committed and already drained: run it for real, in a fresh tenant
+    // transaction — never inline, which would reach the ambient `prisma`
+    // proxy on the now-committed request transaction and die with the same
+    // P2028 this module exists to avoid.
+    return runOneDeferredTask({ name, run }, ctx).then(() => null);
+  }
   scope.tasks.push({ name, run });
   return Promise.resolve(null);
 }
@@ -136,7 +179,7 @@ export async function withDeferredWork<T>(
   fn: () => Promise<T>,
   onCommitted?: () => void
 ): Promise<T> {
-  const scope: DeferralScope = { tasks: [] };
+  const scope: DeferralScope = { tasks: [], ctx };
   let result: T;
   try {
     // `await` resumes in THIS function's context, which is outside the
@@ -159,12 +202,21 @@ export async function withDeferredWork<T>(
       );
       scope.tasks.length = 0;
     }
+    // Close the scope even though nothing is queued: a fire-and-forget
+    // promise from the handler can still be resolving and call
+    // deferAfterTenantCommit after we throw — see the `closed` field's doc.
+    scope.closed = 'rolledback';
     throw err;
   }
   // COMMITTED. Let the client have its response BEFORE the drain: deferred
   // work is post-response work by definition and must not sit on the request's
   // latency path.
   onCommitted?.();
+  // Close BEFORE draining: `drain()` splices `scope.tasks` exactly once, so
+  // anything that arrives after this point has missed its only chance to be
+  // read from that array — see the `closed` field's doc comment. The drain
+  // itself goes through trackDrain so a graceful shutdown can wait on it (#1601).
+  scope.closed = 'drained';
   await trackDrain(scope.tasks, ctx);
   return result;
 }
@@ -214,19 +266,83 @@ export async function awaitDeferredWork(timeoutMs: number): Promise<void> {
  * therefore reported and swallowed, including a failure of the reporter
  * itself.
  */
+/**
+ * How many deferred tasks run at once. A bulk operation that queues one task
+ * per row (e.g. removing every banner image from a section) previously
+ * drained them one Prisma interactive transaction at a time — for N queued
+ * tasks, N sequential round trips on a request whose response has already
+ * gone out, extending how long that connection is held open for no benefit
+ * the client can see. Bounded rather than unbounded: opening all N at once
+ * would spike connections against the Neon pooler on a large batch.
+ */
+const DRAIN_CONCURRENCY = 5;
+
+/**
+ * PROCESS-WIDE cap on deferred interactive transactions in flight at once.
+ *
+ * DRAIN_CONCURRENCY bounds one request's drain, but each deferred task holds
+ * a pooled connection for its whole `runInTenantContext` transaction, and
+ * three concurrent requests draining a batch each reached 3 × 5 = 15 — the
+ * entire default pool (`connection_limit`, DB_CONNECTION_LIMIT, default 15 —
+ * packages/database/src/index.ts) — starving foreground requests into P2024 /
+ * P2028. So every deferred task, on the drain AND on the late-arrival path,
+ * also takes a slot here. Derived from the pool size: a third of it, so
+ * deferred work can never hold more than that share of the connections.
+ */
+export const DEFERRED_TX_GLOBAL_LIMIT = Math.max(
+  1,
+  Math.floor((Number(process.env.DB_CONNECTION_LIMIT) || 15) / 3)
+);
+
+let deferredTxActive = 0;
+const deferredTxWaiters: Array<() => void> = [];
+
+async function acquireDeferredTxSlot(): Promise<void> {
+  if (deferredTxActive < DEFERRED_TX_GLOBAL_LIMIT) {
+    deferredTxActive++;
+    return;
+  }
+  // The releasing task hands its slot straight to us (see release below), so
+  // the active count does not change.
+  await new Promise<void>(resolve => deferredTxWaiters.push(resolve));
+}
+
+function releaseDeferredTxSlot(): void {
+  const next = deferredTxWaiters.shift();
+  if (next) next();
+  else deferredTxActive--;
+}
+
 async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<void> {
   if (tasks.length === 0) return;
   const queued = tasks.splice(0, tasks.length);
-  for (const task of queued) {
-    try {
-      await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
-    } catch (err) {
-      try {
-        reportDeferredFailure(task.name, err, ctx);
-      } catch {
-        // A broken logger/alerter must not strand the rest of the queue.
-      }
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < queued.length) {
+      const task = queued[next++];
+      await runOneDeferredTask(task, ctx);
     }
+  };
+  const workerCount = Math.min(DRAIN_CONCURRENCY, queued.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+}
+
+/**
+ * Run one deferred task in a fresh tenant transaction, holding a global
+ * DEFERRED_TX_GLOBAL_LIMIT slot for its duration; never rejects.
+ */
+async function runOneDeferredTask(task: DeferredTask, ctx: TenantCommitContext): Promise<void> {
+  await acquireDeferredTxSlot();
+  try {
+    await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+  } catch (err) {
+    try {
+      reportDeferredFailure(task.name, err, ctx);
+    } catch {
+      // A broken logger/alerter must not strand the rest of the queue.
+    }
+  } finally {
+    releaseDeferredTxSlot();
   }
 }
 

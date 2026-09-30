@@ -7,6 +7,7 @@ import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
 import { effectiveInventory } from '../../lib/effective-inventory';
+import { invalidateStoreProductCaches } from '../../lib/public-cache';
 
 export interface CreatePoInput {
   storeId: string;
@@ -294,6 +295,11 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
       },
     });
   });
+
+  // Receiving stock changes product/variant availability — same
+  // cache-invalidation gap as the other stock-write paths (see
+  // stock-adjustment.service.ts postAdjustment).
+  await invalidateStoreProductCaches(input.storeId);
 
   // Step 3: Fire async event outside the transaction (.catch pattern from Batch 1 order-posting.ts)
   inngest

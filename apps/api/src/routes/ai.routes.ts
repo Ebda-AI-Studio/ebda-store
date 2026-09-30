@@ -864,13 +864,27 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
     const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '450', 10);
     const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
 
-    const [todayCount, monthCount, last30] = await Promise.all([
+    const [todayCount, monthCount, todayCost, monthCost, last30] = await Promise.all([
       prisma.aiUsage.count({
         where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
       }),
       prisma.aiUsage.count({
         where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: false },
       }),
+      // costMicros is NULL for a model with no configured rate, which SUM
+      // and COUNT(cost_micros) both correctly ignore — null (unpriced) must
+      // never be folded into 0 (genuinely free) when reporting spend. See
+      // lib/ai-pricing.ts's doc comment.
+      prisma.$queryRaw<Array<{ total: bigint | null; unpriced: bigint }>>`
+          SELECT SUM(cost_micros) AS total, COUNT(*) FILTER (WHERE cost_micros IS NULL) AS unpriced
+          FROM ai_usage
+          WHERE store_id = ${storeId} AND created_at >= ${startOfDay}
+        `,
+      prisma.$queryRaw<Array<{ total: bigint | null; unpriced: bigint }>>`
+          SELECT SUM(cost_micros) AS total, COUNT(*) FILTER (WHERE cost_micros IS NULL) AS unpriced
+          FROM ai_usage
+          WHERE store_id = ${storeId} AND created_at >= ${startOfMonth}
+        `,
       prisma.$queryRaw<Array<{ day: Date; total: bigint }>>`
           SELECT
             DATE_TRUNC('day', created_at) AS day,
@@ -890,6 +904,14 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
         thisMonth: monthCount,
         dailyCap,
         monthlyCap,
+        // Micros of the store's billing currency; null when nothing in the
+        // window has a configured rate. unpriced*Count is how many rows
+        // that total excludes, so the admin surface can label it a partial
+        // figure rather than implying it covers every call.
+        todayCostMicros: todayCost[0]?.total != null ? Number(todayCost[0].total) : null,
+        todayUnpricedCount: Number(todayCost[0]?.unpriced ?? 0),
+        monthCostMicros: monthCost[0]?.total != null ? Number(monthCost[0].total) : null,
+        monthUnpricedCount: Number(monthCost[0]?.unpriced ?? 0),
         // Convert bigint → number so JSON.stringify works.
         last30Days: last30.map(r => ({
           day: r.day.toISOString().slice(0, 10),
@@ -922,6 +944,10 @@ router.get('/usage/log', async (req: Request, res: Response, next: NextFunction)
           outputTokens: true,
           cachedHit: true,
           createdAt: true,
+          model: true,
+          costMicros: true,
+          subjectType: true,
+          subjectId: true,
         },
       }),
       prisma.aiUsage.count({ where: { storeId } }),

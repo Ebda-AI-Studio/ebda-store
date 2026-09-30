@@ -659,13 +659,24 @@ export default function EditProductPage() {
                 </div>
               </div>
               <div className="space-y-4">
-                <Input
-                  label={tFields('name')}
-                  value={formData.name}
-                  onChange={e => updateField('name', e.target.value)}
-                  placeholder={tFields('namePlaceholder')}
-                  required
-                />
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="name"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Input
+                    label={tFields('name')}
+                    value={formData.name}
+                    onChange={e => updateField('name', e.target.value)}
+                    placeholder={tFields('namePlaceholder')}
+                    required
+                  />
+                </div>
                 <div>
                   <div className="mb-1 flex justify-end">
                     <AiFieldBadge
@@ -685,13 +696,24 @@ export default function EditProductPage() {
                     dir="rtl"
                   />
                 </div>
-                <Textarea
-                  label={tFields('description')}
-                  value={formData.description}
-                  onChange={e => updateField('description', e.target.value)}
-                  placeholder={tFields('descriptionPlaceholder')}
-                  rows={4}
-                />
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="description"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Textarea
+                    label={tFields('description')}
+                    value={formData.description}
+                    onChange={e => updateField('description', e.target.value)}
+                    placeholder={tFields('descriptionPlaceholder')}
+                    rows={4}
+                  />
+                </div>
                 <div>
                   <div className="mb-1 flex justify-end">
                     <AiFieldBadge

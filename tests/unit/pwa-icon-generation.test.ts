@@ -10,18 +10,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import sharp from 'sharp';
 
-const uploadMock = vi.fn(
-  async (
-    buffer: Buffer,
-    filename: string,
-    options: { folder?: string; storeId?: string | null }
-  ) => ({
-    key: `stores/${options.storeId}/${options.folder}/${filename}`,
-    url: `https://cdn.example.r2.dev/stores/${options.storeId}/${options.folder}/${filename}`,
+async function defaultUploadImpl(
+  buffer: Buffer,
+  originalFilename: string,
+  options: { folder?: string; storeId?: string | null; filename?: string }
+) {
+  // Mirrors the REAL composeKey(): the R2 key (and therefore the URL) is
+  // derived from `options.filename` when given, falling back to
+  // `originalFilename` — never the other way around. Building the mock's
+  // URL from `originalFilename` alone would hide a real cache-busting
+  // regression, since that argument never carries the version suffix.
+  const keyName = options.filename ?? originalFilename;
+  return {
+    key: `stores/${options.storeId}/${options.folder}/${keyName}`,
+    url: `https://cdn.example.r2.dev/stores/${options.storeId}/${options.folder}/${keyName}`,
     size: buffer.length,
     contentType: 'image/png',
-  })
-);
+  };
+}
+
+const uploadMock = vi.fn(defaultUploadImpl);
 
 vi.mock('@api/services/storage.service', () => ({
   StorageService: { upload: uploadMock },
@@ -58,6 +66,7 @@ async function makeSourceBuffer(size = 600): Promise<Buffer> {
 describe('generatePwaIconSet', () => {
   beforeEach(() => {
     uploadMock.mockClear();
+    uploadMock.mockImplementation(defaultUploadImpl);
   });
 
   it('generates every plan-listed size at the correct pixel dimensions', async () => {
@@ -103,13 +112,81 @@ describe('generatePwaIconSet', () => {
     }
   });
 
-  it('re-uploading overwrites the SAME R2 key per icon (no orphan accumulation)', async () => {
+  // Regression for #1912: a FIXED key per icon meant `StorageService`'s
+  // one-year CacheControl kept serving the OLD bytes after a re-upload,
+  // because the URL never changed. Regression for #1913 as a side effect:
+  // a versioned key also means a mid-generation failure can never overwrite
+  // an EARLIER, already-live icon — see the doc comment on
+  // generatePwaIconSet for the full reasoning.
+  it('re-uploading produces a DIFFERENT R2 key/URL per icon (busts the 1-year cache)', async () => {
     const { generatePwaIconSet } = await import('@api/services/pwa.service');
     const first = await generatePwaIconSet(STORE_ID, await makeSourceBuffer());
     const second = await generatePwaIconSet(STORE_ID, await makeSourceBuffer(700));
 
-    expect(second.icon512).toBe(first.icon512);
-    expect(second.favicon16).toBe(first.favicon16);
+    expect(second.icon512).not.toBe(first.icon512);
+    expect(second.favicon16).not.toBe(first.favicon16);
+    expect(second.iconSource).not.toBe(first.iconSource);
+  });
+
+  // Regression for #1914 (measured, not claimed): the caller runs inside a
+  // Postgres interactive transaction held open for the whole request, so
+  // the 7 icon uploads previously ran ONE AT A TIME — 7x one upload's
+  // latency spent holding that transaction/connection for no DB reason.
+  // Proven here by making uploadMock block until every one of the 7 target
+  // uploads is in flight at once, rather than waiting on wall-clock timing.
+  it('uploads all 7 icon targets CONCURRENTLY, not one at a time', async () => {
+    const { generatePwaIconSet } = await import('@api/services/pwa.service');
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const releases: Array<() => void> = [];
+    uploadMock.mockImplementation(async (buffer: Buffer, _f: string, options: any) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise<void>(resolve => releases.push(resolve));
+      inFlight -= 1;
+      return {
+        key: `k-${options.filename}`,
+        url: `u-${options.filename}`,
+        size: buffer.length,
+        contentType: 'image/png',
+      };
+    });
+
+    const done = generatePwaIconSet(STORE_ID, await makeSourceBuffer());
+
+    // sharp's encode crosses into native libvips work via libuv's thread
+    // pool, not plain JS promise chaining — a microtask-flush loop doesn't
+    // wait for it. Poll with real timers instead, with a generous budget.
+    async function waitUntil(pred: () => boolean, budgetMs = 2000): Promise<void> {
+      const start = Date.now();
+      while (!pred()) {
+        if (Date.now() - start > budgetMs) return;
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+    }
+
+    // Release the source upload (sequential, first) as soon as it blocks.
+    await waitUntil(() => releases.length >= 1);
+    releases.splice(0, releases.length).forEach(r => r());
+
+    // Now wait for every one of the 7 target uploads to reach the mock's
+    // blocking await — this is the concurrency being proven.
+    await waitUntil(() => inFlight >= 7);
+    expect(maxInFlight).toBe(7);
+
+    releases.splice(0, releases.length).forEach(r => r());
+    await done;
+  }, 10000);
+
+  it('every icon in one generation shares the SAME version suffix', async () => {
+    const { generatePwaIconSet } = await import('@api/services/pwa.service');
+    await generatePwaIconSet(STORE_ID, await makeSourceBuffer());
+
+    const filenames = uploadMock.mock.calls.map(
+      c => (c[2] as { filename?: string }).filename ?? ''
+    );
+    const versions = filenames.map(f => f.split('-').pop());
+    expect(new Set(versions).size).toBe(1);
   });
 
   it('the maskable icon pads the artwork to ~80% inside the square (safe zone)', async () => {
@@ -138,13 +215,12 @@ describe('generatePwaIconSet', () => {
     });
   });
 
-  // Issue #1913 — a mid-loop upload failure must not have mutated any live
-  // R2 object. Every icon key is fixed (re-upload overwrites the same
-  // object), so the old code — which processed AND uploaded each icon in
-  // the same loop — left uploads #1..N-1 live on R2 the moment upload #N
-  // threw. The fix buffers every sharp output BEFORE any upload starts, so
-  // a failure that happens before the FIRST upload call (source.png) proves
-  // no live object was ever touched.
+  // Issue #1913 — a mid-loop upload failure must not race a still-running
+  // sharp pipeline. The old code processed AND uploaded each icon in the
+  // same loop; the fix buffers every sharp output BEFORE any upload starts,
+  // so a failure that happens before the FIRST upload call (source.png)
+  // proves phase 1 (processing) fully finished before phase 2 (uploads,
+  // each to its own per-generation versioned key) ever began.
   it('a failure on the very first upload leaves no icon uploaded at all', async () => {
     const { generatePwaIconSet } = await import('@api/services/pwa.service');
     uploadMock.mockRejectedValueOnce(new Error('R2 network blip'));

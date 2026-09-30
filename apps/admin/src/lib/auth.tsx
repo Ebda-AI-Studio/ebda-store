@@ -13,6 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { getApiUrl, refreshSession, checkSessionWithMountRetries } from './api';
 import { isIosWebkit, safeInternalPath } from '@force/shared';
 import { useT } from '@/i18n/useT';
+import { FOCUS_MODE_STORAGE_KEY } from '@/contexts/FocusModeContext';
 
 interface User {
   id: string;
@@ -294,6 +295,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('csrfToken');
+    // A second admin signing into this device otherwise inherited whichever
+    // store the previous admin last focused — FocusModeContext restores it
+    // from localStorage on mount with no per-user validation.
+    localStorage.removeItem(FOCUS_MODE_STORAGE_KEY);
     // Clear session indicator cookie
     document.cookie = 'force-session=; path=/; max-age=0';
     setUser(null);

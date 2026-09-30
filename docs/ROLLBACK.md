@@ -184,10 +184,11 @@ If write data since the backup must be preserved:
 
 #### R2 cleanup if applicable
 
-If the bad migration referenced new R2 keys (per-tenant uploads to `stores/<storeId>/...`), the R2 objects survive the DB rollback. Run the orphan audit after restore:
+If the bad migration referenced new R2 keys (per-tenant uploads to `stores/<storeId>/...`), the R2 objects survive the DB rollback. Run the orphan audit after restore — **dry run first**, review the orphan list it writes, and only then re-run with `--apply` (deletes are irreversible; the audit's idea of "referenced" is only as complete as the `R2_REFERENCE_COLUMNS` registry in `apps/api/src/lib/r2-references.ts`):
 
 ```bash
-railway run --service api -- npx tsx ../../scripts/r2-orphan-audit.ts --apply
+railway run --service api -- npx tsx ../../scripts/r2-orphan-audit.ts          # dry run: review /tmp/r2-orphans-*.txt
+railway run --service api -- npx tsx ../../scripts/r2-orphan-audit.ts --apply  # only after the review
 ```
 
 #### Then revert the code

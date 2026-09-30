@@ -29,6 +29,7 @@ import {
   seedBundle,
   setStock,
   cartClientFor,
+  adminBundleClientFor,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
 
@@ -111,6 +112,77 @@ describe.skipIf(!hasDb)('public bundle list route', () => {
     const cart = cartClientFor(app, noFeatureStore.storeId, `session-${suffix}-nofeature`);
     const res = await cart.publicBundles();
     expect(res.status).toBe(403);
+  });
+
+  // Regression for the caching gap (#1565) this file's own "shape" test
+  // above surfaced: the public list is cached for 120s per store
+  // (`bundlesCacheKey`), and a store shared across `it()` blocks means the
+  // FIRST request in the describe block warms that cache for every test
+  // after it. Unlike the tests above (which seed via the DB-direct
+  // `seedBundle`/`setStock` fixtures — now fixed to invalidate too, see
+  // their doc comments), these go through the REAL admin POST/PUT routes,
+  // proving the routes' own `invalidateStoreProductCaches` /
+  // `invalidateStoreBundlesCache` calls actually keep the public list live.
+  it('create bundle via the admin route → public list shows it on the very next request', async () => {
+    const productId = await seedProduct(store.storeId, `${suffix}-create`, {
+      price: 700,
+      inventory: 10,
+    });
+    const admin = adminBundleClientFor(app, store);
+    const cart = cartClientFor(app, store.storeId, `session-${suffix}-create`);
+
+    // Warm the cache BEFORE the bundle exists — the exact shape of the bug:
+    // without invalidation, this bundle would never appear.
+    await cart.publicBundles().expect(200);
+
+    const createRes = await admin
+      .create({
+        name: `Create Bundle ${suffix}`,
+        slug: `create-bundle-${suffix}`,
+        pricingType: 'fixed_price',
+        pricingValue: 600,
+        items: [{ productId, quantity: 1 }],
+      })
+      .expect(201);
+    const bundleId = createRes.body.data.bundle.id;
+
+    const res = await cart.publicBundles().expect(200);
+    const bundle = res.body.data.bundles.find((b: { id: string }) => b.id === bundleId);
+    expect(bundle).toBeDefined();
+    expect(bundle.price).toBe(600);
+  });
+
+  it('update a bundle price via the admin route → public list reflects the new price on the very next request', async () => {
+    const productId = await seedProduct(store.storeId, `${suffix}-update`, {
+      price: 900,
+      inventory: 10,
+    });
+    const admin = adminBundleClientFor(app, store);
+    const cart = cartClientFor(app, store.storeId, `session-${suffix}-update`);
+
+    const createRes = await admin
+      .create({
+        name: `Update Bundle ${suffix}`,
+        slug: `update-bundle-${suffix}`,
+        pricingType: 'fixed_price',
+        pricingValue: 800,
+        items: [{ productId, quantity: 1 }],
+      })
+      .expect(201);
+    const bundleId = createRes.body.data.bundle.id;
+
+    // Warm the cache with the ORIGINAL price before updating.
+    const before = await cart.publicBundles().expect(200);
+    expect(before.body.data.bundles.find((b: { id: string }) => b.id === bundleId)?.price).toBe(
+      800
+    );
+
+    await admin.update(bundleId, { pricingValue: 500 }).expect(200);
+
+    const after = await cart.publicBundles().expect(200);
+    const updated = after.body.data.bundles.find((b: { id: string }) => b.id === bundleId);
+    expect(updated).toBeDefined();
+    expect(updated.price).toBe(500);
   });
 
   it('#1565 — the route is actually CACHED: a direct DB deactivation is not reflected until the cache is busted', async () => {

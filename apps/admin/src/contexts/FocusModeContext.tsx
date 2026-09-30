@@ -20,7 +20,10 @@ export interface FocusModeContextValue {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'fwb_focus_mode';
+// Exported so `logout()` (lib/auth.tsx) can clear it — a second admin
+// signing into the same device otherwise inherited whichever store the
+// PREVIOUS admin last focused, with no per-user validation on restore.
+export const FOCUS_MODE_STORAGE_KEY = 'fwb_focus_mode';
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -41,7 +44,7 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const wantsParam = searchParams?.get('focus') === '1';
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as FocusModeState;
         if (parsed?.storeId) {
@@ -51,7 +54,7 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       // Corrupt storage — ignore and let user re-enter manually.
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(FOCUS_MODE_STORAGE_KEY);
     }
 
     // ?focus=1 but no stored state: the layout will call enterFocusMode
@@ -68,12 +71,12 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
 
   const enterFocusMode = useCallback((storeId: string) => {
     const state: FocusModeState = { storeId };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(FOCUS_MODE_STORAGE_KEY, JSON.stringify(state));
     setFocusStoreId(storeId);
   }, []);
 
   const exitFocusMode = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(FOCUS_MODE_STORAGE_KEY);
     setFocusStoreId(null);
   }, []);
 

@@ -44,6 +44,7 @@ import {
   installClosedTenantTxAlerting,
   withDeferredWork,
   awaitDeferredWork,
+  DEFERRED_TX_GLOBAL_LIMIT,
 } from '@api/lib/after-tenant-commit';
 
 const STORE_ID = '11111111-1111-1111-1111-111111111111';
@@ -135,6 +136,87 @@ describe('withDeferredWork — inside a request transaction', () => {
     expect(after).toHaveBeenCalledTimes(1);
   });
 
+  // Regression for #1591: drain() ran queued tasks one at a time, each in
+  // its own Prisma interactive transaction — a bulk op that queues one task
+  // per row (e.g. removing 8 banner images) paid N sequential round trips
+  // AFTER the response was already sent. Proves overlap (not sequential)
+  // without hardcoding the concurrency constant, and proves it's bounded
+  // (not all N at once) so a large batch can't spike connections.
+  it('drains multiple queued tasks with overlap, not strictly one at a time', async () => {
+    const releases: Array<() => void> = [];
+    runInTenantContextMock.mockImplementation(
+      async (_storeId: string | undefined, fn: () => Promise<unknown>) => {
+        await new Promise<void>(resolve => releases.push(resolve));
+        return fn();
+      }
+    );
+
+    const TASK_COUNT = 8;
+    const donePromise = withDeferredWork({ storeId: STORE_ID }, async () => {
+      for (let i = 0; i < TASK_COUNT; i++) {
+        void deferAfterTenantCommit(`bulk-${i}`, async () => undefined);
+      }
+    });
+
+    // Let every worker that starts synchronously reach its await point.
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    // More than one task is in flight at once (an improvement over strictly
+    // sequential), and fewer than all of them are (bounded, not a fan-out of
+    // TASK_COUNT simultaneous transactions).
+    expect(releases.length).toBeGreaterThan(1);
+    expect(releases.length).toBeLessThan(TASK_COUNT);
+
+    // Let everything finish so the test doesn't leak a pending promise: a
+    // few release/flush rounds cover every remaining batch of workers.
+    for (let round = 0; round < 5; round++) {
+      const pending = releases.splice(0, releases.length);
+      pending.forEach(r => r());
+      // eslint-disable-next-line no-await-in-loop
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    }
+    await donePromise;
+  });
+
+  // P2 on PR #1977: the per-request bound let N concurrent requests hold
+  // N × DRAIN_CONCURRENCY interactive transactions — three draining requests
+  // were the whole default 15-connection pool. The cap is process-wide now.
+  it('caps deferred transactions ACROSS concurrent requests, not per request', async () => {
+    const releases: Array<() => void> = [];
+    runInTenantContextMock.mockImplementation(
+      async (_storeId: string | undefined, fn: () => Promise<unknown>) => {
+        await new Promise<void>(resolve => releases.push(resolve));
+        return fn();
+      }
+    );
+
+    const REQUESTS = 4;
+    const TASKS_EACH = 6;
+    const drains = Array.from({ length: REQUESTS }, (_, r) =>
+      withDeferredWork({ storeId: STORE_ID }, async () => {
+        for (let i = 0; i < TASKS_EACH; i++) {
+          void deferAfterTenantCommit(`req-${r}-task-${i}`, async () => undefined);
+        }
+      })
+    );
+
+    let maxInFlight = 0;
+    let ran = 0;
+    for (let round = 0; round < 100 && ran < REQUESTS * TASKS_EACH; round++) {
+      // eslint-disable-next-line no-await-in-loop
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      maxInFlight = Math.max(maxInFlight, releases.length);
+      const pending = releases.splice(0, releases.length);
+      ran += pending.length;
+      pending.forEach(r => r());
+    }
+    await Promise.all(drains);
+
+    expect(ran).toBe(REQUESTS * TASKS_EACH);
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(maxInFlight).toBeLessThanOrEqual(DEFERRED_TX_GLOBAL_LIMIT);
+  });
+
   it('drops deferred work when the request transaction rolled back', async () => {
     const never = vi.fn(async () => undefined);
 
@@ -161,6 +243,75 @@ describe('withDeferredWork — inside a request transaction', () => {
     });
 
     expect(inner).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression for #1588: a fire-and-forget promise created inside the
+  // handler (never awaited — the anti-pattern this whole module exists to
+  // close) can still be running after `withDeferredWork` has already
+  // returned. Before this fix, a `deferAfterTenantCommit` call arriving from
+  // it pushed into `scope.tasks` after `drain()` had already spliced that
+  // array once — the task was queued but nothing would ever drain it again,
+  // and it vanished silently with no log, no alert.
+  describe('a deferAfterTenantCommit call that arrives after the scope closed (#1588)', () => {
+    it('after a COMMIT + drain: runs the task in a fresh tenant transaction, loudly', async () => {
+      let orphan: Promise<unknown> = Promise.resolve();
+      const late = vi.fn(async () => 'ran-late');
+
+      await withDeferredWork({ storeId: STORE_ID, userId: USER_ID }, async () => {
+        // Captures the ALS context but is never awaited by the handler —
+        // it resolves on its own, after withDeferredWork has returned.
+        orphan = new Promise(resolve => setTimeout(resolve, 0)).then(() =>
+          deferAfterTenantCommit('late.task', late)
+        );
+      });
+
+      // withDeferredWork already resolved and drained (nothing was queued
+      // synchronously) — the orphan is still pending.
+      expect(late).not.toHaveBeenCalled();
+
+      const result = await orphan;
+
+      expect(late).toHaveBeenCalledTimes(1);
+      expect(result).toBe(null); // same "deferred" contract as the on-time path
+      // Ran in a SECOND fresh tenant transaction — the first was drain()'s
+      // (empty, since nothing was queued in time), this is the late one.
+      expect(runInTenantContextMock).toHaveBeenCalledTimes(1);
+      const [storeId, , userId] = runInTenantContextMock.mock.calls[0];
+      expect(storeId).toBe(STORE_ID);
+      expect(userId).toBe(USER_ID);
+      // Loud, not silent — this is exactly the failure class
+      // installClosedTenantTxAlerting exists to catch.
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ task: 'late.task', scopeState: 'drained' }),
+        expect.stringContaining('already drained')
+      );
+      expect(sendAlertMock).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'after-tenant-commit.late.late.task' })
+      );
+    });
+
+    it('after a ROLLBACK: drops the task instead of running it against rolled-back rows', async () => {
+      let orphan: Promise<unknown> = Promise.resolve();
+      const late = vi.fn(async () => 'should-not-run');
+
+      await expect(
+        withDeferredWork({ storeId: STORE_ID }, async () => {
+          orphan = new Promise(resolve => setTimeout(resolve, 0)).then(() =>
+            deferAfterTenantCommit('late.after.rollback', late)
+          );
+          throw new Error('Handler returned 500');
+        })
+      ).rejects.toThrow('Handler returned 500');
+
+      const result = await orphan;
+
+      expect(late).not.toHaveBeenCalled();
+      expect(result).toBe(null);
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ task: 'late.after.rollback', scopeState: 'rolledback' }),
+        expect.stringContaining('already rolledback')
+      );
+    });
   });
 });
 

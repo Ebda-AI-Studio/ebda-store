@@ -2,6 +2,7 @@ import { withRlsBypass } from '@force/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
+import { collectUrlsFromJson, isR2UrlReferenced } from '../lib/r2-references';
 import logger from '../lib/logger';
 
 /**
@@ -18,10 +19,10 @@ import logger from '../lib/logger';
  *
  * Safety model:
  *  - Only delete a key after confirming NO other live row points at the
- *    same URL (productImage, productVariant.imageUrl, category.image,
- *    store logo/hero/og/favicon, storePage.coverImage). This is a
- *    targeted version of `scripts/r2-orphan-audit.ts`'s cross-table
- *    sweep, scoped to a single URL so it's cheap.
+ *    same URL — every column in the shared `R2_REFERENCE_COLUMNS`
+ *    registry (lib/r2-references.ts), JSON and HTML columns included.
+ *    This is a targeted version of `scripts/r2-orphan-audit.ts`'s
+ *    cross-table sweep, scoped to a single URL so it's cheap.
  *  - Skip URLs that aren't ours (third-party CDN images stay alone).
  *  - Best-effort: errors are logged and swallowed; no caller wants
  *    their product save to fail because R2 had a hiccup.
@@ -49,65 +50,23 @@ export function urlToR2Key(url: string | null | undefined): string | null {
 }
 
 /**
- * True when at least one live row anywhere in the schema still
- * references this URL. Checks every table that the orphan-audit script
- * tracks — keep in sync when a new image-bearing column is added.
+ * True when at least one live row anywhere in the schema still references
+ * this URL. The column set is the shared registry in
+ * `lib/r2-references.ts` — the SAME one the orphan-audit script and the
+ * weekly sweep read — so a new image-bearing column is added in one place and
+ * `tests/unit/r2-reference-registry.test.ts` fails until it is.
  *
- * Tables covered: productImage.url, productVariant.imageUrl,
- * category.image, storePage.coverImage, blogPost.coverImage,
- * store.(logo|logoAr|heroImage|ogImage|favicon), user.avatar.
+ * One statement, not one query per column: it ORs an EXISTS per table.
+ *
+ * Under `withRlsBypass`, because "is this URL referenced ANYWHERE" is a
+ * cross-store question (cloned demo stores share image URLs). Callers run
+ * this inside a store's tenant transaction (deferred work) or with no
+ * context at all; under `force_app` the first hid every other store's rows
+ * and the second hid EVERY `blog_posts` row (strict policy), so a still-used
+ * image read as orphaned and was deleted from R2.
  */
-async function isStillReferenced(url: string): Promise<boolean> {
-  // Run all the existence checks; any single match is enough to abort the
-  // delete. Using `findFirst` + `select: { id }` keeps each query as a
-  // one-row index probe.
-  //
-  // Under `withRlsBypass`, because "is this URL referenced ANYWHERE" is a
-  // cross-store question (cloned demo stores share image URLs). Callers run
-  // this inside a store's tenant transaction (deferred work) or with no
-  // context at all; under `force_app` the first hid every other store's rows
-  // and the second hid EVERY `blog_posts` row (strict policy), so a still-used
-  // image read as orphaned and was deleted from R2.
-  const [
-    pi,
-    pv,
-    cat,
-    page,
-    blog,
-    storeLogo,
-    storeLogoAr,
-    storeHero,
-    storeOg,
-    storeFavicon,
-    userAvatar,
-  ] = await withRlsBypass(tx =>
-    Promise.all([
-      tx.productImage.findFirst({ where: { url }, select: { id: true } }),
-      tx.productVariant.findFirst({ where: { imageUrl: url }, select: { id: true } }),
-      tx.category.findFirst({ where: { image: url }, select: { id: true } }),
-      tx.storePage.findFirst({ where: { coverImage: url }, select: { id: true } }),
-      tx.blogPost.findFirst({ where: { coverImage: url }, select: { id: true } }),
-      tx.store.findFirst({ where: { logo: url }, select: { id: true } }),
-      tx.store.findFirst({ where: { logoAr: url }, select: { id: true } }),
-      tx.store.findFirst({ where: { heroImage: url }, select: { id: true } }),
-      tx.store.findFirst({ where: { ogImage: url }, select: { id: true } }),
-      tx.store.findFirst({ where: { favicon: url }, select: { id: true } }),
-      tx.user.findFirst({ where: { avatar: url }, select: { id: true } }),
-    ])
-  );
-  return Boolean(
-    pi ||
-    pv ||
-    cat ||
-    page ||
-    blog ||
-    storeLogo ||
-    storeLogoAr ||
-    storeHero ||
-    storeOg ||
-    storeFavicon ||
-    userAvatar
-  );
+async function isStillReferenced(url: string, key: string): Promise<boolean> {
+  return withRlsBypass(tx => isR2UrlReferenced(tx, url, key));
 }
 
 /**
@@ -124,8 +83,8 @@ async function isStillReferenced(url: string): Promise<boolean> {
 export async function deleteR2ObjectIfOrphan(url: string | null | undefined): Promise<void> {
   // Every caller fires this AFTER its own write, without awaiting, so under a
   // store-scoped request it used to run on the request's tenant transaction
-  // AFTER that transaction committed: `isStillReferenced` below issues ELEVEN
-  // Prisma queries, all of which died with P2028 and were swallowed by the
+  // AFTER that transaction committed: `isStillReferenced` then issued ELEVEN
+  // Prisma queries (one statement now), all of which died with P2028 and were swallowed by the
   // `catch` at the bottom of this function as "[r2-cleanup] failed to delete
   // orphan R2 object". The object then leaked — the exact failure this
   // service was written to prevent. Deferring runs the same work in a fresh
@@ -146,7 +105,7 @@ async function deleteR2ObjectIfOrphanNow(url: string | null | undefined): Promis
     return;
   }
   try {
-    const stillUsed = await isStillReferenced(url);
+    const stillUsed = await isStillReferenced(url, key);
     if (stillUsed) {
       logger.info({ key, url }, '[r2-cleanup] skipping delete — URL still referenced elsewhere');
       return;
@@ -183,31 +142,10 @@ export function cleanupRemovedImages(
 }
 
 /**
- * Recursively walk a JSON value (object / array / string) and collect
- * every string that looks like an http(s) URL. Used by JSON-blob columns
- * (Store.layoutSettings, announcementBar, etc.) where image URLs may be
- * nested arbitrarily — mirrors the walker in scripts/r2-orphan-audit.ts
- * so the runtime cleanup and the periodic audit see the same surface.
+ * JSON URL walker — lives in `lib/r2-references.ts` so the runtime cleanup,
+ * the weekly sweep and the audit script all see the same surface.
  */
-export function collectUrlsFromJson(value: unknown): string[] {
-  const out: string[] = [];
-  const visit = (v: unknown): void => {
-    if (v == null) return;
-    if (typeof v === 'string') {
-      if (v.startsWith('http://') || v.startsWith('https://')) out.push(v);
-      return;
-    }
-    if (Array.isArray(v)) {
-      for (const item of v) visit(item);
-      return;
-    }
-    if (typeof v === 'object') {
-      for (const inner of Object.values(v as Record<string, unknown>)) visit(inner);
-    }
-  };
-  visit(value);
-  return out;
-}
+export { collectUrlsFromJson };
 
 /**
  * Diff two JSON blobs by the URLs they contain and clean up any URL

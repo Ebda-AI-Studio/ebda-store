@@ -2479,6 +2479,75 @@ separate product decision. Cost if wrong: a cart whose every loose line is delet
 "Your cart is empty" screen rather than the refusal copy, because the summary no longer lists
 unorderable lines.
 
+## 2026-09-30 — P2 batch OTHER-O3: merge of main (#2073, #2088)
+
+**Ruling O3-M1 — the public bundle list keeps this branch's dedicated
+`bundlesCacheKey`, not main's `public:products:<id>:bundles:list`.** Both sides
+cached the same #1565 N+1 under different keys. The dedicated key is cleared by
+`clearProductsRedis` (so every product/stock write — the inputs a bundle's price
+and availability derive from — busts it, exactly as main's prefix placement
+intended) AND by `invalidateStoreBundlesCache` on every bundle write, and keeps
+the `take: 200` fan-out cap. Main's integration test (direct DB deactivation,
+then `invalidateStoreProductCaches`) passes against it unchanged. Cost if
+wrong: none beyond the key name; nothing else reads `bundles:list`.
+
+**Ruling O3-M2 — the bulk-AI store busts use main's `bustStoreCachesById`, and
+store-only sweeps no longer bust product caches.** This branch had added
+`bustStoreCaches(storeId, null)`, which skips the `public:store:<slug>` and
+`public:store:resolve:<domain>` keys; main's by-id helper is a strict superset.
+The two remaining null-slug sites main never touched (geo citation, seo) were
+converted too, and `bulk-ai-sweeps-bust-store-cache.test.ts` now pins "every
+sweep busts the store by id" (mutation-checked: restoring the null-slug call in
+seo reddens it) while main's `bulk-ai-store-cache-bust.test.ts` pins which
+sweeps also bust products. Cost if wrong: one extra `store.findUnique` per
+sweep completion.
+
+**Ruling O3-M3 — `resolveReturnTo` (this branch) is dropped for main's
+behaviour-identical `sanitizeReturnTo`.** Both fixed #670 the same way; this
+branch's two extra regression cases (`50%25+off`, a stray `%`) were ported onto
+main's test. Cost if wrong: none — same function body.
+
+## 2026-09-30 — PR #1977 scoped-audit P1 + follow-ups
+
+Branch `fix/p2-other-o3`.
+
+**Ruling O3-R1 — the three R2 reference collectors are replaced by ONE registry,
+and it over-registers.** `apps/api/src/lib/r2-references.ts` `R2_REFERENCE_COLUMNS`
+now drives `scripts/r2-orphan-audit.ts`, the weekly `r2-orphan-sweep` and
+`r2-cleanup.service` `isStillReferenced()`. Columns that may only rarely hold an
+upload (`Store.socialLinks`, `marketingPixels`, `heroCtaLink`,
+`StockAdjustment.evidenceUrl`, `SystemSetting.value`, blog/campaign HTML) are
+registered, not allowlisted: an extra column costs one query, a missing one
+deletes live files. `tests/unit/r2-reference-registry.test.ts` fails when a Json
+or URL-shaped String column is neither registered nor allowlisted with a reason
+(mutation-checked: dropping `pwaSettings` reddens 4 unit tests and the
+integration test; adding a `Bundle.promoVideo` column reddens the gate). Cost if
+wrong: an orphan in an over-registered column is never swept — storage cost only.
+
+**Ruling O3-R2 — `json`/`text` columns match the R2 KEY as a substring, not the
+exact URL.** Catches both URL forms (public vs endpoint) and URLs inside HTML.
+A substring false positive keeps a file alive, never deletes one. Cost if wrong:
+a handful of orphaned objects whose key happens to appear inside another value.
+
+**Ruling O3-R3 — the DataTable `ariaLabel` P2 (0 of 54 call sites pass it) is
+not fixed on this branch.** It is 54 call sites plus EN+AR i18n keys for each,
+unrelated to the P1, and the prop is already optional-and-harmless. Unblock:
+a follow-up PR that makes `ariaLabel` required so tsc enumerates every call
+site. Cost if wrong: admin tables stay unnamed to screen readers until then.
+
+**Ruling O3-R4 — low-stock duplicate digests are closed with a short SET NX
+`pending` claim (1 h), not an Inngest concurrency key.** Inngest concurrency
+limits concurrent steps, not whole runs, and the cron and on-demand functions
+share no key — so neither would stop cron + "Scan now" overlapping. The claim
+is atomic across both. Cost if wrong: a digest whose send fails permanently
+re-alerts after 1 h instead of on the next scan.
+
+**Ruling O3-R5 — `invalidateStoreBundlesCache` keeps its own revalidate POST.**
+The storefront bundle fetches now carry `bundles:<storeId>`, so the tag is real
+and the doc comment true; bundle writes still send two POSTs (this one plus
+`invalidateStoreProductCaches`'). Cost if wrong: one redundant revalidate
+request per bundle write.
+
 ## 2026-09-30 — Admin UI: coupons chrome, feature-flag staleness, Customers page (branch `fix/admin-ui-coupons-features-customers`)
 
 Source: `force-website-builder-audit-accounting-mcp-2026-09-30.md` §8, §9, §10.

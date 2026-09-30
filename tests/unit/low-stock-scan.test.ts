@@ -26,10 +26,12 @@ const { mockRedisClient, mockTx } = vi.hoisted(() => {
     exists: vi.fn().mockResolvedValue(0),
     setex: vi.fn().mockResolvedValue('OK'),
     del: vi.fn().mockResolvedValue(1),
+    // SET … EX … NX — the scan's pending claim. 'OK' = claimed, null = held.
+    set: vi.fn().mockResolvedValue('OK'),
     pipeline: vi.fn(),
   };
   mockRedisClient.pipeline.mockImplementation(() => {
-    const ops: Array<['exists' | 'setex' | 'del', unknown[]]> = [];
+    const ops: Array<['exists' | 'setex' | 'del' | 'set', unknown[]]> = [];
     const p = {
       exists: (key: string) => {
         ops.push(['exists', [key]]);
@@ -43,6 +45,10 @@ const { mockRedisClient, mockTx } = vi.hoisted(() => {
         ops.push(['del', [key]]);
         return p;
       },
+      set: (...args: unknown[]) => {
+        ops.push(['set', args]);
+        return p;
+      },
       exec: async () => {
         const res: Array<[Error | null, unknown]> = [];
         for (const [op, args] of ops) {
@@ -50,6 +56,8 @@ const { mockRedisClient, mockTx } = vi.hoisted(() => {
           else if (op === 'setex') {
             await mockRedisClient.setex(...(args as [string, number, string]));
             res.push([null, 'OK']);
+          } else if (op === 'set') {
+            res.push([null, await mockRedisClient.set(...args)]);
           } else {
             await mockRedisClient.del(args[0]);
             res.push([null, 1]);
@@ -102,8 +110,10 @@ import {
   isSentinelSet,
   setSentinel,
   clearSentinel,
+  commitLowStockAlertSentinels,
   SENTINEL_KEY_PREFIX,
   SENTINEL_TTL_SECONDS,
+  PENDING_CLAIM_TTL_SECONDS,
 } from '@api/services/inventory/low-stock-scan.service';
 
 // ---------------------------------------------------------------------------
@@ -267,7 +277,7 @@ describe('runLowStockScan — sentinel dedup', () => {
     mockTx.store.findUnique.mockResolvedValue(makeStore());
   });
 
-  it('alert-once: first scan includes the product and sets the sentinel', async () => {
+  it('alert-once: first scan includes the product in the digest', async () => {
     mockTx.product.findMany.mockResolvedValue([
       makeProduct({ id: 'p1', inventory: 3, lowStockThreshold: 10 }),
     ]);
@@ -277,11 +287,72 @@ describe('runLowStockScan — sentinel dedup', () => {
 
     expect(result.alertedProducts).toHaveLength(1);
     expect(result.skippedCount).toBe(0);
+  });
+
+  // Regression for #187: the scan used to set the sentinel itself, before
+  // any email had gone out. If the digest send later failed permanently
+  // (retries exhausted — a bad owner email, a delivery outage), the product
+  // was marked "alerted" with no notification ever having been delivered,
+  // and stayed silently suppressed until it happened to cross the
+  // threshold a second time. The scan step now only DETECTS; the caller
+  // commits the sentinel via commitLowStockAlertSentinels() after a
+  // successful send.
+  it("does NOT set the sentinel itself — that is the caller's job, after a successful send", async () => {
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct({ id: 'p1', inventory: 3, lowStockThreshold: 10 }),
+    ]);
+    mockRedisClient.exists.mockResolvedValue(0);
+
+    const result = await runLowStockScan('store-1');
+
+    expect(result.alertedProducts).toHaveLength(1);
+    expect(mockRedisClient.setex).not.toHaveBeenCalled();
+  });
+
+  it('commitLowStockAlertSentinels() sets the sentinel — called by the caller AFTER a successful send', async () => {
+    await commitLowStockAlertSentinels('store-1', ['p1']);
+
     expect(mockRedisClient.setex).toHaveBeenCalledWith(
       `${SENTINEL_KEY_PREFIX}:store-1:p1`,
       SENTINEL_TTL_SECONDS,
       '1'
     );
+  });
+
+  // P2 on PR #1977: with the sentinel committed only after the send, two
+  // overlapping scans (cron + "Scan now", or a double click) both read "unset"
+  // and would both email the same digest. The scan now claims each hit with a
+  // short SET NX; only the winner includes it.
+  it('claims each new hit with a short pending SET NX, not the 30-day sentinel', async () => {
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct({ id: 'p1', inventory: 3, lowStockThreshold: 10 }),
+    ]);
+    mockRedisClient.exists.mockResolvedValue(0);
+
+    await runLowStockScan('store-1');
+
+    expect(mockRedisClient.set).toHaveBeenCalledWith(
+      `${SENTINEL_KEY_PREFIX}:store-1:p1`,
+      'pending',
+      'EX',
+      PENDING_CLAIM_TTL_SECONDS,
+      'NX'
+    );
+    expect(PENDING_CLAIM_TTL_SECONDS).toBeLessThan(SENTINEL_TTL_SECONDS);
+  });
+
+  it('a product another in-flight scan already claimed is left out of the digest', async () => {
+    mockTx.product.findMany.mockResolvedValue([
+      makeProduct({ id: 'p1', inventory: 3, lowStockThreshold: 10 }),
+      makeProduct({ id: 'p2', inventory: 2, lowStockThreshold: 10 }),
+    ]);
+    mockRedisClient.exists.mockResolvedValue(0);
+    mockRedisClient.set.mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+
+    const result = await runLowStockScan('store-1');
+
+    expect(result.alertedProducts.map(p => p.productId)).toEqual(['p1']);
+    expect(result.skippedCount).toBe(1);
   });
 
   it('dedup: second scan with sentinel set skips the product', async () => {

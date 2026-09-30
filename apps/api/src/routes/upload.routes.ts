@@ -102,7 +102,7 @@ const ALLOWED_FOLDERS = new Set([
  * an intentional platform-staff capability — same semantics as the
  * existing `requireStoreAccess` middleware).
  */
-async function resolveFolderAndStore(
+export async function resolveFolderAndStore(
   req: Request
 ): Promise<
   | { ok: true; folder: string; storeId: string | null }
@@ -125,7 +125,13 @@ async function resolveFolderAndStore(
   const userStoreId = req.user?.storeId || undefined;
   const storeId = queryStoreId || headerStoreId || userStoreId || null;
 
-  // No storeId at all → legacy/platform upload path (super_admin only).
+  // No storeId at all. `storage.service.ts`'s `composeKey` HARD-FAILS
+  // (AppError 400 MISSING_TENANT) for every folder in ALLOWED_FOLDERS above
+  // — there is no tenant-less key it will write, by design, since 2026-08-09
+  // (see its doc comment). Reject here too, before touching the uploaded
+  // buffer or hitting R2, instead of letting a super_admin's request reach
+  // the service only to be rejected deeper in. A non-super-admin still gets
+  // the more specific 403 first.
   if (!storeId) {
     if (req.user?.role !== 'super_admin') {
       return {
@@ -134,7 +140,14 @@ async function resolveFolderAndStore(
         error: { code: 'FORBIDDEN', message: 'storeId is required for non-super-admin uploads' },
       };
     }
-    return { ok: true, folder, storeId: null };
+    return {
+      ok: false,
+      status: 400,
+      error: {
+        code: 'MISSING_TENANT',
+        message: 'storeId is required — every upload must be scoped to a store.',
+      },
+    };
   }
 
   // Verify the caller owns this storeId before we trust it as the R2
@@ -258,10 +271,21 @@ router.post(
       }
 
       const results = await withOptionalTenantContext(resolved.storeId, async () => {
-        const uploaded = await StorageService.uploadMultiple(
-          files.map(f => ({ buffer: f.buffer, filename: f.originalname })),
-          { folder: resolved.folder, storeId: resolved.storeId }
+        // Same unconditional size ceiling as POST /image — batching the
+        // upload must not be a way to opt out of it. Without this, a
+        // multi-select gallery upload stored camera originals at full size
+        // (see enforceMaxDimensions' doc comment for the incident this
+        // guards against).
+        const capped = await Promise.all(
+          files.map(async f => ({
+            buffer: await enforceMaxDimensions(f.buffer),
+            filename: f.originalname,
+          }))
         );
+        const uploaded = await StorageService.uploadMultiple(capped, {
+          folder: resolved.folder,
+          storeId: resolved.storeId,
+        });
 
         await auditLog({
           action: 'files.uploaded',

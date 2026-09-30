@@ -5,6 +5,7 @@ import type { StockAdjustment, StockAdjustmentItem, StockAdjustmentType } from '
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
 import { WarehouseService } from '../warehouse.service';
+import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import logger from '../../lib/logger';
 
 // InventoryChangeType mapping for StockAdjustmentType values
@@ -225,6 +226,14 @@ export async function postAdjustment(
       })),
     });
   });
+
+  // Stock changed for every item this adjustment touched — POST-COMMIT, same
+  // as the WarehouseStock reconcile below. This is the write path the
+  // public bundle-list cache staleness traced back to: `postAdjustment`
+  // (also reached via cycle-count reconcile) never busted the product/
+  // bundle caches, so a bundle's `isPurchasable`/price could sit stale for
+  // up to the cache TTL after a manual or reconciled stock correction.
+  await invalidateStoreProductCaches(storeId);
 
   // Re-sync the WarehouseStock shadow for every SKU this adjustment touched
   // — POST-COMMIT, after the money tx above has already committed. Reconcile

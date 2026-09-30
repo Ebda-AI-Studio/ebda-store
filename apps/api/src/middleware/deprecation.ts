@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../lib/logger';
+import { BoundedMap } from '../lib/bounded-map';
 
 /**
  * Endpoint deprecation signalling.
@@ -13,7 +14,7 @@ import logger from '../lib/logger';
  *
  * This emits the two standard headers so a client can find out on its own:
  *
- *   Deprecation: <IMF-fixdate>   RFC 9745 — when the endpoint became deprecated
+ *   Deprecation: @<unix-seconds> RFC 9745 sf-date — when the endpoint became deprecated
  *   Sunset:      <IMF-fixdate>   RFC 8594 — when it will stop responding
  *   Link: <successor>; rel="successor-version"
  *
@@ -54,6 +55,18 @@ export interface DeprecationOptions {
  * 410 early is an outage, not a policy. Enforcement is removing the route on
  * the sunset date, as a normal reviewed change.
  */
+// Last time each `<method> <path>` combination logged a WARN, keyed so one
+// hot deprecated endpoint can't flood the log at request volume. Capped —
+// losing the oldest entry just means that route logs once more than
+// strictly necessary, never a durability concern.
+const lastWarnedAt = new BoundedMap<string, number>(500);
+const WARN_SAMPLE_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Test-only: clear the per-route sample state between test cases. */
+export function __resetDeprecationWarnSampleForTests(): void {
+  lastWarnedAt.clear();
+}
+
 export function deprecate(opts: DeprecationOptions) {
   if (opts.sunset <= opts.since) {
     // Fail at boot, not at request time — a sunset before its own deprecation
@@ -64,8 +77,10 @@ export function deprecate(opts: DeprecationOptions) {
   }
 
   return function deprecationHeaders(req: Request, res: Response, next: NextFunction): void {
-    // RFC 9745 / RFC 8594 both take an IMF-fixdate, which is what toUTCString produces.
-    res.setHeader('Deprecation', opts.since.toUTCString());
+    // Sunset (RFC 8594) takes an IMF-fixdate. Deprecation (RFC 9745) takes an
+    // sf-date — `@<unix-seconds>`, NOT an IMF-fixdate; the two RFCs disagree
+    // on format even though both mark dates.
+    res.setHeader('Deprecation', `@${Math.floor(opts.since.getTime() / 1000)}`);
     res.setHeader('Sunset', opts.sunset.toUTCString());
     if (opts.successor) {
       res.setHeader('Link', `<${opts.successor}>; rel="successor-version"`);
@@ -73,19 +88,27 @@ export function deprecate(opts: DeprecationOptions) {
 
     // WARN, not INFO: this exists to be noticed. Identify the caller so the
     // endpoint can actually be retired rather than left "just in case".
-    logger.warn(
-      {
-        path: req.originalUrl,
-        method: req.method,
-        sunset: opts.sunset.toISOString(),
-        reason: opts.reason,
-        // Best-effort caller identity — whichever the integration presents.
-        callerStore: (req.params as Record<string, string> | undefined)?.storeId,
-        userAgent: req.headers['user-agent'],
-        origin: req.headers.origin,
-      },
-      '[deprecated-endpoint] called'
-    );
+    // Sampled per route (method+path) so a hot deprecated endpoint logs at
+    // most once per interval instead of once per request.
+    const routeKey = `${req.method} ${req.route?.path ?? req.originalUrl}`;
+    const now = Date.now();
+    const lastWarned = lastWarnedAt.get(routeKey);
+    if (lastWarned === undefined || now - lastWarned >= WARN_SAMPLE_INTERVAL_MS) {
+      lastWarnedAt.set(routeKey, now);
+      logger.warn(
+        {
+          path: req.originalUrl,
+          method: req.method,
+          sunset: opts.sunset.toISOString(),
+          reason: opts.reason,
+          // Best-effort caller identity — whichever the integration presents.
+          callerStore: (req.params as Record<string, string> | undefined)?.storeId,
+          userAgent: req.headers['user-agent'],
+          origin: req.headers.origin,
+        },
+        '[deprecated-endpoint] called'
+      );
+    }
 
     next();
   };

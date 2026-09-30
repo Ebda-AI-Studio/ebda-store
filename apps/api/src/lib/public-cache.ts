@@ -121,7 +121,16 @@ export async function invalidateCachedPrefix(prefix: string): Promise<void> {
  * product.service.ts, the bulk-import/bulk-AI Inngest functions) covers the
  * admin category-list cache too, with no second call site to thread through.
  */
-/** Redis-only half, so a caller that will purge for itself doesn't double-fire. */
+/**
+ * Redis-only half, so a caller that will purge for itself doesn't
+ * double-fire. Genuinely Redis-only — do NOT add a revalidateStorefront call
+ * here. It used to call revalidateStorefront itself, contradicting this very
+ * comment: invalidateStoreCategoriesCaches called it AND then called
+ * revalidateStorefront again below, firing the storefront's revalidate POST
+ * twice per categories write, and invalidateStoreProductCaches called it
+ * assuming (per this doc comment) that it was Redis-only, so every product
+ * write ALSO fired an extra unwanted POST for the categories tag.
+ */
 async function clearCategoriesRedis(storeId: string): Promise<void> {
   // Redis ONLY — the storefront purge is the caller's (#1220). This helper
   // used to fire its own purge as well, so every product write and every ORDER
@@ -161,8 +170,20 @@ export async function invalidateStoreCategoriesCaches(storeId: string): Promise<
  * the cached category counts stale. Folding it in here (rather than auditing
  * every product-write call site a second time for this dependency) is the
  * safe default: it costs two extra single-key deletes, not a scan.
+ *
+ * Also busts the bundle-list cache: `bundle.routes.ts`'s public list resolves
+ * each bundle's `price`/`componentSum`/`available` from its component
+ * PRODUCTS' current price/inventory (NEVER-stale data), so a product write
+ * that changes either — including checkout-driven inventory decrement —
+ * would otherwise leave a bundled product's stock/price wrong in the cached
+ * bundle list for up to its own TTL, even though `invalidateStoreBundlesCache`
+ * itself is only ever called from the 3 bundle-specific write handlers.
  */
-/** The Redis half of {@link invalidateStoreProductCaches}, shared with the order path. */
+/**
+ * The Redis half of {@link invalidateStoreProductCaches}, shared with the
+ * order path ({@link invalidateStoreProductCachesAfterOrder}) — both funnel
+ * through here so the bundle-list bust below can't be forgotten by either.
+ */
 async function clearProductsRedis(storeId: string): Promise<void> {
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   await invalidateCachedPrefix(`public:product:${storeId}:`);
@@ -172,6 +193,7 @@ async function clearProductsRedis(storeId: string): Promise<void> {
   // public categories invalidator here would fire a second outbound POST for
   // every product write — two requests per bust, and two per order.
   await clearCategoriesRedis(storeId);
+  await invalidateCached(bundlesCacheKey(storeId));
 }
 
 export async function invalidateStoreProductCaches(storeId: string): Promise<void> {
@@ -185,9 +207,29 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
   // place every writer already funnels through, so no call site can forget.
   // Fire-and-forget by design (see revalidate-storefront) — a storefront blip
   // must never fail a save that already committed.
-  // ONE request carrying both tags. revalidateStorefront accepts a list, so
-  // there is no reason to open a second connection to say the other half.
-  revalidateStorefront({ tags: [`products:${storeId}`, `categories:${storeId}`] });
+  // ONE request carrying every tag. revalidateStorefront accepts a list, so
+  // there is no reason to open a second connection to say another part.
+  revalidateStorefront({
+    tags: [`products:${storeId}`, `categories:${storeId}`, `bundles:${storeId}`],
+  });
+}
+
+/** Cache key for a store's public purchasable-bundle list (`bundle.routes.ts`). */
+export function bundlesCacheKey(storeId: string): string {
+  return `public:bundles:${storeId}`;
+}
+
+/**
+ * Invalidate a store's public bundle-list cache (both layers) plus the
+ * storefront's Next.js data cache tag `bundles:<storeId>` — the tag the
+ * storefront's /bundles list and bundle PDP fetches carry (pinned by
+ * tests/unit/storefront-purge-on-write.test.ts). Call from every bundle write —
+ * create, update, deactivate — the same way product writes call
+ * `invalidateStoreProductCaches`.
+ */
+export async function invalidateStoreBundlesCache(storeId: string): Promise<void> {
+  await invalidateCached(bundlesCacheKey(storeId));
+  revalidateStorefront({ tags: [`bundles:${storeId}`] });
 }
 
 /**
@@ -208,7 +250,9 @@ export const ORDER_PURGE_COALESCE_MS = 10_000;
 const orderPurgeWindows = new BoundedMap<string, { pending: boolean }>(10_000);
 
 function purgeStorefrontProducts(storeId: string): void {
-  revalidateStorefront({ tags: [`products:${storeId}`, `categories:${storeId}`] });
+  revalidateStorefront({
+    tags: [`products:${storeId}`, `categories:${storeId}`, `bundles:${storeId}`],
+  });
 }
 
 function openOrderPurgeWindow(storeId: string): void {
@@ -232,11 +276,15 @@ function openOrderPurgeWindow(storeId: string): void {
  *
  * `OrderService` used to call {@link invalidateStoreProductCaches} on every
  * checkout and every inventory-affecting status change, so each order purged
- * every `products:<storeId>` and `categories:<storeId>` storefront fetch — the
- * homepage blocks, the PLP, every PDP, the sitemap and the feed. During a
- * flash sale the storefront's data cache was invalidated faster than it could
- * be used and every render fell through to the API. Content edits keep the
- * immediate purge; see {@link ORDER_PURGE_COALESCE_MS} for this one.
+ * every `products:<storeId>`, `categories:<storeId>` AND `bundles:<storeId>`
+ * storefront fetch — the homepage blocks, the PLP, every PDP, the sitemap and
+ * the feed. During a flash sale the storefront's data cache was invalidated
+ * faster than it could be used and every render fell through to the API.
+ * Bundles stay in this purge (not split out) because their price/availability
+ * derive from the same component-product inventory an order just changed —
+ * see the bundle paragraph on {@link invalidateStoreProductCaches}. Content
+ * edits keep the immediate purge; see {@link ORDER_PURGE_COALESCE_MS} for
+ * this one.
  */
 export async function invalidateStoreProductCachesAfterOrder(storeId: string): Promise<void> {
   await clearProductsRedis(storeId);

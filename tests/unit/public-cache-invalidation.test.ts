@@ -23,10 +23,18 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: redisMock,
 }));
 
+const revalidateStorefrontMock = vi.hoisted(() => vi.fn());
+vi.mock('../../apps/api/src/lib/revalidate-storefront', () => ({
+  revalidateStorefront: revalidateStorefrontMock,
+}));
+
 import {
   getCached,
   invalidateCachedPrefix,
   invalidateStoreProductCaches,
+  invalidateStoreCategoriesCaches,
+  invalidateStoreBundlesCache,
+  bundlesCacheKey,
 } from '../../apps/api/src/lib/public-cache';
 
 beforeEach(() => {
@@ -77,6 +85,14 @@ describe('invalidateStoreProductCaches() (A2 Redis-layer bust)', () => {
   });
 });
 
+describe('invalidateStoreBundlesCache() (#1565)', () => {
+  it("busts the store's public bundle-list Redis key", async () => {
+    await invalidateStoreBundlesCache('store123');
+    expect(redisMock.delete).toHaveBeenCalledWith(bundlesCacheKey('store123'));
+    expect(bundlesCacheKey('store123')).toBe('public:bundles:store123');
+  });
+});
+
 describe('invalidateCachedPrefix() (A2)', () => {
   it('deletes the matching Redis pattern (not just in-memory)', async () => {
     await invalidateCachedPrefix('public:products:s1:');
@@ -86,5 +102,41 @@ describe('invalidateCachedPrefix() (A2)', () => {
   it('is best-effort — resolves even when Redis throws', async () => {
     redisMock.deleteByPattern.mockRejectedValueOnce(new Error('redis down'));
     await expect(invalidateCachedPrefix('public:products:s1:')).resolves.toBeUndefined();
+  });
+});
+
+// Regression for #1288: clearCategoriesRedis's own doc comment calls it the
+// "Redis-only half", but it ALSO called revalidateStorefront — so
+// invalidateStoreCategoriesCaches (which calls clearCategoriesRedis, THEN
+// calls revalidateStorefront itself) fired the storefront's revalidate POST
+// TWICE per categories write, and invalidateStoreProductCaches (which calls
+// clearCategoriesRedis assuming, per that doc comment, it was Redis-only)
+// fired an extra unwanted POST on every PRODUCT write too.
+describe('clearCategoriesRedis is genuinely Redis-only (#1288)', () => {
+  it('invalidateStoreCategoriesCaches fires revalidateStorefront exactly ONCE', async () => {
+    await invalidateStoreCategoriesCaches('store123');
+    expect(revalidateStorefrontMock).toHaveBeenCalledTimes(1);
+    expect(revalidateStorefrontMock).toHaveBeenCalledWith({ tags: ['categories:store123'] });
+  });
+
+  it('invalidateStoreProductCaches fires revalidateStorefront exactly ONCE, covering all three tags', async () => {
+    await invalidateStoreProductCaches('store123');
+    expect(revalidateStorefrontMock).toHaveBeenCalledTimes(1);
+    expect(revalidateStorefrontMock).toHaveBeenCalledWith({
+      tags: ['products:store123', 'categories:store123', 'bundles:store123'],
+    });
+  });
+});
+
+// A Pull-Request-review finding on this same batch: bundle.routes.ts's
+// public list resolves price/componentSum/available from its component
+// PRODUCTS' current price/inventory (NEVER-stale data). Without this,
+// invalidateStoreProductCaches busted product/category caches on every
+// product write but left the cached bundle list serving a bundled
+// product's stale price/stock for up to its own TTL.
+describe('invalidateStoreProductCaches also busts the bundle-list cache (never-stale)', () => {
+  it('deletes the public bundle-list Redis key on every product write', async () => {
+    await invalidateStoreProductCaches('store123');
+    expect(redisMock.delete).toHaveBeenCalledWith(bundlesCacheKey('store123'));
   });
 });

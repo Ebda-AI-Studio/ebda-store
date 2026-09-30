@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useT } from '@/i18n/useT';
 import { getApiUrl } from '../../../../../lib/api';
@@ -25,6 +25,30 @@ interface IconUploadResponse {
 }
 
 /**
+ * Merge ONLY the icon fields a completed upload generated into `current`
+ * local settings, rather than replacing the whole object with the server's
+ * response (#1915). `uploaded` is what `PWAService.updateSettings` persisted
+ * server-side — the DB row as it existed AT UPLOAD TIME plus the new icon
+ * URLs. If the merchant has unsaved edits in a sibling section (app name,
+ * theme color, iOS settings…) those never reached the server, so replacing
+ * local state with the server's copy would silently discard them the moment
+ * an icon upload finished.
+ */
+export function mergeIconFields(current: PWASettings, uploaded: PWASettings): PWASettings {
+  return {
+    ...current,
+    iconSource: uploaded.iconSource,
+    icon192: uploaded.icon192,
+    icon384: uploaded.icon384,
+    icon512: uploaded.icon512,
+    iconAppleTouch: uploaded.iconAppleTouch,
+    favicon32: uploaded.favicon32,
+    favicon16: uploaded.favicon16,
+    maskableIcon: uploaded.maskableIcon,
+  };
+}
+
+/**
  * Single drag-drop uploader for the store's PWA icon (B5, 2026-05-04 plan
  * task 6): the merchant uploads ONE square 512x512+ source image and the API
  * (`POST /stores/:id/pwa/icons`) generates the full size set server-side —
@@ -40,6 +64,15 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // The merge base must be the settings as they are when the upload
+  // RESOLVES, not when the drop handler was created: the upload can run for
+  // up to 60s, and the merchant may keep editing sibling fields meanwhile.
+  // Merging against the closure's copy reverted those in-flight edits.
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const handleFiles = useCallback(
     async (fileList: FileList) => {
@@ -103,7 +136,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
           xhr.send(formData);
         });
 
-        onChange(updatedSettings);
+        onChange(mergeIconFields(settingsRef.current, updatedSettings));
       } catch (err) {
         setError(err instanceof Error ? err.message : tUpload('errors.uploadFailed'));
       } finally {

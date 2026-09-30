@@ -19,6 +19,7 @@ import {
   runLowStockScan,
   isSentinelSet,
   clearSentinel,
+  commitLowStockAlertSentinels,
   SENTINEL_KEY_PREFIX,
 } from '@api/services/inventory/low-stock-scan.service';
 
@@ -125,6 +126,12 @@ describe('low-stock scan — integration', () => {
     const alertedIds = result.alertedProducts.map(p => p.productId);
     expect(alertedIds).toContain(lowProductId);
     expect(alertedIds).not.toContain(healthyProductId);
+
+    // #187: runLowStockScan itself no longer sets the sentinel — the caller
+    // (the Inngest function) commits it only after a successful digest send.
+    // Simulate that here so the dedup tests below exercise the same
+    // real-world sequence.
+    await commitLowStockAlertSentinels(storeId, alertedIds);
   });
 
   it('first scan: sentinel is now set for the low-stock product', async () => {
@@ -171,7 +178,8 @@ describe('low-stock scan — integration', () => {
     const alertedIds = result.alertedProducts.map(p => p.productId);
     expect(alertedIds).toContain(lowProductId);
 
-    // Sentinel set again
+    // Simulate the caller committing the sentinel after a successful send.
+    await commitLowStockAlertSentinels(storeId, alertedIds);
     const isSet = await isSentinelSet(storeId, lowProductId);
     expect(isSet).toBe(true);
 

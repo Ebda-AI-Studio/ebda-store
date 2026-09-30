@@ -48,9 +48,19 @@ export function skipGlobalRateLimit(req: Request): boolean {
   // from a 429 from there. Double-counting buys nothing — refreshLimiter
   // is user-scoped, tighter in the case that matters, and always runs.
   //
-  // Matched exactly, and on the path only: nothing else may fall through
-  // this bypass. `req.path` here is the full mounted path.
-  if (method === 'POST' && req.path === '/api/v1/auth/refresh') {
+  // Matched on the path only: nothing else may fall through this bypass.
+  // `req.path` here is the full mounted path. Case-insensitive and
+  // tolerant of ONE trailing slash — a raw `===` missed a client/proxy that
+  // normalizes case or appends a trailing slash, which does not admit any
+  // new bypass (the comparison target is still the exact refresh path, not
+  // a pattern), it just failed the SAFE direction (those callers stayed
+  // counted against the shared cap instead of getting their own bucket).
+  // Deliberately NOT percent-decoded, unlike security.ts's
+  // normalizePlatformGatePath sibling: decoding before an ALLOW-list check
+  // fails OPEN (see that function's doc comment) and Express's own req.path
+  // is already decoded for a normal request, so there is nothing to gain
+  // here from decoding again.
+  if (method === 'POST' && req.path.toLowerCase().replace(/\/$/, '') === '/api/v1/auth/refresh') {
     return true;
   }
   // Bypass 4: Inngest step-execution callbacks. Inngest Cloud POSTs this

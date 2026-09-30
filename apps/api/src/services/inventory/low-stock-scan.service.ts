@@ -8,8 +8,10 @@
  *      AND inventory <= lowStockThreshold (in-stock-but-low).
  *   2. Dedup via Redis sentinels (key: `low-stock-alerted:{storeId}:{productId}`):
  *      - Skip a product if its sentinel already exists (already alerted since last restock).
- *      - Set the sentinel after building the digest so a future run is a no-op
- *        until the merchant restocks above the threshold.
+ *      - Claim each new hit with a short `pending` SET NX (so two overlapping
+ *        scans cannot both alert it); the caller promotes the claim to the
+ *        30-day sentinel only after the digest sends, so a future run is a
+ *        no-op until the merchant restocks above the threshold.
  *   3. In the SAME scan, clear sentinels for products now back ABOVE threshold
  *      so the next drop re-alerts.
  *   4. Return the digest (bilingual list) for the Inngest function to email.
@@ -41,6 +43,17 @@ export const SENTINEL_KEY_PREFIX = 'low-stock-alerted';
 // the scan will clear it and re-alert after 30 days for persistent low stock.
 // This also prevents orphaned keys from accumulating forever.
 export const SENTINEL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+// Short-lived CLAIM written by the scan itself (value `pending`, SET NX) so
+// two overlapping scans for one store — the 6-hourly cron and an admin
+// "Scan now", or a double-clicked "Scan now" — cannot both put the same
+// product in a digest: only the scan whose SET NX wins includes it. The caller
+// promotes the claim to the 30-day sentinel after the send succeeds
+// (commitLowStockAlertSentinels overwrites it). If the send fails for good the
+// claim just expires, so the product re-alerts on a later scan — the #187
+// fail-open direction is kept, delayed by at most this window. It must outlast
+// Inngest's retry window for the send step.
+export const PENDING_CLAIM_TTL_SECONDS = 60 * 60; // 1 hour
 
 // ---------------------------------------------------------------------------
 // Types
@@ -192,7 +205,7 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
     products.map(p => p.id)
   );
 
-  const alertedProducts: LowStockAlertItem[] = [];
+  const candidates: LowStockAlertItem[] = [];
   const toClear: string[] = [];
   let clearedCount = 0;
   let skippedCount = 0;
@@ -223,8 +236,8 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
       continue;
     }
 
-    // New low-stock hit — include in digest.
-    alertedProducts.push({
+    // New low-stock hit — a digest candidate, pending the claim below.
+    candidates.push({
       productId: product.id,
       name: product.name,
       nameAr: product.nameAr,
@@ -233,13 +246,26 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
     });
   }
 
-  // Set sentinels for newly-alerted products AFTER building the digest, and
-  // clear restocked ones — both batched into a single pipeline.
-  await writeSentinels(
+  // Clear sentinels for restocked/exhausted products now — that correction
+  // is right regardless of whether a notification ever goes out. Newly-
+  // alerted products deliberately do NOT get the 30-day sentinel here (only
+  // the short `pending` claim below): the caller (the Inngest
+  // function) commits those via commitLowStockAlertSentinels() only AFTER
+  // the digest email actually sends. Setting them here, before the send,
+  // meant a permanently-failed send step (retries exhausted — a bad owner
+  // email, a Resend outage) left the sentinel set with no email ever having
+  // gone out: the product silently never alerted again until it happened to
+  // cross the threshold a second time.
+  await writeSentinels(storeId, [], toClear);
+
+  // Claim the new hits atomically; drop any another in-flight scan already
+  // claimed (see PENDING_CLAIM_TTL_SECONDS).
+  const claimed = await claimPending(
     storeId,
-    alertedProducts.map(p => p.productId),
-    toClear
+    candidates.map(p => p.productId)
   );
+  const alertedProducts = candidates.filter(p => claimed.has(p.productId));
+  skippedCount += candidates.length - alertedProducts.length;
 
   logger.info(
     {
@@ -278,6 +304,50 @@ async function readSentinels(storeId: string, productIds: string[]): Promise<Map
     logger.warn({ err, storeId }, 'low-stock-scan: batch sentinel read failed, proceeding');
   }
   return result;
+}
+
+/**
+ * SET NX a short `pending` claim per product in ONE pipeline and return the
+ * ids this scan won. With no Redis (or on error) every id counts as won —
+ * over-alert rather than silently miss, same fallback as readSentinels.
+ */
+async function claimPending(storeId: string, productIds: string[]): Promise<Set<string>> {
+  const all = new Set(productIds);
+  if (productIds.length === 0) return all;
+  try {
+    const client = redis.getClient();
+    if (!client) return all;
+    const pipeline = client.pipeline();
+    for (const id of productIds) {
+      pipeline.set(sentinelKey(storeId, id), 'pending', 'EX', PENDING_CLAIM_TTL_SECONDS, 'NX');
+    }
+    const replies = await pipeline.exec();
+    if (!replies) return all;
+    const won = new Set<string>();
+    productIds.forEach((id, i) => {
+      const [err, val] = replies[i] ?? [];
+      // An errored reply is treated as won (over-alert); a null reply means
+      // the key already existed — another scan holds this product.
+      if (err || val === 'OK') won.add(id);
+    });
+    return won;
+  } catch (err) {
+    logger.warn({ err, storeId }, 'low-stock-scan: pending claim failed, proceeding');
+    return all;
+  }
+}
+
+/**
+ * Mark the given products as alerted — called by the Inngest function ONLY
+ * after its digest email for them has actually sent successfully. This is
+ * the counterpart to `runLowStockScan` deliberately NOT setting these
+ * sentinels itself; see the comment at its `writeSentinels` call.
+ */
+export async function commitLowStockAlertSentinels(
+  storeId: string,
+  productIds: string[]
+): Promise<void> {
+  await writeSentinels(storeId, productIds, []);
 }
 
 /**

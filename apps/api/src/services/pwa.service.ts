@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import sharp from 'sharp';
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
@@ -95,26 +96,46 @@ const ICON_TARGETS: ReadonlyArray<{
  * Deviation from the 2026-05-04 plan: the plan's sketch called a
  * `uploadToR2` helper that doesn't exist in this codebase. This reuses the
  * repo's actual upload primitive, `StorageService.upload` (same one every
- * other admin upload surface — logos, hero, fonts — goes through), passing
- * a fixed `filename` per icon key so re-uploading a new source OVERWRITES
- * the same R2 object instead of accumulating orphans per upload.
+ * other admin upload surface — logos, hero, fonts — goes through).
+ *
+ * Every icon key carries a per-generation VERSION suffix (`icon192-<ver>`),
+ * unlike the fixed `filename: target.key` this replaced. `StorageService`
+ * sets `CacheControl: public, max-age=31536000` (one year) on every upload,
+ * so a fixed key meant re-uploading a new source kept the SAME R2 key and
+ * URL — the browser/edge/PWA cache kept serving the OLD icon bytes for up to
+ * a year, because nothing about the URL ever changed. Versioning the key
+ * makes a new generation a NEW URL, which busts every cache layer for free.
+ *
+ * It also closes the partial-failure defect this loop otherwise has: because
+ * every target now gets a key nothing has ever pointed at, a mid-loop throw
+ * (network blip, R2 hiccup) can no longer overwrite an EARLIER target that
+ * was already live and referenced by `Store.pwaSettings` — the previous
+ * generation's icons stay exactly as they were, still serving, still
+ * consistent with the DB, until this call fully succeeds and its caller
+ * persists the new URLs. A failed run leaves orphaned new-version objects in
+ * R2, never a half-updated live set. Those orphans are cheap and are REPORTED
+ * by the weekly `r2-orphan-sweep` and `scripts/r2-orphan-audit.ts` (deleted
+ * only when an operator opts in: `R2_ORPHAN_SWEEP_APPLY=true` / `--apply`).
+ * Both read `Store.pwaSettings` through the shared `R2_REFERENCE_COLUMNS`
+ * registry (lib/r2-references.ts), so the LIVE generation's icons count as
+ * referenced and are never swept; `tests/unit/r2-reference-registry.test.ts`
+ * pins that.
  *
  * Two separate failure domains, handled in two phases (issues #1913/#1916):
  *
  *  1. Run the ENTIRE sharp pipeline first and hold every output buffer in
  *     memory before any upload starts. A corrupt/garbage source, an
  *     unsupported format, or a decode/OOM failure therefore never touches
- *     a live R2 object — it 400s as `ICON_GENERATION_FAILED` with
- *     `Store.pwaSettings` and every existing icon object untouched, exactly
- *     as the old single-try version claimed (but did not actually
- *     guarantee, since it uploaded and processed in the same loop).
- *  2. Only once every buffer exists do uploads start. This phase can still
- *     fail (R2 outage, a dropped `pwa` folder allowlist entry, a network
- *     blip) — since every icon key is fixed and re-upload overwrites it in
- *     place (see above), a failure partway through THIS phase (upload #N
- *     of 8) can still leave the live set mixed old/new for the icons
- *     already uploaded before it failed. That residual is real and is not
- *     hidden: a genuine StorageService `AppError` (503
+ *     R2 at all — it 400s as `ICON_GENERATION_FAILED` with every existing
+ *     icon object (the previous generation) untouched.
+ *  2. Only once every buffer exists do uploads start, concurrently (see
+ *     below). This phase can still fail (R2 outage, a dropped `pwa` folder
+ *     allowlist entry, a network blip) — because every key carries this
+ *     run's version suffix (see above), a failure partway through leaves at
+ *     worst a PARTIAL set of new-version objects (orphaned, cheap, swept by
+ *     the orphan-audit script) while the previous generation's icons stay
+ *     exactly as they were, still fully live and referenced by
+ *     `Store.pwaSettings`. A genuine StorageService `AppError` (503
  *     `STORAGE_NOT_CONFIGURED`, 400 `INVALID_FOLDER`/`MISSING_TENANT`, …)
  *     is re-thrown UNCHANGED instead of being masked as "your image is
  *     invalid", so an infra failure surfaces with its real status code
@@ -127,6 +148,14 @@ export async function generatePwaIconSet(
   sourceBuffer: Buffer,
   background: { r: number; g: number; b: number; alpha: number } = { r: 0, g: 0, b: 0, alpha: 0 }
 ): Promise<GeneratedPwaIcons> {
+  // One version per generation run, shared by every uploaded key so the
+  // whole set is internally consistent (and so a caller can tell which
+  // generation a URL belongs to just by reading it). A timestamp alone can
+  // collide when two generations land in the same millisecond (a merchant
+  // double-clicking "save", or a fast test) — randomUUID guarantees a fresh
+  // key every time regardless of timing.
+  const version = randomUUID().slice(0, 8);
+
   let sourcePng: Buffer;
   const prepared: Array<{ target: (typeof ICON_TARGETS)[number]; buffer: Buffer }> = [];
   try {
@@ -167,22 +196,32 @@ export async function generatePwaIconSet(
     const sourceUpload = await StorageService.upload(sourcePng, 'source.png', {
       folder: 'pwa',
       storeId,
-      filename: 'source',
+      filename: `source-${version}`,
       contentType: 'image/png',
       allowedTypes: ['image/png'],
     });
     results.iconSource = sourceUpload.url;
 
-    for (const { target, buffer } of prepared) {
-      const uploaded = await StorageService.upload(buffer, `${target.key}.png`, {
-        folder: 'pwa',
-        storeId,
-        filename: target.key,
-        contentType: 'image/png',
-        allowedTypes: ['image/png'],
-      });
-      results[target.key] = uploaded.url;
-    }
+    // Parallel, not sequential: the caller (POST /:storeId/pwa/icons) runs
+    // under `tenantContext`, which holds one interactive Postgres
+    // transaction open for the ENTIRE request — including this function's
+    // R2 PUTs, which don't touch Postgres at all. Eight sequential round
+    // trips extended that window to roughly 8x one target's latency, on a
+    // transaction budgeted to time out at 30s (packages/database/src/index.ts).
+    // Running the fixed, small ICON_TARGETS set concurrently instead cuts
+    // that window to roughly 1x.
+    await Promise.all(
+      prepared.map(async ({ target, buffer }) => {
+        const uploaded = await StorageService.upload(buffer, `${target.key}.png`, {
+          folder: 'pwa',
+          storeId,
+          filename: `${target.key}-${version}`,
+          contentType: 'image/png',
+          allowedTypes: ['image/png'],
+        });
+        results[target.key] = uploaded.url;
+      })
+    );
 
     return results as GeneratedPwaIcons;
   } catch (err) {

@@ -71,6 +71,28 @@ describe('assertPublicHttpUrl (SSRF guard)', () => {
       /SSRF_BLOCKED/
     );
   });
+
+  // Regression for #1716: a lookup that THROWS (NXDOMAIN, resolver
+  // timeout/unreachable) and a lookup that SUCCEEDS with zero records used
+  // to share the exact same message ("host does not resolve"), making the
+  // two indistinguishable from a carrier-connectivity log line.
+  describe('DNS_UNRESOLVED split (#1716)', () => {
+    it('names a lookup FAILURE distinctly from zero results', async () => {
+      mockLookup.mockImplementationOnce(async () => {
+        throw new Error('ENOTFOUND');
+      });
+      await expect(assertPublicHttpUrl('https://nope.example.com/x.png')).rejects.toThrow(
+        /DNS_UNRESOLVED: host lookup failed/
+      );
+    });
+
+    it('names a lookup that resolves to ZERO addresses distinctly from a failed lookup', async () => {
+      mockLookup.mockResolvedValue([]);
+      await expect(assertPublicHttpUrl('https://nope.example.com/x.png')).rejects.toThrow(
+        /DNS_UNRESOLVED: host resolved to no addresses/
+      );
+    });
+  });
 });
 
 /**
