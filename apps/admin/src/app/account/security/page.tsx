@@ -201,7 +201,7 @@ export default function SecurityPage() {
             {step === 'backup' && (
               <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success dark:bg-success/15">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success-ink dark:bg-success/15">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
@@ -276,7 +276,7 @@ export default function SecurityPage() {
                 {/* Verify form */}
                 <form onSubmit={handleVerifyEnroll} className="space-y-4">
                   {enrollError && (
-                    <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                    <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
                       {enrollError}
                     </div>
                   )}
@@ -337,7 +337,7 @@ export default function SecurityPage() {
                 </div>
                 <form onSubmit={handleDisable} className="space-y-4">
                   {disableError && (
-                    <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                    <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
                       {disableError}
                     </div>
                   )}
@@ -394,7 +394,7 @@ export default function SecurityPage() {
                 {/* Status row */}
                 <div className="flex items-center gap-4 p-5">
                   <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${status?.mfaEnabled ? 'bg-success/10 text-success dark:bg-success/15' : 'bg-muted text-muted-foreground'}`}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${status?.mfaEnabled ? 'bg-success/10 text-success-ink dark:bg-success/15' : 'bg-muted text-muted-foreground'}`}
                   >
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       {status?.mfaEnabled ? (
@@ -431,7 +431,7 @@ export default function SecurityPage() {
                   <div
                     className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                       status?.mfaEnabled
-                        ? 'bg-success/10 text-success dark:bg-success/15'
+                        ? 'bg-success/10 text-success-ink dark:bg-success/15'
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
@@ -468,7 +468,7 @@ export default function SecurityPage() {
                         </p>
                       </div>
                       {enrollError && step === 'idle' && (
-                        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
                           {enrollError}
                         </div>
                       )}

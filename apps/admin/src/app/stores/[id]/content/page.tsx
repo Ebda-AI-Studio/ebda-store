@@ -218,7 +218,9 @@ function PageRowCard({
           {row && (
             <span
               className={`rounded-full px-2 py-0.5 ${
-                row.isPublished ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                row.isPublished
+                  ? 'bg-primary/10 text-primary-ink'
+                  : 'bg-muted text-muted-foreground'
               }`}
             >
               {row.isPublished ? publishedLabel : draftLabel}

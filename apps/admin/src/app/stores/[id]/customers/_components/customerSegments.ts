@@ -23,14 +23,14 @@ export type SegmentBadgeKey = RfmSegmentKey | 'activeBuyer' | 'new' | 'guest';
 export type SegmentFilter = 'all' | RfmSegmentKey | 'guest';
 
 export const SEGMENT_BADGE_CLASSES: Record<SegmentBadgeKey, string> = {
-  vip: 'bg-primary/10 text-primary',
-  loyal: 'bg-success/10 text-success',
-  potential: 'bg-info/10 text-info',
-  new_customer: 'bg-info/10 text-info',
-  at_risk: 'bg-warning/10 text-warning',
+  vip: 'bg-primary/10 text-primary-ink',
+  loyal: 'bg-success/10 text-success-ink',
+  potential: 'bg-info/10 text-info-ink',
+  new_customer: 'bg-info/10 text-info-ink',
+  at_risk: 'bg-warning/10 text-warning-ink',
   hibernating: 'bg-muted text-muted-foreground',
-  lost: 'bg-destructive/10 text-destructive',
-  activeBuyer: 'bg-success/10 text-success',
+  lost: 'bg-destructive/10 text-destructive-ink',
+  activeBuyer: 'bg-success/10 text-success-ink',
   new: 'bg-muted text-muted-foreground',
   guest: 'bg-muted text-muted-foreground',
 };
@@ -79,3 +79,10 @@ export function parseSegmentParam(raw: string | null | undefined): SegmentFilter
   if (raw === 'guest') return 'guest';
   return isRfmSegment(raw ?? undefined) ? (raw as RfmSegmentKey) : 'all';
 }
+
+/**
+ * `?erasureReview=1` on the Customers list: set by the customer page after an
+ * erasure whose CRM match was ambiguous (#2229), so the list the merchant
+ * lands on keeps saying which record still needs manual deletion.
+ */
+export const ERASURE_REVIEW_PARAM = 'erasureReview';

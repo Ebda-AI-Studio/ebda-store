@@ -94,12 +94,12 @@ export default function InsightsCohortsPage() {
 
   const ltvColumns: DataTableColumn<string>[] = [
     {
-      header: 'Cohort',
+      header: t('monthLabel'),
       primaryOnMobile: true,
       cell: month => <span className="font-mono text-xs">{month}</span>,
     },
     {
-      header: 'Customers',
+      header: t('customers'),
       alignEnd: true,
       cell: month => {
         const baseCell = cellMap.get(`${month}::0`);
@@ -108,7 +108,7 @@ export default function InsightsCohortsPage() {
       },
     },
     {
-      header: 'Total Revenue (KWD)',
+      header: t('colTotalRevenue'),
       alignEnd: true,
       cell: month => {
         const totalRevenue = data.cohorts
@@ -118,7 +118,7 @@ export default function InsightsCohortsPage() {
       },
     },
     {
-      header: 'LTV / Customer',
+      header: t('colLtvPerCustomer'),
       alignEnd: true,
       cell: month => {
         const baseCell = cellMap.get(`${month}::0`);
@@ -145,7 +145,7 @@ export default function InsightsCohortsPage() {
 
         {cohortMonths.length === 0 ? (
           <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
-            No cohort data yet. Insights will populate after the first nightly rollup at 02:00 KW.
+            {t('noDataYet')}
           </div>
         ) : (
           <>
@@ -226,7 +226,12 @@ export default function InsightsCohortsPage() {
             {/* LTV data table (simple) */}
             <section>
               <h2 className="text-base font-semibold mb-3">{t('ltvByCohortTitle')}</h2>
-              <DataTable<string> columns={ltvColumns} rows={cohortMonths} rowKey={month => month} />
+              <DataTable<string>
+                ariaLabel={t('ltvByCohortTitle')}
+                columns={ltvColumns}
+                rows={cohortMonths}
+                rowKey={month => month}
+              />
             </section>
           </>
         )}

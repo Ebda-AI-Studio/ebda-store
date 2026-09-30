@@ -30,8 +30,14 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
 
   const W = 520;
   const H = 120;
-  const BAR_GAP = 2;
-  const barW = Math.max(2, Math.floor(W / data.length) - BAR_GAP);
+  // Layout from the data: N bars always span exactly the viewBox. A fixed
+  // `max(2, floor(W/N) - 2)` bar with a 2px gap stopped shrinking past ~130
+  // points, so on "This year" every bar from day ~130 landed at x >= W and was
+  // clipped while the legend still claimed the full range (#2258). The gap
+  // collapses on dense ranges so each bar keeps its whole step.
+  const step = W / data.length;
+  const gap = step > 4 ? 2 : 0;
+  const barW = Math.max(step - gap, 0.5);
   const maxAbs = Math.max(...data.map(d => Math.abs(d.net)), 1);
   const midY = H / 2;
 
@@ -56,7 +62,7 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
           const ratio = point.net / maxAbs;
           const barH = Math.max(1, Math.abs(ratio) * (midY - 4));
           const positive = point.net >= 0;
-          const x = i * (barW + BAR_GAP);
+          const x = i * step;
           const y = positive ? midY - barH : midY;
 
           return (

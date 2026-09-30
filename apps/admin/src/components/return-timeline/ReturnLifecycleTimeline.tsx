@@ -66,7 +66,7 @@ function TimelineIcon({ variant }: { variant: IconVariant }) {
 
   if (variant === 'success') {
     return (
-      <span className={`${base} bg-success/10 text-success`}>
+      <span className={`${base} bg-success/10 text-success-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
@@ -75,7 +75,7 @@ function TimelineIcon({ variant }: { variant: IconVariant }) {
   }
   if (variant === 'reject') {
     return (
-      <span className={`${base} bg-destructive/10 text-destructive`}>
+      <span className={`${base} bg-destructive/10 text-destructive-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -89,7 +89,7 @@ function TimelineIcon({ variant }: { variant: IconVariant }) {
   }
   if (variant === 'received') {
     return (
-      <span className={`${base} bg-info/10 text-info`}>
+      <span className={`${base} bg-info/10 text-info-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -103,7 +103,7 @@ function TimelineIcon({ variant }: { variant: IconVariant }) {
   }
   if (variant === 'tracking') {
     return (
-      <span className={`${base} bg-primary/10 text-primary`}>
+      <span className={`${base} bg-primary/10 text-primary-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"

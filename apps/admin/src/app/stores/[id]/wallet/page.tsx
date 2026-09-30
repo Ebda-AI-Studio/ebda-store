@@ -107,7 +107,7 @@ export default function WalletPage() {
           <div className="h-48 animate-pulse rounded-xl bg-muted" />
         </div>
       ) : error || !data ? (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={load}>
             {t('retry')}
@@ -141,7 +141,7 @@ export default function WalletPage() {
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
                     data.checkout.available
-                      ? 'bg-success/10 text-success'
+                      ? 'bg-success/10 text-success-ink'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >

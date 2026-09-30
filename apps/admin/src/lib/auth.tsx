@@ -17,10 +17,13 @@ import {
   bumpSessionGeneration,
   clearPendingLogout,
   performLogout,
+  readStoredRefreshToken,
+  markSessionEvidence,
+  clearStoredSession,
 } from './api';
 import { isIosWebkit, safeInternalPath } from '@force/shared';
 import { useT } from '@/i18n/useT';
-import { FOCUS_MODE_STORAGE_KEY } from '@/contexts/FocusModeContext';
+import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 
 interface User {
   id: string;
@@ -153,10 +156,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // throttled checkAuth on a PROTECTED route leaves the refresh token intact
   // and routes here, and the documented recovery — "a reload signs you back
   // in without a password" — never ran, because reloading /login is exactly
-  // the mount this skip suppressed. Running the check here too costs two
-  // extra fetches on a genuinely-anonymous /login visit (both resolve fast:
-  // /auth/me 401s, the refresh 401s with no cookie/localStorage token) and,
-  // on a real surviving session, lets the login page below redirect the user
+  // the mount this skip suppressed. On a genuinely-anonymous /login visit the
+  // check costs ONE /auth/me: with no session evidence in this browser it
+  // never posts /auth/refresh and never enters the throttle ladder (#2163 —
+  // it used to, feeding the shared anon refresh bucket up to 8× per load). On
+  // a real surviving session it lets the login page redirect the user
   // straight into the app instead of showing them a password form.
   useEffect(() => {
     if (authCheckedRef.current) return;
@@ -192,6 +196,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // also what lifts a pending (unconfirmed) logout.
     bumpSessionGeneration();
     clearPendingLogout();
+    // The anonymous-mount gate's evidence that a session exists here (#2163).
+    markSessionEvidence();
     // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
     // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
     // purges it). On all other browsers (desktop Chrome/Firefox, Android
@@ -292,8 +298,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // iOS-gated like every other refresh-token read (#1945): elsewhere the
     // token rides the httpOnly cookie, which the server revokes when the body
     // carries none — a leftover localStorage value would be revoked instead.
+    // readStoredRefreshToken also REMOVES a non-iOS residue copy (#2034).
     const refreshTokenValue =
-      typeof window !== 'undefined' && isIosWebkit() ? localStorage.getItem('refreshToken') : null;
+      typeof window !== 'undefined' ? readStoredRefreshToken(isIosWebkit()) : null;
 
     // Invalidate the refresh token server-side before clearing local state.
     // The API also clears the HTTP-only auth cookie in its response.
@@ -305,8 +312,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // undone by the cookies it failed to clear.
     await performLogout(API_URL, refreshTokenValue);
 
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    // accessToken + refreshToken + the session-evidence marker (#2163).
+    clearStoredSession();
     localStorage.removeItem('csrfToken');
     // A second admin signing into this device otherwise inherited whichever
     // store the previous admin last focused — FocusModeContext restores it

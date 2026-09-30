@@ -86,6 +86,9 @@ const ORDER_PAYMENT_SELECT = {
   method: true,
   status: true,
   amount: true,
+  // What a refund-via-provider may still send is `amount - refundedAmount`
+  // on the row that route picks; the admin/PWA confirm dialog quotes it (#2069).
+  refundedAmount: true,
   transactionId: true,
   invoiceId: true,
   paymentUrl: true,

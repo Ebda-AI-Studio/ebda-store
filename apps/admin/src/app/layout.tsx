@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { Providers } from './providers';
+import { intlFormats } from '../i18n/formats';
 import '../styles/globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -106,7 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {t('skipToMainContent')}
         </a>
-        <NextIntlClientProvider locale={locale} messages={messages}>
+        <NextIntlClientProvider locale={locale} messages={messages} formats={intlFormats}>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>
       </body>

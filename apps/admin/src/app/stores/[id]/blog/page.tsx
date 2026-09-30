@@ -177,7 +177,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
             </ul>
           ) : filteredPosts.length === 0 ? (
             <div className="p-10 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
@@ -283,7 +283,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                         type="button"
                         disabled={deletingId === post.id}
                         onClick={() => handleDelete(post.id)}
-                        className="inline-flex items-center justify-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                        className="inline-flex items-center justify-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive-ink hover:bg-destructive/10 disabled:opacity-60"
                       >
                         {deletingId === post.id ? t('postDeleting') : t('postDelete')}
                       </button>

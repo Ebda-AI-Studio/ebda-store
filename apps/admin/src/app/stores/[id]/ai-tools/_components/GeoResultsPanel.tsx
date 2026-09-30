@@ -74,7 +74,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
   }
   if (error) {
     return (
-      <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+      <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive-ink">
         {error}
       </div>
     );

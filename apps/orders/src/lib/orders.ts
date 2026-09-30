@@ -28,6 +28,8 @@ export interface OrderPayment {
   paymentUrl?: string | null;
   /** Legacy alias for paymentUrl kept for backwards compatibility. */
   paymentLink?: string | null;
+  /** Fils already refunded from this payment (partial refunds accumulate). */
+  refundedAmount?: number | null;
   createdAt?: string;
 }
 

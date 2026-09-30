@@ -48,7 +48,7 @@ export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: Sid
                 <span
                   className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${
                     isActive
-                      ? 'bg-primary/15 text-primary'
+                      ? 'bg-primary/15 text-primary-ink'
                       : 'text-muted-foreground group-hover:bg-muted group-hover:text-foreground'
                   }`}
                 >

@@ -8,6 +8,7 @@ import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useLocale } from 'next-intl';
 import { ProductsToolbar } from './_components/ProductsToolbar';
 import { ProductFilters } from './_components/ProductFilters';
@@ -73,8 +74,12 @@ export default function StoreProductsPage() {
   const [isMassEditOpen, setIsMassEditOpen] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
+  // Overlapping list requests (search typed mid-flight, a filter change)
+  // resolve in either order; only the newest may write (#2234 class).
+  const beginRequest = useLatestRequest();
   const fetchProducts = useCallback(async () => {
     if (!isAuthenticated) return;
+    const isLatest = beginRequest();
 
     try {
       setLoading(true);
@@ -94,6 +99,7 @@ export default function StoreProductsPage() {
         meta?: Pagination;
         pagination?: Pagination;
       }>(`/api/v1/stores/${storeId}/products?${queryParams}`);
+      if (!isLatest()) return;
 
       if (data) {
         setProducts(data.products || []);
@@ -102,9 +108,9 @@ export default function StoreProductsPage() {
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [isAuthenticated, storeId, page, limit, statusFilter, categoryFilter, search]);
+  }, [isAuthenticated, storeId, page, limit, statusFilter, categoryFilter, search, beginRequest]);
 
   // Load the category list once (for the category filter dropdown).
   useEffect(() => {

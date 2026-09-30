@@ -159,6 +159,7 @@ export function ShipmentsTable({
       </div>
 
       <DataTable<Shipment>
+        ariaLabel={t('tableLabel')}
         columns={columns}
         rows={shipments}
         rowKey={shipment => shipment.id}

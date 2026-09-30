@@ -163,7 +163,7 @@ export function ProductReorderPage({
       }
     >
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={fetchProducts}>
             {t.retry}
@@ -246,7 +246,7 @@ export function ProductReorderPage({
                     className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold text-sm">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary-ink font-semibold text-sm">
                     {(isRtl
                       ? product.nameAr || product.name
                       : product.name || product.nameAr || ''

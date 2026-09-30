@@ -73,7 +73,7 @@ export function TaxRatesTable({
     {
       header: t('columns.type'),
       cell: rate => (
-        <span className="px-2 py-1 rounded text-xs font-medium bg-info/10 text-info dark:bg-info/30 dark:text-info">
+        <span className="px-2 py-1 rounded text-xs font-medium bg-info/10 text-info-ink dark:bg-info/30 dark:text-info">
           {rate.isCompound ? t('types.compound') : t('types.standard')}
         </span>
       ),
@@ -216,6 +216,7 @@ export function TaxRatesTable({
       </div>
 
       <DataTable<TaxRate>
+        ariaLabel={t('tableLabel')}
         columns={columns}
         rows={rates}
         rowKey={r => r.id}

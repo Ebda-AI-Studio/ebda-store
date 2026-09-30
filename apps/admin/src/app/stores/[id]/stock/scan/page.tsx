@@ -371,7 +371,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
       )}
 
       {lookupErr && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive-ink">
           {lookupErr}
         </div>
       )}
@@ -558,9 +558,10 @@ function PickMode({ storeId }: { storeId: string }) {
 
           {/* Item list */}
           <DataTable<OrderItem>
+            ariaLabel={t('pickItemsTableLabel')}
             columns={[
               {
-                header: 'Item',
+                header: t('colItem'),
                 primaryOnMobile: true,
                 cell: item => {
                   const done = item.pickedQty >= item.quantity;
@@ -575,7 +576,7 @@ function PickMode({ storeId }: { storeId: string }) {
                 },
               },
               {
-                header: 'Picked',
+                header: t('colPicked'),
                 alignEnd: true,
                 className: 'w-20',
                 cell: item => {
@@ -783,7 +784,7 @@ function CountMode({ storeId }: { storeId: string }) {
   };
 
   if (!sessions) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <p className="text-sm text-muted-foreground">{tc('loading')}</p>;
   }
 
   // No active session chosen yet
@@ -927,9 +928,10 @@ function CountMode({ storeId }: { storeId: string }) {
       {/* Lines table */}
       {activeSession.lines.length > 0 && (
         <DataTable<CountLine>
+          ariaLabel={t('countLinesTableLabel')}
           columns={[
             {
-              header: 'Item',
+              header: t('colItem'),
               primaryOnMobile: true,
               cell: line => (
                 <>

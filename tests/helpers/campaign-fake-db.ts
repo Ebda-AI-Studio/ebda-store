@@ -117,6 +117,13 @@ export function createFakePrisma(db: FakeDb) {
         .map(x => pick(x, select)),
     count: async ({ where }: { where?: Row } = {}) =>
       rows().filter(x => matches(x, where, relations)).length,
+    // Single-column `groupBy({ by: [col], _count: { _all: true } })` only.
+    groupBy: async ({ by, where }: { by: string[]; where?: Row }) => {
+      const counts = new Map<unknown, number>();
+      for (const x of rows().filter(r => matches(r, where, relations)))
+        counts.set(x[by[0]], (counts.get(x[by[0]]) ?? 0) + 1);
+      return [...counts].map(([k, n]) => ({ [by[0]]: k, _count: { _all: n } }));
+    },
     updateMany: async ({ where, data }: { where?: Row; data: Row }) => {
       const hit = rows().filter(x => matches(x, where, relations));
       hit.forEach(x => Object.assign(x, data, { updatedAt: new Date() }));

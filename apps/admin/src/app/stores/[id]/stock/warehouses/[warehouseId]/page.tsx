@@ -239,7 +239,7 @@ export default function WarehouseStockPage() {
 
       {/* Error */}
       {err && (
-        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-ink">
           {err}{' '}
           <button className="underline" onClick={loadStock}>
             {tc('retry')}
@@ -267,6 +267,7 @@ export default function WarehouseStockPage() {
       {!loading && rows.length > 0 && (
         <>
           <DataTable<StockRow>
+            ariaLabel={t('title')}
             columns={[
               {
                 header: t('colProduct'),

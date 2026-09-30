@@ -137,7 +137,7 @@ function SortableCategoryRow({
               className="h-10 w-10 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary-ink font-semibold">
               {displayName.charAt(0)}
             </div>
           )}
@@ -162,7 +162,7 @@ function SortableCategoryRow({
         <span
           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
             cat.isActive
-              ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success'
+              ? 'bg-success/10 text-success-ink dark:bg-success/20 dark:text-success'
               : 'bg-muted text-muted-foreground'
           }`}
         >

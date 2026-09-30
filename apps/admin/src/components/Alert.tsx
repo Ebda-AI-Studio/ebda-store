@@ -28,10 +28,10 @@ interface AlertProps {
 const VARIANT_CLASSES: Record<AlertVariant, string> = {
   // Each variant uses the semantic token pair with a translucent background
   // so the alert reads correctly against both light and dark page themes.
-  info: 'border-info/40 bg-info/10 text-info',
-  success: 'border-success/40 bg-success/10 text-success',
-  warning: 'border-warning/40 bg-warning/10 text-warning',
-  destructive: 'border-destructive/40 bg-destructive/10 text-destructive',
+  info: 'border-info/40 bg-info/10 text-info-ink',
+  success: 'border-success/40 bg-success/10 text-success-ink',
+  warning: 'border-warning/40 bg-warning/10 text-warning-ink',
+  destructive: 'border-destructive/40 bg-destructive/10 text-destructive-ink',
 };
 
 /**

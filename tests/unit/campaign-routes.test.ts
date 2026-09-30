@@ -374,11 +374,51 @@ describe('feature ON', () => {
     const res = await request(app).delete(`${BASE}/${c.id}`);
 
     expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('CAMPAIGN_NOT_DELETABLE');
+    // Distinct from the wrong-status refusal so the admin can translate each (issue 2082).
+    expect(res.body.error.code).toBe('CAMPAIGN_HAS_SEND_HISTORY');
     // The campaign AND the sent-history recipient row both survive — deleting
     // the campaign would cascade-delete the recipient too (schema FK).
     expect(db.campaigns).toHaveLength(1);
     expect(db.recipients).toHaveLength(1);
+  });
+
+  it('issue 2082 — a wrong-status delete keeps CAMPAIGN_NOT_DELETABLE, distinct from send history', async () => {
+    const c = draft({ status: 'sending' });
+    const res = await request(app).delete(`${BASE}/${c.id}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CAMPAIGN_NOT_DELETABLE');
+  });
+
+  it('issue 2082 — the detail reports hasSendHistory with the same predicate DELETE refuses on', async () => {
+    const c = draft({ status: 'cancelled' });
+    const recipient = {
+      id: uuid(),
+      campaignId: c.id,
+      storeId: STORE_A,
+      email: 'a@x.test',
+      subscriberId: null,
+      customerId: null,
+      locale: 'en',
+      // bounced AFTER sending: no `sent` status count, but send history all the same
+      status: 'bounced',
+      providerMessageId: 'resend-1',
+      error: null,
+      sentAt: null as Date | null,
+      unsubscribedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    db.recipients.push(recipient);
+    let res = await request(app).get(`${BASE}/${c.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.hasSendHistory).toBe(false);
+
+    recipient.sentAt = new Date();
+    res = await request(app).get(`${BASE}/${c.id}`);
+    expect(res.body.data.hasSendHistory).toBe(true);
+    expect(res.body.data.statusCounts.sent).toBe(0);
+    const del = await request(app).delete(`${BASE}/${c.id}`);
+    expect(del.body.error.code).toBe('CAMPAIGN_HAS_SEND_HISTORY');
   });
 
   it('still allows deleting a cancelled/failed campaign whose recipients never actually sent', async () => {

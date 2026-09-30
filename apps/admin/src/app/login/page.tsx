@@ -92,14 +92,12 @@ export default function LoginPage() {
     }
   }
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
+  // No full-screen spinner while the mount check runs (#2159): with a
+  // throttled refresh bucket that check waits out MOUNT_RETRY_DELAYS_MS
+  // (~21s), and the one page a locked-out admin needs was unreachable for all
+  // of it. The form renders at once; the effect above still carries an
+  // already-signed-in user onward when the check resolves, and a login that
+  // lands first supersedes the check (#2161).
   // ── MFA step ───────────────────────────────────────────────────────────────
   if (mfaChallenge) {
     return (
@@ -108,7 +106,7 @@ export default function LoginPage() {
           <div className="mx-auto w-full max-w-sm lg:w-96">
             <div className="text-center">
               <div className="flex justify-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
@@ -127,7 +125,7 @@ export default function LoginPage() {
 
             <form className="mt-8 space-y-6" onSubmit={handleMfaSubmit}>
               {error && (
-                <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+                <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
                   {error}
                 </div>
               )}
@@ -227,7 +225,7 @@ export default function LoginPage() {
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+              <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
                 {error}
               </div>
             )}

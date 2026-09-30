@@ -130,7 +130,7 @@ export default function InsightsFunnelPage() {
 
   const dailyColumns: DataTableColumn<FunnelDay>[] = [
     {
-      header: 'Date',
+      header: t('colDate'),
       primaryOnMobile: true,
       cell: day => (
         <span className="font-mono text-xs text-muted-foreground">
@@ -292,6 +292,7 @@ export default function InsightsFunnelPage() {
                 <p className="mb-2 text-xs text-muted-foreground">{tGuest('checkoutsTableNote')}</p>
               )}
               <DataTable<FunnelDay>
+                ariaLabel={t('dailyBreakdownTitle')}
                 columns={dailyColumns}
                 rows={sortedDays}
                 rowKey={day => day.periodDate}
@@ -302,8 +303,7 @@ export default function InsightsFunnelPage() {
 
         {!loading && data?.days.length === 0 && (
           <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
-            No funnel data yet for this window. Insights populate after the first nightly rollup at
-            02:00 KW.
+            {t('noDataYet')}
           </div>
         )}
       </div>

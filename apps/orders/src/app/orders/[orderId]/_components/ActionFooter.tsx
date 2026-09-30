@@ -1,6 +1,6 @@
 'use client';
 
-import { orderActionVisibility } from '@force/shared';
+import { orderActionVisibility, refundViaProviderRemaining } from '@force/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { statusOptionsFor, type OrderDetail } from '@/lib/orders';
 import { PaymentLinkButton } from './PaymentLinkButton';
@@ -45,7 +45,11 @@ export function ActionFooter({
   const transitions = statusOptionsFor(order);
   const nextStatus = transitions.find(s => s !== 'cancelled') ?? null;
   const canCancel = transitions.includes('cancelled');
-  const isFinal = ['delivered', 'refunded'].includes(order.status);
+  // Final = the shared transition map offers nothing more (#2144). A hand-kept
+  // list here treated `delivered` as final, hiding the `refunded` the map
+  // offers for a delivered order — the same contradiction #1947 fixed for
+  // `cancelled`.
+  const isFinal = transitions.length === 0;
 
   // Shared with the admin ActionFooter — one gating rule for both surfaces.
   const { showMarkPaid, showManualMarkPaid, showRefundViaProvider, showRefreshRefundStatus } =
@@ -128,9 +132,11 @@ export function ActionFooter({
             storeId={storeId}
             orderId={order.id}
             orderNumber={order.orderNumber ?? ''}
-            // What the PROVIDER refunds: the order value less any customer-wallet
-            // spend (D1), which the refund fanout returns to the wallet instead.
-            total={order.total - (order.walletAmount ?? 0)}
+            // What the PROVIDER refunds (#2069): the refundable remainder of the
+            // payment row the route picks — after a partial refund that is less
+            // than the order value. Older payloads without the figures fall back
+            // to the order value less any customer-wallet spend (D1).
+            total={refundViaProviderRemaining(order) ?? order.total - (order.walletAmount ?? 0)}
             currency={order.currency}
             disabled={isUpdating}
             onRefunded={onRefetch}

@@ -220,7 +220,7 @@ export default function UserDetailPage() {
               <h2 className="font-semibold text-foreground">{t('profile')}</h2>
             </div>
             <div className="p-6 text-center">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
                 <span className="text-2xl font-bold">
                   {user.firstName[0]}
                   {user.lastName[0]}
@@ -426,7 +426,7 @@ export default function UserDetailPage() {
                   className={`rounded-lg p-4 text-sm ${
                     saveMessage.type === 'success'
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                      : 'bg-destructive/5 text-destructive dark:bg-destructive/30/20 dark:text-destructive'
+                      : 'bg-destructive/5 text-destructive-ink dark:bg-destructive/30/20 dark:text-destructive'
                   }`}
                 >
                   {saveMessage.text}

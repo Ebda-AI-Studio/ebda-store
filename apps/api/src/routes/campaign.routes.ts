@@ -229,7 +229,15 @@ router.get('/:campaignId', async (req: Request, res: Response, next: NextFunctio
     const statusCounts = Object.fromEntries(
       CAMPAIGN_RECIPIENT_STATUSES.map(s => [s, groups.find(g => g.status === s)?._count._all ?? 0])
     );
-    res.json({ success: true, data: { campaign, statusCounts } });
+    // The exact predicate DELETE refuses on (`sentAt` set on any recipient) —
+    // a bounced/unsubscribed row can carry it too, so no status count stands in
+    // for it. Lets the admin hide a Delete that can only 409 (issue 2082).
+    const hasSendHistory =
+      (await prisma.campaignRecipient.findFirst({
+        where: { campaignId, storeId, sentAt: { not: null } },
+        select: { id: true },
+      })) !== null;
+    res.json({ success: true, data: { campaign, statusCounts, hasSendHistory } });
   } catch (error) {
     next(error);
   }
@@ -331,7 +339,7 @@ router.delete(
         }
         throw new AppError(
           409,
-          'CAMPAIGN_NOT_DELETABLE',
+          'CAMPAIGN_HAS_SEND_HISTORY',
           'A campaign that already sent mail is send history and cannot be deleted'
         );
       }

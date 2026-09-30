@@ -34,14 +34,30 @@ function row(overrides: Partial<SlugRedirectRow> = {}): SlugRedirectRow {
 
 describe('RedirectsTable', () => {
   it('renders fromSlug -> toSlug and entity type for each row', () => {
-    render(<RedirectsTable rows={[row()]} deletingId={null} onDelete={() => {}} t={t} />);
+    render(
+      <RedirectsTable
+        rows={[row()]}
+        deletingId={null}
+        onDelete={() => {}}
+        t={t}
+        ariaLabel="Slug Redirects"
+      />
+    );
     expect(screen.getAllByText('old-slug')).toHaveLength(1);
     expect(screen.getAllByText('new-slug')).toHaveLength(1);
     expect(screen.getAllByText('PRODUCT')).toHaveLength(1);
   });
 
   it('shows the empty state when there are no rows', () => {
-    render(<RedirectsTable rows={[]} deletingId={null} onDelete={() => {}} t={t} />);
+    render(
+      <RedirectsTable
+        rows={[]}
+        deletingId={null}
+        onDelete={() => {}}
+        t={t}
+        ariaLabel="Slug Redirects"
+      />
+    );
     expect(screen.getByText('redirectsEmpty')).toBeTruthy();
     expect(screen.queryByText('old-slug')).toBeNull();
   });
@@ -54,6 +70,7 @@ describe('RedirectsTable', () => {
         deletingId={null}
         onDelete={onDelete}
         t={t}
+        ariaLabel="Slug Redirects"
       />
     );
     const buttons = screen.getAllByText('redirectsDelete');
@@ -70,6 +87,7 @@ describe('RedirectsTable', () => {
         deletingId="a"
         onDelete={() => {}}
         t={t}
+        ariaLabel="Slug Redirects"
       />
     );
     const buttons = screen.getAllByRole('button');

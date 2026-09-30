@@ -194,7 +194,7 @@ export function PaymentLinkButton({
           type="button"
           onClick={() => setOpen(true)}
           disabled={disabled || isIssuing}
-          className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-4 py-2.5 text-sm font-semibold text-info hover:bg-info/10 disabled:opacity-60 transition-colors cursor-pointer"
+          className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-4 py-2.5 text-sm font-semibold text-info-ink hover:bg-info/10 disabled:opacity-60 transition-colors cursor-pointer"
         >
           <svg
             className="h-4 w-4"

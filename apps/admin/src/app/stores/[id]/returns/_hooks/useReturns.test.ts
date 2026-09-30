@@ -54,7 +54,7 @@ describe('useReturns.complete — refusals say why', () => {
     expect(requestRefundMethod).toHaveBeenCalledWith('ret-9');
   });
 
-  it.each(['PROVIDER_REFUND_INDETERMINATE', 'REFUND_ALREADY_ISSUED'])(
+  it.each(['PROVIDER_REFUND_INDETERMINATE', 'REFUND_ALREADY_ISSUED', 'INVALID_STATE'])(
     '%s: the money may have moved — a specific message that stays until dismissed',
     async code => {
       apiPost.mockResolvedValue({ data: null, error: { code, message: 'x', status: 502 } });
@@ -75,6 +75,10 @@ describe('useReturns.complete — refusals say why', () => {
     'PARTIAL_REFUND_NOTHING_TO_REFUND',
     'PAYMENT_FULLY_REFUNDED',
     'NO_COMPLETED_PAYMENT',
+    'PAYMENT_NOT_REFUNDABLE',
+    'ALREADY_REFUNDED',
+    'REFUND_EXCEEDS_REMAINING',
+    'INVALID_REFUND_AMOUNT',
   ])('%s gets its own message', async code => {
     apiPost.mockResolvedValue({ data: null, error: { code, message: 'x', status: 409 } });
     const { result } = setup();

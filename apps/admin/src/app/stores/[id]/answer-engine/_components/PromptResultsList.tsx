@@ -61,7 +61,7 @@ export function PromptResultsList({ storeId, prompts }: PromptResultsListProps) 
               {!prompt.cited && (
                 <Link
                   href={`/stores/${storeId}/ai-tools`}
-                  className="shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+                  className="shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10 transition-colors whitespace-nowrap"
                 >
                   {t('recCta')}
                 </Link>

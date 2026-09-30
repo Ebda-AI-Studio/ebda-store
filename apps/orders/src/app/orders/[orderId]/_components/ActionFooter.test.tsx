@@ -65,6 +65,17 @@ describe('orders PWA ActionFooter — status action (#1936)', () => {
     expect(screen.queryByText('refunded')).toBeNull();
   });
 
+  it('offers Refunded on a PAID delivered order (#2144)', () => {
+    const onStatusChange = renderFooter(order('delivered', 'paid'));
+    fireEvent.click(screen.getByText('refunded'));
+    expect(onStatusChange).toHaveBeenCalledWith('refunded');
+  });
+
+  it('offers nothing on a refunded order', () => {
+    renderFooter(order('refunded', 'paid'));
+    expect(screen.queryByText('refunded')).toBeNull();
+  });
+
   it('keeps the usual next step for an active order', () => {
     const onStatusChange = renderFooter(order('shipped', 'paid'));
     fireEvent.click(screen.getByText('delivered'));

@@ -254,7 +254,7 @@ export default function DeadstockPage() {
 
         {/* Flags whose product has no cost price — value unknown */}
         {!loading && !error && valueUnknownCount > 0 && (
-          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-ink">
             {t('valueUnknownBanner', { count: valueUnknownCount })}
           </div>
         )}

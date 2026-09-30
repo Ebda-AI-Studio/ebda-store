@@ -35,6 +35,11 @@ describe('CustomerDetailPage.handleEraseConfirm does not re-fetch the erased cus
   });
 
   it('navigates back to the customers list instead', () => {
-    expect(handlerBody).toContain('router.push(`/stores/${storeId}/customers`)');
+    expect(handlerBody).toMatch(/router\.push\(\s*`\/stores\/\$\{storeId\}\/customers/);
+  });
+
+  it('#2229 — an ambiguous CRM match: a toast that stays + the review banner param', () => {
+    expect(handlerBody).toMatch(/duration:\s*0/);
+    expect(handlerBody).toContain('ERASURE_REVIEW_PARAM');
   });
 });

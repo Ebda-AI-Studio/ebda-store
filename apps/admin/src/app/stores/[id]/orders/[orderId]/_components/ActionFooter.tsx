@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { orderActionVisibility } from '@force/shared';
+import { orderActionVisibility, refundViaProviderRemaining } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { statusOptionsFor } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
@@ -53,7 +53,11 @@ export function ActionFooter({
   const transitions = statusOptionsFor(order);
   const nextStatus = transitions.find(s => s !== 'cancelled') ?? null;
   const canCancel = transitions.includes('cancelled');
-  const isFinal = ['delivered', 'refunded'].includes(order.status);
+  // Final = the shared transition map offers nothing more (#2144). A hand-kept
+  // list here treated `delivered` as final, hiding the `refunded` the map
+  // offers for a delivered order — the same contradiction #1947 fixed for
+  // `cancelled`.
+  const isFinal = transitions.length === 0;
   // Money-action gating lives in @force/shared's orderActionVisibility,
   // shared with the orders PWA so the two surfaces cannot drift (#1908):
   //   - showMarkPaid: promoted out of the overflow on mobile — the PWA flow
@@ -151,9 +155,11 @@ export function ActionFooter({
             storeId={storeId}
             orderId={order.id}
             orderNumber={order.orderNumber}
-            // What the PROVIDER refunds: the order value less any customer-wallet
-            // spend (D1), which the refund fanout returns to the wallet instead.
-            total={order.total - (order.walletAmount ?? 0)}
+            // What the PROVIDER refunds (#2069): the refundable remainder of the
+            // payment row the route picks — after a partial refund that is less
+            // than the order value. Older payloads without the figures fall back
+            // to the order value less any customer-wallet spend (D1).
+            total={refundViaProviderRemaining(order) ?? order.total - (order.walletAmount ?? 0)}
             currency={order.currency}
             disabled={isUpdating}
             onRefunded={onPaymentRefreshed}
@@ -179,7 +185,7 @@ export function ActionFooter({
             type="button"
             onClick={onMarkPaid}
             disabled={isUpdating}
-            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 py-2.5 text-center text-sm font-semibold leading-tight text-primary hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
+            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 py-2.5 text-center text-sm font-semibold leading-tight text-primary-ink hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
           >
             <svg
               className="h-4 w-4 shrink-0"

@@ -71,7 +71,7 @@ function EventIcon({ variant }: { variant: IconVariant }) {
   const base = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full';
   if (variant === 'success') {
     return (
-      <span className={`${base} bg-success/10 text-success`}>
+      <span className={`${base} bg-success/10 text-success-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
@@ -80,7 +80,7 @@ function EventIcon({ variant }: { variant: IconVariant }) {
   }
   if (variant === 'reject') {
     return (
-      <span className={`${base} bg-destructive/10 text-destructive`}>
+      <span className={`${base} bg-destructive/10 text-destructive-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -94,7 +94,7 @@ function EventIcon({ variant }: { variant: IconVariant }) {
   }
   if (variant === 'money') {
     return (
-      <span className={`${base} bg-info/10 text-info`}>
+      <span className={`${base} bg-info/10 text-info-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"

@@ -61,6 +61,6 @@ describe('cohorts retention matrix is a genuine grid, not card-stacked (#1966)',
 
   it('the simple LTV table still uses DataTable (a normal list, not a grid)', () => {
     const source = readFileSync(pagePath('cohorts'), 'utf8');
-    expect(source).toMatch(/<DataTable<string> columns=\{ltvColumns\}/);
+    expect(source).toMatch(/<DataTable<string>[^>]*columns=\{ltvColumns\}/);
   });
 });

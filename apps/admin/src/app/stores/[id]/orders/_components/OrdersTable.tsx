@@ -287,6 +287,7 @@ export function OrdersTable({
 
   return (
     <DataTable<Order>
+      ariaLabel={t('table.label')}
       columns={columns}
       rows={orders}
       rowKey={o => o.id}

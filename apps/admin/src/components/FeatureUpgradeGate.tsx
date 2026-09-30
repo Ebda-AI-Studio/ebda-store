@@ -19,6 +19,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@force/ui';
+import { AdminLayout } from './AdminLayout';
 import {
   FEATURE_REGISTRY,
   PLAN_LABELS,
@@ -88,127 +89,135 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
           .slice(0, 3)
       : [];
 
+  // Rendered INSIDE the admin chrome (#2236): pages `return gate`, and a
+  // bare card here unmounted the sidebar, hub tabs and topbar — a store_admin
+  // on a gated page had no navigation left but the browser's back button.
   return (
-    <div className="flex items-center justify-center min-h-[60vh] px-4 py-12">
-      <div className="w-full max-w-lg">
-        {/* Card */}
-        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-          {/* Orange accent strip */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 to-orange-400" />
+    <AdminLayout title={featureName}>
+      <div className="flex items-center justify-center min-h-[60vh] px-4 py-12">
+        <div className="w-full max-w-lg">
+          {/* Card */}
+          <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+            {/* Orange accent strip */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 to-orange-400" />
 
-          <div className="p-8">
-            {/* Lock badge */}
-            <div className="flex items-center gap-2 mb-5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-400 px-3 py-1 text-xs font-medium">
-                {/* Lock icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="w-3.5 h-3.5 shrink-0"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {t('lockedBadge')}
-              </span>
-            </div>
+            <div className="p-8">
+              {/* Lock badge */}
+              <div className="flex items-center gap-2 mb-5">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-400 px-3 py-1 text-xs font-medium">
+                  {/* Lock icon */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="w-3.5 h-3.5 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {t('lockedBadge')}
+                </span>
+              </div>
 
-            {/* Feature name headline */}
-            <h1
-              className="text-2xl font-bold tracking-tight text-foreground mb-2"
-              dir={isAr ? 'rtl' : 'ltr'}
-            >
-              {featureName}
-            </h1>
-
-            {/* Feature description (value proposition) */}
-            {featureDescription && (
-              <p
-                className="text-base text-muted-foreground leading-relaxed mb-5"
+              {/* Feature name headline */}
+              <h1
+                className="text-2xl font-bold tracking-tight text-foreground mb-2"
                 dir={isAr ? 'rtl' : 'ltr'}
               >
-                {featureDescription}
-              </p>
-            )}
+                {featureName}
+              </h1>
 
-            {/* Plan availability line */}
-            {planLabel && (
-              <p className="text-sm font-medium text-foreground/80 mb-6" dir={isAr ? 'rtl' : 'ltr'}>
-                {t('availableOn', { plan: planLabel })}
-              </p>
-            )}
-
-            {/* CTA buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              {/* Primary: upgrade */}
-              <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex-1">
-                <Button
-                  type="button"
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white border-0 font-semibold"
-                >
-                  {planLabel ? t('upgradeCta', { plan: planLabel }) : t('contactCta')}
-                </Button>
-              </a>
-
-              {/* Secondary: talk to us */}
-              <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex-1">
-                <Button type="button" variant="outline" className="w-full">
-                  {t('contactCta')}
-                </Button>
-              </a>
-            </div>
-
-            {/* Sibling features — "also included" upsell list */}
-            {siblings.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-border">
+              {/* Feature description (value proposition) */}
+              {featureDescription && (
                 <p
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3"
+                  className="text-base text-muted-foreground leading-relaxed mb-5"
                   dir={isAr ? 'rtl' : 'ltr'}
                 >
-                  {t('alsoIncluded')}
+                  {featureDescription}
                 </p>
-                <ul className="space-y-2">
-                  {siblings.map(sibling => (
-                    <li
-                      key={sibling.key}
-                      className="flex items-start gap-2.5"
-                      dir={isAr ? 'rtl' : 'ltr'}
-                    >
-                      {/* Sparkle / check icon */}
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        className="w-4 h-4 text-orange-500 mt-0.5 shrink-0"
-                        aria-hidden="true"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-foreground">
-                          {isAr ? sibling.nameAr : sibling.name}
-                        </span>
-                        <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
-                          {isAr ? sibling.descriptionAr : sibling.description}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+              )}
+
+              {/* Plan availability line */}
+              {planLabel && (
+                <p
+                  className="text-sm font-medium text-foreground/80 mb-6"
+                  dir={isAr ? 'rtl' : 'ltr'}
+                >
+                  {t('availableOn', { plan: planLabel })}
+                </p>
+              )}
+
+              {/* CTA buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Primary: upgrade */}
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                  <Button
+                    type="button"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white border-0 font-semibold"
+                  >
+                    {planLabel ? t('upgradeCta', { plan: planLabel }) : t('contactCta')}
+                  </Button>
+                </a>
+
+                {/* Secondary: talk to us */}
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                  <Button type="button" variant="outline" className="w-full">
+                    {t('contactCta')}
+                  </Button>
+                </a>
               </div>
-            )}
+
+              {/* Sibling features — "also included" upsell list */}
+              {siblings.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-border">
+                  <p
+                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3"
+                    dir={isAr ? 'rtl' : 'ltr'}
+                  >
+                    {t('alsoIncluded')}
+                  </p>
+                  <ul className="space-y-2">
+                    {siblings.map(sibling => (
+                      <li
+                        key={sibling.key}
+                        className="flex items-start gap-2.5"
+                        dir={isAr ? 'rtl' : 'ltr'}
+                      >
+                        {/* Sparkle / check icon */}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          className="w-4 h-4 text-orange-500 mt-0.5 shrink-0"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium text-foreground">
+                            {isAr ? sibling.nameAr : sibling.name}
+                          </span>
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+                            {isAr ? sibling.descriptionAr : sibling.description}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

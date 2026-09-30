@@ -129,6 +129,76 @@ export class RefreshThrottledError extends Error {
   }
 }
 
+/**
+ * The iOS-only refresh-token read, which also REMOVES the legacy copy on every
+ * other browser (#2034). Writes are iOS-gated, so a value found elsewhere is
+ * residue from before the gate: a 365-day credential in JS-readable storage
+ * that is never read or sent again. Mirrors apps/web/src/lib/api.ts.
+ */
+export function readStoredRefreshToken(ios: boolean): string | null {
+  if (typeof window === 'undefined') return null;
+  if (ios) return localStorage.getItem('refreshToken');
+  localStorage.removeItem('refreshToken');
+  return null;
+}
+
+/**
+ * Evidence that a session ever existed in this browser (#2095, #2163).
+ *
+ * The mount check runs on EVERY route, /login included, and an anonymous
+ * visitor's `GET /auth/me` 401 used to be followed by a credential-less
+ * `POST /auth/refresh`. express-rate-limit counts that request against the
+ * SHARED `<ip>-refresh-anon` bucket and the IP-wide backstop before the route
+ * can answer, so staff reloading the login page behind one office/carrier IP
+ * drained the budget the signed-in sessions on that IP renew from — and once
+ * it was throttled, the mount ladder multiplied each load into 4 × /auth/me +
+ * 8 × /auth/refresh. Same gate as apps/web (`hasSessionEvidence`).
+ *
+ * Evidence: the marker written on every authenticated answer, a stored token
+ * (iOS mirrors them), or the admin's `force-session=1` hint cookie.
+ */
+const SESSION_MARKER_KEY = 'hadSession';
+
+export function markSessionEvidence(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(SESSION_MARKER_KEY, '1');
+}
+
+export function hasSessionEvidence(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (
+    localStorage.getItem(SESSION_MARKER_KEY) !== null ||
+    localStorage.getItem('refreshToken') !== null ||
+    localStorage.getItem('accessToken') !== null ||
+    localStorage.getItem('csrfToken') !== null
+  ) {
+    return true;
+  }
+  return (
+    typeof document !== 'undefined' && /(?:^|;\s*)force-session=1(?:;|$)/.test(document.cookie)
+  );
+}
+
+/**
+ * One evidence-free refresh per TAB (web's #2164 answer): Safari ITP can evict
+ * localStorage while the server's refresh cookie survives, so a real session
+ * with no local evidence still gets one chance per tab — sessionStorage keeps
+ * it to one across reloads. No sessionStorage means no probe.
+ */
+const SESSION_PROBE_KEY = 'authProbe';
+
+function claimSessionProbe(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const ss = window.sessionStorage;
+    if (!ss || ss.getItem(SESSION_PROBE_KEY) !== null) return false;
+    ss.setItem(SESSION_PROBE_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
 
@@ -146,7 +216,7 @@ export function refreshAccessToken(): Promise<string | null> {
     // rejected. This was previously checked only inside the unused
     // refreshToken() callback, so checkAuth's own refresh path missed it.
     if (ios && !localStorage.getItem('refreshToken')) return null;
-    const storedRefreshToken = ios ? localStorage.getItem('refreshToken') : null;
+    const storedRefreshToken = readStoredRefreshToken(ios);
 
     try {
       const res = await fetch(`${getApiUrl()}/api/v1/auth/refresh`, {
@@ -231,6 +301,14 @@ export function clearStoredSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
+  // The session is over: nothing is left to refresh, so the next anonymous
+  // mount must not read as a session worth probing (#2163) — every piece of
+  // evidence goes, or a dead session buys one doomed refresh per page load.
+  localStorage.removeItem(SESSION_MARKER_KEY);
+  localStorage.removeItem('csrfToken');
+  if (typeof document !== 'undefined') {
+    document.cookie = 'force-session=; path=/; max-age=0';
+  }
 }
 
 /**
@@ -414,10 +492,16 @@ export async function checkSession(
   if (stale()) return { status: 'superseded' };
   if (first.ok) {
     const data = await first.json();
+    markSessionEvidence();
     return { status: 'authenticated', user: data.data.user };
   }
-  if (first.status === 429) return { status: 'throttled' };
+  // No session was ever here: nothing to wait out and nothing to refresh, so
+  // neither the mount ladder nor a credential-less /auth/refresh runs (#2163).
+  if (first.status === 429) {
+    return hasSessionEvidence() ? { status: 'throttled' } : { status: 'signed-out' };
+  }
   if (first.status !== 401) return { status: 'unavailable' };
+  if (!hasSessionEvidence() && !claimSessionProbe()) return { status: 'signed-out' };
 
   const outcome = await refreshSessionWaitingOutThrottle();
   if (stale()) return { status: 'superseded' };
@@ -426,6 +510,7 @@ export async function checkSession(
     if (stale()) return { status: 'superseded' };
     if (retry.ok) {
       const data = await retry.json();
+      markSessionEvidence();
       return { status: 'authenticated', user: data.data.user };
     }
     if (retry.status === 429) return { status: 'throttled' };

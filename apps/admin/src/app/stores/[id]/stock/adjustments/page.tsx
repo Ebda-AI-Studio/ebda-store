@@ -156,7 +156,7 @@ export default function StockAdjustmentsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}
@@ -178,6 +178,7 @@ export default function StockAdjustmentsPage() {
           </div>
 
           <DataTable<AdjustmentRow>
+            ariaLabel={t('title')}
             columns={columns}
             rows={filteredAdjustments ?? adjustments}
             rowKey={adj => adj.id}

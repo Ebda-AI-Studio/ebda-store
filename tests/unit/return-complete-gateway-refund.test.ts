@@ -1070,6 +1070,7 @@ describe('ReturnService.refundPreview — what the admin confirms is what comple
       walletShare: 0,
       refundableRemaining: PAYMENT_TOTAL,
       unavailableReason: null,
+      alreadyPaidToCustomer: false,
     });
     // And complete() sends exactly that.
     await ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'original');
@@ -1123,6 +1124,31 @@ describe('ReturnService.refundPreview — what the admin confirms is what comple
     const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
 
     expect(preview.gateway.unavailableReason).toBe('REFUND_ALREADY_ISSUED');
+    expect(preview.gateway.alreadyPaidToCustomer).toBe(true);
+  });
+
+  it('issue 2003 — a payment already refunded in full elsewhere: record-only is honest', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    paymentFindFirst.mockResolvedValue({
+      id: 'pay-1',
+      amount: PAYMENT_TOTAL,
+      refundedAmount: PAYMENT_TOTAL,
+      status: 'refunded',
+      transactionId: 'tx-1',
+      provider: 'tap',
+    });
+
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+
+    expect(preview.gateway.unavailableReason).toBe('PAYMENT_FULLY_REFUNDED');
+    expect(preview.gateway.alreadyPaidToCustomer).toBe(true);
+  });
+
+  it('issue 2003 — a COD order is NOT already paid to the customer', async () => {
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+    paymentFindFirst.mockResolvedValue(null);
+    const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);
+    expect(preview.gateway.alreadyPaidToCustomer).toBe(false);
   });
 
   it('wallet OFF: no wallet figure — store credit keeps its off-platform meaning', async () => {

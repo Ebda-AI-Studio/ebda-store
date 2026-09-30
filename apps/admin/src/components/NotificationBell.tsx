@@ -17,12 +17,13 @@ const iconMap: Record<string, string> = {
 };
 
 const colorMap: Record<string, string> = {
-  new_order: 'bg-success/10 text-success dark:bg-success/30 dark:text-success',
-  new_review: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning',
-  new_return: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
-  low_stock: 'bg-destructive/10 text-destructive dark:bg-destructive/30/30 dark:text-destructive',
-  order_status: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-  return_status: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+  new_order: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success',
+  new_review: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning',
+  new_return: 'bg-primary/10 text-primary-ink dark:bg-primary/30 dark:text-primary',
+  low_stock:
+    'bg-destructive/10 text-destructive-ink dark:bg-destructive/30/30 dark:text-destructive',
+  order_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
+  return_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
 };
 
 export function NotificationBell() {

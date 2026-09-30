@@ -57,10 +57,11 @@ const CSP_SUFFIX = "; worker-src 'self' blob:; manifest-src 'self'; frame-ancest
  */
 const PAGE_BUILDER_PREVIEW_SOURCE = '/stores/:id/page-builder';
 // Named capture group (`:path(...)`), not the unnamed `(...)` form this used
-// to be — functionally identical (verified: both compile to the same
-// path-to-regexp match matrix), but the named form is what Next's own docs
-// use and is proven by the source-pattern test below rather than by a
-// production curl.
+// to be. Verified at the level of what is SERVED (issues 2178/2189): the test
+// compiles both sources with Next's own buildCustomRoute (the routes-manifest
+// regex) and applies them the way OpenNext's router does on Workers — every
+// admin path gets all seven security headers, values unaltered, and only the
+// bare page-builder route gets the preview frame-src.
 const ADMIN_CATCHALL_SOURCE = '/:path((?!stores/[^/]+/page-builder$).*)';
 
 /**

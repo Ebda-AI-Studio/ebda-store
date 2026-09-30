@@ -183,7 +183,7 @@ export default function WarehousesPage() {
     >
       {/* Error banner */}
       {err && (
-        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-ink">
           {err}{' '}
           <button className="underline" onClick={load}>
             {tc('retry')}
@@ -203,6 +203,7 @@ export default function WarehousesPage() {
       {/* Warehouse table */}
       {!loading && warehouses && (
         <DataTable<Warehouse>
+          ariaLabel={t('title')}
           columns={[
             {
               header: t('colName'),
@@ -225,7 +226,7 @@ export default function WarehousesPage() {
               mobileBadge: true,
               cell: w =>
                 w.isDefault ? (
-                  <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-ink">
                     {t('default')}
                   </span>
                 ) : (

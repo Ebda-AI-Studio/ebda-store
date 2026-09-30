@@ -89,5 +89,12 @@ export function StoresTable({ stores }: StoresTableProps) {
     },
   ];
 
-  return <DataTable<Store> columns={columns} rows={stores} rowKey={s => s.id} />;
+  return (
+    <DataTable<Store>
+      ariaLabel={t('tableLabel')}
+      columns={columns}
+      rows={stores}
+      rowKey={s => s.id}
+    />
+  );
 }

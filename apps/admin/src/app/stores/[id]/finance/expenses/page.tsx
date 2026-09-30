@@ -219,7 +219,7 @@ export default function ExpensesPage() {
       />
 
       {error && (
-        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}
@@ -233,7 +233,12 @@ export default function ExpensesPage() {
           {expenses.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('emptyState')}</p>
           ) : (
-            <DataTable<ExpenseRow> columns={columns} rows={expenses} rowKey={exp => exp.id} />
+            <DataTable<ExpenseRow>
+              ariaLabel={t('title')}
+              columns={columns}
+              rows={expenses}
+              rowKey={exp => exp.id}
+            />
           )}
         </div>
       )}

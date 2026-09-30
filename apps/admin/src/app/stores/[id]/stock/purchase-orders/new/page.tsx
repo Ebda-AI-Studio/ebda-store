@@ -101,7 +101,7 @@ export default function NewPurchaseOrderPage() {
 
   const lineColumns: DataTableColumn<POLineItem>[] = [
     {
-      header: 'Product',
+      header: tNew('colProduct'),
       primaryOnMobile: true,
       cell: (line, i) => (
         <select
@@ -294,7 +294,12 @@ export default function NewPurchaseOrderPage() {
 
         {/* Line items */}
         <div>
-          <DataTable<POLineItem> columns={lineColumns} rows={lines} rowKey={(_l, i) => String(i)} />
+          <DataTable<POLineItem>
+            ariaLabel={tNew('lineItemsTableLabel')}
+            columns={lineColumns}
+            rows={lines}
+            rowKey={(_l, i) => String(i)}
+          />
           {/* DataTable has no footer concept, so the subtotal is a summary bar
               right below the table — visible on both layouts. */}
           <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
@@ -321,7 +326,7 @@ export default function NewPurchaseOrderPage() {
             disabled={submitting}
             className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : tNew('submit')}
+            {submitting ? tc('saving') : tNew('submit')}
           </button>
           <button
             type="button"

@@ -106,7 +106,12 @@ export function EventConfigTable({
         </div>
       </div>
 
-      <DataTable<EventConfig> columns={columns} rows={events} rowKey={ev => ev.event} />
+      <DataTable<EventConfig>
+        ariaLabel={t('tableLabel')}
+        columns={columns}
+        rows={events}
+        rowKey={ev => ev.event}
+      />
 
       <div className="bg-card rounded-xl border border-border px-6 py-4 flex justify-end">
         <Button

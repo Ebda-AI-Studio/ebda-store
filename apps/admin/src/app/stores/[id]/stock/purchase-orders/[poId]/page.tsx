@@ -171,12 +171,12 @@ export default function PurchaseOrderDetailPage() {
 
   const itemColumns: DataTableColumn<POItem>[] = [
     {
-      header: 'Product',
+      header: tDetail('colProduct'),
       primaryOnMobile: true,
       cell: item => <span className="truncate max-w-[12rem] block">{item.productName}</span>,
     },
     {
-      header: 'Ordered',
+      header: tDetail('colOrdered'),
       alignEnd: true,
       className: 'w-24',
       cell: item => <span className="font-mono text-xs">{item.qty}</span>,
@@ -203,13 +203,13 @@ export default function PurchaseOrderDetailPage() {
       },
     },
     {
-      header: 'Unit Cost (KWD)',
+      header: t('new.unitCost'),
       alignEnd: true,
       className: 'w-28',
       cell: item => <span className="font-mono text-xs">{filsToKwd(item.unitCost)}</span>,
     },
     {
-      header: 'Line Total (KWD)',
+      header: t('new.lineTotal'),
       alignEnd: true,
       hideOnMobile: true,
       className: 'w-28',
@@ -220,7 +220,7 @@ export default function PurchaseOrderDetailPage() {
     ...(canReceive
       ? [
           {
-            header: 'Receive Qty',
+            header: tDetail('colReceiveQty'),
             alignEnd: true,
             className: 'w-28',
             cell: (item: POItem) => {
@@ -278,14 +278,19 @@ export default function PurchaseOrderDetailPage() {
               disabled={cancelling}
               className="ms-auto px-3 py-1 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-40"
             >
-              {cancelling ? 'Cancelling…' : tDetail('cancelButton')}
+              {cancelling ? tDetail('cancelling') : tDetail('cancelButton')}
             </button>
           )}
         </div>
 
         {/* Items table */}
         <div>
-          <DataTable<POItem> columns={itemColumns} rows={po.items} rowKey={item => item.id} />
+          <DataTable<POItem>
+            ariaLabel={tDetail('itemsTableLabel')}
+            columns={itemColumns}
+            rows={po.items}
+            rowKey={item => item.id}
+          />
           {/* DataTable has no footer concept, so the total is a summary bar
               right below the table — visible on both layouts. */}
           <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
@@ -305,7 +310,7 @@ export default function PurchaseOrderDetailPage() {
               disabled={receiving}
               className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
             >
-              {receiving ? 'Receiving…' : tDetail('receiveButton')}
+              {receiving ? tDetail('receiving') : tDetail('receiveButton')}
             </button>
             <p className="text-xs text-muted-foreground">{tDetail('receiveHelp')}</p>
           </div>

@@ -10,7 +10,7 @@ interface RefundButtonProps {
   storeId: string;
   orderId: string;
   orderNumber: string;
-  /** Order total in fils — shown in the confirmation modal. */
+  /** Fils the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
   total: number;
   currency?: string;
   onRefunded?: () => void;

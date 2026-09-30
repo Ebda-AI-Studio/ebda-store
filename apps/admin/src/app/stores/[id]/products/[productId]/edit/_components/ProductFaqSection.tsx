@@ -280,7 +280,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
             </svg>
             {t('title')}
             {faqs.length > 0 && (
-              <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-ink">
                 {faqs.length}
               </span>
             )}

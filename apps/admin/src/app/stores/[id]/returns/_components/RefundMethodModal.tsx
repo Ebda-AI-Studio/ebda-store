@@ -28,6 +28,8 @@ interface RefundPreview {
     walletShare?: number;
     refundableRemaining: number | null;
     unavailableReason: string | null;
+    /** Server-decided: the customer already has money back on the original method. */
+    alreadyPaidToCustomer?: boolean;
   };
 }
 
@@ -126,8 +128,13 @@ export function RefundMethodModal({
   }, [open, storeId, returnId]);
 
   const gateway = preview?.gateway;
-  const alreadyIssued = gateway?.unavailableReason === 'REFUND_ALREADY_ISSUED';
-  const visibleMethods = REFUND_METHODS.filter(m => m !== 'manual' || alreadyIssued);
+  // The server decides (issue 2003); the reason-code fallback covers an API
+  // that predates the flag.
+  const alreadyPaid =
+    gateway?.alreadyPaidToCustomer ??
+    (gateway?.unavailableReason === 'REFUND_ALREADY_ISSUED' ||
+      gateway?.unavailableReason === 'PAYMENT_FULLY_REFUNDED');
+  const visibleMethods = REFUND_METHODS.filter(m => m !== 'manual' || alreadyPaid);
   // Without a confirmed amount the gateway is never offered.
   const gatewayEnabled = previewState === 'ready' && gateway?.available === true;
 
@@ -161,9 +168,11 @@ export function RefundMethodModal({
             {previewState === 'error' && (
               <p className="text-xs text-destructive">{t('previewError')}</p>
             )}
-            {alreadyIssued && (
-              <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
-                {t('alreadyIssuedNotice')}
+            {alreadyPaid && (
+              <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive-ink">
+                {gateway?.unavailableReason === 'REFUND_ALREADY_ISSUED'
+                  ? t('alreadyIssuedNotice')
+                  : t('alreadyFullyRefundedNotice')}
               </p>
             )}
             {visibleMethods.map(value => {
@@ -239,7 +248,7 @@ export function RefundMethodModal({
                     })}
                   </p>
                 )}
-                <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+                <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive-ink">
                   {t('confirmIrreversible')}
                 </p>
               </>

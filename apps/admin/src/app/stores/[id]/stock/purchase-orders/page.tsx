@@ -112,6 +112,7 @@ export default function PurchaseOrdersPage() {
         </div>
 
         <DataTable<PurchaseOrder>
+          ariaLabel={t('title')}
           columns={[
             {
               header: t('poNumber'),

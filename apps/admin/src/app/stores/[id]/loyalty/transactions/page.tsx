@@ -58,11 +58,11 @@ function TypeBadge({ type, label }: { type: string; label: string }) {
   if (type === 'tier_changed') {
     className += 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
   } else if (type.startsWith('earn_')) {
-    className += 'bg-success/10 text-success';
+    className += 'bg-success/10 text-success-ink';
   } else if (type.startsWith('redeem_')) {
-    className += 'bg-info/10 text-info';
+    className += 'bg-info/10 text-info-ink';
   } else if (type === 'expire') {
-    className += 'bg-destructive/10 text-destructive';
+    className += 'bg-destructive/10 text-destructive-ink';
   } else {
     className += 'bg-muted text-muted-foreground';
   }
@@ -287,6 +287,7 @@ export default function LoyaltyTransactionsPage() {
           </div>
         ) : (
           <DataTable
+            ariaLabel={t('title')}
             columns={columns}
             rows={transactions}
             rowKey={tx => tx.id}

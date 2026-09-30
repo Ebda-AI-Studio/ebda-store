@@ -221,3 +221,101 @@ describe('Customers page table + filters', () => {
     );
   });
 });
+
+describe('Customers page — segment filter integrity (#2222, #2234)', () => {
+  it('?segment=guest keeps a reachable Guest pill even when the list request failed', async () => {
+    nav.query = 'segment=guest';
+    mockApi(() => ({ data: null, error: { code: 'X', message: 'boom', status: 500 } }));
+    renderPage();
+    const guest = await screen.findByRole('radio', { name: 'badges.guest' });
+    // The filter is still applied, so the group must show and be tabbable.
+    expect(guest.getAttribute('aria-checked')).toBe('true');
+    expect(guest.getAttribute('tabindex')).toBe('0');
+    expect(screen.getByRole('radio', { name: 'segmentAll' })).toBeTruthy();
+  });
+
+  it('a segment change on page 3 sends ONE request, for page 1', async () => {
+    mockApi(() => ({
+      data: { ...listResponse().data, meta: { ...listResponse().data.meta, totalPages: 5 } },
+    }));
+    renderPage();
+    await screen.findByText('Ahmed S');
+    // Move to page 3 through the real pagination control.
+    const next = () => screen.getAllByRole('button').find(b => /next/i.test(b.textContent ?? ''));
+    await act(async () => {
+      fireEvent.click(next()!);
+    });
+    await act(async () => {
+      fireEvent.click(next()!);
+    });
+    await waitFor(() =>
+      expect(api.apiGet.mock.calls.some((c: unknown[]) => String(c[0]).includes('page=3'))).toBe(
+        true
+      )
+    );
+    api.apiGet.mockClear();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('radio', { name: 'badges.vip' }));
+    });
+    await waitFor(() => expect(api.apiGet).toHaveBeenCalled());
+    const urls = api.apiGet.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(urls.filter(u => u.includes('/customers?'))).toHaveLength(1);
+    expect(urls[0]).toContain('page=1');
+    expect(urls[0]).toContain('segment=vip');
+  });
+
+  it('a stale response that lands last does not overwrite the newer one', async () => {
+    let release: (v: unknown) => void = () => {};
+    const slow = new Promise(r => (release = r));
+    let call = 0;
+    api.apiGet.mockImplementation(() => {
+      call += 1;
+      // The first (older) request resolves LAST, with a different row.
+      if (call === 1)
+        return slow.then(() => ({
+          data: {
+            data: [{ ...ROWS[0], id: 'old', firstName: 'Stale' }],
+            meta: listResponse().data.meta,
+          },
+        }));
+      return Promise.resolve(listResponse());
+    });
+    renderPage();
+    const input = await screen.findByRole('textbox', { name: 'searchPlaceholder' });
+    fireEvent.change(input, { target: { value: 'ahm' } });
+    await screen.findByText('Ahmed S', {}, { timeout: 2000 });
+    await act(async () => {
+      release(null);
+      await slow;
+    });
+    expect(screen.queryByText('Stale S')).toBeNull();
+    expect(screen.getByText('Ahmed S')).toBeTruthy();
+  });
+});
+
+describe('Customers page — erasure review banner (#2229)', () => {
+  it('shows the manual-deletion instruction after an ambiguous erasure', async () => {
+    nav.query = 'erasureReview=1';
+    renderPage();
+    await screen.findByText('Ahmed S');
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('erasedCrmAmbiguous');
+  });
+
+  it('dismissing it drops the param and keeps the rest of the query', async () => {
+    nav.query = 'erasureReview=1&segment=vip';
+    renderPage();
+    await screen.findByText('Ahmed S');
+    fireEvent.click(screen.getByRole('button', { name: 'close' }));
+    expect(nav.replace).toHaveBeenCalledWith('/stores/store-1/customers?segment=vip', {
+      scroll: false,
+    });
+  });
+
+  it('is absent on a normal visit', async () => {
+    renderPage();
+    await screen.findByText('Ahmed S');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});

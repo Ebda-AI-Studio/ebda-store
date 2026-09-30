@@ -133,6 +133,7 @@ export function AbandonedCartsTable({
       </div>
 
       <DataTable<AbandonedCartRecord>
+        ariaLabel={t('ariaLabel')}
         columns={columns}
         rows={records}
         rowKey={record => record.id}

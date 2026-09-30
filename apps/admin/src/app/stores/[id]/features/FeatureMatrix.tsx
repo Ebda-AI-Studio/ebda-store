@@ -439,7 +439,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
             <p className="text-sm text-muted-foreground mt-0.5">{t('storePlanSubtitle')}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-medium">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary-ink px-3 py-1 text-sm font-medium">
               {planLabelFor(plan)}
             </span>
             <select

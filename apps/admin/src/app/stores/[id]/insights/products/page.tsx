@@ -153,6 +153,7 @@ export default function InsightsProductsPage() {
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-6xl space-y-6">
         <DataTable<ProductVelocityRow>
+          ariaLabel={t('title')}
           columns={columns}
           rows={data.products}
           rowKey={row => row.productId}

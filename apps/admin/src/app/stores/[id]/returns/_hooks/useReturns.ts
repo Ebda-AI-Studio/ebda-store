@@ -26,7 +26,7 @@ interface UseReturnsArgs {
  * under `returns.messages.completeErrors` (#1318). The API's own text is
  * English-only, so it is never shown directly.
  */
-const COMPLETE_ERROR_CODES = new Set([
+export const COMPLETE_ERROR_CODES = new Set([
   'PROVIDER_REFUND_INDETERMINATE',
   'REFUND_ALREADY_ISSUED',
   'RETURN_ALREADY_COMPLETING',
@@ -37,6 +37,15 @@ const COMPLETE_ERROR_CODES = new Set([
   'EXCHANGE_CANNOT_REFUND_TO_GATEWAY',
   'PROVIDER_REFUND_FAILED',
   'INVALID_STATUS',
+  // Refused by PaymentService.refund before or at its claim (issue 2033).
+  // Every 4xx the completion path can raise is pinned by
+  // useReturns.codes.test.ts, which reads the producers.
+  'INVALID_STATE',
+  'PAYMENT_NOT_REFUNDABLE',
+  'ALREADY_REFUNDED',
+  'REFUND_EXCEEDS_REMAINING',
+  'INVALID_REFUND_AMOUNT',
+  'AMBIGUOUS_PAYMENT',
 ]);
 
 /**
@@ -44,7 +53,13 @@ const COMPLETE_ERROR_CODES = new Set([
  * a few seconds like a transient failure: the merchant's next move must be
  * to check the provider, not to click Complete again.
  */
-const MONEY_MAY_HAVE_MOVED = new Set(['PROVIDER_REFUND_INDETERMINATE', 'REFUND_ALREADY_ISSUED']);
+// INVALID_STATE = another refund on this payment holds the claim right now:
+// refresh and look, never click Complete again (issue 2033).
+const MONEY_MAY_HAVE_MOVED = new Set([
+  'PROVIDER_REFUND_INDETERMINATE',
+  'REFUND_ALREADY_ISSUED',
+  'INVALID_STATE',
+]);
 
 /**
  * Encapsulates the returns list + stats fetches and the four lifecycle

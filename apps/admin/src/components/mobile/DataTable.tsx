@@ -102,9 +102,10 @@ interface DataTableProps<T> {
   /** Accessible name for the desktop `<table>` (e.g. "Orders", "Products") —
    *  read by a screen reader before the column headers, since a bare
    *  `<table>` with no visible `<caption>` otherwise announces as an
-   *  unnamed table. Every caller should pass one; optional only so this
-   *  stays a non-breaking addition for existing callers. */
-  ariaLabel?: string;
+   *  unnamed table. Required so `tsc` enumerates every call site (issues
+   *  2200/2225) — a bare optional prop let every admin table ship with no
+   *  accessible name. */
+  ariaLabel: string;
 }
 
 /**

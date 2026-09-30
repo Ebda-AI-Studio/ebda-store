@@ -146,5 +146,6 @@ export function formatDateTime(iso: string | null | undefined, locale: string): 
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    numberingSystem: 'latn', // Latin digits in both locales (issue 1971)
   });
 }

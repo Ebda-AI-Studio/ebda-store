@@ -169,7 +169,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
                   onMouseEnter={() => setActive(idx)}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start text-sm transition-colors ${
                     idx === active
-                      ? 'bg-primary/10 text-primary'
+                      ? 'bg-primary/10 text-primary-ink'
                       : 'text-foreground hover:bg-muted/70'
                   }`}
                 >

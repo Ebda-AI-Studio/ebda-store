@@ -810,7 +810,13 @@ store whose balance that run forfeited OR whose ledger notes it scrubbed (not
 every store holding a wallet, and nothing on a re-run — issues 2122/2125, PR
 2279 audit) gets its own `audit_logs` row (`customer.wallet.erased`, that
 store's `storeId`, `details.actor` = the acting user id or `'system'`) so a
-store whose liability changed without any action of its own can see why. Every
+store whose liability changed without any action of its own can see why.
+CORRECTED 2026-10-01 (issue 2126): "can see why" is not true today — the only
+audit-log viewer is the super-admin `/audit-logs` page, and an erased
+customer's wallet drops off the store's wallet list at a 0 balance, so no
+store_admin surface shows the write-off. Giving merchants a store-scoped audit
+view (which would also expose staff IPs / user agents and platform actions on
+their store) is an owner decision, left open on issue 2126. Every
 `expire` ledger entry carries the actor in `actorId`. Supersedes the #1957
 design (bypass on every path) in PR #2015. The other erasure statements
 (orders, reviews, carts, loyalty, push) keep their existing shape: after this
@@ -1080,6 +1086,13 @@ paid, cancelled order. It records a refund without moving money, which is the
 confusion #762 is about, so both pages confirm first, reusing #2007's list-page
 copy (same keys and text in the admin, so the two merge as one). Cost if wrong:
 one extra tap for the merchant.
+AMENDED 2026-10-01: the confirm covers EVERY state that offers `refunded`, not
+just `cancelled` — a paid `delivered` order now shows it too, because the
+footers derive finality from the shared transition map (issue 2144). The
+admin copy is status-aware (issue 2140): a cancelled order gets
+`manualRefundDescriptionCancelled`, which does not promise the stock, coupon,
+loyalty and customer-notice effects that already ran (or were claimed) at
+cancellation.
 
 ---
 
@@ -1938,6 +1951,15 @@ in Ruling P2-B2-2.
 >    `apps/orders`'s login page already had, so a reload (or, for orders, any
 >    navigation to /login) that recovers the session now actually carries the
 >    user onward instead of leaving them on the form.
+>    CORRECTED 2026-10-01 (issues 2095, 2159, 2163): the removal was described
+>    as costing "two extra fetches" per anonymous /login load — true only when
+>    untrottled. Throttled, the ladder made it 4 × /auth/me + 8 ×
+>    /auth/refresh into the shared anon + IP-wide refresh buckets, and the
+>    admin login page hid its form behind a ~21s spinner. Now `checkSession`
+>    (admin + orders) posts /auth/refresh only with session evidence (the
+>    `hadSession` marker, a stored token, the `force-session` cookie) or one
+>    evidence-free probe per tab, an evidence-free throttle is `signed-out`
+>    (no ladder), and the admin form renders during the check.
 >
 > The event-driven re-check (focus/`visibilitychange`) is still deferred for
 > the reason stated above — it remains a behavioural change to the auth
@@ -2868,6 +2890,16 @@ remainder can then land 1 fil off. Cost if wrong: a merchant with shipping on a
 fully-cancelled backorder order sees shipping income remain until they cancel
 the order; a line cancelled but never refunded at the provider shows cash lower
 than the gateway balance.
+AMENDED 2026-10-01 (issue 2275): the admin no longer says otherwise. The cancel
+button reads "Cancel line & reverse the sale" (was "Cancel & Refund"), the modal
+states up front that no money is sent, the reason label no longer claims it is
+"sent to customer" (it lands only in the order event and the journal memo), and
+`cancelBackorder` returns `owedToCustomer` (the allocated `cashCredit` when the
+order was paid, else 0) so the modal names the sum the merchant must still refund
+at the provider. (3) is unchanged: the customer's "Refund issued" email still
+fires at cancel, before the merchant's off-platform refund. Cost if wrong: a
+customer is told a refund was issued a little before the merchant actually sends
+it — the admin now tells the merchant to.
 
 **Ruling AP-6 — margin_drop is not evaluated unless BOTH windows booked COGS.**
 With no cost of goods the margin is 100% by construction; the week cost prices
@@ -3504,6 +3536,7 @@ the debt). The guard's docstring now states exactly which shapes are enforced an
 (template literals, text between two interpolations, lower-case ternary literals, files outside the
 list). Cost if wrong: the 66 strings keep rendering in English on an Arabic admin until someone
 translates them and deletes their debt entries.
+RESOLVED 2026-10-01: the debt is cleared (`admin-i18n-known-debt.json` is `{}`) — see Ruling I18N-G2.
 
 ---
 
@@ -3866,6 +3899,23 @@ transaction/invoice ids + every matching payment id in the context) before
 refusing, and `isTerminalWebhookClientError` exempts `AMBIGUOUS_PAYMENT` from
 the silent `rejected` lane, so the inbox row retries, lands `failed`, and
 dead-letters into alerts-failure-watch's P0 like any other stuck money event.
+
+**Ruling I18N-G2 — the admin-i18n known debt is cleared; three hits stay as
+per-file allowlist entries, not translations (issues 2180, 2181, 2183, 2281).**
+Every string in `tests/unit/admin-i18n-known-debt.json` is translated en + ar
+except eight `[prop]` hits that are not admin chrome: the nav/footer PRESET
+items in `components/NavMenuEditor.tsx` and `FooterLinksEditor.tsx` are
+bilingual content data (each English `label` sits beside its `labelAr` and is
+saved into the store theme for the storefront), and `app/layout.tsx`'s
+"Force AI Store Admin" is the installed-app product name, which must equal
+`app/manifest.ts` `name` — a manifest the browser fetches without the locale
+cookie, so it cannot be localized. They live in `WIDENED_FILE_ALLOWLIST`
+(scoped to their file, so a real `header: 'Products'` elsewhere still fails),
+and a new check fails on any debt or allowlist entry whose string no longer
+exists, so the ratchet cannot silently re-admit a translated string. Cost if
+wrong: an Arabic-locale merchant installing the admin PWA sees the English
+product name, and a preset nav/footer item added in English-only form would
+not be caught by this guard.
 
 ## 2026-10-01 — owner money decisions (branch `fix/owner-money-decisions-1001`)
 

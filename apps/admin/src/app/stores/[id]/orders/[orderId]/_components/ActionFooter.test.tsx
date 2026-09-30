@@ -41,7 +41,11 @@ vi.mock('./RefreshPaymentButton', () => ({
   RefreshPaymentButton: () => <button data-testid="refresh-payment-button">refresh-payment</button>,
 }));
 vi.mock('./RefundButton', () => ({
-  RefundButton: () => <button data-testid="refund-button">refund</button>,
+  RefundButton: ({ total }: { total: number }) => (
+    <button data-testid="refund-button" data-total={total}>
+      refund
+    </button>
+  ),
 }));
 vi.mock('./RefreshRefundStatusButton', () => ({
   RefreshRefundStatusButton: () => (
@@ -202,5 +206,43 @@ describe('ActionFooter — status action for a cancelled order (#1947)', () => {
     renderFooter(baseOrder({ status: 'pending', paymentStatus: 'unpaid' }));
     expect(screen.getByText('confirmed')).toBeTruthy();
     expect(screen.queryByText('refunded')).toBeNull();
+  });
+
+  // #2144 — `delivered` was hand-listed as final, hiding the `refunded` the
+  // shared map offers for it: a delivered cash order had no refund action here.
+  it('offers Refunded on a PAID delivered order', () => {
+    const onStatusChange = vi.fn();
+    renderFooter(baseOrder({ status: 'delivered', paymentStatus: 'paid' }), onStatusChange);
+    fireEvent.click(screen.getByText('refunded'));
+    expect(onStatusChange).toHaveBeenCalledWith('refunded');
+  });
+
+  it('offers no status action on a refunded order', () => {
+    renderFooter(baseOrder({ status: 'refunded', paymentStatus: 'paid' }));
+    expect(screen.queryByText('refunded')).toBeNull();
+  });
+});
+
+// #2069 — the refund confirm quoted the order value even after a partial
+// refund; the provider is asked for the payment's remainder.
+describe('ActionFooter — refund-via-provider amount (#2069)', () => {
+  it('passes the payment remainder, not the order total, after a partial refund', () => {
+    renderFooter(
+      baseOrder({
+        status: 'delivered',
+        paymentStatus: 'paid',
+        total: 5000,
+        payments: [
+          payment({
+            provider: 'tap',
+            status: 'partially_refunded',
+            transactionId: 'tx',
+            amount: 5000,
+            refundedAmount: 2000,
+          }),
+        ],
+      })
+    );
+    expect(screen.getByTestId('refund-button').getAttribute('data-total')).toBe('3000');
   });
 });

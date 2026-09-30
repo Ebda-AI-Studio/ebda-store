@@ -220,7 +220,7 @@ export default function StorePaymentSettingsPage() {
       }
     >
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={fetchConfigs}>
             {t('errors.retry')}

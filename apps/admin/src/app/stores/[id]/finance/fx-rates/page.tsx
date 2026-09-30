@@ -263,7 +263,12 @@ export default function FxRatesPage() {
           ) : rates.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('noRates')}</p>
           ) : (
-            <DataTable<FxRateEntry> columns={rateColumns} rows={rates} rowKey={r => r.id} />
+            <DataTable<FxRateEntry>
+              ariaLabel={t('historyTitle')}
+              columns={rateColumns}
+              rows={rates}
+              rowKey={r => r.id}
+            />
           )}
         </div>
       </div>

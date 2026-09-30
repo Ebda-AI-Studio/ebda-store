@@ -170,7 +170,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             type="button"
             onClick={generatePalette}
             disabled={!canGenerate}
-            className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-medium text-primary-ink hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             ✨ {tColors('generateButton')}
           </button>

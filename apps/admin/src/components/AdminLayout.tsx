@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth';
 import { useStore } from '../contexts/StoreContext';
@@ -211,7 +212,7 @@ export function AdminLayout({
       if (params.get('focus') === '1') {
         try {
           // Only enter if there's no valid stored storeId yet
-          const raw = localStorage.getItem('fwb_focus_mode');
+          const raw = localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
           if (!raw) {
             enterFocusMode(currentStoreId);
           }

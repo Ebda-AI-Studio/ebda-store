@@ -314,17 +314,13 @@ export default function StockInventoryPage() {
         size="sm"
         disabled={bulkBusy}
         onClick={() => handleBulkSetBackorder(!allBackorderEnabled)}
-        title={
-          allBackorderEnabled
-            ? 'Turn off backorder for every active product'
-            : 'Allow customers to order every product even when out of stock'
-        }
+        title={allBackorderEnabled ? t('bulkBackorderDisableTip') : t('bulkBackorderEnableTip')}
       >
         {bulkBusy
           ? '…'
           : allBackorderEnabled
-            ? 'Disable backorder on all products'
-            : 'Enable backorder on all products'}
+            ? t('bulkBackorderDisable')
+            : t('bulkBackorderEnable')}
       </Button>
     ) : null;
 
@@ -362,8 +358,8 @@ export default function StockInventoryPage() {
 
         {/* Inline error banner: products fetch failed but page stays mounted */}
         {productsErr && (
-          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive flex items-center justify-between gap-4">
-            <span title={productsErr}>Couldn't load products — {productsErr}</span>
+          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink flex items-center justify-between gap-4">
+            <span title={productsErr}>{t('loadFailed', { error: productsErr })}</span>
             <button
               type="button"
               onClick={retryProducts}
@@ -378,9 +374,9 @@ export default function StockInventoryPage() {
         {activeStockFilter && (
           <div className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             <span>
-              Filtered:{' '}
+              {t('filteredLabel')}{' '}
               <span className="font-medium text-foreground">
-                {activeStockFilter === 'low_stock' ? 'Low stock' : 'Out of stock'}
+                {activeStockFilter === 'low_stock' ? t('filterLowStock') : t('filterOutOfStock')}
               </span>
             </span>
             <button
@@ -560,6 +556,7 @@ export default function StockInventoryPage() {
                     />
                   </div>
                   <DataTable<ProductRow>
+                    ariaLabel={t('title')}
                     columns={inventoryColumns}
                     rows={visibleProducts}
                     rowKey={p => p.id}

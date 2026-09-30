@@ -59,6 +59,7 @@ describe('DataTable renders exactly one tree', () => {
     mockMatchMedia(false);
     const { container } = render(
       <DataTable<Row>
+        ariaLabel="Rows"
         columns={makeColumns(() => {})}
         rows={[{ id: 'a', qty: 1 }]}
         rowKey={r => r.id}
@@ -72,6 +73,7 @@ describe('DataTable renders exactly one tree', () => {
     mockMatchMedia(true);
     const { container } = render(
       <DataTable<Row>
+        ariaLabel="Rows"
         columns={makeColumns(() => {})}
         rows={[{ id: 'a', qty: 1 }]}
         rowKey={r => r.id}
@@ -88,6 +90,7 @@ describe('DataTable renders exactly one tree', () => {
     const cellSpy = vi.fn();
     render(
       <DataTable<Row>
+        ariaLabel="Rows"
         columns={makeColumns(cellSpy)}
         rows={[
           { id: 'a', qty: 1 },
@@ -107,6 +110,7 @@ describe('DataTable renders exactly one tree', () => {
     const { container } = render(
       <form>
         <DataTable<Row>
+          ariaLabel="Rows"
           columns={makeColumns(() => {})}
           rows={[{ id: 'a', qty: 1 }]}
           rowKey={r => r.id}

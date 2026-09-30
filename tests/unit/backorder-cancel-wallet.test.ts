@@ -94,7 +94,9 @@ beforeEach(() => {
 
 describe('cancelBackorder → order/refunded', () => {
   it('fires the item-level event for this line only, never the whole-order one', async () => {
-    await cancelBackorder('s1', 'bo1', 'supplier cancelled', 'u1');
+    const res = await cancelBackorder('s1', 'bo1', 'supplier cancelled', 'u1');
+    // Issue 2275 — the admin is told what it still owes; no money moved.
+    expect(res.owedToCustomer).toBe(2000);
     expect(h.applyRefundEffects).toHaveBeenCalledWith('s1', 'o1', {
       restoreInventory: false,
       reverseWallet: false,
@@ -117,12 +119,14 @@ describe('cancelBackorder → order/refunded', () => {
       paymentStatus: 'unpaid',
       items: [{ id: 'oi1', quantity: 2, price: 1000 }],
     });
-    await cancelBackorder('s1', 'bo1', 'r');
+    const res = await cancelBackorder('s1', 'bo1', 'r');
     expect(h.applyRefundEffects).toHaveBeenLastCalledWith(
       's1',
       'o1',
       expect.objectContaining({ fireRefundNotification: false })
     );
+    // Nothing was taken, so nothing is owed.
+    expect(res.owedToCustomer).toBe(0);
   });
 
   it('a lost cancel race is a 404 with no event', async () => {

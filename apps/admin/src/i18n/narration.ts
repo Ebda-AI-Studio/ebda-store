@@ -18,5 +18,7 @@ export function pickNarration(
 ): string | undefined {
   if (!narration) return undefined;
   if (locale === 'ar') return narration.ar || narration.en || undefined;
-  return narration.en || undefined;
+  // An ar-only row still shows on the English admin rather than hiding the
+  // insight entirely (issue 2179).
+  return narration.en || narration.ar || undefined;
 }

@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { OrdersFilters } from './_components/OrdersFilters';
 import { OrdersBulkBar } from './_components/OrdersBulkBar';
 import { OrdersTable } from './_components/OrdersTable';
@@ -16,6 +17,7 @@ import type { Order, Pagination, StatusFilter } from './_components/types';
 import { ConfirmActionModal } from '../../../../components/ConfirmActionModal';
 import type { Period, ResolvedDateRange } from '../analytics/_components/types';
 import { resolveDateRange } from '../analytics/_components/types';
+import { manualRefundDescriptionKey } from './_components/manualRefundCopy';
 
 type ConfirmType = 'markPaid' | 'bulkMarkPaid' | 'manualRefund';
 
@@ -76,8 +78,12 @@ export default function StoreOrdersPage() {
     return `${yyyy}-${mm}-${dd}`;
   }
 
+  // Overlapping list requests (a filter or period change mid-flight) resolve
+  // in either order; only the newest may write (#2234 class).
+  const beginRequest = useLatestRequest();
   const fetchOrders = useCallback(async () => {
     if (!storeId) return;
+    const isLatest = beginRequest();
     setIsLoading(true);
     setError(null);
     try {
@@ -100,6 +106,7 @@ export default function StoreOrdersPage() {
         meta?: Pagination;
         pagination?: Pagination;
       }>(`/api/v1/stores/${storeId}/orders?${qs}`);
+      if (!isLatest()) return;
 
       if (apiError) {
         setError(apiError.message || t('errors.fetchFailed'));
@@ -111,11 +118,20 @@ export default function StoreOrdersPage() {
         }
       }
     } catch {
-      setError(t('errors.connection'));
+      if (isLatest()) setError(t('errors.connection'));
     } finally {
-      setIsLoading(false);
+      if (isLatest()) setIsLoading(false);
     }
-  }, [storeId, pagination.page, pagination.limit, statusFilter, period, customRange, t]);
+  }, [
+    storeId,
+    pagination.page,
+    pagination.limit,
+    statusFilter,
+    period,
+    customRange,
+    t,
+    beginRequest,
+  ]);
 
   useEffect(() => {
     fetchOrders();
@@ -338,7 +354,7 @@ export default function StoreOrdersPage() {
     confirmState.type === 'markPaid'
       ? tConfirm('markPaidDescription')
       : confirmState.type === 'manualRefund'
-        ? tConfirm('manualRefundDescription')
+        ? tConfirm(manualRefundDescriptionKey(confirmState.order?.status))
         : tConfirm('bulkMarkPaidDescription', { count: confirmState.ids?.length ?? 0 });
 
   const isConfirmLoading =
@@ -437,7 +453,7 @@ export default function StoreOrdersPage() {
       />
 
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-4 font-medium underline" onClick={fetchOrders}>
             {t('errors.retry')}

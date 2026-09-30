@@ -458,7 +458,7 @@ export default function NewOrderPage() {
               }}
               className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                 customerMode === 'existing'
-                  ? 'border-primary bg-primary/5 text-primary'
+                  ? 'border-primary bg-primary/5 text-primary-ink'
                   : 'border-border text-muted-foreground hover:bg-muted'
               }`}
             >
@@ -473,7 +473,7 @@ export default function NewOrderPage() {
               }}
               className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                 customerMode === 'guest'
-                  ? 'border-primary bg-primary/5 text-primary'
+                  ? 'border-primary bg-primary/5 text-primary-ink'
                   : 'border-border text-muted-foreground hover:bg-muted'
               }`}
             >
@@ -508,7 +508,7 @@ export default function NewOrderPage() {
                           </span>
                         )}
                         {c.isGuest && (
-                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
+                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning-ink">
                             {t('customerSection.guestBadge')}
                           </span>
                         )}

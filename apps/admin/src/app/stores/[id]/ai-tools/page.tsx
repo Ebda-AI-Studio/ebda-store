@@ -358,7 +358,7 @@ export default function AiToolsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive-ink">
           {error}
         </div>
       )}
@@ -658,6 +658,7 @@ export default function AiToolsPage() {
       <div className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">{t('recentRuns.title')}</h2>
         <DataTable<BulkAiJob>
+          ariaLabel={t('recentRuns.title')}
           columns={recentRunsColumns}
           rows={jobs}
           rowKey={j => j.id}
@@ -897,7 +898,7 @@ function StatusBadge({ status, t }: { status: string; t: TFn }) {
     status === 'completed'
       ? 'bg-emerald-100 text-emerald-700'
       : status === 'failed'
-        ? 'bg-destructive/15 text-destructive'
+        ? 'bg-destructive/15 text-destructive-ink'
         : status === 'cancelled'
           ? 'bg-muted text-muted-foreground'
           : status === 'running'
@@ -976,7 +977,7 @@ function ActiveJobCard({
               type="button"
               onClick={onCancel}
               disabled={cancelling}
-              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20 disabled:opacity-50"
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive-ink hover:bg-destructive/20 disabled:opacity-50"
             >
               {cancelling ? t('activeJob.cancelling') : t('activeJob.cancel')}
             </button>
@@ -1125,7 +1126,7 @@ function MasterSweepCard({
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20"
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive-ink hover:bg-destructive/20"
             >
               {t('activeJob.cancelAll')}
             </button>

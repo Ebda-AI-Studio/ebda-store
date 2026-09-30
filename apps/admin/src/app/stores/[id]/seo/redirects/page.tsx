@@ -148,7 +148,7 @@ export default function SlugRedirectsPage() {
         {(loadError || actionError) && (
           <div
             role="alert"
-            className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+            className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive-ink"
           >
             <span>{loadError ?? actionError}</span>
             {loadError ? (
@@ -179,6 +179,7 @@ export default function SlugRedirectsPage() {
               deletingId={deletingId}
               onDelete={handleDelete}
               t={t}
+              ariaLabel={t('redirectsTitle')}
             />
             {list.nextCursor && (
               <div className="flex justify-center">

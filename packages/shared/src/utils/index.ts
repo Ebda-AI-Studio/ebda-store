@@ -56,12 +56,19 @@ export { isSafeUrl, sanitizeUrl, safeInternalPath } from './safe-url';
  */
 export function formatPrice(
   amount: number,
-  options?: { unit?: 'fils' | 'kwd'; currency?: string; locale?: 'en' | 'ar' }
+  options?: {
+    unit?: 'fils' | 'kwd';
+    currency?: string;
+    locale?: 'en' | 'ar';
+    /** Arabic currency symbol with Latin digits (`1.500 د.ك.`) — the admin's
+     *  digit policy (issue 1971). The storefront chooses per merchant. */
+    latinDigits?: boolean;
+  }
 ): string {
-  const { unit = 'fils', currency = 'KWD', locale = 'en' } = options ?? {};
+  const { unit = 'fils', currency = 'KWD', locale = 'en', latinDigits = false } = options ?? {};
   const decimals = currency === 'KWD' ? 3 : 2;
   const divisor = unit === 'fils' ? (currency === 'KWD' ? 1000 : 100) : 1;
-  const intlLocale = locale === 'ar' ? 'ar-KW' : 'en-US';
+  const intlLocale = locale === 'ar' ? (latinDigits ? 'ar-KW-u-nu-latn' : 'ar-KW') : 'en-US';
 
   return new Intl.NumberFormat(intlLocale, {
     style: 'currency',

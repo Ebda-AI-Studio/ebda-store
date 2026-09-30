@@ -17,6 +17,9 @@ import {
   bumpSessionGeneration,
   clearPendingLogout,
   performLogout,
+  readStoredRefreshToken,
+  markSessionEvidence,
+  clearStoredSession,
 } from './api';
 
 /**
@@ -94,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // On all other browsers the refresh token rides in the refresh_token
     // httpOnly cookie — do NOT bail out early when localStorage is empty;
     // the server reads it from the cookie via credentials:'include'.
-    if (typeof window !== 'undefined' && isIosWebkit() && !localStorage.getItem('refreshToken')) {
+    if (typeof window !== 'undefined' && isIosWebkit() && !readStoredRefreshToken(true)) {
       return false;
     }
     // The context's own contract stays boolean — only 'refreshed' is a
@@ -175,6 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // also what lifts a pending (unconfirmed) logout.
     bumpSessionGeneration();
     clearPendingLogout();
+    // The anonymous-mount gate's evidence that a session exists here (#2163).
+    markSessionEvidence();
     // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
     // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
     // purges it). On all other browsers auth rides the httpOnly cookie and
@@ -258,16 +263,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // iOS-gated like every other refresh-token read (#1945): elsewhere the
     // token rides the httpOnly cookie, which the server revokes when the body
     // carries none — a leftover localStorage value would be revoked instead.
+    // readStoredRefreshToken also REMOVES a non-iOS residue copy (#2034).
     const refreshTokenValue =
-      typeof window !== 'undefined' && isIosWebkit() ? localStorage.getItem('refreshToken') : null;
+      typeof window !== 'undefined' ? readStoredRefreshToken(isIosWebkit()) : null;
     // Authoritative, not best-effort (#2160): performLogout bumps the session
     // generation so no in-flight check can restore the session, and records
     // the logout as pending until the server confirms it. While it is pending
     // every session check re-sends it instead of reading /auth/me, so a logout
     // that never reached the API cannot be undone by the /login re-check.
     await performLogout(API_URL, refreshTokenValue);
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    // accessToken + refreshToken + the session-evidence marker (#2163).
+    clearStoredSession();
     localStorage.removeItem('csrfToken');
     setUser(null);
     router.push('/login');

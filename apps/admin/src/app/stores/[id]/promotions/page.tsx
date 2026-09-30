@@ -330,7 +330,7 @@ export default function PromotionsPage() {
         {error && (
           <div
             role="alert"
-            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
           >
             {error}
           </div>
@@ -344,7 +344,12 @@ export default function PromotionsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
           </div>
         ) : (
-          <DataTable<Promotion> columns={columns} rows={promotions} rowKey={promo => promo.id} />
+          <DataTable<Promotion>
+            ariaLabel={t('title')}
+            columns={columns}
+            rows={promotions}
+            rowKey={promo => promo.id}
+          />
         )}
 
         {showModal && (

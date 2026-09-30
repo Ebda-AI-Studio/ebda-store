@@ -1035,7 +1035,8 @@
         "confirm": "Confirm",
         "cancel": "Cancel",
         "manualRefundTitle": "Mark Order as Refunded?",
-        "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\"."
+        "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\".",
+        "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed at cancellation. This only records the refund on the order — it does NOT send any money back, and the customer is not sent a new notice. To actually return a card payment, use \"Refund via provider\"."
       },
       "toast": {
         "errorTitle": "Error",
@@ -1130,7 +1131,7 @@
         "overrideReasonLabel": "Reason for the override"
       },
       "footer": {
-        "itemCount": "{count, plural, one {# item} other {# items}}",
+        "itemCount": "{count, plural, one {{count, number, latn} item} other {{count, number, latn} items}}",
         "creating": "Creating…",
         "placeOrder": "Place order",
         "unpaidHint": "Order created in unpaid state. Issue a MyFatoorah payment link from the order detail page after save."
@@ -1271,7 +1272,9 @@
         "iframeTitle": "Storefront preview (mobile)",
         "openInNewTab": "Open in new tab ↗",
         "unavailable": "Preview unavailable — the store has no slug or domain configured.",
-        "saveHint": "Click <b>Save changes</b> to refresh — the iframe reloads after each save."
+        "saveHint": "Click <b>Save changes</b> to refresh — the iframe reloads after each save.",
+        "generating": "Generating…",
+        "unsaved": "Preview unsaved"
       },
       "sections": {
         "hero": {
@@ -1665,7 +1668,8 @@
         "uploading": "Uploading…",
         "uploadFont": "Upload font",
         "addGoogleFont": "+ Add Google Font",
-        "uploadCustomFont": "↥ Upload custom font"
+        "uploadCustomFont": "↥ Upload custom font",
+        "uploadFailed": "Upload failed."
       },
       "sectionOrder": {
         "title": "Section order",
@@ -1883,10 +1887,10 @@
         "totalSpent": "Total spent",
         "unknown": "Unknown",
         "partial": "Recent orders only",
-        "guestsSub": "{count, plural, =0 {No guest checkouts} one {# guest checkout} other {# guest checkouts}}",
+        "guestsSub": "{count, plural, =0 {No guest checkouts} one {{count, number, latn} guest checkout} other {{count, number, latn} guest checkouts}}",
         "repeatSub": "{repeat} of {buyers} buyers ordered again",
         "noBuyersSub": "No orders yet",
-        "ordersSub": "{count, plural, one {Across # order} other {Across # orders}}",
+        "ordersSub": "{count, plural, one {Across {count, number, latn} order} other {Across {count, number, latn} orders}}",
         "spentSub": "All orders except cancelled and refunded — paid or not"
       }
     },
@@ -2542,7 +2546,7 @@
       "showInFooterTitle": "Show branches in footer",
       "showInFooterHint": "Adds a \"Branches\" column to your storefront footer listing your published locations (name, address, phone). Off by default — existing footers are unaffected until you turn this on.",
       "showInFooterToggle": "Show a Branches column in the storefront footer",
-      "count": "{count, plural, =0 {No locations} one {# location} other {# locations}}",
+      "count": "{count, plural, =0 {No locations} one {{count, number, latn} location} other {{count, number, latn} locations}}",
       "addButton": "+ Add location",
       "formNewTitle": "New Location",
       "formEditTitle": "Edit Location",
@@ -2593,7 +2597,8 @@
       "emptyCta": "Add your first location →",
       "errCreate": "Failed to create location",
       "errUpdate": "Failed to update location",
-      "errDelete": "Delete failed"
+      "errDelete": "Delete failed",
+      "tableLabel": "Locations"
     }
   },
   "coupons": {
@@ -3207,7 +3212,7 @@
       "kwdValue": "{value} KWD"
     },
     "alertBanner": {
-      "needAttention": "{count, plural, =1 {# product needs attention} other {# products need attention}}",
+      "needAttention": "{count, plural, =1 {{count, number, latn} product needs attention} other {{count, number, latn} products need attention}}",
       "breakdown": "{out} out of stock, {low} low stock",
       "viewAlerts": "View Alerts"
     },
@@ -3587,7 +3592,7 @@
       "noEvents": "No audit events yet",
       "noEventsHint": "Status changes (approve / reject / suspend) appear here once they occur.",
       "loadError": "Failed to load audit trail",
-      "eventsCount": "{count, plural, one {# event} other {# events}}",
+      "eventsCount": "{count, plural, one {{count, number, latn} event} other {{count, number, latn} events}}",
       "reasonLabel": "Reason: {reason}",
       "commissionLabel": "Commission:",
       "payoutLabelText": "Payout:",
@@ -3767,7 +3772,12 @@
       "invalidSchedule": "Pick a time in the future, within the next 30 days.",
       "queueUnreachable": "Could not queue the campaign right now. Nothing was sent — try again.",
       "featureDisabled": "This feature isn't enabled for your store.",
-      "notDraft": "This campaign has already been sent and can no longer be edited."
+      "notDraft": "This campaign has already been sent and can no longer be edited.",
+      "notDeletable": "Only a draft, cancelled or failed campaign can be deleted. Refresh to see its current status.",
+      "hasSendHistory": "This campaign already sent mail, so it is kept as send history and cannot be deleted.",
+      "notCancellable": "Only a scheduled or sending campaign can be cancelled. Refresh to see its current status.",
+      "noAdminEmail": "Your account has no email address to send the test to.",
+      "notEditable": "Only a draft campaign can be edited. Refresh to see its current status."
     },
     "editor": {
       "loadingTitle": "Campaign",
@@ -3836,7 +3846,8 @@
       "loadMore": "Load more",
       "confirmCancelTitle": "Cancel this campaign?",
       "confirmCancelDescription": "This stops it before it starts, or before its next batch if it is already sending. It cannot be resumed — you would need to send it again.",
-      "confirmCancelButton": "Cancel campaign"
+      "confirmCancelButton": "Cancel campaign",
+      "sendHistoryPermanent": "This campaign already sent mail — it is kept as send history and can't be deleted."
     }
   },
   "abandonedCarts": {
@@ -3892,7 +3903,7 @@
       "ariaLabel": "Abandoned carts",
       "filterAriaLabel": "Filter by status",
       "allStatuses": "All statuses",
-      "totalRecords": "{count, plural, =0 {No records} one {# total record} other {# total records}}",
+      "totalRecords": "{count, plural, =0 {No records} one {{count, number, latn} total record} other {{count, number, latn} total records}}",
       "empty": "No abandoned carts yet",
       "emptyDescription": "Carts appear here when a shopper adds items but leaves before starting checkout. The recovery campaign above sends reminders to bring them back.",
       "emptyOrdersHint": "Someone started checkout but didn't pay? That's a pending order, not an abandoned cart.",
@@ -3953,7 +3964,7 @@
       "orderLabel": "Order",
       "customerLabel": "Customer",
       "reasonLabel": "Reason",
-      "itemCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
+      "itemCount": "{count, plural, =0 {No items} one {{count, number, latn} item} other {{count, number, latn} items}}",
       "pagination": "Showing {from} to {to} of {total} returns",
       "previous": "Previous",
       "next": "Next",
@@ -4011,7 +4022,13 @@
         "NO_COMPLETED_PAYMENT": "This order has no online payment to refund. Choose store credit or bank transfer.",
         "EXCHANGE_CANNOT_REFUND_TO_GATEWAY": "An exchange does not refund the customer. Choose store credit or complete it as a return.",
         "PROVIDER_REFUND_FAILED": "The payment provider refused the refund. Nothing was sent — try again or choose another method.",
-        "INVALID_STATUS": "Mark the return as received before completing it."
+        "INVALID_STATUS": "Mark the return as received before completing it.",
+        "INVALID_STATE": "A refund on this payment is already in progress. Do NOT complete the return again: refresh the page and check the payment's refund status first.",
+        "PAYMENT_NOT_REFUNDABLE": "This payment has no payment-provider transaction (for example cash on delivery), so it cannot be refunded at the gateway. Choose store credit or bank transfer.",
+        "ALREADY_REFUNDED": "This payment has already been refunded in full.",
+        "REFUND_EXCEEDS_REMAINING": "The refund is more than what is left un-refunded on this payment. Refresh the page — part of it was refunded elsewhere.",
+        "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
+        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support."
       }
     },
     "modal": {
@@ -4063,7 +4080,8 @@
         "default": "Not available for this order.",
         "REFUND_PERMISSION_REQUIRED": "Not available: sending a refund to the original payment method needs the store owner. Ask them to complete it, or use store credit or bank transfer."
       },
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "alreadyFullyRefundedNotice": "This order's payment was already refunded in full — from the order page or in the payment provider's dashboard. Nothing more can be sent to the card. If that refund covered this return, choose \"Already refunded — record only\" to complete it without refunding again."
     }
   },
   "marketingPixels": {
@@ -4380,7 +4398,7 @@
     "push": {
       "title": "Push Notifications",
       "subtitle": "Standards-based Web Push (W3C Push API)",
-      "subscribers": "{count, number} subscribers",
+      "subscribers": "{count, number, latn} subscribers",
       "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
     },
     "broadcast": {
@@ -4404,7 +4422,7 @@
       "send": "Send broadcast",
       "sending": "Sending…",
       "sentTitle": "Broadcast sent",
-      "sentDescription": "Targeted {count, number} subscriber(s).",
+      "sentDescription": "Targeted {count, number, latn} subscriber(s).",
       "sendFailed": "Failed to send broadcast.",
       "notConfiguredTitle": "Push provider not configured",
       "notConfiguredDescription": "OneSignal credentials are missing on the API server. Set the env vars below on Railway and redeploy:",
@@ -4414,8 +4432,8 @@
       "refresh": "Refresh",
       "refreshing": "Refreshing…",
       "untitled": "(untitled)",
-      "deliveredCount": "{count, number} delivered",
-      "clickedCount": "{count, number} clicked"
+      "deliveredCount": "{count, number, latn} delivered",
+      "clickedCount": "{count, number, latn} clicked"
     },
     "events": {
       "title": "Event Configuration",
@@ -4793,7 +4811,7 @@
       "storePlanSubtitle": "Current plan determines the feature baseline.",
       "changePlanOption": "Change plan…",
       "planChangeNote": "Plan changes preserve all existing overrides. Baseline features update immediately.",
-      "featureCount": "{count, plural, one {# feature} other {# features}}",
+      "featureCount": "{count, plural, one {{count, number, latn} feature} other {{count, number, latn} features}}",
       "loadStoreFailed": "Failed to load store.",
       "badges": {
         "includedIn": "Included in {plan}",
@@ -5618,7 +5636,7 @@
     "aiTranslateButton": {
       "translating": "Translating {done}/{total}…",
       "nothing": "Nothing to translate",
-      "translate": "Translate {count, plural, one {# missing field} other {# missing fields}}",
+      "translate": "Translate {count, plural, one {{count, number, latn} missing field} other {{count, number, latn} missing fields}}",
       "summaryFilled": "Filled {count}. ",
       "summarySkippedBoth": "Skipped {count} already-translated. ",
       "summarySkippedEmpty": "Skipped {count} empty. ",
@@ -6089,7 +6107,9 @@
         "title": "Link to Journal Entry",
         "entryId": "Journal Entry ID (UUID)",
         "confirm": "Link",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "entryIdHelp": "You can find entry IDs in Finance → Journal.",
+        "confirming": "Linking…"
       },
       "difference": {
         "title": "Reconciliation Difference",
@@ -6103,7 +6123,15 @@
         "bankLines": "bank line(s)",
         "ledgerEntries": "ledger entry/entries",
         "suggestedAction": "Suggested action"
-      }
+      },
+      "errors": {
+        "loadStatement": "Failed to load statement",
+        "loadTransactions": "Failed to load transactions",
+        "autoMatch": "Error: {message}",
+        "action": "Action failed",
+        "match": "Match failed"
+      },
+      "filterAll": "All"
     },
     "fxRates": {
       "title": "FX Rate Registry",
@@ -6173,7 +6201,15 @@
       "bulkSetThreshold": "Set threshold",
       "bulkThresholdFailed": "Threshold update failed",
       "bulkThresholdDone": "{count} products updated",
-      "clearFilter": "Clear filter"
+      "clearFilter": "Clear filter",
+      "bulkBackorderDisableTip": "Turn off backorder for every active product",
+      "bulkBackorderEnableTip": "Allow customers to order every product even when out of stock",
+      "bulkBackorderDisable": "Disable backorder on all products",
+      "bulkBackorderEnable": "Enable backorder on all products",
+      "loadFailed": "Couldn't load products — {error}",
+      "filteredLabel": "Filtered:",
+      "filterLowStock": "Low stock",
+      "filterOutOfStock": "Out of stock"
     },
     "scan": {
       "title": "Barcode Scan",
@@ -6234,7 +6270,11 @@
       "helpCount": "Run a cycle count: scan items on a shelf and enter the counted quantity — the system auto-adjusts any difference from the recorded stock.",
       "helpCamera": "Camera scanning works in Chrome (Android/desktop) and Safari on iPhone (iOS 17+). On other browsers, type the barcode manually. Products must have a barcode set to be found.",
       "scanWithCamera": "Scan with camera",
-      "pickChangeOrder": "Change"
+      "pickChangeOrder": "Change",
+      "colItem": "Item",
+      "colPicked": "Picked",
+      "pickItemsTableLabel": "Order items",
+      "countLinesTableLabel": "Count lines"
     },
     "adjustments": {
       "title": "Stock Adjustments",
@@ -6287,7 +6327,32 @@
         "csvShowRowErrors": "Show row errors",
         "csvViewAllAdjustments": "View all adjustments",
         "csvClear": "Clear",
-        "csvStatusError": "Error"
+        "csvStatusError": "Error",
+        "colSku": "SKU",
+        "colBarcode": "Barcode",
+        "colNewQty": "New Qty",
+        "colDelta": "Delta",
+        "colReason": "Reason",
+        "colStatus": "Status",
+        "csvStatusOk": "OK",
+        "csvDropzoneHint": "Click to choose a CSV file, or drag and drop",
+        "csvParsedTotal": "{count} rows parsed —",
+        "csvParsedValid": "{count} valid",
+        "csvParsedErrors": ", {count} with errors",
+        "csvPreviewHeading": "Preview — first {count} rows",
+        "csvPreviewOfTotal": "(of {total})",
+        "csvRowPrefix": "Row {row}:",
+        "csvImportComplete": "Import complete — adjustment #{number}",
+        "csvTotalRows": "Total rows in file:",
+        "csvImported": "Imported:",
+        "csvSkipped": "Skipped (errors):",
+        "csvStatus": "Status:",
+        "csvStatusPosted": "Posted",
+        "csvStatusDraft": "Draft",
+        "csvImporting": "Importing…",
+        "csvSubmit": "Import & Post ({count} rows)",
+        "irreversibleNote": "Posting is irreversible — it applies inventory mutations and posts a GL journal entry. Save as draft to review first.",
+        "itemsTableLabel": "Adjustment items"
       },
       "searchPlaceholder": "Search adjustments…",
       "emptyState": "No stock adjustments yet. Create one with the button above."
@@ -6355,7 +6420,9 @@
         "submit": "Create draft PO",
         "notesLabel": "Notes (English)",
         "notesArLabel": "Notes (Arabic)",
-        "notesPlaceholder": "Optional notes"
+        "notesPlaceholder": "Optional notes",
+        "colProduct": "Product",
+        "lineItemsTableLabel": "Line items"
       },
       "detail": {
         "qtyReceived": "Received",
@@ -6365,7 +6432,13 @@
         "receiveHelp": "Receiving updates inventory levels and posts to the Inventory and Accounts Payable accounts.",
         "cancelButton": "Cancel PO",
         "cancelConfirm": "Cancel this PO? This action cannot be undone.",
-        "totalLabel": "Total"
+        "totalLabel": "Total",
+        "colProduct": "Product",
+        "colOrdered": "Ordered",
+        "colReceiveQty": "Receive Qty",
+        "cancelling": "Cancelling…",
+        "receiving": "Receiving…",
+        "itemsTableLabel": "Purchase order items"
       },
       "searchPlaceholder": "Search POs…",
       "errors": {
@@ -6385,11 +6458,16 @@
       "cancel": "Cancel",
       "cancelModal": {
         "title": "Cancel backorder",
-        "reasonLabel": "Cancellation reason (sent to customer)",
-        "confirm": "Cancel & Refund",
-        "discard": "Keep"
+        "reasonLabel": "Cancellation reason (internal — kept on the order's history)",
+        "confirm": "Cancel line & reverse the sale",
+        "discard": "Keep",
+        "body": "This cancels the waiting line and reverses its sale in your books. It does NOT send any money to the customer — if they paid, you refund this line yourself at the payment provider.",
+        "doneTitle": "Backorder cancelled",
+        "owedNotice": "No money was sent. You still owe the customer {amount} for this line — refund it at the payment provider.",
+        "ok": "OK"
       },
-      "empty": "No open backorders. When customers buy out-of-stock items with backorder enabled, they'll appear here."
+      "empty": "No open backorders. When customers buy out-of-stock items with backorder enabled, they'll appear here.",
+      "loadFailed": "Failed to load backorders"
     },
     "reorder": {
       "title": "Reorder Suggestions",
@@ -6431,7 +6509,7 @@
         "valueUnknown": "Unknown (no cost price)",
         "neverSold": "Never sold"
       },
-      "valueUnknownBanner": "{count, plural, one {# flagged product has} other {# flagged products have}} no cost price, so the stock value is unknown. Add cost prices on the product page to value them."
+      "valueUnknownBanner": "{count, plural, one {{count, number, latn} flagged product has} other {{count, number, latn} flagged products have}} no cost price, so the stock value is unknown. Add cost prices on the product page to value them."
     },
     "warehouses": {
       "title": "Warehouses",
@@ -6514,9 +6592,13 @@
       "aiCallout": "AI:",
       "noDataYet": "Insights will populate after the first nightly rollup at 02:00 KW.",
       "asOf": "As of",
-      "repeatPurchaseBasis": "of {count, plural, one {# buyer} other {# buyers}} re-ordered (last 30 days)",
+      "repeatPurchaseBasis": "of {count, plural, one {{count, number, latn} buyer} other {{count, number, latn} buyers}} re-ordered (last 30 days)",
       "repeatPurchaseUnknown": "No identifiable buyers in the last 30 days",
-      "cartToOrder": "Cart → order"
+      "cartToOrder": "Cart → order",
+      "colSku": "SKU",
+      "colName": "Name",
+      "colSold7d": "Sold 7d",
+      "colVelocity": "Velocity"
     },
     "cohorts": {
       "title": "Customer Cohorts",
@@ -6527,7 +6609,10 @@
       "retention": "Retention",
       "aiLabel": "AI:",
       "retentionMatrixTitle": "Retention Matrix",
-      "ltvByCohortTitle": "Cumulative LTV by Cohort"
+      "ltvByCohortTitle": "Cumulative LTV by Cohort",
+      "colTotalRevenue": "Total Revenue (KWD)",
+      "colLtvPerCustomer": "LTV / Customer",
+      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 KW."
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -6546,7 +6631,9 @@
       "aiLabel": "AI:",
       "overviewTitle": "Funnel Overview",
       "abandonedUnit": "carts",
-      "dailyBreakdownTitle": "Daily Breakdown"
+      "dailyBreakdownTitle": "Daily Breakdown",
+      "colDate": "Date",
+      "noDataYet": "No funnel data yet for this window. Insights populate after the first nightly rollup at 02:00 KW."
     },
     "segments": {
       "title": "Customer Segments (RFM)",
@@ -6983,7 +7070,7 @@
       "viewFaqsOnSeoPage": "View FAQs on SEO page",
       "guideUnit": "{count, plural, one {guide} other {guides}}",
       "noHowtosYet": "No HowTo guides yet. Run the HowTo sweep above.",
-      "stepCount": "{count, plural, one {# step} other {# steps}}",
+      "stepCount": "{count, plural, one {{count, number, latn} step} other {{count, number, latn} steps}}",
       "viewHowtosOnSeoPage": "View HowTos on SEO page",
       "storeAeoDescriptionLabel": "Store AEO description:",
       "recentlyRewritten": "Recently rewritten",
@@ -7444,12 +7531,12 @@
       "savedTitle": "Bot copy saved",
       "savedBody": "Your bot wording overrides are now live.",
       "groups": {
-        "Greeting": "Greeting",
-        "Products": "Products",
-        "Cart": "Cart",
-        "Checkout": "Checkout",
-        "Search": "Search",
-        "Prompts": "Prompts"
+        "greeting": "Greeting",
+        "products": "Products",
+        "cart": "Cart",
+        "checkout": "Checkout",
+        "search": "Search",
+        "prompts": "Prompts"
       },
       "keys": {
         "catalog_preparing": "Catalog preparing",
@@ -8003,7 +8090,7 @@
     "loadError": "Failed to load usage history.",
     "empty": "No monthly snapshots recorded yet. The first one is written at the start of next month.",
     "month": "Month",
-    "storeCount": "{count, plural, one {# store} other {# stores}}",
+    "storeCount": "{count, plural, one {{count, number, latn} store} other {{count, number, latn} stores}}",
     "table": {
       "store": "Store",
       "products": "Products (active / all)",

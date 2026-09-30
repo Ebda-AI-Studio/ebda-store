@@ -831,7 +831,7 @@ export default function StoreSeoPage() {
                   setFaqDraft({ ...EMPTY_FAQ, orderIndex: faqs.length });
                   setEditingFaqId('new');
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink hover:bg-primary/10"
               >
                 + {t('addFaq')}
               </button>
@@ -981,7 +981,7 @@ export default function StoreSeoPage() {
                     <button
                       type="button"
                       onClick={() => handleDeleteFaq(faq.id)}
-                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive text-xs border border-border"
+                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive-ink text-xs border border-border"
                     >
                       ✕
                     </button>
@@ -1085,7 +1085,7 @@ export default function StoreSeoPage() {
                   setHowtoDraft({ ...EMPTY_HOWTO, orderIndex: howtos.length });
                   setEditingHowtoId('new');
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink hover:bg-primary/10"
               >
                 + {t('addHowto')}
               </button>
@@ -1154,7 +1154,7 @@ export default function StoreSeoPage() {
                     <button
                       type="button"
                       onClick={() => handleDeleteHowto(howto.id)}
-                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive text-xs border border-border"
+                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive-ink text-xs border border-border"
                     >
                       ✕
                     </button>
@@ -1262,7 +1262,7 @@ export default function StoreSeoPage() {
               className={`rounded-lg p-3 text-sm ${
                 socialMessage.type === 'success'
                   ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                  : 'bg-destructive/5 border border-destructive/30 text-destructive'
+                  : 'bg-destructive/5 border border-destructive/30 text-destructive-ink'
               }`}
             >
               {socialMessage.text}
@@ -1276,7 +1276,7 @@ export default function StoreSeoPage() {
             className={`rounded-xl p-4 text-sm ${
               message.type === 'success'
                 ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                : 'bg-destructive/5 border border-destructive/30 text-destructive'
+                : 'bg-destructive/5 border border-destructive/30 text-destructive-ink'
             }`}
           >
             {message.text}
@@ -1387,7 +1387,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
           return (
             <div key={i} className="mb-2 rounded-lg border border-border p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary-ink">
                   {i + 1}
                 </span>
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">

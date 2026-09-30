@@ -42,19 +42,27 @@ const EVENT_LABELS: Record<string, { en: string; ar: string; color: string }> = 
   'referral.converted': {
     en: 'Referral converted (sale)',
     ar: 'تحويل الإحالة (بيع)',
-    color: 'bg-success/10 text-success',
+    color: 'bg-success/10 text-success-ink',
   },
-  'payout.initiated': { en: 'Payout initiated', ar: 'بدء الدفع', color: 'bg-info/10 text-info' },
+  'payout.initiated': {
+    en: 'Payout initiated',
+    ar: 'بدء الدفع',
+    color: 'bg-info/10 text-info-ink',
+  },
   'payout.completed': {
     en: 'Payout completed',
     ar: 'اكتمل الدفع',
-    color: 'bg-success/10 text-success',
+    color: 'bg-success/10 text-success-ink',
   },
-  'payout.pending': { en: 'Payout pending', ar: 'دفع معلق', color: 'bg-warning/10 text-warning' },
+  'payout.pending': {
+    en: 'Payout pending',
+    ar: 'دفع معلق',
+    color: 'bg-warning/10 text-warning-ink',
+  },
   'payout.failed': {
     en: 'Payout failed',
     ar: 'فشل الدفع',
-    color: 'bg-destructive/10 text-destructive',
+    color: 'bg-destructive/10 text-destructive-ink',
   },
 };
 
@@ -79,7 +87,7 @@ function EventIcon({ type }: { type: IconType }) {
   const base = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full';
   if (type === 'conversion')
     return (
-      <span className={`${base} bg-success/10 text-success`}>
+      <span className={`${base} bg-success/10 text-success-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -92,7 +100,7 @@ function EventIcon({ type }: { type: IconType }) {
     );
   if (type === 'payout')
     return (
-      <span className={`${base} bg-info/10 text-info`}>
+      <span className={`${base} bg-info/10 text-info-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -105,7 +113,7 @@ function EventIcon({ type }: { type: IconType }) {
     );
   if (type === 'fail')
     return (
-      <span className={`${base} bg-destructive/10 text-destructive`}>
+      <span className={`${base} bg-destructive/10 text-destructive-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"

@@ -14,7 +14,6 @@ export function SummaryCard({ order }: SummaryCardProps) {
   const t = useT('orders.detail');
   const locale = useLocale();
   const taxPlacement = orderTaxPlacement(order);
-  const discountPct = order.subtotal > 0 ? Math.round((order.discount / order.subtotal) * 100) : 0;
 
   // Break the total discount into its levers — coupon, automatic promotion,
   // loyalty-points redemption, and any remainder — instead of showing the
@@ -31,6 +30,11 @@ export function SummaryCard({ order }: SummaryCardProps) {
     0,
     order.discount - couponPortion - promotionPortion - loyaltyPortion
   );
+  // The percentage of the amount SHOWN on the remainder row — the whole-order
+  // `discount / subtotal` printed next to only the remainder labelled e.g.
+  // 0.500 KWD as "50%" once coupon/promotion/loyalty were split out (#2261).
+  const otherDiscountPct =
+    order.subtotal > 0 ? Math.round((otherDiscount / order.subtotal) * 100) : 0;
   // I5 (final review): reporting-only, NOT a component of `discount` — the
   // saving already lives in a lower `subtotal` (a bundle is priced at
   // bundlePrice, never componentSum), so it is shown as its own informational
@@ -64,7 +68,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
     ...(loyaltyPortion > 0
       ? [
           {
-            label: `${t('loyaltyPoints')}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed.toLocaleString(locale)})` : ''}`,
+            label: `${t('loyaltyPoints')}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed.toLocaleString(locale, { numberingSystem: 'latn' })})` : ''}`,
             value: formatMoney(loyaltyPortion, order.currency),
           },
         ]
@@ -73,7 +77,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
       ? [
           {
             label: t('discount'),
-            value: `${formatMoney(otherDiscount, order.currency)} (${discountPct}%)`,
+            value: `${formatMoney(otherDiscount, order.currency)} (${otherDiscountPct}%)`,
           },
         ]
       : []),

@@ -156,6 +156,7 @@ export function NotificationsLog({
       </div>
 
       <DataTable<NotificationLog>
+        ariaLabel={t('tableLabel')}
         columns={columns}
         rows={logs}
         rowKey={log => log.id}

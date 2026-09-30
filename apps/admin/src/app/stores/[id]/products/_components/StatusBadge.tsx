@@ -12,14 +12,18 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   switch (status) {
     case 'active':
       return (
-        <span className={`${base} bg-success/10 text-success dark:bg-success/20 dark:text-success`}>
+        <span
+          className={`${base} bg-success/10 text-success-ink dark:bg-success/20 dark:text-success`}
+        >
           <span className="h-1.5 w-1.5 rounded-full bg-success" />
           {t('active')}
         </span>
       );
     case 'draft':
       return (
-        <span className={`${base} bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning`}>
+        <span
+          className={`${base} bg-warning/10 text-warning-ink dark:bg-warning/20 dark:text-warning`}
+        >
           <span className="h-1.5 w-1.5 rounded-full bg-warning" />
           {t('draft')}
         </span>

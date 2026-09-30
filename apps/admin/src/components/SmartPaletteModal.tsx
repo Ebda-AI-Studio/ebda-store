@@ -264,7 +264,7 @@ export function SmartPaletteModal({
             type="button"
             onClick={handleLogoSuggest}
             disabled={logoLoading || !storeId}
-            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary-ink hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {logoLoading ? (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />

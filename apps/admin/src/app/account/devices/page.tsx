@@ -84,7 +84,7 @@ export default function DevicesPage() {
                 className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
                     <svg
                       className="h-5 w-5"
                       fill="none"
@@ -110,6 +110,7 @@ export default function DevicesPage() {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
+                          numberingSystem: 'latn', // Latin digits in both locales (issue 1971)
                         }),
                       })}
                     </p>
@@ -118,7 +119,7 @@ export default function DevicesPage() {
                 <button
                   type="button"
                   onClick={() => setConfirmRemoveId(d.playerId)}
-                  className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                  className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-sm font-medium text-destructive-ink hover:bg-destructive/10 transition-colors cursor-pointer"
                 >
                   {t('remove')}
                 </button>

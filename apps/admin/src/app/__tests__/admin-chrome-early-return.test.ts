@@ -12,9 +12,10 @@
  * This walks every .tsx under apps/admin/src/app with the TypeScript AST:
  *
  *  1. In any function that returns <AdminLayout>, every OTHER return must be
- *     `gate` (the feature upsell, which is its own full page), `null`, or a
- *     component whose own module renders <AdminLayout> (e.g.
- *     ProductsLoadingSkeleton, StoreErrorState).
+ *     `null`, a component whose own module renders <AdminLayout> (e.g.
+ *     ProductsLoadingSkeleton, StoreErrorState), or `gate` — accepted ONLY
+ *     because FeatureUpgradeGate itself renders <AdminLayout> (pinned below;
+ *     it used to be a bare card that dropped the chrome, #2236).
  *  2. Every store page (`app/stores/[id]/**\/page.tsx`) must reach
  *     <AdminLayout> — directly or through an imported component — unless it
  *     is a redirect.
@@ -106,10 +107,19 @@ function returnsOf(fn: ts.FunctionLikeDeclaration): ts.ReturnStatement[] {
 }
 
 const files = walk(APP);
+const GATE_COMPONENT = path.join(SRC, 'components/FeatureUpgradeGate.tsx');
 
 describe('admin chrome stays mounted (no early return before <AdminLayout>)', () => {
   it('finds admin pages to check (positive control)', () => {
     expect(files.length).toBeGreaterThan(100);
+  });
+
+  // #2236 — `if (gate) return gate;` on every feature-gated page returns the
+  // upsell card, so the card must carry the chrome itself.
+  it('the feature upsell a gated page returns renders inside <AdminLayout>', () => {
+    expect(moduleRendersLayout(GATE_COMPONENT)).toBe(true);
+    const hook = fs.readFileSync(path.join(SRC, 'hooks/useRequireFeature.ts'), 'utf8');
+    expect(hook).toMatch(/createElement\(FeatureUpgradeGate/);
   });
 
   it('every non-layout return beside an <AdminLayout> return keeps the chrome', () => {
@@ -128,7 +138,8 @@ describe('admin chrome stays mounted (no early return before <AdminLayout>)', ()
             for (const r of rets) {
               if (!r.expression) continue;
               const text = r.expression.getText();
-              if (text === 'gate' || text === 'null') continue;
+              if (text === 'null') continue;
+              if (text === 'gate' && moduleRendersLayout(GATE_COMPONENT)) continue;
               const tag = jsxTagName(r.expression);
               if (tag === 'AdminLayout') continue;
               const target = tag ? imports.get(tag) : undefined;

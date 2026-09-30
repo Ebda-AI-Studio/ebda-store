@@ -13,9 +13,10 @@
  *   - WIDENED (issue 2182 — the guard used to advertise coverage it could
  *     not enforce): text with digits/→/—/%, `title={'…'}`, capitalised
  *     ternary literals, and `header:`/`label:`-style props. A ratchet: a hit
- *     must be allowlisted or in admin-i18n-known-debt.json, the snapshot of
- *     what those shapes found on 2026-10-01. New ones fail; the debt only
- *     shrinks (delete an entry when its string is translated).
+ *     must be allowlisted (globally, or per-file in WIDENED_FILE_ALLOWLIST
+ *     for content data / product names) or in admin-i18n-known-debt.json —
+ *     empty since issue 2281 translated the 2026-10-01 snapshot. New ones
+ *     fail, and a debt/allowlist entry whose string is gone fails too.
  * NOT enforced even now: template literals, text between two
  * interpolations (`{n} rows`), lower-case ternary literals, and every admin
  * file NOT in the list below. "This file is guarded" means exactly the
@@ -324,17 +325,58 @@ describe('widened tier catches the shapes STRICT is blind to (issue 2182)', () =
   });
 });
 
+// Widened hits that are NOT admin chrome, scoped to the one file where each
+// is legitimate (a global ALLOWLIST entry like 'Products' would also wave
+// through a real `header: 'Products'` anywhere else). Issue 2281.
+const WIDENED_FILE_ALLOWLIST: Record<string, string[]> = {
+  // Storefront nav/footer PRESET items: each English `label` sits next to its
+  // `labelAr` sibling in the same object literal — bilingual content data the
+  // merchant saves into the store theme and the storefront renders in the
+  // shopper's language. Not admin chrome, so not a next-intl key.
+  'components/NavMenuEditor.tsx': [
+    '[prop] Products',
+    '[prop] Categories',
+    '[prop] About',
+    '[prop] Contact',
+    '[prop] Locations',
+  ],
+  'components/FooterLinksEditor.tsx': ['[prop] Contact', '[prop] Wishlist', '[prop] Locations'],
+  // The installed-app product name. It must equal app/manifest.ts `name`, and
+  // a browser fetches the manifest without the locale cookie, so it cannot be
+  // localized — a product name, kept identical in both locales (Ruling I18N-G2).
+  'app/layout.tsx': ['[prop] Force AI Store Admin'],
+};
+
 describe('admin i18n: widened-shape ratchet over the 81 files (issue 2182)', () => {
   const debt = KNOWN_DEBT as Record<string, string[]>;
 
   it('known debt only names covered files', () => {
     const covered = new Set<string>(B2_FILES);
     expect(Object.keys(debt).filter(f => !covered.has(f))).toEqual([]);
+    expect(Object.keys(WIDENED_FILE_ALLOWLIST).filter(f => !covered.has(f))).toEqual([]);
   });
+
+  // The ratchet only shrinks if a translated string's entry is deleted: an
+  // entry whose string is gone would silently re-admit that exact string.
+  it.each(Object.keys({ ...debt, ...WIDENED_FILE_ALLOWLIST }))(
+    '%s: every known-debt / allowlisted widened entry still matches (delete stale ones)',
+    relativePath => {
+      const source = readFileSync(resolve(ADMIN_SRC, relativePath), 'utf8');
+      const live = new Set(findWidenedHits(source, ALLOWLIST));
+      const recorded = [
+        ...(debt[relativePath] ?? []),
+        ...(WIDENED_FILE_ALLOWLIST[relativePath] ?? []),
+      ];
+      expect(recorded.filter(h => !live.has(h))).toEqual([]);
+    }
+  );
 
   it.each(B2_FILES)('%s adds no NEW widened-shape hardcoded string', relativePath => {
     const source = readFileSync(resolve(ADMIN_SRC, relativePath), 'utf8');
-    const known = new Set(debt[relativePath] ?? []);
+    const known = new Set([
+      ...(debt[relativePath] ?? []),
+      ...(WIDENED_FILE_ALLOWLIST[relativePath] ?? []),
+    ]);
     const fresh = findWidenedHits(source, ALLOWLIST).filter(h => !known.has(h));
     expect(
       fresh,

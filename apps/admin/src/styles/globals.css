@@ -41,6 +41,16 @@
     --destructive-light: 0 72% 95%;
     --destructive-foreground: 0 0% 100%;
 
+    /* "-ink": a role's TEXT colour on its own 10% tint (`bg-warning/10
+       text-warning-ink`). The role colour itself fails WCAG AA there — amber
+       text on an amber pill measured 1.7:1 (issue 2233). Each pair is pinned
+       >= 4.5:1 in both themes by admin-tint-ink-contrast.test.ts. */
+    --primary-ink: 26 100% 33%;
+    --success-ink: 158 64% 24%;
+    --warning-ink: 43 96% 24%;
+    --info-ink: 210 100% 35%;
+    --destructive-ink: 0 72% 40%;
+
     /* Borders & Inputs */
     --border: 30 15% 90%;
     --input: 30 15% 90%;
@@ -79,6 +89,11 @@
     --accent-foreground: 30 100% 90%;
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
+    --primary-ink: 26 100% 62%;
+    --success-ink: 158 64% 65%;
+    --warning-ink: 43 96% 62%;
+    --info-ink: 210 100% 72%;
+    --destructive-ink: 0 72% 70%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 26 100% 55%;
@@ -223,7 +238,7 @@
   }
 
   .force-nav-item.active {
-    @apply bg-primary/10 text-primary font-semibold;
+    @apply bg-primary/10 text-primary-ink font-semibold;
     box-shadow: inset 3px 0 0 0 hsl(var(--primary));
   }
 
@@ -237,19 +252,19 @@
   }
 
   .force-badge-success {
-    @apply bg-success/10 text-success;
+    @apply bg-success/10 text-success-ink;
   }
 
   .force-badge-warning {
-    @apply bg-warning/10 text-warning;
+    @apply bg-warning/10 text-warning-ink;
   }
 
   .force-badge-error {
-    @apply bg-destructive/10 text-destructive;
+    @apply bg-destructive/10 text-destructive-ink;
   }
 
   .force-badge-info {
-    @apply bg-info/10 text-info;
+    @apply bg-info/10 text-info-ink;
   }
 
   /* Force Table */

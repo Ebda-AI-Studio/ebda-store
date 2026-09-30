@@ -237,7 +237,7 @@ export default function NewsletterPage() {
         {/* Truncation notice — the table is capped; the full count above is
             accurate, but rows beyond the cap are only available via export. */}
         {total > subs.length && (
-          <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
+          <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning-ink">
             {tPage('truncatedNotice', { shown: subs.length, total })}
           </div>
         )}
@@ -247,7 +247,7 @@ export default function NewsletterPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : error ? (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive-ink">
             {error}
           </div>
         ) : subs.length === 0 ? (
@@ -258,7 +258,12 @@ export default function NewsletterPage() {
             </p>
           </div>
         ) : (
-          <DataTable<Subscriber> columns={columns} rows={subs} rowKey={s => s.id} />
+          <DataTable<Subscriber>
+            ariaLabel={tPage('title')}
+            columns={columns}
+            rows={subs}
+            rowKey={s => s.id}
+          />
         )}
       </div>
 
@@ -355,7 +360,7 @@ export default function NewsletterPage() {
                   />
 
                   {hasRiskyHtml && (
-                    <div className="mt-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning-foreground">
+                    <div className="mt-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning-ink">
                       {tPage('broadcastUnsafeWarning')}
                     </div>
                   )}
@@ -389,7 +394,7 @@ export default function NewsletterPage() {
                 </div>
 
                 {broadcastError && (
-                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive-ink">
                     {broadcastError}
                   </div>
                 )}

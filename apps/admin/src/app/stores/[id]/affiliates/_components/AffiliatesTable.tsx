@@ -194,7 +194,13 @@ export function AffiliatesTable({
         ))}
       </div>
 
-      <DataTable columns={columns} rows={affiliates} rowKey={a => a.id} emptyState={emptyState} />
+      <DataTable
+        ariaLabel={t('tableLabel')}
+        columns={columns}
+        rows={affiliates}
+        rowKey={a => a.id}
+        emptyState={emptyState}
+      />
 
       {meta && meta.totalPages > 1 && (
         <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-muted">

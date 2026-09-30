@@ -12,7 +12,7 @@ export function QuickActions() {
       description: t('qaCreateStoreDesc'),
       href: '/stores/new',
       icon: 'M12 4v16m8-8H4',
-      iconBg: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+      iconBg: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
     },
     {
       title: t('qaManageUsersTitle'),

@@ -306,7 +306,7 @@ export default function BlogPostEditorPage({
           </label>
 
           {error && (
-            <p className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            <p className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive-ink">
               {error}
             </p>
           )}

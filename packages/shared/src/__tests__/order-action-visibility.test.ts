@@ -3,7 +3,7 @@
  * orders PWA. One rule, tested once.
  */
 import { describe, it, expect } from 'vitest';
-import { orderActionVisibility } from '../order-action-visibility';
+import { orderActionVisibility, refundViaProviderRemaining } from '../order-action-visibility';
 
 const card = (status: string, extra: Record<string, unknown> = {}) => ({
   provider: 'myfatoorah',
@@ -82,5 +82,52 @@ describe('orderActionVisibility', () => {
     const v = orderActionVisibility({ status: 'pending', paymentStatus: 'unpaid' });
     expect(v.showManualMarkPaid).toBe(true);
     expect(v.showRefundViaProvider).toBe(false);
+  });
+});
+
+describe('refundViaProviderRemaining (#2069)', () => {
+  const pay = (over: Record<string, unknown>) => ({
+    provider: 'tap',
+    status: 'completed',
+    transactionId: 'tx',
+    amount: 5000,
+    refundedAmount: 0,
+    createdAt: '2026-09-01T00:00:00Z',
+    ...over,
+  });
+
+  it('quotes what is left after a partial refund, not the order value', () => {
+    expect(
+      refundViaProviderRemaining({
+        status: 'delivered',
+        paymentStatus: 'paid',
+        payments: [pay({ status: 'partially_refunded', refundedAmount: 2000 })],
+      })
+    ).toBe(3000);
+  });
+
+  it('reads the NEWEST refundable row — the one the route refunds', () => {
+    expect(
+      refundViaProviderRemaining({
+        status: 'delivered',
+        paymentStatus: 'paid',
+        payments: [
+          pay({ amount: 9000, createdAt: '2026-08-01T00:00:00Z' }),
+          pay({ amount: 4000, refundedAmount: 500, createdAt: '2026-09-02T00:00:00Z' }),
+          pay({ status: 'failed', amount: 1, createdAt: '2026-09-03T00:00:00Z' }),
+        ],
+      })
+    ).toBe(3500);
+  });
+
+  it('is unknown (null), not 0, when the payload lacks the figures', () => {
+    expect(
+      refundViaProviderRemaining({
+        status: 'delivered',
+        paymentStatus: 'paid',
+        payments: [{ provider: 'tap', status: 'completed', transactionId: 'tx' }],
+      })
+    ).toBeNull();
+    expect(refundViaProviderRemaining({ status: 'x', paymentStatus: 'paid' })).toBeNull();
   });
 });

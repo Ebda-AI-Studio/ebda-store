@@ -16,7 +16,7 @@ export function StoreOwnerCard({ owner }: StoreOwnerCardProps) {
       </div>
       <div className="p-6">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
             <span className="text-lg font-bold">
               {owner.firstName[0]}
               {owner.lastName[0]}

@@ -116,6 +116,32 @@ describe('admin + orders logout — same iOS gate on the read (#1945 sibling)', 
     const src = readFileSync(path.resolve(__dirname, '../..', file), 'utf-8');
     const logout = src.slice(src.indexOf('async function logout()'));
     const body = logout.slice(0, logout.indexOf('/auth/logout'));
-    expect(body).toMatch(/isIosWebkit\(\)\s*\?\s*localStorage\.getItem\('refreshToken'\)/);
+    // #2034: the gated read is the helper that also removes non-iOS residue.
+    expect(body).toMatch(/readStoredRefreshToken\(isIosWebkit\(\)\)/);
+    expect(body).not.toMatch(/localStorage\.getItem\('refreshToken'\)/);
   });
+});
+
+describe('admin + orders — a non-iOS refresh removes the residue copy (#2034)', () => {
+  it.each(['@admin/lib/api', '@orders/lib/api'])('%s', async mod => {
+    const { readStoredRefreshToken } = (await import(mod)) as {
+      readStoredRefreshToken: (ios: boolean) => string | null;
+    };
+    localStorage.setItem('refreshToken', 'residue');
+    expect(readStoredRefreshToken(true)).toBe('residue');
+    expect(localStorage.getItem('refreshToken'), 'iOS keeps its only copy').toBe('residue');
+    expect(readStoredRefreshToken(false)).toBeNull();
+    expect(localStorage.getItem('refreshToken'), 'elsewhere it is removed').toBeNull();
+  });
+
+  it.each(['apps/admin/src/lib/api.ts', 'apps/orders/src/lib/api.ts'])(
+    '%s: refreshAccessToken reads through the helper',
+    async file => {
+      const { readFileSync } = await import('fs');
+      const path = await import('path');
+      const src = readFileSync(path.resolve(__dirname, '../..', file), 'utf-8');
+      const fn = src.slice(src.indexOf('export function refreshAccessToken('));
+      expect(fn.slice(0, fn.indexOf('fetch('))).toMatch(/readStoredRefreshToken\(ios\)/);
+    }
+  );
 });

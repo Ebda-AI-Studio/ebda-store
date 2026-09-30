@@ -69,6 +69,7 @@ function formatMonth(periodStart: string, locale: string): string {
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC',
+    numberingSystem: 'latn', // Latin digits in both locales (issue 1971)
   });
 }
 
@@ -218,7 +219,12 @@ function UsageHistoryInner() {
         </span>
       </label>
       <div className="rounded-xl border bg-card shadow-sm">
-        <DataTable<UsageStoreRow> columns={columns} rows={rows} rowKey={r => r.storeId} />
+        <DataTable<UsageStoreRow>
+          ariaLabel={t('title')}
+          columns={columns}
+          rows={rows}
+          rowKey={r => r.storeId}
+        />
       </div>
     </div>
   );

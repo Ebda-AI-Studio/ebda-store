@@ -1035,7 +1035,8 @@
         "confirm": "تأكيد",
         "cancel": "إلغاء",
         "manualRefundTitle": "تعليم الطلب كمسترد؟",
-        "manualRefundDescription": "هذا يسجّل الاسترداد فقط: يعيد المخزون ويلغي الكوبون ونقاط الولاء ويُبلغ العميل بأنه تم الاسترداد — لكنه لا يعيد أي مبلغ. لإعادة دفعة البطاقة فعلياً، افتح الطلب واستخدم \"استرداد عبر مزوّد الدفع\"."
+        "manualRefundDescription": "هذا يسجّل الاسترداد فقط: يعيد المخزون ويلغي الكوبون ونقاط الولاء ويُبلغ العميل بأنه تم الاسترداد — لكنه لا يعيد أي مبلغ. لإعادة دفعة البطاقة فعلياً، افتح الطلب واستخدم \"استرداد عبر مزوّد الدفع\".",
+        "manualRefundDescriptionCancelled": "تم إلغاء هذا الطلب، لذا أُعيد مخزونه وأُلغي الكوبون ونقاط الولاء عند الإلغاء. هذا يسجّل الاسترداد على الطلب فقط — ولا يعيد أي مبلغ، ولا يُرسل إشعار جديد إلى العميل. لإعادة دفعة البطاقة فعلياً، استخدم \"استرداد عبر مزوّد الدفع\"."
       },
       "toast": {
         "errorTitle": "خطأ",
@@ -1130,7 +1131,7 @@
         "overrideReasonLabel": "سبب التجاوز"
       },
       "footer": {
-        "itemCount": "{count, plural, zero {# عنصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصرًا} other {# عنصر}}",
+        "itemCount": "{count, plural, zero {{count, number, latn} عنصر} one {عنصر واحد} two {عنصران} few {{count, number, latn} عناصر} many {{count, number, latn} عنصرًا} other {{count, number, latn} عنصر}}",
         "creating": "جارٍ الإنشاء…",
         "placeOrder": "إتمام الطلب",
         "unpaidHint": "أُنشئ الطلب بحالة غير مدفوع. أصدر رابط دفع عبر MyFatoorah من صفحة تفاصيل الطلب بعد الحفظ."
@@ -1271,7 +1272,9 @@
         "iframeTitle": "معاينة واجهة المتجر (جوال)",
         "openInNewTab": "فتح في تبويب جديد ↗",
         "unavailable": "المعاينة غير متاحة — لا يوجد معرّف أو نطاق مهيّأ للمتجر.",
-        "saveHint": "اضغط <b>حفظ التغييرات</b> للتحديث — تُعاد تحميل المعاينة بعد كل حفظ."
+        "saveHint": "اضغط <b>حفظ التغييرات</b> للتحديث — تُعاد تحميل المعاينة بعد كل حفظ.",
+        "generating": "جارٍ الإنشاء…",
+        "unsaved": "معاينة التغييرات غير المحفوظة"
       },
       "sections": {
         "hero": {
@@ -1665,7 +1668,8 @@
         "uploading": "جارٍ الرفع…",
         "uploadFont": "رفع الخط",
         "addGoogleFont": "+ إضافة خط من Google",
-        "uploadCustomFont": "↥ رفع خط مخصص"
+        "uploadCustomFont": "↥ رفع خط مخصص",
+        "uploadFailed": "فشل الرفع."
       },
       "sectionOrder": {
         "title": "ترتيب الأقسام",
@@ -1883,10 +1887,10 @@
         "totalSpent": "إجمالي الإنفاق",
         "unknown": "غير معروف",
         "partial": "أحدث الطلبات فقط",
-        "guestsSub": "{count, plural, =0 {لا طلبات كزائر} one {طلب واحد كزائر} two {طلبان كزائر} few {# طلبات كزائر} many {# طلبًا كزائر} other {# طلب كزائر}}",
+        "guestsSub": "{count, plural, =0 {لا طلبات كزائر} one {طلب واحد كزائر} two {طلبان كزائر} few {{count, number, latn} طلبات كزائر} many {{count, number, latn} طلبًا كزائر} other {{count, number, latn} طلب كزائر}}",
         "repeatSub": "{repeat} من {buyers} مشترين طلبوا مجددًا",
         "noBuyersSub": "لا توجد طلبات بعد",
-        "ordersSub": "{count, plural, one {من طلب واحد} two {من طلبين} few {من # طلبات} many {من # طلبًا} other {من # طلب}}",
+        "ordersSub": "{count, plural, one {من طلب واحد} two {من طلبين} few {من {count, number, latn} طلبات} many {من {count, number, latn} طلبًا} other {من {count, number, latn} طلب}}",
         "spentSub": "كل الطلبات عدا الملغاة والمستردة — مدفوعة أو غير مدفوعة"
       }
     },
@@ -2542,7 +2546,7 @@
       "showInFooterTitle": "إظهار الفروع في التذييل",
       "showInFooterHint": "يضيف عمود \"فروعنا\" إلى تذييل متجرك يعرض فروعك المنشورة (الاسم والعنوان والهاتف). معطّل افتراضياً — لن يتغير تذييل متجرك حتى تفعّل هذا الخيار.",
       "showInFooterToggle": "إظهار عمود فروعنا في تذييل المتجر",
-      "count": "{count, plural, =0 {لا توجد فروع} one {فرع واحد} two {فرعان} few {# فروع} many {# فرعًا} other {# فرع}}",
+      "count": "{count, plural, =0 {لا توجد فروع} one {فرع واحد} two {فرعان} few {{count, number, latn} فروع} many {{count, number, latn} فرعًا} other {{count, number, latn} فرع}}",
       "addButton": "+ إضافة فرع",
       "formNewTitle": "فرع جديد",
       "formEditTitle": "تعديل الفرع",
@@ -2593,7 +2597,8 @@
       "emptyCta": "أضف فرعك الأول ←",
       "errCreate": "فشل في إنشاء الفرع",
       "errUpdate": "فشل في تحديث الفرع",
-      "errDelete": "فشل في الحذف"
+      "errDelete": "فشل في الحذف",
+      "tableLabel": "الفروع"
     }
   },
   "coupons": {
@@ -3207,7 +3212,7 @@
       "kwdValue": "{value} د.ك"
     },
     "alertBanner": {
-      "needAttention": "{count, plural, =1 {# منتج يحتاج إلى انتباه} other {# منتج يحتاجون إلى انتباه}}",
+      "needAttention": "{count, plural, =1 {{count, number, latn} منتج يحتاج إلى انتباه} other {{count, number, latn} منتج يحتاجون إلى انتباه}}",
       "breakdown": "{out} نفدت من المخزون، {low} مخزون منخفض",
       "viewAlerts": "عرض التنبيهات"
     },
@@ -3587,7 +3592,7 @@
       "noEvents": "لا توجد أحداث تدقيق حتى الآن",
       "noEventsHint": "تظهر هنا تغييرات الحالة (موافقة / رفض / تعليق) فور حدوثها.",
       "loadError": "تعذّر تحميل سجل التدقيق",
-      "eventsCount": "{count, plural, one {# حدث} two {# حدثان} few {# أحداث} many {# حدثًا} other {# حدث}}",
+      "eventsCount": "{count, plural, one {{count, number, latn} حدث} two {{count, number, latn} حدثان} few {{count, number, latn} أحداث} many {{count, number, latn} حدثًا} other {{count, number, latn} حدث}}",
       "reasonLabel": "السبب: {reason}",
       "commissionLabel": "العمولة:",
       "payoutLabelText": "الدفعة:",
@@ -3767,7 +3772,12 @@
       "invalidSchedule": "اختر وقتًا في المستقبل، خلال الثلاثين يومًا القادمة.",
       "queueUnreachable": "تعذّر جدولة الحملة الآن. لم يتم إرسال شيء — حاول مرة أخرى.",
       "featureDisabled": "هذه الميزة غير مفعّلة لمتجرك.",
-      "notDraft": "تم إرسال هذه الحملة بالفعل ولم يعد بالإمكان تعديلها."
+      "notDraft": "تم إرسال هذه الحملة بالفعل ولم يعد بالإمكان تعديلها.",
+      "notDeletable": "لا يمكن حذف الحملة إلا إذا كانت مسودة أو ملغاة أو فاشلة. حدّث الصفحة لرؤية حالتها الحالية.",
+      "hasSendHistory": "أرسلت هذه الحملة رسائل بالفعل، لذا تُحفظ كسجل إرسال ولا يمكن حذفها.",
+      "notCancellable": "لا يمكن إلغاء الحملة إلا إذا كانت مجدولة أو قيد الإرسال. حدّث الصفحة لرؤية حالتها الحالية.",
+      "noAdminEmail": "لا يوجد بريد إلكتروني في حسابك لإرسال الرسالة التجريبية إليه.",
+      "notEditable": "لا يمكن تعديل الحملة إلا إذا كانت مسودة. حدّث الصفحة لرؤية حالتها الحالية."
     },
     "editor": {
       "loadingTitle": "الحملة",
@@ -3836,7 +3846,8 @@
       "loadMore": "عرض المزيد",
       "confirmCancelTitle": "إلغاء هذه الحملة؟",
       "confirmCancelDescription": "سيوقف هذا الحملة قبل أن تبدأ، أو قبل الدفعة التالية إذا كانت قيد الإرسال. لا يمكن استئنافها — سيتوجب عليك إرسالها من جديد.",
-      "confirmCancelButton": "إلغاء الحملة"
+      "confirmCancelButton": "إلغاء الحملة",
+      "sendHistoryPermanent": "أرسلت هذه الحملة رسائل بالفعل — تُحفظ كسجل إرسال ولا يمكن حذفها."
     }
   },
   "abandonedCarts": {
@@ -3892,7 +3903,7 @@
       "ariaLabel": "العربات المتروكة",
       "filterAriaLabel": "تصفية حسب الحالة",
       "allStatuses": "جميع الحالات",
-      "totalRecords": "{count, plural, =0 {لا توجد سجلات} one {# سجل إجمالًا} other {# سجل إجمالًا}}",
+      "totalRecords": "{count, plural, =0 {لا توجد سجلات} one {{count, number, latn} سجل إجمالًا} other {{count, number, latn} سجل إجمالًا}}",
       "empty": "لا توجد عربات متروكة بعد",
       "emptyDescription": "تظهر العربات هنا عندما يضيف أحد المتسوقين منتجات ثم يغادر قبل بدء عملية الدفع. تُرسل حملة الاسترداد أعلاه تذكيرات لإعادتهم.",
       "emptyOrdersHint": "بدأ أحدهم الدفع ولكن لم يُكمِل السداد؟ هذا طلب قيد الانتظار وليس عربة متروكة.",
@@ -3953,7 +3964,7 @@
       "orderLabel": "الطلب",
       "customerLabel": "العميل",
       "reasonLabel": "السبب",
-      "itemCount": "{count, plural, =0 {لا توجد عناصر} one {# عنصر} other {# عنصر}}",
+      "itemCount": "{count, plural, =0 {لا توجد عناصر} one {{count, number, latn} عنصر} other {{count, number, latn} عنصر}}",
       "pagination": "عرض {from} إلى {to} من {total} إرجاع",
       "previous": "السابق",
       "next": "التالي",
@@ -4011,7 +4022,13 @@
         "NO_COMPLETED_PAYMENT": "لا يوجد دفع إلكتروني لهذا الطلب يمكن استرداده. اختر رصيد المتجر أو التحويل البنكي.",
         "EXCHANGE_CANNOT_REFUND_TO_GATEWAY": "الاستبدال لا يسترد المبلغ للعميل. اختر رصيد المتجر أو أكمله كإرجاع.",
         "PROVIDER_REFUND_FAILED": "رفض مزوّد الدفع الاسترداد ولم يُرسل أي مبلغ — حاول مرة أخرى أو اختر طريقة أخرى.",
-        "INVALID_STATUS": "علّم الإرجاع كمستلم قبل إكماله."
+        "INVALID_STATUS": "علّم الإرجاع كمستلم قبل إكماله.",
+        "INVALID_STATE": "هناك استرداد قيد التنفيذ على هذه الدفعة. لا تُكمل المرتجع مرة أخرى: حدّث الصفحة وتحقّق أولاً من حالة استرداد الدفعة.",
+        "PAYMENT_NOT_REFUNDABLE": "لا توجد معاملة لدى مزوّد الدفع لهذه الدفعة (مثل الدفع عند الاستلام)، لذا لا يمكن استردادها عبر البوابة. اختر رصيد المتجر أو التحويل البنكي.",
+        "ALREADY_REFUNDED": "تم استرداد هذه الدفعة بالكامل مسبقاً.",
+        "REFUND_EXCEEDS_REMAINING": "مبلغ الاسترداد أكبر من المتبقي غير المسترد من هذه الدفعة. حدّث الصفحة — فقد تم استرداد جزء منها بطريقة أخرى.",
+        "INVALID_REFUND_AMOUNT": "لا يوجد مبلغ استرداد لهذا المرتجع. حدّد مبلغ الاسترداد قبل إكماله.",
+        "AMBIGUOUS_PAYMENT": "مرجع هذه الدفعة يطابق أكثر من دفعة واحدة، لذا لم يُسترد أي مبلغ ولم يكتمل الإرجاع. استرده من لوحة تحكم مزوّد الدفع وتواصل مع الدعم."
       }
     },
     "modal": {
@@ -4063,7 +4080,8 @@
         "default": "غير متاح لهذا الطلب.",
         "REFUND_PERMISSION_REQUIRED": "غير متاح: إرجاع المبلغ إلى وسيلة الدفع الأصلية يحتاج صاحب المتجر. اطلب منه إكمال الإرجاع، أو استخدم رصيد المتجر أو التحويل البنكي."
       },
-      "cancel": "إلغاء"
+      "cancel": "إلغاء",
+      "alreadyFullyRefundedNotice": "تم استرداد دفعة هذا الطلب بالكامل مسبقًا — من صفحة الطلب أو من لوحة تحكم مزوّد الدفع. لا يمكن إرسال مبلغ إضافي إلى البطاقة. إذا كان ذلك الاسترداد يغطي هذا الإرجاع، فاختر \"تم الاسترداد مسبقًا — تسجيل فقط\" لإكماله دون استرداد مرة أخرى."
     }
   },
   "marketingPixels": {
@@ -4380,7 +4398,7 @@
     "push": {
       "title": "الإشعارات الفورية",
       "subtitle": "Web Push قياسي (W3C Push API)",
-      "subscribers": "{count, number} مشترك",
+      "subscribers": "{count, number, latn} مشترك",
       "platformNote": "تستخدم الإشعارات الفورية إعداد VAPID الخاص بالمنصة. لا يلزم إعداد لكل متجر — فقط فعّل الخيار."
     },
     "broadcast": {
@@ -4404,7 +4422,7 @@
       "send": "إرسال الإشعار",
       "sending": "جارٍ الإرسال…",
       "sentTitle": "تم إرسال الإشعار",
-      "sentDescription": "تم استهداف {count, number} مشترك.",
+      "sentDescription": "تم استهداف {count, number, latn} مشترك.",
       "sendFailed": "تعذّر إرسال الإشعار.",
       "notConfiguredTitle": "مزوّد الإشعارات غير مُعَدّ",
       "notConfiguredDescription": "بيانات اعتماد OneSignal غير مضبوطة على خادم الـ API. اضبط متغيرات البيئة التالية على Railway ثم أعد النشر:",
@@ -4414,8 +4432,8 @@
       "refresh": "تحديث",
       "refreshing": "جارٍ التحديث…",
       "untitled": "(بدون عنوان)",
-      "deliveredCount": "تم تسليم {count, number}",
-      "clickedCount": "{count, number} نقرة"
+      "deliveredCount": "تم تسليم {count, number, latn}",
+      "clickedCount": "{count, number, latn} نقرة"
     },
     "events": {
       "title": "إعدادات الأحداث",
@@ -4793,7 +4811,7 @@
       "storePlanSubtitle": "الخطة الحالية تحدد الميزات الأساسية.",
       "changePlanOption": "تغيير الخطة…",
       "planChangeNote": "تغيير الخطة يحافظ على كل الإعدادات المخصصة الحالية. تتحدث الميزات الأساسية فورًا.",
-      "featureCount": "{count, plural, zero {# ميزة} one {ميزة واحدة} two {ميزتان} few {# ميزات} many {# ميزة} other {# ميزة}}",
+      "featureCount": "{count, plural, zero {{count, number, latn} ميزة} one {ميزة واحدة} two {ميزتان} few {{count, number, latn} ميزات} many {{count, number, latn} ميزة} other {{count, number, latn} ميزة}}",
       "loadStoreFailed": "تعذّر تحميل بيانات المتجر.",
       "badges": {
         "includedIn": "مُضمّن في {plan}",
@@ -5618,7 +5636,7 @@
     "aiTranslateButton": {
       "translating": "جاري الترجمة {done}/{total}…",
       "nothing": "لا يوجد ما يُترجم",
-      "translate": "ترجمة {count, plural, one {حقل ناقص} other {# حقول ناقصة}}",
+      "translate": "ترجمة {count, plural, one {حقل ناقص} other {{count, number, latn} حقول ناقصة}}",
       "summaryFilled": "تم التعبئة {count}. ",
       "summarySkippedBoth": "تجاوزت {count} من العناصر المترجمة مسبقاً. ",
       "summarySkippedEmpty": "تم تخطي {count} فارغ. ",
@@ -6089,7 +6107,9 @@
         "title": "ربط بقيد يومية",
         "entryId": "معرّف القيد (UUID)",
         "confirm": "ربط",
-        "cancel": "إلغاء"
+        "cancel": "إلغاء",
+        "entryIdHelp": "يمكنك العثور على معرّفات القيود في المالية ← دفتر اليومية.",
+        "confirming": "جارٍ الربط…"
       },
       "difference": {
         "title": "فارق المطابقة",
@@ -6103,7 +6123,15 @@
         "bankLines": "حركة/حركات",
         "ledgerEntries": "قيد/قيود",
         "suggestedAction": "الإجراء المقترح"
-      }
+      },
+      "errors": {
+        "loadStatement": "تعذّر تحميل كشف الحساب",
+        "loadTransactions": "تعذّر تحميل المعاملات",
+        "autoMatch": "خطأ: {message}",
+        "action": "تعذّر تنفيذ الإجراء",
+        "match": "تعذّرت المطابقة"
+      },
+      "filterAll": "الكل"
     },
     "fxRates": {
       "title": "سجل أسعار الصرف",
@@ -6173,7 +6201,15 @@
       "bulkSetThreshold": "تحديد الحد",
       "bulkThresholdFailed": "فشل تحديث الحد",
       "bulkThresholdDone": "تم تحديث {count} منتج",
-      "clearFilter": "مسح الفلتر"
+      "clearFilter": "مسح الفلتر",
+      "bulkBackorderDisableTip": "إيقاف الطلب الآجل لكل المنتجات النشطة",
+      "bulkBackorderEnableTip": "السماح للعملاء بطلب كل المنتجات حتى عند نفاد المخزون",
+      "bulkBackorderDisable": "إيقاف الطلب الآجل لكل المنتجات",
+      "bulkBackorderEnable": "تفعيل الطلب الآجل لكل المنتجات",
+      "loadFailed": "تعذّر تحميل المنتجات — {error}",
+      "filteredLabel": "الفلتر:",
+      "filterLowStock": "مخزون منخفض",
+      "filterOutOfStock": "نفد المخزون"
     },
     "scan": {
       "title": "مسح الباركود",
@@ -6234,7 +6270,11 @@
       "helpCount": "نفّذ جردًا دوريًا: امسح الأصناف على الرف وأدخل الكمية المعدودة — يقوم النظام بتسوية أي فرق عن المخزون المسجّل تلقائيًا.",
       "helpCamera": "مسح الكاميرا يعمل في Chrome (أندرويد/سطح المكتب) و Safari على iPhone (iOS 17+). في المتصفحات الأخرى أدخل الباركود يدويًا. يجب أن يكون للمنتج باركود محدّد ليتم العثور عليه.",
       "scanWithCamera": "مسح بالكاميرا",
-      "pickChangeOrder": "تغيير"
+      "pickChangeOrder": "تغيير",
+      "colItem": "الصنف",
+      "colPicked": "المُلتقط",
+      "pickItemsTableLabel": "أصناف الطلب",
+      "countLinesTableLabel": "أسطر الجرد"
     },
     "adjustments": {
       "title": "تسويات المخزون",
@@ -6287,7 +6327,32 @@
         "csvShowRowErrors": "عرض أخطاء الصفوف",
         "csvViewAllAdjustments": "عرض كل التسويات",
         "csvClear": "مسح",
-        "csvStatusError": "خطأ"
+        "csvStatusError": "خطأ",
+        "colSku": "رمز المنتج (SKU)",
+        "colBarcode": "الباركود",
+        "colNewQty": "الكمية الجديدة",
+        "colDelta": "الفرق",
+        "colReason": "السبب",
+        "colStatus": "الحالة",
+        "csvStatusOk": "سليم",
+        "csvDropzoneHint": "انقر لاختيار ملف CSV، أو اسحبه وأفلته هنا",
+        "csvParsedTotal": "تم تحليل {count} صف —",
+        "csvParsedValid": "{count} صالح",
+        "csvParsedErrors": "، {count} به أخطاء",
+        "csvPreviewHeading": "معاينة — أول {count} صف",
+        "csvPreviewOfTotal": "(من أصل {total})",
+        "csvRowPrefix": "الصف {row}:",
+        "csvImportComplete": "اكتمل الاستيراد — التسوية رقم {number}",
+        "csvTotalRows": "إجمالي الصفوف في الملف:",
+        "csvImported": "تم استيرادها:",
+        "csvSkipped": "تم تخطيها (أخطاء):",
+        "csvStatus": "الحالة:",
+        "csvStatusPosted": "مُرحّلة",
+        "csvStatusDraft": "مسودة",
+        "csvImporting": "جارٍ الاستيراد…",
+        "csvSubmit": "استيراد وترحيل ({count} صف)",
+        "irreversibleNote": "الترحيل نهائي ولا يمكن التراجع عنه — فهو يطبّق تغييرات المخزون ويرحّل قيد يومية في دفتر الأستاذ العام. احفظ كمسودة للمراجعة أولاً.",
+        "itemsTableLabel": "بنود التسوية"
       },
       "searchPlaceholder": "ابحث في التسويات…",
       "emptyState": "لا توجد تسويات مخزون بعد. أنشئ واحدة باستخدام الزر أعلاه."
@@ -6355,7 +6420,9 @@
         "submit": "إنشاء مسودة أمر الشراء",
         "notesLabel": "ملاحظات (إنجليزي)",
         "notesArLabel": "ملاحظات (عربي)",
-        "notesPlaceholder": "ملاحظات اختيارية"
+        "notesPlaceholder": "ملاحظات اختيارية",
+        "colProduct": "المنتج",
+        "lineItemsTableLabel": "بنود الطلب"
       },
       "detail": {
         "qtyReceived": "المستلَم",
@@ -6365,7 +6432,13 @@
         "receiveHelp": "الاستلام يحدّث مستويات المخزون ويرحّل قيوداً إلى حسابي المخزون والذمم الدائنة.",
         "cancelButton": "إلغاء الأمر",
         "cancelConfirm": "هل تريد إلغاء هذا الأمر؟ لا يمكن التراجع عن هذا الإجراء.",
-        "totalLabel": "الإجمالي"
+        "totalLabel": "الإجمالي",
+        "colProduct": "المنتج",
+        "colOrdered": "المطلوب",
+        "colReceiveQty": "كمية الاستلام",
+        "cancelling": "جارٍ الإلغاء…",
+        "receiving": "جارٍ الاستلام…",
+        "itemsTableLabel": "بنود أمر الشراء"
       },
       "searchPlaceholder": "ابحث في أوامر الشراء…",
       "errors": {
@@ -6385,11 +6458,16 @@
       "cancel": "إلغاء",
       "cancelModal": {
         "title": "إلغاء طلب الانتظار",
-        "reasonLabel": "سبب الإلغاء (يُرسَل للعميل)",
-        "confirm": "إلغاء واسترداد",
-        "discard": "إبقاء"
+        "reasonLabel": "سبب الإلغاء (داخلي — يُحفظ في سجل الطلب)",
+        "confirm": "إلغاء البند وعكس البيع",
+        "discard": "إبقاء",
+        "body": "يلغي هذا البند المنتظر ويعكس بيعه في دفاترك. لا يرسل أي مبلغ إلى العميل — إذا كان قد دفع، فعليك استرداد قيمة هذا البند بنفسك لدى مزوّد الدفع.",
+        "doneTitle": "تم إلغاء الطلب الآجل",
+        "owedNotice": "لم يُرسل أي مبلغ. ما زلت مديناً للعميل بمبلغ {amount} عن هذا البند — استرده له لدى مزوّد الدفع.",
+        "ok": "حسناً"
       },
-      "empty": "لا توجد طلبات انتظار مفتوحة. عندما يشتري العملاء أصنافاً نفدت مع تفعيل خيار الانتظار، ستظهر هنا."
+      "empty": "لا توجد طلبات انتظار مفتوحة. عندما يشتري العملاء أصنافاً نفدت مع تفعيل خيار الانتظار، ستظهر هنا.",
+      "loadFailed": "تعذّر تحميل الطلبات الآجلة"
     },
     "reorder": {
       "title": "اقتراحات إعادة الطلب",
@@ -6431,7 +6509,7 @@
         "valueUnknown": "غير معروفة (لا يوجد سعر تكلفة)",
         "neverSold": "لم يُبَع أبداً"
       },
-      "valueUnknownBanner": "{count, plural, one {منتج محدَّد واحد ليس له سعر تكلفة} other {# منتجات محدَّدة ليس لها سعر تكلفة}}، لذا قيمة المخزون غير معروفة. أضف أسعار التكلفة من صفحة المنتج لتقييمها."
+      "valueUnknownBanner": "{count, plural, one {منتج محدَّد واحد ليس له سعر تكلفة} other {{count, number, latn} منتجات محدَّدة ليس لها سعر تكلفة}}، لذا قيمة المخزون غير معروفة. أضف أسعار التكلفة من صفحة المنتج لتقييمها."
     },
     "warehouses": {
       "title": "المستودعات",
@@ -6514,9 +6592,13 @@
       "aiCallout": "AI:",
       "noDataYet": "ستظهر التحليلات بعد أول تحديث ليلي الساعة 02:00 بتوقيت الكويت.",
       "asOf": "حتى",
-      "repeatPurchaseBasis": "{count, plural, one {من مشترٍ واحد أعاد الطلب} other {من # مشترين أعادوا الطلب}} (آخر 30 يوماً)",
+      "repeatPurchaseBasis": "{count, plural, one {من مشترٍ واحد أعاد الطلب} other {من {count, number, latn} مشترين أعادوا الطلب}} (آخر 30 يوماً)",
       "repeatPurchaseUnknown": "لا يوجد مشترون يمكن تمييزهم خلال آخر 30 يوماً",
-      "cartToOrder": "من السلة إلى الطلب"
+      "cartToOrder": "من السلة إلى الطلب",
+      "colSku": "رمز المنتج (SKU)",
+      "colName": "الاسم",
+      "colSold7d": "المباع (7 أيام)",
+      "colVelocity": "معدل البيع"
     },
     "cohorts": {
       "title": "شرائح العملاء الزمنية",
@@ -6527,7 +6609,10 @@
       "retention": "الاستبقاء",
       "aiLabel": "الذكاء الاصطناعي:",
       "retentionMatrixTitle": "مصفوفة الاستبقاء",
-      "ltvByCohortTitle": "القيمة الدائمة التراكمية حسب الشريحة"
+      "ltvByCohortTitle": "القيمة الدائمة التراكمية حسب الشريحة",
+      "colTotalRevenue": "إجمالي الإيرادات (د.ك)",
+      "colLtvPerCustomer": "القيمة الدائمة / عميل",
+      "noDataYet": "لا توجد بيانات مجموعات بعد. ستظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت الكويت."
     },
     "funnel": {
       "title": "قمع إتمام الشراء",
@@ -6546,7 +6631,9 @@
       "aiLabel": "الذكاء الاصطناعي:",
       "overviewTitle": "نظرة عامة على القمع",
       "abandonedUnit": "سلة",
-      "dailyBreakdownTitle": "التفصيل اليومي"
+      "dailyBreakdownTitle": "التفصيل اليومي",
+      "colDate": "التاريخ",
+      "noDataYet": "لا توجد بيانات لمسار الشراء في هذه الفترة بعد. تظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت الكويت."
     },
     "segments": {
       "title": "شرائح العملاء (RFM)",
@@ -6983,7 +7070,7 @@
       "viewFaqsOnSeoPage": "عرض الأسئلة في صفحة السيو",
       "guideUnit": "{count, plural, one {دليل} other {أدلة}}",
       "noHowtosYet": "لا توجد أدلة بعد. شغّل مسح الأدلة أعلاه.",
-      "stepCount": "{count, plural, one {# خطوة} other {# خطوات}}",
+      "stepCount": "{count, plural, one {{count, number, latn} خطوة} other {{count, number, latn} خطوات}}",
       "viewHowtosOnSeoPage": "عرض الأدلة في صفحة السيو",
       "storeAeoDescriptionLabel": "وصف AEO للمتجر:",
       "recentlyRewritten": "أُعيدت صياغته مؤخراً",
@@ -7444,12 +7531,12 @@
       "savedTitle": "تم حفظ نصوص البوت",
       "savedBody": "تعديلاتك على نصوص البوت أصبحت مفعّلة الآن.",
       "groups": {
-        "Greeting": "الترحيب",
-        "Products": "المنتجات",
-        "Cart": "السلة",
-        "Checkout": "الدفع",
-        "Search": "البحث",
-        "Prompts": "التوجيهات"
+        "greeting": "الترحيب",
+        "products": "المنتجات",
+        "cart": "السلة",
+        "checkout": "الدفع",
+        "search": "البحث",
+        "prompts": "التوجيهات"
       },
       "keys": {
         "catalog_preparing": "التحضير",
@@ -8003,7 +8090,7 @@
     "loadError": "تعذّر تحميل سجل الاستخدام.",
     "empty": "لم تُسجَّل أي لقطات شهرية بعد. تُكتب أول لقطة في بداية الشهر القادم.",
     "month": "الشهر",
-    "storeCount": "{count, plural, one {متجر واحد} two {متجران} few {# متاجر} many {# متجرًا} other {# متجر}}",
+    "storeCount": "{count, plural, one {متجر واحد} two {متجران} few {{count, number, latn} متاجر} many {{count, number, latn} متجرًا} other {{count, number, latn} متجر}}",
     "table": {
       "store": "المتجر",
       "products": "المنتجات (النشطة / الكل)",

@@ -17,7 +17,6 @@ interface SummaryCardProps {
 export function SummaryCard({ order }: SummaryCardProps) {
   const { t, locale } = useLanguage();
   const taxPlacement = orderTaxPlacement(order);
-  const discountPct = order.subtotal > 0 ? Math.round((order.discount / order.subtotal) * 100) : 0;
 
   // Break the total discount into its levers — coupon, automatic promotion,
   // loyalty-points redemption, and any remainder — instead of one aggregate
@@ -33,6 +32,11 @@ export function SummaryCard({ order }: SummaryCardProps) {
     0,
     order.discount - couponPortion - promotionPortion - loyaltyPortion
   );
+  // The percentage of the amount SHOWN on the remainder row — the whole-order
+  // `discount / subtotal` printed next to only the remainder labelled e.g.
+  // 0.500 KWD as "50%" once coupon/promotion/loyalty were split out (#2261).
+  const otherDiscountPct =
+    order.subtotal > 0 ? Math.round((otherDiscount / order.subtotal) * 100) : 0;
   const walletAmount = order.walletAmount ?? 0;
   const promotionName = order.appliedPromotion
     ? locale === 'ar' && order.appliedPromotion.nameAr
@@ -70,7 +74,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
       ? [
           {
             label: t.detail.discount,
-            value: `${formatMoney(otherDiscount, order.currency)} (${discountPct}%)`,
+            value: `${formatMoney(otherDiscount, order.currency)} (${otherDiscountPct}%)`,
           },
         ]
       : []),

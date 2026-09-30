@@ -72,6 +72,10 @@ describe('SummaryCard — loyalty points line (#197)', () => {
     expect(screen.getByText('loyaltyPoints (800)')).toBeTruthy();
     // The unexplained remainder (500 fils) still shows as the generic bucket.
     expect(screen.getByText(/^discount/)).toBeTruthy();
+    // #2261 — its percentage is of the 500 fils shown (5% of 10,000), not the
+    // whole-order 50%.
+    expect(screen.getByText('0.500 KWD (5%)')).toBeTruthy();
+    expect(screen.queryByText(/\(50%\)/)).toBeNull();
   });
 
   it('omits the loyalty row entirely when no redemption applied', () => {

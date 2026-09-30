@@ -164,7 +164,7 @@ export default function UsersPage() {
       primaryOnMobile: true,
       cell: user => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
             <span className="text-sm font-bold">
               {user.firstName[0]}
               {user.lastName[0]}
@@ -332,6 +332,7 @@ export default function UsersPage() {
             </div>
           ) : (
             <DataTable<User>
+              ariaLabel={t('tableLabel')}
               columns={columns}
               rows={users}
               rowKey={user => user.id}

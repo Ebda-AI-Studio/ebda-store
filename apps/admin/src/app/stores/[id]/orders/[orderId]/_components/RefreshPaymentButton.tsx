@@ -65,7 +65,7 @@ export function RefreshPaymentButton({
       onClick={handleRefresh}
       disabled={disabled || busy}
       title={t('buttonTooltip')}
-      className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-warning bg-warning/5 px-4 py-2.5 text-sm font-semibold text-warning hover:bg-warning/10 disabled:opacity-60 transition-colors cursor-pointer"
+      className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-warning bg-warning/5 px-4 py-2.5 text-sm font-semibold text-warning-ink hover:bg-warning/10 disabled:opacity-60 transition-colors cursor-pointer"
     >
       <svg
         className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`}

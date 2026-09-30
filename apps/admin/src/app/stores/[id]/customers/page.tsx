@@ -9,6 +9,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
 import { apiGet, apiFetch } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { SearchInput } from '@/components/SearchInput';
 import { StatusFilterPills } from '@/components/StatusFilterPills';
@@ -18,6 +19,7 @@ import {
   badgeKeyFor,
   parseSegmentParam,
   segmentFilterOptions,
+  ERASURE_REVIEW_PARAM,
   type SegmentFilter,
 } from './_components/customerSegments';
 
@@ -68,6 +70,8 @@ export default function StoreCustomersPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('customers.page');
+  const tPrivacy = useT('customers.detail.privacy');
+  const tc = useT('common');
   const locale = useLocale();
 
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
@@ -95,11 +99,20 @@ export default function StoreCustomersPage() {
   const [isExporting, setIsExporting] = useState(false);
   const { error: toastError } = useToast();
 
-  // Reset to page 1 whenever the search term or segment changes so results
-  // always start from the beginning of the filtered set.
-  useEffect(() => {
+  // A search or segment change starts from page 1. Reset in the HANDLER, not
+  // in an effect: an effect ran after the fetch effect of the same commit, so
+  // every change fired two list requests (old page, then page 1) and the
+  // older could land last (#2234). `beginRequest` guards the remaining case —
+  // any two overlapping fetches.
+  const beginRequest = useLatestRequest();
+  const changeSearch = useCallback((value: string) => {
+    setSearch(value);
     setPage(1);
-  }, [search, segment]);
+  }, []);
+  const changeSegment = useCallback((value: SegmentFilter) => {
+    setSegment(value);
+    setPage(1);
+  }, []);
 
   // Keep `?segment=` in step with the pills so the filtered view is
   // shareable and survives back-navigation from a customer's detail page.
@@ -123,6 +136,7 @@ export default function StoreCustomersPage() {
    */
   const fetchCustomers = useCallback(async () => {
     if (!storeId) return;
+    const isLatest = beginRequest();
     setIsLoading(true);
     setError(null);
 
@@ -137,6 +151,7 @@ export default function StoreCustomersPage() {
       const { data, error: fetchError } = await apiGet<CustomersListResponse>(
         `/api/v1/stores/${storeId}/customers?${qs.toString()}`
       );
+      if (!isLatest()) return;
 
       if (fetchError || !data) {
         setError(fetchError?.message || t('fetchFailed'));
@@ -155,12 +170,13 @@ export default function StoreCustomersPage() {
       setSummary(data.meta?.summary ?? null);
       setPresentSegments(data.meta?.segments ?? []);
     } catch {
+      if (!isLatest()) return;
       setError(t('connectionError'));
       setSummary(null);
     } finally {
-      setIsLoading(false);
+      if (isLatest()) setIsLoading(false);
     }
-  }, [storeId, t, page, search, segment]);
+  }, [storeId, t, page, search, segment, beginRequest]);
 
   useEffect(() => {
     fetchCustomers();
@@ -215,9 +231,13 @@ export default function StoreCustomersPage() {
     () =>
       // The active segment stays selectable even when the store has no member
       // in it (a drill-down link to an emptied segment still shows its pill).
+      // The active segment ALWAYS stays among the pills (#2222) — `guest`
+      // included, whose pill otherwise hangs off `summary`, which is null
+      // while loading or after an error — so the group can never hide, or
+      // leave no tabbable pill, while a filter is still applied.
       segmentFilterOptions(
         segment === 'all' || segment === 'guest' ? presentSegments : [...presentSegments, segment],
-        (summary?.guests ?? 0) > 0
+        (summary?.guests ?? 0) > 0 || segment === 'guest'
       ).map(value => ({
         value,
         label: value === 'all' ? t('segmentAll') : t(`badges.${value}`),
@@ -245,7 +265,7 @@ export default function StoreCustomersPage() {
           // name itself stays `dir="auto"` so it still reads correctly.
           <div className="flex min-w-0 items-center gap-2.5" dir={pageDir}>
             <div
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary-ink"
               aria-hidden="true"
             >
               {customer.firstName?.[0]}
@@ -412,7 +432,7 @@ export default function StoreCustomersPage() {
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
             <SearchInput
               value={search}
-              onSearch={setSearch}
+              onSearch={changeSearch}
               placeholder={t('searchPlaceholder')}
               className="w-full sm:w-72"
             />
@@ -430,7 +450,7 @@ export default function StoreCustomersPage() {
                 ariaLabel={t('segmentFilterLabel')}
                 options={segmentOptions}
                 value={segment}
-                onChange={setSegment}
+                onChange={changeSegment}
                 className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl bg-muted p-1"
               />
             </div>
@@ -439,7 +459,7 @@ export default function StoreCustomersPage() {
 
         {/* Error */}
         {error && (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
             {error}
             <button type="button" className="ms-4 font-medium underline" onClick={fetchCustomers}>
               {t('retry')}
@@ -447,10 +467,37 @@ export default function StoreCustomersPage() {
           </div>
         )}
 
+        {/* An erasure left an ambiguous CRM match for the merchant to delete by
+            hand (#2229) — said here, on the list they were sent to, until
+            they dismiss it, not only in a toast. */}
+        {searchParams?.get(ERASURE_REVIEW_PARAM) === '1' && (
+          <div
+            role="alert"
+            className="flex items-start justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
+          >
+            <div>
+              <p className="font-semibold">{tPrivacy('erasedCrmReviewTitle')}</p>
+              <p className="mt-1">{tPrivacy('erasedCrmAmbiguous')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const qs = new URLSearchParams(searchParams?.toString() ?? '');
+                qs.delete(ERASURE_REVIEW_PARAM);
+                const q = qs.toString();
+                if (pathname) router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+              }}
+              className="shrink-0 rounded-md border border-warning/40 px-2 py-1 text-xs font-medium hover:bg-warning/10"
+            >
+              {tc('close')}
+            </button>
+          </div>
+        )}
+
         {/* Truncation notice — the server capped the order scan on a very large
           store, so this list aggregates only the most recent orders. */}
         {truncated && (
-          <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+          <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink">
             {t('truncatedNotice')}
           </div>
         )}
@@ -460,6 +507,7 @@ export default function StoreCustomersPage() {
           <AdminSkeletonTable rows={6} columns={6} showToolbar={false} />
         ) : (
           <DataTable
+            ariaLabel={t('tableLabel')}
             columns={columns}
             rows={pagedCustomers}
             rowKey={c => c.id}

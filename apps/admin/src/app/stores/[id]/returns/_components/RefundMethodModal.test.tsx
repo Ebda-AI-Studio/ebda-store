@@ -35,6 +35,7 @@ type Gateway = {
   amount: number | null;
   refundableRemaining: number | null;
   unavailableReason: string | null;
+  alreadyPaidToCustomer?: boolean;
 };
 
 function previewWith(gateway: Gateway, recordedAmount = 1978) {
@@ -158,6 +159,32 @@ describe('RefundMethodModal', () => {
     await waitFor(() => expect(radio('manual')).not.toBeNull());
     expect(radio('original')?.disabled).toBe(true);
     expect(screen.getByText('alreadyIssuedNotice')).toBeTruthy();
+  });
+
+  it('issue 2003 — also offers "record only" when the payment was refunded in full elsewhere', async () => {
+    previewWith({
+      available: false,
+      amount: null,
+      refundableRemaining: 0,
+      unavailableReason: 'PAYMENT_FULLY_REFUNDED',
+      alreadyPaidToCustomer: true,
+    });
+    renderModal();
+    await waitFor(() => expect(radio('manual')).not.toBeNull());
+    expect(screen.getByText('alreadyFullyRefundedNotice')).toBeTruthy();
+  });
+
+  it('issue 2003 — never offers "record only" when money is still owed', async () => {
+    previewWith({
+      available: false,
+      amount: null,
+      refundableRemaining: 500,
+      unavailableReason: 'PARTIAL_REFUND_EXCEEDS_PAYMENT',
+      alreadyPaidToCustomer: false,
+    });
+    renderModal();
+    await waitFor(() => expect(radio('original')?.disabled).toBe(true));
+    expect(radio('manual')).toBeNull();
   });
   it('with the wallet on, store credit shows and confirms what the wallet receives', async () => {
     // A full return: the wallet gets cashCredit + shipping − walletAmount,

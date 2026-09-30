@@ -1,4 +1,16 @@
-export { formatPrice } from '@force/shared';
+import { formatPrice as sharedFormatPrice } from '@force/shared';
+
+/**
+ * The admin renders Latin digits in both locales (issue 1971) — the same
+ * policy as its ICU messages (`i18n/formats.ts`). An Arabic-locale price keeps
+ * its Arabic currency symbol (`1.500 د.ك.`) but not Arabic-Indic digits.
+ */
+export function formatPrice(
+  amount: number,
+  options?: Parameters<typeof sharedFormatPrice>[1]
+): string {
+  return sharedFormatPrice(amount, { ...options, latinDigits: true });
+}
 
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '—';

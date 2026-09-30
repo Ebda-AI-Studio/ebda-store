@@ -77,10 +77,15 @@ export function StatusFilterPills<T extends string = string>({
     }
   }
 
+  const hasActive = options.some(o => o.value === value);
   return (
     <div role="radiogroup" aria-label={ariaLabel} className={className}>
       {options.map((option, index) => {
         const isActive = option.value === value;
+        // Roving tabindex needs exactly ONE tabbable pill. If `value` matches
+        // no option (a dynamic option list that dropped it), the first pill
+        // takes the tab stop so the group stays keyboard-reachable (#2222).
+        const tabbable = isActive || (!hasActive && index === 0);
         return (
           <button
             key={option.value}
@@ -90,7 +95,7 @@ export function StatusFilterPills<T extends string = string>({
             type="button"
             role="radio"
             aria-checked={isActive}
-            tabIndex={isActive ? 0 : -1}
+            tabIndex={tabbable ? 0 : -1}
             onClick={() => onChange(option.value)}
             onKeyDown={e => handleKeyDown(e, index)}
             className={`${pillClassName} ${isActive ? activeClassName : inactiveClassName}`}

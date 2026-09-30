@@ -72,10 +72,10 @@ export type CartStatus = (typeof CART_STATUS_KEYS)[number];
  * warning/success palette used elsewhere.
  */
 export const ABANDONED_CART_COLORS = {
-  pending: { className: 'bg-warning/10 text-warning dark:bg-warning/30 dark:text-warning' },
-  step1_sent: { className: 'bg-info/10 text-info dark:bg-info/30 dark:text-info' },
-  step2_sent: { className: 'bg-info/10 text-info dark:bg-info/30 dark:text-info' },
-  step3_sent: { className: 'bg-info/10 text-info dark:bg-info/30 dark:text-info' },
-  recovered: { className: 'bg-success/10 text-success dark:bg-success/30 dark:text-success' },
+  pending: { className: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning' },
+  step1_sent: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info' },
+  step2_sent: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info' },
+  step3_sent: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info' },
+  recovered: { className: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success' },
   expired: { className: 'bg-muted text-muted-foreground' },
 } as const;

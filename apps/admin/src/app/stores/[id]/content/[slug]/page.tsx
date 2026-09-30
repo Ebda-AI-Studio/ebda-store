@@ -612,7 +612,7 @@ function BlockEditor({
             onClick={onRemove}
             title={t('removeBlock')}
             aria-label={t('removeBlock')}
-            className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20 cursor-pointer"
+            className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/20 cursor-pointer"
           >
             ✕
           </button>
@@ -767,7 +767,7 @@ function ItemListEditor({
             onClick={() => removeAt(idx)}
             title={t('removeItem')}
             aria-label={t('removeItem')}
-            className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20 cursor-pointer"
+            className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/20 cursor-pointer"
           >
             ✕
           </button>

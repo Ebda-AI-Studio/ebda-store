@@ -258,7 +258,16 @@ export async function cancelBackorder(
     );
   }
 
-  return { id: backorderId, cancelledAt: now, cancelledReason: reason };
+  // `owedToCustomer`: cancelling reverses the sale in the books but sends NO
+  // money (Ruling AP-5b(2)) — the merchant refunds this sum off-platform, so
+  // the admin states it rather than a "Cancel & Refund" it never performs
+  // (issue 2275). 0 when the order was never paid or nothing was left open.
+  return {
+    id: backorderId,
+    cancelledAt: now,
+    cancelledReason: reason,
+    owedToCustomer: cancelled.notify ? cancelled.refundAmount : 0,
+  };
 }
 
 function notFound(): Error {

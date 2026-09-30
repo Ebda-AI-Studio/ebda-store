@@ -127,7 +127,7 @@ export default function EmailQueuePage() {
         </div>
 
         {message && (
-          <div className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
+          <div className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary-ink">
             {message}
           </div>
         )}
@@ -138,6 +138,7 @@ export default function EmailQueuePage() {
           </div>
         ) : (
           <DataTable<FailedEmail>
+            ariaLabel={t('title')}
             columns={columns}
             rows={emails}
             rowKey={e => e.id}

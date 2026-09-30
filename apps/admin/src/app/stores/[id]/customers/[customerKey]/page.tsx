@@ -86,6 +86,7 @@ interface OrderRow {
 }
 
 import { formatDate, formatPrice } from '../../../../../lib/format';
+import { ERASURE_REVIEW_PARAM } from '../_components/customerSegments';
 import { useT } from '../../../../../i18n/useT';
 
 function formatKwd(fils: number): string {
@@ -95,10 +96,10 @@ function formatKwd(fils: number): string {
 function StatusChip({ status }: { status: string }) {
   const cls =
     status === 'paid' || status === 'completed' || status === 'confirmed'
-      ? 'bg-success/10 text-success'
+      ? 'bg-success/10 text-success-ink'
       : status === 'cancelled' || status === 'failed' || status === 'refunded'
-        ? 'bg-destructive/10 text-destructive'
-        : 'bg-warning/10 text-warning';
+        ? 'bg-destructive/10 text-destructive-ink'
+        : 'bg-warning/10 text-warning-ink';
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${cls}`}
@@ -127,7 +128,7 @@ export default function CustomerDetailPage() {
   const t = useT('customers.detail');
   const tPrivacy = useT('customers.detail.privacy');
   const { user } = useAuth();
-  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+  const { success: toastSuccess, error: toastError, addToast } = useToast();
   // Owner/admin roles only — matches the API's `authorize('store_admin',
   // 'super_admin')` on both routes. Hiding the card for staff/other roles
   // is UX only; the API is the real gate.
@@ -274,8 +275,17 @@ export default function CustomerDetailPage() {
       // The account is erased either way, but the merchant-CRM copy is
       // matched by email/phone and can be missed or refused as ambiguous —
       // say so instead of an unqualified success (#1880).
+      // An ambiguous CRM match leaves a record the merchant must delete by
+      // hand. A 5s toast followed by a navigation was the only place that
+      // said so (#2229): the toast now stays until dismissed, and the list we
+      // navigate to carries the same instruction as a banner.
       if (data?.crmReviewNeeded) {
-        toastWarning(tPrivacy('erasedCrmReviewTitle'), tPrivacy('erasedCrmAmbiguous'));
+        addToast({
+          type: 'warning',
+          title: tPrivacy('erasedCrmReviewTitle'),
+          message: tPrivacy('erasedCrmAmbiguous'),
+          duration: 0,
+        });
       } else if (data?.crmChecked && data.crmRowsScrubbed === 0) {
         toastSuccess(tPrivacy('erasedToastTitle'), tPrivacy('erasedCrmNotMatched'));
       } else {
@@ -287,13 +297,15 @@ export default function CustomerDetailPage() {
       // nulled/scrubbed all three — so a re-fetch 404s every time,
       // surfacing an error banner over the stale pre-erase PII still in
       // state (audit-followup #1872). Navigate back to the list instead.
-      router.push(`/stores/${storeId}/customers`);
+      router.push(
+        `/stores/${storeId}/customers${data?.crmReviewNeeded ? `?${ERASURE_REVIEW_PARAM}=1` : ''}`
+      );
     } catch (err) {
       toastError(tPrivacy('eraseFailed'), err instanceof Error ? err.message : '');
     } finally {
       setIsErasing(false);
     }
-  }, [storeId, customer, tPrivacy, toastError, toastSuccess, toastWarning, router]);
+  }, [storeId, customer, tPrivacy, toastError, toastSuccess, addToast, router]);
 
   const displayName =
     customer && (customer.firstName || customer.lastName)
@@ -441,7 +453,7 @@ export default function CustomerDetailPage() {
         // the first page succeeded). `!customer` stays null-guarded below.
         <>
           {error && (
-            <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+            <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive-ink">
               {error}
               <button type="button" className="ms-4 font-medium underline" onClick={fetchDetail}>
                 {t('retry')}
@@ -462,7 +474,7 @@ export default function CustomerDetailPage() {
                       <dd className="font-medium text-foreground text-end">
                         {customer.firstName} {customer.lastName}
                         {customer.isGuest && (
-                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
+                          <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning-ink">
                             {t('guestBadge')}
                           </span>
                         )}
@@ -588,29 +600,29 @@ export default function CustomerDetailPage() {
               {/* Status breakdown */}
               <div className="flex flex-wrap items-center gap-3">
                 {customer.paidCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success-ink">
                     {t('statusPaid')} · {customer.paidCount}
                   </span>
                 )}
                 {customer.pendingCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning-ink">
                     {t('statusPending')} · {customer.pendingCount}
                   </span>
                 )}
                 {customer.cancelledCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive-ink">
                     {t('statusCancelled')} · {customer.cancelledCount}
                   </span>
                 )}
                 {customer.failedCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive-ink">
                     {t('statusFailed')} · {customer.failedCount}
                   </span>
                 )}
                 {customer.refundedCount > 0 && (
                   <span
                     title={`${t('refunded')}: ${formatKwd(customer.totalRefunded)}`}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive-ink"
                   >
                     {t('statusRefunded')} · {customer.refundedCount}
                     <span className="text-[10px] text-destructive/70">
@@ -630,7 +642,12 @@ export default function CustomerDetailPage() {
                 <h2 className="mb-3 text-sm font-semibold text-foreground">
                   {t('ordersSection', { count: orders.length })}
                 </h2>
-                <DataTable<OrderRow> columns={orderColumns} rows={orders} rowKey={o => o.id} />
+                <DataTable<OrderRow>
+                  ariaLabel={t('ordersSection', { count: orders.length })}
+                  columns={orderColumns}
+                  rows={orders}
+                  rowKey={o => o.id}
+                />
               </div>
 
               {/* Customer wallet (store credit) — registered customers only:

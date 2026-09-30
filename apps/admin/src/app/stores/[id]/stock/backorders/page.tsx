@@ -7,6 +7,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,35 +46,66 @@ interface CancelModalProps {
   storeId: string;
   onClose: () => void;
   onSuccess: () => void;
-  t: (key: string) => string;
+  t: (key: string, values?: Record<string, string | number>) => string;
 }
 
+/**
+ * Cancelling a backorder line reverses the sale in the books but sends NO
+ * money (Ruling AP-5b(2)) — so the modal says that before, and states the sum
+ * the merchant still owes after (issue 2275), instead of "Cancel & Refund".
+ */
 function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModalProps) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [owed, setOwed] = useState<number | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const { error: apiError } = await apiPost(
+    const { data, error: apiError } = await apiPost<{ owedToCustomer?: number }>(
       `/api/v1/stores/${storeId}/backorders/${backorderId}/cancel`,
       { reason }
     );
     setSubmitting(false);
     if (apiError) {
       setError(apiError.message);
-    } else {
-      onSuccess();
-      onClose();
+      return;
     }
+    onSuccess();
+    const owedToCustomer = data?.owedToCustomer ?? 0;
+    if (owedToCustomer > 0) setOwed(owedToCustomer);
+    else onClose();
+  }
+
+  if (owed !== null) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-background rounded-xl border border-border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
+          <h2 className="text-base font-semibold">{t('cancelModal.doneTitle')}</h2>
+          <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive-ink">
+            {t('cancelModal.owedNotice', { amount: formatPrice(owed) })}
+          </p>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm"
+            >
+              {t('cancelModal.ok')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-background rounded-xl border border-border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
         <h2 className="text-base font-semibold">{t('cancelModal.title')}</h2>
+        <p className="text-xs text-muted-foreground">{t('cancelModal.body')}</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium text-muted-foreground">
@@ -136,8 +168,8 @@ export default function BackordersPage() {
           setLines(data ?? []);
         }
       })
-      .catch(() => setError('Failed to load backorders'));
-  }, [storeId]);
+      .catch(() => setError(t('loadFailed')));
+  }, [storeId, t]);
 
   useEffect(() => {
     load();
@@ -231,6 +263,7 @@ export default function BackordersPage() {
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-5xl space-y-4">
         <DataTable<BackorderLine>
+          ariaLabel={t('title')}
           columns={columns}
           rows={lines}
           rowKey={line => line.id}

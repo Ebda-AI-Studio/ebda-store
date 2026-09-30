@@ -617,7 +617,7 @@ export default function EditProductPage() {
     >
       <form onSubmit={handleSubmit}>
         {error && (
-          <div className="mb-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="mb-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
             {error}
           </div>
         )}

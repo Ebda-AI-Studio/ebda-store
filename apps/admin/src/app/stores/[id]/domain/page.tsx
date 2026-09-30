@@ -424,6 +424,7 @@ export default function StoreDomainPage() {
                         </p>
                         <div className="mt-3">
                           <DataTable<DnsRecordRow>
+                            ariaLabel={t('dnsTableLabel')}
                             columns={dnsColumns}
                             rows={dnsRows}
                             rowKey={(record, i) => `${record.type}-${record.name}-${i}`}

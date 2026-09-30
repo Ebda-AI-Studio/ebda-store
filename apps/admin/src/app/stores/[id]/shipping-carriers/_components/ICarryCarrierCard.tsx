@@ -67,7 +67,7 @@ export function ICarryCarrierCard({
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
               {config.isDefault && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-ink">
                   {tShared('defaultBadge')}
                 </span>
               )}

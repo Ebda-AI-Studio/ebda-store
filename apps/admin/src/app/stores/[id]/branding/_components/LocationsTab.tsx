@@ -314,7 +314,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
               <button
                 type="button"
                 onClick={() => setConfirmDeleteId(loc.id)}
-                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 max-md:px-4 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 max-md:px-4 text-xs font-semibold text-destructive-ink hover:bg-destructive/10"
               >
                 {t('delete')}
               </button>
@@ -419,7 +419,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           </h3>
 
           {formError && (
-            <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive-ink">
               {formError}
             </p>
           )}
@@ -652,7 +652,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
       ) : locations.length === 0 ? (
         <div className="rounded-xl border bg-card">
           <div className="p-10 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -683,6 +683,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
         </div>
       ) : (
         <DataTable<Location>
+          ariaLabel={t('tableLabel')}
           columns={locationColumns}
           rows={sortedLocations}
           rowKey={loc => loc.id}
@@ -691,7 +692,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
 
       {/* Generic error (e.g. from delete) when form is closed */}
       {formError && formMode === null && (
-        <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive-ink">
           {formError}
         </p>
       )}

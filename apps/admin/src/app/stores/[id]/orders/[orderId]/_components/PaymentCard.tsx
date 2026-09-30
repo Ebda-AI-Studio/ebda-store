@@ -75,7 +75,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
       <div className="flex items-start gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            isPaid ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+            isPaid ? 'bg-success/10 text-success-ink' : 'bg-destructive/10 text-destructive-ink'
           }`}
         >
           <svg

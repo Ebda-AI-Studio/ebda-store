@@ -12,6 +12,10 @@ export interface OrderActionPayment {
   transactionId?: string | null;
   paymentUrl?: string | null;
   paymentLink?: string | null;
+  /** Fils. Needed (with refundedAmount) for refundViaProviderRemaining. */
+  amount?: number | null;
+  refundedAmount?: number | null;
+  createdAt?: string | Date | null;
 }
 
 export interface OrderActionInput {
@@ -31,6 +35,26 @@ export interface OrderActionVisibility {
   showRefundViaProvider: boolean;
   /** Refresh refund status: a provider-issued refund exists to ask about. */
   showRefreshRefundStatus: boolean;
+}
+
+/**
+ * What `POST /orders/:id/refund-via-provider` would send, in fils: the NEWEST
+ * `completed` / `partially_refunded` payment's `amount - refundedAmount` — the
+ * row and figure that route and PaymentService.refund use when no amount is
+ * given (#2069). The order total overstates it after a partial refund.
+ * Null when the payload does not carry the figures (an older API), so the
+ * caller says "the remaining balance" instead of quoting a number it cannot
+ * stand behind.
+ */
+export function refundViaProviderRemaining(order: OrderActionInput): number | null {
+  const candidates = (order.payments ?? []).filter(
+    p => p.status === 'completed' || p.status === 'partially_refunded'
+  );
+  if (candidates.length === 0) return null;
+  const ts = (p: OrderActionPayment) => (p.createdAt ? new Date(p.createdAt).getTime() : 0);
+  const newest = candidates.reduce((a, b) => (ts(b) > ts(a) ? b : a));
+  if (typeof newest.amount !== 'number' || typeof newest.refundedAmount !== 'number') return null;
+  return Math.max(0, newest.amount - newest.refundedAmount);
 }
 
 export function orderActionVisibility(order: OrderActionInput): OrderActionVisibility {

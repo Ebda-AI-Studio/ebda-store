@@ -305,6 +305,7 @@ export default function AccountsPage() {
               <section key={key}>
                 <h2 className="text-base font-semibold mb-2">{t(`type.${typeKey}`)}</h2>
                 <DataTable<AccountTreeRow>
+                  ariaLabel={t(`type.${typeKey}`)}
                   columns={accountColumns}
                   rows={rows}
                   rowKey={({ node }) => node.id}

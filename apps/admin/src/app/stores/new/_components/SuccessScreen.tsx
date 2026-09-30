@@ -139,6 +139,7 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
               <p className="mt-2 text-sm">{t('dnsInstructions')}</p>
               <div className="mt-3">
                 <DataTable<DnsRecordRow>
+                  ariaLabel={t('dnsTableLabel')}
                   columns={dnsColumns}
                   rows={dnsRows}
                   rowKey={(record, i) => `${record.type}-${record.name}-${i}`}

@@ -202,7 +202,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
 
       {/* Error */}
       {!loading && error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}
@@ -256,6 +256,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
             <div className="rounded-xl border border-border bg-card p-5">
               <h3 className="text-sm font-semibold mb-4">{t('intentTitle')}</h3>
               <DataTable<[string, number]>
+                ariaLabel={t('intentTitle')}
                 columns={intentColumns}
                 rows={intentEntries}
                 rowKey={([intent]) => intent}

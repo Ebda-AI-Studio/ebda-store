@@ -314,6 +314,7 @@ export default function MerchantKeysPage() {
 
         {data ? (
           <DataTable<KeyRow>
+            ariaLabel={t('page.title')}
             columns={keyColumns}
             rows={data.keys}
             rowKey={row => row.id}

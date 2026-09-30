@@ -169,3 +169,95 @@ describe('a browser that HAS held a session still recovers (#1789)', () => {
     expect(refreshCalls(fetchMock)).toHaveLength(1);
   });
 });
+
+/**
+ * #2095 / #2163 — the admin and orders PWA mount check (`checkSession`, run
+ * on EVERY route, /login included) had no evidence gate: each anonymous
+ * login-page load posted a credential-less /auth/refresh into the shared
+ * `<ip>-refresh-anon` bucket, and once throttled the mount ladder multiplied
+ * it into 4 × /auth/me + 8 × /auth/refresh. Same gate as the storefront.
+ */
+describe.each(['@admin/lib/api', '@orders/lib/api'])('%s — the mount check', mod => {
+  type Api = {
+    checkSession: (url: string) => Promise<{ status: string }>;
+    checkSessionWithMountRetries: (url: string) => Promise<{ status: string }>;
+    clearStoredSession: () => void;
+  };
+  const load = async () => (await import(mod)) as unknown as Api;
+
+  it('an anonymous visitor: /auth/me 401 → signed-out, no /auth/refresh', async () => {
+    const fetchMock = vi.fn(async () => res(401, { success: false }));
+    globalThis.fetch = fetchMock as never;
+    const { checkSession } = await load();
+
+    await expect(checkSession('http://test/api/v1')).resolves.toEqual({ status: 'signed-out' });
+    expect(refreshCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it('an anonymous visitor on a throttled /auth/me: signed-out at once, no ladder', async () => {
+    const fetchMock = vi.fn(async () => res(429));
+    globalThis.fetch = fetchMock as never;
+    const { checkSessionWithMountRetries } = await load();
+
+    await expect(checkSessionWithMountRetries('http://test/api/v1')).resolves.toEqual({
+      status: 'signed-out',
+    });
+    // One /auth/me, zero refreshes — not 4 × /auth/me + 8 × /auth/refresh.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a browser that held a session still refreshes and recovers', async () => {
+    let me = 0;
+    const fetchMock = vi.fn(async (url: unknown) => {
+      if (String(url).includes('/auth/refresh')) {
+        return res(200, { success: true, data: { refreshed: true } });
+      }
+      me += 1;
+      return me === 1
+        ? res(401, { success: false })
+        : res(200, { success: true, data: { user: { id: 'u1' } } });
+    });
+    globalThis.fetch = fetchMock as never;
+    const { checkSession } = await load();
+    localStorage.setItem('hadSession', '1');
+
+    await expect(checkSession('http://test/api/v1')).resolves.toMatchObject({
+      status: 'authenticated',
+    });
+    expect(refreshCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it('an authenticated answer arms the marker; ending the session disarms all evidence', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      res(200, { success: true, data: { user: { id: 'u1' } } })
+    ) as never;
+    const { checkSession, clearStoredSession } = await load();
+
+    await checkSession('http://test/api/v1');
+    expect(localStorage.getItem('hadSession')).toBe('1');
+
+    localStorage.setItem('csrfToken', 'c');
+    clearStoredSession();
+    expect(localStorage.getItem('hadSession')).toBeNull();
+    expect(localStorage.getItem('csrfToken')).toBeNull();
+  });
+
+  it('one evidence-free probe per tab for the Safari-ITP cohort, then none', async () => {
+    const tab = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: store,
+      navigator: { userAgent: 'node' },
+      sessionStorage: {
+        getItem: (k: string) => tab.get(k) ?? null,
+        setItem: (k: string, v: string) => void tab.set(k, v),
+      },
+    });
+    const fetchMock = vi.fn(async () => res(401, { success: false }));
+    globalThis.fetch = fetchMock as never;
+    const { checkSession } = await load();
+
+    await checkSession('http://test/api/v1');
+    await checkSession('http://test/api/v1');
+    expect(refreshCalls(fetchMock)).toHaveLength(1);
+  });
+});

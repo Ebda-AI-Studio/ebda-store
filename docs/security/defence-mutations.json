@@ -1032,6 +1032,26 @@
       "test": "tests/unit/refresh-throttle-not-logout.test.ts"
     },
     {
+      "id": "admin-anon-mount-no-refresh",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the admin mount check posts a credential-less /auth/refresh for every anonymous /login load again, draining the shared <ip>-refresh-anon and IP-wide refresh buckets the signed-in sessions behind the same office/carrier IP renew from (#2095, #2163)",
+      "source": "apps/admin/src/lib/api.ts",
+      "find": "  if (!hasSessionEvidence() && !claimSessionProbe()) return { status: 'signed-out' };",
+      "replace": "",
+      "test": "tests/unit/anonymous-visitor-no-refresh.test.ts"
+    },
+    {
+      "id": "orders-anon-mount-no-refresh",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "same as admin-anon-mount-no-refresh, on the orders PWA — the third frontend that must not diverge (Ruling P2-B2-5)",
+      "source": "apps/orders/src/lib/api.ts",
+      "find": "  if (!hasSessionEvidence() && !claimSessionProbe()) return { status: 'signed-out' };",
+      "replace": "",
+      "test": "tests/unit/anonymous-visitor-no-refresh.test.ts"
+    },
+    {
       "id": "web-auth-me-refresh-not-skipped",
       "domain": "authn / session",
       "tier": "unit",

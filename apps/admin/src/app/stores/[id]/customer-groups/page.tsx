@@ -135,7 +135,7 @@ export default function CustomerGroupsPage() {
             </span>
           )}
           {group.isDefault && (
-            <span className="ms-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+            <span className="ms-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink">
               {t('defaultBadge')}
             </span>
           )}
@@ -196,7 +196,7 @@ export default function CustomerGroupsPage() {
         {error && (
           <div
             role="alert"
-            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
           >
             {error}
           </div>
@@ -210,7 +210,12 @@ export default function CustomerGroupsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
           </div>
         ) : (
-          <DataTable<CustomerGroup> columns={columns} rows={groups} rowKey={group => group.id} />
+          <DataTable<CustomerGroup>
+            ariaLabel={t('title')}
+            columns={columns}
+            rows={groups}
+            rowKey={group => group.id}
+          />
         )}
 
         {showModal && (

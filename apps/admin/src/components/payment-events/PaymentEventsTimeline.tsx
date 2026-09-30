@@ -95,7 +95,7 @@ function EventIcon({ variant }: { variant: IconVariant }) {
   // ❌ failure — red X
   if (variant === 'failure') {
     return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive-ink">
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -124,7 +124,7 @@ function EventIcon({ variant }: { variant: IconVariant }) {
   }
   // 🔧 admin / reconciliation — wrench-like settings
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
         <path
           strokeLinecap="round"

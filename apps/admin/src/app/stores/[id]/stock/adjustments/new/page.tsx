@@ -179,23 +179,23 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           cell: row => <span className="text-muted-foreground">{row.rowNumber}</span>,
         },
         {
-          header: 'SKU',
+          header: tNew('colSku'),
           primaryOnMobile: true,
           cell: row => <span className="font-mono">{row.sku ?? '—'}</span>,
         },
         {
-          header: 'Barcode',
+          header: tNew('colBarcode'),
           cell: row => <span className="font-mono">{row.barcode ?? '—'}</span>,
         },
         {
-          header: 'New Qty',
+          header: tNew('colNewQty'),
           alignEnd: true,
           cell: row => (
             <span className="font-mono">{row.newQuantity !== null ? row.newQuantity : '—'}</span>
           ),
         },
         {
-          header: 'Delta',
+          header: tNew('colDelta'),
           alignEnd: true,
           cell: row => (
             <span className="font-mono">
@@ -204,12 +204,12 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           ),
         },
         {
-          header: 'Reason',
+          header: tNew('colReason'),
           hideOnMobile: true,
           cell: row => <span className="truncate max-w-[120px] block">{row.reason ?? '—'}</span>,
         },
         {
-          header: 'Status',
+          header: tNew('colStatus'),
           mobileBadge: true,
           cell: row => {
             const rowErrors = parseResult.errors[row.rowNumber];
@@ -219,7 +219,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
                 {tNew('csvStatusError')}
               </span>
             ) : (
-              <span className="text-[hsl(var(--success))]">OK</span>
+              <span className="text-[hsl(var(--success))]">{tNew('csvStatusOk')}</span>
             );
           },
         },
@@ -329,15 +329,19 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           {selectedFileName ? (
             <span className="font-medium text-foreground">{selectedFileName}</span>
           ) : (
-            'Click to choose a CSV file, or drag and drop'
+            tNew('csvDropzoneHint')
           )}
         </p>
         {parseResult && (
           <p className="mt-1 text-xs text-muted-foreground">
-            {parseResult.totalRows} rows parsed —{' '}
-            <span className="text-[hsl(var(--success))]">{validRowCount} valid</span>
+            {tNew('csvParsedTotal', { count: parseResult.totalRows })}{' '}
+            <span className="text-[hsl(var(--success))]">
+              {tNew('csvParsedValid', { count: validRowCount })}
+            </span>
             {errorRowCount > 0 && (
-              <span className="text-destructive">, {errorRowCount} with errors</span>
+              <span className="text-destructive">
+                {tNew('csvParsedErrors', { count: errorRowCount })}
+              </span>
             )}
           </p>
         )}
@@ -347,10 +351,14 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
       {parseResult && parseResult.rows.length > 0 && (
         <div className="space-y-2">
           <div className="px-1 text-xs font-medium text-muted-foreground">
-            Preview — first {Math.min(parseResult.rows.length, 50)} rows
-            {parseResult.rows.length > 50 && ` (of ${parseResult.rows.length})`}
+            {tNew('csvPreviewHeading', { count: Math.min(parseResult.rows.length, 50) })}
+            {parseResult.rows.length > 50 &&
+              ` ${tNew('csvPreviewOfTotal', { total: parseResult.rows.length })}`}
           </div>
           <DataTable<StockAdjustParsedRow>
+            ariaLabel={tNew('csvPreviewHeading', {
+              count: Math.min(parseResult.rows.length, 50),
+            })}
             columns={previewColumns}
             rows={parseResult.rows.slice(0, 50)}
             rowKey={row => String(row.rowNumber)}
@@ -364,7 +372,8 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
               <ul className="text-xs text-destructive space-y-0.5 max-h-36 overflow-y-auto">
                 {Object.entries(parseResult.errors).map(([rn, msgs]) => (
                   <li key={rn}>
-                    <span className="font-mono">Row {rn}:</span> {(msgs as string[]).join('; ')}
+                    <span className="font-mono">{tNew('csvRowPrefix', { row: rn })}</span>{' '}
+                    {(msgs as string[]).join('; ')}
                   </li>
                 ))}
               </ul>
@@ -377,28 +386,30 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
       {importResult && (
         <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-2">
           <p className="text-sm font-semibold text-foreground">
-            Import complete — adjustment #{importResult.adjustmentNumber}
+            {tNew('csvImportComplete', { number: importResult.adjustmentNumber })}
           </p>
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>
-              Total rows in file:{' '}
+              {tNew('csvTotalRows')}{' '}
               <span className="text-foreground font-medium">{importResult.totalRows}</span>
             </li>
             <li>
-              Imported:{' '}
+              {tNew('csvImported')}{' '}
               <span className="text-[hsl(var(--success))] font-medium">
                 {importResult.importedRows}
               </span>
             </li>
             {importResult.skippedRows > 0 && (
               <li>
-                Skipped (errors):{' '}
+                {tNew('csvSkipped')}{' '}
                 <span className="text-destructive font-medium">{importResult.skippedRows}</span>
               </li>
             )}
             <li>
-              Status:{' '}
-              <span className="font-medium">{importResult.posted ? 'Posted' : 'Draft'}</span>
+              {tNew('csvStatus')}{' '}
+              <span className="font-medium">
+                {importResult.posted ? tNew('csvStatusPosted') : tNew('csvStatusDraft')}
+              </span>
             </li>
           </ul>
           {importResult.errors && Object.keys(importResult.errors).length > 0 && (
@@ -407,7 +418,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
               <ul className="mt-1 space-y-0.5 pl-2">
                 {Object.entries(importResult.errors).map(([rn, msgs]) => (
                   <li key={rn}>
-                    Row {rn}: {(msgs as string[]).join('; ')}
+                    {tNew('csvRowPrefix', { row: rn })} {(msgs as string[]).join('; ')}
                   </li>
                 ))}
               </ul>
@@ -434,7 +445,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             disabled={submitting || !parseResult?.hasValidRows}
             className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
           >
-            {submitting ? 'Importing…' : `Import & Post (${validRowCount} rows)`}
+            {submitting ? tNew('csvImporting') : tNew('csvSubmit', { count: validRowCount })}
           </button>
           {selectedFileName && (
             <button
@@ -742,6 +753,7 @@ export default function NewStockAdjustmentPage() {
 
             {/* Items table */}
             <DataTable<ItemDraft>
+              ariaLabel={tNew('itemsTableLabel')}
               columns={itemColumns}
               rows={items}
               rowKey={(_it, i) => String(i)}
@@ -768,7 +780,7 @@ export default function NewStockAdjustmentPage() {
                 disabled={submitting}
                 className="px-4 py-2 border border-border rounded text-sm disabled:opacity-50"
               >
-                {submitting ? 'Saving…' : tNew('submitDraft')}
+                {submitting ? tc('saving') : tNew('submitDraft')}
               </button>
               <button
                 type="button"
@@ -776,7 +788,7 @@ export default function NewStockAdjustmentPage() {
                 disabled={submitting}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
               >
-                {submitting ? 'Saving…' : tNew('submitPost')}
+                {submitting ? tc('saving') : tNew('submitPost')}
               </button>
               <button
                 type="button"
@@ -788,10 +800,7 @@ export default function NewStockAdjustmentPage() {
             </div>
 
             <div className="flex items-start gap-1.5">
-              <p className="text-xs text-muted-foreground">
-                Posting is irreversible — it applies inventory mutations and posts a GL journal
-                entry. Save as draft to review first.
-              </p>
+              <p className="text-xs text-muted-foreground">{tNew('irreversibleNote')}</p>
               <HelpTip text={tNew('glJournalTip')} />
             </div>
           </div>

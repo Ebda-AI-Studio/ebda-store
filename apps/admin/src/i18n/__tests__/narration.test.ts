@@ -21,6 +21,10 @@ describe('pickNarration', () => {
     expect(pickNarration({ en: 'Sales are up 12%.', ar: '' }, 'ar')).toBe('Sales are up 12%.');
   });
 
+  it('shows an ar-only row on the en locale instead of hiding the insight (issue 2179)', () => {
+    expect(pickNarration({ en: '', ar: 'ارتفعت المبيعات.' }, 'en')).toBe('ارتفعت المبيعات.');
+  });
+
   it('returns undefined when there is no narration at all', () => {
     expect(pickNarration(null, 'ar')).toBeUndefined();
     expect(pickNarration(undefined, 'en')).toBeUndefined();

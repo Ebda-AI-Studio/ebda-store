@@ -67,6 +67,10 @@ describe('orders PWA SummaryCard — loyalty redemption line (issue 197)', () =>
     const labels = rowLabels();
     expect(labels).toContain('loyaltyPoints (250)');
     expect(labels).toContain('discount');
+    // #2261 — the percentage is of the 300 fils on this row (3% of 10,000),
+    // not the whole-order 8%.
+    expect(screen.getByText(/\(3%\)/)).toBeTruthy();
+    expect(screen.queryByText(/\(8%\)/)).toBeNull();
   });
 
   it('shows no loyalty line on an order that redeemed nothing', () => {

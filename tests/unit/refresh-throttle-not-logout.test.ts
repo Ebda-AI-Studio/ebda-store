@@ -44,6 +44,8 @@ function makeLocalStorage() {
 }
 
 const store = makeLocalStorage();
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15';
+const ORIGINAL_NAVIGATOR = globalThis.navigator;
 vi.stubGlobal('localStorage', store);
 vi.stubGlobal('window', { localStorage: store, navigator: { userAgent: 'node' } });
 
@@ -69,6 +71,7 @@ beforeEach(() => {
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
   vi.restoreAllMocks();
+  vi.stubGlobal('navigator', ORIGINAL_NAVIGATOR);
 });
 
 describe('admin client — a throttled refresh keeps the credentials', () => {
@@ -118,6 +121,9 @@ describe('admin client — a throttled refresh keeps the credentials', () => {
     // localStorage is the only copy of the credential. checkAuth calls this
     // for 'rejected' and for a failed retry — never for 'throttled'.
     globalThis.fetch = vi.fn(async () => res(429)) as never;
+    // "The only copy" is an iOS PWA fact: anywhere else a stored refreshToken
+    // is residue the refresh now removes (#2034), so model the iOS device.
+    vi.stubGlobal('navigator', { userAgent: IPHONE_UA });
     const { refreshSession, clearStoredSession } = await import('@admin/lib/api');
 
     expect(await refreshSession()).toBe('throttled');
@@ -176,6 +182,7 @@ describe('orders client — the third frontend gets the same answer', () => {
 
   it('leaves the only copy of the credential in place on a throttle', async () => {
     globalThis.fetch = vi.fn(async () => res(429)) as never;
+    vi.stubGlobal('navigator', { userAgent: IPHONE_UA }); // see the admin case (#2034)
     const { refreshSession, clearStoredSession } = await import('@orders/lib/api');
 
     expect(await refreshSession()).toBe('throttled');

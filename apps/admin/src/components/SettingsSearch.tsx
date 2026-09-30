@@ -185,7 +185,7 @@ export function SettingsSearch({ searchItems }: { searchItems: SettingsSearchIte
                   onMouseEnter={() => setActiveIndex(i)}
                   className={`cursor-pointer px-4 py-2.5 transition-colors ${
                     i === activeIndex
-                      ? 'bg-primary/10 text-primary'
+                      ? 'bg-primary/10 text-primary-ink'
                       : 'text-foreground hover:bg-muted'
                   }`}
                 >

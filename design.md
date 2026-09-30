@@ -396,16 +396,19 @@ Storefront rendering stays **structurally uniform** across all 5 templates — `
 
 Inspired by Shopify Polaris + Material Design Tokens, adapted to FWB's simpler 5-theme system. Future tokens should follow this naming:
 
-| Pattern                     | Example                                          | Use                           |
-| --------------------------- | ------------------------------------------------ | ----------------------------- |
-| `bg-<role>`                 | `bg-page`, `bg-section-alt`, `bg-surface`        | container backgrounds         |
-| `text-<role>` / `fg-<role>` | `text-foreground`, `text-muted-foreground`       | text colors via Tailwind      |
-| `border-<role>/<opacity>`   | `border-border/40`, `border-foreground/10`       | borders with opacity          |
-| `<role>-<style>`            | `productCardName`, `sectionKicker`               | pack-styles tokens            |
-| `rounded-<scale>`           | `rounded-sm` / `rounded-md` / `rounded-2xl`      | Tailwind radii                |
-| `duration-<ms>`             | `duration-200` / `duration-500` / `duration-700` | Tailwind transition durations |
+| Pattern                     | Example                                          | Use                                                  |
+| --------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| `bg-<role>`                 | `bg-page`, `bg-section-alt`, `bg-surface`        | container backgrounds                                |
+| `text-<role>` / `fg-<role>` | `text-foreground`, `text-muted-foreground`       | text colors via Tailwind                             |
+| `border-<role>/<opacity>`   | `border-border/40`, `border-foreground/10`       | borders with opacity                                 |
+| `<role>-<style>`            | `productCardName`, `sectionKicker`               | pack-styles tokens                                   |
+| `rounded-<scale>`           | `rounded-sm` / `rounded-md` / `rounded-2xl`      | Tailwind radii                                       |
+| `duration-<ms>`             | `duration-200` / `duration-500` / `duration-700` | Tailwind transition durations                        |
+| `text-<role>-ink` (admin)   | `bg-warning/10 text-warning-ink`                 | text on a role's own 10% tint (status pills, badges) |
 
 **Role-over-value:** never name a token by its color (`color-blue-500`). Always name by the role (`accent-primary`, `bg-page`). Lets us swap palettes per theme without renaming consumers.
+
+**Tinted pills (admin):** a status pill is `bg-<role>/10 text-<role>-ink`, never `text-<role>` — the role colour on its own tint fails WCAG AA (amber on amber measured 1.7:1, issue 2233). `-ink` exists for `primary`, `success`, `warning`, `info`, `destructive` in both the light and dark blocks of `apps/admin/src/styles/globals.css`; `tests/unit/admin-tint-ink-contrast.test.ts` pins each pair at ≥ 4.5:1 and forbids the bare pair in admin source.
 
 ### Token architecture (Polaris-inspired, FWB-adapted)
 

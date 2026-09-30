@@ -137,7 +137,7 @@ function AiAutopilotChip({ storeId }: { storeId: string }) {
       <span
         className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
           autopilot
-            ? 'bg-primary/5 text-primary border-primary/20 dark:bg-primary/10 dark:border-primary/30'
+            ? 'bg-primary/5 text-primary-ink border-primary/20 dark:bg-primary/10 dark:border-primary/30'
             : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
         }`}
       >
@@ -241,7 +241,7 @@ export default function StoreSettingsPage() {
     {
       key: 'branding',
       href: `/stores/${storeId}/branding`,
-      color: 'bg-primary/10 text-primary',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -309,7 +309,7 @@ export default function StoreSettingsPage() {
     {
       key: 'seo',
       href: `/stores/${storeId}/seo`,
-      color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
       featureKey: 'seo',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -325,7 +325,7 @@ export default function StoreSettingsPage() {
     {
       key: 'domain',
       href: `/stores/${storeId}/domain`,
-      color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
+      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -417,7 +417,7 @@ export default function StoreSettingsPage() {
     {
       key: 'template',
       href: `/stores/${storeId}/template`,
-      color: 'bg-primary/10 text-primary',
+      color: 'bg-primary/10 text-primary-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -609,7 +609,7 @@ export default function StoreSettingsPage() {
             </div>
             {storeInfo && (
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-medium">
+                <span className="inline-flex items-center rounded-full bg-primary/10 text-primary-ink px-3 py-1 text-sm font-medium">
                   {PLAN_LABELS[storeInfo.plan]?.en ?? storeInfo.plan}
                 </span>
                 <select

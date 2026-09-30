@@ -2,11 +2,37 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FocusModeState {
   storeId: string;
+  /** The admin who entered focus mode. A restore for anyone else is dropped. */
+  userId?: string;
+}
+
+/**
+ * Whether a stored focus state may be restored for `userId` (issue 2253).
+ * Clearing the key on logout covered one exit; a session that EXPIRES (a
+ * rejected refresh) leaves it behind, and the next admin on the device
+ * inherited the previous admin's store. Binding the state to its owner closes
+ * every exit at once. A legacy state with no owner cannot be validated, so it
+ * is dropped too — re-entering focus mode is one tap.
+ */
+export function restorableFocusStoreId(
+  raw: string | null,
+  userId: string | null | undefined
+): string | null {
+  if (!raw || !userId) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<FocusModeState> | null;
+    if (!parsed?.storeId || parsed.userId !== userId) return null;
+    return parsed.storeId;
+  } catch {
+    return null;
+  }
 }
 
 export interface FocusModeContextValue {
@@ -20,10 +46,9 @@ export interface FocusModeContextValue {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Exported so `logout()` (lib/auth.tsx) can clear it — a second admin
-// signing into the same device otherwise inherited whichever store the
-// PREVIOUS admin last focused, with no per-user validation on restore.
-export const FOCUS_MODE_STORAGE_KEY = 'fwb_focus_mode';
+// `logout()` (lib/auth.tsx) also clears it; the owner check on restore below
+// covers every other way a session ends (issue 2253).
+export { FOCUS_MODE_STORAGE_KEY };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +58,8 @@ const FocusModeContext = createContext<FocusModeContextValue | null>(null);
 
 export function FocusModeProvider({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [focusStoreId, setFocusStoreId] = useState<string | null>(null);
 
   // On mount: restore from localStorage. If ?focus=1 is present we also
@@ -43,19 +70,14 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
   // the current storeId.
   useEffect(() => {
     const wantsParam = searchParams?.get('focus') === '1';
-    try {
-      const raw = localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as FocusModeState;
-        if (parsed?.storeId) {
-          setFocusStoreId(parsed.storeId);
-          return;
-        }
-      }
-    } catch {
-      // Corrupt storage — ignore and let user re-enter manually.
-      localStorage.removeItem(FOCUS_MODE_STORAGE_KEY);
+    const raw = localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
+    const restored = restorableFocusStoreId(raw, userId);
+    if (restored) {
+      setFocusStoreId(restored);
+      return;
     }
+    // Another admin's (or an unowned / corrupt) state: never restore it.
+    if (raw) localStorage.removeItem(FOCUS_MODE_STORAGE_KEY);
 
     // ?focus=1 but no stored state: the layout will call enterFocusMode
     // once it resolves a storeId (see AdminLayout's useEffect below).
@@ -66,14 +88,19 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
       // for routing — AdminLayout guards against it.
       setFocusStoreId('__pending__');
     }
-  }, []); // intentionally run once on mount only
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-
-  const enterFocusMode = useCallback((storeId: string) => {
-    const state: FocusModeState = { storeId };
-    localStorage.setItem(FOCUS_MODE_STORAGE_KEY, JSON.stringify(state));
-    setFocusStoreId(storeId);
+    // Run once on mount: the provider mounts only for an authenticated user,
+    // so `userId` is already the owner to validate against.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const enterFocusMode = useCallback(
+    (storeId: string) => {
+      const state: FocusModeState = { storeId, userId: userId ?? undefined };
+      localStorage.setItem(FOCUS_MODE_STORAGE_KEY, JSON.stringify(state));
+      setFocusStoreId(storeId);
+    },
+    [userId]
+  );
 
   const exitFocusMode = useCallback(() => {
     localStorage.removeItem(FOCUS_MODE_STORAGE_KEY);

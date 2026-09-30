@@ -172,7 +172,7 @@ export default function WebhookEventsPage() {
         </div>
 
         {message && (
-          <div className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
+          <div className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary-ink">
             {message}
           </div>
         )}
@@ -183,6 +183,7 @@ export default function WebhookEventsPage() {
           </div>
         ) : (
           <DataTable<WebhookEvent>
+            ariaLabel={t('title')}
             columns={columns}
             rows={events}
             rowKey={ev => ev.id}

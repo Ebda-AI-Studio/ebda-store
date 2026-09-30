@@ -83,7 +83,7 @@ function planLabel(plan: string): string {
 const PLAN_COLORS: Record<string, string> = {
   free: 'bg-muted text-muted-foreground',
   starter: 'bg-blue-100 text-blue-700',
-  professional: 'bg-primary/10 text-primary',
+  professional: 'bg-primary/10 text-primary-ink',
   enterprise: 'bg-amber-100 text-amber-700',
 };
 
@@ -402,6 +402,7 @@ function PlatformAiUsagePageInner() {
         </div>
 
         <DataTable<StoreUsageRow>
+          ariaLabel={t('perStoreBreakdown')}
           columns={columns}
           rows={filteredStores}
           rowKey={store => store.storeId}

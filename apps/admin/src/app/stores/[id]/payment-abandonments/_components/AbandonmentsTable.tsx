@@ -162,6 +162,7 @@ export function AbandonmentsTable({
   return (
     <div className="space-y-4">
       <DataTable<AbandonmentRecord>
+        ariaLabel={t('title')}
         columns={columns}
         rows={records}
         rowKey={record => record.id}

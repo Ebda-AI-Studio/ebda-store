@@ -535,7 +535,7 @@ export default function BundlesPage() {
         {error && (
           <div
             role="alert"
-            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
           >
             {error}
           </div>
@@ -549,7 +549,12 @@ export default function BundlesPage() {
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
           </div>
         ) : (
-          <DataTable<Bundle> columns={columns} rows={bundles} rowKey={bundle => bundle.id} />
+          <DataTable<Bundle>
+            ariaLabel={t('title')}
+            columns={columns}
+            rows={bundles}
+            rowKey={bundle => bundle.id}
+          />
         )}
 
         {loadingDetail && (
@@ -758,7 +763,7 @@ export default function BundlesPage() {
               {allocationSuggestion !== null && (
                 <div
                   role="alert"
-                  className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                  className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
                 >
                   <p>
                     {t('priceNotAllocatable', {
@@ -779,7 +784,7 @@ export default function BundlesPage() {
               {error && (
                 <div
                   role="alert"
-                  className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                  className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
                 >
                   {error}
                 </div>

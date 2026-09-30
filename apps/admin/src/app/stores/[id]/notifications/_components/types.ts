@@ -61,11 +61,11 @@ export const DEFAULT_CONFIGS: NotificationConfigs = {
  * success states.
  */
 export const NOTIFICATION_COLORS = {
-  sent: { className: 'bg-success/10 text-success' },
-  delivered: { className: 'bg-success/10 text-success' },
-  failed: { className: 'bg-destructive/10 text-destructive' },
+  sent: { className: 'bg-success/10 text-success-ink' },
+  delivered: { className: 'bg-success/10 text-success-ink' },
+  failed: { className: 'bg-destructive/10 text-destructive-ink' },
   pending: { className: 'bg-muted text-muted-foreground' },
-  queued: { className: 'bg-primary/10 text-primary' },
+  queued: { className: 'bg-primary/10 text-primary-ink' },
 } as const;
 
 export const DEFAULT_EVENTS: EventConfig[] = [

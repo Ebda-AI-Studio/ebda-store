@@ -130,6 +130,7 @@ export function MembersTable({
       </div>
 
       <DataTable<LoyaltyMember>
+        ariaLabel={t('tableLabel')}
         columns={columns}
         rows={members}
         rowKey={m => m.id}

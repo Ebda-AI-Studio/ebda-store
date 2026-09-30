@@ -115,7 +115,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
           placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
-        <p className="mt-1 text-xs text-gray-400">You can find entry IDs in Finance → Journal.</p>
+        <p className="mt-1 text-xs text-gray-400">{t('entryIdHelp')}</p>
         <div className="mt-5 flex gap-3 justify-end">
           <button
             onClick={onClose}
@@ -128,7 +128,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
             disabled={!entryId.trim() || loading}
             className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
           >
-            {loading ? 'Linking…' : 'Link'}
+            {loading ? t('confirming') : t('confirm')}
           </button>
         </div>
       </div>
@@ -167,7 +167,7 @@ export default function StatementDetailPage() {
       `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}`
     );
     if (err) {
-      setError(err.message ?? 'Failed to load statement');
+      setError(err.message ?? t('errors.loadStatement'));
       return;
     }
     setStmt(data ?? null);
@@ -187,7 +187,7 @@ export default function StatementDetailPage() {
       `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}/transactions?perPage=200${qs}`
     );
     if (err) {
-      setError(err.message ?? 'Failed to load transactions');
+      setError(err.message ?? t('errors.loadTransactions'));
       return;
     }
     setTxs(data ?? []);
@@ -216,7 +216,7 @@ export default function StatementDetailPage() {
     }>(`/api/v1/stores/${storeId}/finance/bank-statements/${statementId}/auto-match`);
     setAutoMatchLoading(false);
     if (err) {
-      setAutoMatchMsg(`Error: ${err.message}`);
+      setAutoMatchMsg(t('errors.autoMatch', { message: err.message ?? '' }));
       return;
     }
     const r = data;
@@ -241,7 +241,7 @@ export default function StatementDetailPage() {
     );
     setActionLoading(null);
     if (err) {
-      alert(err.message ?? 'Action failed');
+      alert(err.message ?? t('errors.action'));
       return;
     }
     fetchStmt();
@@ -254,7 +254,7 @@ export default function StatementDetailPage() {
       { action: 'match', journalEntryId }
     );
     if (err) {
-      alert(err.message ?? 'Match failed');
+      alert(err.message ?? t('errors.match'));
       return;
     }
     fetchStmt();
@@ -265,7 +265,7 @@ export default function StatementDetailPage() {
   const difference = stmt?.difference;
 
   const FILTER_OPTIONS: { value: FilterOption; label: string }[] = [
-    { value: 'all', label: 'All' },
+    { value: 'all', label: t('filterAll') },
     { value: 'unmatched', label: tx_t('statusLabels.unmatched') },
     { value: 'auto_matched', label: tx_t('statusLabels.auto_matched') },
     { value: 'manual_matched', label: tx_t('statusLabels.manual_matched') },

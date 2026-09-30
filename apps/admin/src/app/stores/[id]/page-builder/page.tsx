@@ -442,7 +442,7 @@ export default function StoreLayoutPage() {
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-60"
           >
-            {isGeneratingPreview ? 'Generating…' : '👁  Preview unsaved'}
+            {isGeneratingPreview ? t('preview.generating') : `👁  ${t('preview.unsaved')}`}
           </button>
           {previewDraftToken && (
             <button
@@ -3629,7 +3629,7 @@ function ModeButton({
       onClick={onClick}
       className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors cursor-pointer ${
         active
-          ? 'border-primary bg-primary/10 text-primary'
+          ? 'border-primary bg-primary/10 text-primary-ink'
           : 'border-border bg-card text-foreground hover:bg-muted'
       }`}
     >
@@ -4007,7 +4007,7 @@ function FontsCard({
       setUploadFile(null);
       setShowUpload(false);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed.');
+      setUploadError(err instanceof Error ? err.message : t('fonts.uploadFailed'));
     } finally {
       setIsUploading(false);
     }
@@ -4044,7 +4044,7 @@ function FontsCard({
               <button
                 type="button"
                 onClick={() => remove(i)}
-                className="rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                className="rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs font-semibold text-destructive-ink hover:bg-destructive/10"
               >
                 {t('fonts.remove')}
               </button>
@@ -4131,7 +4131,7 @@ function FontsCard({
             )}
           </label>
           {uploadError && (
-            <p className="rounded-md bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
+            <p className="rounded-md bg-destructive/10 px-2 py-1 text-[11px] text-destructive-ink">
               {uploadError}
             </p>
           )}
@@ -4840,7 +4840,7 @@ function ExtraCarouselCard({
                 onDelete();
               }
             }}
-            className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
+            className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive-ink hover:bg-destructive/10"
           >
             {t('extraCarousel.deleteButton')}
           </button>
@@ -5450,7 +5450,7 @@ function AiSectionFillButton({
       type="button"
       onClick={generate}
       disabled={busy}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
     >
       <svg
         className="h-3.5 w-3.5"

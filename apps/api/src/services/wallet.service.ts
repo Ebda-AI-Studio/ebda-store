@@ -499,9 +499,13 @@ export class WalletService {
    *     cron): every store the customer holds a wallet in. Wallets are
    *     store-scoped under RLS, so this runs inside `withScopedRlsBypass`
    *     (#1957/#2037), and each store whose balance this run forfeited gets
-   *     its OWN `audit_logs` row naming the actor, so a store whose liability
-   *     changed without any action of its own can see why. A store with
-   *     nothing to forfeit, or a re-run, writes no row.
+   *     its OWN `audit_logs` row naming the actor. A store with nothing to
+   *     forfeit, or a re-run, writes no row. NOTE (issue 2126): the only
+   *     audit-log viewer is the super-admin `/audit-logs` page, so today that
+   *     row explains the change to the PLATFORM, not to the store — no
+   *     merchant-facing surface shows it (the wallet drops off the store's
+   *     wallet list at 0 balance). Whether store_admins get a store-scoped
+   *     audit view is an open owner question; see Ruling W-7.
    * The `expire` entries carry `scope.actorId` (a user id, or 'system').
    */
   static async forfeitOnErasure(

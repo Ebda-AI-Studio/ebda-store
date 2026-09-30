@@ -73,7 +73,7 @@ export function ReviewStep({ formData, error, onJumpTo }: ReviewStepProps) {
       </div>
 
       {error && (
-        <div className="mt-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="mt-6 rounded-lg bg-destructive/10 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}

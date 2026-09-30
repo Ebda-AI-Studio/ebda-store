@@ -128,23 +128,23 @@ export default function InsightsDashboardPage() {
 
   const topSkusColumns: DataTableColumn<TopSku>[] = [
     {
-      header: 'SKU',
+      header: t('colSku'),
       cell: (sku, i) => (
         <span className="font-mono text-xs text-muted-foreground">{sku.sku ?? `#${i + 1}`}</span>
       ),
     },
     {
-      header: 'Name',
+      header: t('colName'),
       primaryOnMobile: true,
       cell: sku => sku.name,
     },
     {
-      header: 'Sold 7d',
+      header: t('colSold7d'),
       alignEnd: true,
       cell: sku => <span className="font-mono">{sku.unitsSold7d}</span>,
     },
     {
-      header: 'Velocity',
+      header: t('colVelocity'),
       alignEnd: true,
       cell: sku => (
         <span className="font-mono text-xs text-muted-foreground">{num(sku.velocity, 2)}/day</span>
@@ -292,6 +292,7 @@ export default function InsightsDashboardPage() {
               )}
             </div>
             <DataTable<TopSku>
+              ariaLabel={t('topSkus')}
               columns={topSkusColumns}
               rows={data.topSkus}
               rowKey={sku => sku.productId}

@@ -137,42 +137,42 @@ interface KeyMeta {
 }
 
 const KEY_META: Record<string, KeyMeta> = {
-  catalog_preparing: { group: 'Greeting' },
-  welcome_header: { group: 'Greeting' },
-  welcome_body: { group: 'Greeting', vars: '{storeName}' },
-  welcome_button_text: { group: 'Greeting' },
-  welcome_footer: { group: 'Greeting' },
-  categories_section_title: { group: 'Greeting' },
-  no_products: { group: 'Products' },
-  products_body: { group: 'Products' },
-  products_button_text: { group: 'Products' },
-  products_section_title: { group: 'Products' },
-  products_more_footer: { group: 'Products' },
-  out_of_stock: { group: 'Products' },
-  product_out_of_stock: { group: 'Products' },
-  add_to_cart_body: { group: 'Cart', vars: '{name} {price}' },
-  qty_1: { group: 'Cart' },
-  qty_2: { group: 'Cart' },
-  qty_more: { group: 'Cart' },
-  qty_prompt: { group: 'Cart' },
-  qty_range: { group: 'Cart' },
-  cart_updated: { group: 'Cart', vars: '{qty} {name} {total} {currency}' },
-  btn_add_more: { group: 'Cart' },
-  btn_checkout: { group: 'Cart' },
-  btn_cancel: { group: 'Cart' },
-  cart_cleared: { group: 'Cart' },
-  checkout_unavailable: { group: 'Checkout' },
-  checkout_error: { group: 'Checkout', vars: '{error}' },
-  checkout_ready: { group: 'Checkout', vars: '{url}' },
-  checkout_resend: { group: 'Checkout', vars: '{url}' },
-  search_found_n: { group: 'Search', vars: '{count} {query}' },
-  search_no_results: { group: 'Search' },
-  search_section_title: { group: 'Search' },
-  tap_a_product: { group: 'Prompts' },
-  tap_a_flow_button: { group: 'Prompts' },
+  catalog_preparing: { group: 'greeting' },
+  welcome_header: { group: 'greeting' },
+  welcome_body: { group: 'greeting', vars: '{storeName}' },
+  welcome_button_text: { group: 'greeting' },
+  welcome_footer: { group: 'greeting' },
+  categories_section_title: { group: 'greeting' },
+  no_products: { group: 'products' },
+  products_body: { group: 'products' },
+  products_button_text: { group: 'products' },
+  products_section_title: { group: 'products' },
+  products_more_footer: { group: 'products' },
+  out_of_stock: { group: 'products' },
+  product_out_of_stock: { group: 'products' },
+  add_to_cart_body: { group: 'cart', vars: '{name} {price}' },
+  qty_1: { group: 'cart' },
+  qty_2: { group: 'cart' },
+  qty_more: { group: 'cart' },
+  qty_prompt: { group: 'cart' },
+  qty_range: { group: 'cart' },
+  cart_updated: { group: 'cart', vars: '{qty} {name} {total} {currency}' },
+  btn_add_more: { group: 'cart' },
+  btn_checkout: { group: 'cart' },
+  btn_cancel: { group: 'cart' },
+  cart_cleared: { group: 'cart' },
+  checkout_unavailable: { group: 'checkout' },
+  checkout_error: { group: 'checkout', vars: '{error}' },
+  checkout_ready: { group: 'checkout', vars: '{url}' },
+  checkout_resend: { group: 'checkout', vars: '{url}' },
+  search_found_n: { group: 'search', vars: '{count} {query}' },
+  search_no_results: { group: 'search' },
+  search_section_title: { group: 'search' },
+  tap_a_product: { group: 'prompts' },
+  tap_a_flow_button: { group: 'prompts' },
 };
 
-const GROUPS = ['Greeting', 'Products', 'Cart', 'Checkout', 'Search', 'Prompts'];
+const GROUPS = ['greeting', 'products', 'cart', 'checkout', 'search', 'prompts'];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -359,7 +359,7 @@ export function BotCopyTab({ storeId }: { storeId: string }) {
                           </span>
                         )}
                         {isOverridden && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary-ink">
                             {t('customizedBadge')}
                           </span>
                         )}

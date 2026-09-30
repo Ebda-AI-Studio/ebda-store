@@ -21,6 +21,7 @@ import { NotesCard } from './_components/NotesCard';
 import { ActionFooter } from './_components/ActionFooter';
 import { OrderLifecycleTimeline } from '../../../../../components/order-timeline/OrderLifecycleTimeline';
 import type { OrderDetail } from './_components/types';
+import { manualRefundDescriptionKey } from '../_components/manualRefundCopy';
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -220,6 +221,7 @@ export default function OrderDetailPage() {
                 {new Date(order.createdAt).toLocaleString(locale, {
                   dateStyle: 'medium',
                   timeStyle: 'short',
+                  numberingSystem: 'latn', // Latin digits in both locales (issue 1971)
                 })}
               </span>
             </div>
@@ -265,7 +267,7 @@ export default function OrderDetailPage() {
         <ConfirmActionModal
           open={confirmRefundOpen}
           title={tList('confirm.manualRefundTitle')}
-          description={tList('confirm.manualRefundDescription')}
+          description={tList(`confirm.${manualRefundDescriptionKey(order?.status)}`)}
           confirmLabel={tList('confirm.confirm')}
           cancelLabel={tList('confirm.cancel')}
           variant="destructive"

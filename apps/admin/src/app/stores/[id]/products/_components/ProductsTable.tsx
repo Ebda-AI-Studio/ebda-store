@@ -283,7 +283,12 @@ export function ProductsTable({
           ariaLabel="Select all on this page"
         />
       </div>
-      <DataTable<Product> columns={columns} rows={products} rowKey={p => p.id} />
+      <DataTable<Product>
+        ariaLabel={t('table.label')}
+        columns={columns}
+        rows={products}
+        rowKey={p => p.id}
+      />
     </div>
   );
 }

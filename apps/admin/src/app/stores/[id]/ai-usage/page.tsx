@@ -175,7 +175,7 @@ export default function AiUsagePage() {
             {t('table.cached')}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary-ink">
             {t('table.live')}
           </span>
         ),
@@ -209,7 +209,12 @@ export default function AiUsagePage() {
           </div>
         ) : (
           <>
-            <DataTable<UsageRow> columns={columns} rows={log.rows} rowKey={row => row.id} />
+            <DataTable<UsageRow>
+              ariaLabel={t('table.title')}
+              columns={columns}
+              rows={log.rows}
+              rowKey={row => row.id}
+            />
 
             {/* Pagination */}
             {log.pages > 1 && (

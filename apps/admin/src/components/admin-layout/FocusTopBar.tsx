@@ -71,7 +71,7 @@ export function FocusTopBar({ storeBranding }: FocusTopBarProps) {
           />
         )}
         <span className="truncate text-sm font-semibold text-foreground">{storeName}</span>
-        <span className="hidden shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
+        <span className="hidden shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary-ink sm:inline-flex">
           {t('focusMode.ordersOnly')}
         </span>
       </div>
@@ -85,7 +85,7 @@ export function FocusTopBar({ storeBranding }: FocusTopBarProps) {
             type="button"
             onClick={handleEnableNotifications}
             disabled={isSubscribing}
-            className="hidden items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60 sm:flex"
+            className="hidden items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink transition-colors hover:bg-primary/10 disabled:opacity-60 sm:flex"
             aria-label={t('focusMode.enableNotifications')}
           >
             <svg

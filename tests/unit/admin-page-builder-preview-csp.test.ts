@@ -47,10 +47,11 @@ const ADMIN_PATHS = [
   '/',
 ];
 
-// `/stores/:id/page-builder/` (trailing slash) matches BOTH patterns — a
-// pre-existing characteristic of the exact regex shipped today, unchanged by
-// the #1677 named-capture-group rewrite (verified identical on both forms
-// before switching). Not a security regression: both rules' header sets are
+// `/stores/:id/page-builder/` (trailing slash) matches BOTH patterns under
+// path-to-regexp's DEFAULT options (`strict: false`) used in this first block.
+// That is a property of those defaults, not of the live routing: Next compiles
+// header sources with `strict: true`, under which only the catch-all matches —
+// pinned by the SERVED-headers block at the bottom (issues 2178/2189). Not a security regression: both rules' header sets are
 // equally or more restrictive, and no batch issue asked for a routing
 // behaviour change, so this test documents the overlap rather than "fixing"
 // it as an unrelated, unreviewed change.
@@ -224,5 +225,113 @@ describe('page-builder preview CSP', () => {
         !matchesPageBuilder
       );
     }
+  });
+});
+
+/**
+ * Issues 2178 / 2189 — every assertion above compiles the sources with
+ * path-to-regexp's DEFAULT options, which is neither of the two matchers that
+ * serve production. This block drives the two that do:
+ *
+ *  1. Next's own `buildCustomRoute('header', …)` — the function that writes
+ *     `routes-manifest.json` (`strict: true`, `delimiter: '/'`, plus Next's
+ *     regex normalisation). Both `next start` and OpenNext read that regex.
+ *  2. OpenNext's header application (`getNextConfigHeaders`,
+ *     @opennextjs/aws/dist/core/routing/matcher.js, v4.0.2 — the router the
+ *     admin runs behind on Cloudflare Workers): `new RegExp(regex).test(path)`,
+ *     then every header KEY and VALUE is passed through path-to-regexp
+ *     `compile()` with the route's match params — reproduced below with the
+ *     same path-to-regexp v6 it resolves. A named capture (`:path(...)`) makes
+ *     those params non-empty, so this also proves no CSP value is rewritten.
+ *
+ * The result is the header set a request to each path is SERVED with — the
+ * response-level check the issues asked for, without a deploy.
+ */
+import { buildCustomRoute } from 'next/dist/lib/build-custom-route';
+import { compile, match } from 'path-to-regexp';
+
+async function headerRules(): Promise<
+  { source: string; headers: { key: string; value: string }[] }[]
+> {
+  const start = CONFIG.indexOf('const DEFAULT_FRAME_SRC');
+  const end = CONFIG.search(/^(const nextConfig|module\.exports)/m);
+  const make = new Function(
+    `${CONFIG.slice(start, end)}
+     return [
+       { source: PAGE_BUILDER_PREVIEW_SOURCE, headers: securityHeaders(PREVIEW_PAGE_FRAME_SRC) },
+       { source: ADMIN_CATCHALL_SOURCE, headers: securityHeaders(DEFAULT_FRAME_SRC) },
+     ];`
+  ) as () => { source: string; headers: { key: string; value: string }[] }[];
+  return make();
+}
+
+/** OpenNext's getNextConfigHeaders over Next's routes-manifest regexes. */
+function servedHeaders(
+  rulesIn: { source: string; headers: { key: string; value: string }[] }[],
+  path: string
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const rule of rulesIn) {
+    const { regex } = buildCustomRoute('header', rule as never) as unknown as { regex: string };
+    if (!new RegExp(regex).test(path)) continue;
+    const m = match(rule.source)(path);
+    const apply = (tpl: string) =>
+      m && Object.keys(m.params).length > 0 ? compile(tpl)(m.params as object) : tpl;
+    for (const h of rule.headers) {
+      try {
+        out[apply(h.key)] = apply(h.value);
+      } catch {
+        out[h.key] = h.value;
+      }
+    }
+  }
+  return out;
+}
+
+describe('admin security headers as SERVED — Next manifest regex + OpenNext router (2178/2189)', () => {
+  const KEYS = [
+    'X-Frame-Options',
+    'X-Content-Type-Options',
+    'Referrer-Policy',
+    'Permissions-Policy',
+    'Strict-Transport-Security',
+    'Content-Security-Policy',
+    'X-Robots-Tag',
+  ];
+
+  it.each(ADMIN_PATHS)('%s is served the full security header set, values unaltered', async p => {
+    const rs = await headerRules();
+    const served = servedHeaders(rs, p);
+    expect(Object.keys(served).sort()).toEqual([...KEYS].sort());
+    // Every served value is byte-identical to one the config emits — the
+    // params substitution never rewrote a header (e.g. a CSP `https:`).
+    const emitted = new Set(rs.flatMap(r => r.headers.map(h => h.value)));
+    for (const v of Object.values(served)) expect(emitted.has(v), v).toBe(true);
+  });
+
+  it('only the bare page-builder route is served the permissive preview frame-src', async () => {
+    const rs = await headerRules();
+    const fsOf = (p: string) =>
+      (servedHeaders(rs, p)['Content-Security-Policy'].match(/frame-src[^;]*/) ?? [''])[0].split(
+        /\s+/
+      );
+    expect(fsOf('/stores/abc123/page-builder')).toContain('https:');
+    for (const p of [
+      '/',
+      '/login',
+      '/stores/abc123/products',
+      '/stores/abc123/page-builder/extra',
+      // Next compiles header sources with `strict: true`: the trailing-slash
+      // form is NOT the preview route when served (unlike the default-options
+      // overlap documented at the top of this file).
+      TRAILING_SLASH_OVERLAP,
+    ]) {
+      expect(fsOf(p), p).not.toContain('https:');
+    }
+  });
+
+  it('control: a catch-all that matches nothing would be caught (no headers served)', () => {
+    const broken = [{ source: '/:path((?!x)x)', headers: [{ key: 'X-Test', value: '1' }] }];
+    expect(servedHeaders(broken, '/login')).toEqual({});
   });
 });

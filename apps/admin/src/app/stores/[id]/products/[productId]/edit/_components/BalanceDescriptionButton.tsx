@@ -83,7 +83,7 @@ export function BalanceDescriptionButton({
         }}
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 transition-colors ${
           failedBalance
-            ? 'bg-destructive/10 text-destructive'
+            ? 'bg-destructive/10 text-destructive-ink'
             : balanced
               ? 'bg-emerald-100 text-emerald-700'
               : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
@@ -131,7 +131,7 @@ export function BalanceDescriptionButton({
           }}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 transition-colors ${
             failedRevert
-              ? 'bg-destructive/10 text-destructive'
+              ? 'bg-destructive/10 text-destructive-ink'
               : 'bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
           }`}
           title={

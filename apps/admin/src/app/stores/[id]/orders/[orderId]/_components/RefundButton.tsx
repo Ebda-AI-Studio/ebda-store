@@ -9,7 +9,7 @@ interface RefundButtonProps {
   storeId: string;
   orderId: string;
   orderNumber: string;
-  /** Order total in fils — shown in the confirmation modal for full refunds. */
+  /** Fils the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
   total: number;
   currency: string;
   /** Re-fetch the parent order after a successful refund. */
@@ -100,7 +100,7 @@ export function RefundButton({
         onClick={() => setOpen(true)}
         disabled={disabled || busy}
         title={t('buttonTooltip')}
-        className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-4 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60 transition-colors cursor-pointer"
+        className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-4 py-2.5 text-sm font-semibold text-destructive-ink hover:bg-destructive/10 disabled:opacity-60 transition-colors cursor-pointer"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path

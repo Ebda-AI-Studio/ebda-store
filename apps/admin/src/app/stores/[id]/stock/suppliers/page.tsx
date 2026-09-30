@@ -116,6 +116,7 @@ export default function SuppliersPage() {
         </div>
 
         <DataTable<Supplier>
+          ariaLabel={t('title')}
           columns={[
             {
               header: t('name'),

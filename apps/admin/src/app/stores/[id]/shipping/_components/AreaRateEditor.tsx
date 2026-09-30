@@ -908,12 +908,12 @@ export function AreaRateEditor({ storeId }: Props) {
                   <span className="font-medium text-foreground">{gov.en}</span>
                   <span className="text-muted-foreground font-arabic text-sm">{gov.ar}</span>
                   {count > 0 && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-ink">
                       {count} / {gov.areas.length}
                     </span>
                   )}
                   {customAreas.length > 0 && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-ink">
                       +{customAreas.length}
                     </span>
                   )}
@@ -1196,7 +1196,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 {countryAr && (
                   <span className="text-muted-foreground font-arabic text-sm">{countryAr}</span>
                 )}
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-ink">
                   {countryRows.length}
                 </span>
               </div>

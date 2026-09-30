@@ -74,6 +74,9 @@ interface ListReturnsOptions {
 // the same set this service branches on; re-exported for the route.
 export { GATEWAY_REFUND_METHODS, REFUND_METHODS };
 
+/** Gateway refusals meaning the customer already has the money on the original method. */
+const ALREADY_PAID_TO_CUSTOMER = new Set(['REFUND_ALREADY_ISSUED', 'PAYMENT_FULLY_REFUNDED']);
+
 /** This return's share of the order's money — see ReturnService.allocateThisReturn. */
 interface PartialAllocation {
   /** Net amount owed for the lines this return actually takes back. */
@@ -1104,12 +1107,19 @@ export class ReturnService {
       walletShare: number;
       refundableRemaining: number | null;
       unavailableReason: string | null;
+      /**
+       * The customer already has money back on the original method — so
+       * "Already refunded — record only" is an honest completion. Decided here,
+       * not by string-matching reason codes in the client (issue 2003).
+       */
+      alreadyPaidToCustomer: boolean;
     } = {
       available: false,
       amount: null,
       walletShare: 0,
       refundableRemaining: null,
       unavailableReason: null,
+      alreadyPaidToCustomer: false,
     };
     if (!isInventoryRestoring) {
       gateway.unavailableReason = 'EXCHANGE_CANNOT_REFUND_TO_GATEWAY';
@@ -1126,6 +1136,7 @@ export class ReturnService {
         walletShare: partial.walletShare,
         refundableRemaining: null,
         unavailableReason: null,
+        alreadyPaidToCustomer: false,
       };
     } else {
       try {
@@ -1142,10 +1153,17 @@ export class ReturnService {
           walletShare: partial?.walletShare ?? 0,
           refundableRemaining: plan.refundableRemaining,
           unavailableReason: null,
+          alreadyPaidToCustomer: false,
         };
       } catch (err) {
         if (!(err instanceof AppError)) throw err;
         gateway.unavailableReason = err.code;
+        // REFUND_ALREADY_ISSUED: this return's refund went out. PAYMENT_FULLY_
+        // REFUNDED: the whole payment went back by a path with no refundKey (the
+        // order page's refund-via-provider, or the provider's own dashboard).
+        // PARTIAL_REFUND_EXCEEDS_PAYMENT stays out: part of the money is still
+        // owed, and its copy directs the merchant to store credit.
+        gateway.alreadyPaidToCustomer = ALREADY_PAID_TO_CUSTOMER.has(err.code);
       }
     }
 

@@ -220,7 +220,7 @@ export default function StoreStaffPage() {
       }
     >
       {error && !isLoading && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}
@@ -241,6 +241,7 @@ export default function StoreStaffPage() {
         </div>
       ) : (
         <DataTable<StaffMember>
+          ariaLabel={t('table.ariaLabel')}
           columns={columns}
           rows={staff}
           rowKey={member => member.membershipId}

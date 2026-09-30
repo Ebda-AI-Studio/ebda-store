@@ -62,7 +62,7 @@ function TimelineIcon({ type }: { type: IconType }) {
   const base = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full';
   if (type === 'success')
     return (
-      <span className={`${base} bg-success/10 text-success`}>
+      <span className={`${base} bg-success/10 text-success-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
@@ -70,7 +70,7 @@ function TimelineIcon({ type }: { type: IconType }) {
     );
   if (type === 'cancel')
     return (
-      <span className={`${base} bg-destructive/10 text-destructive`}>
+      <span className={`${base} bg-destructive/10 text-destructive-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -83,7 +83,7 @@ function TimelineIcon({ type }: { type: IconType }) {
     );
   if (type === 'ship')
     return (
-      <span className={`${base} bg-info/10 text-info`}>
+      <span className={`${base} bg-info/10 text-info-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -96,7 +96,7 @@ function TimelineIcon({ type }: { type: IconType }) {
     );
   if (type === 'location')
     return (
-      <span className={`${base} bg-warning/10 text-warning`}>
+      <span className={`${base} bg-warning/10 text-warning-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -115,7 +115,7 @@ function TimelineIcon({ type }: { type: IconType }) {
     );
   if (type === 'admin')
     return (
-      <span className={`${base} bg-primary/10 text-primary`}>
+      <span className={`${base} bg-primary/10 text-primary-ink`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"

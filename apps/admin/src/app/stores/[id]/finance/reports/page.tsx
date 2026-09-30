@@ -128,6 +128,7 @@ async function downloadXlsx(endpoint: string, filename: string): Promise<void> {
 function TrialBalanceTab({ storeId }: { storeId: string }) {
   const t = useT('finance.reports');
   const tb = useT('finance.reports.trialBalance');
+  const tc = useT('common');
   const [asOf, setAsOf] = useState(todayIso());
   const [rows, setRows] = useState<TrialBalanceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -221,7 +222,7 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {rows && !loading && (
@@ -292,6 +293,7 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
 function PnlTab({ storeId }: { storeId: string }) {
   const t = useT('finance.reports');
   const tp = useT('finance.reports.pnl');
+  const tc = useT('common');
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(todayIso());
   const [data, setData] = useState<PnlData | null>(null);
@@ -381,7 +383,7 @@ function PnlTab({ storeId }: { storeId: string }) {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {data && !loading && (
@@ -467,6 +469,7 @@ function PnlTab({ storeId }: { storeId: string }) {
 function BalanceSheetTab({ storeId }: { storeId: string }) {
   const t = useT('finance.reports');
   const tbs = useT('finance.reports.balanceSheet');
+  const tc = useT('common');
   const [asOf, setAsOf] = useState(todayIso());
   const [data, setData] = useState<BalanceSheetData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -599,7 +602,7 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {data && !loading && (
@@ -623,6 +626,7 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
 function TaxReportTab({ storeId }: { storeId: string }) {
   const t = useT('finance.reports');
   const tt = useT('finance.reports.taxReport');
+  const tc = useT('common');
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(todayIso());
   const [data, setData] = useState<TaxReportData | null>(null);
@@ -725,7 +729,7 @@ function TaxReportTab({ storeId }: { storeId: string }) {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {data && !loading && (

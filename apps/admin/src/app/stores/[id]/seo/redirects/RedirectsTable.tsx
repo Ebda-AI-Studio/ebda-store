@@ -20,9 +20,10 @@ export interface RedirectsTableProps {
   deletingId: string | null;
   onDelete: (id: string) => void;
   t: (key: string) => string;
+  ariaLabel: string;
 }
 
-export function RedirectsTable({ rows, deletingId, onDelete, t }: RedirectsTableProps) {
+export function RedirectsTable({ rows, deletingId, onDelete, t, ariaLabel }: RedirectsTableProps) {
   const columns: DataTableColumn<SlugRedirectRow>[] = [
     {
       header: t('redirectsFromSlug'),
@@ -67,6 +68,7 @@ export function RedirectsTable({ rows, deletingId, onDelete, t }: RedirectsTable
 
   return (
     <DataTable<SlugRedirectRow>
+      ariaLabel={ariaLabel}
       columns={columns}
       rows={rows}
       rowKey={row => row.id}

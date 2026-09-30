@@ -52,7 +52,7 @@ export function RecentStores({ stores, isLoading }: RecentStoresProps) {
               className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30 cursor-pointer"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary-ink">
                   {store.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">

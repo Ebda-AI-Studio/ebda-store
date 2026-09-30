@@ -36,6 +36,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
+import { CAMPAIGN_ERROR_KEYS } from '../_components/campaignErrorKeys';
 import { ConfirmDialog } from '../_components/ConfirmDialog';
 
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
@@ -114,17 +115,7 @@ const RECIPIENT_STATUS_COLORS = {
   unsubscribed: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 } as const;
 
-// Codes surfaced by campaign.routes.ts that this editor can translate. Every
-// other AppError code falls back to `error.message` (raw, English-only).
-const ERROR_KEYS: Record<string, string> = {
-  DAILY_CAP_EXCEEDED: 'dailyCapExceeded',
-  EMPTY_AUDIENCE: 'emptyAudience',
-  CAMPAIGN_INCOMPLETE: 'campaignIncomplete',
-  INVALID_SCHEDULE: 'invalidSchedule',
-  CAMPAIGN_QUEUE_UNREACHABLE: 'queueUnreachable',
-  FEATURE_DISABLED: 'featureDisabled',
-  CAMPAIGN_NOT_DRAFT: 'notDraft',
-};
+const ERROR_KEYS = CAMPAIGN_ERROR_KEYS;
 
 function formFromCampaign(c: CampaignDetail): FormState {
   return {
@@ -160,6 +151,10 @@ export default function CampaignDetailPage() {
 
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [statusCounts, setStatusCounts] = useState<StatusCounts | null>(null);
+  // DELETE refuses a campaign with any recipient `sentAt` — send history is
+  // permanent (#1951). The API reports that exact predicate; an older API
+  // without the field falls back to the campaign's own sent counter.
+  const [hasSendHistory, setHasSendHistory] = useState(false);
   const [form, setForm] = useState<FormState | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState<string>('');
   const [audience, setAudience] = useState<AudienceInfo | null>(null);
@@ -200,6 +195,7 @@ export default function CampaignDetailPage() {
     const { data, error: err } = await apiGet<{
       campaign: CampaignDetail;
       statusCounts: StatusCounts;
+      hasSendHistory?: boolean;
     }>(`/api/v1/stores/${storeId}/campaigns/${campaignId}`);
     if (err) {
       setLoadError(err.message || tD('loadFailed'));
@@ -208,6 +204,7 @@ export default function CampaignDetailPage() {
     if (data) {
       setCampaign(data.campaign);
       setStatusCounts(data.statusCounts);
+      setHasSendHistory(data.hasSendHistory ?? data.campaign.sentCount > 0);
       const f = formFromCampaign(data.campaign);
       setForm(f);
       setSavedSnapshot(snapshotOf(f));
@@ -453,7 +450,7 @@ export default function CampaignDetailPage() {
           {backLink}
           <div
             role="alert"
-            className="mt-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            className="mt-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
           >
             {loadError || tD('loadFailed')}
           </div>
@@ -484,7 +481,7 @@ export default function CampaignDetailPage() {
         {error && (
           <div
             role="alert"
-            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-ink"
           >
             {error}
           </div>
@@ -811,15 +808,18 @@ export default function CampaignDetailPage() {
                   {tD('cancelCampaign')}
                 </button>
               )}
-              {(campaign.status === 'cancelled' || campaign.status === 'failed') && (
-                <button
-                  type="button"
-                  onClick={() => setPendingAction('delete')}
-                  className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
-                >
-                  {tc('delete')}
-                </button>
-              )}
+              {(campaign.status === 'cancelled' || campaign.status === 'failed') &&
+                (hasSendHistory ? (
+                  <p className="text-xs text-muted-foreground">{tD('sendHistoryPermanent')}</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPendingAction('delete')}
+                    className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                  >
+                    {tc('delete')}
+                  </button>
+                ))}
             </div>
 
             {/* Per-recipient table */}
