@@ -2298,3 +2298,41 @@ naming the product and refetching the cart so /cart shows the mark. A line whose
 separate product decision. Cost if wrong: a cart whose every loose line is deleted shows checkout's
 "Your cart is empty" screen rather than the refusal copy, because the summary no longer lists
 unorderable lines.
+
+## 2026-09-30 — Admin UI: coupons chrome, feature-flag staleness, Customers page (branch `fix/admin-ui-coupons-features-customers`)
+
+Source: `force-website-builder-audit-accounting-mcp-2026-09-30.md` §8, §9, §10.
+
+**Ruling AUI-1 — the Customers KPI "Total spent" / "Avg order value" / "Repeat rate" count orders
+with `status NOT IN ('cancelled','refunded')`; the table's per-row "Total spent" keeps its existing
+all-status sum.** The KPI population is the same one the dashboard's revenue uses
+(`analytics.service.ts` `getPeriodStats`), so the two pages cannot disagree about what "spent"
+means; the KPI card says "Excludes cancelled and refunded orders". The row column was not changed
+because it also feeds the detail page and the export, and changing its meaning is a separate
+decision. Cost if wrong: on a store with cancelled orders the KPI total is lower than the sum of the
+row column, which the card label explains but a merchant may still question.
+
+**Ruling AUI-2 — `GET /customers?segment=<rfm>` is refused (403) for `staff`.** `staff` can read the
+list, but RFM segments are served by `rfm-batch` to store_admin/super_admin only; filtering by a
+segment would let staff enumerate segment membership. `segment=guest` and the plain list stay open to
+staff. Unknown segment values are ignored (unfiltered list), not a 400, so a stale link still loads.
+Cost if wrong: staff who legitimately need segment views must ask an admin.
+
+**Ruling AUI-3 — #2046, #2049, #2051 (duplicate / phantom / zero-spend rows in the aggregation) are
+NOT fixed in this branch.** The KPI "Customers" count inherits them because it counts the same rows
+the list shows; on a truncated store (>20k orders) every KPI is marked "Recent orders only" rather
+than presented as complete. Those issues change the aggregation's keying, which is a separate,
+larger change. Cost if wrong: a store with guest-then-registered shoppers shows a customer count a
+few rows high until those issues land.
+
+**Ruling AUI-4 — feature-flag freshness uses `refresh()` after every admin write path plus
+focus/visibility revalidation; the optional socket push (`store.feature_toggled`) is not built.**
+Every write path in the admin (FeatureMatrix toggle, reset, plan change; Settings plan change) now
+refreshes the store-wide context, and a merchant in another tab or device picks the change up on the
+next focus. Cost if wrong: a merchant who keeps the admin tab focused while a super-admin toggles a
+feature elsewhere sees it only after switching tabs, navigating a full reload, or refocusing.
+
+**Ruling AUI-5 — the customers aggregation cache key moves to `customers-agg:v2:<storeId>`.** The
+cached value gained `summary`; a v1 entry read after deploy would render an unknown KPI strip for up
+to the 300s TTL. The version bump turns it into a clean miss. Cost if wrong: one extra aggregation
+per store right after deploy.

@@ -251,7 +251,10 @@ export async function invalidateStoreProductCachesAfterOrder(storeId: string): P
 
 /** Cache key for the admin aggregated-customers snapshot (`customers.routes.ts`). */
 export function customersCacheKey(storeId: string): string {
-  return `customers-agg:${storeId}`;
+  // v2 (2026-09-30): the cached value gained `summary` (KPI strip). A v1
+  // entry has none, so reading one after deploy would show an empty strip
+  // for up to the 300s TTL — the version bump makes it a clean miss instead.
+  return `customers-agg:v2:${storeId}`;
 }
 
 /**

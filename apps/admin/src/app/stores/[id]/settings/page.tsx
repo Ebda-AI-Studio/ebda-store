@@ -168,7 +168,7 @@ interface StoreBasicInfo {
 export default function StoreSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
-  const { isEnabled, isLoading } = useFeatures();
+  const { isEnabled, isLoading, refresh: refreshFeatures } = useFeatures();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('settings');
@@ -228,12 +228,14 @@ export default function StoreSettingsPage() {
       toastError('Plan change failed', apiErr.message);
     } else {
       toastSuccess('Plan updated', `Store plan changed to ${PLAN_LABELS[pendingPlan].en}.`);
-      await fetchStore();
+      // A plan change moves the feature baseline — refresh the store-wide
+      // flags so the Settings cards and sidebar reflect it without a reload.
+      await Promise.all([fetchStore(), refreshFeatures()]);
     }
     setPlanChanging(false);
     setPlanModalOpen(false);
     setPendingPlan(null);
-  }, [pendingPlan, storeId, fetchStore, toastSuccess, toastError]);
+  }, [pendingPlan, storeId, fetchStore, refreshFeatures, toastSuccess, toastError]);
 
   const cards: SettingsCard[] = [
     {

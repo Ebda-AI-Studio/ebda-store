@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
 import { neutralizeRowObject, neutralizeRowArray } from '../lib/exports/xlsx';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, type RfmSegment } from '@force/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
@@ -104,6 +104,92 @@ function formatShippingAddress(addr: ShippingAddressShape | null): string {
 }
 
 /**
+ * Order statuses that do NOT count toward customer spend in the KPI strip.
+ * Same population as the dashboard's revenue (`analytics.service.ts`
+ * `getPeriodStats`: `status notIn ['cancelled','refunded']`), so the
+ * Customers page and Analytics never disagree about what "spent" means.
+ */
+const KPI_EXCLUDED_STATUSES = new Set(['cancelled', 'refunded']);
+
+/**
+ * Store-wide KPI strip for the Customers page. Computed over the WHOLE
+ * aggregated set (never the current page, search or segment), so it
+ * describes the store. A rate/average with no denominator is `null` —
+ * unknown, rendered as unknown — never a fabricated 0.
+ */
+export interface CustomersSummary {
+  /** Every row the list can show: buyers, zero-order registered, guests. */
+  customers: number;
+  /** Rows keyed as guests (no customer account). */
+  guests: number;
+  /** Customers with at least one counted (non-cancelled/refunded) order. */
+  buyers: number;
+  /** Customers with two or more counted orders. */
+  repeatBuyers: number;
+  /** repeatBuyers / buyers, 0..1. Null when there are no buyers. */
+  repeatRate: number | null;
+  /** Counted orders across all customers. */
+  orders: number;
+  /** Sum of counted order totals, in fils. */
+  totalSpent: number;
+  /** totalSpent / orders, in fils. Null when there are no counted orders. */
+  avgOrderValue: number | null;
+}
+
+// A literal list, not `Object.values(RfmSegment)`: reading the enum VALUE at
+// module load breaks every unit test that mocks '@force/database' wholesale.
+// The type assertion below still fails the build if the enum gains a member.
+const RFM_SEGMENT_VALUES = [
+  'vip',
+  'loyal',
+  'potential',
+  'new_customer',
+  'at_risk',
+  'hibernating',
+  'lost',
+] as const satisfies readonly RfmSegment[];
+const RFM_SEGMENTS_COMPLETE: [Exclude<RfmSegment, (typeof RFM_SEGMENT_VALUES)[number]>] extends [
+  never,
+]
+  ? true
+  : false = true;
+void RFM_SEGMENTS_COMPLETE;
+const RFM_SEGMENTS: ReadonlySet<string> = new Set(RFM_SEGMENT_VALUES);
+
+/** Parse `?segment=` into an RFM segment or `'guest'`; anything else → null. */
+export function parseSegmentFilter(raw: unknown): RfmSegment | 'guest' | null {
+  if (typeof raw !== 'string') return null;
+  if (raw === 'guest') return 'guest';
+  return RFM_SEGMENTS.has(raw) ? (raw as RfmSegment) : null;
+}
+
+export function summarizeCustomers(
+  rows: Array<{ isGuest: boolean }>,
+  counted: Map<string, { orders: number; spent: number }>
+): CustomersSummary {
+  let buyers = 0;
+  let repeatBuyers = 0;
+  let orders = 0;
+  let totalSpent = 0;
+  for (const c of counted.values()) {
+    if (c.orders >= 1) buyers += 1;
+    if (c.orders >= 2) repeatBuyers += 1;
+    orders += c.orders;
+    totalSpent += c.spent;
+  }
+  return {
+    customers: rows.length,
+    guests: rows.filter(r => r.isGuest).length,
+    buyers,
+    repeatBuyers,
+    repeatRate: buyers > 0 ? repeatBuyers / buyers : null,
+    orders,
+    totalSpent,
+    avgOrderValue: orders > 0 ? Math.round(totalSpent / orders) : null,
+  };
+}
+
+/**
  * Hard cap on the number of orders scanned to build the aggregated customer
  * list / export. Protects the API from an OOM/timeout on stores with tens of
  * thousands of orders (the previous `findMany` had NO `take`). When the cap is
@@ -171,6 +257,7 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
   truncated: boolean;
   ordersScanned: number;
   orders: OrderWithItems[];
+  summary: CustomersSummary;
 }> {
   const fetched = await prisma.order.findMany({
     where: { storeId, deletedAt: null },
@@ -214,6 +301,8 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
   // after the loop without polluting the AggregatedCustomer shape.
   const statusSets = new Map<string, Set<string>>();
   const paymentMethodSets = new Map<string, Set<string>>();
+  // KPI accumulator: counted (non-cancelled/refunded) orders + spend per key.
+  const countedByKey = new Map<string, { orders: number; spent: number }>();
 
   const map = new Map<string, AggregatedCustomer>();
   for (const order of orders) {
@@ -243,6 +332,13 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
       statusSets.set(key, statusSet);
     }
     if (status) statusSet.add(status);
+
+    if (!KPI_EXCLUDED_STATUSES.has(status)) {
+      const counted = countedByKey.get(key) ?? { orders: 0, spent: 0 };
+      counted.orders += 1;
+      counted.spent += order.total;
+      countedByKey.set(key, counted);
+    }
 
     let methodSet = paymentMethodSets.get(key);
     if (!methodSet) {
@@ -378,7 +474,13 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
   }
 
   const customers = Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
-  return { customers, truncated, ordersScanned: orders.length, orders: orders as OrderWithItems[] };
+  return {
+    customers,
+    truncated,
+    ordersScanned: orders.length,
+    orders: orders as OrderWithItems[],
+    summary: summarizeCustomers(customers, countedByKey),
+  };
 }
 
 /**
@@ -399,6 +501,7 @@ async function aggregateCustomers(storeId: string): Promise<{
   truncated: boolean;
   ordersScanned: number;
   orders: OrderWithItems[];
+  summary: CustomersSummary;
 }> {
   const result = await getCached(customersCacheKey(storeId), CUSTOMERS_CACHE_TTL_SECONDS, () =>
     aggregateCustomersUncached(storeId)
@@ -800,7 +903,7 @@ router.get(
 );
 
 /**
- * GET /stores/:storeId/customers?page=&perPage=&search=
+ * GET /stores/:storeId/customers?page=&perPage=&search=&segment=
  *
  * Server-side aggregated customers list. Replaces the admin page's previous
  * client-side "fetch page 1, then Promise.all over every remaining orders
@@ -808,7 +911,13 @@ router.get(
  * (incl. guest orders + cancelled/unpaid) happens here once, bounded by
  * `MAX_ORDERS_SCANNED`, and only the requested page of customers is returned.
  *
- * Response: { data, meta: { page, perPage, total, totalPages, truncated } }.
+ * `segment` (optional): an RFM segment (`vip`, `loyal`, `potential`,
+ * `new_customer`, `at_risk`, `hibernating`, `lost`) or `guest`. An unknown
+ * value is ignored (the unfiltered list), never a 400, so an old bookmark
+ * with a retired segment still loads.
+ *
+ * Response: { data, meta: { page, perPage, total, totalPages, truncated,
+ * summary } } — `summary` is the store-wide KPI strip (`CustomersSummary`).
  */
 router.get(
   '/customers',
@@ -820,20 +929,48 @@ router.get(
       // Hard-cap perPage so a caller can't request an unbounded page.
       const perPage = Math.min(100, Math.max(1, Number(req.query.perPage ?? 20) || 20));
       const search = (req.query.search as string | undefined)?.trim().toLowerCase() ?? '';
+      const segment = parseSegmentFilter(req.query.segment);
 
-      const { customers, truncated } = await aggregateCustomers(storeId);
+      // RFM segments are analytics that `rfm-batch` serves to store_admin /
+      // super_admin only. Filtering by one here would let `staff` (who can
+      // read this list) enumerate segment membership, so keep the same line.
+      if (segment && segment !== 'guest' && req.user?.role === 'staff') {
+        throw new AppError(403, 'FORBIDDEN', 'Segment filtering requires a store admin');
+      }
+
+      const { customers, truncated, summary } = await aggregateCustomers(storeId);
+
+      // Segment filter runs server-side, over the whole aggregated set, so the
+      // total + pagination reflect the segment rather than one page of it.
+      const segmentIds =
+        segment && segment !== 'guest'
+          ? new Set(
+              (
+                await prisma.customerRfmSnapshot.findMany({
+                  where: { storeId, isGuest: false, segment },
+                  select: { customerId: true },
+                })
+              ).map(r => r.customerId)
+            )
+          : null;
+      const bySegment =
+        segment === 'guest'
+          ? customers.filter(c => c.isGuest)
+          : segmentIds
+            ? customers.filter(c => segmentIds.has(c.id))
+            : customers;
 
       // Optional server-side filter so search is consistent across pages
       // (the old client-only search only matched the fetched page).
       const filtered = search
-        ? customers.filter(
+        ? bySegment.filter(
             c =>
               c.firstName.toLowerCase().includes(search) ||
               c.lastName.toLowerCase().includes(search) ||
               c.email.toLowerCase().includes(search) ||
               c.phone.toLowerCase().includes(search)
           )
-        : customers;
+        : bySegment;
 
       const total = filtered.length;
       const totalPages = Math.max(1, Math.ceil(total / perPage));
@@ -846,7 +983,8 @@ router.get(
         success: true,
         data: {
           data: pageItems,
-          meta: { page, perPage, total, totalPages, truncated },
+          // `summary` is store-wide (unaffected by page/search/segment).
+          meta: { page, perPage, total, totalPages, truncated, summary },
         },
       });
     } catch (error) {

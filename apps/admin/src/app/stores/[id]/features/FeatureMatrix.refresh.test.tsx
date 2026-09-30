@@ -1,0 +1,87 @@
+// @vitest-environment jsdom
+/**
+ * Audit 2026-09-30 §9 — a feature toggle in the super-admin FeatureMatrix
+ * refreshed only the matrix's own local state; the store-wide feature
+ * context (sidebar, page gates, the Settings MCP card) stayed stale until a
+ * hard reload. Every successful write must now also refresh that context.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+
+const api = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPut: vi.fn(),
+  apiDelete: vi.fn(),
+  apiPatch: vi.fn(),
+}));
+const features = vi.hoisted(() => ({ refresh: vi.fn() }));
+
+vi.mock('next-intl', () => {
+  const t = Object.assign((key: string) => key, { has: () => true, rich: (key: string) => key });
+  return { useTranslations: () => t, useLocale: () => 'en' };
+});
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+vi.mock('@/lib/api', () => api);
+vi.mock('@/hooks/useFeatures', () => ({
+  useFeatures: () => ({ isEnabled: () => true, isLoading: false, refresh: features.refresh }),
+}));
+
+import { ToastProvider } from '@force/ui';
+import { FeatureMatrix } from './FeatureMatrix';
+
+beforeEach(() => {
+  api.apiGet.mockImplementation((url: string) =>
+    Promise.resolve(
+      url.endsWith('/features')
+        ? { data: { features: {}, metadata: [], registry: {} }, error: null }
+        : {
+            data: { store: { id: 's1', name: 'S', plan: 'starter', status: 'active' } },
+            error: null,
+          }
+    )
+  );
+  api.apiPut.mockResolvedValue({ data: {}, error: null });
+  api.apiDelete.mockResolvedValue({ data: {}, error: null });
+  features.refresh.mockResolvedValue(undefined);
+});
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe('FeatureMatrix → store feature context', () => {
+  it('refreshes the store-wide feature context after a successful toggle', async () => {
+    render(
+      <ToastProvider>
+        <FeatureMatrix storeId="s1" />
+      </ToastProvider>
+    );
+    const toggles = await screen.findAllByRole('switch');
+    fireEvent.click(toggles[0]);
+
+    await waitFor(() => expect(features.refresh).toHaveBeenCalledTimes(1));
+    expect(api.apiPut.mock.calls.length + api.apiDelete.mock.calls.length).toBe(1);
+  });
+
+  it('does not refresh when the write failed', async () => {
+    api.apiPut.mockResolvedValue({ data: null, error: { message: 'nope' } });
+    api.apiDelete.mockResolvedValue({ data: null, error: { message: 'nope' } });
+    render(
+      <ToastProvider>
+        <FeatureMatrix storeId="s1" />
+      </ToastProvider>
+    );
+    const toggles = await screen.findAllByRole('switch');
+    fireEvent.click(toggles[0]);
+
+    await waitFor(() =>
+      expect(api.apiPut.mock.calls.length + api.apiDelete.mock.calls.length).toBe(1)
+    );
+    expect(features.refresh).not.toHaveBeenCalled();
+  });
+});

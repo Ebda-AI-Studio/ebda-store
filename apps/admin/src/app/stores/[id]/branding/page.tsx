@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { AdminSkeletonDetail } from '../../../../components/AdminSkeleton';
 import { BrandingIdentityTab } from './_components/BrandingIdentityTab';
 import { BrandingTabs } from './_components/BrandingTabs';
 import { ContactInfoTab } from './_components/ContactInfoTab';
@@ -54,22 +55,24 @@ export default function StoreBrandingPage() {
     toastMessages
   );
 
-  if (isLoading) {
+  // Loading + not-found render INSIDE <AdminLayout> so the sidebar, hub tabs
+  // and topbar stay mounted — an early return before the layout made the
+  // whole admin chrome vanish and reappear (audit 2026-09-30 §8, fixed as a
+  // class across every admin page).
+  if (isLoading || !branding) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!branding) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">{tMessages('notFound')}</p>
-        <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
-          {tActions('backToStores')}
-        </Link>
-      </div>
+      <AdminLayout title={tPage('title')}>
+        {isLoading ? (
+          <AdminSkeletonDetail showHeader={false} />
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">{tMessages('notFound')}</p>
+            <Link href="/stores" className="text-primary hover:underline mt-2 inline-block">
+              {tActions('backToStores')}
+            </Link>
+          </div>
+        )}
+      </AdminLayout>
     );
   }
 

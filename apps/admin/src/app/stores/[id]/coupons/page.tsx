@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
 import { apiGet } from '../../../../lib/api';
 import { CouponFormModal } from './_components/CouponFormModal';
 import { CouponsFilters } from './_components/CouponsFilters';
@@ -116,14 +117,10 @@ export default function CouponsPage() {
     }, 0);
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
+  // Gate first, then render the loading state INSIDE <AdminLayout>. An early
+  // `return <spinner/>` before the layout unmounted the whole sidebar, hub
+  // tabs and topbar for the length of the fetch and remounted them after it,
+  // which read as the page navigating away and back (audit 2026-09-30 §8).
   if (gate) return gate;
 
   return (
@@ -143,35 +140,39 @@ export default function CouponsPage() {
         </button>
       }
     >
-      <div className="space-y-6">
-        <CouponsFilters
-          searchTerm={searchTerm}
-          onSearchTermChange={setSearchTerm}
-          filterActive={filterActive}
-          onFilterActiveChange={handleFilterActiveChange}
-          onSubmitSearch={fetchCoupons}
-        />
-
-        <CouponsTable
-          coupons={coupons}
-          onEdit={openEditModal}
-          onDelete={deleteCoupon}
-          onToggleActive={toggleActive}
-          onCreateFirst={openCreateModal}
-        />
-
-        {showModal && (
-          <CouponFormModal
-            isEditing={editingCoupon !== null}
-            formData={formData}
-            onChange={setFormData}
-            onSubmit={handleSubmit}
-            onClose={closeModal}
-            storeId={storeId}
-            customerGroups={customerGroups}
+      {isLoading ? (
+        <AdminSkeletonTable rows={6} columns={6} />
+      ) : (
+        <div className="space-y-6">
+          <CouponsFilters
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            filterActive={filterActive}
+            onFilterActiveChange={handleFilterActiveChange}
+            onSubmitSearch={fetchCoupons}
           />
-        )}
-      </div>
+
+          <CouponsTable
+            coupons={coupons}
+            onEdit={openEditModal}
+            onDelete={deleteCoupon}
+            onToggleActive={toggleActive}
+            onCreateFirst={openCreateModal}
+          />
+
+          {showModal && (
+            <CouponFormModal
+              isEditing={editingCoupon !== null}
+              formData={formData}
+              onChange={setFormData}
+              onSubmit={handleSubmit}
+              onClose={closeModal}
+              storeId={storeId}
+              customerGroups={customerGroups}
+            />
+          )}
+        </div>
+      )}
     </AdminLayout>
   );
 }

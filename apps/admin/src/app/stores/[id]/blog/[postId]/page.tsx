@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { recommendedSizeText } from '@force/shared';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { ImageUpload } from '../../../../../components/ImageUpload';
+import { AdminLayout } from '../../../../../components/AdminLayout';
+import { AdminSkeletonDetail } from '../../../../../components/AdminSkeleton';
 import { useT } from '@/i18n/useT';
 
 interface BlogPost {
@@ -149,180 +151,183 @@ export default function BlogPostEditorPage({
     router.push(`/stores/${storeId}/blog`);
   }
 
-  if (isLoading) {
-    return <div className="p-10 text-center text-sm text-muted-foreground">{t('loading')}</div>;
-  }
-
+  // The editor renders inside <AdminLayout> like every other store page —
+  // loading included. It used to render bare (no sidebar, hub tabs or
+  // topbar at all), the same chrome-dropping class as audit 2026-09-30 §8.
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            {isNew ? t('newTitle') : t('editTitle')}
-          </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">{t('subtitle')}</p>
-        </div>
+    <AdminLayout
+      title={isNew ? t('newTitle') : t('editTitle')}
+      subtitle={t('subtitle')}
+      actions={
         <Link
           href={`/stores/${storeId}/blog`}
           className="text-sm font-semibold text-muted-foreground hover:text-foreground"
         >
           {t('backToAll')}
         </Link>
-      </div>
+      }
+    >
+      {isLoading ? (
+        <AdminSkeletonDetail showHeader={false} />
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border bg-card p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                {t('titleEn')} <span className="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={e => update('title', e.target.value)}
+                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder={t('titleEnPlaceholder')}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                {t('titleAr')}
+              </label>
+              <input
+                type="text"
+                lang="ar"
+                dir="rtl"
+                value={form.titleAr}
+                onChange={e => update('titleAr', e.target.value)}
+                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="ما الجديد في متجرك..."
+              />
+            </div>
+          </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border bg-card p-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              {t('titleEn')} <span className="text-destructive">*</span>
+              {t('slug')} <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
-              value={form.title}
-              onChange={e => update('title', e.target.value)}
-              className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder={t('titleEnPlaceholder')}
+              value={form.slug}
+              onChange={e => update('slug', slugify(e.target.value))}
+              className="w-full rounded-lg border border-border px-4 py-2 font-mono text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder={t('slugPlaceholder')}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('slugHint', { slug: form.slug || '<slug>' })}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                {t('excerptEn')}
+              </label>
+              <textarea
+                value={form.excerpt}
+                onChange={e => update('excerpt', e.target.value)}
+                rows={3}
+                className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder={t('excerptEnPlaceholder')}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                {t('excerptAr')}
+              </label>
+              <textarea
+                lang="ar"
+                dir="rtl"
+                value={form.excerptAr}
+                onChange={e => update('excerptAr', e.target.value)}
+                rows={3}
+                className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="جملة أو اثنتان تظهران في قائمة المدونة..."
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              {t('coverImage')}
+            </label>
+            <ImageUpload
+              value={form.coverImage || undefined}
+              onUpload={url => update('coverImage', url)}
+              onRemove={() => update('coverImage', '')}
+              folder="pages"
+              storeId={storeId}
+              label={t('coverImageUpload')}
+              aspectRatio="3/2"
+              recommendedSizeHint={recommendedSizeText('blogCover')}
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">{t('titleAr')}</label>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                {t('contentEn')} <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                value={form.content}
+                onChange={e => update('content', e.target.value)}
+                rows={14}
+                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder={t('contentEnPlaceholder')}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                {t('contentAr')}
+              </label>
+              <textarea
+                lang="ar"
+                dir="rtl"
+                value={form.contentAr}
+                onChange={e => update('contentAr', e.target.value)}
+                rows={14}
+                className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4">
             <input
-              type="text"
-              lang="ar"
-              dir="rtl"
-              value={form.titleAr}
-              onChange={e => update('titleAr', e.target.value)}
-              className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="ما الجديد في متجرك..."
+              type="checkbox"
+              checked={form.isPublished}
+              onChange={e => update('isPublished', e.target.checked)}
+              className="h-5 w-5 cursor-pointer accent-primary"
             />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-foreground">
-            {t('slug')} <span className="text-destructive">*</span>
-          </label>
-          <input
-            type="text"
-            value={form.slug}
-            onChange={e => update('slug', slugify(e.target.value))}
-            className="w-full rounded-lg border border-border px-4 py-2 font-mono text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            placeholder={t('slugPlaceholder')}
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t('slugHint', { slug: form.slug || '<slug>' })}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
-              {t('excerptEn')}
-            </label>
-            <textarea
-              value={form.excerpt}
-              onChange={e => update('excerpt', e.target.value)}
-              rows={3}
-              className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder={t('excerptEnPlaceholder')}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
-              {t('excerptAr')}
-            </label>
-            <textarea
-              lang="ar"
-              dir="rtl"
-              value={form.excerptAr}
-              onChange={e => update('excerptAr', e.target.value)}
-              rows={3}
-              className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="جملة أو اثنتان تظهران في قائمة المدونة..."
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-foreground">
-            {t('coverImage')}
-          </label>
-          <ImageUpload
-            value={form.coverImage || undefined}
-            onUpload={url => update('coverImage', url)}
-            onRemove={() => update('coverImage', '')}
-            folder="pages"
-            storeId={storeId}
-            label={t('coverImageUpload')}
-            aspectRatio="3/2"
-            recommendedSizeHint={recommendedSizeText('blogCover')}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
-              {t('contentEn')} <span className="text-destructive">*</span>
-            </label>
-            <textarea
-              value={form.content}
-              onChange={e => update('content', e.target.value)}
-              rows={14}
-              className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder={t('contentEnPlaceholder')}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
-              {t('contentAr')}
-            </label>
-            <textarea
-              lang="ar"
-              dir="rtl"
-              value={form.contentAr}
-              onChange={e => update('contentAr', e.target.value)}
-              rows={14}
-              className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="اكتب قصتك هنا. اترك سطرًا فارغًا لبدء فقرة جديدة."
-            />
-          </div>
-        </div>
-
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4">
-          <input
-            type="checkbox"
-            checked={form.isPublished}
-            onChange={e => update('isPublished', e.target.checked)}
-            className="h-5 w-5 cursor-pointer accent-primary"
-          />
-          <span className="text-sm">
-            <span className="block font-semibold text-foreground">{t('publishLabel')}</span>
-            <span className="block text-xs text-muted-foreground">
-              {t('publishHint', { slug: form.slug || '<slug>' })}
+            <span className="text-sm">
+              <span className="block font-semibold text-foreground">{t('publishLabel')}</span>
+              <span className="block text-xs text-muted-foreground">
+                {t('publishHint', { slug: form.slug || '<slug>' })}
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
 
-        {error && (
-          <p className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p>
-        )}
+          {error && (
+            <p className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
 
-        <div className="flex items-center justify-end gap-3 border-t pt-6">
-          <Link
-            href={`/stores/${storeId}/blog`}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
-          >
-            {t('cancel')}
-          </Link>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-          >
-            {isSaving ? t('saving') : isNew ? t('createPost') : t('saveChanges')}
-          </button>
-        </div>
-      </form>
-    </div>
+          <div className="flex items-center justify-end gap-3 border-t pt-6">
+            <Link
+              href={`/stores/${storeId}/blog`}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+            >
+              {t('cancel')}
+            </Link>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            >
+              {isSaving ? t('saving') : isNew ? t('createPost') : t('saveChanges')}
+            </button>
+          </div>
+        </form>
+      )}
+    </AdminLayout>
   );
 }

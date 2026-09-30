@@ -17,6 +17,7 @@ import {
 } from '@force/shared';
 import { ToggleSwitch } from './_components/ToggleSwitch';
 import { useT } from '@/i18n/useT';
+import { useFeatures } from '@/hooks/useFeatures';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,9 @@ interface FeatureMatrixProps {
 
 export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   const { success: toastSuccess, error: toastError } = useToast();
+  // The store-wide feature context (sidebar, page gates, Settings cards) —
+  // refreshed after every write below so a toggle shows up without a reload.
+  const { refresh: refreshFeatureContext } = useFeatures();
   const t = useT('features.matrix');
   const tCommon = useT('common');
   const locale = useLocale();
@@ -302,7 +306,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       if (result.error) {
         toastError(t('toasts.featureUpdateFailed'), result.error.message);
       } else {
-        await fetchFeatures();
+        await Promise.all([fetchFeatures(), refreshFeatureContext()]);
       }
 
       setInFlightKeys(prev => {
@@ -311,7 +315,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
         return next;
       });
     },
-    [inFlightKeys, storeId, fetchFeatures, toastError, t]
+    [inFlightKeys, storeId, fetchFeatures, refreshFeatureContext, toastError, t]
   );
 
   // ── Plan change ────────────────────────────────────────────────────────────
@@ -328,12 +332,24 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
         t('toasts.planUpdated'),
         t('toasts.planUpdatedDescription', { plan: planLabelFor(pendingPlan) })
       );
-      await fetchStore();
+      // A plan change moves the feature BASELINE, so the matrix and the
+      // store-wide context both change even with no override touched.
+      await Promise.all([fetchStore(), fetchFeatures(), refreshFeatureContext()]);
     }
     setPlanChanging(false);
     setPlanModalOpen(false);
     setPendingPlan(null);
-  }, [pendingPlan, storeId, fetchStore, toastSuccess, toastError, t, planLabelFor]);
+  }, [
+    pendingPlan,
+    storeId,
+    fetchStore,
+    fetchFeatures,
+    refreshFeatureContext,
+    toastSuccess,
+    toastError,
+    t,
+    planLabelFor,
+  ]);
 
   // ── Suspend / reactivate ───────────────────────────────────────────────────
   const handleStatusChange = useCallback(async () => {
@@ -368,11 +384,11 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       toastError(t('toasts.resetFailed'), apiErr.message);
     } else {
       toastSuccess(t('toasts.overridesCleared'), t('toasts.overridesClearedDescription'));
-      await fetchFeatures();
+      await Promise.all([fetchFeatures(), refreshFeatureContext()]);
     }
     setResetting(false);
     setResetModalOpen(false);
-  }, [storeId, fetchFeatures, toastSuccess, toastError, t]);
+  }, [storeId, fetchFeatures, refreshFeatureContext, toastSuccess, toastError, t]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
