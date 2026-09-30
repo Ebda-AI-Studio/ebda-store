@@ -9,6 +9,7 @@ import { CartProvider } from '../contexts/CartContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { FeatureProvider } from '../contexts/FeatureContext';
 import { getStore } from '../lib/store-resolver';
+import { isPlatformFromHeader } from '../lib/platform-host';
 import { API_URL } from '../lib/api';
 import { organizationJsonLd } from '../lib/structured-data';
 import { buildStorefrontMetadata } from '../lib/storefront-metadata';
@@ -165,8 +166,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Middleware already resolved platform-vs-custom-domain for this request
   // (`x-is-platform`) — hand it to StoreProvider so the FIRST render already
   // knows, instead of guessing `false` until a client `useEffect` corrects
-  // it. See StoreContext.tsx's `isPlatform` doc comment.
-  const initialIsPlatform = headersList.get('x-is-platform') === 'true';
+  // it. See StoreContext.tsx's `isPlatform` doc comment. Tri-state: an
+  // ABSENT header (middleware did not run) stays `undefined` so the client
+  // fallback still runs (#2091).
+  const initialIsPlatform = isPlatformFromHeader(headersList.get('x-is-platform'));
   // API_URL already includes the /api/v1 prefix (see lib/api.ts); the helper
   // appends the route path directly to avoid a doubled /api/v1/api/v1/ 404.
   const draftBundle = await fetchDraftBundleForCurrentRequest(store.id, draftToken, API_URL);

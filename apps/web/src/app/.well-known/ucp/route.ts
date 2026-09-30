@@ -92,12 +92,10 @@ export async function GET() {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      // See acp.json for the full reasoning: URL slug / custom-domain Host
-      // resolution stays public+s-maxage (Vary: Cookie protects it from a
-      // stray Cookie header); the sticky x-store-slug cookie fallback makes
-      // the response cookie-dependent, and Vary alone doesn't protect that
-      // on Cloudflare (edge-cache.ts), so it drops to private instead
-      // (scoped-audit P2 on PR #1942).
+      // See acp.json: resolved only from URL slug / custom-domain Host
+      // (middleware.ts URL_KEYED_PUBLIC_PATHS, #1959 — the load-bearing
+      // control). The `viaCookie → private` branch is an unreachable second
+      // line of defence (#2174).
       'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },

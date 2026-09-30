@@ -1,5 +1,5 @@
 import type { StoreTheme, TemplateId } from '@force/shared';
-import { resolveBackgroundPreset } from '@force/shared';
+import { colorToHslTriplet, resolveBackgroundPreset } from '@force/shared';
 
 /**
  * Resolves the EFFECTIVE footer background color so `ShopChrome`'s
@@ -28,6 +28,24 @@ export function resolveFooterAutoContrastBg(
 ): string {
   if (explicitBg) return explicitBg;
   const boldInverted = template === 'bold' && theme?.personaChromeV2 === true;
-  if (boldInverted) return `hsl(${theme.foregroundColor})`;
-  return `hsl(${resolveBackgroundPreset(theme).bgSectionAlt})`;
+  if (boldInverted) return asHslColor(theme.foregroundColor, theme);
+  return asHslColor(resolveBackgroundPreset(theme).bgSectionAlt, theme);
+}
+
+const BARE_HSL_TRIPLET = /^\s*-?[\d.]+(deg)?\s+[\d.]+%\s+[\d.]+%\s*$/;
+
+/**
+ * Issue #2156 — a stored theme color is a bare triplet OR `#rrggbb` OR a
+ * `token:*` ref (packages/shared color.ts), and the footer PAINTS the
+ * normalized value (`themeToCssVars` runs every color var through
+ * `colorToHslTriplet`). Wrapping the RAW value produced `hsl(#1a1a1a)`, which
+ * `parseColorToRgb` rejects → the contrast filter fell back to `'none'` → a
+ * dark logo on the near-black inverted bold footer. Normalize with the SAME
+ * shared helper (never a fork of it); an already-bare triplet is passed
+ * through untouched so every store that works today computes byte-identically.
+ */
+function asHslColor(value: string | undefined, theme: StoreTheme): string {
+  if (value && BARE_HSL_TRIPLET.test(value)) return `hsl(${value.trim()})`;
+  const triplet = colorToHslTriplet(value, theme);
+  return triplet.startsWith('hsl(') ? triplet : `hsl(${triplet})`;
 }

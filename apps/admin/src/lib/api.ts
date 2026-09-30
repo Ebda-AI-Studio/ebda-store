@@ -270,11 +270,104 @@ export async function refreshSessionWaitingOutThrottle(): Promise<RefreshOutcome
   return outcome;
 }
 
-/** A `GET /auth/me` outcome, named the same three ways as a refresh. */
+/**
+ * Session generation — bumped by every login and every logout.
+ *
+ * A session check is two to twelve sequential round trips (up to ~21s on the
+ * mount ladder below), and nothing used to tie its answer to the session it
+ * was asked about. A check that started before a login could land after it
+ * and run `clearStoredSession()` over the tokens the login had just written
+ * (#2161); one that started before a logout could land after it and
+ * re-populate `user` from cookies the logout was about to kill (#2165). A
+ * check captures the generation when it starts and, if it has moved by the
+ * time an answer arrives, reports `superseded` and touches nothing.
+ */
+let sessionGeneration = 0;
+
+export function bumpSessionGeneration(): number {
+  sessionGeneration += 1;
+  return sessionGeneration;
+}
+
+/** A `GET /auth/me` outcome, named the same three ways as a refresh — plus
+ *  the two answers that say nothing about the session at all. */
 export type SessionCheckResult =
   | { status: 'authenticated'; user: unknown }
   | { status: 'signed-out' }
-  | { status: 'throttled' };
+  | { status: 'throttled' }
+  /** `/auth/me` failed for a reason that is not "you are signed out" — a
+   *  5xx during a deploy, a 404 from a mis-routed edge. Leave `user` as it is
+   *  (#2096): only a 401 followed by a rejected refresh ends a session. */
+  | { status: 'unavailable' }
+  /** A login, a logout or a newer check happened while this one ran; its
+   *  answer is about a session that no longer exists. Apply nothing. */
+  | { status: 'superseded' };
+
+export interface SessionCheckOptions {
+  /** The caller's own staleness signal (e.g. "a newer check has started").
+   *  Combined with the session generation. */
+  isCurrent?: () => boolean;
+}
+
+/**
+ * A logout the server may not have received.
+ *
+ * `logout()` used to treat `POST /auth/logout` as best-effort. When it never
+ * reached the API (shop-floor wifi, an installed PWA on a shared tablet) the
+ * cookies and the refresh token stayed live, and the very next session check
+ * — which now runs on /login too (#1814) — read `/auth/me` 200 and signed the
+ * staff member straight back in (#2160). The marker is written BEFORE the
+ * request and removed only when the server confirms it; while it is present a
+ * session check re-sends the logout instead of restoring anything, and only
+ * an explicit login (`clearPendingLogout`) lifts it.
+ *
+ * The value is the iOS refresh token the logout has to revoke (empty on the
+ * cookie path, where the server reads the cookie) — the same value that was
+ * already in localStorage a moment earlier.
+ */
+const PENDING_LOGOUT_KEY = 'pendingLogout';
+
+export function isLogoutPending(): boolean {
+  return typeof window !== 'undefined' && localStorage.getItem(PENDING_LOGOUT_KEY) !== null;
+}
+
+export function clearPendingLogout(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(PENDING_LOGOUT_KEY);
+}
+
+async function postLogout(apiUrl: string, refreshToken: string | null): Promise<boolean> {
+  try {
+    const res = await fetch(`${apiUrl}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * End the session authoritatively. Bumps the generation (so an in-flight
+ * check cannot restore it), records the logout as pending, and clears the
+ * marker only on a confirmed server answer. Returns whether the server
+ * confirmed it.
+ */
+export async function performLogout(apiUrl: string, refreshToken: string | null): Promise<boolean> {
+  bumpSessionGeneration();
+  if (typeof window !== 'undefined') localStorage.setItem(PENDING_LOGOUT_KEY, refreshToken ?? '');
+  const confirmed = await postLogout(apiUrl, refreshToken);
+  if (confirmed) clearPendingLogout();
+  return confirmed;
+}
+
+async function retryPendingLogout(apiUrl: string): Promise<void> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem(PENDING_LOGOUT_KEY) : null;
+  if (await postLogout(apiUrl, token || null)) clearPendingLogout();
+}
 
 async function fetchMe(apiUrl: string): Promise<Response> {
   const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -289,24 +382,45 @@ async function fetchMe(apiUrl: string): Promise<Response> {
  * a plain function — network calls only, no component state — so the
  * decision logic is unit-testable without rendering `AuthProvider`: this repo
  * has no jsdom (Ruling P2-B2-2 / P2-B2-7).
+ *
+ * Only a 401 followed by a REJECTED refresh is `signed-out`. A 429 on
+ * `/auth/me` is `throttled` (the mount ladder retries it); any other non-ok
+ * answer is `unavailable` and leaves the caller's state alone (#2096). Every
+ * destructive step re-checks the generation first (#2161).
  */
-export async function checkSession(apiUrl: string): Promise<SessionCheckResult> {
+export async function checkSession(
+  apiUrl: string,
+  options: SessionCheckOptions = {}
+): Promise<SessionCheckResult> {
+  const generation = sessionGeneration;
+  const stale = () =>
+    generation !== sessionGeneration || (options.isCurrent ? !options.isCurrent() : false);
+
+  if (isLogoutPending()) {
+    await retryPendingLogout(apiUrl);
+    return stale() ? { status: 'superseded' } : { status: 'signed-out' };
+  }
+
   const first = await fetchMe(apiUrl);
+  if (stale()) return { status: 'superseded' };
   if (first.ok) {
     const data = await first.json();
     return { status: 'authenticated', user: data.data.user };
   }
-  if (first.status !== 401) {
-    return { status: 'signed-out' };
-  }
+  if (first.status === 429) return { status: 'throttled' };
+  if (first.status !== 401) return { status: 'unavailable' };
 
   const outcome = await refreshSessionWaitingOutThrottle();
+  if (stale()) return { status: 'superseded' };
   if (outcome === 'refreshed') {
     const retry = await fetchMe(apiUrl);
+    if (stale()) return { status: 'superseded' };
     if (retry.ok) {
       const data = await retry.json();
       return { status: 'authenticated', user: data.data.user };
     }
+    if (retry.status === 429) return { status: 'throttled' };
+    if (retry.status !== 401) return { status: 'unavailable' };
     clearStoredSession();
     return { status: 'signed-out' };
   }
@@ -336,12 +450,23 @@ export async function checkSession(apiUrl: string): Promise<SessionCheckResult> 
  */
 export const MOUNT_RETRY_DELAYS_MS = [5_000, 5_000, 5_000] as const;
 
-export async function checkSessionWithMountRetries(apiUrl: string): Promise<SessionCheckResult> {
-  let result = await checkSession(apiUrl);
+export async function checkSessionWithMountRetries(
+  apiUrl: string,
+  options: SessionCheckOptions = {}
+): Promise<SessionCheckResult> {
+  // A superseded ladder stops at its next sleep instead of running its whole
+  // budget (#2165): each navigation on the orders PWA starts a new check, and
+  // three overlapping ~21s ladders used to post up to 24 refreshes and race
+  // each other (and a logout) to setUser.
+  const generation = sessionGeneration;
+  const stale = () =>
+    generation !== sessionGeneration || (options.isCurrent ? !options.isCurrent() : false);
+  let result = await checkSession(apiUrl, options);
   for (const delay of MOUNT_RETRY_DELAYS_MS) {
     if (result.status !== 'throttled') break;
     await sleep(delay);
-    result = await checkSession(apiUrl);
+    if (stale()) return { status: 'superseded' };
+    result = await checkSession(apiUrl, options);
   }
   return result;
 }

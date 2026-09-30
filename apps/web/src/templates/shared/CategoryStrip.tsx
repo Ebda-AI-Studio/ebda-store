@@ -1,5 +1,6 @@
 'use client';
 
+import { pickLocalizedName } from './display-helpers';
 import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -103,7 +104,7 @@ export function CategoryStrip({
           style={{ scrollbarWidth: 'thin' }}
         >
           {categories.map((cat, i) => {
-            const name = isRtl ? (cat.nameAr ?? cat.name) : (cat.name ?? cat.nameAr);
+            const name = pickLocalizedName(cat, Boolean(isRtl)) ?? cat.name;
             const href = `${urlPrefix}/products?category=${cat.slug ?? cat.id}`;
             return (
               <li

@@ -156,3 +156,43 @@ describe('PWAService.generateManifest', () => {
     ]);
   });
 });
+
+// #2194 — the Arabic identity the admin PWA tab authors reaches the manifest.
+describe('PWAService.generateManifest — Arabic identity members', () => {
+  beforeEach(() => {
+    findUniqueMock.mockReset();
+    isFeatureEnabledMock.mockReset();
+    isFeatureEnabledMock.mockResolvedValue(true);
+  });
+  type M = { name_ar?: string; short_name_ar?: string; description_ar?: string; name: string };
+
+  it('emits the merchant-authored appNameAr / shortNameAr / descriptionAr', async () => {
+    findUniqueMock.mockResolvedValue({
+      name: 'Wady Aljuz',
+      nameAr: 'وادي الجوز',
+      pwaSettings: { appNameAr: 'تطبيق وادي', shortNameAr: 'وادي', descriptionAr: 'تسوق الآن' },
+    });
+    const { PWAService } = await import('@api/services/pwa.service');
+    const m = (await PWAService.generateManifest(STORE_ID)) as M;
+    expect(m.name_ar).toBe('تطبيق وادي');
+    expect(m.short_name_ar).toBe('وادي');
+    expect(m.description_ar).toBe('تسوق الآن');
+    expect(m.name).toBe('Wady Aljuz'); // standard member unchanged
+  });
+
+  it('falls back to the store Arabic name when the PWA tab left the Arabic fields blank', async () => {
+    findUniqueMock.mockResolvedValue({ name: 'Wady Aljuz', nameAr: 'وادي الجوز', pwaSettings: {} });
+    const { PWAService } = await import('@api/services/pwa.service');
+    const m = (await PWAService.generateManifest(STORE_ID)) as M;
+    expect(m.name_ar).toBe('وادي الجوز');
+    expect(m.description_ar).toBe('تسوق في وادي الجوز');
+  });
+
+  it('no Arabic name anywhere: no name_ar, and the Arabic description names the store', async () => {
+    findUniqueMock.mockResolvedValue({ name: 'Bare', nameAr: null, pwaSettings: {} });
+    const { PWAService } = await import('@api/services/pwa.service');
+    const m = (await PWAService.generateManifest(STORE_ID)) as M;
+    expect(m.name_ar).toBeUndefined();
+    expect(m.description_ar).toBe('تسوق في Bare');
+  });
+});

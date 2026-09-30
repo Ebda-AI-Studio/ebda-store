@@ -31,6 +31,23 @@ export interface ResolvedFooterSection {
  * If RTL is active and an Arabic variant exists, use it; otherwise fall back
  * to the default text.
  */
+/**
+ * Locale-picked NAME of a product / category / bundle (issue #2110, the #1805
+ * class). `nameAr ?? name` is NOT a fallback for this data: the API accepts
+ * `nameAr: ''` (no `.min(1)`), and `??` only falls back on null/undefined, so
+ * an Arabic shopper saw a BLANK product name. A blank or whitespace-only value
+ * in either language falls back to the other; `undefined` only when both are
+ * blank (callers supply their own final fallback).
+ */
+export function pickLocalizedName(
+  entity: { name?: string | null; nameAr?: string | null } | null | undefined,
+  isRtl: boolean
+): string | undefined {
+  const en = entity?.name?.trim() ? entity.name : undefined;
+  const ar = entity?.nameAr?.trim() ? entity.nameAr : undefined;
+  return (isRtl ? (ar ?? en) : (en ?? ar)) ?? undefined;
+}
+
 export function getDisplayText<T extends string | undefined>(
   text: T,
   textAr: string | undefined,

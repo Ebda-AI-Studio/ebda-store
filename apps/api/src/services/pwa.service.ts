@@ -361,6 +361,7 @@ export class PWAService {
         where: { id: storeId },
         select: {
           name: true,
+          nameAr: true,
           pwaSettings: true,
         },
       }),
@@ -391,6 +392,23 @@ export class PWAService {
       scope: '/',
       icons: [],
     };
+
+    // Arabic identity (#2194). The admin PWA tab authors appNameAr /
+    // shortNameAr / descriptionAr, but the manifest used to emit only the
+    // English fields, so an Arabic storefront's install prompt read English.
+    // Emitted as EXTRA members alongside the standard ones (a browser ignores
+    // unknown manifest members) rather than a `?lang=` variant, so the
+    // storefront's single `pwa:<storeId>`-tagged fetch serves both locales and
+    // updateSettings' tag bust still refreshes both at once. The storefront
+    // (apps/web/src/app/manifest.ts) picks them under the `ar` locale.
+    const authored = (store.pwaSettings ?? {}) as Partial<PWASettings>;
+    const clean = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+    const nameAr = clean(authored.appNameAr) ?? clean(store.nameAr);
+    if (nameAr) {
+      manifest.name_ar = nameAr;
+      manifest.short_name_ar = clean(authored.shortNameAr) ?? nameAr.substring(0, 12);
+    }
+    manifest.description_ar = clean(authored.descriptionAr) ?? `تسوق في ${nameAr ?? store.name}`;
 
     // Add icons if available.
     //
@@ -503,6 +521,7 @@ export class PWAService {
         where: { id: storeId },
         select: {
           name: true,
+          nameAr: true,
           pwaSettings: true,
         },
       }),

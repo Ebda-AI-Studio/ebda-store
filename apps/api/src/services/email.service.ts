@@ -274,6 +274,10 @@ export interface OrderEmailData {
   }>;
   subtotal: number;
   tax: number;
+  /** Order.taxIncludedInPrice — inclusive tax is already inside subtotal/total
+   *  and prints as an "incl. VAT" caption after Total, never a summed row
+   *  (orderTaxPlacement, issue 2210). */
+  taxIncludedInPrice?: boolean | null;
   shipping: number;
   discount?: number;
   couponCode?: string;

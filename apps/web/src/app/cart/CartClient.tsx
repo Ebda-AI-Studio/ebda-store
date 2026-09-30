@@ -395,6 +395,17 @@ export default function CartClient() {
         `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — أضف ${formatPrice(minimumOrderCheck.shortfallFils)} أخرى`
       )
     : undefined;
+  // #2117: a line whose product was deleted blocks the order server-side
+  // (OrderService.create refuses PRODUCT_NO_LONGER_AVAILABLE), so the banner's
+  // "remove it to check out" is enforced here rather than left advisory —
+  // otherwise the shopper fills the whole checkout form only to be refused.
+  const hasUnavailableLines = unavailableItems.length > 0;
+  const checkoutBlocked = belowMinimumOrder || hasUnavailableLines;
+  const checkoutBlockedMessage =
+    minimumOrderMessage ??
+    (hasUnavailableLines
+      ? t('Remove the unavailable items to check out.', 'أزل المنتجات غير المتوفرة لإتمام الطلب.')
+      : undefined);
 
   return (
     <ShopChrome>
@@ -786,8 +797,8 @@ export default function CartClient() {
                         ctaLabel="Proceed to Checkout"
                         ctaLabelAr="المتابعة للدفع"
                         ctaHref={storeUrl('/checkout')}
-                        ctaDisabled={belowMinimumOrder}
-                        ctaBlockedMessage={minimumOrderMessage}
+                        ctaDisabled={checkoutBlocked}
+                        ctaBlockedMessage={checkoutBlockedMessage}
                         typography={cartTypography}
                         summaryColors={{
                           labelColor: summaryLabelColorResolved,
@@ -1075,14 +1086,14 @@ export default function CartClient() {
                           </div>
 
                           {/* Below-minimum notice */}
-                          {belowMinimumOrder && minimumOrderMessage && (
+                          {checkoutBlocked && checkoutBlockedMessage && (
                             <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
-                              {minimumOrderMessage}
+                              {checkoutBlockedMessage}
                             </p>
                           )}
 
                           {/* Checkout Button */}
-                          {belowMinimumOrder ? (
+                          {checkoutBlocked ? (
                             <Button
                               type="button"
                               disabled

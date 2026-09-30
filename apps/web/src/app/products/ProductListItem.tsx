@@ -1,5 +1,6 @@
 'use client';
 
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 import Link from 'next/link';
 import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
@@ -44,10 +45,8 @@ export function ProductListItem({
   const priceVisible = showCardPrice !== false;
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
-  const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
-  const displayCategory = isRtl
-    ? (product.categories?.[0]?.category?.nameAr ?? product.categories?.[0]?.category?.name)
-    : product.categories?.[0]?.category?.name;
+  const displayName = pickLocalizedName(product, isRtl) ?? product.name;
+  const displayCategory = pickLocalizedName(product.categories?.[0]?.category, isRtl);
   // Variant-aware pricing. Listing cards use the `card` surface so
   // multi-variant products render "From <min>" instead of the parent's
   // (often stale) standalone price.

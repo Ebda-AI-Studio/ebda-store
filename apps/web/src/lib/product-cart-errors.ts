@@ -1,3 +1,4 @@
+import { pickLocalizedName } from '../templates/shared/display-helpers';
 /**
  * Checkout copy for a cart line whose PRODUCT is gone — the sibling of
  * `checkout-bundle-errors.ts`, which does the same job for bundle lines.
@@ -51,7 +52,7 @@ export function pickProductName(
   product: { name: string; nameAr?: string | null },
   language: string
 ): string {
-  return language === 'ar' && product.nameAr ? product.nameAr : product.name;
+  return pickLocalizedName(product, language === 'ar') ?? product.name;
 }
 
 /**

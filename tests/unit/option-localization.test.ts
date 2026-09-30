@@ -14,8 +14,8 @@ import {
 describe('localizeOptionName (Arabic)', () => {
   const AR = true;
 
-  it('weight values → الوزن even when the axis is named "Size" or stored as متغير', () => {
-    expect(localizeOptionName('Size', null, AR, ['400 Gram', '700 Gram'])).toBe('الوزن');
+  it('weight values → الوزن when the axis is generic or stored as متغير', () => {
+    expect(localizeOptionName('Option', null, AR, ['400 Gram', '700 Gram'])).toBe('الوزن');
     // the old admin default "متغير" is a generic placeholder → ignored, values win
     expect(localizeOptionName('Variant', 'متغير', AR, ['185 Gram', '1 KG'])).toBe('الوزن');
     expect(localizeOptionName('Weight', null, AR, ['٧٠٠ جرام'])).toBe('الوزن');
@@ -25,8 +25,8 @@ describe('localizeOptionName (Arabic)', () => {
     expect(localizeOptionName('Size', null, AR, ['500 ml', '1 Liter'])).toBe('الحجم');
   });
 
-  it('garment letter-sizes → المقاس', () => {
-    expect(localizeOptionName('Size', null, AR, ['S', 'M', 'L', 'XL'])).toBe('المقاس');
+  it('garment letter-sizes → المقاس when the axis name is generic', () => {
+    expect(localizeOptionName('Variant', null, AR, ['S', 'M', 'L', 'XL'])).toBe('المقاس');
   });
 
   it('never surfaces the placeholder "متغير"', () => {
@@ -101,5 +101,28 @@ describe('localizeOptionValue (Arabic)', () => {
   });
   it('merchant valueAr wins', () => {
     expect(localizeOptionValue('185 Gram', '١٨٥ جرام', true)).toBe('١٨٥ جرام');
+  });
+});
+
+/**
+ * #2193 — EN and AR must name the SAME axis concept for the same option. The
+ * motivating OSOSS shape (name='Size', values='185 Gram', nameAr blank) read
+ * "Size" in EN but "الوزن" (Weight) in AR. Pinned as a PAIR so the two
+ * branches can never silently diverge again.
+ */
+describe('localizeOptionName — EN/AR symmetry (#2193)', () => {
+  it.each([
+    ['Size', ['1 KG'], 'Size', 'الحجم'],
+    ['Size', ['185 Gram', '400 Gram'], 'Size', 'الحجم'],
+    ['Weight', ['500 ml'], 'Weight', 'الوزن'],
+    ['Flavor', ['Vanilla'], 'Flavor', 'النكهة'],
+  ])('name=%s values=%j → EN %s / AR %s', (name, values, en, ar) => {
+    expect(localizeOptionName(name, null, false, values)).toBe(en);
+    expect(localizeOptionName(name, null, true, values)).toBe(ar);
+  });
+
+  it('generic name + weight values still reads Weight / الوزن in both', () => {
+    expect(localizeOptionName('Variant', null, false, ['1 KG'])).toBe('Weight');
+    expect(localizeOptionName('Variant', null, true, ['1 KG'])).toBe('الوزن');
   });
 });

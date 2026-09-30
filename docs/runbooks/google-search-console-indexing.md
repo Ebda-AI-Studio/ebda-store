@@ -106,6 +106,18 @@ No changes to the sitemap/robots.txt/structured-data guidance above are needed f
 >   and 404s the bare `/sitemap.xml` every merchant has already submitted.
 > - Merchant custom-domain sitemaps are unaffected by the store cap and the
 >   50k clamp (11 static pages + ≤1,000 products).
+> - **An API outage now 5xxs the sitemap instead of emptying it (2026-10-01,
+>   #2127).** A 200 with an empty `<urlset/>` made GSC record "0 discovered
+>   URLs" and replace its last-good state; a 5xx makes Google retry and keep
+>   the previous copy. The render THROWS (`sitemap source unavailable: …`) when
+>   the store list's page 1 fails or the fetch throws, when a custom-domain
+>   host resolve fails with anything but a 404 (previously it silently fell
+>   through to the PLATFORM sitemap on the merchant's domain), and when a
+>   custom-domain sitemap's products page 1 fails. Worker logs carry
+>   `sitemap: store list unavailable — failing the render (5xx)`. **An empty
+>   200 sitemap is now only ever a genuine "zero stores" answer** — if GSC
+>   reports one, that is alertable, not an outage. A master-sitemap store whose
+>   own product fan-out fails still degrades to static pages (counted, above).
 
 ---
 

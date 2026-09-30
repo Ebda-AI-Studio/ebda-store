@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { middleware } from '../../apps/web/middleware';
+import { middleware, config } from '../../apps/web/middleware';
 
 /**
  * CHARACTERIZATION tests for `apps/web/middleware.ts`.
@@ -199,5 +199,94 @@ describe('middleware — agent/feed documents never resolve the store from the s
   it('the URL-slug form still resolves the store (/<slug>/llms.txt)', () => {
     const res = middleware(req('https://store.force-ai.co/palora/llms.txt', 'store.force-ai.co'));
     expect(forwardedSlug(res)).toBe('palora');
+  });
+});
+
+describe('middleware — client-supplied store-context headers never reach the render (#2153)', () => {
+  // requestHeaders is seeded from the RAW request. Every header in this list is
+  // the middleware's own assertion; a client value must be dropped, and only
+  // the value the middleware derives from Host / URL / cookie may survive.
+  const forwarded = (res: Response, name: string) =>
+    res.headers.get(`x-middleware-request-${name}`);
+
+  const SPOOF = {
+    'x-is-platform': 'true',
+    'x-store-slug': 'evil',
+    'x-store-slug-source': 'cookie',
+    'x-store-domain': 'evil.example',
+    'x-store-identifier': 'evil.example',
+    'x-preview-draft': 'forged-draft',
+    'x-original-host': 'evil.example',
+  };
+
+  it('custom domain: a spoofed x-is-platform / slug / draft is stripped', () => {
+    const res = middleware(req('https://wadyaljuz.com/products', 'wadyaljuz.com', SPOOF));
+    // Re-asserted as 'false' (never absent) so layout.tsx can tell a custom
+    // domain apart from "middleware did not run" (#2091).
+    expect(forwarded(res, 'x-is-platform')).toBe('false');
+    expect(forwarded(res, 'x-store-slug')).toBeNull();
+    expect(forwarded(res, 'x-store-slug-source')).toBeNull();
+    expect(forwarded(res, 'x-preview-draft')).toBeNull();
+    // The authentic values are re-asserted from the Host.
+    expect(forwarded(res, 'x-store-domain')).toBe('wadyaljuz.com');
+    expect(forwarded(res, 'x-store-identifier')).toBe('wadyaljuz.com');
+    expect(forwarded(res, 'x-original-host')).toBe('wadyaljuz.com');
+  });
+
+  it('platform host: a spoofed x-store-domain cannot make /llms.txt answer as another store', () => {
+    const res = middleware(req('https://store.force-ai.co/llms.txt', 'store.force-ai.co', SPOOF));
+    expect(forwarded(res, 'x-store-domain')).toBeNull();
+    expect(forwarded(res, 'x-store-identifier')).toBeNull();
+    expect(forwarded(res, 'x-store-slug')).toBeNull();
+    expect(forwarded(res, 'x-preview-draft')).toBeNull();
+    expect(forwarded(res, 'x-is-platform')).toBe('true');
+  });
+
+  it('a draft header outside the preview iframe is dropped, inside it is re-derived', () => {
+    const outside = middleware(
+      req('https://wadyaljuz.com/', 'wadyaljuz.com', { 'x-preview-draft': 'forged' })
+    );
+    expect(forwarded(outside, 'x-preview-draft')).toBeNull();
+    const inside = middleware(
+      req('https://wadyaljuz.com/?_preview=1&_layoutDraft=real', 'wadyaljuz.com', {
+        'x-preview-draft': 'forged',
+      })
+    );
+    expect(forwarded(inside, 'x-preview-draft')).toBe('real');
+  });
+});
+
+describe('middleware — /manifest.webmanifest gets the same store context as a page', () => {
+  // Excluded from the matcher until 2026-10-01, so app/manifest.ts resolved no
+  // store and every custom domain served the platform "Force" manifest.
+  const matcher = new RegExp(`^${config.matcher[0]}$`);
+
+  it('the matcher runs middleware on /manifest.webmanifest', () => {
+    expect(matcher.test('/manifest.webmanifest')).toBe(true);
+  });
+
+  it('still skips the static files it exists to skip (control)', () => {
+    expect(matcher.test('/sw.js')).toBe(false);
+    expect(matcher.test('/_next/static/chunks/a.js')).toBe(false);
+    expect(matcher.test('/.well-known/security.txt')).toBe(false);
+    expect(matcher.test('/api/store-favicon')).toBe(false);
+  });
+
+  it('custom domain: the manifest request carries x-store-domain', () => {
+    const res = middleware(
+      req('https://pecannbee.com.kw/manifest.webmanifest', 'pecannbee.com.kw')
+    );
+    expect(res.headers.get('x-middleware-request-x-store-domain')).toBe('pecannbee.com.kw');
+    expect(rewriteOf(res)).toBeNull();
+  });
+
+  it('platform host: the manifest is not mistaken for a store slug', () => {
+    const res = middleware(
+      req('https://store.force-ai.co/manifest.webmanifest', 'store.force-ai.co', {
+        cookie: 'x-store-slug=palora',
+      })
+    );
+    expect(rewriteOf(res)).toBeNull();
+    expect(res.headers.get('x-middleware-request-x-store-slug')).toBe('palora');
   });
 });

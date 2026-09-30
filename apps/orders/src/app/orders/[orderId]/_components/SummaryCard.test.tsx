@@ -74,3 +74,29 @@ describe('orders PWA SummaryCard — loyalty redemption line (issue 197)', () =>
     expect(rowLabels().some(l => l?.startsWith('loyaltyPoints'))).toBe(false);
   });
 });
+
+describe('SummaryCard — inclusive VAT is a caption after Total, never a summed row (issue 2210)', () => {
+  // The exact order the M3-8 integration test creates: tax 238 is INSIDE the
+  // 5000 subtotal, so Subtotal + Tax + Shipping must not be printed as rows
+  // that add up to more than the 5500 Total.
+  const inclusive = { subtotal: 5000, tax: 238, shipping: 500, total: 5500 };
+
+  it('inclusive: no summed tax row; an "incl. VAT" caption follows Total', () => {
+    const { container } = render(
+      <SummaryCard order={order({ ...inclusive, taxIncludedInPrice: true })} />
+    );
+    const labels = screen.getAllByRole('term').map(el => el.textContent);
+    expect(labels).not.toContain('tax');
+    expect(labels).toContain('taxIncluded');
+    // Caption renders AFTER the Total row.
+    const terms = Array.from(container.querySelectorAll('dt')).map(el => el.textContent);
+    expect(terms.indexOf('taxIncluded')).toBeGreaterThan(terms.indexOf('total'));
+  });
+
+  it('exclusive (default, every existing order): tax stays a summed row, no caption', () => {
+    render(<SummaryCard order={order({ subtotal: 5000, tax: 250, shipping: 500, total: 5750 })} />);
+    const labels = screen.getAllByRole('term').map(el => el.textContent);
+    expect(labels).toContain('tax');
+    expect(labels).not.toContain('taxIncluded');
+  });
+});

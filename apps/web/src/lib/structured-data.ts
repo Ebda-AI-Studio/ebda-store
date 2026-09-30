@@ -2,16 +2,42 @@ import type { ResolvedStore } from './store-resolver';
 import { pickMetaDescription } from './seo/meta-description';
 import type { StorefrontLocale } from './seo/resolve-locale';
 
+/**
+ * The name/description a JSON-LD node publishes for `locale` (#2196): the
+ * Arabic field when the page resolved to `ar` and the merchant filled it in,
+ * else the English one. MUST be the same locale the page's `<title>` /
+ * `og:title` used, or the page's structured data contradicts its own title
+ * and Google's rich result keeps the other language.
+ */
+export function localizedField(
+  en: string,
+  ar: string | null | undefined,
+  locale: StorefrontLocale
+): string {
+  return locale === 'ar' && ar?.trim() ? ar.trim() : en;
+}
+
+/** Fixed breadcrumb labels, in the page's locale (#2196). */
+export const BREADCRUMB_LABELS: Record<
+  StorefrontLocale,
+  { home: string; products: string; bundles: string }
+> = {
+  en: { home: 'Home', products: 'Products', bundles: 'Bundles' },
+  ar: { home: 'الرئيسية', products: 'المنتجات', bundles: 'الباقات' },
+};
+
 interface ProductForJsonLd {
   name: string;
+  nameAr?: string | null;
   description?: string;
+  descriptionAr?: string | null;
   price: number;
   compareAtPrice?: number;
   sku?: string;
   slug: string;
   images?: Array<{ url: string; alt?: string }>;
   inventory?: number;
-  categories?: Array<{ category?: { name?: string; slug?: string } }>;
+  categories?: Array<{ category?: { name?: string; nameAr?: string | null; slug?: string } }>;
   /** Verified-purchase published reviews for JSON-LD. Server MUST pre-filter
    *  (status='published' AND verifiedPurchase=true) before passing here. */
   reviews?: Array<{
@@ -39,8 +65,11 @@ interface ProductForJsonLd {
  * single-brand and there is no per-product brand column, so the store name IS
  * the brand — there is nothing more specific to prefer over it.
  */
-export function brandJsonLd(store: Pick<ResolvedStore, 'name'>) {
-  return { '@type': 'Brand', name: store.name };
+export function brandJsonLd(
+  store: Pick<ResolvedStore, 'name' | 'nameAr'>,
+  locale: StorefrontLocale = 'en'
+) {
+  return { '@type': 'Brand', name: localizedField(store.name, store.nameAr, locale) };
 }
 
 /**
@@ -143,8 +172,20 @@ export function shippingDetailsJsonLd(zones: PublicShippingZone[], opts: { curre
 export function productJsonLd(
   product: ProductForJsonLd,
   store: ResolvedStore,
-  opts?: { shippingZones?: PublicShippingZone[] }
+  opts?: { shippingZones?: PublicShippingZone[]; locale?: StorefrontLocale }
 ) {
+  const locale = opts?.locale ?? 'en';
+  // Same rule as the page's metadata (buildProductMetadata): under `ar` the
+  // description is the Arabic one or nothing — never the English text.
+  const description = locale === 'ar' ? product.descriptionAr?.trim() : product.description;
+  const categoryName = product.categories?.[0]?.category?.name
+    ? localizedField(
+        product.categories[0].category.name,
+        product.categories[0].category.nameAr,
+        locale
+      )
+    : undefined;
+  const storeName = localizedField(store.name, store.nameAr, locale);
   const productUrl = storeAbsoluteUrl(store, `/products/${product.slug}`);
   const image = product.images?.[0]?.url;
   const availability =
@@ -155,15 +196,13 @@ export function productJsonLd(
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: product.name,
-    ...(product.description ? { description: product.description } : {}),
+    name: localizedField(product.name, product.nameAr, locale),
+    ...(description ? { description } : {}),
     ...(image ? { image } : {}),
     ...(product.sku ? { sku: product.sku } : {}),
     url: productUrl,
-    ...(product.categories?.[0]?.category?.name
-      ? { category: product.categories[0].category.name }
-      : {}),
-    brand: brandJsonLd(store),
+    ...(categoryName ? { category: categoryName } : {}),
+    brand: brandJsonLd(store, locale),
     ...(() => {
       const rp = merchantReturnPolicyJsonLd(store);
       return rp ? { hasMerchantReturnPolicy: rp } : {};
@@ -176,7 +215,7 @@ export function productJsonLd(
       url: productUrl,
       seller: {
         '@type': 'Organization',
-        name: store.name,
+        name: storeName,
       },
       // Nested inside Offer (not Product) — schema.org scopes shipping to the
       // offer, and Google's merchant-listing docs require it there.
@@ -200,7 +239,9 @@ export function productJsonLd(
 
 interface BundleForJsonLd {
   name: string;
+  nameAr?: string | null;
   description?: string | null;
+  descriptionAr?: string | null;
   slug: string;
   image?: string | null;
   /** The bundle's single selling price (fils) — never a per-component price. */
@@ -217,7 +258,12 @@ interface BundleForJsonLd {
  * `availability` is derived from `available` (the bundle's OWN derived
  * stock, from `resolveBundle`), not from any per-component figure.
  */
-export function bundleJsonLd(bundle: BundleForJsonLd, store: ResolvedStore) {
+export function bundleJsonLd(
+  bundle: BundleForJsonLd,
+  store: ResolvedStore,
+  locale: StorefrontLocale = 'en'
+) {
+  const description = locale === 'ar' ? bundle.descriptionAr?.trim() : bundle.description;
   const bundleUrl = storeAbsoluteUrl(store, `/bundles/${bundle.slug}`);
   const availability =
     bundle.available > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
@@ -225,11 +271,11 @@ export function bundleJsonLd(bundle: BundleForJsonLd, store: ResolvedStore) {
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: bundle.name,
-    ...(bundle.description ? { description: bundle.description } : {}),
+    name: localizedField(bundle.name, bundle.nameAr, locale),
+    ...(description ? { description } : {}),
     ...(bundle.image ? { image: bundle.image } : {}),
     url: bundleUrl,
-    brand: brandJsonLd(store),
+    brand: brandJsonLd(store, locale),
     ...(() => {
       const rp = merchantReturnPolicyJsonLd(store);
       return rp ? { hasMerchantReturnPolicy: rp } : {};
@@ -242,7 +288,7 @@ export function bundleJsonLd(bundle: BundleForJsonLd, store: ResolvedStore) {
       url: bundleUrl,
       seller: {
         '@type': 'Organization',
-        name: store.name,
+        name: localizedField(store.name, store.nameAr, locale),
       },
     },
   };
@@ -313,7 +359,8 @@ export function organizationJsonLd(store: ResolvedStore, locale: StorefrontLocal
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: store.name,
+    // Same locale as `description` below and the page's <title> (#2196).
+    name: localizedField(store.name, store.nameAr, locale),
     url: siteUrl,
     ...(store.logo ? { logo: store.logo } : {}),
     ...(description ? { description } : {}),

@@ -71,46 +71,35 @@ export function resolveProductCardDefaults(
  * elegant/ProductCard.tsx and ProductCarousel.tsx each repeated the identical
  * ~15-line `const { ctaShape: resolvedCtaShape, ... } = resolveProductCardDefaults(layout)`
  * destructure — dream #1095. One rename here, one call site each there.
+ *
+ * Issue #2093 — this type and its mapping are DERIVED from
+ * `ResolvedProductCardDefaults`, never re-declared field by field. A
+ * hand-written copy let a new field added to the base resolver silently never
+ * reach any of the eight render paths (they all call only this wrapper) — the
+ * exact "template that gets missed" failure the base resolver exists to
+ * prevent. Now a new base field appears here automatically, renamed.
  */
-export interface ResolvedProductCardCtaOosDefaults {
-  resolvedCtaShape?: CtaShape;
-  resolvedCtaSize?: CtaSize;
-  resolvedCtaColor?: ProductCardDefaults['ctaColor'];
-  resolvedCtaTextColor?: ProductCardDefaults['ctaTextColor'];
-  resolvedCtaLabelTextEn?: ProductCardDefaults['ctaLabelTextEn'];
-  resolvedCtaLabelTextAr?: ProductCardDefaults['ctaLabelTextAr'];
-  resolvedOosDimColor?: ProductCardDefaults['oosDimColor'];
-  resolvedOosLabel?: ProductCardDefaults['oosLabel'];
-  resolvedOosLabelTextEn?: ProductCardDefaults['oosLabelTextEn'];
-  resolvedOosLabelTextAr?: ProductCardDefaults['oosLabelTextAr'];
-  resolvedOosLabelShape?: CtaShape;
-  resolvedOosLabelPlacement?: ProductCardDefaults['oosLabelPlacement'];
-  resolvedOosLabelColor?: ProductCardDefaults['oosLabelColor'];
-  resolvedOosLabelTextColor?: ProductCardDefaults['oosLabelTextColor'];
-  nameCase?: ProductCardDefaults['productNameCase'];
-  viewOnly: boolean;
+type UnrenamedKey = 'nameCase' | 'viewOnly';
+type RenamedKey<K extends string> = K extends UnrenamedKey ? K : `resolved${Capitalize<K>}`;
+
+export type ResolvedProductCardCtaOosDefaults = {
+  [K in keyof ResolvedProductCardDefaults as RenamedKey<
+    K & string
+  >]: ResolvedProductCardDefaults[K];
+};
+
+const UNRENAMED_KEYS: readonly string[] = ['nameCase', 'viewOnly'] satisfies UnrenamedKey[];
+
+/** The runtime twin of `RenamedKey` — exported for the parity test. */
+export function renamedCardDefaultsKey(key: string): string {
+  return UNRENAMED_KEYS.includes(key) ? key : `resolved${key[0].toUpperCase()}${key.slice(1)}`;
 }
 
 export function resolveProductCardCtaOosDefaults(
   layout?: StoreLayoutSettings | null
 ): ResolvedProductCardCtaOosDefaults {
   const r = resolveProductCardDefaults(layout);
-  return {
-    resolvedCtaShape: r.ctaShape,
-    resolvedCtaSize: r.ctaSize,
-    resolvedCtaColor: r.ctaColor,
-    resolvedCtaTextColor: r.ctaTextColor,
-    resolvedCtaLabelTextEn: r.ctaLabelTextEn,
-    resolvedCtaLabelTextAr: r.ctaLabelTextAr,
-    resolvedOosDimColor: r.oosDimColor,
-    resolvedOosLabel: r.oosLabel,
-    resolvedOosLabelTextEn: r.oosLabelTextEn,
-    resolvedOosLabelTextAr: r.oosLabelTextAr,
-    resolvedOosLabelShape: r.oosLabelShape,
-    resolvedOosLabelPlacement: r.oosLabelPlacement,
-    resolvedOosLabelColor: r.oosLabelColor,
-    resolvedOosLabelTextColor: r.oosLabelTextColor,
-    nameCase: r.nameCase,
-    viewOnly: r.viewOnly,
-  };
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(r)) out[renamedCardDefaultsKey(key)] = value;
+  return out as ResolvedProductCardCtaOosDefaults;
 }

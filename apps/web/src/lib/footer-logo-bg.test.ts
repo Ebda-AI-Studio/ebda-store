@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_THEME, resolveBackgroundPreset } from '@force/shared';
+import {
+  DEFAULT_THEME,
+  footerLogoContrastFilter,
+  parseColorToRgb,
+  resolveBackgroundPreset,
+} from '@force/shared';
 import { resolveFooterAutoContrastBg } from './footer-logo-bg';
 
 /**
@@ -52,5 +57,37 @@ describe('resolveFooterAutoContrastBg', () => {
     const invertedTheme = { ...DEFAULT_THEME, personaChromeV2: true };
 
     expect(resolveFooterAutoContrastBg('bold', invertedTheme, '#101010')).toBe('#101010');
+  });
+});
+
+// Issue #2156 — hex / token-stored theme colors must yield a PARSEABLE color,
+// not `hsl(#1a1a1a)`, or the logo contrast filter silently becomes 'none'.
+describe('resolveFooterAutoContrastBg — non-triplet stored colors (#2156)', () => {
+  it('bold invert with a HEX foregroundColor → parseable dark background', () => {
+    const theme = { ...DEFAULT_THEME, personaChromeV2: true, foregroundColor: '#1a1a1a' };
+    const bg = resolveFooterAutoContrastBg('bold', theme, undefined);
+    expect(bg).not.toContain('#');
+    expect(parseColorToRgb(bg)).not.toBeNull();
+    expect(footerLogoContrastFilter(bg)).not.toBe('none');
+  });
+
+  it('bold invert with a token:* foregroundColor resolves the token', () => {
+    const theme = { ...DEFAULT_THEME, personaChromeV2: true, foregroundColor: 'token:primary' };
+    const bg = resolveFooterAutoContrastBg('bold', theme, undefined);
+    expect(bg).not.toContain('token:');
+    expect(parseColorToRgb(bg)).not.toBeNull();
+  });
+
+  it('a hex-saved custom section-alt is normalized too', () => {
+    const theme = {
+      ...DEFAULT_THEME,
+      bgPage: '#faf8f3',
+      bgSectionAlt: '#f4f1ea',
+    } as typeof DEFAULT_THEME;
+    // precondition: the merchant-set value reaches the resolver unnormalized
+    expect(resolveBackgroundPreset(theme).bgSectionAlt).toBe('#f4f1ea');
+    const bg = resolveFooterAutoContrastBg('modern', theme, undefined);
+    expect(bg).not.toContain('#');
+    expect(parseColorToRgb(bg)).not.toBeNull();
   });
 });

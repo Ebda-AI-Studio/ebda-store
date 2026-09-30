@@ -112,6 +112,8 @@ export interface OrderDetail extends Order {
   storeId: string;
   subtotal: number;
   tax: number;
+  /** Frozen at sale time (Ruling M3-8): `tax` is already inside subtotal/total. */
+  taxIncludedInPrice?: boolean;
   shipping: number;
   discount: number;
   couponCode?: string | null;

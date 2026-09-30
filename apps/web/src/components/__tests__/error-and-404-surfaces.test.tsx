@@ -21,14 +21,15 @@ vi.mock('../../contexts/LanguageContext', async importOriginal => {
 });
 
 const storeState = { store: { id: 'store-1', slug: 'pecannbee' } };
+// Host class is an INDEPENDENT signal (#2223): the unresolved 'demo' sentinel
+// occurs on a merchant's custom domain too (a transient resolve failure there
+// also leaves the client holding it). Deriving isPlatform from the sentinel
+// conflated the two and hid the custom-domain regression.
+const hostState = { isPlatform: false };
 vi.mock('../../contexts/StoreContext', () => ({
   useStore: () => storeState,
   useStoreUrl: () => (p: string) => p,
-  // The 'demo' sentinel IS the platform-host fallback (see RouteErrorFallback's
-  // SR-7 comment: getStore() only falls back to it on a platform host), so
-  // deriving isPlatform from the same sentinel keeps this mock consistent with
-  // the real useIsPlatform()/useStore().isPlatform pairing.
-  useIsPlatform: () => storeState.store.id === 'demo',
+  useIsPlatform: () => hostState.isPlatform,
 }));
 
 const refresh = vi.fn();
@@ -59,6 +60,7 @@ afterEach(() => {
   cleanup();
   languageState.language = 'en';
   storeState.store = { id: 'store-1', slug: 'pecannbee' };
+  hostState.isPlatform = false;
   refresh.mockReset();
 });
 
@@ -114,8 +116,9 @@ describe('segment error boundaries during a transient (#1843)', () => {
   const transient = Object.assign(new Error('busy'), { digest: STORE_UNAVAILABLE_DIGEST });
   const ordinary = Object.assign(new Error('boom'), { digest: 'abc' });
 
-  it('drop the chrome when the store is the unresolved sentinel', () => {
+  it('drop the chrome when the store is the unresolved sentinel on a platform host', () => {
     storeState.store = { id: 'demo', slug: 'demo' };
+    hostState.isPlatform = true;
     const shop = render(<ProductsListError error={transient} reset={() => {}} />);
     expect(shop.queryByTestId('shop-chrome')).toBeNull();
     expect(shop.container.textContent).toContain('We’re a little busy right now');
@@ -127,6 +130,21 @@ describe('segment error boundaries during a transient (#1843)', () => {
   it('keep the chrome when the store resolved (its links are correct)', () => {
     const { queryByTestId } = render(<ProductsListError error={transient} reset={() => {}} />);
     expect(queryByTestId('shop-chrome')).not.toBeNull();
+  });
+
+  // #2223 — on a merchant's own domain the chrome's prefix-less links are the
+  // merchant's own pages, so the chrome (logo, nav, cart, footer) must stay.
+  it('keep the chrome on a CUSTOM domain even with the unresolved sentinel', () => {
+    storeState.store = { id: 'demo', slug: 'demo' };
+    hostState.isPlatform = false;
+    const shop = render(<ProductsListError error={transient} reset={() => {}} />);
+    expect(shop.queryByTestId('shop-chrome')).not.toBeNull();
+    expect(shop.container.textContent).toContain('We’re a little busy right now');
+    // …and the Go Home escape route stays too (#1841).
+    expect(shop.getByText('Go Home')).toBeTruthy();
+    cleanup();
+    const minimal = render(<CheckoutError error={transient} reset={() => {}} />);
+    expect(minimal.queryByTestId('minimal-chrome')).not.toBeNull();
   });
 
   it('keep the chrome for an ordinary render error', () => {

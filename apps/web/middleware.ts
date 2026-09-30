@@ -286,6 +286,10 @@ function handleCustomDomain(
 ): NextResponse {
   requestHeaders.set('x-store-domain', storeIdentifier);
   requestHeaders.set('x-store-identifier', storeIdentifier);
+  // Asserted explicitly (not just left absent) so layout.tsx can tell
+  // "custom domain" apart from "middleware never ran" — the latter is the only
+  // case where StoreProvider's client-side host detection should run (#2091).
+  requestHeaders.set('x-is-platform', 'false');
   // Host-resolved, never cookie-resolved — clear any client-supplied value
   // (requestHeaders is seeded from the raw request) so a custom-domain
   // response is never wrongly marked non-shared-cacheable.
@@ -427,6 +431,27 @@ function isUrlKeyedPublicPath(pathname: string): boolean {
   return URL_KEYED_PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+/**
+ * Request headers only this middleware may assert. `requestHeaders` is seeded
+ * from the RAW client request, so without this strip a caller can send any of
+ * them and the server components / route handlers downstream take it as the
+ * middleware's word: a spoofed `x-is-platform` flips SSR link shape (#2153), a
+ * spoofed `x-store-domain` on a platform URL makes `/llms.txt` and
+ * `/feeds/products.json` answer as another store under a `public, s-maxage`
+ * header, and a spoofed `x-preview-draft` would render a draft layout outside
+ * the preview iframe. Every value in this list is re-set below from the Host,
+ * the URL, the sticky cookie or the preview params — never from the client.
+ */
+export const MIDDLEWARE_ASSERTED_HEADERS = [
+  'x-is-platform',
+  'x-store-slug',
+  'x-store-slug-source',
+  'x-store-domain',
+  'x-store-identifier',
+  'x-preview-draft',
+  'x-original-host',
+] as const;
+
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
 
@@ -460,6 +485,7 @@ export function middleware(request: NextRequest) {
   const withDraftCookie = applyDraftCookie(request, draftToken, isPreviewIframe);
 
   const requestHeaders = new Headers(request.headers);
+  for (const name of MIDDLEWARE_ASSERTED_HEADERS) requestHeaders.delete(name);
   requestHeaders.set('x-original-host', hostname);
   propagateDraftHeader(requestHeaders, request, draftToken, isPreviewIframe);
 
@@ -487,7 +513,7 @@ export const config = {
      * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - manifest.webmanifest / sw.js
+     * - sw.js
      * - public folder
      * - .well-known/security.txt (RFC 9116 — must serve the STATIC file on
      *   every host, incl. custom domains, without tenant rewrites). Narrowed
@@ -503,6 +529,14 @@ export const config = {
      *   we want: middleware runs once on `/favicon.ico`, not again on the
      *   rewritten destination)
      *
+     * manifest.webmanifest is NOT excluded either (it was, from 2026-03-16,
+     * "so it is not treated as a store slug" — `extractStoreSlug` has since
+     * skipped any dotted first segment, so that reason is gone). Excluded, it
+     * never received `x-store-domain` / `x-store-slug`, so `app/manifest.ts`'s
+     * `getStore()` resolved NO store and every custom-domain merchant served
+     * the platform's "Force" manifest — verified live on pecannbee.com.kw
+     * 2026-10-01. It must see the same store context every page gets.
+     *
      * favicon.ico is intentionally NOT excluded here (removed 2026-07-02) so
      * custom-domain stores can get a per-store favicon (see the
      * `x-store-domain` branch above). This does NOT change platform-domain
@@ -511,6 +545,6 @@ export const config = {
      * NextResponse.next() with no rewrite, and Next serves the static
      * /public/favicon.ico exactly as before.
      */
-    '/((?!_next/static|_next/image|manifest\\.webmanifest|sw\\.js|api/|public/|\\.well-known/security\\.txt).*)',
+    '/((?!_next/static|_next/image|sw\\.js|api/|public/|\\.well-known/security\\.txt).*)',
   ],
 };

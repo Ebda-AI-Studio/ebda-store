@@ -108,7 +108,8 @@ function parsePhysicalCorner(position: CustomBadgePosition): { v: CornerV; h: Ph
  * `lifted`   — issues #1609/#1611: a quick-add button or the mobile CTA
  *              band occupies the bottom of THIS corner; move above it.
  *
- * The `lifted` offset (96px = `bottom-24`) is a MEASURED value, not a guess:
+ * The `lifted` offset (96px = 6rem, clamped to the image box — see
+ * `bottomCornerClass`) is a MEASURED value, not a guess:
  * rendered live via the badge-preview harness (2026-09-25), the 5 theme
  * cards' mobile CTA band is 44-92px tall at the platform's default 'sm'
  * card size (170px, `productSizeClass`) — modern 88px, minimal 92px,
@@ -135,15 +136,33 @@ function topCornerClass(h: PhysicalH, stacked: boolean): string {
   return stacked ? 'top-12 right-3' : 'top-3 right-3';
 }
 
-function bottomCornerClass(h: PhysicalH, stacked: boolean, lifted: boolean): string {
+function bottomCornerClass(
+  h: PhysicalH,
+  stacked: boolean,
+  lifted: boolean,
+  belowStackedChip = false
+): string {
+  // Issue #1996 — the lifted tiers are CLAMPED to the image box.
+  // `bottom-24`/`bottom-36` were absolute pixel offsets inside an
+  // aspect-ratio, `overflow-hidden` image wrapper: on a short box (the admin's
+  // 16:9 `cardImageAspect`, ~112px tall at the 200px desktop cap) `bottom-24`
+  // pushed the chip's top edge above the box and `overflow-hidden` clipped it
+  // out of existence. `min(<tier>, calc(100% - <room>))` keeps the measured
+  // tier whenever the box is tall enough (every default shape — byte-identical
+  // placement there) and otherwise pins the chip so its top edge stays ≥12px
+  // inside the box. `2.25rem` = the chip's ~24px box + the 12px `top-3` inset;
+  // a lifted chip sitting BELOW a stacked custom chip reserves one more row
+  // (`4.5rem`) so the two clamps can never land on the same pixels.
   if (h === 'left') {
-    if (stacked && lifted) return 'bottom-36 left-3';
-    if (lifted) return 'bottom-24 left-3';
+    if (stacked && lifted) return 'bottom-[min(9rem,calc(100%-2.25rem))] left-3';
+    if (lifted && belowStackedChip) return 'bottom-[min(6rem,calc(100%-4.5rem))] left-3';
+    if (lifted) return 'bottom-[min(6rem,calc(100%-2.25rem))] left-3';
     if (stacked) return 'bottom-12 left-3';
     return 'bottom-3 left-3';
   }
-  if (stacked && lifted) return 'bottom-36 right-3';
-  if (lifted) return 'bottom-24 right-3';
+  if (stacked && lifted) return 'bottom-[min(9rem,calc(100%-2.25rem))] right-3';
+  if (lifted && belowStackedChip) return 'bottom-[min(6rem,calc(100%-4.5rem))] right-3';
+  if (lifted) return 'bottom-[min(6rem,calc(100%-2.25rem))] right-3';
   if (stacked) return 'bottom-12 right-3';
   return 'bottom-3 right-3';
 }
@@ -185,15 +204,28 @@ export function getCustomBadgeColor(color: string | undefined, theme?: StoreThem
  * a light primary (cream, pastel) still gets readable text on it; hardcoded
  * white on a pale primary was ~1.2:1. The NEW chip already pairs them this way.
  *
- * A merchant-picked colour keeps white, exactly as before: choosing a
- * contrast-aware foreground for an arbitrary hex is a design decision (it
- * would flip white text to black on mid-tone reds, changing live cards), so
- * it is not made here.
+ * A merchant-picked RAW colour (hex / hsl()) keeps white, exactly as before:
+ * choosing a contrast-aware foreground for an arbitrary hex is a design
+ * decision (it would flip white text to black on mid-tone reds, changing live
+ * cards), so it is not made here. A `token:*` pick is different — see below.
  */
 export function getCustomBadgeTextColor(color: string | undefined, theme?: StoreTheme): string {
+  // Issue #2129 — a `token:*` pick whose token HAS a platform-computed paired
+  // foreground gets that pair, not white: `token:primary` on a pale primary is
+  // the exact ~1.2:1 case #1614 fixed for the unset path. The contrast choice
+  // is not a design decision here — `themeToCssVars`/`deriveBrandRoles` already
+  // made it, and globals.css defines every one of these vars as a fallback.
+  // `foreground`/`border` have no paired var and keep white, like a raw hex.
+  const token = color?.startsWith('token:') ? color.slice('token:'.length) : undefined;
+  if (token && (PAIRED_FOREGROUND_TOKENS as readonly string[]).includes(token)) {
+    return `hsl(var(--${token}-foreground))`;
+  }
   const resolved = color && theme ? resolveColor(color, theme) : undefined;
   return resolved ? '#ffffff' : 'hsl(var(--primary-foreground))';
 }
+
+/** Tokens whose `--<token>-foreground` CSS var the platform emits per store. */
+const PAIRED_FOREGROUND_TOKENS = ['primary', 'secondary', 'accent', 'card', 'muted'] as const;
 
 /** Minimal product shape the custom badge needs. */
 export interface CustomBadgeProductLike {
@@ -461,10 +493,14 @@ export function resolveCardBadges({
   // collision" branch needed.
   const stacked = bothRender && avoidedCustom.v === avoidedDiscount.v;
 
-  function classFor(avoided: { v: CornerV; h: PhysicalH }, stack: boolean): string {
+  function classFor(
+    avoided: { v: CornerV; h: PhysicalH },
+    stack: boolean,
+    belowStackedChip = false
+  ): string {
     if (avoided.v === 'top') return topCornerClass(avoided.h, stack);
     const lifted = avoided.h === 'left' ? overlayLeftReserved : overlayRightReserved;
-    return bottomCornerClass(avoided.h, stack, lifted);
+    return bottomCornerClass(avoided.h, stack, lifted, belowStackedChip);
   }
 
   return {
@@ -473,6 +509,9 @@ export function resolveCardBadges({
     customBadgePositionCls: classFor(avoidedCustom, stacked),
     // Rule 4 only ever lifts the CUSTOM chip (stack=false here) — the
     // discount chip stays at its base row so the two never both move.
-    discountBadgePositionCls: classFor(avoidedDiscount, false),
+    // When the custom chip stacks above it, the discount chip's clamp reserves
+    // the stacked row too (#1996) so a short image box cannot pin both chips
+    // to the same ceiling.
+    discountBadgePositionCls: classFor(avoidedDiscount, false, stacked),
   };
 }

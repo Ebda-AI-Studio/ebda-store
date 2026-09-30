@@ -69,6 +69,18 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     getStoreOrNotFound(),
     getPreviewDraftToken(),
   ]);
+  // Same locale generateMetadata resolves, so the JSON-LD names agree with
+  // the page's <title> (#2196).
+  const locale = await resolveStorefrontLocale(
+    (store.settings as Record<string, unknown> | undefined)?.defaultLanguage as string | undefined
+  );
 
-  return <ProductDetailBody store={store} slug={decodeRouteParam(slug)} draftToken={draftToken} />;
+  return (
+    <ProductDetailBody
+      store={store}
+      slug={decodeRouteParam(slug)}
+      draftToken={draftToken}
+      locale={locale}
+    />
+  );
 }

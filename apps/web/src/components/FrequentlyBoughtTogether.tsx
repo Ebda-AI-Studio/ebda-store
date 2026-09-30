@@ -1,5 +1,6 @@
 'use client';
 
+import { pickLocalizedName } from '../templates/shared/display-helpers';
 import {
   useProductRecommendations,
   selectCrossSell,
@@ -87,7 +88,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         t('Choose a variant first', 'اختر نوع المنتج أولاً'),
         t(
           `"${p.name}" has options — open the product to pick one.`,
-          `"${p.nameAr ?? p.name}" يحتوي على خيارات — افتح المنتج لاختيار النوع.`
+          `"${pickLocalizedName(p, true) ?? p.name}" يحتوي على خيارات — افتح المنتج لاختيار النوع.`
         )
       );
       window.location.href = storeUrl(`/products/${p.slug}`);
@@ -129,7 +130,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
 
     if (needVariant.length > 0) {
       const names = needVariant
-        .map(p => (isRtl ? (p.nameAr ?? p.name) : p.name))
+        .map(p => pickLocalizedName(p, isRtl) ?? p.name)
         .join(isRtl ? '، ' : ', ');
       toastInfo(
         t(

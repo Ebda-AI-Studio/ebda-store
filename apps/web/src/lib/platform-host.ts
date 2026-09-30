@@ -47,3 +47,18 @@ export function isPlatformHost(hostname: string): boolean {
   if (PLATFORM_HOSTS.has(host)) return true;
   return PLATFORM_SUFFIXES.some(suffix => host.endsWith(`.${suffix}`));
 }
+
+/**
+ * Read middleware's `x-is-platform` request header as a TRI-state (#2091).
+ *
+ * `middleware.ts` asserts it on every request it handles — `'true'` on a
+ * platform host, `'false'` on a custom domain — after stripping any
+ * client-supplied value. ABSENT therefore means "middleware did not run for
+ * this render", which is exactly when StoreProvider must fall back to its
+ * client-side `isPlatformHost()` detection. Collapsing absent to `false`
+ * (the old `=== 'true'`) silently disabled that fallback.
+ */
+export function isPlatformFromHeader(value: string | null): boolean | undefined {
+  if (value === null) return undefined;
+  return value === 'true';
+}

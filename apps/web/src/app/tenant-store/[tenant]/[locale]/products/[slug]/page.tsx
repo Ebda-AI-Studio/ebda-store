@@ -53,11 +53,18 @@ export async function generateMetadata({
 export default async function StoreProductDetailPage({
   params,
 }: {
-  params: Promise<{ tenant: string; slug: string }>;
+  params: Promise<{ tenant: string; locale: string; slug: string }>;
 }) {
-  const { tenant, slug: rawSlug } = await params;
+  const { tenant, locale: localeParam, slug: rawSlug } = await params;
   const slug = decodeRouteParam(rawSlug);
   const store = await getStoreByTenantParam(tenant);
 
-  return <ProductDetailBody store={store} slug={slug} draftToken={undefined} />;
+  return (
+    <ProductDetailBody
+      store={store}
+      slug={slug}
+      draftToken={undefined}
+      locale={localeFromRouteParam(localeParam)}
+    />
+  );
 }

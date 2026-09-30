@@ -11,6 +11,8 @@ import { buildOgImages } from '../../../lib/seo/og-images';
 import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
 import {
   productJsonLd,
+  localizedField,
+  BREADCRUMB_LABELS,
   breadcrumbJsonLd,
   faqPageJsonLd,
   storeAbsoluteUrl,
@@ -165,9 +167,12 @@ export async function ProductDetailBody({
   store,
   slug,
   draftToken,
+  locale = 'en',
 }: {
   store: ResolvedStore;
   slug: string;
+  /** The locale the page's <title>/og resolved to — the JSON-LD must match it (#2196). */
+  locale?: StorefrontLocale;
   /** Always `undefined` from the new `tenant-store` tree — see HomePageBody's
    *  doc comment for why Track-A never carries a draft token. */
   draftToken?: string;
@@ -246,13 +251,13 @@ export async function ProductDetailBody({
             aggregateRating: aggregateRatingForJsonLd,
           },
           store,
-          { shippingZones }
+          { shippingZones, locale }
         ),
         breadcrumbJsonLd([
-          { name: 'Home', url: storeAbsoluteUrl(store, '') },
-          { name: 'Products', url: storeAbsoluteUrl(store, '/products') },
+          { name: BREADCRUMB_LABELS[locale].home, url: storeAbsoluteUrl(store, '') },
+          { name: BREADCRUMB_LABELS[locale].products, url: storeAbsoluteUrl(store, '/products') },
           {
-            name: initialProduct.name,
+            name: localizedField(initialProduct.name, initialProduct.nameAr, locale),
             url: storeAbsoluteUrl(store, `/products/${initialProduct.slug}`),
           },
         ]),

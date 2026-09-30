@@ -1,8 +1,23 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getApiUrl, refreshSession, checkSessionWithMountRetries } from './api';
+import {
+  getApiUrl,
+  refreshSession,
+  checkSessionWithMountRetries,
+  bumpSessionGeneration,
+  clearPendingLogout,
+  performLogout,
+} from './api';
 
 /**
  * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where
@@ -61,6 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  // Id of the newest checkAuth run. This provider re-checks on every
+  // navigation (#1814), so several checks can be in flight at once; only the
+  // newest may touch state, and an older ladder stops at its next sleep
+  // (#2165). Logins and logouts invalidate every in-flight check through the
+  // session generation in api.ts (#2161, #2160).
+  const latestCheckRef = useRef(0);
 
   // Silent refresh using the long-lived rotating refresh token. Delegates to
   // the SAME single-flight refreshAccessToken() used by apiRequest() in
@@ -83,6 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkAuth = useCallback(async () => {
+    const checkId = ++latestCheckRef.current;
+    const isCurrent = () => latestCheckRef.current === checkId;
     try {
       // checkSessionWithMountRetries owns the full /auth/me -> throttle-retry
       // decision (api.ts) so it is unit-testable without rendering this
@@ -94,7 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // clears, the credential still survives (never cleared on 'throttled')
       // and the user lands on /login, where a re-check now actually runs
       // instead of being a dead end (#1814).
-      const result = await checkSessionWithMountRetries(API_URL);
+      //
+      // 'unavailable' (a 5xx/404 on /auth/me) and 'superseded' (a login,
+      // logout or newer check happened meanwhile) leave `user` untouched: only
+      // a 401 followed by a rejected refresh signs anyone out (#2096).
+      const result = await checkSessionWithMountRetries(API_URL, { isCurrent });
       if (result.status === 'authenticated') {
         setUser(result.user as AuthUser);
       } else if (result.status === 'signed-out') {
@@ -103,7 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Auth check failed:', error);
     } finally {
-      setIsLoading(false);
+      // A superseded check leaves the loading flag to the newest one.
+      if (isCurrent()) setIsLoading(false);
     }
   }, []);
 
@@ -122,8 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // check that resolves here into a redirect, but that only ever gets a
   // chance to fire if the check actually runs on this route. checkAuth is
   // now bounded by checkSessionWithMountRetries's own retry ladder (see
-  // above), so re-running it per navigation no longer risks the throttle
-  // races #1802 was written to avoid.
+  // above), and a navigation SUPERSEDES the previous check (latestCheckRef):
+  // the older ladder stops at its next sleep and never applies its answer,
+  // so overlapping navigations cannot stack ladders or race each other, a
+  // login or a logout to setUser (#2165).
   useEffect(() => {
     checkAuth();
   }, [checkAuth, pathname]);
@@ -140,6 +170,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshToken: string;
     csrfToken?: string;
   }) {
+    // A fresh session: any check still in flight is about the old one and
+    // must not clear these tokens when it lands (#2161). An explicit login is
+    // also what lifts a pending (unconfirmed) logout.
+    bumpSessionGeneration();
+    clearPendingLogout();
     // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
     // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
     // purges it). On all other browsers auth rides the httpOnly cookie and
@@ -225,14 +260,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // carries none — a leftover localStorage value would be revoked instead.
     const refreshTokenValue =
       typeof window !== 'undefined' && isIosWebkit() ? localStorage.getItem('refreshToken') : null;
-    await fetch(`${API_URL}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: refreshTokenValue }),
-    }).catch(() => {
-      // best-effort
-    });
+    // Authoritative, not best-effort (#2160): performLogout bumps the session
+    // generation so no in-flight check can restore the session, and records
+    // the logout as pending until the server confirms it. While it is pending
+    // every session check re-sends it instead of reading /auth/me, so a logout
+    // that never reached the API cannot be undone by the /login re-check.
+    await performLogout(API_URL, refreshTokenValue);
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('csrfToken');

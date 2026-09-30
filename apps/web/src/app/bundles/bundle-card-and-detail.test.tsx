@@ -34,8 +34,9 @@ vi.mock('../../hooks/useLocalePrice', () => ({
 vi.mock('../../hooks/useNumerals', () => ({
   useNumerals: () => ({ localize: (s: unknown) => String(s) }),
 }));
+let addBundleImpl: () => Promise<boolean> = async () => true;
 vi.mock('../../contexts/CartContext', () => ({
-  useCart: () => ({ addBundle: vi.fn(async () => true) }),
+  useCart: () => ({ addBundle: () => addBundleImpl() }),
 }));
 vi.mock('../../contexts/StoreContext', () => ({
   useStore: () => ({ store: { id: 'store-1' } }),
@@ -78,6 +79,34 @@ describe('BundleCard (#1557)', () => {
     }
     expect(container.querySelector('button')).not.toBeNull();
     expect(container.querySelector('a')?.getAttribute('href')).toBe('/bundles/ramadan-box');
+  });
+});
+
+describe('BundleCard (#2198) — the busy button still absorbs taps', () => {
+  afterEach(() => {
+    addBundleImpl = async () => true;
+  });
+
+  it('while adding, the element stacked over the stretched link is never pointer-events-none', async () => {
+    // Hold the add in flight so the card renders its loading state.
+    addBundleImpl = () => new Promise<boolean>(() => {});
+    const { container } = render(<BundleCard bundle={BUNDLE as never} />);
+    const button = container.querySelector('button')!;
+    await act(async () => {
+      button.click();
+    });
+    expect(button.disabled).toBe(true);
+    // The disabled Button is `disabled:pointer-events-none`, so it cannot be
+    // the layer that sits above the link's `after:inset-0` overlay: the
+    // positioned z-10 layer must be an ancestor that stays hit-testable.
+    expect(button.className).toContain('disabled:pointer-events-none');
+    expect(button.className).not.toMatch(/\bz-10\b/);
+    const layer = button.closest('.z-10');
+    expect(layer, 'no z-10 layer above the stretched link').not.toBeNull();
+    expect(layer).not.toBe(button);
+    expect(layer!.className).toMatch(/\brelative\b/);
+    expect(layer!.className).not.toContain('pointer-events-none');
+    expect(layer!.closest('a')).toBeNull();
   });
 });
 

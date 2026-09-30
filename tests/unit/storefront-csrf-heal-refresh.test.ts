@@ -97,7 +97,12 @@ describe('iOS shopper with the refresh cookie alive and localStorage evicted (#1
     expect((retryInit.headers as Record<string, string>)['X-CSRF-Token']).toBe('fresh-csrf');
   });
 
-  it('negative control: with no cookie either, the refresh 400s and nothing is retried', async () => {
+  // #2148: the refresh route's 400 ("no refresh token presented") now clears
+  // any dead `token` cookie that caused the CSRF-403, so it is the same fact
+  // as a 401 — the browser is cookieless afterwards and the write is retried
+  // ONCE as the guest request it now is. If that retry still 403s it is
+  // surfaced, never looped on.
+  it('a refresh 400 retries the CSRF-403 once, then surfaces a second 403 without looping', async () => {
     const fetchMock = vi.fn(async (url: unknown) =>
       String(url).includes('/auth/refresh')
         ? res(400, { success: false, error: { code: 'VALIDATION_ERROR' } })
@@ -110,7 +115,8 @@ describe('iOS shopper with the refresh cookie alive and localStorage evicted (#1
 
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe('CSRF_INVALID');
-    expect(calls(fetchMock).filter(u => u.includes('/payments/create'))).toHaveLength(1);
+    expect(calls(fetchMock).filter(u => u.includes('/payments/create'))).toHaveLength(2);
+    expect(calls(fetchMock).filter(u => u.includes('/auth/refresh'))).toHaveLength(1);
   });
 });
 

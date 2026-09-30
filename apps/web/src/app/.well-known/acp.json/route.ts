@@ -120,25 +120,17 @@ export async function GET() {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      // Short TTL either way: the feature gate is permission state, and a
-      // stale answer tells an agent it may transact when it may not (or the
-      // reverse). Five minutes bounds the window without a per-request DB
-      // read. The SHARED-cacheability differs by how the store was resolved:
+      // Short TTL: the feature gate is permission state, and a stale answer
+      // tells an agent it may transact when it may not (or the reverse). Five
+      // minutes bounds the window without a per-request DB read.
       //
-      // - URL slug segment or custom-domain Host → the response is a pure
-      //   function of the request line, safe for any shared cache
-      //   (`public, s-maxage`). `Vary: Cookie` still protects a
-      //   Vary-respecting cache from a stray Cookie header on this path.
-      // - Sticky `x-store-slug` COOKIE fallback (middleware.ts, a subroute
-      //   with no slug segment in the URL — exactly this path on a bare
-      //   platform-host request) → the SAME request line answers with a
-      //   DIFFERENT merchant's contact info depending on which visitor's
-      //   cookie it carried. `Vary: Cookie` alone does not close this:
-      //   Cloudflare's cache ignores `Vary` outside its Enterprise-only
-      //   feature (see apps/api/src/lib/edge-cache.ts), and `s-maxage` is
-      //   what authorizes a shared cache to store this response at all. Drop
-      //   shared-cacheability entirely (`private`) rather than rely on Vary
-      //   (scoped-audit P2 on PR #1942).
+      // Shared-cacheable because this path is resolved ONLY from the URL slug
+      // segment or the custom-domain Host — middleware.ts's
+      // URL_KEYED_PUBLIC_PATHS guard (#1959) never lets the sticky
+      // `x-store-slug` cookie reach it. THAT guard is the load-bearing control
+      // against a cross-tenant edge-cache entry; the `viaCookie → private`
+      // branch below is an unreachable second line of defence (#2174, see
+      // resolvedViaCookie). `Vary: Cookie` covers a Vary-respecting cache.
       'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },

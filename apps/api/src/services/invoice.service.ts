@@ -1,5 +1,5 @@
 import { prisma } from '@force/database';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay, orderTaxPlacement } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -44,6 +44,7 @@ const INVOICE_LABELS = {
     subtotal: 'Subtotal',
     discount: 'Discount',
     tax: 'Tax',
+    taxIncluded: 'Incl. VAT',
     shipping: 'Shipping',
     grandTotal: 'Total',
     free: 'Free',
@@ -69,6 +70,7 @@ const INVOICE_LABELS = {
     subtotal: 'المجموع الفرعي',
     discount: 'الخصم',
     tax: 'الضريبة',
+    taxIncluded: 'شامل ضريبة القيمة المضافة',
     shipping: 'الشحن',
     grandTotal: 'الإجمالي',
     free: 'مجاني',
@@ -148,6 +150,7 @@ export class InvoiceService {
     const dir = ar ? 'rtl' : 'ltr';
 
     const currency = order.store.currency || 'KWD';
+    const taxPlacement = orderTaxPlacement(order);
     const formatPrice = (fils: number) => `${(fils / 1000).toFixed(3)} ${currency}`;
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
     // Bill To should reflect the buyer info entered in checkout, not the
@@ -423,6 +426,8 @@ export class InvoiceService {
     .totals .row .label { color: var(--ink-soft); }
     .totals .row .val { color: var(--ink); font-variant-numeric: tabular-nums; }
     .totals .discount .val { color: var(--success); }
+    .totals .tax-included { font-size: 12px; padding: 6px 0 0; }
+    .totals .tax-included .val { color: var(--ink-soft); }
     .totals .grand {
       margin-top: 10px; padding: 14px 16px;
       background: color-mix(in srgb, var(--brand) 8%, white 92%);
@@ -589,12 +594,19 @@ export class InvoiceService {
               : ''
           }
           ${
-            order.tax > 0
-              ? `<div class="row"><span class="label">${escapeHtml(labels.tax)}</span><span class="val">${formatPrice(order.tax)}</span></div>`
+            (taxPlacement.taxRow ?? 0) > 0
+              ? `<div class="row"><span class="label">${escapeHtml(labels.tax)}</span><span class="val">${formatPrice(taxPlacement.taxRow ?? 0)}</span></div>`
               : ''
           }
           <div class="row"><span class="label">${escapeHtml(labels.shipping)}</span><span class="val">${order.shipping === 0 ? escapeHtml(labels.free) : formatPrice(order.shipping)}</span></div>
           <div class="row grand"><span class="label">${escapeHtml(labels.grandTotal)}</span><span class="val">${formatPrice(order.total)}</span></div>
+          ${
+            // Inclusive VAT is already inside subtotal/total — a caption after
+            // the grand total, never a summed row (issue 2210, Ruling M3-8).
+            taxPlacement.includedTaxCaption !== null
+              ? `<div class="row tax-included"><span class="label">${escapeHtml(labels.taxIncluded)}</span><span class="val">${formatPrice(taxPlacement.includedTaxCaption)}</span></div>`
+              : ''
+          }
         </div>
       </section>
 

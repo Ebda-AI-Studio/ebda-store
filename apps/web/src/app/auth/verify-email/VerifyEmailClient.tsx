@@ -7,69 +7,90 @@ import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { API_URL } from '../../../lib/api';
 
-type VerifyState = 'loading' | 'success' | 'error';
+/**
+ * `retry` is a TRANSIENT failure — the verification endpoint throttled us
+ * (#1863: a shared Kuwait carrier/office IP) or the network dropped. The
+ * link itself may be perfectly valid, so this state must never read
+ * "Invalid Link" and must offer a way to try the SAME token again (#2162):
+ * Login is a dead end for an address that is still unverified.
+ */
+type VerifyState = 'loading' | 'success' | 'error' | 'retry';
+type RetryReason = 'throttled' | 'network';
 
 export default function VerifyEmailClient() {
   const storeUrl = useStoreUrl();
   const { t } = useLanguage();
   const [state, setState] = useState<VerifyState>('loading');
-  const [errorMessage, setErrorMessage] = useState(
-    'The verification link is invalid or has expired.'
-  );
+  const [retryReason, setRetryReason] = useState<RetryReason>('throttled');
+  const [errorMessage, setErrorMessage] = useState('');
   // Guard against StrictMode double-invoke in development
   const called = useRef(false);
+
+  const invalidLinkCopy = t(
+    'The verification link is invalid or has expired.',
+    'رابط التحقق غير صالح أو منتهي الصلاحية.'
+  );
+
+  async function verify() {
+    setState('loading');
+    // Read the token from the URL search params
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    if (!token) {
+      setErrorMessage(
+        t(
+          'No verification token was provided. Please check the link in your email.',
+          'لم يتم تقديم رمز التحقق. يرجى التحقق من الرابط في بريدك الإلكتروني.'
+        )
+      );
+      setState('error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (res.ok && json?.success) {
+        setState('success');
+      } else if (res.status === 429 || json?.error?.code === 'RATE_LIMITED') {
+        setRetryReason('throttled');
+        setState('retry');
+      } else if (res.status >= 500 || !json) {
+        // The server could not answer (5xx, or a non-JSON edge error page):
+        // nothing is known about the link, so it is not called invalid.
+        setRetryReason('network');
+        setState('retry');
+      } else {
+        // The server's message is English-only; the shopper sees localized
+        // copy keyed on the error code instead.
+        setErrorMessage(
+          json.error?.code === 'TOKEN_EXPIRED'
+            ? t(
+                'This verification link has expired. Please request a new one.',
+                'انتهت صلاحية رابط التحقق هذا. يرجى طلب رابط جديد.'
+              )
+            : invalidLinkCopy
+        );
+        setState('error');
+      }
+    } catch {
+      setRetryReason('network');
+      setState('retry');
+    }
+  }
 
   useEffect(() => {
     if (called.current) return;
     called.current = true;
-
-    async function verify() {
-      // Read the token from the URL search params
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('token');
-
-      if (!token) {
-        setErrorMessage('No verification token was provided. Please check the link in your email.');
-        setState('error');
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API_URL}/auth/verify-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-
-        const json = await res.json();
-
-        if (res.ok && json.success) {
-          setState('success');
-        } else if (json.error?.code === 'RATE_LIMITED') {
-          // #1863: this route now has its own limiter, but the server's
-          // message is English-only like every other rate-limit message in
-          // this codebase — localize the one path that route change actually
-          // surfaces to shoppers instead of the raw server string.
-          setErrorMessage(
-            t(
-              'Too many verification attempts. Please wait a few minutes and try again.',
-              'محاولات تحقق كثيرة جدًا. يرجى الانتظار بضع دقائق ثم المحاولة مرة أخرى.'
-            )
-          );
-          setState('error');
-        } else {
-          setErrorMessage(
-            json.error?.message || 'The verification link is invalid or has expired.'
-          );
-          setState('error');
-        }
-      } catch {
-        setErrorMessage('Unable to verify your email. Please check your connection and try again.');
-        setState('error');
-      }
-    }
-
     verify();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -134,6 +155,61 @@ export default function VerifyEmailClient() {
                     {t(
                       'Go to Login',
                       '\u0627\u0644\u0630\u0647\u0627\u0628 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644'
+                    )}
+                  </Link>
+                </div>
+              </>
+            )}
+
+            {state === 'retry' && (
+              <>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--info))]/10">
+                  <svg
+                    className="h-8 w-8 text-[hsl(var(--info))]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h1 className="mt-6 text-2xl font-bold text-foreground">
+                  {retryReason === 'throttled'
+                    ? t('Too many attempts', 'محاولات كثيرة جدًا')
+                    : t("We couldn't verify right now", 'تعذّر التحقق الآن')}
+                </h1>
+                <p className="mt-2 text-muted-foreground" role="status">
+                  {retryReason === 'throttled'
+                    ? t(
+                        'Your link is still valid. Please wait a few minutes, then try again.',
+                        'رابطك لا يزال صالحًا. يرجى الانتظار بضع دقائق ثم المحاولة مرة أخرى.'
+                      )
+                    : t(
+                        'Please check your connection and try again. Your link is still valid.',
+                        'يرجى التحقق من اتصالك والمحاولة مرة أخرى. رابطك لا يزال صالحًا.'
+                      )}
+                </p>
+                <div className="mt-8 flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => verify()}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary/90 transition"
+                  >
+                    {t('Try again', 'حاول مرة أخرى')}
+                  </button>
+                  <Link
+                    href={storeUrl('/')}
+                    className="inline-flex w-full items-center justify-center rounded-lg border border-border px-6 py-3 font-medium text-foreground hover:bg-muted transition"
+                  >
+                    {t(
+                      'Back to Home',
+                      '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0631\u0626\u064a\u0633\u064a\u0629'
                     )}
                   </Link>
                 </div>

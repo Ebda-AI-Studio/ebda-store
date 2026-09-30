@@ -35,3 +35,37 @@ describe('#1766 checkout wiring', () => {
     expect(checkout).toMatch(/void refetchCart\(\)\.catch/);
   });
 });
+
+describe('#2117 /cart enforces the banner: checkout CTAs are gated on unavailable lines', () => {
+  it('both CTA sites (theme summary + default list) read the combined gate', () => {
+    expect(cart).toMatch(/const checkoutBlocked = belowMinimumOrder \|\| hasUnavailableLines;/);
+    expect(cart).toMatch(/ctaDisabled=\{checkoutBlocked\}/);
+    expect(cart).toMatch(/ctaBlockedMessage=\{checkoutBlockedMessage\}/);
+    expect(cart).toMatch(/\{checkoutBlocked \? \(\s*<Button/);
+    // No CTA site may still gate on the minimum order alone.
+    expect(cart).not.toMatch(/ctaDisabled=\{belowMinimumOrder\}/);
+    expect(cart).not.toMatch(/\{belowMinimumOrder \? \(/);
+  });
+});
+
+describe('#2116/#2117 checkout names unavailable lines instead of hiding them', () => {
+  it('derives the notice from the UNFILTERED cart lines', () => {
+    expect(checkout).toMatch(
+      /const unavailableCartItems = cartContextItems\.filter\(item => item\.unavailable\);/
+    );
+  });
+  it('an all-unavailable cart gets its own state, checked BEFORE the empty-cart screen', () => {
+    const own = checkout.indexOf('data-checkout-nothing-orderable');
+    const empty = checkout.indexOf("t('Your cart is empty'");
+    expect(own).toBeGreaterThan(-1);
+    expect(own).toBeLessThan(empty);
+  });
+  it('renders a banner on the checkout form and blocks submit while any remain', () => {
+    expect(checkout).toContain('data-checkout-unavailable-banner');
+    const submit = checkout.slice(checkout.indexOf('const handleSubmit = async'));
+    const guard = submit.slice(0, submit.indexOf('if (step === 1)'));
+    expect(guard).toMatch(
+      /if \(unavailableLinesNotice\) \{\s*setCheckoutError\(unavailableLinesNotice\);\s*return;/
+    );
+  });
+});

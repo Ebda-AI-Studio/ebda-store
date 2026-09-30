@@ -38,6 +38,8 @@ import {
   resolveDeliverySelection,
   getNowMinutesInTimezone,
   formatWindowTime,
+  findStillBookableWindow,
+  type DeliveryDay,
 } from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
@@ -49,7 +51,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 import { estimateLoyaltyRedemption } from './_lib/loyaltyEstimate';
-import { repriceAfterCouponRemoval } from './_lib/repriceAfterCouponRemoval';
+import { repriceAfterCouponRemoval, isShippingSettled } from './_lib/repriceAfterCouponRemoval';
 import { useLastListing } from '../../hooks/useLastListing';
 import { useWallet } from '../../hooks/useWallet';
 
@@ -175,15 +177,36 @@ export default function CheckoutClient() {
     | undefined;
   const [selectedDeliveryWindowId, setSelectedDeliveryWindowId] = useState<string | null>(null);
   const [deliveryWindowError, setDeliveryWindowError] = useState<string | null>(null);
-  // "Now" in the store's local timezone, computed once per mount/timezone
-  // change — not a ticking clock. Today/tomorrow + availability derive from
-  // this via the pure resolveDeliverySelection helper (unit-tested
-  // separately), which also rolls over to tomorrow once every window's
-  // order-by time has passed for today.
-  const nowMinutes = useMemo(
-    () => getNowMinutesInTimezone(store?.timezone || 'Asia/Kuwait'),
-    [store?.timezone]
-  );
+  // The day the picker showed when the customer chose (today/tomorrow) — the
+  // id alone cannot tell a same-slot midnight crossing from a rollover that
+  // would silently move the booking to tomorrow (findStillBookableWindow).
+  const [selectedDeliveryDay, setSelectedDeliveryDay] = useState<DeliveryDay | null>(null);
+  // "Now" in the store's local timezone, as a TICKING clock (#2047/#2050).
+  // It used to be memoized once per mount, so the picker kept offering a
+  // window whose cutoff had passed while submit (which re-reads the clock)
+  // refused it — an unescapable loop. The picker and submit now read the same
+  // clock: a 30s tick (cutoffs are minute-granular), a refresh when the tab
+  // becomes visible again, and submit writes its own reading back here.
+  // Today/tomorrow + availability derive from this via the pure
+  // resolveDeliverySelection helper, which also rolls over to tomorrow once
+  // every window's order-by time has passed for today.
+  const storeTimezone = store?.timezone || 'Asia/Kuwait';
+  const [nowMinutes, setNowMinutes] = useState(() => getNowMinutesInTimezone(storeTimezone));
+  const deliveryWindowsEnabled = !!checkoutDelivery?.windows?.enabled;
+  useEffect(() => {
+    const tick = () => setNowMinutes(getNowMinutesInTimezone(storeTimezone));
+    tick();
+    if (!deliveryWindowsEnabled) return;
+    const interval = setInterval(tick, 30_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [storeTimezone, deliveryWindowsEnabled]);
   const deliverySelection = useMemo(
     () =>
       checkoutDelivery?.windows?.enabled
@@ -191,6 +214,23 @@ export default function CheckoutClient() {
         : { day: 'today' as const, windows: [] },
     [checkoutDelivery, nowMinutes]
   );
+  const lapsedWindowMessage = t(
+    'The time you chose is no longer available — please pick another.',
+    'الموعد الذي اخترته لم يعد متاحًا — يرجى اختيار موعد آخر.'
+  );
+  // A picked window whose cutoff passes while the customer is still on the
+  // page is dropped with a SPECIFIC message, and the picker (same clock)
+  // already shows it closed — never a generic "please select" next to a
+  // window that still looks selectable.
+  useEffect(() => {
+    if (!selectedDeliveryWindowId) return;
+    if (findStillBookableWindow(deliverySelection, selectedDeliveryWindowId, selectedDeliveryDay)) {
+      return;
+    }
+    setSelectedDeliveryWindowId(null);
+    setSelectedDeliveryDay(null);
+    setDeliveryWindowError(lapsedWindowMessage);
+  }, [deliverySelection, selectedDeliveryWindowId, selectedDeliveryDay, lapsedWindowMessage]);
 
   // Fire InitiateCheckout pixel event once the cart has hydrated from the
   // server and we know it isn't empty. Firing on mount (before hydration)
@@ -266,6 +306,22 @@ export default function CheckoutClient() {
       total: cartContextTotal,
     };
   }, [cartContextItems, cartContextBundles, cartContextTotal]);
+
+  // #2116/#2117: lines whose product was deleted are priced OUT of `cart`
+  // above (#1766), but they still block the order — OrderService.create
+  // refuses PRODUCT_NO_LONGER_AVAILABLE while any remains. So the checkout
+  // must SAY so, before the shopper fills the form, instead of silently
+  // listing a shorter summary (and, for an all-unavailable cart, instead of
+  // claiming the cart is empty — it is not; /cart still shows the lines).
+  const unavailableCartItems = cartContextItems.filter(item => item.unavailable);
+  const unavailableLinesNotice =
+    unavailableCartItems.length > 0
+      ? productUnavailableCopy(
+          t,
+          unavailableCartItems.length,
+          unavailableCartItems.map(item => pickProductName(item, language))
+        )
+      : null;
   // The basis a COUPON is quoted against: loose items only, never the
   // bundle-inclusive `cart.subtotal`. `OrderService.create` evaluates a
   // coupon against `cart.items` alone (Ruling B1 — a coupon never
@@ -302,6 +358,13 @@ export default function CheckoutClient() {
   // Shipping & discount
   const [selectedArea, setSelectedArea] = useState('');
   const [shippingCost, setShippingCost] = useState(0);
+  // A shipping quote is in flight — the fee on screen is the PREVIOUS one
+  // (another area, or a removed free-shipping coupon's 0) until it lands.
+  const [shippingQuotePending, setShippingQuotePending] = useState(false);
+  // Only the latest quote may write the fee: an older response landing after
+  // a newer one (fast area changes) would otherwise put the wrong area's fee
+  // back on screen.
+  const shippingQuoteSeqRef = useRef(0);
   const [freeShipping, setFreeShipping] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -576,11 +639,19 @@ export default function CheckoutClient() {
   }, [store?.id, checkoutReloadKey]);
 
   // Calculate shipping when area changes
-  const calculateShipping = useCallback(async () => {
-    if (!selectedArea || !store?.id || !cart?.subtotal) return;
+  //
+  // Resolves true only when a quote actually LANDED (#2067): it never throws,
+  // so a caller that needs to know whether the fee is real reads this — and
+  // the submit gates read `shippingError`/`shippingQuotePending` via
+  // isShippingSettled().
+  const calculateShipping = useCallback(async (): Promise<boolean> => {
+    if (!selectedArea || !store?.id || !cart?.subtotal) return false;
 
+    const seq = ++shippingQuoteSeqRef.current;
+    const isLatest = () => seq === shippingQuoteSeqRef.current;
     setShippingUnavailable(false);
     setShippingError(false);
+    setShippingQuotePending(true);
     try {
       const result = await api.post<{
         shippingCost: number;
@@ -592,6 +663,7 @@ export default function CheckoutClient() {
         orderTotal: cart.subtotal,
         governorate: formData.governorate,
       });
+      if (!isLatest()) return false;
       if (result.success && result.data) {
         const hasAreaRates = result.data.storeHasAreaRates === true;
         setStoreHasAreaRates(hasAreaRates);
@@ -608,12 +680,16 @@ export default function CheckoutClient() {
           setShippingCost(result.data.shippingCost || 0);
           setFreeShipping(result.data.freeShipping || false);
         }
-      } else {
-        setShippingError(true);
+        return true;
       }
+      setShippingError(true);
+      return false;
     } catch (error) {
       console.error('Failed to calculate shipping:', error);
-      setShippingError(true);
+      if (isLatest()) setShippingError(true);
+      return false;
+    } finally {
+      if (isLatest()) setShippingQuotePending(false);
     }
   }, [selectedArea, store?.id, cart?.subtotal, formData.governorate]);
 
@@ -986,6 +1062,13 @@ export default function CheckoutClient() {
   const minimumOrderFils = store?.settings?.minimumOrderFils as number | undefined;
   const minimumOrderCheck = checkMinimumOrder(subtotal, minimumOrderFils);
   const belowMinimumOrder = !minimumOrderCheck.met;
+  // The delivery fee in the summary is confirmed (#2067): no quote in flight,
+  // no failed quote, no coupon-removal reprice pending.
+  const shippingSettled = isShippingSettled({
+    shippingError,
+    quotePending: shippingQuotePending,
+    repricing: repricingShipping,
+  });
   const minimumOrderMessage = belowMinimumOrder
     ? t(
         `Minimum order is ${formatPrice(minimumOrderFils as number)} — add ${formatPrice(minimumOrderCheck.shortfallFils)} more`,
@@ -1007,6 +1090,30 @@ export default function CheckoutClient() {
       return;
     }
 
+    // An unavailable line can never be ordered — say so now rather than let the
+    // shopper fill both steps and meet the server's refusal (#2117).
+    if (unavailableLinesNotice) {
+      setCheckoutError(unavailableLinesNotice);
+      return;
+    }
+
+    // Never advance or submit on a delivery fee that was not confirmed
+    // (#2067). A failed quote sends the customer back to step 1, where the
+    // delivery panel carries the "couldn't calculate shipping — Retry"
+    // control; an in-flight quote simply waits.
+    if (!shippingSettled) {
+      if (shippingError) {
+        setCheckoutError(
+          t(
+            "We couldn't confirm the delivery fee. Please retry shipping before placing your order.",
+            'تعذّر تأكيد رسوم التوصيل. يرجى إعادة حساب الشحن قبل إتمام الطلب.'
+          )
+        );
+        setStep(1);
+      }
+      return;
+    }
+
     if (step === 1) {
       // Validate before proceeding to payment
       if (!validateForm()) {
@@ -1025,26 +1132,34 @@ export default function CheckoutClient() {
       return;
     }
 
-    // #776: `nowMinutes`/`deliverySelection` above are memoized once per
-    // mount/timezone change — not a ticking clock. A customer who sits on
-    // step 2 past a window's order-by cutoff (or past midnight, rolling the
-    // day) would otherwise submit a selection the render-time picker itself
-    // would no longer offer. Recompute fresh right before validating/using
-    // it, so submission always checks the window against "now", not
-    // "whenever this component last re-rendered".
-    const submitNowMinutes = getNowMinutesInTimezone(store?.timezone || 'Asia/Kuwait');
+    // #776: `nowMinutes` above ticks every 30s, so it can still be up to a
+    // tick behind. Re-read the clock right before validating/using the
+    // window, so submission always checks it against "now"; on a lapse the
+    // reading is written back to `nowMinutes` so the picker agrees with the
+    // refusal (#2047/#2050).
+    const submitNowMinutes = getNowMinutesInTimezone(storeTimezone);
     const freshDeliverySelection = checkoutDelivery?.windows?.enabled
       ? resolveDeliverySelection(checkoutDelivery.windows.items, submitNowMinutes)
       : { day: 'today' as const, windows: [] };
     const freshAnyWindowAvailable = freshDeliverySelection.windows.some(w => w.available);
-    const freshSelectedWindow = freshDeliverySelection.windows.find(
-      w => w.id === selectedDeliveryWindowId && w.available
+    const freshSelectedWindow = findStillBookableWindow(
+      freshDeliverySelection,
+      selectedDeliveryWindowId,
+      selectedDeliveryDay
     );
-    // The picked window lapsed (or a day-rollover happened) between mount and
-    // submit — treat it the same as never having picked one, not as a stale
-    // choice that silently ships.
-    if (selectedDeliveryWindowId && !freshSelectedWindow) {
+    // The picked window lapsed (or the picker rolled over to tomorrow) since
+    // it was chosen. Move the picker onto the same clock so the lapsed window
+    // renders closed, drop the choice, and say WHY — then stop: the customer
+    // re-picks from what is actually bookable (#2047/#2050). Never ship the
+    // order without the slot they believe they booked.
+    if (checkoutDelivery?.windows?.enabled && selectedDeliveryWindowId && !freshSelectedWindow) {
+      setNowMinutes(submitNowMinutes);
       setSelectedDeliveryWindowId(null);
+      setSelectedDeliveryDay(null);
+      setDeliveryWindowError(lapsedWindowMessage);
+      const firstError = document.querySelector('[data-error="true"]');
+      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
     }
 
     // Delivery window is required only when the store enabled windows AND at
@@ -1540,6 +1655,29 @@ export default function CheckoutClient() {
     );
   }
 
+  if (cart && cart.items.length === 0 && cart.bundles.length === 0 && unavailableLinesNotice) {
+    // Every line in the cart is unorderable (#2116). NOT "your cart is empty":
+    // the lines are still there and /cart is the only place to remove them.
+    return (
+      <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
+        <div
+          className="mx-auto max-w-7xl px-4 py-16 text-center"
+          data-checkout-nothing-orderable=""
+        >
+          <h1 className="text-2xl font-bold text-foreground">
+            {t('Nothing in your cart can be ordered', 'لا يمكن طلب أي منتج في سلتك')}
+          </h1>
+          <p role="alert" className="mt-2 text-muted-foreground">
+            {unavailableLinesNotice}
+          </p>
+          <Link href={storeUrl('/cart')}>
+            <Button className="mt-6">{t('Go to cart', 'الذهاب إلى السلة')}</Button>
+          </Link>
+        </div>
+      </MinimalChrome>
+    );
+  }
+
   if (!cart || (cart.items.length === 0 && cart.bundles.length === 0)) {
     return (
       <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
@@ -1642,6 +1780,18 @@ export default function CheckoutClient() {
             {/* Form */}
             <div className="order-1 lg:order-none lg:col-span-8">
               <form id="checkout-shipping-form" onSubmit={handleSubmit}>
+                {unavailableLinesNotice && !checkoutError && (
+                  <div
+                    role="alert"
+                    data-checkout-unavailable-banner=""
+                    className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive"
+                  >
+                    <p>{unavailableLinesNotice}</p>
+                    <Link href={storeUrl('/cart')} className="mt-1 inline-block underline">
+                      {t('Go to cart', 'الذهاب إلى السلة')}
+                    </Link>
+                  </div>
+                )}
                 <CheckoutErrorAlert
                   message={checkoutError}
                   onClear={() => setCheckoutError(null)}
@@ -2035,7 +2185,7 @@ export default function CheckoutClient() {
                         type="submit"
                         className="w-full sm:w-auto"
                         size="lg"
-                        disabled={shippingUnavailable || belowMinimumOrder}
+                        disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
                       >
                         {t(
                           'Continue to Payment',
@@ -2055,7 +2205,7 @@ export default function CheckoutClient() {
                     onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}
                     onSelectProvider={setSelectedProvider}
-                    isProcessing={isProcessing || repricingShipping}
+                    isProcessing={isProcessing || repricingShipping || shippingQuotePending}
                     total={total}
                     formatPrice={formatPrice}
                     belowMinimumOrder={belowMinimumOrder}
@@ -2068,6 +2218,7 @@ export default function CheckoutClient() {
                             selectedWindowId={selectedDeliveryWindowId}
                             onSelectWindow={id => {
                               setSelectedDeliveryWindowId(id);
+                              setSelectedDeliveryDay(deliverySelection.day);
                               setDeliveryWindowError(null);
                             }}
                             error={deliveryWindowError}
@@ -2155,7 +2306,7 @@ export default function CheckoutClient() {
                   form="checkout-shipping-form"
                   className="w-full sm:w-auto"
                   size="lg"
-                  disabled={shippingUnavailable || belowMinimumOrder}
+                  disabled={shippingUnavailable || belowMinimumOrder || !shippingSettled}
                 >
                   {t('Continue to Payment', 'المتابعة للدفع')}
                 </Button>

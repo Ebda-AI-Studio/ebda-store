@@ -161,6 +161,9 @@ function MinimalProductCard({
     // reserves the whole bottom edge same as the other 4 themes.
     topStartReserved: Boolean(onToggleCompare),
     topEndReserved: Boolean(onRemoveFromWishlist),
+    // Issue #2092 (#1997 sweep) — minimal's own NEW chip sits at logical
+    // top-start; the SAME expression it renders on below.
+    newOrBrandBadgeReserved: Boolean(product.inStock !== false && isProductNew(product)),
     bottomOverlay: 'both',
   });
 

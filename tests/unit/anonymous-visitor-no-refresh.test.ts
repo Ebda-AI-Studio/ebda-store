@@ -15,6 +15,11 @@
  * The fix gates the 401-refresh on evidence a session ever existed in this
  * browser. These tests pin both directions: no evidence → no refresh; evidence
  * → the #1789 recovery still happens.
+ *
+ * Since issue 2164 one evidence-free `/auth/me` probe per TAB is allowed (the
+ * Safari-ITP cohort), keyed on sessionStorage. These tests stub no
+ * sessionStorage, so they pin the no-probe budget; the per-tab cap is pinned in
+ * storefront-session-refresh-gates.test.ts.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

@@ -126,7 +126,17 @@ export function BundleLine({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && nameAr ? nameAr : name;
   const savings = componentSum && componentSum > total ? componentSum - total : 0;
-  const isOutOfStock = available !== undefined && available < quantity;
+  // Same semantics as the server's gate (#2053): the order's atomic stock
+  // decrement (order.service.ts, Ruling T5-c) refuses when a component has
+  // less stock than THIS quantity of boxes needs — not only when the box is
+  // sold out. So the note fires on `available < quantity`, but it must say
+  // which case it is: "Out of stock" next to a box with 2 of 5 left is false.
+  const stockNote =
+    available === undefined || available >= quantity
+      ? null
+      : available <= 0
+        ? t('Out of stock', 'غير متوفر')
+        : t(`Only ${localize(available)} available`, `المتوفر ${localize(available)} فقط`);
 
   const badge = (
     <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -134,8 +144,10 @@ export function BundleLine({
     </span>
   );
 
-  const outOfStockNote = isOutOfStock ? (
-    <p className="mt-1 text-xs font-semibold text-destructive">{t('Out of stock', 'غير متوفر')}</p>
+  const outOfStockNote = stockNote ? (
+    <p data-bundle-stock-note="" className="mt-1 text-xs font-semibold text-destructive">
+      {stockNote}
+    </p>
   ) : null;
 
   if (variant === 'card') {

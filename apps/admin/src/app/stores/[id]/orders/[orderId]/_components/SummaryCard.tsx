@@ -2,6 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { orderTaxPlacement } from '@force/shared';
 import { formatMoney } from './format';
 import type { OrderDetail } from './types';
 
@@ -12,6 +13,7 @@ interface SummaryCardProps {
 export function SummaryCard({ order }: SummaryCardProps) {
   const t = useT('orders.detail');
   const locale = useLocale();
+  const taxPlacement = orderTaxPlacement(order);
   const discountPct = order.subtotal > 0 ? Math.round((order.discount / order.subtotal) * 100) : 0;
 
   // Break the total discount into its levers — coupon, automatic promotion,
@@ -87,7 +89,17 @@ export function SummaryCard({ order }: SummaryCardProps) {
           },
         ]
       : []),
-    { label: t('tax'), value: formatMoney(order.tax, order.currency), muted: order.tax === 0 },
+    // Exclusive tax is a summed row; inclusive tax is already inside
+    // subtotal/total and is captioned after Total instead (issue 2210).
+    ...(taxPlacement.taxRow !== null
+      ? [
+          {
+            label: t('tax'),
+            value: formatMoney(taxPlacement.taxRow, order.currency),
+            muted: taxPlacement.taxRow === 0,
+          },
+        ]
+      : []),
     {
       label: t('deliveryFee'),
       value: formatMoney(order.shipping, order.currency),
@@ -117,6 +129,12 @@ export function SummaryCard({ order }: SummaryCardProps) {
             {formatMoney(order.total, order.currency)}
           </dd>
         </div>
+        {taxPlacement.includedTaxCaption !== null && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <dt>{t('taxIncluded')}</dt>
+            <dd>{formatMoney(taxPlacement.includedTaxCaption, order.currency)}</dd>
+          </div>
+        )}
         {/* Customer wallet (D1): the part of the total the customer paid from
             store credit, and what the gateway / courier actually collects. */}
         {walletAmount > 0 && (

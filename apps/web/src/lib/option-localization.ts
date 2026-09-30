@@ -8,9 +8,11 @@
  * translate the common cases at DISPLAY time so the Arabic store reads Arabic
  * platform-wide, WITHOUT mutating the stored data.
  *
- * Precedence: a MEANINGFUL merchant-supplied `nameAr`/`valueAr` wins; generic
- * placeholder axis names (notably the old admin default "متغير") are ignored so
- * smart value-driven detection runs; the maps below are the last fallback.
+ * Precedence: a MEANINGFUL merchant-supplied `nameAr`/`valueAr` wins, then (in
+ * Arabic) the merchant's meaningful English name translated through the map —
+ * the same name the English storefront shows (#2193); generic placeholder axis
+ * names (notably the old admin default "متغير") are ignored so smart
+ * value-driven detection runs.
  *
  * Axis labelling is value-aware (see `localizeOptionName`): weight-unit values →
  * الوزن, volume-unit values → الحجم, garment letter-sizes → المقاس. We never
@@ -128,11 +130,15 @@ const AXIS_LABEL: Record<'weight' | 'volume' | 'garment', { en: string; ar: stri
  *  name, e.g. nameAr='التعبئة' with values '500 جرام' rendered as 'الوزن'):
  *  1. a MEANINGFUL merchant name for the active locale — generic placeholders
  *     ("Variant", "Option", the old "متغير" default) and a blank name do NOT
- *     win, so they fall through to step 2;
+ *     win, so they fall through;
+ *  1b. (Arabic only) a MEANINGFUL English name with an entry in the option-name
+ *     map — so both locales name the SAME axis concept (#2193): `Size` reads
+ *     "Size" / "الحجم", never "Size" / "الوزن";
  *  2. VALUE-driven detection (units are unambiguous) — a generic/blank axis
- *     whose values are "400 Gram / 700 Gram" reads Weight / الوزن;
- *  3. the option-name map (Arabic) / the English name; else a neutral fallback
- *     ("Options" / الخيار). The label is NEVER "متغير" or a bare "Variant". */
+ *     (or, in Arabic, an English name the map cannot translate) whose values
+ *     are "400 Gram / 700 Gram" reads Weight / الوزن;
+ *  3. a neutral fallback ("Options" / الخيار). The label is NEVER "متغير" or a
+ *     bare "Variant". */
 export function localizeOptionName(
   name: string,
   nameAr: string | null | undefined,
@@ -143,10 +149,21 @@ export function localizeOptionName(
     const trimmedAr = nameAr?.trim();
     if (trimmedAr && !GENERIC_AXIS_NAMES.has(trimmedAr.toLowerCase())) return trimmedAr;
 
+    // The merchant's MEANINGFUL English name, translated through the map,
+    // outranks value detection too (#2193) — exactly as it does on the
+    // English storefront below. Otherwise `name='Size'` + `185 Gram` read
+    // "Size" in EN but "الوزن" (Weight) in AR: two different axis concepts
+    // for the same option. Generic names ("Variant", "Option") are skipped so
+    // they still fall through to detection.
+    const trimmedEn = name?.trim().toLowerCase();
+    if (trimmedEn && !GENERIC_AXIS_NAMES.has(trimmedEn) && OPTION_NAME_AR[trimmedEn]) {
+      return OPTION_NAME_AR[trimmedEn];
+    }
+
     const axis = detectAxisFromValues(values);
     if (axis) return AXIS_LABEL[axis].ar;
 
-    return OPTION_NAME_AR[name.trim().toLowerCase()] ?? 'الخيار';
+    return 'الخيار';
   }
 
   const trimmedEn = name?.trim();

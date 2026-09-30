@@ -1027,8 +1027,8 @@
       "tier": "unit",
       "why": "/auth/me is folded back into the blanket /auth/ refresh-skip, so a customer's 401 on the storefront's own session check can never trigger a refresh — a signed-in customer with a perfectly valid refresh token is rendered a guest 30 minutes after login",
       "source": "apps/web/src/lib/api.ts",
-      "find": "        (!endpoint.startsWith('/auth/') || endpoint === '/auth/me')",
-      "replace": "        !endpoint.startsWith('/auth/')",
+      "find": "        endpointMayRefresh(endpoint) &&",
+      "replace": "        !endpoint.startsWith('/auth/') &&",
       "test": "tests/unit/refresh-throttle-not-logout.test.ts"
     },
     {

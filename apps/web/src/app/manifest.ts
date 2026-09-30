@@ -24,6 +24,10 @@ interface ApiManifest {
   name?: string;
   short_name?: string;
   description?: string;
+  /** Arabic identity members emitted by generateManifest (#2194). */
+  name_ar?: string;
+  short_name_ar?: string;
+  description_ar?: string;
   theme_color?: string;
   background_color?: string;
   display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser';
@@ -98,10 +102,19 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const apiManifest = await fetchStoreManifest(store.id);
 
   if (apiManifest) {
+    // Under `ar` the API's Arabic members win (#2194), then the API's own
+    // (English) value, then the localized store name (#2195) — so a merchant
+    // who typed an Arabic app name gets it, and one who did not still never
+    // gets a half-localized install prompt from the fallback.
+    const isAr = locale === 'ar';
     return {
-      name: apiManifest.name || store.name,
-      short_name: apiManifest.short_name || store.name,
-      description: apiManifest.description || localizedStoreDescriptionFallback,
+      name: (isAr && apiManifest.name_ar) || apiManifest.name || localizedStoreName,
+      short_name:
+        (isAr && apiManifest.short_name_ar) || apiManifest.short_name || localizedStoreName,
+      description:
+        (isAr && apiManifest.description_ar) ||
+        (isAr ? localizedStoreDescriptionFallback : apiManifest.description) ||
+        localizedStoreDescriptionFallback,
       start_url: apiManifest.start_url || '/',
       display: apiManifest.display || 'standalone',
       orientation: apiManifest.orientation || 'any',
@@ -124,8 +137,10 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   }
 
   return {
-    name: store.name,
-    short_name: store.name,
+    // Localized like the description below (#2195): an Arabic storefront's
+    // home-screen caption must not read English next to an Arabic description.
+    name: localizedStoreName,
+    short_name: localizedStoreName,
     description: pickMetaDescription(store, locale) || localizedStoreDescriptionFallback,
     start_url: '/',
     display: 'standalone',

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { api, type User } from '../lib/api';
+import { api, getProfileWithMountRetries, isTransientSessionAnswer, type User } from '../lib/api';
 import { useStore } from './StoreContext';
 
 interface AuthContextType {
@@ -29,7 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // different storefronts (the schema's `@@unique([storeId, email])`).
   const { store } = useStore();
 
-  const refreshUser = useCallback(async () => {
+  // `onMount` runs the bounded retry ladder (getProfileWithMountRetries) so a
+  // throttled/unreachable session check on page load does not settle the
+  // customer as a guest; later explicit calls (e.g. after the profile save on
+  // /account/profile) ask once.
+  const checkUser = useCallback(async (onMount: boolean) => {
     // Auth is handled via HTTP-only cookies sent automatically with
     // credentials: 'include'. The cookie is scoped to the API domain
     // (api.force-ai.co), so an admin signed in at
@@ -42,31 +46,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // so the storefront UI never accidentally shows merchant info as
     // the customer's profile.
     try {
-      const result = await api.getProfile();
+      const result = onMount ? await getProfileWithMountRetries() : await api.getProfile();
       if (result.success && result.data && result.data.user.role === 'customer') {
         setUser(result.data.user);
-      } else if (result.error?.code === 'RATE_LIMITED') {
-        // A throttled refresh is not a sign-out (see #1789): api.ts's
-        // request() now retries /auth/me through a refresh on a 401, and
-        // reports RATE_LIMITED only when that refresh itself was
-        // rate-limited — a "slow down", not a "you are signed out". Clearing
-        // `user` here would render an actually-still-signed-in customer as a
-        // guest for a reason that has nothing to do with their session.
-        // Leave the existing state alone; the next refreshUser() call (e.g.
-        // after the profile save on /account/profile) gets another chance.
+      } else if (isTransientSessionAnswer(result)) {
+        // A throttle, a timeout or a 5xx is not a sign-out (#1789, #2098):
+        // the server could not be asked, which is unknown — never "signed
+        // out". On mount the ladder above has already spent its retries with
+        // `isLoading` still true; leave the existing state alone.
       } else {
         setUser(null);
       }
     } catch {
-      setUser(null);
+      // Unknown, not signed out — same reasoning as the transient branch.
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  const refreshUser = useCallback(() => checkUser(false), [checkUser]);
+
   useEffect(() => {
-    refreshUser();
-  }, [refreshUser]);
+    checkUser(true);
+  }, [checkUser]);
 
   const login = useCallback(
     async (email: string, password: string) => {

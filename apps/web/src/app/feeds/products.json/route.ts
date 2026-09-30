@@ -80,7 +80,18 @@ export async function GET() {
     // read this).
     next: storeId ? { revalidate: 600, tags: [`products:${storeId}`] } : { revalidate: 600 },
   });
-  if (!upstream.ok) return new Response('Not found', { status: 404 });
+  // Only the API's definitive 404 is "no feed here". Any other failure (429,
+  // 5xx) means the API could not be asked (#2224's class): answering 404 would
+  // tell a feed consumer the store has no feed, and `.json` is on Cloudflare's
+  // default-cacheable list, so the edge could hold that false 404. 503 +
+  // no-store makes the consumer retry and caches nothing.
+  if (upstream.status === 404) return new Response('Not found', { status: 404 });
+  if (!upstream.ok) {
+    return new Response('Product feed temporarily unavailable', {
+      status: 503,
+      headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' },
+    });
+  }
 
   return new Response(await upstream.text(), {
     status: 200,

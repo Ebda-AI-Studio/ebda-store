@@ -33,6 +33,21 @@ type ProductEntry = {
 };
 
 const STORE_LIST_PAGE_SIZE = 100;
+
+/**
+ * The API that a sitemap enumerates could not be asked (#2127). Thrown rather
+ * than degraded to an empty list: a 200 with an empty `<urlset/>` makes Google
+ * Search Console record "0 discovered URLs" and replace its last-good state,
+ * while a 5xx makes it retry and keep the previous sitemap. "Could not ask" is
+ * kept distinct from a genuinely empty answer (zero stores / zero products),
+ * the same contract `fetchCategories` in llms.txt/route.ts follows.
+ */
+class SitemapSourceUnavailableError extends Error {
+  constructor(detail: string) {
+    super(`sitemap source unavailable: ${detail}`);
+    this.name = 'SitemapSourceUnavailableError';
+  }
+}
 const STORE_LIST_MAX_PAGES = 50;
 
 /**
@@ -61,8 +76,13 @@ async function fetchStores(): Promise<{
         status: res.status,
         fetchedSoFar: stores.length,
       });
-      // Page 1 failing means we know nothing about the total; a later page
-      // failing leaves the remaining pages' stores unfetched.
+      // Page 1 failing means we know nothing at all — not "zero stores" but
+      // "could not ask" (#2127). Throw so the route 5xxs and Google keeps its
+      // last-good copy, instead of a 200 empty <urlset/> that overwrites it.
+      if (page === 1) {
+        throw new SitemapSourceUnavailableError(`store list page 1 → HTTP ${res.status}`);
+      }
+      // A later page failing leaves the remaining pages' stores unfetched.
       return {
         stores,
         storesNeverFetched:
@@ -104,13 +124,19 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
       next: { revalidate: 3600 },
       headers: { 'Content-Type': 'application/json', 'x-store-domain': host },
     });
-    if (!res.ok) return null;
+    // 404 is the API's definitive "no store owns this host" (platform path,
+    // preview host). Anything else is "could not ask" (#2127): falling through
+    // to the master branch would serve a merchant's custom domain the
+    // PLATFORM's URLs, so fail the render instead.
+    if (res.status === 404) return null;
+    if (!res.ok) throw new SitemapSourceUnavailableError(`host resolve → HTTP ${res.status}`);
     const data = await res.json();
     const store = data?.data?.store;
     if (!store?.id || !store?.slug) return null;
     return { id: store.id, slug: store.slug };
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof SitemapSourceUnavailableError) throw error;
+    throw new SitemapSourceUnavailableError('host resolve → network error');
   }
 }
 
@@ -141,7 +167,15 @@ async function fetchProducts(storeId: string, maxPages: number): Promise<Product
         headers: { 'Content-Type': 'application/json', 'X-Store-ID': storeId },
       }
     );
-    if (!res.ok) break;
+    if (!res.ok) {
+      // Page 1 is "could not ask" — the caller decides (the tenant branch
+      // fails the render; the master fan-out degrades that one store to
+      // static pages and counts it). A later page keeps what was fetched.
+      if (page === 1) {
+        throw new SitemapSourceUnavailableError(`products page 1 → HTTP ${res.status}`);
+      }
+      break;
+    }
     const data = await res.json();
     // Keep only the three fields the sitemap reads (#1290). The API returns
     // the full storefront payload (descriptions, images, variants, store) —
@@ -232,7 +266,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // plus 1 unpaginated bundle-list request (see fetchBundles) — 12
     // subrequests worst case, nowhere near any Worker limit.
     const [products, bundles] = await Promise.all([
-      fetchProducts(tenant.id, 10).catch(() => [] as ProductEntry[]),
+      // No catch (#2127): a products outage must 5xx this merchant's own
+      // sitemap, not publish it with every product URL missing.
+      fetchProducts(tenant.id, 10),
       fetchBundles(tenant.id),
     ]);
     const entries: MetadataRoute.Sitemap = [];
@@ -291,13 +327,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // sitemap URL that redirects is reported by GSC as "Page with redirect".
   const siteUrl = getSiteUrl();
 
-  let stores: StoreListEntry[] = [];
-  let storesNeverFetched = 0;
+  // A failure here THROWS (#2127): `fetchStores` raises on a page-1 failure,
+  // and a network/parse error propagates, so the route 5xxs and Google keeps
+  // the last-good sitemap. Only a successful answer of zero stores (possible
+  // pre-launch) renders an empty sitemap.
+  let stores: StoreListEntry[];
+  let storesNeverFetched: number;
   try {
     ({ stores, storesNeverFetched } = await fetchStores());
   } catch (error) {
-    console.error('sitemap: failed to fetch stores', error);
-    return [];
+    console.error('sitemap: store list unavailable — failing the render (5xx)', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
 
   // Bounded fan-out. `fetchStores()` pages up to 50x100 = 5000 stores, and one

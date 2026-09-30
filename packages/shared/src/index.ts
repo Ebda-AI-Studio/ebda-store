@@ -16,3 +16,4 @@ export * from './order-lines';
 export * from './order-tax';
 export * from './order-action-visibility';
 export * from './order-status-transitions';
+export * from './order-tax-display';

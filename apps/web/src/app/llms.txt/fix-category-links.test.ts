@@ -219,3 +219,110 @@ describe('perStoreResponse — the served body, not just the builder', () => {
     expect(body).not.toContain('## Product Feed');
   });
 });
+
+// #2131 — each generated section is deduped on its OWN heading.
+describe('perStoreResponse — per-section append on a stored override', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const okApi = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/public/categories')
+          ? new Response(JSON.stringify({ data: { categories: [] } }), { status: 200 })
+          : new Response(JSON.stringify({ data: { products: [] } }), { status: 200 })
+      )
+    );
+  const base = { id: 's1', name: 'P', slug: 'p', domain: 'p.example', status: 'active' };
+  const count = (body: string, needle: string) => body.split(needle).length - 1;
+
+  it('an override that already documents the feed gets no second ## Product Feed', async () => {
+    okApi();
+    const llmsTxt = '# P\n\n## Product Feed\n\n- [feed](https://p.example/feeds/products.json)';
+    const body = await (
+      await perStoreResponse({ ...base, llmsTxt, enabledFeatures: ['agent_feed'] })
+    ).text();
+    expect(count(body, '## Product Feed')).toBe(1);
+  });
+
+  it('an override that already carries the MCP section still receives the feed section', async () => {
+    okApi();
+    const llmsTxt = '# P\n\n## Agentic checkout (MCP)\n\n- MCP endpoint: x';
+    const body = await (
+      await perStoreResponse({
+        ...base,
+        llmsTxt,
+        enabledFeatures: ['agent_feed', 'agent_checkout'],
+      })
+    ).text();
+    expect(count(body, '## Agentic checkout (MCP)')).toBe(1);
+    expect(count(body, '## Product Feed')).toBe(1);
+    expect(body).toContain('https://p.example/feeds/products.json');
+  });
+});
+
+// #2224 — the AUTO-BUILT body enumerates categories and products, so a failed
+// fetch of either must not publish "0 categories" / "0 products".
+describe('perStoreResponse — auto-build under a failed upstream fetch', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const store = { id: 's1', name: 'P', slug: 'p', domain: 'p.example', status: 'active' };
+  function stub(opts: { categories: 'ok' | 'fail'; products: 'ok' | 'fail' | 'fail-page-2' }) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes('/public/categories')) {
+          return opts.categories === 'ok'
+            ? new Response(
+                JSON.stringify({ data: { categories: [{ name: 'Nuts', slug: 'nuts' }] } })
+              )
+            : new Response('busy', { status: 503 });
+        }
+        if (opts.products === 'fail') return new Response('busy', { status: 429 });
+        if (opts.products === 'fail-page-2' && u.includes('page=2')) {
+          return new Response('busy', { status: 503 });
+        }
+        const n = opts.products === 'fail-page-2' && u.includes('page=1') ? 100 : 1;
+        const products = Array.from({ length: n }, (_, i) => ({
+          name: `Item ${i}`,
+          slug: `item-${i}`,
+          price: 1000,
+        }));
+        return new Response(JSON.stringify({ data: { products } }));
+      })
+    );
+  }
+
+  it('categories could not be asked → 503 + Retry-After, never "Categories (0)"', async () => {
+    stub({ categories: 'fail', products: 'ok' });
+    const res = await perStoreResponse(store);
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Retry-After')).toBe('60');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(await res.text()).not.toContain('## Categories (0)');
+  });
+
+  it('products could not be asked → 503, never "Products (0 total"', async () => {
+    stub({ categories: 'ok', products: 'fail' });
+    const res = await perStoreResponse(store);
+    expect(res.status).toBe(503);
+    expect(await res.text()).not.toContain('Products (0 total');
+  });
+
+  it('a later products page failing is not published as a short, "complete" list', async () => {
+    stub({ categories: 'ok', products: 'fail-page-2' });
+    const res = await perStoreResponse(store);
+    expect(res.status).toBe(503);
+  });
+
+  it('both fetched → 200 with the long edge TTL (control)', async () => {
+    stub({ categories: 'ok', products: 'ok' });
+    const res = await perStoreResponse(store);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('## Categories (1)');
+    expect(body).toContain('## Products (1 total, showing 1)');
+    expect(res.headers.get('Cache-Control')).toBe(
+      'public, s-maxage=600, stale-while-revalidate=86400'
+    );
+  });
+});

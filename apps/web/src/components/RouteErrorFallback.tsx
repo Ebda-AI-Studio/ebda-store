@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLanguage, translations } from '../contexts/LanguageContext';
@@ -65,14 +65,35 @@ interface RouteErrorFallbackProps {
  * walk the shopper off their store. When the store DID resolve (the layout
  * got it, the page's own fetch failed) the chrome's links are correct and it
  * stays.
+ *
+ * PLATFORM HOST ONLY (#2223). The sentinel's prefix-less links are wrong only
+ * where bare `/` is not the merchant's store. On a CUSTOM domain `useStoreUrl`
+ * never adds a prefix (`isPlatform && …` in StoreContext), so the chrome's
+ * `/products`, logo and nav links there were always the merchant's own — the
+ * same distinction the "Go Home" gate below draws (#1841 CORRECTION). Dropping
+ * the chrome on a custom domain removed every working escape route from the
+ * majority production configuration.
  */
 export function useBareErrorFallback(error: Error & { digest?: string }): boolean {
   const { store } = useStore();
-  return isStoreTemporarilyUnavailable(error) && store.id === 'demo';
+  const isPlatform = useIsPlatform();
+  return isStoreTemporarilyUnavailable(error) && store.id === 'demo' && isPlatform;
 }
 
 /** Ignore Try Again clicks this soon after the previous one (#1842). */
 const RETRY_COOLDOWN_MS = 2000;
+
+/**
+ * Longest the button stays disabled waiting for a refresh (#2130). The pending
+ * flag of `useTransition` only clears when `router.refresh()` settles, and the
+ * dependency that refresh waits on is by definition the API that just failed —
+ * a hung refresh would latch the page's ONLY control (the bare platform-host
+ * transient page has no chrome and no Go Home) in "Retrying…" forever. After
+ * this long the button re-enables, and a click then does a full reload of the
+ * CURRENT url, which stays on the merchant's host (SR-7 is not at risk) and
+ * cannot be stuck behind the pending transition.
+ */
+export const RETRY_MAX_BUSY_MS = 8000;
 
 export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
   const { t } = useLanguage();
@@ -81,6 +102,17 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
   const router = useRouter();
   const [isRetrying, startTransition] = useTransition();
   const lastRetryAt = useRef(0);
+  // True from a click until RETRY_MAX_BUSY_MS later; the button is disabled
+  // only while BOTH this and the transition are busy (#2130).
+  const [retryBusy, setRetryBusy] = useState(false);
+  const busyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (busyTimer.current) clearTimeout(busyTimer.current);
+    },
+    []
+  );
+  const buttonBusy = isRetrying && retryBusy;
 
   /**
    * "Try Again" must actually retry.
@@ -107,8 +139,17 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
   // last are ignored.
   const retry = () => {
     const now = Date.now();
-    if (isRetrying || now - lastRetryAt.current < RETRY_COOLDOWN_MS) return;
+    if (buttonBusy || now - lastRetryAt.current < RETRY_COOLDOWN_MS) return;
     lastRetryAt.current = now;
+    if (isRetrying) {
+      // The previous soft refresh never settled (#2130) — a hard reload of the
+      // current url is the one retry a hung transition cannot block.
+      window.location.reload();
+      return;
+    }
+    setRetryBusy(true);
+    if (busyTimer.current) clearTimeout(busyTimer.current);
+    busyTimer.current = setTimeout(() => setRetryBusy(false), RETRY_MAX_BUSY_MS);
     startTransition(() => {
       router.refresh();
       reset();
@@ -191,11 +232,11 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
       <div className="flex gap-3">
         <button
           onClick={retry}
-          disabled={isRetrying}
-          aria-busy={isRetrying}
+          disabled={buttonBusy}
+          aria-busy={buttonBusy}
           className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70"
         >
-          {isRetrying ? t('Retrying…', translations['Retrying…']) : t('Try Again', 'حاول مرة أخرى')}
+          {buttonBusy ? t('Retrying…', translations['Retrying…']) : t('Try Again', 'حاول مرة أخرى')}
         </button>
         {/* "Go Home" is suppressed during a transient ONLY on a platform host.
             We do not know which store this is there — `getStore()` fell back

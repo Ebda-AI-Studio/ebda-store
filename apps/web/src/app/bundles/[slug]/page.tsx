@@ -39,6 +39,11 @@ export async function generateMetadata({
 
 export default async function BundleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const [{ slug }, store] = await Promise.all([params, getStoreOrNotFound()]);
+  // Same locale generateMetadata resolves, so the JSON-LD names agree with
+  // the page's <title> (#2196).
+  const locale = await resolveStorefrontLocale(
+    (store.settings as Record<string, unknown> | undefined)?.defaultLanguage as string | undefined
+  );
 
-  return <BundleDetailBody store={store} slug={decodeRouteParam(slug)} />;
+  return <BundleDetailBody store={store} slug={decodeRouteParam(slug)} locale={locale} />;
 }

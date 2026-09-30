@@ -103,21 +103,26 @@ export async function resolveAgentStore(): Promise<AgentStore | null> {
 }
 
 /**
- * True when THIS request's store identity came from the sticky
- * `x-store-slug` cookie fallback (middleware.ts's "subroute with no slug in
- * the URL" branch — exactly the shape of `/llms.txt` and the two
- * `.well-known/*` discovery paths on a bare platform-host request), not from
- * an explicit URL slug segment or a custom-domain Host. middleware.ts sets
- * `x-store-slug-source: cookie` ONLY on that branch and clears it everywhere
- * else, so its presence here is not client-spoofable through the normal
- * request path.
+ * True when THIS request's store identity came from the sticky `x-store-slug`
+ * cookie fallback rather than a URL slug segment or a custom-domain Host.
  *
- * A response resolved this way must not be marked publicly/shared-cacheable:
- * the exact same request line can answer with a different merchant's data
- * depending on which visitor's cookie it carried (scoped-audit P2 on
- * PR #1942 — `Vary: Cookie` alone doesn't help here because Cloudflare's
- * cache ignores `Vary` outside its Enterprise-only feature, see
- * apps/api/src/lib/edge-cache.ts).
+ * SECOND LINE OF DEFENCE ONLY — unreachable in production today (#2174). The
+ * load-bearing control is middleware.ts's `URL_KEYED_PUBLIC_PATHS` guard
+ * (#1959): for `/llms.txt`, `/.well-known/acp.json`, `/.well-known/ucp` and
+ * `/feeds/products.json` the middleware never reads the cookie at all, so it
+ * never sets `x-store-slug-source: cookie` on these paths (and it strips any
+ * client-supplied copy of that header). This function therefore returns false
+ * for every real request to the agent routes. It stays so that a future
+ * change which lets the cookie reach these paths degrades to `private`
+ * instead of to a cross-tenant shared-cache entry — but do NOT simplify the
+ * middleware guard on the strength of it: the unit tests that exercise this
+ * branch inject the header directly and prove nothing about the real path.
+ * The real path is pinned by tests/unit/agent-discovery-real-path.test.ts.
+ *
+ * Why the cookie must never make these responses shared-cacheable: the same
+ * request line would answer with a different merchant depending on which
+ * visitor's cookie it carried, and Cloudflare's cache ignores `Vary` outside
+ * its Enterprise-only feature (apps/api/src/lib/edge-cache.ts).
  */
 export async function resolvedViaCookie(): Promise<boolean> {
   const h = await headers();

@@ -5,7 +5,13 @@ import { API_URL, type PublicBundleDetail } from '../../../lib/api';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
 import { buildOgImages } from '../../../lib/seo/og-images';
 import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
-import { bundleJsonLd, breadcrumbJsonLd, storeAbsoluteUrl } from '../../../lib/structured-data';
+import {
+  bundleJsonLd,
+  breadcrumbJsonLd,
+  storeAbsoluteUrl,
+  localizedField,
+  BREADCRUMB_LABELS,
+} from '../../../lib/structured-data';
 import { JsonLd } from '../../../components/JsonLd';
 import BundleDetailClient from './BundleDetailClient';
 
@@ -119,7 +125,16 @@ export function buildBundleMetadata(
   };
 }
 
-export async function BundleDetailBody({ store, slug }: { store: ResolvedStore; slug: string }) {
+export async function BundleDetailBody({
+  store,
+  slug,
+  locale = 'en',
+}: {
+  store: ResolvedStore;
+  slug: string;
+  /** The locale the page's <title>/og resolved to — the JSON-LD must match it (#2196). */
+  locale?: StorefrontLocale;
+}) {
   const initialBundle = store.id !== 'demo' ? await fetchInitialBundle(slug, store) : null;
 
   // Genuine miss (unknown slug, cross-store slug, deactivated bundle, or
@@ -133,12 +148,12 @@ export async function BundleDetailBody({ store, slug }: { store: ResolvedStore; 
 
   const jsonLdScripts = initialBundle
     ? [
-        bundleJsonLd(initialBundle, store),
+        bundleJsonLd(initialBundle, store, locale),
         breadcrumbJsonLd([
-          { name: 'Home', url: storeAbsoluteUrl(store, '') },
-          { name: 'Bundles', url: storeAbsoluteUrl(store, '/bundles') },
+          { name: BREADCRUMB_LABELS[locale].home, url: storeAbsoluteUrl(store, '') },
+          { name: BREADCRUMB_LABELS[locale].bundles, url: storeAbsoluteUrl(store, '/bundles') },
           {
-            name: initialBundle.name,
+            name: localizedField(initialBundle.name, initialBundle.nameAr, locale),
             url: storeAbsoluteUrl(store, `/bundles/${initialBundle.slug}`),
           },
         ]),

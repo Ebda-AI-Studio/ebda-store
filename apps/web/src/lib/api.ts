@@ -368,9 +368,10 @@ interface CreateOrderData {
 const COOKIE_ROTATED = 'cookie-rotated';
 
 /**
- * Returned by refreshAccessToken() when the server REJECTED the refresh (401).
- * NOT a token and NOT a success. The server clears both auth cookies on that
- * answer (auth.routes.ts POST /auth/refresh), so the browser is now genuinely
+ * Returned by refreshAccessToken() when the server REJECTED the refresh (401)
+ * or found no refresh token to rotate (400, #2148). NOT a token and NOT a
+ * success. The server clears any auth cookies on both answers (auth.routes.ts
+ * POST /auth/refresh), so the browser is now genuinely
  * cookieless — the state in which csrfProtection's no-cookie branch lets a
  * guest-reachable write (POST /payments/create) through. A CSRF-403 is
  * therefore worth retrying ONCE after it; a plain 401 is not.
@@ -432,6 +433,66 @@ function hasSessionEvidence(): boolean {
     localStorage.getItem('refreshToken') !== null ||
     localStorage.getItem('csrfToken') !== null
   );
+}
+
+/**
+ * One evidence-free refresh probe per TAB, for the session check only (#2164).
+ *
+ * `hasSessionEvidence()` reads localStorage alone, and Safari ITP evicts
+ * localStorage while the server-set `refresh_token` cookie survives — exactly
+ * the iOS state the localStorage mirroring exists for. With every marker gone
+ * the gate refused the refresh, `/auth/me` stayed a 401, and a signed-in
+ * customer was rendered a guest indefinitely (and checked out as one).
+ *
+ * Letting that cohort through without re-opening #2157 (one anonymous refresh
+ * per PAGE LOAD starving the shared `<ip>-refresh-anon` bucket) means capping
+ * the evidence-free attempt at one per tab session: `sessionStorage` survives
+ * navigations and reloads within a tab and is dropped when the tab closes.
+ * Only `GET /auth/me` may spend it — it is the one call whose 401 means "is
+ * there a session here at all?". No sessionStorage (private mode, a throwing
+ * accessor) means no probe: the conservative side of the budget.
+ */
+const SESSION_PROBE_KEY = 'authProbe';
+
+function claimSessionProbe(endpoint: string, options: RequestInit): boolean {
+  if (typeof window === 'undefined') return false;
+  if (endpoint !== '/auth/me' || (options.method || 'GET').toUpperCase() !== 'GET') return false;
+  try {
+    const ss = window.sessionStorage;
+    if (!ss || ss.getItem(SESSION_PROBE_KEY) !== null) return false;
+    ss.setItem(SESSION_PROBE_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Auth routes a 401/CSRF-403 must NEVER send through a refresh (#2097).
+ *
+ * The loop guard only needs to exclude `/auth/refresh` itself (its own 401/429
+ * handling lives in refreshAccessToken(), a raw fetch). The rest of this list
+ * is the credential-LESS entry points: a 401 there means wrong credentials or
+ * a bad link, which a refresh cannot fix. Every other `/auth/` route sits
+ * behind `authenticate` (/auth/me, /auth/change-password, …) and heals on a
+ * refresh exactly like a non-auth route — change-password used to be folded
+ * into a blanket `/auth/` skip, so an expired access token or a pre-CSRF
+ * session made it fail with nothing to recover it.
+ */
+const NO_REFRESH_AUTH_ROUTES = new Set([
+  '/auth/refresh',
+  '/auth/login',
+  '/auth/register',
+  '/auth/logout',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
+  '/auth/resend-verification',
+  '/auth/mfa/verify',
+]);
+
+export function endpointMayRefresh(endpoint: string): boolean {
+  return !NO_REFRESH_AUTH_ROUTES.has(endpoint.split('?')[0]);
 }
 
 /**
@@ -530,10 +591,19 @@ class ApiClient {
           body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
         });
         if (res.status === 429) throw new RefreshThrottledError();
-        if (res.status === 401) {
-          // The server cleared both auth cookies on this answer: this browser
-          // holds no session any more, so it must stop presenting itself as one
-          // that could be refreshed.
+        // 401 (the presented token failed) and 400 (no refresh token was
+        // presented at all) are the SAME fact for this browser: the server
+        // holds no session for it, and on either answer it has cleared any
+        // auth cookies the browser still carried (#1531 — the 400 branch now
+        // clears dead `token`/`refresh_token` cookies too). The route's ONLY
+        // 400 is that no-token branch. Reading the 400 as a plain failure
+        // (`null`) left a CSRF-403 un-retried, so the shopper's first write
+        // after the heal still failed — the heal only took effect on the NEXT
+        // request (#2148) — and it kept stale evidence alive, buying one
+        // doomed refresh per page load.
+        if (res.status === 401 || res.status === 400) {
+          // This browser holds no session any more, so it must stop
+          // presenting itself as one that could be refreshed.
           clearSessionEvidence();
           return SESSION_ENDED;
         }
@@ -643,14 +713,13 @@ class ApiClient {
       }
 
       // On 401 (or a CSRF 403), attempt a single token refresh and retry.
-      // /auth/ endpoints are skipped in general — the loop guard only needs
-      // to exclude /auth/refresh itself, whose own 401/429 handling lives in
-      // refreshAccessToken() above (a raw fetch, not a recursive call through
-      // here). /auth/me is exempted from the skip: it's how AuthContext
-      // learns the customer is still signed in, and with the blanket skip a
-      // 401 there could never trigger a refresh — a customer returning after
-      // the 30-minute access-token window (with a perfectly valid 365-day
-      // refresh token) was rendered signed-out with nothing to recover it.
+      // Only the credential-less /auth/ entry points are skipped
+      // (`endpointMayRefresh`, #2097); /auth/refresh is the loop guard. /auth/me
+      // must refresh: it's how AuthContext learns the customer is still signed
+      // in, and a 401 there that could never trigger a refresh rendered a
+      // customer returning after the 30-minute access-token window (with a
+      // perfectly valid 365-day refresh token) signed-out with nothing to
+      // recover it (#1789). /auth/change-password heals the same way.
       //
       // A plain 401 additionally requires EVIDENCE that a session ever existed
       // in this browser (`hasSessionEvidence`). /auth/me is called on every
@@ -662,10 +731,15 @@ class ApiClient {
       // user-paced rather than per-page-load, and it is the one case where a
       // session can be alive in the cookies while localStorage was evicted
       // (Safari ITP) — the state #1526 exists to heal.
+      //
+      // The one exception to the evidence rule is `claimSessionProbe`: a single
+      // evidence-free `/auth/me` refresh per tab, for the Safari-ITP cohort
+      // whose localStorage was evicted while the refresh cookie survived
+      // (#2164). Evaluated LAST so a browser with evidence never spends it.
       if (
         shouldRefreshRetry &&
-        (csrfRejected || hasSessionEvidence()) &&
-        (!endpoint.startsWith('/auth/') || endpoint === '/auth/me')
+        endpointMayRefresh(endpoint) &&
+        (csrfRejected || hasSessionEvidence() || claimSessionProbe(endpoint, options))
       ) {
         // A throttle must not read as a rejection. The storefront has
         // nothing to retry with here, so it returns the original response —
@@ -1286,6 +1360,54 @@ class ApiClient {
 
 export const api = new ApiClient(API_URL);
 export { API_URL };
+
+/**
+ * `/auth/me` answers that say nothing about the session: the server (or the
+ * network between) could not be asked. A throttled refresh or a direct 429
+ * (`RATE_LIMITED`), a timeout, a dropped connection, a non-JSON 502/503 page
+ * from the edge (`INVALID_RESPONSE`), or a server-side 5xx. "Could not ask" is
+ * unknown, never "signed out" (#2096's class on the storefront, #2098).
+ */
+const TRANSIENT_SESSION_CODES = new Set([
+  'RATE_LIMITED',
+  'NETWORK_ERROR',
+  'TIMEOUT',
+  'INVALID_RESPONSE',
+  'INTERNAL_ERROR',
+  'DATABASE_ERROR',
+  'COMMIT_TIMEOUT',
+]);
+
+export function isTransientSessionAnswer(result: { success: boolean; error?: { code: string } }) {
+  return !result.success && TRANSIENT_SESSION_CODES.has(result.error?.code ?? '');
+}
+
+/**
+ * The storefront's mount-time session check, with the same bounded ladder
+ * admin and orders run (`checkSessionWithMountRetries`, Ruling P2-B2-5):
+ * a transient answer is retried after each delay before the caller settles.
+ *
+ * Without it the RATE_LIMITED branch in AuthContext was a no-op on the only
+ * path that matters (#2158/#2098): on mount `user` is already null, so
+ * "leave the state alone" rendered a signed-in customer a guest, `isLoading`
+ * went false, and nothing ever re-checked. AuthContext keeps `isLoading` true
+ * across this whole call, so no consumer renders the guest UI mid-retry.
+ * Same 3 × 5s budget as the other two frontends; a throttle that outlasts it
+ * falls through to the pre-existing behaviour (guest render, cookies intact).
+ */
+export const PROFILE_MOUNT_RETRY_DELAYS_MS = [5_000, 5_000, 5_000] as const;
+
+export async function getProfileWithMountRetries(
+  sleep: (ms: number) => Promise<void> = ms => new Promise(r => setTimeout(r, ms))
+) {
+  let result = await api.getProfile();
+  for (const delay of PROFILE_MOUNT_RETRY_DELAYS_MS) {
+    if (!isTransientSessionAnswer(result)) break;
+    await sleep(delay);
+    result = await api.getProfile();
+  }
+  return result;
+}
 export type {
   User,
   Product,

@@ -178,6 +178,7 @@ export async function handleOrderStatusChanged(
             ),
             subtotal: order.subtotal,
             tax: order.tax,
+            taxIncludedInPrice: order.taxIncludedInPrice,
             shipping: order.shipping,
             total: order.total,
             shippingAddress: shippingAddrFull,

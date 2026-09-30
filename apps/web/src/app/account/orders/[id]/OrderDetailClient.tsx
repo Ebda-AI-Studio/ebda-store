@@ -12,7 +12,7 @@ import {
   formatDate as formatStoreDate,
   formatDateTime as formatStoreDateTime,
 } from '@/lib/format-date';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay, orderTaxPlacement } from '@force/shared';
 
 interface OrderDetail {
   id: string;
@@ -22,6 +22,8 @@ interface OrderDetail {
   paymentStatus: string;
   subtotal: number;
   tax: number;
+  /** Frozen at sale time (Ruling M3-8): `tax` is already inside subtotal/total. */
+  taxIncludedInPrice?: boolean;
   shipping: number;
   discount: number;
   total: number;
@@ -332,6 +334,7 @@ export default function OrderDetailClient() {
   const displayRows = groupOrderLinesForDisplay(order.items);
 
   const shippingAddr = order.shippingAddress;
+  const taxPlacement = orderTaxPlacement(order);
   const successfulPayment = order.payments?.find(
     p => p.status === 'completed' || p.status === 'paid'
   );
@@ -585,12 +588,15 @@ export default function OrderDetailClient() {
               </span>
               <span className="text-foreground">{formatPrice(order.subtotal)}</span>
             </div>
-            {order.tax > 0 && (
+            {/* Exclusive tax is a summed row; inclusive tax is already inside
+                subtotal/total and renders as a caption after Total instead
+                (orderTaxPlacement, issue 2210). */}
+            {(taxPlacement.taxRow ?? 0) > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
                   {t('Tax', '\u0627\u0644\u0636\u0631\u064a\u0628\u0629')}
                 </span>
-                <span className="text-foreground">{formatPrice(order.tax)}</span>
+                <span className="text-foreground">{formatPrice(taxPlacement.taxRow ?? 0)}</span>
               </div>
             )}
             {order.shipping > 0 && (
@@ -683,6 +689,12 @@ export default function OrderDetailClient() {
               </span>
               <span className="font-semibold text-foreground">{formatPrice(order.total)}</span>
             </div>
+            {taxPlacement.includedTaxCaption !== null && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{t('Incl. VAT', 'شامل ضريبة القيمة المضافة')}</span>
+                <span>{formatPrice(taxPlacement.includedTaxCaption)}</span>
+              </div>
+            )}
             {/* Customer wallet (D1): the part paid from store credit, and the
                 rest the customer paid (or pays on delivery). */}
             {(order.walletAmount ?? 0) > 0 && (

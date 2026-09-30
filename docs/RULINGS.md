@@ -36,7 +36,10 @@ segment boundaries emitted the same prefix-less links. The segment boundaries no
 fallback without chrome when the error is the transient AND the client holds the unresolved
 sentinel (`useBareErrorFallback`). When the store did resolve, the chrome stays: its links are
 correct. Cost if wrong: during a transient the PLP/PDP/cart/checkout retry page shows no header,
-matching the root boundary.
+matching the root boundary. **Amended 2026-10-01 (EWO-G2, #2223):** the bare fallback is scoped
+to a PLATFORM host (`&& isPlatform`). On a custom domain `useStoreUrl` never prefixes, so the
+chrome's links there were always the merchant's own and it now stays — the same host distinction
+the "Go Home" gate already drew (#1841).
 
 **Ruling O2-4 — #1201: `www.google.com` is added to `connect-src` only, not `script-src`.** The Ads
 conversion runtime loads from `www.googleadservices.com` / `googleads.g.doubleclick.net` (both
@@ -1709,6 +1712,13 @@ auth fix could land on two of three surfaces and look complete. The alias is
 added, the orders copy is covered by the same suite as admin and web, and both
 orders defences are registered in `docs/security/defence-mutations.json`.
 
+> AMENDED 2026-10-01 (issues 2158 / 2098 / 2097 — Ruling EWO-A11, EWO-A10):
+> the paragraph below is superseded. After #1789 `/auth/me` DOES refresh, so
+> the "no caller" premise no longer held, and the RATE_LIMITED branch was a
+> no-op on mount. `apps/web` now runs `getProfileWithMountRetries` (the same
+> 3 × 5s ladder), and the refresh skip is the credential-less-route list
+> `endpointMayRefresh`, not an `/auth/me` special case.
+
 `apps/web` deliberately does NOT get the retry loop, and that is not a
 third miss. Its `AuthContext.refreshUser` calls `/auth/me`, and the storefront
 client skips the refresh-retry path entirely for `/auth/` endpoints — so the
@@ -2185,7 +2195,8 @@ follow-up lands; no live store has tax on (per the owner, 2026-09-25; not re-mea
 `CheckoutClient` (the awaited removal in the refusal handler, `setStep(1)`, and the PaymentStep
 gate) are asserted on the source, for the reason recorded in P2-B2-2: no DOM environment exists in
 this repo. Each assertion was mutation-checked against the pre-fix file. Cost if wrong: a refactor
-that keeps the strings but breaks the behaviour passes.
+that keeps the strings but breaks the behaviour passes. _(Amended by EWO-D1 — the "fee lands"
+premise was false on the failure branch; the gate now closes on an unconfirmed fee, #2067.)_
 
 **Ruling M3-5 — the loyalty reversals lock inside a separate `withMoneyTx`, as the array batch they
 replace already ran.** Inside the Inngest step's `runInTenantContext`, `$transaction` is not proxied
@@ -2274,6 +2285,11 @@ Known residual, NOT fixed here: the invoice PDF (`invoice.service.ts`) still pri
 summed row between Subtotal and Total, so an inclusive order's invoice reads as an arithmetic
 error — the same P2 the storefront closed by moving the inclusive case to a caption after Total.
 Display-only; no money moves wrong.
+
+_Amended 2026-10-01 (issue 2210, Ruling EWO-C1):_ the residual was wider than the invoice — the
+storefront order detail (`OrderDetailClient.tsx`), the admin `SummaryCard` and the orders-PWA
+`SummaryCard` printed the same summed row. All four now take the placement from
+`orderTaxPlacement` (`@force/shared`); see EWO-C1/EWO-C2 for what is fixed and what remains.
 
 **Ruling M3-9 — overrides M3-7's accepted residual: the CHARGE now uses the SAME gate as the
 DISPLAY (owner decision, 2026-09-26, on a production read-only check: 0 rows in `tax_rates` and
@@ -2497,7 +2513,7 @@ naming the product and refetching the cart so /cart shows the mark. A line whose
 `draft`/`archived` is NOT flagged — checkout does not refuse those either, and changing that is a
 separate product decision. Cost if wrong: a cart whose every loose line is deleted shows checkout's
 "Your cart is empty" screen rather than the refusal copy, because the summary no longer lists
-unorderable lines.
+unorderable lines. _(Residual closed by EWO-D2 — #2116/#2117.)_
 
 ## 2026-09-30 — Analytics batch 1 (branch `fix/analytics-batch-1`, PR #2220)
 
@@ -2965,3 +2981,293 @@ known — the casts could never have succeeded on this schema.
 mutation and is kept.** Its `orderId IN (...)` comes from an already store-scoped page and order ids
 are globally unique, so removing `storeId` changes no observable result (an equivalent mutant). It
 stays as defence in depth. Cost if wrong: none; it is one indexed predicate.
+
+## 2026-10-01 — backlog batch e-web-orders (branch `fix/backlog-e-web-orders`)
+
+Context: 49 `audit-followup` P2 findings on the storefront (`apps/web`) and the orders PWA
+(`apps/orders`). Ruling ids are `EWO-<cluster><n>`.
+
+### Cluster A — auth/session (orders, admin, storefront)
+
+**Ruling EWO-A1 — issues 2096 / 2161 / 2165: the admin + orders session check reports five outcomes, and
+only `signed-out` changes state.** `checkSession` now returns `unavailable` for a non-401, non-429
+answer on `/auth/me` (5xx during a deploy, a mis-routed 404) and `throttled` for a 429 there (so the
+mount ladder retries it); `checkAuth` leaves `user` untouched on both. A module-level session
+generation, bumped by every `storeSession` (login/MFA) and every logout, is re-checked before each
+destructive step, and a check whose generation moved — or whose caller says a newer check started —
+returns `superseded` and applies nothing. The orders provider keeps re-checking on every navigation
+(#1814) but tags each run; an older ladder stops at its next sleep and only the newest run clears
+`isLoading`. The session-check block stays byte-identical between `apps/admin/src/lib/api.ts` and
+`apps/orders/src/lib/api.ts` (Ruling P2-B2-5). Evidence: `tests/unit/orders-auth-session-races.test.ts`,
+7 mutations × 2 clients all red. Cost if wrong: a staff user whose `/auth/me` keeps 5xx-ing on a cold
+mount (user already null) still lands on /login, where the next check recovers them — the same as before.
+
+**Ruling EWO-A2 — issue 2160: logout is authoritative through a pending-logout marker, not a UI
+toast.** `performLogout` writes `pendingLogout` (the iOS refresh token to revoke, empty on the cookie
+path) BEFORE `POST /auth/logout` and removes it only on a 2xx. While it exists, every session check
+(admin and orders, a reload of /login included) re-sends the logout instead of reading `/auth/me`
+and reports `signed-out`; only an explicit login lifts it. The finding's second suggestion — surface
+the failure and retry in the UI — is not built: the marker already retries on every check and the
+user is shown signed out, which is the true client state. Residual: until connectivity returns the
+server-side refresh token stays live (it was never revoked), so a stolen copy remains usable for that
+window exactly as before. Cost if wrong: a staff member on a device that never regains connectivity
+to the API keeps an un-revoked session server-side with no on-screen warning.
+
+**Ruling EWO-A10 — issues 2164 / 2157: the storefront spends ONE evidence-free `/auth/me` refresh per
+tab.** #2157 (anonymous page loads posting `/auth/refresh` into the shared `<ip>-refresh-anon`
+bucket) was already closed on main by `hasSessionEvidence()`; #2164 shows that gate locked out the
+Safari-ITP cohort (localStorage evicted, refresh cookie alive) it exists for. `claimSessionProbe`
+(`apps/web/src/lib/api.ts`) lets exactly one `GET /auth/me` per tab session (`sessionStorage`
+`authProbe`) refresh without evidence; no sessionStorage → no probe. Anonymous cost goes from 0 to at
+most 1 refresh per tab (vs 1 per page load before #2157's gate). Evidence:
+`tests/unit/storefront-session-refresh-gates.test.ts` (5 loads → 1 refresh; iOS cohort recovers;
+removing the probe reddens 2 tests). Cost if wrong: on a heavily shared CGNAT IP the anon bucket
+absorbs one extra POST per new tab, which could still tip a borderline IP into 429 for its signed-in
+customers.
+
+**Ruling EWO-A11 — issues 2158 / 2098: the storefront gets the mount ladder; a transient `/auth/me`
+answer is unknown, never signed out.** `getProfileWithMountRetries` (3 × 5s, same budget as
+admin/orders) runs on mount with `isLoading` held true; RATE_LIMITED, TIMEOUT, NETWORK_ERROR,
+INVALID_RESPONSE and server 5xx codes (`isTransientSessionAnswer`) are retried and, if they outlast
+the ladder, leave `user` untouched — as does a later `refreshUser()` (the Ruling P2-B2-5 amendment's
+"the next refreshUser() call gets another chance" was unreachable on mount; the AuthContext comment
+now says what actually happens). Residual: under a sustained throttle every `isLoading`-gated
+storefront surface (account pages, checkout's signed-in affordances) waits up to ~15s before
+settling as a guest. Cost if wrong: a customer on a throttled IP sees a spinner for 15s and still
+ends up a guest, exactly the pre-fix outcome but slower.
+
+**Ruling EWO-A12 — issue 2148: the refresh route's 400 is read as SESSION_ENDED on the storefront.**
+Client-only fix: `/auth/refresh`'s only 400 is the "no refresh token presented" branch, which now
+clears dead session cookies, so it is the same fact as the 401 — the CSRF-403'd write is retried
+once on the SAME request and stale localStorage evidence is dropped. No server discriminator code
+was added (keeps the defence-mutation `refresh-no-token-clears-dead-cookies` find-string intact). A
+genuinely cookieless 400 costs at most one extra retry of a request that already failed. Admin and
+orders keep `!res.ok → null`: an admin session is never the guest-CSRF victim (platform origins).
+Cost if wrong: if the route ever grows a second 400 (e.g. body validation), a storefront CSRF-403
+would be retried once needlessly and local session evidence cleared, costing one mount refresh.
+
+### Cluster C — order summaries + tax display
+
+**Ruling EWO-C1 — issue 2210: inclusive VAT renders as a caption after Total on every post-purchase
+order summary.** `orderTaxPlacement(order)` (`packages/shared/src/order-tax-display.ts`) reads the
+frozen `Order.taxIncludedInPrice` (M3-8) and returns either a summed-row amount (exclusive, the
+default and every existing order) or an "Incl. VAT" caption amount (inclusive). Wired into the
+storefront order detail, the admin SummaryCard, the orders-PWA SummaryCard (a fourth surface the
+issue did not name) and the invoice HTML. No payload change was needed: all three order-detail
+reads (`OrderService.getById`, `InvoiceService.generateInvoice`) use `include`, which already
+returns every scalar column. Display only — no amount, total, charge or persisted value changes.
+Tests: `tests/unit/order-tax-display-post-purchase.test.ts` + both SummaryCard render tests;
+breaking the helper's inclusive branch turns 6 tests red. Cost if wrong: an inclusive order's
+summary omits the tax row it previously (wrongly) summed — nothing is live today (0 active
+inclusive-VAT rates, M3-9).
+
+**Ruling EWO-C2 — the order e-mails follow the same placement (closed in the same batch).**
+`order-confirmation.ts` (order-created + payment-success e-mails, en + ar) now takes its tax row and
+an "Incl. VAT / شامل ضريبة القيمة المضافة" caption after Total from `orderTaxPlacement`;
+`OrderEmailData` carries `taxIncludedInPrice`, passed by `order-created.ts` and
+`order-status-changed.ts` (both load the full order row via `include`). Pinned by
+`tests/unit/order-confirmation-email-tax.test.ts` (2 red with the placement input dropped).
+Exclusive-tax e-mails are byte-for-byte unchanged. Cost if wrong: none for existing orders — every
+row has `taxIncludedInPrice=false` and 0 inclusive rates are active.
+
+**Ruling EWO-C3 — issues 2207 and 2052 are closed as already fixed on main.** 2207: the orders-PWA
+SummaryCard already splits `loyaltyDiscount` out of `otherDiscount`. 2052: the orders PWA takes
+both the map and the payment-capture gate from `@force/shared` (`orderStatusOptions`), and
+`ActionFooter` derives its transitions from that gate. Evidence is in the close comments.
+Cost if wrong: none; both are reads of current code.
+
+### Cluster D — checkout + cart
+
+**Ruling EWO-D1 — #2067: the checkout submit gates on "is the delivery fee confirmed", not on "is
+a reprice in flight". Amends M3-4.** `calculateShipping` never throws — a non-2xx and a network
+error both resolve after `setShippingError(true)` — so `repriceAfterCouponRemoval`'s `finally`
+reopened Place Order over the coupon's stale 0 fee. `calculateShipping` now resolves `true` only
+when a quote landed, tracks `shippingQuotePending`, and drops superseded answers (a slower
+response for a previous area can no longer overwrite the current fee). `isShippingSettled`
+(`shippingError`, pending, repricing) gates both step-1 Continue buttons, the Pay button's busy
+state, and `handleSubmit` itself — a failed quote sends the customer back to step 1, where the
+delivery panel's Retry lives. No amount expression changed: the server prices shipping at order
+creation; this only stops a submit on a fee the summary never confirmed. Still source-pinned
+(P2-B2-2), each pin mutation-checked. Cost if wrong: a customer on a flapping shipping endpoint
+cannot continue until a quote lands, instead of ordering on an unconfirmed fee.
+
+**Ruling EWO-D2 — #2116/#2117: an unavailable (deleted-product) line is announced on /checkout and
+enforced on /cart; closes R3-4's residual.** /cart's two checkout CTAs (theme `CartSummary` via the
+existing `ctaDisabled`/`ctaBlockedMessage` props, which all five themes already honour, and the
+default list) now gate on `belowMinimumOrder || hasUnavailableLines`. /checkout derives the notice
+from the UNFILTERED cart lines: a banner with a link to /cart above the form, a `handleSubmit`
+guard that shows the same copy instead of advancing, and — when every loose line is unavailable
+and there are no bundles — a dedicated "Nothing in your cart can be ordered" state checked BEFORE
+the generic "Your cart is empty" screen, which was false for that cart. The summary still excludes
+the lines from its arithmetic (R3-4). Cost if wrong: a shopper who ignores both notices is stopped
+client-side one step earlier than the server would have stopped them — the same outcome, sooner.
+
+**Ruling EWO-D3 — #2053: the bundle stock note keeps its quantity-aware trigger; its copy now
+names the case, and no client-side submit block is added.** The finding's premise — that the
+server gate is only the boolean `isPurchasable` — is incomplete: `OrderService.create`'s atomic
+per-component decrement (Ruling T5-c) refuses `INSUFFICIENT_INVENTORY` whenever stock is below the
+requested quantity, so `available < quantity` IS the server's semantic, and the checkout already
+maps that refusal to copy (`checkout-bundle-errors.ts`). What was wrong was the label: "Out of
+stock" for a box with 2 of 5 left. It now reads "Only N available" (`available > 0`) or "Out of
+stock" (`0`), en + ar, pinned by a jsdom render test over both layouts. The Pay button is NOT
+disabled client-side because backorder eligibility (the feature flag + per-product
+`allowBackorder`) is not in the cart payload, and the decrement accepts a backordered component —
+blocking there would refuse orders the server takes. Cost if wrong: a shopper who ignores the note
+submits and meets the server's INSUFFICIENT_INVENTORY copy one round-trip later.
+
+**Ruling EWO-D4 — #2047/#2050: the delivery-window picker and submit read the same clock.**
+`nowMinutes` is state refreshed every 30s and on `visibilitychange`; a picked window whose cutoff
+passes is dropped with a specific "no longer available — pick another" message (both while the
+page is open and at submit, which also writes its clock reading back so the picker renders the
+lapse). `findStillBookableWindow` treats a today→tomorrow rollover as a lapse (ids are reused for
+tomorrow, so an id match used to move a "today" booking to tomorrow silently) and a
+tomorrow→today midnight crossing as the same slot. Cost if wrong: a customer idling across a
+cutoff sees their slot cleared with an explanation and re-picks — never an order without the slot
+they believe they booked.
+
+### Cluster E — middleware, headers, static assets
+
+**Ruling EWO-E1 — #2153: middleware strips every header it asserts before deriving them; the
+two matcher-excluded routes that read them are an accepted residual.** `MIDDLEWARE_ASSERTED_HEADERS`
+(`x-is-platform`, `x-store-slug`, `x-store-slug-source`, `x-store-domain`, `x-store-identifier`,
+`x-preview-draft`, `x-original-host`) is deleted from the copied request headers first, so only the
+Host / URL / cookie / preview params can set them. The class was wider than the issue named: a
+spoofed `x-store-domain` on a platform URL made `/llms.txt` and `/feeds/products.json` answer as
+another store under `public, s-maxage`. Pinned by the `#2153` block in
+`tests/unit/web-middleware-characterization.test.ts` (3 cases red with the strip removed). Residual:
+`/api/store-favicon` is outside the matcher and still reads a raw `x-store-domain` on a DIRECT hit
+(its only intended caller is the middleware rewrite); the worst outcome is a 302 to another store's
+public favicon for the requester, and the path has no extension Cloudflare caches by default. Cost if
+wrong: a shared cache configured to cache `/api/*` would serve that redirect to other visitors of the
+same host for up to an hour.
+
+**Ruling EWO-E2 — #2091: `x-is-platform` is a tri-state; custom domains now assert `false`.**
+`layout.tsx` reads it through `isPlatformFromHeader` (absent → `undefined`), and `handleCustomDomain`
+sets `'false'` explicitly, so ABSENT means only "middleware did not run", which is when
+StoreProvider's client-side `isPlatformHost()` fallback must run. SSR output is unchanged for both
+host classes. This makes the 2026-09-25 "falls back when the header is absent" ruling true.
+Cost if wrong: none for rendered HTML — both host classes seed the same value as before.
+
+**Ruling EWO-E3 — `/manifest.webmanifest` runs through middleware again (found while sweeping
+#2153 / #1731's matcher class).** Excluded since 2026-03-16 "so it is not treated as a store slug";
+`extractStoreSlug` has skipped dotted segments since, and the exclusion meant `app/manifest.ts` never
+saw `x-store-domain`: `curl https://pecannbee.com.kw/manifest.webmanifest` on 2026-10-01 returned
+`{"name":"Force",…,"theme_color":"#ff6e00"}` — every custom-domain merchant's install prompt showed
+the platform identity. Cost if wrong: the manifest now does one extra middleware pass per install
+check; no rewrite applies to it (pinned by tests).
+
+**Ruling EWO-E4 — #709 and #1980 stay open: both are findings on the tenant-routing canary work,
+and the fix belongs in open PR #1979 (`feat/tenant-routing-canary`), not this batch.** #1980's code
+(`STOREFRONT_TENANT_ROUTING_ROUTES`) does not exist on `main` @ 726f4231. #709's duplicate
+pixels/JSON-LD in `tenant-store/[tenant]/[locale]/layout.tsx` is real on `main` but inert
+(`STOREFRONT_TENANT_ROUTING` unset everywhere) and PR #1979 item 2 removes it. Fixing either here
+would conflict with that branch. Cost if wrong: if #1979 is abandoned, #709 must be picked up before
+anyone sets the flag — the docs/ENVIRONMENT.md entry already says "do not set it anywhere yet".
+
+### Cluster F — agent discovery, llms.txt, SEO, i18n
+
+**Ruling EWO-F1 — #2174: the `viaCookie → private` branches in llms.txt / acp.json / ucp are
+KEPT as an unreachable second line of defence, with their comments rewritten; they are not
+deleted.** middleware.ts's `URL_KEYED_PUBLIC_PATHS` guard (#1959) never reads the sticky cookie on
+these four paths, and the middleware now also strips a client-supplied `x-store-slug-source`, so
+`resolvedViaCookie()` is false for every real request. Deleting the branches would leave the
+middleware's `x-store-slug-source` assertion with no reader. The comments now name the middleware
+guard as load-bearing, and `tests/unit/agent-discovery-real-path.test.ts` drives `middleware()` and
+feeds the route only what it forwarded (mutating the guard to `false` turns 6/7 red). Cost if wrong:
+dead code that a reader could still mistake for the real control — mitigated by the comments and
+the real-path test.
+
+**Ruling EWO-F2 — #2224: a per-store llms.txt AUTO-BUILD answers 503 (`Retry-After: 60`,
+`no-store`) when categories OR products could not be asked; `fetchProducts` now returns `null` for
+"could not ask" (any page failing, including a later one).** A body that enumerates "0 categories"
+/ "0 products" / a silently short list is a false statement to every crawler; a 503 is retried and
+caches nothing. The stored-override branch has no enumerations of its own and keeps serving (short
+`s-maxage=60` when categories were not fetched). The same collapse was fixed in
+`/feeds/products.json` (every upstream failure used to answer a cacheable `404 Not found`; now
+404 only on the API's own 404, else 503 no-store). acp.json/ucp enumerate nothing. Cost if wrong:
+during an API blip an auto-built llms.txt is unavailable for ~60s rather than served degraded.
+
+**Ruling EWO-F3 — #2127: the sitemap THROWS (route 5xx) when its source could not be asked —
+store-list page 1, a thrown store-list fetch, a non-404 custom-domain host resolve, and a
+custom-domain products page 1.** A 200 empty `<urlset/>` overwrote GSC's last-good state; the host
+resolve failure used to fall through to the PLATFORM sitemap on a merchant's own domain. A
+master-sitemap store whose own fan-out fails still degrades to static pages (logged, existing
+behaviour, O2-1). Cost if wrong: a persistent API outage leaves GSC on a stale-but-valid sitemap
+instead of an empty one — the intended trade.
+
+**Ruling EWO-F4 — #2194/#2195: Arabic PWA identity ships as EXTRA manifest members (`name_ar`,
+`short_name_ar`, `description_ar`) on the one API manifest, not as a `?lang=` variant.** One
+`pwa:<storeId>`-tagged fetch then serves both locales, so `PWAService.updateSettings`' single tag
+bust refreshes both and no cache-key contract changes; browsers ignore unknown manifest members.
+`name_ar` falls back to `store.nameAr`; `description_ar` to `تسوق في <name>`. Under `ar` the
+storefront never falls back to the English API description. Residual: the live custom-domain
+manifest only reflects this once the middleware matcher change (a sibling fix in this batch that
+stops excluding `manifest.webmanifest`) is deployed — until then custom domains serve the platform
+manifest regardless. `apps/admin/src/app/manifest.ts` is admin chrome, English by design, and out
+of scope. Cost if wrong: a consumer that reads the raw API manifest sees three non-standard keys.
+
+**Ruling EWO-F5 — #2196: JSON-LD names follow the page locale on the PDP (both trees), the bundle
+detail page and the Organization block; listing-page breadcrumbs/ItemLists are NOT changed in this
+batch.** `localizedField` + `BREADCRUMB_LABELS` in `lib/structured-data.ts` are the shared helpers;
+under `ar` a Product/Bundle `description` is the Arabic one or omitted (the metadata's own rule),
+never English. The Home / PLP / Categories / About / Contact / FAQ / Bundles-index pages still emit
+English breadcrumb labels and `name: p.name` in their ItemLists — those pages' own `<title>`s were
+not localized by #1987, so there is no same-page contradiction to fix there yet. Cost if wrong: an
+Arabic listing page's breadcrumb rich result reads "Home › Products" — follow-up is to thread the
+same locale through those bodies with these helpers.
+
+**Ruling EWO-F6 — #2193: in Arabic, a meaningful English axis name that the option-name map can
+translate outranks value detection, mirroring the English branch.** `Size` + `185 Gram` now reads
+"Size" / "الحجم" (was "Size" / "الوزن"). An English name the map cannot translate (e.g. "Pack
+size") still falls to value detection in Arabic. Pinned as EN/AR pairs in
+`tests/unit/option-localization.test.ts`. Cost if wrong: an OSOSS weight axis stored as "Size"
+reads "الحجم" rather than "الوزن" on Arabic storefronts — the merchant's own word, translated, over
+an inference.
+
+**Note — #1958 closed as already fixed:** acp.json (`authentication.write: 'api_key'`
+unconditionally) and ucp (`auth.write: 'api_key'` unconditionally) no longer branch on
+`agent_checkout_open_writes`, and `tests/unit/well-known-agent-discovery.test.ts` asserts
+non-disclosure with the hatch on — all three surfaces agree (fixed in #1942).
+
+### Cluster G — product cards, error fallback, UI
+
+**Ruling EWO-G1 — #1998 is left to the owner; the desktop badge tier is not changed.** On desktop
+(`lg:`) the theme cards' CTA band and modern/elegant's heart are hidden at rest and slide in on
+hover, so the reserved tiers float the chip ~96px up with nothing under it at rest. Scoping them to
+`lg:bottom-3` would instead put the chip UNDER the band while hovered. Which of the two states wins
+is a look decision on every store's desktop grid (Ahmad's #1994 call was "overlays stay put, the
+chip moves"), not a defect with one right answer. Cost if wrong: desktop shoppers keep seeing the
+sale chip lifted off the image corner at rest until the owner picks.
+
+**Ruling EWO-G2 — amends O2-3 (#2223).** See the O2-3 amendment above: bare fallback only on a
+platform host. Cost if wrong: a custom-domain transient shows the chrome, whose links are the
+merchant's own — no off-store walk is possible there.
+
+**Ruling EWO-G3 — #1996: lifted badge tiers are clamped to the image box; the compound short-box
+case is an accepted residual.** `bottom-[min(6rem,calc(100%-2.25rem))]` (9rem when stacked; the
+chip below a stacked one reserves 4.5rem) keeps every tall-box placement byte-identical and stops
+a 16:9 / short square image from clipping the chip away. On a box shorter than the CTA band plus a
+chip there is no pixel that is both inside the image and clear of the band, so the chip may sit
+over the band there. Cost if wrong: on a 16:9 `sm` card on mobile the chip overlaps the Add-to-Cart
+band instead of disappearing — visible, not lost.
+
+**Ruling EWO-G4 — #2129: only `token:primary|secondary|accent|card|muted` get a paired foreground;
+a raw hex keeps white.** The paired var is a contrast decision the platform already made
+(`deriveBrandRoles`); for an arbitrary hex it would be a new design decision that flips live cards.
+Cost if wrong: a merchant who picks a pale RAW hex still gets white text on it.
+
+**Ruling EWO-G5 — #2130: the retry button re-enables after 8s (`RETRY_MAX_BUSY_MS`) and the next
+click hard-reloads the current url.** A second soft refresh would queue behind the hung one; a
+reload stays on the merchant's host, so SR-7 is untouched. Cost if wrong: a refresh that was merely
+slow (>8s) gets superseded by a full reload — one extra page load.
+
+**Ruling EWO-G6 — #2110's blank-string fallback is applied to product and category NAMES only, not
+to page-builder section copy.** `pickLocalizedName` now covers every product/category name display
+path: a product with a blank name is never intentional, and the API accepts `nameAr: ''`. The same
+`xAr ?? x` idiom remains in merchant-authored section copy (`FormCard` ×5, `HeroBanner`,
+`SectionHeading`, `BrandStoryBlock`, `useRtlText`, `BottomTabBar`, `MinimalChrome`,
+`FloatingWidget`, `useOrderSummaryBase`, the footer copyright override). There, a blank Arabic field
+can be a deliberate "show nothing in Arabic", and changing it would change what live Arabic
+storefronts render. That is a look change, not a bug fix, under the batch's standing rule. Cost if
+wrong: a merchant who cleared an Arabic section field by accident sees an empty heading in Arabic
+instead of the English one until they fill it in.

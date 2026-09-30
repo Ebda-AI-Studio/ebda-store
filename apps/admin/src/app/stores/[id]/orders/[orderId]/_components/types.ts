@@ -90,6 +90,8 @@ export interface OrderDetail {
   source?: string | null;
   subtotal: number;
   tax: number;
+  /** Frozen at sale time (Ruling M3-8): `tax` is already inside subtotal/total. */
+  taxIncludedInPrice?: boolean;
   shipping: number;
   discount: number;
   total: number;

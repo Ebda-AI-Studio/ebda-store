@@ -246,9 +246,11 @@ interface StoreProviderProps {
   previewDraftToken?: string;
   /**
    * Server-resolved platform-host check (`middleware.ts`'s `x-is-platform`
-   * header, read in `layout.tsx`). Optional so any caller that hasn't been
-   * updated still falls back to the client-side `isPlatformHost()` detection
-   * below instead of failing to compile.
+   * header, read in `layout.tsx` via `isPlatformFromHeader`). `undefined`
+   * — header absent, i.e. middleware did not run for this render, or a
+   * caller that passes nothing — falls back to the client-side
+   * `isPlatformHost()` detection below (#2091: `layout.tsx` used to collapse
+   * absent into `false`, which made this fallback unreachable).
    */
   initialIsPlatform?: boolean;
 }

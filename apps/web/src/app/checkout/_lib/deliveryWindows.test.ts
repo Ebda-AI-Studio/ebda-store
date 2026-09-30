@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeWindowAvailability,
+  findStillBookableWindow,
   formatWindowTime,
   getNowMinutesInTimezone,
   orderByMinutes,
@@ -201,5 +202,55 @@ describe('getNowMinutesInTimezone', () => {
     const now = new Date('2026-07-15T10:30:00Z');
     // UTC stays 10:30.
     expect(getNowMinutesInTimezone('UTC', now)).toBe(10 * 60 + 30);
+  });
+});
+
+describe('findStillBookableWindow (#2047/#2050)', () => {
+  const MORNING: DeliveryWindowItem = {
+    id: 'am',
+    label: 'Morning',
+    labelAr: 'صباحًا',
+    start: '10:00',
+    end: '12:00',
+    orderBy: '10:00',
+  };
+  const AFTERNOON: DeliveryWindowItem = {
+    id: 'pm',
+    label: 'Afternoon',
+    labelAr: 'بعد الظهر',
+    start: '14:00',
+    end: '17:00',
+    orderBy: '14:00',
+  };
+  const items = [MORNING, AFTERNOON];
+
+  it('keeps a window whose cutoff has not passed', () => {
+    const fresh = resolveDeliverySelection(items, 9 * 60 + 55);
+    expect(findStillBookableWindow(fresh, 'am', 'today')?.id).toBe('am');
+  });
+
+  it('drops a same-day window whose cutoff passed while another is still open', () => {
+    // Picked at 09:55, submitted at 10:03: the morning slot closed.
+    const fresh = resolveDeliverySelection(items, 10 * 60 + 3);
+    expect(fresh.day).toBe('today');
+    expect(findStillBookableWindow(fresh, 'am', 'today')).toBeUndefined();
+  });
+
+  it('does NOT silently move a today booking to tomorrow on rollover', () => {
+    // Every cutoff passed: the picker rolls over and REUSES the ids.
+    const fresh = resolveDeliverySelection(items, 15 * 60);
+    expect(fresh.day).toBe('tomorrow');
+    expect(fresh.windows.find(w => w.id === 'pm')?.available).toBe(true);
+    expect(findStillBookableWindow(fresh, 'pm', 'today')).toBeUndefined();
+  });
+
+  it('keeps a tomorrow booking across midnight (same slot, now "today")', () => {
+    const fresh = resolveDeliverySelection(items, 5);
+    expect(fresh.day).toBe('today');
+    expect(findStillBookableWindow(fresh, 'am', 'tomorrow')?.id).toBe('am');
+  });
+
+  it('returns undefined with nothing selected', () => {
+    expect(findStillBookableWindow(resolveDeliverySelection(items, 0), null, null)).toBeUndefined();
   });
 });

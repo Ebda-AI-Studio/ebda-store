@@ -435,3 +435,75 @@ describe('sitemap — master-branch contract fixes', () => {
     );
   });
 });
+
+// #2127 — "could not ask" must 5xx (Google keeps the last-good sitemap), never
+// serve a 200 empty <urlset/> that overwrites it.
+describe('sitemap — could-not-ask vs genuinely empty', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  function stubWith(handler: (url: URL) => { ok: boolean; status: number; body?: unknown }) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const r = handler(new URL(String(input)));
+        return { ok: r.ok, status: r.status, json: async () => r.body ?? {} };
+      })
+    );
+  }
+
+  it('master branch: page-1 store-list failure throws instead of returning []', async () => {
+    hostRef.host = 'store.test';
+    stubWith(u =>
+      u.pathname.endsWith('/public/store/resolve')
+        ? { ok: false, status: 404 }
+        : { ok: false, status: 503 }
+    );
+    await expect(sitemap()).rejects.toThrow(/sitemap source unavailable/);
+  });
+
+  it('master branch: a thrown store-list fetch propagates (5xx), not []', async () => {
+    hostRef.host = 'store.test';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        if (String(input).includes('/public/store/resolve')) {
+          return { ok: false, status: 404, json: async () => ({}) };
+        }
+        throw new Error('ECONNRESET');
+      })
+    );
+    await expect(sitemap()).rejects.toThrow();
+  });
+
+  it('master branch: a successful answer of zero stores is a legitimately empty sitemap', async () => {
+    hostRef.host = 'store.test';
+    installFetchMock({ tenant: null, stores: [], productCounts: {} });
+    await expect(sitemap()).resolves.toEqual([]);
+  });
+
+  it('host resolve failing (not 404) does not fall through to the platform sitemap', async () => {
+    hostRef.host = 'merchant.example';
+    stubWith(u =>
+      u.pathname.endsWith('/public/store/resolve')
+        ? { ok: false, status: 429 }
+        : { ok: true, status: 200, body: { data: [], pagination: { totalPages: 1 } } }
+    );
+    await expect(sitemap()).rejects.toThrow(/host resolve/);
+  });
+
+  it('tenant branch: a products page-1 failure fails the render instead of dropping every product URL', async () => {
+    hostRef.host = 'merchant.example';
+    stubWith(u => {
+      if (u.pathname.endsWith('/public/store/resolve')) {
+        return { ok: true, status: 200, body: { data: { store: { id: 's1', slug: 'm' } } } };
+      }
+      if (u.pathname.endsWith('/public/products')) return { ok: false, status: 503 };
+      return { ok: false, status: 404 };
+    });
+    await expect(sitemap()).rejects.toThrow(/products page 1/);
+  });
+});

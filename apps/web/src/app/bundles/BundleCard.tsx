@@ -103,14 +103,18 @@ export function BundleCard({ bundle }: BundleCardProps) {
               </span>
             )}
           </div>
-          <Button
-            size="sm"
-            onClick={handleAddToCart}
-            isLoading={isAdding}
-            className="relative z-10"
-          >
-            {t('Add to Cart', translations['Add to Cart'])}
-          </Button>
+          {/* #2198: the positioned z-10 layer is this WRAPPER, not the Button.
+              While adding, @force/ui's Button is `disabled` and its base class
+              carries `disabled:pointer-events-none`, so a z-10 BUTTON became
+              transparent to hit-testing and the tap fell through to the
+              stretched title link's `::after` overlay — navigating mid-add, the
+              exact #1557 symptom. The span is never pointer-events-none, so it
+              absorbs the tap in every state. */}
+          <span className="relative z-10 shrink-0">
+            <Button size="sm" onClick={handleAddToCart} isLoading={isAdding}>
+              {t('Add to Cart', translations['Add to Cart'])}
+            </Button>
+          </span>
         </div>
       </div>
     </div>

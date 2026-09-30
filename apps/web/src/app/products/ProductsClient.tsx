@@ -1,5 +1,6 @@
 'use client';
 
+import { pickLocalizedName } from '../../templates/shared/display-helpers';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -251,7 +252,7 @@ export default function ProductsClient({
   const ctxAr =
     categoryFilter === 'best-sellers'
       ? 'الأكثر مبيعاً'
-      : (activeCategory?.nameAr ?? activeCategory?.name ?? translations['All Products']);
+      : (pickLocalizedName(activeCategory, true) ?? translations['All Products']);
   // Arabic reads "تصفح الدراجية" (with the definite article ال), not "تصفح دراجية".
   // Prepend ال for the subtitle phrase unless the name already carries it.
   const ctxArDefinite = ctxAr.startsWith('ال') ? ctxAr : `ال${ctxAr}`;

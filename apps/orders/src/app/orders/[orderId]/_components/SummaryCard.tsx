@@ -1,5 +1,6 @@
 'use client';
 
+import { orderTaxPlacement } from '@force/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney } from '@/lib/format';
 import type { OrderDetail } from '@/lib/orders';
@@ -15,6 +16,7 @@ interface SummaryCardProps {
  */
 export function SummaryCard({ order }: SummaryCardProps) {
   const { t, locale } = useLanguage();
+  const taxPlacement = orderTaxPlacement(order);
   const discountPct = order.subtotal > 0 ? Math.round((order.discount / order.subtotal) * 100) : 0;
 
   // Break the total discount into its levers — coupon, automatic promotion,
@@ -75,7 +77,17 @@ export function SummaryCard({ order }: SummaryCardProps) {
     ...(order.discount === 0
       ? [{ label: t.detail.discount, value: `${formatMoney(0, order.currency)} (0%)`, muted: true }]
       : []),
-    { label: t.detail.tax, value: formatMoney(order.tax, order.currency), muted: order.tax === 0 },
+    // Exclusive tax is a summed row; inclusive tax is already inside
+    // subtotal/total and is captioned after Total instead (issue 2210).
+    ...(taxPlacement.taxRow !== null
+      ? [
+          {
+            label: t.detail.tax,
+            value: formatMoney(taxPlacement.taxRow, order.currency),
+            muted: taxPlacement.taxRow === 0,
+          },
+        ]
+      : []),
     {
       label: t.detail.deliveryFee,
       value: formatMoney(order.shipping, order.currency),
@@ -105,6 +117,12 @@ export function SummaryCard({ order }: SummaryCardProps) {
             {formatMoney(order.total, order.currency)}
           </dd>
         </div>
+        {taxPlacement.includedTaxCaption !== null && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <dt>{t.detail.taxIncluded}</dt>
+            <dd>{formatMoney(taxPlacement.includedTaxCaption, order.currency)}</dd>
+          </div>
+        )}
         {/* Customer wallet (D1): what the courier collects on a COD order is
             the amount due, not the total, when part was paid from store credit. */}
         {walletAmount > 0 && (

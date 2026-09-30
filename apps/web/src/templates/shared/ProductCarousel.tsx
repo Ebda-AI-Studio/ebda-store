@@ -1,5 +1,6 @@
 'use client';
 
+import { pickLocalizedName } from './display-helpers';
 import type React from 'react';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import Image from 'next/image';
@@ -328,7 +329,7 @@ export function ProductCarousel({
             style={{ scrollbarWidth: 'thin' }}
           >
             {products.map((product, i) => {
-              const name = isRtl ? (product.nameAr ?? product.name) : product.name;
+              const name = pickLocalizedName(product, Boolean(isRtl)) ?? product.name;
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;
               const onSale = isOnSale(product);

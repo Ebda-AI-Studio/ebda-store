@@ -141,3 +141,27 @@ export function getNowMinutesInTimezone(timezone: string, now: Date = new Date()
   // Some environments render midnight as "24" under hour12:false — normalize.
   return (hour % 24) * 60 + minute;
 }
+
+/**
+ * The window the customer picked, if it can still be booked against `fresh`
+ * (a selection resolved at a LATER "now") — undefined when it lapsed (#2047,
+ * #2050).
+ *
+ * `pickedDay` is the day the picker showed when the customer chose. Two
+ * transitions matter:
+ * - today → tomorrow: every window's cutoff passed, the picker rolled over.
+ *   The ids are reused for tomorrow, so an id match alone would silently move
+ *   a "today 10:00" booking to TOMORROW. That is a lapse, not a match.
+ * - tomorrow → today: the clock crossed midnight. "Tomorrow 10:00" picked at
+ *   23:55 IS "today 10:00" at 00:05 — the same slot — so it stays valid if
+ *   its cutoff has not passed.
+ */
+export function findStillBookableWindow(
+  fresh: DeliverySelection,
+  selectedId: string | null,
+  pickedDay: DeliveryDay | null
+): DeliveryWindowAvailability | undefined {
+  if (!selectedId) return undefined;
+  if (pickedDay === 'today' && fresh.day === 'tomorrow') return undefined;
+  return fresh.windows.find(w => w.id === selectedId && w.available);
+}

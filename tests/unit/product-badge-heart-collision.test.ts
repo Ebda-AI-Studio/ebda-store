@@ -135,7 +135,7 @@ describe('resolveCardBadges — quick-add / CTA-band avoidance (issues #1609/#16
       orderable: true,
       bottomOverlay: 'both',
     });
-    expect(r.customBadgePositionCls).toBe('bottom-24 right-3');
+    expect(r.customBadgePositionCls).toBe('bottom-[min(6rem,calc(100%-2.25rem))] right-3');
   });
 
   it("a full-width CTA band ('both') lifts the DEFAULT corner in RTL too", () => {
@@ -145,7 +145,7 @@ describe('resolveCardBadges — quick-add / CTA-band avoidance (issues #1609/#16
       orderable: true,
       bottomOverlay: 'both',
     });
-    expect(r.customBadgePositionCls).toBe('bottom-24 right-3');
+    expect(r.customBadgePositionCls).toBe('bottom-[min(6rem,calc(100%-2.25rem))] right-3');
   });
 
   it("issue #1609 — a corner-only quick-add ('end') only lifts a badge on quick-add's OWN side", () => {
@@ -158,7 +158,7 @@ describe('resolveCardBadges — quick-add / CTA-band avoidance (issues #1609/#16
       orderable: true,
       bottomOverlay: 'end',
     });
-    expect(ltr.customBadgePositionCls).toBe('bottom-24 right-3');
+    expect(ltr.customBadgePositionCls).toBe('bottom-[min(6rem,calc(100%-2.25rem))] right-3');
 
     // A badge explicitly placed on the OTHER bottom corner never shares
     // quick-add's footprint, so it must NOT lift.
@@ -193,7 +193,9 @@ describe('resolveCardBadges — quick-add / CTA-band avoidance (issues #1609/#16
       customPosition: 'bottom-left',
       bottomOverlay: 'end',
     });
-    expect(rtlLeftCorner.customBadgePositionCls).toBe('bottom-24 left-3');
+    expect(rtlLeftCorner.customBadgePositionCls).toBe(
+      'bottom-[min(6rem,calc(100%-2.25rem))] left-3'
+    );
   });
 
   it('stacking (rule 4) AND overlay-lift compose to the highest tier', () => {
@@ -206,10 +208,11 @@ describe('resolveCardBadges — quick-add / CTA-band avoidance (issues #1609/#16
     });
     // Default corners differ (custom bottom-right, discount bottom-left),
     // so this is the "both render, same edge" stack case, PLUS the overlay.
-    expect(r.customBadgePositionCls).toBe('bottom-36 right-3');
+    expect(r.customBadgePositionCls).toBe('bottom-[min(9rem,calc(100%-2.25rem))] right-3');
     // The discount chip never stacks (rule 4 only ever lifts the custom
     // chip) but still clears the overlay on its own row.
-    expect(r.discountBadgePositionCls).toBe('bottom-24 left-3');
+    // It sits BELOW the stacked chip, so its clamp reserves that row (#1996).
+    expect(r.discountBadgePositionCls).toBe('bottom-[min(6rem,calc(100%-4.5rem))] left-3');
   });
 
   it('a heart-forced bottom corner also respects the overlay lift', () => {
@@ -224,7 +227,7 @@ describe('resolveCardBadges — quick-add / CTA-band avoidance (issues #1609/#16
       topEndReserved: true,
       bottomOverlay: 'both',
     });
-    expect(r.customBadgePositionCls).toBe('bottom-24 left-3');
+    expect(r.customBadgePositionCls).toBe('bottom-[min(6rem,calc(100%-2.25rem))] left-3');
   });
 });
 
@@ -251,5 +254,69 @@ describe('resolveCardBadges — collision avoidance never reopens the mutex or r
       topEndReserved: true,
     });
     expect(r.discountBadgeAllowed).toBe(false);
+  });
+});
+
+// Issue #1996 — the lifted tiers used to be absolute pixel offsets
+// (`bottom-24` = 96px, `bottom-36` = 144px) inside an aspect-ratio,
+// overflow-hidden image box. On a 16:9 image (~112px tall) the chip's top
+// edge left the box and was clipped out of existence. The tier must be
+// clamped to the box height, and the two clamps of a stacked pair must
+// reserve different room so they cannot collapse onto the same pixels.
+describe('resolveCardBadges — lifted tiers stay inside the image box (#1996)', () => {
+  /** Evaluate a `bottom-[min(Xrem,calc(100%-Yrem))]` class for a box height. */
+  function bottomPx(cls: string, boxPx: number): number {
+    const m = cls.match(/bottom-\[min\(([\d.]+)rem,calc\(100%-([\d.]+)rem\)\)\]/);
+    if (!m) throw new Error(`not a clamped tier: ${cls}`);
+    return Math.min(Number(m[1]) * 16, boxPx - Number(m[2]) * 16);
+  }
+  const CHIP_PX = 24;
+
+  it('every lifted tier is a clamp, never a bare pixel offset', () => {
+    for (const isRtl of [false, true]) {
+      for (const discountVisible of [false, true]) {
+        const r = resolveCardBadges({
+          product: OFFER,
+          isRtl,
+          orderable: true,
+          discountVisible,
+          bottomOverlay: 'both',
+        });
+        for (const cls of [r.customBadgePositionCls, r.discountBadgePositionCls]) {
+          expect(cls).not.toMatch(/\bbottom-(24|36)\b/);
+        }
+      }
+    }
+  });
+
+  it('a 112px (16:9) box keeps both chips fully inside and apart', () => {
+    const r = resolveCardBadges({
+      product: OFFER,
+      isRtl: false,
+      orderable: true,
+      discountVisible: true,
+      bottomOverlay: 'both',
+    });
+    const box = 112;
+    const custom = bottomPx(r.customBadgePositionCls, box);
+    const discount = bottomPx(r.discountBadgePositionCls, box);
+    // top edge of each chip stays inside the box
+    expect(custom + CHIP_PX).toBeLessThanOrEqual(box);
+    expect(discount + CHIP_PX).toBeLessThanOrEqual(box);
+    expect(discount).toBeGreaterThanOrEqual(0);
+    // the stacked chip stays a full row above the other
+    expect(custom - discount).toBeGreaterThanOrEqual(CHIP_PX);
+  });
+
+  it('a tall box keeps the measured 96px / 144px tiers exactly', () => {
+    const r = resolveCardBadges({
+      product: OFFER,
+      isRtl: false,
+      orderable: true,
+      discountVisible: true,
+      bottomOverlay: 'both',
+    });
+    expect(bottomPx(r.customBadgePositionCls, 400)).toBe(144);
+    expect(bottomPx(r.discountBadgePositionCls, 400)).toBe(96);
   });
 });

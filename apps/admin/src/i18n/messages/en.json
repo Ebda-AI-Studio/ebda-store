@@ -1168,6 +1168,7 @@
       "bundleSavings": "Bundle savings",
       "bundleBadge": "Bundle",
       "tax": "Taxes",
+      "taxIncluded": "Incl. VAT",
       "deliveryFee": "Delivery",
       "total": "Total",
       "items": "Items",

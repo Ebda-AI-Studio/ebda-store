@@ -1,3 +1,4 @@
+import { orderTaxPlacement } from '@force/shared';
 import { escapeHtml } from './_util';
 import type { OrderEmailData } from '../email.service';
 
@@ -8,6 +9,7 @@ export const orderConfirmationTemplate = {
   },
 
   en: (d: OrderEmailData, _storeName: string) => {
+    const { taxRow, includedTaxCaption } = orderTaxPlacement(d);
     const itemsHtml = d.items
       .map(
         item => `
@@ -40,10 +42,14 @@ export const orderConfirmationTemplate = {
           <td colspan="2">Subtotal</td>
           <td style="text-align: right;">${(d.subtotal / 1000).toFixed(3)} KWD</td>
         </tr>
-        <tr>
+        ${
+          taxRow !== null
+            ? `<tr>
           <td colspan="2">Tax</td>
-          <td style="text-align: right;">${(d.tax / 1000).toFixed(3)} KWD</td>
-        </tr>
+          <td style="text-align: right;">${(taxRow / 1000).toFixed(3)} KWD</td>
+        </tr>`
+            : ''
+        }
         <tr>
           <td colspan="2">Shipping</td>
           <td style="text-align: right;">${(d.shipping / 1000).toFixed(3)} KWD</td>
@@ -60,6 +66,13 @@ export const orderConfirmationTemplate = {
           <td colspan="2">Total</td>
           <td style="text-align: right;">${(d.total / 1000).toFixed(3)} KWD</td>
         </tr>
+        ${
+          includedTaxCaption !== null
+            ? `<tr>
+          <td colspan="3" style="text-align: right; color: #6b7280; font-size: 12px;">Incl. VAT ${(includedTaxCaption / 1000).toFixed(3)} KWD</td>
+        </tr>`
+            : ''
+        }
       </tfoot>
     </table>
 
@@ -75,6 +88,7 @@ export const orderConfirmationTemplate = {
   },
 
   ar: (d: OrderEmailData, _storeName: string) => {
+    const { taxRow, includedTaxCaption } = orderTaxPlacement(d);
     const itemsHtml = d.items
       .map(
         item => `
@@ -107,10 +121,14 @@ export const orderConfirmationTemplate = {
           <td colspan="2">المجموع الفرعي</td>
           <td style="text-align: right;">${(d.subtotal / 1000).toFixed(3)} د.ك</td>
         </tr>
-        <tr>
+        ${
+          taxRow !== null
+            ? `<tr>
           <td colspan="2">الضريبة</td>
-          <td style="text-align: right;">${(d.tax / 1000).toFixed(3)} د.ك</td>
-        </tr>
+          <td style="text-align: right;">${(taxRow / 1000).toFixed(3)} د.ك</td>
+        </tr>`
+            : ''
+        }
         <tr>
           <td colspan="2">الشحن</td>
           <td style="text-align: right;">${(d.shipping / 1000).toFixed(3)} د.ك</td>
@@ -127,6 +145,13 @@ export const orderConfirmationTemplate = {
           <td colspan="2">الإجمالي</td>
           <td style="text-align: right;">${(d.total / 1000).toFixed(3)} د.ك</td>
         </tr>
+        ${
+          includedTaxCaption !== null
+            ? `<tr>
+          <td colspan="3" style="text-align: right; color: #6b7280; font-size: 12px;">شامل ضريبة القيمة المضافة ${(includedTaxCaption / 1000).toFixed(3)} د.ك</td>
+        </tr>`
+            : ''
+        }
       </tfoot>
     </table>
 

@@ -85,6 +85,7 @@ export interface Messages {
     tax: string;
     shipping: string;
     deliveryFee: string;
+    taxIncluded: string;
     discount: string;
     coupon: string;
     promotion: string;
@@ -305,6 +306,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       tax: 'Tax',
       shipping: 'Shipping',
       deliveryFee: 'Delivery fee',
+      taxIncluded: 'Incl. VAT',
       discount: 'Discount',
       coupon: 'Coupon',
       promotion: 'Promotion',
@@ -525,6 +527,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       tax: 'الضريبة',
       shipping: 'الشحن',
       deliveryFee: 'رسوم التوصيل',
+      taxIncluded: 'شامل ضريبة القيمة المضافة',
       discount: 'الخصم',
       coupon: 'كوبون',
       promotion: 'عرض ترويجي',

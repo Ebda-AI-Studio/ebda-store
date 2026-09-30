@@ -155,6 +155,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       ),
       subtotal: order.subtotal,
       tax: order.tax,
+      taxIncludedInPrice: order.taxIncludedInPrice,
       shipping: order.shipping,
       discount: order.discount,
       couponCode: order.couponCode ?? undefined,

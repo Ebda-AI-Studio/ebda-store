@@ -647,7 +647,7 @@ describe('heart collision — modern/elegant (heart at top-end)', () => {
       // Both top corners are now spoken for (heart at top-right, NEW at
       // top-left) — same side as the merchant's chosen corner, but lifted
       // above the always-mounted CTA band per issue #1611/#1609.
-      expect(chip).toMatch(/\bbottom-24 right-3\b/);
+      expect(chip).toContain('bottom-[min(6rem,calc(100%-2.25rem))] right-3');
       expect(chip).not.toMatch(/\btop-3 left-3\b/);
       expect(chip).not.toMatch(/\btop-3 right-3\b/);
     }
@@ -672,6 +672,44 @@ describe('heart collision — modern/elegant (heart at top-end)', () => {
   );
 });
 
+// Issue #2092 — minimal renders its own NEW chip at LOGICAL top-start
+// (`absolute top-2 start-2`) but its `resolveCardBadges` call never passed
+// `newOrBrandBadgeReserved`, so a merchant's `top-left` custom badge resolved
+// straight onto the NEW chip (Palora runs minimal). No wishlist heart on
+// minimal, so the avoidance target is the other top corner.
+describe('NEW-badge corner — minimal (#2092)', () => {
+  it('LTR: a top-left badge on a NEW product moves off the NEW chip to top-right', () => {
+    const html = render(
+      MinimalProductCard,
+      { ...NO_SALE, ...LABEL, isNew: true },
+      { layout: layoutWith({ position: 'top-left', color: BADGE_COLOR }) }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 right-3\b/);
+    expect(chip).not.toMatch(/\btop-3 left-3\b/);
+  });
+
+  it('RTL: NEW sits at physical top-right, so a top-right badge moves to top-left', () => {
+    const html = render(
+      MinimalProductCard,
+      { ...NO_SALE, ...LABEL, isNew: true },
+      { language: 'ar', layout: layoutWith({ position: 'top-right', color: BADGE_COLOR }) }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 left-3\b/);
+  });
+
+  it('a product that is NOT new keeps the top-left corner (no regression)', () => {
+    const html = render(
+      MinimalProductCard,
+      { ...NO_SALE, ...LABEL, isNew: false },
+      { layout: layoutWith({ position: 'top-left', color: BADGE_COLOR }) }
+    );
+    const chip = stripBadgeChip(html).chips[0];
+    expect(chip).toMatch(/\btop-3 left-3\b/);
+  });
+});
+
 describe('bottom-band collision — the 5 theme cards never sit under the mobile CTA (issue #1611)', () => {
   // PecannbeeProductCard's Add-to-Cart button is a normal block element
   // below the image, not an overlay, so it is excluded here on purpose —
@@ -687,7 +725,7 @@ describe('bottom-band collision — the 5 theme cards never sit under the mobile
         { layout: layoutWith({ color: BADGE_COLOR }) }
       );
       const chip = stripBadgeChip(html).chips[0];
-      expect(chip).toMatch(/\bbottom-24\b/);
+      expect(chip).toContain('bottom-[min(6rem,calc(100%-2.25rem))]');
       expect(chip).not.toMatch(/\bbottom-3\b/);
     }
   );
@@ -737,7 +775,7 @@ describe('quick-add collision — ProductCarousel only lifts the side quick-add 
         { layout: layoutWith({ color: BADGE_COLOR }) }
       );
       const chip = stripBadgeChip(html).chips[0];
-      expect(chip).toMatch(/\bbottom-24 right-3\b/);
+      expect(chip).toContain('bottom-[min(6rem,calc(100%-2.25rem))] right-3');
     } finally {
       storeState.store.theme = {};
     }

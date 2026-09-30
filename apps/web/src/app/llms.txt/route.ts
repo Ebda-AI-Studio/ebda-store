@@ -168,8 +168,14 @@ async function fetchCategories(storeId: string): Promise<PublicCategory[] | null
 /**
  * Fetch up to 500 active products for a store.
  * The product service caps each page at 100, so we paginate up to 5 pages.
+ *
+ * Same contract as `fetchCategories` (#2224): `null` = the API could not be
+ * asked (any page non-2xx, network error, unparseable body) — distinct from
+ * `[]`, a store that genuinely has no active products. A partial list is
+ * `null` too: the body states a total, and "showing 100 of 100" after page 2
+ * failed is as false as "0 products".
  */
-async function fetchProducts(storeId: string): Promise<PublicProduct[]> {
+async function fetchProducts(storeId: string): Promise<PublicProduct[] | null> {
   const products: PublicProduct[] = [];
   const perPage = 100;
   const maxPages = 5;
@@ -186,15 +192,16 @@ async function fetchProducts(storeId: string): Promise<PublicProduct[]> {
           },
         }
       );
-      if (!res.ok) break;
+      if (!res.ok) return null;
       const json = await res.json();
-      const batch: PublicProduct[] = Array.isArray(json?.data?.products) ? json.data.products : [];
+      if (!Array.isArray(json?.data?.products)) return null;
+      const batch: PublicProduct[] = json.data.products;
       products.push(...batch);
 
       // Stop early if we got fewer than a full page
       if (batch.length < perPage) break;
     } catch {
-      break;
+      return null;
     }
   }
 
@@ -334,14 +341,25 @@ function storeBaseUrl(store: PublicStore): string {
  * every per-store body, not only the auto-built one.
  */
 function buildAgentSections(store: PublicStore, base: string): string {
+  return `${buildFeedSection(store, base)}${buildMcpSection(store, base)}`;
+}
+
+/** Heading of the generated product-feed section — also its dedupe sentinel. */
+export const FEED_SECTION_HEADING = '## Product Feed';
+/** Heading of the generated MCP section — also its dedupe sentinel. */
+export const MCP_SECTION_HEADING = '## Agentic checkout (MCP)';
+
+function buildFeedSection(store: PublicStore, base: string): string {
   // agent_feed is in every paid plan baseline (AI-first policy, 2026-07-21),
   // so this now advertises the feed on essentially every storefront. Still
   // conditional: a super-admin StoreFeature override can disable it for a
   // specific client, and the `free` (lapsed-payment grace) plan excludes it.
-  const feedSection = store.enabledFeatures?.includes('agent_feed')
-    ? `\n\n## Product Feed\n\n- [Machine-readable product feed (JSON)](${base}/feeds/products.json)`
+  return store.enabledFeatures?.includes('agent_feed')
+    ? `\n\n${FEED_SECTION_HEADING}\n\n- [Machine-readable product feed (JSON)](${base}/feeds/products.json)`
     : '';
+}
 
+function buildMcpSection(store: PublicStore, base: string): string {
   // agent_checkout is in every paid plan baseline (AI-first policy,
   // 2026-07-21), same rollout as agent_feed above. Advertises the MCP
   // (Model Context Protocol) endpoint an agentic shopping client can call
@@ -387,11 +405,9 @@ function buildAgentSections(store: PublicStore, base: string): string {
   // above, change it in apps/web/src/app/.well-known/{acp.json,ucp}/route.ts
   // too — tests/unit/well-known-agent-discovery.test.ts asserts they agree.
   const discoveryLines = `\n- Discovery (ACP): ${base}/.well-known/acp.json\n- Discovery (UCP): ${base}/.well-known/ucp`;
-  const mcpSection = store.enabledFeatures?.includes('agent_checkout')
-    ? `\n\n## Agentic checkout (MCP)\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Read tools (no credential): search_products, get_product, get_store_info, view_cart, get_order_status\n${mcpWriteLine}${discoveryLines}`
+  return store.enabledFeatures?.includes('agent_checkout')
+    ? `\n\n${MCP_SECTION_HEADING}\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Read tools (no credential): search_products, get_product, get_store_info, view_cart, get_order_status\n${mcpWriteLine}${discoveryLines}`
     : '';
-
-  return `${feedSection}${mcpSection}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,16 +492,40 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
   // auto-build. Set by the bulk-ai-llms-txt sweep, or hand-edited from the
   // admin SEO page. The generated feed + MCP discovery sections are still
   // appended (#1667) unless the stored text already carries the MCP heading.
+  //
+  // Each generated section is appended independently, keyed on its OWN
+  // heading (#2131): an override that already documents the feed must not get
+  // a second `## Product Feed`, and one that already carries the MCP section
+  // must still receive the feed section when `agent_feed` is on.
   let body: string;
+  const degraded = categories === null;
   if (store.llmsTxt && store.llmsTxt.trim()) {
     body = store.llmsTxt;
-    if (!body.includes('## Agentic checkout (MCP)')) {
-      const agentSections = buildAgentSections(store, storeBaseUrl(store));
-      if (agentSections) body = `${body.trimEnd()}${agentSections}\n`;
-    }
+    const base = storeBaseUrl(store);
+    const missing = [
+      body.includes(FEED_SECTION_HEADING) ? '' : buildFeedSection(store, base),
+      body.includes(MCP_SECTION_HEADING) ? '' : buildMcpSection(store, base),
+    ].join('');
+    if (missing) body = `${body.trimEnd()}${missing}\n`;
   } else {
+    // The auto-built body ENUMERATES categories and products, so publishing
+    // it after either fetch failed would assert to every crawler that the
+    // store has none (#2224, the auto-build twin of #1853). Answer 503 with a
+    // short Retry-After instead: the crawler and the CDN retry, and nothing
+    // false is cached. (The override branch above has no enumerations of its
+    // own and is served with the short TTL below.)
     const products = await fetchProducts(storeId);
-    body = buildPerStoreBody(store, categories ?? [], products, products.length);
+    if (categories === null || products === null) {
+      return new Response('llms.txt is temporarily unavailable — retry shortly.\n', {
+        status: 503,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Retry-After': '60',
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+    body = buildPerStoreBody(store, categories, products, products.length);
   }
 
   // Only sanitize against a category set we actually fetched: an empty set
@@ -498,24 +538,17 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
     status: 200,
     headers: {
       'Content-Type': 'text/markdown; charset=utf-8',
-      // `GET` can reach this via a `x-store-slug` set from the sticky cookie
-      // fallback (middleware.ts, subroute with no slug in the URL — this
-      // exact path on a bare platform-root request), in which case the SAME
-      // request line answers with a DIFFERENT merchant's index depending on
-      // which visitor's cookie it carried. `Vary: Cookie` alone doesn't
-      // protect that: Cloudflare's cache ignores Vary outside its
-      // Enterprise-only feature (apps/api/src/lib/edge-cache.ts), and
-      // `s-maxage` is what authorizes a shared cache to store it at all — so
-      // a cookie-resolved response drops shared-cacheability entirely
-      // instead. A URL slug segment or custom-domain Host stays
-      // public+s-maxage (scoped-audit P2 on PR #1942). Independently, a
-      // categories-API failure (#1853) still gets the short public retry TTL
-      // rather than the long one — but only on the shared-cacheable path;
-      // the cookie-resolved path is never shared-cached at all, so that
-      // distinction doesn't apply to it.
+      // Shared-cacheable because `/llms.txt` is resolved ONLY from the URL
+      // slug segment or the custom-domain Host: middleware.ts's
+      // URL_KEYED_PUBLIC_PATHS guard (#1959) never lets the sticky
+      // `x-store-slug` cookie reach this path. THAT guard is the load-bearing
+      // control against a cross-tenant edge-cache entry; `viaCookie → private`
+      // is an unreachable second line of defence (#2174, see
+      // resolvedViaCookie). A degraded body (an upstream API could not be
+      // asked, #1853/#2224) gets a short retry TTL so the next request heals it.
       'Cache-Control': viaCookie
         ? 'private, max-age=600'
-        : categories === null
+        : degraded
           ? 'public, s-maxage=60'
           : 'public, s-maxage=600, stale-while-revalidate=86400',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),

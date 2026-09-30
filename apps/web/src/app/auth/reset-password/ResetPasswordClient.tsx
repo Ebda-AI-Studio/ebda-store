@@ -58,6 +58,17 @@ function ResetPasswordForm() {
         const result = await api.resetPassword(token, formData.newPassword);
 
         if (!result.success) {
+          // A throttle is "wait and try again", not a failure of the link —
+          // and the server's rate-limit message is English-only (#2162's
+          // sibling surface).
+          if (result.error?.code === 'RATE_LIMITED') {
+            throw new Error(
+              t(
+                'Too many attempts. Please wait a few minutes, then try again.',
+                'محاولات كثيرة جدًا. يرجى الانتظار بضع دقائق ثم المحاولة مرة أخرى.'
+              )
+            );
+          }
           throw new Error(
             result.error?.message || t('Failed to reset password', 'فشلت إعادة تعيين كلمة المرور')
           );

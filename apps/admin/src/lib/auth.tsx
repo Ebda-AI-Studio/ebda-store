@@ -10,7 +10,14 @@ import {
   ReactNode,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getApiUrl, refreshSession, checkSessionWithMountRetries } from './api';
+import {
+  getApiUrl,
+  refreshSession,
+  checkSessionWithMountRetries,
+  bumpSessionGeneration,
+  clearPendingLogout,
+  performLogout,
+} from './api';
 import { isIosWebkit, safeInternalPath } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/contexts/FocusModeContext';
@@ -107,6 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // clears, the credential still survives (never cleared on 'throttled')
       // and the user lands on /login, where a full reload now actually
       // re-checks instead of being a dead end (#1814).
+      //
+      // 'unavailable' (a 5xx/404 on /auth/me) and 'superseded' (a login or
+      // logout happened meanwhile) leave `user` untouched: only a 401 followed
+      // by a rejected refresh signs anyone out (#2096, #2161).
       const result = await checkSessionWithMountRetries(API_URL);
       if (result.status === 'authenticated') {
         setUser(result.user as User);
@@ -176,6 +187,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshToken: string;
     csrfToken?: string;
   }) {
+    // A fresh session: any check still in flight is about the old one and
+    // must not clear these tokens when it lands (#2161). An explicit login is
+    // also what lifts a pending (unconfirmed) logout.
+    bumpSessionGeneration();
+    clearPendingLogout();
     // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
     // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
     // purges it). On all other browsers (desktop Chrome/Firefox, Android
@@ -281,16 +297,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Invalidate the refresh token server-side before clearing local state.
     // The API also clears the HTTP-only auth cookie in its response.
-    // Awaiting ensures the token is revoked before we redirect, preventing
-    // a window where a stolen token could still be used to obtain new access.
-    await fetch(`${API_URL}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: refreshTokenValue }),
-    }).catch(() => {
-      // Best-effort: if the server is unreachable we still clear local state
-    });
+    // Authoritative, not best-effort (#2160): performLogout bumps the session
+    // generation so no in-flight check can restore the session, and records
+    // the logout as pending until the server confirms it. While it is pending
+    // every session check (a reload of /login included) re-sends it instead of
+    // reading /auth/me, so a logout that never reached the API cannot be
+    // undone by the cookies it failed to clear.
+    await performLogout(API_URL, refreshTokenValue);
 
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
