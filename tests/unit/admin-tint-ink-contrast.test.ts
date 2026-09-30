@@ -92,7 +92,8 @@ const classStrings = (src: string): string[] =>
 function droppedForms(cls: string): string[] {
   const out: string[] = [];
   // `bg-x/30/30` matches no utility — Tailwind emits nothing for it.
-  for (const m of cls.matchAll(/\S*-[\w-]+\/\d+\/\d+/g)) out.push(`double opacity modifier: ${m[0]}`);
+  for (const m of cls.matchAll(/\S*-[\w-]+\/\d+\/\d+/g))
+    out.push(`double opacity modifier: ${m[0]}`);
   // An opacity step outside Tailwind 3's scale (`bg-primary/8`) also emits
   // nothing, silently: the sidebar's active item had no tint at all.
   for (const m of cls.matchAll(COLOUR_OPACITY)) {
@@ -207,15 +208,18 @@ for (const app of APPS.filter(a => a.css)) {
   const token = tokensFrom(join(app.root, app.css!));
   describe(`${app.name}: tinted-pill ink contrast (issues 2233, 2341)`, () => {
     for (const theme of ['light', 'dark'] as const) {
-      it.each(ROLES)(`${theme}: %s-ink on its 5/10/15/20%% tints and the card is >= 4.5:1`, role => {
-        const card = rgb(token('card', theme));
-        for (const a of [0, 0.05, 0.1, 0.15, 0.2]) {
-          const tint = rgb(token(role, theme)).map((v, i) => v * a + card[i] * (1 - a));
-          expect(ratio(rgb(token(`${role}-ink`, theme)), tint), `${a}`).toBeGreaterThanOrEqual(
-            4.5
-          );
+      it.each(ROLES)(
+        `${theme}: %s-ink on its 5/10/15/20%% tints and the card is >= 4.5:1`,
+        role => {
+          const card = rgb(token('card', theme));
+          for (const a of [0, 0.05, 0.1, 0.15, 0.2]) {
+            const tint = rgb(token(role, theme)).map((v, i) => v * a + card[i] * (1 - a));
+            expect(ratio(rgb(token(`${role}-ink`, theme)), tint), `${a}`).toBeGreaterThanOrEqual(
+              4.5
+            );
+          }
         }
-      });
+      );
     }
 
     it('control: the bare role colour really does fail on the light warning tint', () => {
@@ -250,7 +254,10 @@ describe('the contrast detector (controls)', () => {
     ['2332 bare role text on the card', `'mt-1 text-sm text-destructive'`],
     ['2332 bare warning text on the card', `'text-xs text-warning'`],
     ['2332 hover tint under bare text', `'w-1/2 text-success border hover:bg-success/10'`],
-    ['2332 hover text swap', `'text-muted-foreground hover:text-destructive hover:bg-destructive/10'`],
+    [
+      '2332 hover text swap',
+      `'text-muted-foreground hover:text-destructive hover:bg-destructive/10'`,
+    ],
     ['2332 role text with opacity', `'text-xs text-destructive/80'`],
     ['2332 warning icon (under 3:1)', `'h-4 w-4 text-warning'`],
     ['2342 off-scale via stop', `'bg-gradient-to-br from-primary/15 via-primary/8 to-muted'`],
@@ -284,9 +291,11 @@ for (const app of APPS) {
       () => {
         const offenders = files.flatMap(f =>
           classStrings(readFileSync(f, 'utf8')).flatMap(cls =>
-            [...(token ? [...contrastProblems(cls, token), ...bannedForms(cls)] : droppedForms(cls))].map(
-              p => `${f.slice(app.root.length + 1)} — ${p} — ${cls}`
-            )
+            [
+              ...(token
+                ? [...contrastProblems(cls, token), ...bannedForms(cls)]
+                : droppedForms(cls)),
+            ].map(p => `${f.slice(app.root.length + 1)} — ${p} — ${cls}`)
           )
         );
         expect(offenders).toEqual([]);

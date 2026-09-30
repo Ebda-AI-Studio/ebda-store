@@ -371,7 +371,7 @@ export default function StoreSettingsPage() {
       key: 'taxSettings',
       href: `/stores/${storeId}/tax`,
       color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300',
-      featureKey: 'tax',
+      // No featureKey (issue 2358): the tax page is reachable on every plan.
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path

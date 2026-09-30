@@ -118,7 +118,12 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
   });
 
   it('order creation is the attribution writer the report reads', () => {
-    const src = readFileSync(join(__dirname, '../../apps/api/src/services/order.service.ts'), 'utf8');
-    expect(src).toMatch(/status: 'recovered',\s+recoveredAt: new Date\(\),\s+recoveredOrderId: newOrder\.id/);
+    const src = readFileSync(
+      join(__dirname, '../../apps/api/src/services/order.service.ts'),
+      'utf8'
+    );
+    expect(src).toMatch(
+      /status: 'recovered',\s+recoveredAt: new Date\(\),\s+recoveredOrderId: newOrder\.id/
+    );
   });
 });

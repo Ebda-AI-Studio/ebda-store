@@ -287,7 +287,9 @@ export default function StoreDomainPage() {
                     placeholder={t('domainPlaceholder')}
                     className={`mt-1 ${domainError ? 'border-destructive' : ''}`}
                   />
-                  {domainError && <p className="mt-1 text-sm text-destructive-ink">{domainError}</p>}
+                  {domainError && (
+                    <p className="mt-1 text-sm text-destructive-ink">{domainError}</p>
+                  )}
                   <p className="mt-1 text-xs text-muted-foreground">{t('domainRemoveHint')}</p>
                 </div>
                 <div className="flex gap-2">

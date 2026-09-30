@@ -443,8 +443,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
           // A rule always takes priority over the supplier's lead time.
           leadTimeDays = rule.leadTimeDays;
           // Supplier for the suggestion: prefer rule's explicit preferred supplier.
-          resolvedSupplierId =
-            rule.preferredSupplierId ?? (await lastSupplierFor(product.id, tx));
+          resolvedSupplierId = rule.preferredSupplierId ?? (await lastSupplierFor(product.id, tx));
         } else {
           // No rule: resolve the supplier first (last PO), then use its leadTimeDays.
           resolvedSupplierId = await lastSupplierFor(product.id, tx);

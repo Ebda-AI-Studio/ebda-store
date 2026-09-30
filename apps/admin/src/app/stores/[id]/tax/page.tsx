@@ -19,11 +19,10 @@ import {
   type TaxTemplate,
 } from './_components/types';
 
-import { useRequireFeature } from '../../../../hooks/useRequireFeature';
-
 export default function TaxSettingsPage() {
-  const { gate } = useRequireFeature('tax');
-
+  // Not feature-gated (issue 2358, ruling TAX-1a): tax collection is a legal
+  // obligation gated on `taxEnabled` alone, so the on/off switch and the rate
+  // list must work on every plan — including a store that lapsed to `free`.
   const params = useParams();
   const storeId = params.id as string;
   const tPage = useT('tax.page');
@@ -31,8 +30,10 @@ export default function TaxSettingsPage() {
   const [settings, setSettings] = useState<TaxSettings>({
     taxEnabled: false,
     taxIncludedInPrice: false,
-    defaultTaxRate: null,
   });
+  // Every active rate, whatever the list filter shows — the combined figure
+  // in the info box must be what the charge applies.
+  const [activeRates, setActiveRates] = useState<TaxRate[]>([]);
   const [rates, setRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,11 +49,12 @@ export default function TaxSettingsPage() {
     );
     if (data) {
       setSettings(
-        data.settings || {
-          taxEnabled: false,
-          taxIncludedInPrice: false,
-          defaultTaxRate: null,
-        }
+        data.settings
+          ? {
+              taxEnabled: data.settings.taxEnabled,
+              taxIncludedInPrice: data.settings.taxIncludedInPrice,
+            }
+          : { taxEnabled: false, taxIncludedInPrice: false }
       );
     }
   }, [storeId]);
@@ -76,6 +78,7 @@ export default function TaxSettingsPage() {
       }
 
       setRates(allRates);
+      setActiveRates((data.rates || []).filter((r: TaxRate) => r.isActive));
     }
   }, [storeId, filter]);
 
@@ -114,10 +117,6 @@ export default function TaxSettingsPage() {
         name: rate.name,
         nameAr: rate.nameAr || '',
         rate: rate.rate.toString(),
-        country: rate.country || '',
-        state: rate.state || '',
-        priority: rate.priority.toString(),
-        isCompound: rate.isCompound,
         isActive: rate.isActive,
       });
     } else {
@@ -145,10 +144,6 @@ export default function TaxSettingsPage() {
         name: formData.name,
         nameAr: textFieldValue(formData.nameAr, intent),
         rate: parseFloat(formData.rate),
-        country: textFieldValue(formData.country, intent),
-        state: textFieldValue(formData.state, intent),
-        priority: parseInt(formData.priority) || 0,
-        isCompound: formData.isCompound,
         isActive: formData.isActive,
       };
 
@@ -198,8 +193,6 @@ export default function TaxSettingsPage() {
 
   const updateForm = (patch: Partial<RateFormData>) => setFormData(prev => ({ ...prev, ...patch }));
 
-  if (gate) return gate;
-
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
       <div className="space-y-6">
@@ -225,7 +218,7 @@ export default function TaxSettingsPage() {
               onToggle={handleToggle}
               onDelete={handleDelete}
             />
-            <TaxInfoBox />
+            <TaxInfoBox taxEnabled={settings.taxEnabled} activeRates={activeRates} />
           </>
         )}
 

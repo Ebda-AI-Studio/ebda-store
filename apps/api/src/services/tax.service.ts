@@ -24,20 +24,21 @@ interface CreateTaxRateData {
   /** `null` clears the column; `undefined` leaves the stored value alone. */
   nameAr?: string | null;
   rate: number;
-  country?: string | null;
-  state?: string | null;
-  priority?: number;
-  isCompound?: boolean;
   isActive?: boolean;
 }
 
 type UpdateTaxRateData = Partial<CreateTaxRateData>;
 
+// `defaultTaxRate` is still READ (and returned) so a stored legacy value is
+// visible, but it is no longer writable: the charge never reads it (issue
+// 2357, ruling TAX-1a).
 interface TaxSettings {
   taxEnabled: boolean;
   taxIncludedInPrice: boolean;
   defaultTaxRate: number | null;
 }
+
+type TaxSettingsPatch = Partial<Pick<TaxSettings, 'taxEnabled' | 'taxIncludedInPrice'>>;
 
 export class TaxService {
   /**
@@ -67,13 +68,12 @@ export class TaxService {
   /**
    * Update store tax settings
    */
-  static async updateSettings(storeId: string, settings: Partial<TaxSettings>) {
+  static async updateSettings(storeId: string, settings: TaxSettingsPatch) {
     const store = await prisma.store.update({
       where: { id: storeId },
       data: {
         taxEnabled: settings.taxEnabled,
         taxIncludedInPrice: settings.taxIncludedInPrice,
-        defaultTaxRate: settings.defaultTaxRate,
       },
       select: {
         taxEnabled: true,
@@ -101,7 +101,9 @@ export class TaxService {
 
     const rates = await prisma.taxRate.findMany({
       where,
-      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      // Priority is not a charge input (every active rate is summed, ruling
+      // TAX-1), so it does not order the list either.
+      orderBy: { createdAt: 'asc' },
     });
 
     return rates.map(rate => ({
@@ -138,10 +140,6 @@ export class TaxService {
         name: data.name,
         nameAr: data.nameAr,
         rate: data.rate,
-        country: data.country,
-        state: data.state,
-        priority: data.priority || 0,
-        isCompound: data.isCompound || false,
         isActive: data.isActive ?? true,
       },
     });
@@ -165,10 +163,6 @@ export class TaxService {
         name: data.name,
         nameAr: data.nameAr,
         rate: data.rate,
-        country: data.country,
-        state: data.state,
-        priority: data.priority,
-        isCompound: data.isCompound,
         isActive: data.isActive,
       },
     });

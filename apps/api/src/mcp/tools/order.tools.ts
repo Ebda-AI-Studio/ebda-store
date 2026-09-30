@@ -12,6 +12,10 @@ import { config } from '../../config';
 import logger from '../../lib/logger';
 import { buildPaymentLineItems } from '../../lib/payment-line-items';
 import {
+  alertOrphanedProviderInvoice,
+  type OrphanedProviderInvoice,
+} from '../../services/payment-providers/orphaned-invoice-alert';
+import {
   agentContextFrom,
   assertAgentWrite,
   auditAgentWrite,
@@ -318,6 +322,10 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
         // a commit failure of that wrap after `OrderService.create` resolved
         // still rolls the (separately committed) order back.
         let rollbackOrderId = null as string | null;
+        // Set once the gateway accepts; cleared with the rollback on COMMIT.
+        // Still set in the catch = a live invoice with no Payment row
+        // (issue 2360, ruling PAY-ORPH-1).
+        let acceptedInvoice = null as OrphanedProviderInvoice | null;
         try {
           const order = await runInTenantContext(store.id, async () => {
             const created = await OrderService.create(store.id, undefined, cartId, {
@@ -335,8 +343,8 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // same callback/error URL convention, same
           // `.../webhooks/payment/<provider>` webhook shape — provider is
           // resolved explicitly above rather than left undefined.
-          const payment = await runInTenantContext(store.id, () =>
-            PaymentService.createPayment(
+          const payment = await runInTenantContext(store.id, async () => {
+            const created = await PaymentService.createPayment(
               {
                 orderId: order.id,
                 orderNumber: order.orderNumber,
@@ -362,11 +370,23 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
               },
               provider,
               store.id
-            )
-          );
+            );
+            acceptedInvoice = {
+              storeId: store.id,
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              provider: created.provider,
+              transactionId: created.transactionId,
+              amount: order.total,
+              currency: order.currency,
+              source: 'agent',
+            };
+            return created;
+          });
           // The Payment row is committed: the order is paid-for-pending now,
           // and must never be rolled back from here on.
           rollbackOrderId = null;
+          acceptedInvoice = null;
 
           return ok({
             orderId: order.id,
@@ -394,6 +414,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
               )
             );
           }
+          if (acceptedInvoice) await alertOrphanedProviderInvoice(acceptedInvoice);
           throw err;
         }
       } catch (err) {

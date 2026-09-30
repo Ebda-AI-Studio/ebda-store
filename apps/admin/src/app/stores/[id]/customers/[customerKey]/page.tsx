@@ -670,7 +670,9 @@ export default function CustomerDetailPage() {
               {!customer.isGuest && canManagePrivacy && (
                 <div className="rounded-xl border border-destructive/30 bg-card shadow-sm">
                   <div className="border-b border-destructive/30 bg-destructive/10 p-4">
-                    <h2 className="font-semibold text-destructive-ink">{tPrivacy('sectionTitle')}</h2>
+                    <h2 className="font-semibold text-destructive-ink">
+                      {tPrivacy('sectionTitle')}
+                    </h2>
                     <p className="text-sm text-destructive-ink">{tPrivacy('sectionSubtitle')}</p>
                   </div>
                   <div className="p-6 space-y-4">

@@ -335,7 +335,9 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         {parseResult && (
           <p className="mt-1 text-xs text-muted-foreground">
             {tNew('csvParsedTotal', { count: parseResult.totalRows })}{' '}
-            <span className="text-success-ink">{tNew('csvParsedValid', { count: validRowCount })}</span>
+            <span className="text-success-ink">
+              {tNew('csvParsedValid', { count: validRowCount })}
+            </span>
             {errorRowCount > 0 && (
               <span className="text-destructive-ink">
                 {tNew('csvParsedErrors', { count: errorRowCount })}

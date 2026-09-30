@@ -220,9 +220,8 @@ describe('handleStuckRefundClaimSweep', () => {
     }
     events.push(event('refund_initiated', 'stuck-late', minutesAgo(60), 'pay-stuck'));
     h.events = events;
-    const { CLAIM_SCAN_BUDGET_MS } = await import(
-      '@api/lib/inngest/functions/refund-claim-stuck-sweep'
-    );
+    const { CLAIM_SCAN_BUDGET_MS } =
+      await import('@api/lib/inngest/functions/refund-claim-stuck-sweep');
     const real = Date.now();
     let calls = 0;
     const spy = vi.spyOn(Date, 'now').mockImplementation(() => {
@@ -233,7 +232,9 @@ describe('handleStuckRefundClaimSweep', () => {
     try {
       const res = await handleStuckRefundClaimSweep(stepStub);
       expect(res.stuck).toBe(0); // the late claim is deferred to a later tick, not lost
-      const claimReads = h.findMany.mock.calls.filter(c => c[0].where.eventType === 'refund_initiated');
+      const claimReads = h.findMany.mock.calls.filter(
+        c => c[0].where.eventType === 'refund_initiated'
+      );
       expect(claimReads).toHaveLength(1);
       const logger = (await import('@api/lib/logger')).default;
       expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(

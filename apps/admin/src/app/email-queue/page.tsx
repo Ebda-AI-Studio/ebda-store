@@ -66,7 +66,7 @@ export default function EmailQueuePage() {
     setRetrying(true);
     setMessage(null);
     // apiPost resolves { data, error } (never throws), so branch on error.
-    const res = await apiPost<{ retried: number; skipped?: number }>(
+    const res = await apiPost<{ retried: number; skipped?: number; kept?: number }>(
       '/admin/email-queue/failed/retry',
       {}
     );
@@ -74,11 +74,13 @@ export default function EmailQueuePage() {
       setMessage(t('retryFailed', { message: res.error.message || 'error' }));
     } else {
       const skipped = res.data?.skipped ?? 0;
-      setMessage(
+      const kept = res.data?.kept ?? 0;
+      const base =
         skipped > 0
           ? t('retryPartial', { count: res.data?.retried ?? 0, skipped })
-          : t('retrySuccess', { count: res.data?.retried ?? 0 })
-      );
+          : t('retrySuccess', { count: res.data?.retried ?? 0 });
+      // Issue 2361: entries a Redis write rejected mid-replay stay on the list.
+      setMessage(kept > 0 ? `${base} · ${t('retryKept', { kept })}` : base);
       await fetchFailed();
     }
     setRetrying(false);
@@ -146,6 +148,9 @@ export default function EmailQueuePage() {
           <div className="flex gap-2">
             <Link href="/webhook-events" className="text-sm text-primary hover:underline">
               {t('webhookInboxLink')}
+            </Link>
+            <Link href="/sms-queue" className="text-sm text-primary hover:underline">
+              {t('smsQueueLink')}
             </Link>
             <Button variant="outline" size="sm" onClick={() => fetchFailed()}>
               {t('refresh')}

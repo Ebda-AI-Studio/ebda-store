@@ -20,7 +20,13 @@ describe.skipIf(!hasDb)('list-variantless-po-lines', () => {
         data: { storeId: store.storeId, name: 'S' },
       });
       const variantProduct = await tx.product.create({
-        data: { storeId: store.storeId, name: 'VP', slug: `vp-${uniq}`, price: 1000, hasVariants: true },
+        data: {
+          storeId: store.storeId,
+          name: 'VP',
+          slug: `vp-${uniq}`,
+          price: 1000,
+          hasVariants: true,
+        },
       });
       const variant = await tx.productVariant.create({
         data: { productId: variantProduct.id, title: 'A', price: 1000, inventory: 0 },
@@ -44,13 +50,25 @@ describe.skipIf(!hasDb)('list-variantless-po-lines', () => {
       await line(sent.id, simple.id, null); // simple product — not reported
     });
 
-    const res = await withRlsBypass(tx =>
-      findVariantlessLines(tx as never, slug)
-    );
+    const res = await withRlsBypass(tx => findVariantlessLines(tx as never, slug));
     expect(res.po).toEqual([
       // Ordered by the status enum (sent before partial).
-      { storeSlug: slug, poNumber: `PO-S-${uniq}`, poStatus: 'sent', lines: 1, openQty: 10, receivedQty: 0 },
-      { storeSlug: slug, poNumber: `PO-P-${uniq}`, poStatus: 'partial', lines: 1, openQty: 6, receivedQty: 4 },
+      {
+        storeSlug: slug,
+        poNumber: `PO-S-${uniq}`,
+        poStatus: 'sent',
+        lines: 1,
+        openQty: 10,
+        receivedQty: 0,
+      },
+      {
+        storeSlug: slug,
+        poNumber: `PO-P-${uniq}`,
+        poStatus: 'partial',
+        lines: 1,
+        openQty: 6,
+        receivedQty: 4,
+      },
     ]);
     expect(res.backorders).toEqual([]);
   });

@@ -86,7 +86,8 @@ async function main(): Promise<void> {
     await tx.$executeRawUnsafe(`SET LOCAL app.current_store_id = ''`);
     return findVariantlessLines(tx as unknown as RawClient, slug);
   });
-  if (res.po.length === 0) console.log('purchase orders: no variant-less lines on variant products');
+  if (res.po.length === 0)
+    console.log('purchase orders: no variant-less lines on variant products');
   else {
     console.log('purchase orders — variant-less lines on variant products:');
     for (const r of res.po) {

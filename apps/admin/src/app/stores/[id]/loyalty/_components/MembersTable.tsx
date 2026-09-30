@@ -64,7 +64,9 @@ export function MembersTable({
     },
     {
       header: t('columns.totalEarned'),
-      cell: member => <span className="text-success-ink">+{member.totalEarned.toLocaleString()}</span>,
+      cell: member => (
+        <span className="text-success-ink">+{member.totalEarned.toLocaleString()}</span>
+      ),
     },
     {
       header: t('columns.totalRedeemed'),

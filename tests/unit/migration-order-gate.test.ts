@@ -177,7 +177,10 @@ describe('ci.yml runs the gate on every PR', () => {
 
   it('issue 2355: on a push to main it compares against the PRE-push tip, not origin/main', () => {
     const ci = yaml.load(readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8')) as {
-      jobs: Record<string, { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> }>;
+      jobs: Record<
+        string,
+        { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> }
+      >;
     };
     const step = ci.jobs.lint.steps.find(s => s.name === 'Migration ordering gate')!;
     expect(step.env?.BEFORE_SHA).toBe('${{ github.event.before }}');
@@ -238,7 +241,9 @@ describe('post-merge arm (issue 2355): two PRs that each passed against the same
     const { gate, before } = pushed('20261002080000_b_new');
     const r = gate(before);
     expect(r.status, r.stdout).toBe(1);
-    expect(r.stderr).toMatch(/20261002080000_b_new: timestamp .* does not sort after .*20261002090000_a_new/);
+    expect(r.stderr).toMatch(
+      /20261002080000_b_new: timestamp .* does not sort after .*20261002090000_a_new/
+    );
   });
 
   it('control: the PR-time arm (origin/main = the pushed commit) compares nothing and passes', () => {

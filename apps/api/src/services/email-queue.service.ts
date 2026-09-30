@@ -9,7 +9,7 @@ import { EmailService, EmailOptions } from './email.service';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
-import { parkCorrupt, CORRUPT_CAP } from '../lib/dead-letter';
+import { CORRUPT_CAP, replayDeadLetters } from '../lib/dead-letter';
 
 export interface QueuedEmail {
   id: string;
@@ -304,43 +304,39 @@ class EmailQueueService {
    * `rpop` had removed it — that record destroyed, everything behind it never
    * retried, the route 500ing with no audit row. Each entry is now parsed on
    * its own; an unreadable one is moved to `email:failed:corrupt` (kept, never
-   * re-popped here) and counted as skipped. The loop is bounded by the list's
-   * length when it started, so it always terminates.
+   * re-popped here) and counted as skipped. Issue 2361: a Redis write that
+   * rejects AFTER the `rpop` (a blip mid-"Retry all") no longer destroys the
+   * entry or aborts the loop — it is put back on `email:failed` (`kept`). The
+   * loop lives in `replayDeadLetters` (lib/dead-letter.ts), shared with the
+   * SMS twin, and is bounded by the list's length when it started.
    */
-  async retryFailed(): Promise<{ retried: number; skipped: number }> {
-    if (!redis.isAvailable()) return { retried: 0, skipped: 0 };
+  async retryFailed(): Promise<{ retried: number; skipped: number; kept: number }> {
+    if (!redis.isAvailable()) return { retried: 0, skipped: 0, kept: 0 };
 
     const client = redis.getClient();
-    if (!client) return { retried: 0, skipped: 0 };
-    let retried = 0;
-    let skipped = 0;
+    if (!client) return { retried: 0, skipped: 0, kept: 0 };
 
-    const total = await client.llen(FAILED_KEY);
-    for (let i = 0; i < total; i++) {
-      const emailJson = await client.rpop(FAILED_KEY);
-      if (!emailJson) break;
+    const { retried, skipped, kept, lost } = await replayDeadLetters<QueuedEmail>(
+      client,
+      { failed: FAILED_KEY, corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
+      (v): v is QueuedEmail =>
+        !!v && typeof v === 'object' && !!(v as Partial<QueuedEmail>).options,
+      logger
+    );
 
-      let email: QueuedEmail;
-      try {
-        email = JSON.parse(emailJson) as QueuedEmail;
-        if (!email || typeof email !== 'object' || !email.options) throw new Error('bad shape');
-      } catch {
-        await parkCorrupt(client, FAILED_CORRUPT_KEY, emailJson);
-        skipped++;
-        logger.error(
-          { bytes: emailJson.length },
-          '[EMAIL QUEUE] unreadable dead-lettered email moved to email:failed:corrupt'
-        );
-        continue;
-      }
-      email.attempts = 0;
-      email.error = undefined;
-
-      await client.lpush(QUEUE_KEY, JSON.stringify(email));
-      retried++;
+    logger.info({ retried, skipped, kept, lost }, '[EMAIL QUEUE] Retrying failed emails');
+    if (lost > 0) {
+      await sendAlert({
+        level: 'p1',
+        source: 'email.queue.replay_lost',
+        title: 'Dead-lettered emails lost during retry',
+        body:
+          `${lost} dead-lettered email(s) were removed from \`${FAILED_KEY}\` during "Retry all" and ` +
+          'Redis rejected both the re-queue and the put-back, so they are gone. Their ids are in ' +
+          'the error log ("[dead-letter] replay write AND put-back failed").',
+        context: { lost, list: FAILED_KEY },
+      }).catch(() => undefined);
     }
-
-    logger.info({ retried, skipped }, '[EMAIL QUEUE] Retrying failed emails');
     if (skipped > 0) {
       // Set aside is not silent (PR 2335 audit): an operator is told how many
       // unreadable entries were parked and where, so they are not invisible.
@@ -356,7 +352,7 @@ class EmailQueueService {
         context: { skipped, list: FAILED_CORRUPT_KEY },
       }).catch(() => undefined);
     }
-    return { retried, skipped };
+    return { retried, skipped, kept };
   }
 }
 

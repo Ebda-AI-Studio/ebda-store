@@ -10,7 +10,7 @@ import { smsService, SmsConfig } from './sms.service';
 import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
-import { parkCorrupt, CORRUPT_CAP } from '../lib/dead-letter';
+import { CORRUPT_CAP, replayDeadLetters } from '../lib/dead-letter';
 
 export interface QueuedSms {
   id: string;
@@ -29,6 +29,7 @@ export interface QueuedSms {
 
 const QUEUE_KEY = 'sms:queue';
 const FAILED_KEY = 'sms:failed';
+const FAILED_CORRUPT_KEY = 'sms:failed:corrupt';
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5000;
 
@@ -242,23 +243,47 @@ class SmsQueueService {
   async getStats(): Promise<{
     pending: number;
     failed: number;
+    /** Unreadable set-aside entries (issue 2353). */
+    corrupt: number;
     processing: boolean;
   }> {
     if (!redis.isAvailable()) {
-      return { pending: 0, failed: 0, processing: this.processing };
+      return { pending: 0, failed: 0, corrupt: 0, processing: this.processing };
     }
 
     const client = redis.getClient();
-    const [pending, failed] = await Promise.all([
+    const [pending, failed, corrupt] = await Promise.all([
       client?.llen(QUEUE_KEY) || 0,
       client?.llen(FAILED_KEY) || 0,
+      client?.llen(FAILED_CORRUPT_KEY) || 0,
     ]);
 
     return {
       pending: pending || 0,
       failed: failed || 0,
+      corrupt: corrupt || 0,
       processing: this.processing,
     };
+  }
+
+  /**
+   * The unreadable set-aside entries, for the super-admin SMS queue page
+   * (issue 2363). Size only — they cannot be parsed, so nothing can be masked.
+   */
+  async getCorruptEntries(limit: number = 50): Promise<Array<{ position: number; bytes: number }>> {
+    if (!redis.isAvailable()) return [];
+    const raw = (await redis.getClient()?.lrange(FAILED_CORRUPT_KEY, 0, limit - 1)) || [];
+    return raw.map((e, position) => ({ position, bytes: Buffer.byteLength(e, 'utf8') }));
+  }
+
+  /** Drop every set-aside entry. Returns how many were discarded. */
+  async discardCorrupt(): Promise<number> {
+    if (!redis.isAvailable()) return 0;
+    const client = redis.getClient();
+    if (!client) return 0;
+    const count = await client.llen(FAILED_CORRUPT_KEY);
+    await client.del(FAILED_CORRUPT_KEY);
+    return count;
   }
 
   /**
@@ -281,45 +306,39 @@ class SmsQueueService {
   }
 
   /**
-   * Re-queue every dead-lettered SMS. Same hardening as the email queue's
-   * `retryFailed` (issue 2292): each entry parsed on its own, an unreadable
-   * one moved to `sms:failed:corrupt` instead of being destroyed by a throw
-   * after `rpop`, and the loop bounded by the list length at the start.
+   * Re-queue every dead-lettered SMS — the super-admin "Retry all" on
+   * `/sms-queue` (issue 2363). Same loop as the email twin
+   * (`replayDeadLetters`, lib/dead-letter.ts): each entry parsed on its own,
+   * an unreadable one moved to `sms:failed:corrupt`, a Redis write that
+   * rejects after the `rpop` puts the entry back instead of destroying it
+   * (issue 2361), and the loop bounded by the list length at the start.
    */
-  async retryFailed(): Promise<{ retried: number; skipped: number }> {
-    if (!redis.isAvailable()) return { retried: 0, skipped: 0 };
+  async retryFailed(): Promise<{ retried: number; skipped: number; kept: number }> {
+    if (!redis.isAvailable()) return { retried: 0, skipped: 0, kept: 0 };
 
     const client = redis.getClient();
-    if (!client) return { retried: 0, skipped: 0 };
-    let retried = 0;
-    let skipped = 0;
+    if (!client) return { retried: 0, skipped: 0, kept: 0 };
 
-    const total = await client.llen(FAILED_KEY);
-    for (let i = 0; i < total; i++) {
-      const smsJson = await client.rpop(FAILED_KEY);
-      if (!smsJson) break;
+    const { retried, skipped, kept, lost } = await replayDeadLetters<QueuedSms>(
+      client,
+      { failed: FAILED_KEY, corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
+      (v): v is QueuedSms => !!v && typeof v === 'object',
+      logger
+    );
 
-      let sms: QueuedSms;
-      try {
-        sms = JSON.parse(smsJson) as QueuedSms;
-        if (!sms || typeof sms !== 'object') throw new Error('bad shape');
-      } catch {
-        await parkCorrupt(client, `${FAILED_KEY}:corrupt`, smsJson);
-        skipped++;
-        logger.error(
-          { bytes: smsJson.length },
-          '[SMS QUEUE] unreadable dead-lettered SMS moved to sms:failed:corrupt'
-        );
-        continue;
-      }
-      sms.attempts = 0;
-      sms.error = undefined;
-
-      await client.lpush(QUEUE_KEY, JSON.stringify(sms));
-      retried++;
+    logger.info({ retried, skipped, kept, lost }, '[SMS QUEUE] Retrying failed SMS messages');
+    if (lost > 0) {
+      await sendAlert({
+        level: 'p1',
+        source: 'sms.queue.replay_lost',
+        title: 'Dead-lettered SMS lost during retry',
+        body:
+          `${lost} dead-lettered SMS were removed from \`${FAILED_KEY}\` during "Retry all" and ` +
+          'Redis rejected both the re-queue and the put-back, so they are gone. Their ids are in ' +
+          'the error log ("[dead-letter] replay write AND put-back failed").',
+        context: { lost, list: FAILED_KEY },
+      }).catch(() => undefined);
     }
-
-    logger.info({ retried, skipped }, '[SMS QUEUE] Retrying failed SMS messages');
     if (skipped > 0) {
       // Same as the email twin (issue 2353): set aside is never silent.
       await sendAlert({
@@ -328,12 +347,13 @@ class SmsQueueService {
         title: 'Unreadable dead-lettered SMS set aside',
         body:
           `${skipped} dead-lettered SMS entr(ies) could not be parsed during a retry and were ` +
-          `moved to Redis list \`${FAILED_KEY}:corrupt\` (not replayed; newest ${CORRUPT_CAP}, ` +
-          'kept 30 days). Inspect with `railway connect Redis` → `LRANGE sms:failed:corrupt 0 -1`.',
-        context: { skipped, list: `${FAILED_KEY}:corrupt` },
+          `moved to Redis list \`${FAILED_CORRUPT_KEY}\` (not replayed; newest ${CORRUPT_CAP}, ` +
+          'kept 30 days). Count + discard: super-admin SMS queue page. Raw payload: ' +
+          '`railway connect Redis` → `LRANGE sms:failed:corrupt 0 -1`.',
+        context: { skipped, list: FAILED_CORRUPT_KEY },
       }).catch(() => undefined);
     }
-    return { retried, skipped };
+    return { retried, skipped, kept };
   }
 }
 

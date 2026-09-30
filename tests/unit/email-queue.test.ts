@@ -219,7 +219,7 @@ describe('Email Queue Service', () => {
 
       const count = await emailQueue.retryFailed();
 
-      expect(count).toEqual({ retried: 1, skipped: 0 });
+      expect(count).toEqual({ retried: 1, skipped: 0, kept: 0 });
       expect(mockRedisClient.lpush).toHaveBeenCalledWith(
         'email:queue',
         expect.stringContaining('"attempts":0') // Reset attempts
@@ -253,7 +253,7 @@ describe('Email Queue Service', () => {
 
       const count = await emailQueue.retryFailed();
 
-      expect(count).toEqual({ retried: 0, skipped: 0 });
+      expect(count).toEqual({ retried: 0, skipped: 0, kept: 0 });
     });
 
     // Issue 2292: one unreadable entry used to throw AFTER rpop removed it —
@@ -276,7 +276,7 @@ describe('Email Queue Service', () => {
 
       const res = await emailQueue.retryFailed();
 
-      expect(res).toEqual({ retried: 2, skipped: 1 });
+      expect(res).toEqual({ retried: 2, skipped: 1, kept: 0 });
       expect(mockRedisClient.lpush).toHaveBeenCalledWith('email:failed:corrupt', '{"truncated":');
       expect(mockRedisClient.rpop).toHaveBeenCalledTimes(3); // bounded by the starting length
       // PR 2335 audit: set aside is never silent — an operator is told where.
@@ -288,13 +288,80 @@ describe('Email Queue Service', () => {
       );
     });
 
+    // Issue 2361: a Redis write that rejects AFTER rpop removed the entry used
+    // to destroy it and abort the loop (route 500, no audit row).
+    it('a rejected re-queue puts the entry back and keeps going', async () => {
+      const good = (id: string): QueuedEmail => ({
+        id,
+        storeId: 'store-1',
+        options: { to: 'x@example.com', subject: 'S', html: '<p>x</p>' },
+        attempts: 3,
+        maxAttempts: 3,
+        createdAt: new Date().toISOString(),
+      });
+      const a = JSON.stringify(good('a'));
+      mockRedisClient.llen.mockResolvedValueOnce(2);
+      mockRedisClient.rpop
+        .mockResolvedValueOnce(a)
+        .mockResolvedValueOnce(JSON.stringify(good('b')));
+      mockRedisClient.lpush
+        .mockRejectedValueOnce(new Error('READONLY')) // re-queue of 'a' fails
+        .mockResolvedValue(1);
+
+      const res = await emailQueue.retryFailed();
+
+      expect(res).toEqual({ retried: 1, skipped: 0, kept: 1 });
+      expect(mockRedisClient.lpush).toHaveBeenNthCalledWith(2, 'email:failed', a); // put back
+      expect(mockRedisClient.rpop).toHaveBeenCalledTimes(2); // 'b' still processed
+    });
+
+    it('a rejected set-aside puts the unreadable entry back on the failed list', async () => {
+      mockRedisClient.llen.mockResolvedValueOnce(1);
+      mockRedisClient.rpop.mockResolvedValueOnce('{"broken":');
+      mockRedisClient.lpush.mockRejectedValueOnce(new Error('OOM')).mockResolvedValue(1);
+
+      const res = await emailQueue.retryFailed();
+
+      expect(res).toEqual({ retried: 0, skipped: 0, kept: 1 });
+      expect(mockRedisClient.lpush).toHaveBeenLastCalledWith('email:failed', '{"broken":');
+    });
+
+    it('a rejected rpop removed nothing: stops and reports the rest as kept', async () => {
+      mockRedisClient.llen.mockResolvedValueOnce(3);
+      mockRedisClient.rpop.mockRejectedValueOnce(new Error('connection lost'));
+      await expect(emailQueue.retryFailed()).resolves.toEqual({ retried: 0, skipped: 0, kept: 3 });
+    });
+
+    it('re-queue AND put-back both rejected → lost, and a P1 names it', async () => {
+      sendAlertMock.mockClear();
+      mockRedisClient.llen.mockResolvedValueOnce(1);
+      mockRedisClient.rpop.mockResolvedValueOnce(
+        JSON.stringify({ id: 'e1', options: { to: 'x@example.com' }, attempts: 3 })
+      );
+      mockRedisClient.lpush.mockRejectedValue(new Error('down'));
+
+      const res = await emailQueue.retryFailed();
+
+      expect(res).toEqual({ retried: 0, skipped: 0, kept: 0 });
+      expect(sendAlertMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'p1',
+          source: 'email.queue.replay_lost',
+          context: { lost: 1, list: 'email:failed' },
+        })
+      );
+    });
+
     // Issue 2353: the set-aside list is bounded and has a reader + a drain.
     it('bounds the set-aside list (newest 200, 30-day expiry) on every write', async () => {
       mockRedisClient.llen.mockResolvedValueOnce(1);
       mockRedisClient.rpop.mockResolvedValueOnce('not json');
       await emailQueue.retryFailed();
       expect(mockRedisClient.ltrim).toHaveBeenCalledWith('email:failed:corrupt', 0, 199);
-      expect(mockRedisClient.expire).toHaveBeenCalledWith('email:failed:corrupt', 30 * 24 * 60 * 60);
+      expect(mockRedisClient.expire).toHaveBeenCalledWith(
+        'email:failed:corrupt',
+        30 * 24 * 60 * 60
+      );
     });
 
     it('exposes the set-aside entries by size only, and counts them in getStats', async () => {
@@ -304,7 +371,10 @@ describe('Email Queue Service', () => {
         { position: 1, bytes: 3 },
       ]);
       expect(mockRedisClient.lrange).toHaveBeenCalledWith('email:failed:corrupt', 0, 49);
-      mockRedisClient.llen.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(4);
+      mockRedisClient.llen
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(4);
       expect((await emailQueue.getStats()).corrupt).toBe(4);
     });
 

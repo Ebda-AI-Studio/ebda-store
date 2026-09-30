@@ -84,7 +84,9 @@ describe.skipIf(!hasDb)('R2 strict-visibility guard on a real Postgres (issue 23
   });
 
   it('non-owner, never-analyzed empty table: ANALYZE is skipped and reltuples stays -1', async () => {
-    await expect(assertStrictTablesVisible(runner(role, true), catalogAs(role), [table])).resolves.toBeUndefined();
+    await expect(
+      assertStrictTablesVisible(runner(role, true), catalogAs(role), [table])
+    ).resolves.toBeUndefined();
     // The branch under test really executed: the non-owner ANALYZE did not mint an estimate.
     expect(await reltuples()).toBe(-1);
   });

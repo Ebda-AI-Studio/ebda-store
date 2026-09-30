@@ -879,7 +879,9 @@ export default function CampaignDetailPage() {
                                 })
                               : formatDateTime(r.sentAt)}
                           </td>
-                          <td className="px-3 py-2 text-xs text-destructive-ink">{r.error || '—'}</td>
+                          <td className="px-3 py-2 text-xs text-destructive-ink">
+                            {r.error || '—'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -178,4 +178,3 @@ describe('runReorderScan — variant-aware on-hand (#1100)', () => {
     tx.supplier.findUnique.mockResolvedValue(null);
   });
 });
-

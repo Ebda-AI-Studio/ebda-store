@@ -55,6 +55,11 @@ const h = vi.hoisted(() => ({
   // Spy (not an inline passthrough) so tests can assert the FORCE-RLS side
   // effects actually run INSIDE a tenant context — the whole point of the fix.
   runInTenant: vi.fn((_s: string, fn: () => unknown) => fn()),
+  // Issue 2359: tracks whether a withMoneyTx callback is currently open, so a
+  // test can prove the cross-store bypass read never runs inside one.
+  moneyTxDepth: { n: 0 },
+  auditLogFindFirst: vi.fn(),
+  bypassCalledInsideMoneyTx: vi.fn(),
 }));
 
 const txClient = {
@@ -84,7 +89,18 @@ vi.mock('@force/database', () => ({
   },
   runInTenantContext: h.runInTenant,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withMoneyTx: (_client: any, fn: (tx: typeof txClient) => unknown) => fn(txClient),
+  withMoneyTx: async (_client: any, fn: (tx: typeof txClient) => unknown) => {
+    h.moneyTxDepth.n++;
+    try {
+      return await fn(txClient);
+    } finally {
+      h.moneyTxDepth.n--;
+    }
+  },
+  withRlsBypass: async (fn: (b: unknown) => unknown) => {
+    if (h.moneyTxDepth.n > 0) h.bypassCalledInsideMoneyTx();
+    return fn({ auditLog: { findFirst: h.auditLogFindFirst } });
+  },
 }));
 
 vi.mock('@api/services/email.service', () => ({
@@ -319,6 +335,69 @@ describe('order-refunded fanout — reverse-coupon step', () => {
       ([arg]: [{ data: { toStatus: string } }]) => arg.data.toStatus === 'coupon_reversed'
     );
     expect(couponMarkers).toHaveLength(1); // marker written once
+  });
+
+  // Issue 2359: the pre-cutover admin-order lookup is a withRlsBypass read —
+  // a fresh $transaction on a second pool connection. It must run in its own
+  // step BEFORE the coupon withMoneyTx opens, never inside it.
+  it('pre-cutover admin order: looks up admin_created OUTSIDE the money tx and skips the decrement', async () => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      couponCode: 'SAVE10',
+      customerId: 'c1',
+      createdAt: '2026-09-01T00:00:00Z',
+    });
+    h.auditLogFindFirst.mockResolvedValue({ id: 'audit-1' });
+    const ids: string[] = [];
+    const recordingStep = {
+      run: async <T>(id: string, fn: () => Promise<T>): Promise<T> => {
+        ids.push(id);
+        return fn();
+      },
+    };
+
+    await handleOrderRefunded('o1', 's1', true, true, recordingStep);
+
+    expect(h.auditLogFindFirst).toHaveBeenCalledTimes(1);
+    expect(h.bypassCalledInsideMoneyTx).not.toHaveBeenCalled();
+    expect(ids.indexOf('admin-created-lookup')).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf('admin-created-lookup')).toBeLessThan(ids.indexOf('reverse-coupon'));
+    expect(h.couponUpdateMany).not.toHaveBeenCalled();
+    expect(h.orderEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        toStatus: 'coupon_reversed',
+        metadata: { skipped: 'admin_order_never_reserved' },
+      }),
+    });
+  });
+
+  it('pre-cutover checkout order (no admin_created row) still decrements once', async () => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      couponCode: 'SAVE10',
+      customerId: 'c1',
+      createdAt: '2026-09-01T00:00:00Z',
+    });
+    h.auditLogFindFirst.mockResolvedValue(null);
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.bypassCalledInsideMoneyTx).not.toHaveBeenCalled();
+    expect(h.couponUpdateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('post-cutover order never runs the admin_created lookup', async () => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      couponCode: 'SAVE10',
+      customerId: 'c1',
+      createdAt: '2026-10-01T00:00:00Z',
+    });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.auditLogFindFirst).not.toHaveBeenCalled();
+    expect(h.couponUpdateMany).toHaveBeenCalledTimes(1);
   });
 
   it('skips coupon reversal entirely when the order has no couponCode', async () => {

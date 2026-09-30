@@ -220,8 +220,7 @@ describe.skipIf(!hasDb)('flatten-single-variant-products script', () => {
     const late = await withRlsBypass(async tx =>
       tx.orderItem.create({
         data: {
-          orderId: (await tx.orderItem.findUniqueOrThrow({ where: { id: s.orderItemId } }))
-            .orderId,
+          orderId: (await tx.orderItem.findUniqueOrThrow({ where: { id: s.orderItemId } })).orderId,
           productId: s.productId,
           variantId: s.variantId,
           productName: 'late line',

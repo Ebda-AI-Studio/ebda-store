@@ -264,8 +264,20 @@ describe('legacy-corner stores are byte-identical (issue 2343, owner rule)', () 
   function* grid() {
     for (const isRtl of [false, true])
       for (const orderable of [false, true])
-        for (const customPosition of [undefined, 'top-left', 'top-right', 'bottom-left', 'bottom-right'] as const)
-          for (const discountPosition of [undefined, 'bottom-left', 'top-left', 'top-right', 'bottom-right'] as const)
+        for (const customPosition of [
+          undefined,
+          'top-left',
+          'top-right',
+          'bottom-left',
+          'bottom-right',
+        ] as const)
+          for (const discountPosition of [
+            undefined,
+            'bottom-left',
+            'top-left',
+            'top-right',
+            'bottom-right',
+          ] as const)
             for (const discountVisible of [false, true])
               for (const discountOccupiesCorner of [false, true])
                 for (const topStartReserved of [false, true])

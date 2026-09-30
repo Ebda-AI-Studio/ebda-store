@@ -163,7 +163,9 @@ export function CategoryForm({
               placeholder={t('nameEnglishPlaceholder')}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-destructive' : 'border-border'}`}
             />
-            {formErrors.name && <p className="mt-1 text-xs text-destructive-ink">{formErrors.name}</p>}
+            {formErrors.name && (
+              <p className="mt-1 text-xs text-destructive-ink">{formErrors.name}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
@@ -195,7 +197,9 @@ export function CategoryForm({
             placeholder={t('urlSlugPlaceholder')}
             className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-destructive' : 'border-border'}`}
           />
-          {formErrors.slug && <p className="mt-1 text-xs text-destructive-ink">{formErrors.slug}</p>}
+          {formErrors.slug && (
+            <p className="mt-1 text-xs text-destructive-ink">{formErrors.slug}</p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">{t('urlSlugHint')}</p>
         </div>
 

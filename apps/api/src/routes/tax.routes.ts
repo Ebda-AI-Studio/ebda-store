@@ -2,7 +2,6 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { requireFeature } from '../middleware/feature-gate';
 import { TaxService } from '../services/tax.service';
 import { tenantContext } from '../middleware/tenant-context';
 
@@ -15,26 +14,40 @@ const router = Router();
 // correctly here. See F2, docs/plans/2026-07-02-rls-cutover.md.
 router.param('storeId', tenantContext);
 
-// Validation schemas
-const updateSettingsSchema = z.object({
-  taxEnabled: z.boolean().optional(),
-  taxIncludedInPrice: z.boolean().optional(),
-  defaultTaxRate: z.number().min(0).max(100).nullable().optional(),
-});
+// NOT behind `requireFeature('tax')` (issue 2358, ruling TAX-1a). Collection is
+// gated on `Store.taxEnabled` alone (ruling TAX-1: a legal obligation, not a
+// plan feature), so the switch that turns it on or off and the rate list that
+// sets what it charges must be reachable on EVERY plan — a store that lapsed
+// to `free` kept charging VAT while every route here 403'd. The `tax` feature
+// is reserved for ADVANCED tax features (region-scoped or compound rates);
+// none exists today, so nothing here is gated by it.
 
-// Optional columns are `.nullable()` so an emptied field on the edit modal
-// CLEARS them: Prisma reads `null` as "set to NULL", `undefined` (omitted
-// key) as "leave alone". Without the null form the merchant's clear no-ops.
-const createTaxRateSchema = z.object({
-  name: z.string().min(1).max(100),
-  nameAr: z.string().max(100).optional().nullable(),
-  rate: z.number().min(0).max(100),
-  country: z.string().max(2).optional().nullable(),
-  state: z.string().max(100).optional().nullable(),
-  priority: z.number().int().min(0).optional(),
-  isCompound: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-});
+// Validation schemas
+//
+// `.strict()` (issue 2357, ruling TAX-1a): the charge reads only `taxEnabled`,
+// `taxIncludedInPrice` and the SUM of every active rate's `rate`
+// (lib/order-tax.ts). Keys it does not read — `defaultTaxRate`, and a rate's
+// `country`/`state`/`priority`/`isCompound` — are REJECTED (400), never
+// accepted and silently ignored: a merchant who set "KW 5%" and "SA 15%"
+// would otherwise have every order charged 20%.
+const updateSettingsSchema = z
+  .object({
+    taxEnabled: z.boolean().optional(),
+    taxIncludedInPrice: z.boolean().optional(),
+  })
+  .strict();
+
+// `nameAr` is `.nullable()` so an emptied field on the edit modal CLEARS it:
+// Prisma reads `null` as "set to NULL", `undefined` (omitted key) as "leave
+// alone". Without the null form the merchant's clear no-ops.
+export const createTaxRateSchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    nameAr: z.string().max(100).optional().nullable(),
+    rate: z.number().min(0).max(100),
+    isActive: z.boolean().optional(),
+  })
+  .strict();
 
 export const updateTaxRateSchema = createTaxRateSchema.partial();
 
@@ -44,7 +57,6 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -67,7 +79,6 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -91,7 +102,6 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -115,7 +125,6 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -138,7 +147,6 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -162,7 +170,6 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -186,7 +193,6 @@ router.delete(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -209,7 +215,6 @@ router.patch(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  requireFeature('tax'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;

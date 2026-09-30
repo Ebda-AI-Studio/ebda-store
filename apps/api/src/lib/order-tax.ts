@@ -19,16 +19,17 @@ export { computeOrderTax } from '@force/shared';
  * ruling TAX-1). VAT collection is a legal obligation, not a billing feature:
  * the plan-derived `tax` feature used to gate the charge too, and `free` (the
  * lapsed-payment grace plan) does not carry it, so a merchant whose
- * subscription lapsed silently stopped collecting VAT. The `tax` feature still
- * gates the admin tax PAGES; it can no longer switch collection off. A
- * merchant who flips "Enable tax" off (`taxEnabled: false`) is neither shown
- * a VAT line nor charged one.
+ * subscription lapsed silently stopped collecting VAT. The admin tax page and
+ * its routes are not feature-gated either (issue 2358, ruling TAX-1a): the
+ * switch and the rate list work on every plan. A merchant who flips "Enable
+ * tax" off (`taxEnabled: false`) is neither shown a VAT line nor charged one.
  *
  * What it charges: the SUM of every ACTIVE rate (owner decision 2026-10-01,
  * issue 2114, ruling TAX-1) — 5% + 2% charges and shows 7%, matching what the
  * admin tax page lets a merchant configure. It does not read
- * `country`/`state`, `isCompound` or `TaxSettings.defaultTaxRate`: every
- * active rate applies additively to the taxable amount.
+ * `country`/`state`, `priority`, `isCompound` or `defaultTaxRate`: every
+ * active rate applies additively to the taxable amount, and the tax routes
+ * reject those fields (issue 2357, ruling TAX-1a).
  *
  * Returns `{ ratePercent: 0, includedInPrice }` when disabled OR there is no
  * active tax rate — identical to before for every store with tax off.

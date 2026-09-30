@@ -631,7 +631,9 @@ export default function NewOrderPage() {
               ) : shippingPreview ? (
                 shippingPreview.matched ? (
                   shippingPreview.freeShipping ? (
-                    <p className="font-medium text-success-ink">{t('shippingSection.freeDelivery')}</p>
+                    <p className="font-medium text-success-ink">
+                      {t('shippingSection.freeDelivery')}
+                    </p>
                   ) : (
                     <p className="font-semibold text-foreground">
                       {formatPrice(shippingPreview.shippingCost)}

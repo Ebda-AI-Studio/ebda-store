@@ -44,7 +44,12 @@ export interface RevalidateOptions {
   tags?: string[];
 }
 
-export type RevalidateOutcome = 'ok' | 'not-configured' | 'nothing-to-purge' | 'rejected' | 'failed';
+export type RevalidateOutcome =
+  | 'ok'
+  | 'not-configured'
+  | 'nothing-to-purge'
+  | 'rejected'
+  | 'failed';
 
 /**
  * The same purge, awaitable, with its outcome — for a one-off script that must

@@ -18,7 +18,9 @@ import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { emailQueue } from '../services/email-queue.service';
-import { maskEmail } from '../lib/pii-mask';
+import { smsQueue } from '../services/sms-queue.service';
+import { redis } from '../services/redis.service';
+import { maskEmail, maskPhone } from '../lib/pii-mask';
 import {
   prisma,
   withRlsBypass,
@@ -2053,7 +2055,11 @@ router.get(
       res.json({
         success: true,
         data: {
-          stats: { pending: stats.pending, failed: stats.failed, corrupt: stats.corrupt },
+          // Redis down → the counts are UNKNOWN, not zero (the page renders
+          // "Queue status unknown" for null).
+          stats: redis.isAvailable()
+            ? { pending: stats.pending, failed: stats.failed, corrupt: stats.corrupt }
+            : null,
           // Issue 2353: the unreadable set-aside entries — size only (they
           // cannot be parsed, so nothing can be masked; no payload returned).
           corrupt,
@@ -2080,17 +2086,17 @@ router.post(
   requireRole(['super_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { retried, skipped } = await emailQueue.retryFailed();
+      const { retried, skipped, kept } = await emailQueue.retryFailed();
       await auditLog({
         action: 'email_queue.retry_failed',
         userId: req.user!.userId,
         resourceType: 'setting',
         resourceId: 'email:failed',
-        details: { retried, skipped },
+        details: { retried, skipped, kept },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res.json({ success: true, data: { retried, skipped } });
+      res.json({ success: true, data: { retried, skipped, kept } });
     } catch (err) {
       next(err);
     }
@@ -2110,6 +2116,91 @@ router.post(
         userId: req.user!.userId,
         resourceType: 'setting',
         resourceId: 'email:failed:corrupt',
+        details: { discarded },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { discarded } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ── SMS queue dead-letter — super-admin observability + replay (issue 2363) ──
+// The twin of the email-queue handlers above. An SMS that fails every attempt
+// lands in the Redis list `sms:failed`; before this, that list had no viewer,
+// no replay and no discard (the only drain was `railway connect Redis`). The
+// recipient number is masked; the message text is never returned.
+router.get(
+  '/sms-queue/failed',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 100) || 100));
+      const [messages, stats, corrupt] = await Promise.all([
+        smsQueue.getFailedMessages(limit),
+        smsQueue.getStats(),
+        smsQueue.getCorruptEntries(50),
+      ]);
+      res.json({
+        success: true,
+        data: {
+          stats: redis.isAvailable()
+            ? { pending: stats.pending, failed: stats.failed, corrupt: stats.corrupt }
+            : null,
+          corrupt,
+          messages: messages.map(m => ({
+            id: m.id,
+            storeId: m.storeId ?? null,
+            event: m.event ?? null,
+            to: maskPhone(m.recipientPhone),
+            attempts: m.attempts,
+            error: m.error ?? null,
+            createdAt: m.createdAt,
+            lastAttempt: m.lastAttempt ?? null,
+          })),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/sms-queue/failed/retry',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { retried, skipped, kept } = await smsQueue.retryFailed();
+      await auditLog({
+        action: 'sms_queue.retry_failed',
+        userId: req.user!.userId,
+        resourceType: 'setting',
+        resourceId: 'sms:failed',
+        details: { retried, skipped, kept },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { retried, skipped, kept } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/sms-queue/corrupt/discard',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const discarded = await smsQueue.discardCorrupt();
+      await auditLog({
+        action: 'sms_queue.discard_corrupt',
+        userId: req.user!.userId,
+        resourceType: 'setting',
+        resourceId: 'sms:failed:corrupt',
         details: { discarded },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

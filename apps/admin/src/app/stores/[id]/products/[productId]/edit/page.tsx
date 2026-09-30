@@ -905,7 +905,9 @@ export default function EditProductPage() {
                 const marginPct = (margin / sellPrice) * 100;
                 const profitable = margin > 0;
                 return (
-                  <p className={`mt-3 text-sm ${profitable ? 'text-success-ink' : 'text-destructive-ink'}`}>
+                  <p
+                    className={`mt-3 text-sm ${profitable ? 'text-success-ink' : 'text-destructive-ink'}`}
+                  >
                     {tFields('profitLabel')}{' '}
                     <span className="font-semibold">
                       {margin.toFixed(3)} KWD ({marginPct.toFixed(1)}%)

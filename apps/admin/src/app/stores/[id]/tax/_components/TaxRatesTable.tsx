@@ -53,32 +53,6 @@ export function TaxRatesTable({
       cell: rate => <span className="font-medium text-foreground">{rate.rate}%</span>,
     },
     {
-      header: t('columns.region'),
-      cell: rate =>
-        rate.country || rate.state ? (
-          <div className="text-sm text-muted-foreground">
-            {rate.country && <span className="uppercase">{rate.country}</span>}
-            {rate.country && rate.state && <span> / </span>}
-            {rate.state && <span>{rate.state}</span>}
-          </div>
-        ) : (
-          <span className="text-sm text-muted-foreground">{t('allRegions')}</span>
-        ),
-    },
-    {
-      header: t('columns.priority'),
-      hideOnMobile: true,
-      cell: rate => <span className="text-sm text-muted-foreground">{rate.priority}</span>,
-    },
-    {
-      header: t('columns.type'),
-      cell: rate => (
-        <span className="px-2 py-1 rounded text-xs font-medium bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink">
-          {rate.isCompound ? t('types.compound') : t('types.standard')}
-        </span>
-      ),
-    },
-    {
       header: t('columns.status'),
       mobileBadge: true,
       cell: rate => (

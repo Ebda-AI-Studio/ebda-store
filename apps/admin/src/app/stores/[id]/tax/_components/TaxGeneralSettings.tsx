@@ -11,8 +11,9 @@ interface TaxGeneralSettingsProps {
 }
 
 /**
- * Top card: toggles for enabling tax, tax-inclusive pricing, and the default rate input.
- * Each control auto-saves via `onSaveSettings` on change/blur.
+ * Top card: toggles for enabling tax and tax-inclusive pricing. Each control
+ * auto-saves via `onSaveSettings` on change. The old "default tax rate" input
+ * was removed (issue 2357): the charge never read it.
  */
 export function TaxGeneralSettings({
   settings,
@@ -68,31 +69,6 @@ export function TaxGeneralSettings({
               className={`w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${!settings.taxEnabled ? 'opacity-50' : ''}`}
             ></div>
           </label>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            {t('defaultRate.label')}
-          </label>
-          <p className="text-sm text-muted-foreground mb-2">{t('defaultRate.description')}</p>
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={settings.defaultTaxRate ?? ''}
-              onChange={e => {
-                const value = e.target.value ? parseFloat(e.target.value) : null;
-                onSettingsChange({ ...settings, defaultTaxRate: value });
-              }}
-              onBlur={() => onSaveSettings({ defaultTaxRate: settings.defaultTaxRate })}
-              placeholder={t('defaultRate.placeholder')}
-              className="w-32 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              disabled={!settings.taxEnabled}
-            />
-            <span className="text-muted-foreground">%</span>
-          </div>
         </div>
       </div>
     </div>

@@ -123,7 +123,10 @@ export default function WebhookEventsPage() {
     {
       header: t('columns.lastError'),
       cell: ev => (
-        <span className="block max-w-[240px] truncate text-destructive-ink" title={ev.lastError || ''}>
+        <span
+          className="block max-w-[240px] truncate text-destructive-ink"
+          title={ev.lastError || ''}
+        >
           {ev.lastError || '—'}
         </span>
       ),

@@ -405,6 +405,29 @@ export async function handleOrderRefunded(
     );
   });
 
+  // An admin order created before admin orders reserved their coupon never
+  // incremented `usageCount`; decrementing on its cancel handed a live
+  // redemption back to the merchant's limit (issue 2303, ruling M-OVR-1a).
+  // The `order.admin_created` audit row is the durable record of an
+  // admin-created order (cross-store actor row, so read bypassed). Looked up
+  // in its OWN step, BEFORE the coupon transaction opens (issue 2359):
+  // `withRlsBypass` is a fresh `$transaction` on a second pool connection, and
+  // taking one while `withMoneyTx` holds another is the double-nest pool
+  // hazard (assert-store-owns.ts). The row is immutable history, so reading it
+  // outside the transaction loses nothing.
+  const adminOrderNeverReserved =
+    !isPartial && !!order.couponCode && new Date(order.createdAt) < ADMIN_COUPON_RESERVE_CUTOVER
+      ? await step.run('admin-created-lookup', async () => {
+          const row = await withRlsBypass(b =>
+            b.auditLog.findFirst({
+              where: { action: 'order.admin_created', resourceType: 'order', resourceId: orderId },
+              select: { id: true },
+            })
+          );
+          return !!row;
+        })
+      : false;
+
   // Reverse the coupon usage count consumed at checkout. Guarded by its OWN
   // `coupon_reversed` orderEvent marker (NOT the inventory `return_stock`
   // marker — restoreInventory:false calls, or orders with no tracked
@@ -437,32 +460,20 @@ export async function handleOrderRefunded(
         });
         if (legacyRollback) return { skipped: true };
 
-        // An admin order created before admin orders reserved their coupon
-        // never incremented `usageCount`; decrementing on its cancel handed a
-        // live redemption back to the merchant's limit (issue 2303, ruling
-        // M-OVR-1a). The `order.admin_created` audit row is the durable record
-        // of an admin-created order (cross-store actor row, so read bypassed).
+        // Pre-cutover admin order (looked up above, outside this transaction).
         // Marked like a reversal so a redelivery skips it cheaply.
-        if (new Date(order.createdAt) < ADMIN_COUPON_RESERVE_CUTOVER) {
-          const adminCreated = await withRlsBypass(b =>
-            b.auditLog.findFirst({
-              where: { action: 'order.admin_created', resourceType: 'order', resourceId: orderId },
-              select: { id: true },
-            })
-          );
-          if (adminCreated) {
-            await tx.orderEvent.create({
-              data: {
-                storeId,
-                orderId,
-                fromStatus: null,
-                toStatus: 'coupon_reversed',
-                actorId: null,
-                metadata: { skipped: 'admin_order_never_reserved' },
-              },
-            });
-            return { skipped: true };
-          }
+        if (adminOrderNeverReserved) {
+          await tx.orderEvent.create({
+            data: {
+              storeId,
+              orderId,
+              fromStatus: null,
+              toStatus: 'coupon_reversed',
+              actorId: null,
+              metadata: { skipped: 'admin_order_never_reserved' },
+            },
+          });
+          return { skipped: true };
         }
 
         // Decrement back to zero floor — concurrent refunds shouldn't push

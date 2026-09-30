@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
   paymentCreate: vi.fn(),
   paymentConfigFindFirst: vi.fn(),
   createPayment: vi.fn(),
+  orphanAlert: vi.fn(),
 }));
 
 vi.mock('@force/database', () => ({
@@ -56,6 +57,9 @@ vi.mock('@api/middleware/security', () => ({
 vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: { createPayment: (...a: unknown[]) => h.createPayment(...a) },
+}));
+vi.mock('@api/services/payment-providers/orphaned-invoice-alert', () => ({
+  alertOrphanedProviderInvoice: (...a: unknown[]) => h.orphanAlert(...a),
 }));
 vi.mock('@api/services/payment-event.service', () => ({ recordPaymentEvent: vi.fn() }));
 vi.mock('@api/services/order.service', () => ({
@@ -122,6 +126,38 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
     expect(h.rollbackCalls).toEqual([['store-1', ORDER_ID, 'sess-1']]);
   });
 
+  // issue 2360: the rollback cannot reach the gateway — the accepted invoice is
+  // still live with no Payment row behind it, so it must be named in a P1.
+  it('online: provider accepted, COMMIT fails → the live invoice is alerted', async () => {
+    h.commitFails = true;
+    await create('myfatoorah');
+    expect(h.orphanAlert).toHaveBeenCalledTimes(1);
+    expect(h.orphanAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storeId: 'store-1',
+        orderId: ORDER_ID,
+        provider: 'myfatoorah',
+        transactionId: 'txn-1',
+        amount: 5000,
+        source: 'checkout',
+      })
+    );
+  });
+
+  it('online: provider REJECTED → no orphaned-invoice alert (nothing was minted)', async () => {
+    h.createPayment.mockRejectedValueOnce(new Error('gateway 400'));
+    const res = await create('myfatoorah');
+    expect(res.status).toBe(500);
+    expect(h.rollbackCalls).toEqual([['store-1', ORDER_ID, 'sess-1']]);
+    expect(h.orphanAlert).not.toHaveBeenCalled();
+  });
+
+  it('cod: COMMIT fails → no orphaned-invoice alert (no gateway involved)', async () => {
+    h.commitFails = true;
+    await create('cod');
+    expect(h.orphanAlert).not.toHaveBeenCalled();
+  });
+
   it('cod: payment row written, COMMIT fails → the order is rolled back', async () => {
     h.commitFails = true;
     const res = await create('cod');
@@ -133,5 +169,6 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
     const res = await create('myfatoorah');
     expect(res.status).toBe(200);
     expect(h.rollbackCalls).toEqual([]);
+    expect(h.orphanAlert).not.toHaveBeenCalled();
   });
 });

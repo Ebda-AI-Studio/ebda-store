@@ -108,7 +108,9 @@ describe('the nightly cron fans out one run per store (issue 2348)', () => {
     expect(cron).toMatch(/step\.sendEvent\(/);
     expect(cron).toMatch(/name: 'insights\/rollup-requested'/);
     const onDemand = src.slice(src.indexOf('export const analyticsRollupOnDemand'));
-    expect(onDemand).toMatch(/concurrency: \[\{ limit: 3 \}, \{ key: 'event\.data\.storeId', limit: 1 \}\]/);
+    expect(onDemand).toMatch(
+      /concurrency: \[\{ limit: 3 \}, \{ key: 'event\.data\.storeId', limit: 1 \}\]/
+    );
   });
 
   it('batches the fan-out: 1201 stores → 3 sendEvent calls', async () => {

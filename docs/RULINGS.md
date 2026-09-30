@@ -4683,6 +4683,7 @@ the store count. Cost if wrong: a store's nightly rollup and a "run now" for it 
 other instead of running together.
 
 **Owner questions left open in this batch (not guessed):**
+
 - Issues 2345 / 2346 — what an old-shape variant-less PO line on a variant product means for a
   merchant. `sent` lines cannot be received (VARIANT_REQUIRED) and count as on order for no
   variant, so the reorder scan can over-suggest; `partial` lines already put units on the parent
@@ -4694,3 +4695,66 @@ other instead of running together.
 - Issue 2349's storefront half — `apps/web` cart/checkout/auth banners pair a role tint with the
   bare role colour (1.98–3.30:1). Those pages render on pecannbee, whose look must not change, so
   re-colouring needs an owner OK or a default-off theme flag with pecannbee pinned by data.
+
+## Backlog batch followups (2026-10-01, branch `fix/backlog-followups`)
+
+Audit follow-ups filed on PRs 2335 and 2362. Owner decisions TAX-1 stand unchanged (several active
+rates are charged as their SUM; VAT keeps being collected on `free`); the two tax items make the
+admin and the API agree with them.
+
+**Ruling TAX-1a — the tax surface offers only what the charge reads, on every plan (issues 2357,
+2358; amends TAX-1).** The charge reads `taxEnabled`, `taxIncludedInPrice` and the sum of the
+active rates, nothing else. The admin tax page no longer offers a rate's country/state, priority or
+compound flag, nor the store's "default tax rate" (whose own help text still claimed the
+highest-priority rate is charged); the info box now states the sum rule and shows the combined
+rate being charged. `tax.routes.ts` rejects those keys with a 400 (`.strict()` Zod) instead of
+storing values nothing reads — a merchant who entered "KW 5%" and "SA 15%" had every order charged
+20%. The columns stay in the schema (stored values are harmless, never read). Every tax route and
+the admin page are no longer behind `requireFeature('tax')`: collection is gated on `taxEnabled`
+alone, so the switch that turns it off and the list that sets what it charges answer on every
+plan, including a store that lapsed to `free`. The `tax` feature key is kept, re-described as
+reserved for advanced tax features (region-scoped or compound rates); none is built, so today it
+gates nothing — a super-admin toggling it changes nothing. Cost if wrong: a merchant who needs a
+region-specific or compound rate has no way to express it until that advanced feature is built
+(production has 0 `tax_rates` rows, so no configured rate is affected).
+
+**Ruling M-OVR-1b — the pre-cutover admin-order check runs outside the coupon money transaction
+(issue 2359; amends M-OVR-1a).** `withRlsBypass` opens its own `$transaction` on a second pool
+connection; calling it inside `withMoneyTx` held one connection while waiting for another (the
+double-nest hazard). The `order.admin_created` lookup is now its own `step.run`
+(`admin-created-lookup`) before `reverse-coupon`, and only for an order with a coupon created
+before `ADMIN_COUPON_RESERVE_CUTOVER`; its result (immutable history) is passed into the
+transaction. A sweep of all 132 `withRlsBypass` call sites found no other one nested inside an
+explicit transaction. NOT done: an index on `audit_logs(resource_type, resource_id)` — the lookup
+is no longer inside a money transaction, runs once per pre-cutover couponed order and has the
+`action` index; a new index on the largest append-only table is not worth its write cost for a
+shrinking historical set. Cost if wrong: that one-off lookup is a slower scan on a store with a
+very large audit log.
+
+**Ruling PAY-ORPH-1 — a gateway invoice whose Payment row died with a failed COMMIT is alerted,
+not voided (issue 2360).** The compensating rollback stays armed until the payment wrap commits
+(issue 2306), so a failed COMMIT after the provider ACCEPTED rolls the order back while the invoice
+stays live — MyFatoorah can notify the customer directly, and a paid invoice's webhook then
+matches no Payment row and is rejected. No provider adapter has a void/cancel call, and none was
+guessed: POST /payments/create and the MCP `place_order` tool now record the accepted invoice and,
+if the wrap then fails, log it and raise a P1 (`payment.create.orphaned_invoice.*`) naming the
+provider, the gateway transaction id and the order, for an operator to void in the provider
+dashboard. The admin payment-link and retry paths are the same shape without a rollback (their
+order is untouched); a failed COMMIT there already surfaces as the request's 500/503 +
+`COMMIT_TIMEOUT` P1, not as this alert. Cost if wrong: an operator who misses the P1 leaves an
+invoice payable with nothing recorded, until a provider void entry point exists.
+
+**Ruling BF-2a — replay never destroys a popped entry, and SMS gets the email queue's page
+(issues 2361, 2363; supersedes BF-2's "no SMS page").** One replay loop,
+`replayDeadLetters` in `lib/dead-letter.ts`, now serves both queues: every Redis write after the
+`rpop` is guarded, a failed re-queue or set-aside puts the raw entry back on the dead-letter list
+(`kept`, reported by the route and the page) and the loop continues; a failed `rpop` removed
+nothing and ends the run. Only when the re-queue AND the put-back are both rejected is an entry
+lost — logged by id (never payload) with a P1 (`*.queue.replay_lost`). `sms:failed` is live data
+(the transactional SMS path enqueues for any store with an SMS provider configured), so it gets
+the email twin's surface: `GET /admin/sms-queue/failed` (number masked, text never returned),
+`POST …/failed/retry` and `POST …/corrupt/discard`, super-admin only and audited
+(`sms_queue.retry_failed`, `sms_queue.discard_corrupt`), and a `/sms-queue` page cross-linked with
+`/email-queue`. Both list routes now report stats as unknown (`null`) when Redis is down instead of
+zeros. Cost if wrong: a Redis outage that rejects two writes in a row loses the entries being
+replayed at that moment (alerted, by id).

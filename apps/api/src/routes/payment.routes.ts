@@ -12,6 +12,10 @@ import { OrderService } from '../services/order.service';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import logger from '../lib/logger';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
+import {
+  alertOrphanedProviderInvoice,
+  type OrphanedProviderInvoice,
+} from '../services/payment-providers/orphaned-invoice-alert';
 
 const router = Router();
 
@@ -169,6 +173,10 @@ router.post(
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     let rollbackContext: { orderId: string; storeId: string; sessionId: string } | null = null;
+    // Set the moment the gateway ACCEPTS an invoice, cleared with the rollback
+    // once the wrap COMMITs. Still set in the catch = the provider holds a live
+    // invoice whose Payment row died with the failed COMMIT (issue 2360).
+    let acceptedInvoice: OrphanedProviderInvoice | null = null;
 
     try {
       const data = createPaymentSchema.parse(req.body);
@@ -527,6 +535,19 @@ router.post(
         // (issue 2306, same class as the agent path in mcp/tools/order.tools.ts):
         // the Payment row is only durable after this wrap COMMITs, so a COMMIT
         // failure/timeout must still roll the order back in the outer catch.
+        // That rollback does NOT reach the gateway: the invoice stays live, so
+        // the catch raises a P1 naming it for an operator to void (issue 2360,
+        // ruling PAY-ORPH-1). The client never receives this paymentUrl.
+        acceptedInvoice = {
+          storeId: order.storeId,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          provider: result.provider,
+          transactionId: result.transactionId,
+          amount: order.total - walletAmount,
+          currency: order.currency,
+          source: 'checkout',
+        };
 
         // Audit log
         await auditLog({
@@ -564,6 +585,7 @@ router.post(
       // pending order with stock decremented, the cart cleared and no Payment
       // row (issue 2306).
       rollbackContext = null;
+      acceptedInvoice = null;
 
       // Only now do the bytes go out, so a 200 here means the payment row is
       // durable and visible to every other connection.
@@ -585,6 +607,9 @@ router.post(
           logger.error({ err: rbErr, ...rollbackContext }, 'Order rollback failed in catch block')
         );
       }
+      // Independent of the rollback: an order that was not rolled back (no
+      // session header) still has no Payment row behind a live invoice.
+      if (acceptedInvoice) await alertOrphanedProviderInvoice(acceptedInvoice);
       next(error);
     }
   }

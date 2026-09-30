@@ -35,7 +35,9 @@ export function LoyaltyStatsCards({ stats }: LoyaltyStatsCardsProps) {
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('outstanding')}</p>
-        <p className="text-2xl font-bold text-info-ink">{stats.outstandingPoints.toLocaleString()}</p>
+        <p className="text-2xl font-bold text-info-ink">
+          {stats.outstandingPoints.toLocaleString()}
+        </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground mb-2">{t('tierBreakdown')}</p>

@@ -197,7 +197,9 @@ export function ProductsTable({
         const margin = product.price - product.costPrice;
         const profitable = margin > 0;
         return (
-          <span className={`font-medium ${profitable ? 'text-success-ink' : 'text-destructive-ink'}`}>
+          <span
+            className={`font-medium ${profitable ? 'text-success-ink' : 'text-destructive-ink'}`}
+          >
             {formatPrice(margin)}
           </span>
         );

@@ -284,7 +284,9 @@ describe('PUT /stores/:storeId/tax/rates/:id — an emptied tax-rate field clear
     );
   });
 
-  for (const field of ['nameAr', 'country', 'state'] as const) {
+  // `country`/`state` are no longer accepted at all (issue 2357, ruling
+  // TAX-1a — the charge never read them); `nameAr` is the one clearable field.
+  for (const field of ['nameAr'] as const) {
     it(`accepts null for ${field} and writes null`, async () => {
       const res = await request(app)
         .put(`/api/v1/stores/${STORE_ID}/tax/rates/rate-1`)
@@ -301,7 +303,7 @@ describe('PUT /stores/:storeId/tax/rates/:id — an emptied tax-rate field clear
       .send({ isActive: false });
 
     expect(res.status).toBe(200);
-    expect(mockPrisma.taxRate.update.mock.calls[0][0].data.country).toBeUndefined();
+    expect(mockPrisma.taxRate.update.mock.calls[0][0].data.nameAr).toBeUndefined();
   });
 });
 

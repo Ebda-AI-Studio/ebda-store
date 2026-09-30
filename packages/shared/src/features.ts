@@ -180,8 +180,14 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'tax',
     name: 'Tax Management',
     nameAr: 'إدارة الضرائب',
-    description: 'Configure tax rates and rules for different regions.',
-    descriptionAr: 'تكوين معدلات الضرائب والقواعد للمناطق المختلفة.',
+    // Issue 2358, ruling TAX-1a: the tax on/off switch and the rate list are
+    // NOT gated by this key — collection is a legal obligation, available on
+    // every plan. The key is reserved for advanced tax features (region-scoped
+    // or compound rates); none is built, so it currently gates nothing.
+    description:
+      'Reserved for advanced tax features (region or compound rates). Basic tax settings and rates are available on every plan.',
+    descriptionAr:
+      'مخصّص لميزات الضريبة المتقدمة (معدلات حسب المنطقة أو مركّبة). إعدادات الضريبة ومعدلاتها الأساسية متاحة في كل الباقات.',
     category: 'commerce',
     tier: 'core',
   },

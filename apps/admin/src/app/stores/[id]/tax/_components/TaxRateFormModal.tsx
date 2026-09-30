@@ -129,68 +129,7 @@ export function TaxRateFormModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">
-              {t('country.label')}
-            </label>
-            <input
-              type="text"
-              value={formData.country}
-              onChange={e => onFormChange({ country: e.target.value.toUpperCase() })}
-              placeholder={t('country.placeholder')}
-              maxLength={2}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary uppercase"
-            />
-            <p className="text-xs text-muted-foreground mt-1">{t('country.hint')}</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">
-              {t('state.label')}
-            </label>
-            <input
-              type="text"
-              value={formData.state}
-              onChange={e => onFormChange({ state: e.target.value })}
-              placeholder={t('state.placeholder')}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-            <p className="text-xs text-muted-foreground mt-1">{t('state.hint')}</p>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-2">
-            {t('priority.label')}
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={formData.priority}
-            onChange={e => onFormChange({ priority: e.target.value })}
-            placeholder="0"
-            className="w-24 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-          <p className="text-xs text-muted-foreground mt-1">{t('priority.hint')}</p>
-        </div>
-
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.isCompound}
-                onChange={e => onFormChange({ isCompound: e.target.checked })}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-info"></div>
-            </label>
-            <div>
-              <span className="text-sm text-foreground font-medium">{t('compound.label')}</span>
-              <p className="text-xs text-muted-foreground">{t('compound.hint')}</p>
-            </div>
-          </div>
-
           <div className="flex items-center gap-3">
             <label className="relative inline-flex items-center cursor-pointer">
               <input

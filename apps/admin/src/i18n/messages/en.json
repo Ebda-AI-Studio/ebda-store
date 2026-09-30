@@ -3104,19 +3104,13 @@
       "included": {
         "title": "Prices Include Tax",
         "description": "Product prices already include tax (tax will be calculated backwards)"
-      },
-      "defaultRate": {
-        "label": "Default Tax Rate (%)",
-        "description": "Not applied at checkout — checkout charges the highest-priority active tax rate below. Add a rate to charge VAT.",
-        "placeholder": "e.g., 5.00"
       }
     },
     "rates": {
       "title": "Tax Rates",
-      "subtitle": "Create specific tax rates for different regions or categories",
+      "subtitle": "Every active rate applies to every order, added together",
       "addButton": "Add Rate",
       "tableLabel": "Tax rules",
-      "allRegions": "All regions",
       "filters": {
         "all": "All",
         "active": "Active",
@@ -3124,22 +3118,15 @@
       },
       "empty": {
         "title": "No Tax Rates",
-        "enabled": "Create tax rates for specific regions or product categories",
+        "enabled": "Add the tax your store must charge, e.g. VAT 5%",
         "disabled": "Enable tax collection to start adding tax rates",
         "createFirst": "Create First Rate"
       },
       "columns": {
         "name": "Name",
         "rate": "Rate",
-        "region": "Region",
-        "priority": "Priority",
-        "type": "Type",
         "status": "Status",
         "actions": "Actions"
-      },
-      "types": {
-        "compound": "Compound",
-        "standard": "Standard"
       },
       "status": {
         "active": "Active",
@@ -3168,24 +3155,6 @@
         "label": "Tax Rate (%)",
         "placeholder": "5.00"
       },
-      "country": {
-        "label": "Country Code",
-        "placeholder": "e.g., KW",
-        "hint": "Leave empty for all countries"
-      },
-      "state": {
-        "label": "State/Region",
-        "placeholder": "e.g., Capital",
-        "hint": "Leave empty for all states"
-      },
-      "priority": {
-        "label": "Priority",
-        "hint": "Higher priority rates are applied first"
-      },
-      "compound": {
-        "label": "Compound Tax",
-        "hint": "Calculate on subtotal + previous taxes"
-      },
       "active": {
         "label": "Active"
       },
@@ -3194,12 +3163,10 @@
       "update": "Update Rate"
     },
     "info": {
-      "title": "About Tax Calculation",
-      "priority": "Tax rates are applied based on priority (highest first).",
-      "compoundLabel": "Compound taxes",
-      "compoundDescription": "are calculated on top of the subtotal plus any previously calculated taxes.",
-      "standardLabel": "Standard taxes",
-      "standardDescription": "are calculated only on the original subtotal."
+      "title": "How tax is charged",
+      "sum": "Every active rate applies to every order, and active rates are added together: 5% + 2% charges 7%. Checkout shows and charges that same combined rate.",
+      "combined": "Combined rate charged now: {rate}%",
+      "off": "Tax collection is off — no tax is charged, whatever rates are listed."
     }
   },
   "inventory": {
@@ -6718,6 +6685,43 @@
     "corrupt": {
       "title": "{count} unreadable entr(ies) set aside",
       "body": "These dead-lettered emails could not be read during \"Retry all\", so they cannot be re-sent. The newest 200 are kept for 30 days in the Redis list email:failed:corrupt for inspection; discard them once reviewed.",
+      "sizes": "Sizes (bytes, newest first): {sizes}",
+      "discard": "Discard",
+      "discarding": "Discarding…",
+      "confirmDiscard": "Discard every unreadable entry? They cannot be recovered afterwards.",
+      "discarded": "Discarded {count} unreadable entr(ies)"
+    },
+    "retryKept": "{kept} could not be re-queued because Redis rejected the write — they are still in the failed list; retry again",
+    "smsQueueLink": "Failed SMS"
+  },
+  "smsQueue": {
+    "title": "SMS queue — failed messages",
+    "subtitle": "Queued SMS messages that failed every attempt. Retry puts them all back on the queue.",
+    "refresh": "Refresh",
+    "retryAll": "Retry all",
+    "retrying": "Retrying…",
+    "confirmRetry": "Put every failed SMS back on the queue? Only do this once the SMS provider has recovered.",
+    "retrySuccess": "Re-queued {count} SMS",
+    "retryPartial": "Re-queued {count} SMS; {skipped} unreadable entr(ies) could not be re-queued and were set aside",
+    "retryKept": "{kept} could not be re-queued because Redis rejected the write — they are still in the failed list; retry again",
+    "retryFailed": "Retry failed: {message}",
+    "loading": "Loading…",
+    "empty": "No failed SMS",
+    "failedToLoad": "Failed to load failed SMS",
+    "stats": "{pending} pending · {failed} failed",
+    "statsUnknown": "Queue status unknown",
+    "webhookInboxLink": "Payment webhook inbox",
+    "emailQueueLink": "Failed emails",
+    "columns": {
+      "created": "Queued",
+      "event": "Event",
+      "to": "To",
+      "attempts": "Attempts",
+      "error": "Last error"
+    },
+    "corrupt": {
+      "title": "{count} unreadable entr(ies) set aside",
+      "body": "These dead-lettered SMS messages could not be read during \"Retry all\", so they cannot be re-sent. The newest 200 are kept for 30 days in the Redis list sms:failed:corrupt for inspection; discard them once reviewed.",
       "sizes": "Sizes (bytes, newest first): {sizes}",
       "discard": "Discard",
       "discarding": "Discarding…",
