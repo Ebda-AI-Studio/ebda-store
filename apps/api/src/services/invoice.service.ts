@@ -1,6 +1,15 @@
 import { prisma } from '@force/database';
 import { groupOrderLinesForDisplay, orderTaxPlacement } from '@force/shared';
 import { emailMoney } from './email-templates/_util';
+import {
+  EMAIL_COLORS,
+  EMAIL_THUMB_SIZE,
+  emailBadge,
+  emailColor,
+  emailImage,
+  emailSides,
+  type EmailDir,
+} from './email-templates/_layout';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -98,6 +107,48 @@ function isArabic(locale: string): locale is 'ar' {
   return locale === 'ar';
 }
 
+/**
+ * The one order read both invoice renderers share (the printable page and the
+ * email body), so the two can never disagree about what an invoice contains.
+ */
+function loadInvoiceOrder(storeId: string, orderId: string) {
+  return prisma.order.findFirst({
+    where: { id: orderId, storeId },
+    include: {
+      store: {
+        select: {
+          name: true,
+          email: true,
+          phone: true,
+          address: true,
+          logo: true,
+          theme: true,
+          currency: true,
+          timezone: true,
+        },
+      },
+      customer: { select: { email: true, firstName: true, lastName: true } },
+      items: {
+        include: {
+          product: {
+            select: {
+              nameAr: true,
+              images: { take: 1, select: { url: true } },
+            },
+          },
+        },
+      },
+      // A partial refund leaves the payment captured — keep showing it.
+      payments: { where: { status: { in: ['completed', 'partially_refunded'] } }, take: 1 },
+      // Names the promotion behind the discount line when an automatic
+      // promotion (not a coupon code) was the applied lever.
+      appliedPromotion: { select: { name: true, nameAr: true } },
+    },
+  });
+}
+
+export type InvoiceOrder = NonNullable<Awaited<ReturnType<typeof loadInvoiceOrder>>>;
+
 export class InvoiceService {
   /**
    * Generate HTML invoice for an order. Themed with the store's brand color
@@ -110,39 +161,7 @@ export class InvoiceService {
    *                   Falls back to order.locale when omitted.
    */
   static async generateInvoice(storeId: string, orderId: string, locale?: string): Promise<string> {
-    const order = await prisma.order.findFirst({
-      where: { id: orderId, storeId },
-      include: {
-        store: {
-          select: {
-            name: true,
-            email: true,
-            phone: true,
-            address: true,
-            logo: true,
-            theme: true,
-            currency: true,
-            timezone: true,
-          },
-        },
-        customer: { select: { email: true, firstName: true, lastName: true } },
-        items: {
-          include: {
-            product: {
-              select: {
-                nameAr: true,
-                images: { take: 1, select: { url: true } },
-              },
-            },
-          },
-        },
-        // A partial refund leaves the payment captured — keep showing it.
-        payments: { where: { status: { in: ['completed', 'partially_refunded'] } }, take: 1 },
-        // Names the promotion behind the discount line when an automatic
-        // promotion (not a coupon code) was the applied lever.
-        appliedPromotion: { select: { name: true, nameAr: true } },
-      },
-    });
+    const order = await loadInvoiceOrder(storeId, orderId);
 
     if (!order) {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
@@ -219,24 +238,13 @@ export class InvoiceService {
       otherDiscount > 0 ? discountRow(escapeHtml(labels.discount), otherDiscount) : '',
     ].join('');
 
-    const isPaid = order.paymentStatus === 'paid';
-    const isCancelled = order.status === 'cancelled';
-    const isRefunded = order.paymentStatus === 'refunded' || order.status === 'refunded';
-
-    const statusLabel = isCancelled
-      ? labels.statusCancelled
-      : isRefunded
-        ? labels.statusRefunded
-        : isPaid
-          ? labels.statusPaid
-          : labels.statusUnpaid;
-    const statusClass = isCancelled
-      ? 'cancelled'
-      : isRefunded
-        ? 'refunded'
-        : isPaid
-          ? 'paid'
-          : 'unpaid';
+    const statusClass = invoiceStatus(order);
+    const statusLabel = {
+      paid: labels.statusPaid,
+      unpaid: labels.statusUnpaid,
+      cancelled: labels.statusCancelled,
+      refunded: labels.statusRefunded,
+    }[statusClass];
 
     // Render the invoice date in the store's timezone so a Kuwait merchant's
     // invoice doesn't show the UTC day on edge-of-midnight orders. Falls back
@@ -687,4 +695,252 @@ export class InvoiceService {
 </body>
 </html>`;
   }
+
+  /**
+   * The invoice as an EMAIL body — the content `EmailService.sendInvoice`
+   * wraps in the branded shell.
+   *
+   * The emailed invoice used to be `generateInvoice()`'s whole printable web
+   * page (its own `<html>`, `<head>` and a `<style>` of `var()`/`color-mix()`
+   * rules) nested inside the shell. Gmail discards a nested `<style>`, so on
+   * the Gmail Android app every class-sized element fell back to its natural
+   * size: the logo rendered twice at full resolution (shell + page header),
+   * the product photo ran several screens tall, and the 80px diagonal "PAID"
+   * watermark lost its positioning (Pecannbee, ORD-TM67JC-2Q6XK, 2026-09-30).
+   * This renderer is inline-styled tables only: no logo (the shell has it),
+   * 64px thumbnails, and the status as a small badge.
+   */
+  static async generateInvoiceEmail(
+    storeId: string,
+    orderId: string,
+    locale?: string
+  ): Promise<string> {
+    const order = await loadInvoiceOrder(storeId, orderId);
+    if (!order) {
+      throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    }
+    return renderInvoiceEmailContent(order, locale);
+  }
+}
+
+/** Status of an invoice — one derivation for the page's stamp and the email badge. */
+function invoiceStatus(order: InvoiceOrder): 'paid' | 'unpaid' | 'cancelled' | 'refunded' {
+  if (order.status === 'cancelled') return 'cancelled';
+  if (order.paymentStatus === 'refunded' || order.status === 'refunded') return 'refunded';
+  return order.paymentStatus === 'paid' ? 'paid' : 'unpaid';
+}
+
+/** Pure renderer behind `generateInvoiceEmail` (exported for tests). */
+export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string): string {
+  const resolvedLocale: InvoiceLocale =
+    (locale as InvoiceLocale) || ((order.locale as InvoiceLocale) ?? 'en');
+  const ar = isArabic(resolvedLocale);
+  const labels = ar ? INVOICE_LABELS.ar : INVOICE_LABELS.en;
+  const dir: EmailDir = ar ? 'rtl' : 'ltr';
+  const { start, end } = emailSides(dir);
+  const c = EMAIL_COLORS;
+  const brand = emailColor(
+    order.store.theme && typeof order.store.theme === 'object'
+      ? ((order.store.theme as { primaryColor?: string }).primaryColor ?? null)
+      : null
+  );
+  const currency = order.currency || order.store.currency || 'KWD';
+  // Amounts stay an LTR run on the Arabic invoice so a leading minus stays in
+  // front of the figure (same rule as the printable page).
+  const money = (minor: number) =>
+    `<span dir="ltr" style="unicode-bidi:embed;white-space:nowrap;">${emailMoney(minor, currency, 'en')}</span>`;
+  const taxPlacement = orderTaxPlacement(order);
+  const shippingAddr = order.shippingAddress as Record<string, string> | null;
+  const billingAddr = (order.billingAddress as Record<string, string> | null) ?? shippingAddr;
+  const payment = order.payments?.[0];
+
+  const status = invoiceStatus(order);
+  const statusLabel = {
+    paid: labels.statusPaid,
+    unpaid: labels.statusUnpaid,
+    cancelled: labels.statusCancelled,
+    refunded: labels.statusRefunded,
+  }[status];
+  const tone = status === 'paid' ? 'success' : status === 'unpaid' ? 'warning' : 'danger';
+
+  const dateText = new Date(order.createdAt).toLocaleDateString(ar ? 'ar-KW' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: order.store.timezone || 'Asia/Kuwait',
+  });
+
+  const table = (inner: string, style = '') =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" dir="${dir}" style="width:100%;border-collapse:collapse;${style}">${inner}</table>`;
+  const label = (text: string) =>
+    `<div style="font-size:11px;line-height:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:${c.inkMute};margin:0 0 4px;">${escapeHtml(text)}</div>`;
+  const line = (text: string) =>
+    `<div style="font-size:13px;line-height:20px;color:${c.inkSoft};">${text}</div>`;
+
+  // --- Header: invoice number + date, status badge at the end side ---
+  const header = table(
+    `<tr>
+      <td align="${start}" style="text-align:${start};vertical-align:top;padding:0 0 16px;">
+        <div style="font-size:11px;line-height:16px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:${brand};">${escapeHtml(labels.invoice)}</div>
+        <div dir="ltr" style="font-size:18px;line-height:24px;font-weight:800;color:${c.ink};text-align:${start};">${escapeHtml(order.orderNumber)}</div>
+        <div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(dateText)}</div>
+      </td>
+      <td align="${end}" width="110" style="text-align:${end};vertical-align:top;padding:0 0 16px;">${emailBadge(escapeHtml(statusLabel), tone)}</td>
+    </tr>`,
+    `border-bottom:1px solid ${c.line};`
+  );
+
+  // --- Addresses: stacked, so a 390px phone never squeezes two columns ---
+  const card = (inner: string) =>
+    `<tr><td style="padding:12px 14px;background-color:${c.bgSoft};border-radius:10px;text-align:${start};">${inner}</td></tr><tr><td height="10" style="height:10px;line-height:10px;font-size:0;">&nbsp;</td></tr>`;
+  const billEmail = billingAddr?.email || shippingAddr?.email || order.customer?.email;
+  const billName = `${escapeHtml(billingAddr?.firstName || order.customer?.firstName || '')} ${escapeHtml(billingAddr?.lastName || order.customer?.lastName || '')}`;
+  const addresses = table(
+    card(
+      label(labels.billTo) +
+        `<div style="font-size:14px;line-height:20px;font-weight:600;color:${c.ink};">${billName}</div>` +
+        (billEmail ? line(escapeHtml(billEmail)) : '') +
+        (billingAddr?.phone ? line(`<span dir="ltr">${escapeHtml(billingAddr.phone)}</span>`) : '')
+    ) +
+      (shippingAddr
+        ? card(
+            label(labels.shipTo) +
+              `<div style="font-size:14px;line-height:20px;font-weight:600;color:${c.ink};">${escapeHtml(shippingAddr.firstName)} ${escapeHtml(shippingAddr.lastName)}</div>` +
+              line(escapeHtml(shippingAddr.address1)) +
+              (shippingAddr.address2 ? line(escapeHtml(shippingAddr.address2)) : '') +
+              line(
+                `${escapeHtml(shippingAddr.city)}${shippingAddr.state ? `, ${escapeHtml(shippingAddr.state)}` : ''}${shippingAddr.postalCode ? ` ${escapeHtml(shippingAddr.postalCode)}` : ''}`
+              ) +
+              line(escapeHtml(shippingAddr.country))
+          )
+        : ''),
+    'margin:16px 0 0;'
+  );
+
+  let paymentHtml = '';
+  if (payment) {
+    const provider = (payment.provider || '').trim();
+    const method = (payment.method || '').trim();
+    const showMethod = method && method.toLowerCase() !== provider.toLowerCase();
+    const text = showMethod
+      ? `${escapeHtml(provider)} (${escapeHtml(method)})`
+      : escapeHtml(provider) || 'N/A';
+    paymentHtml = `<p style="margin:6px 0 0;padding:10px 14px;background-color:#e0f2fe;color:#075985;border-radius:10px;font-size:13px;line-height:20px;text-align:${start};"><strong>${escapeHtml(labels.payment)}:</strong> ${text}${payment.transactionId ? ` &middot; ${escapeHtml(payment.transactionId)}` : ''}</p>`;
+  }
+
+  // --- Items: thumb | name, sku, qty × unit | line total ---
+  const thumbPlaceholder = `<div style="width:${EMAIL_THUMB_SIZE}px;height:${EMAIL_THUMB_SIZE}px;background-color:${c.lineSoft};border-radius:8px;"></div>`;
+  const itemRow = (thumb: string, name: string, sub: string, total: string) =>
+    `<tr>
+      <td width="${EMAIL_THUMB_SIZE}" style="width:${EMAIL_THUMB_SIZE}px;padding:12px 0;vertical-align:top;border-bottom:1px solid ${c.lineSoft};">${thumb}</td>
+      <td style="padding:12px 12px;vertical-align:top;text-align:${start};border-bottom:1px solid ${c.lineSoft};">
+        <div style="font-size:14px;line-height:20px;font-weight:600;color:${c.ink};">${name}</div>
+        ${sub}
+      </td>
+      <td align="${end}" style="padding:12px 0;vertical-align:top;text-align:${end};font-size:14px;line-height:20px;font-weight:600;color:${c.ink};white-space:nowrap;">${total}</td>
+    </tr>`;
+  const qtyLine = (qty: number, unit: string | null) =>
+    `<div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(labels.qty)}: ${qty}${unit ? ` &times; ${unit}` : ''}</div>`;
+  const itemsHtml = groupOrderLinesForDisplay(order.items)
+    .map(row => {
+      if (row.kind === 'bundle') {
+        const name = ar && row.nameAr ? row.nameAr : row.name;
+        return itemRow(
+          thumbPlaceholder,
+          escapeHtml(name),
+          qtyLine(row.quantity, null),
+          money(row.total)
+        );
+      }
+      const item = row.item;
+      const image = item.product?.images?.[0]?.url;
+      const name = ar && item.product?.nameAr ? item.product.nameAr : item.productName;
+      return itemRow(
+        image
+          ? emailImage({
+              src: image,
+              alt: '',
+              width: EMAIL_THUMB_SIZE,
+              height: EMAIL_THUMB_SIZE,
+              radius: 8,
+            })
+          : thumbPlaceholder,
+        `${escapeHtml(name)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}`,
+        (item.sku
+          ? `<div style="font-size:11px;line-height:16px;color:${c.inkMute};">${escapeHtml(item.sku)}</div>`
+          : '') + qtyLine(item.quantity, money(item.price)),
+        money(item.total)
+      );
+    })
+    .join('');
+  const items = table(
+    `<tr><th colspan="2" align="${start}" style="padding:8px 0;text-align:${start};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:${c.inkMute};border-bottom:1px solid ${c.line};">${escapeHtml(labels.item)}</th><th align="${end}" style="padding:8px 0;text-align:${end};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:${c.inkMute};border-bottom:1px solid ${c.line};">${escapeHtml(labels.total)}</th></tr>${itemsHtml}`,
+    'margin:20px 0 0;'
+  );
+
+  // --- Totals: same lever split + tax placement as the printable page ---
+  const promotionLabel = order.appliedPromotion
+    ? ar && order.appliedPromotion.nameAr
+      ? order.appliedPromotion.nameAr
+      : order.appliedPromotion.name
+    : null;
+  const coupon = order.couponDiscount ?? 0;
+  const promotion = order.promotionDiscount ?? 0;
+  const loyalty = order.loyaltyDiscount ?? 0;
+  const other = Math.max(0, order.discount - coupon - promotion - loyalty);
+  const totalRow = (l: string, v: string, color: string = c.ink) =>
+    `<tr><td style="padding:5px 0;text-align:${start};font-size:14px;line-height:20px;color:${c.inkSoft};">${l}</td><td align="${end}" style="padding:5px 0;text-align:${end};font-size:14px;line-height:20px;color:${color};">${v}</td></tr>`;
+  const minus = (n: number) => `−${money(n)}`;
+  const totalsRows = [
+    totalRow(escapeHtml(labels.subtotal), money(order.subtotal)),
+    coupon > 0
+      ? totalRow(
+          `${escapeHtml(labels.coupon)}${order.couponCode ? ` (${escapeHtml(order.couponCode)})` : ''}`,
+          minus(coupon),
+          c.success
+        )
+      : '',
+    promotion > 0
+      ? totalRow(
+          `${escapeHtml(labels.promotion)}${promotionLabel ? ` (${escapeHtml(promotionLabel)})` : ''}`,
+          minus(promotion),
+          c.success
+        )
+      : '',
+    loyalty > 0
+      ? totalRow(
+          `${escapeHtml(labels.loyaltyPoints)}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed})` : ''}`,
+          minus(loyalty),
+          c.success
+        )
+      : '',
+    other > 0 ? totalRow(escapeHtml(labels.discount), minus(other), c.success) : '',
+    (taxPlacement.taxRow ?? 0) > 0
+      ? totalRow(escapeHtml(labels.tax), money(taxPlacement.taxRow ?? 0))
+      : '',
+    totalRow(
+      escapeHtml(labels.shipping),
+      order.shipping === 0 ? escapeHtml(labels.free) : money(order.shipping)
+    ),
+    `<tr><td style="padding:12px 0 4px;text-align:${start};font-size:16px;line-height:22px;font-weight:800;color:${c.ink};border-top:2px solid ${c.line};">${escapeHtml(labels.grandTotal)}</td><td align="${end}" style="padding:12px 0 4px;text-align:${end};font-size:18px;line-height:22px;font-weight:800;color:${brand};border-top:2px solid ${c.line};">${money(order.total)}</td></tr>`,
+    taxPlacement.includedTaxCaption !== null
+      ? `<tr><td colspan="2" align="${end}" style="padding:2px 0 0;text-align:${end};font-size:12px;color:${c.inkSoft};">${escapeHtml(labels.taxIncluded)} ${money(taxPlacement.includedTaxCaption)}</td></tr>`
+      : '',
+  ].join('');
+  const totals = table(totalsRows, 'margin:12px 0 0;');
+
+  const notes = order.notes
+    ? `<div style="margin:18px 0 0;padding:12px 14px;background-color:${c.bgSoft};border-radius:10px;text-align:${start};">${label(labels.orderNotes)}<div style="font-size:13px;line-height:20px;color:${c.ink};white-space:pre-wrap;">${escapeHtml(order.notes)}</div></div>`
+    : '';
+
+  return `<div dir="${dir}" style="text-align:${start};">
+${header}
+${addresses}
+${paymentHtml}
+${items}
+${totals}
+${notes}
+<p style="margin:22px 0 4px;font-size:13px;line-height:20px;font-weight:600;color:${c.inkSoft};text-align:${start};">${escapeHtml(labels.thankYou(order.store.name))}</p>
+<p style="margin:0 0 8px;font-size:12px;line-height:18px;color:${c.inkMute};text-align:${start};">${escapeHtml(labels.autoGenerated)}</p>
+</div>`;
 }

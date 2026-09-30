@@ -1,4 +1,5 @@
 import { escapeHtml } from './_util';
+import { EMAIL_THUMB_SIZE, emailImage } from './_layout';
 
 export interface ReviewRequestData {
   to: string;
@@ -35,9 +36,14 @@ export const reviewRequestTemplate = {
 
     const headlineImg = headline.productImage
       ? `<p style="text-align:center;margin:16px 0;">
-           <img src="${escapeHtml(headline.productImage)}"
-                alt="${escapeHtml(headline.productName)}"
-                style="max-width:180px;border-radius:10px;border:1px solid #e2e8f0;">
+           ${emailImage({
+             src: headline.productImage,
+             alt: headline.productName,
+             width: EMAIL_THUMB_SIZE + 16,
+             height: EMAIL_THUMB_SIZE + 16,
+             radius: 10,
+             align: 'center',
+           })}
          </p>`
       : '';
 
@@ -82,9 +88,14 @@ export const reviewRequestTemplate = {
 
     const headlineImg = headline.productImage
       ? `<p style="text-align:center;margin:16px 0;">
-           <img src="${escapeHtml(headline.productImage)}"
-                alt="${escapeHtml(headlineName)}"
-                style="max-width:180px;border-radius:10px;border:1px solid #e2e8f0;">
+           ${emailImage({
+             src: headline.productImage,
+             alt: headlineName,
+             width: EMAIL_THUMB_SIZE + 16,
+             height: EMAIL_THUMB_SIZE + 16,
+             radius: 10,
+             align: 'center',
+           })}
          </p>`
       : '';
 

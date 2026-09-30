@@ -27,11 +27,11 @@ export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    // InvoiceService.generateInvoice reads the order; it runs its own DB
+    // InvoiceService.generateInvoiceEmail reads the order; it runs its own DB
     // calls that need tenant context. Wrap in runInTenantContext so FORCE
     // RLS lets those reads through (Inngest has no HTTP middleware context).
     const html = await step.run('render-invoice', () =>
-      runInTenantContext(storeId, () => InvoiceService.generateInvoice(storeId, orderId))
+      runInTenantContext(storeId, () => InvoiceService.generateInvoiceEmail(storeId, orderId))
     );
 
     const order = await step.run('load-order-number', () =>

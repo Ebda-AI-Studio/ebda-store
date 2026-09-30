@@ -13,6 +13,19 @@ import { resendVerificationTemplate } from './email-templates/resend-verificatio
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from './email-templates/order-confirmation';
 import { emailMoney } from './email-templates/_util';
+import {
+  EMAIL_COLORS,
+  EMAIL_FONT,
+  EMAIL_FONT_AR,
+  EMAIL_LOGO_WIDTH,
+  EMAIL_MAX_WIDTH,
+  emailColor,
+  emailImage,
+  emailSides,
+  emailTint,
+  inlineEmailStyles,
+  type EmailDir,
+} from './email-templates/_layout';
 import { orderRefundedTemplate } from './email-templates/order-refunded';
 import { paymentSuccessTemplate } from './email-templates/payment-success';
 import { paymentFailedTemplate } from './email-templates/payment-failed';
@@ -73,54 +86,37 @@ export interface EmailStoreContext {
   defaultLanguage?: 'en' | 'ar';
 }
 
-// Derive a low-alpha tint of the brand color for soft header backdrops.
-// Emits hsla() for HSL components, rgba() for hex inputs — keeps email
-// client compatibility (no color-mix() dependency).
-function brandTint(rawColor: string | null | undefined, alpha = 0.06): string {
-  if (!rawColor) return 'rgba(15,23,42,0.04)';
-  const hslComp = /^([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%(?:\s*\/\s*[0-9.]+%?)?$/.exec(
-    rawColor.trim()
-  );
-  if (hslComp) return `hsla(${hslComp[1]} ${hslComp[2]}% ${hslComp[3]}% / ${alpha})`;
-  const hex = /^#([0-9a-fA-F]{6})$/.exec(rawColor.trim());
-  if (hex) {
-    const r = parseInt(hex[1].slice(0, 2), 16);
-    const g = parseInt(hex[1].slice(2, 4), 16);
-    const b = parseInt(hex[1].slice(4, 6), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-  return 'rgba(15,23,42,0.04)';
-}
-
-// Validate theme primary color (HSL components or hex). Mirrors the
-// `sanitizeThemeColor` helper in apps/web/src/app/layout.tsx so admin-
-// controlled theme strings can't break out of the CSS declaration.
-function sanitizeThemeColor(value: string | null | undefined, fallback = '#ff6e00'): string {
-  if (!value || typeof value !== 'string' || value.length === 0 || value.length > 50) {
-    return fallback;
-  }
-  if (/[{}]|url\s*\(|@import|expression\s*\(|javascript\s*:/i.test(value)) return fallback;
-  if (/^#[0-9a-fA-F]{3,8}$/.test(value)) return value;
-  const hsl =
-    /^[0-9]+(?:\.[0-9]+)?\s+[0-9]+(?:\.[0-9]+)?%\s+[0-9]+(?:\.[0-9]+)?%(?:\s*\/\s*[0-9]+(?:\.[0-9]+)?%?)?$/;
-  if (hsl.test(value)) return `hsl(${value})`;
-  return fallback;
-}
-
+/**
+ * The branded wrapper every customer/merchant email ships in.
+ *
+ * Email-client-safe by construction (Pecannbee invoice on the Gmail Android
+ * app, 2026-09-30): NO `<style>` block — Gmail and Outlook drop or partially
+ * drop them, and the old shell's `var()`/`color-mix()` rules were discarded
+ * wholesale, so every class-sized element rendered at its natural size. The
+ * layout is a 600px presentation table (`width="600"` for Outlook, fluid
+ * `width:100%;max-width:600px` elsewhere), every colour is solid hex, the
+ * logo is an `emailImage` with a fixed width, and the content is run through
+ * `inlineEmailStyles` so templates' `.button`/`.order-table`/headings carry
+ * inline styles. `dir` is set on the html, the wrapper table and the content
+ * cell, with physical alignment, so Arabic reads right-to-left everywhere.
+ */
 export function renderBrandedShell(content: string, store: EmailStoreContext): string {
   const isArabic = store.defaultLanguage === 'ar';
-  const dir = isArabic ? 'rtl' : 'ltr';
+  const dir: EmailDir = isArabic ? 'rtl' : 'ltr';
+  const { start } = emailSides(dir);
+  const c = EMAIL_COLORS;
   // Prefer canonical `primaryColor` token; fall back to legacy `primary` for
   // any old admin payloads that pre-date the rename.
   const rawBrand = store.theme?.primaryColor ?? store.theme?.primary ?? null;
-  const brand = sanitizeThemeColor(rawBrand);
-  const brandSoft = brandTint(rawBrand, 0.06);
+  const brand = emailColor(rawBrand);
+  const brandSoft = emailTint(brand, 0.06);
+  const font = isArabic ? EMAIL_FONT_AR : EMAIL_FONT;
   const storeName = escapeHtml(store.name);
   // Logo OR name — never both. When a logo is set it's the brand mark;
   // rendering the name underneath duplicates the visual identity.
   const header = store.logo
-    ? `<img src="${escapeHtml(store.logo)}" alt="${storeName}" class="store-logo">`
-    : `<div class="store-name">${storeName}</div>`;
+    ? emailImage({ src: store.logo, alt: store.name, width: EMAIL_LOGO_WIDTH, align: 'center' })
+    : `<div class="store-name" style="font-size:22px;line-height:28px;font-weight:700;color:${c.ink};">${storeName}</div>`;
   const year = new Date().getFullYear();
   const footerLines: string[] = [];
   if (store.address) footerLines.push(escapeHtml(store.address));
@@ -130,134 +126,59 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     // while keeping the formatted version visible to readers.
     const dial = store.phone.replace(/[^+\d]/g, '');
     footerLines.push(
-      `<a href="tel:${escapeHtml(
-        dial
-      )}" style="color: var(--ink-soft); text-decoration: none;">${safePhone}</a>`
+      `<a dir="ltr" href="tel:${escapeHtml(dial)}" style="color:${c.inkSoft};text-decoration:none;">${safePhone}</a>`
     );
   }
   // Contact line — replaces the per-template "please reply to this email"
   // sentence so every branded email has a canonical reachable contact.
   const contactBlock = store.email
-    ? `<p class="contact-cta">Questions? Email us at <a href="mailto:${escapeHtml(
-        store.email
-      )}" style="color: var(--brand); text-decoration: none; font-weight: 600;">${escapeHtml(
+    ? `<p class="contact-cta" style="margin:0 auto 14px;padding:12px 16px;max-width:460px;background-color:${c.bg};border:1px solid ${c.lineSoft};border-radius:10px;color:${c.inkSoft};font-size:13px;line-height:1.5;">${
+        isArabic ? 'لديك سؤال؟ راسلنا على' : 'Questions? Email us at'
+      } <a href="mailto:${escapeHtml(store.email)}" style="color:${brand};text-decoration:none;font-weight:600;">${escapeHtml(
         store.email
       )}</a></p>`
     : '';
+  const footerP = `margin:4px 0;font-size:12px;color:${c.inkMute};`;
 
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${isArabic ? 'ar' : 'en'}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
   <title>${storeName}</title>
-  <style>
-    :root {
-      --brand: ${brand};
-      --brand-soft: ${brandSoft};
-      --ink: #0f172a;
-      --ink-soft: #475569;
-      --ink-mute: #94a3b8;
-      --line: #e2e8f0;
-      --line-soft: #f1f5f9;
-      --bg: #ffffff;
-      --bg-soft: #f8fafc;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; padding: 24px 12px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--bg-soft);
-      color: var(--ink);
-      line-height: 1.5;
-      font-size: 14px;
-      -webkit-font-smoothing: antialiased;
-    }
-    .page {
-      max-width: 640px;
-      margin: 0 auto;
-      background: var(--bg);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(15,23,42,0.06);
-    }
-    .ribbon { height: 6px; background: var(--brand); }
-    .header {
-      padding: 20px 28px 18px;
-      text-align: center;
-      background: linear-gradient(180deg, var(--brand-soft) 0%, transparent 100%);
-      border-bottom: 1px solid var(--line-soft);
-    }
-    /* Email clients show ~350-400px of vertical space before the fold. A 180px
-       logo plus 72px of header padding ate almost all of it, so a merchant
-       opening a new-order alert saw branding and had to scroll to reach the
-       order. 56px is the usual email-header logo height; width is capped only
-       so a very wide wordmark cannot re-inflate the header. height/width auto
-       keeps the aspect ratio for any logo shape. */
-    .store-logo { max-height: 56px; max-width: 220px; display: inline-block; height: auto; width: auto; }
-    .store-name { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
-    .content { padding: 28px 28px 8px; }
-    .content h1, .content h2 { color: var(--ink); margin: 0 0 14px; }
-    .content h1 { font-size: 22px; }
-    .content h2 { font-size: 18px; }
-    .content h3 { font-size: 16px; margin: 22px 0 10px; color: var(--ink); }
-    .content p { margin: 0 0 14px; color: var(--ink-soft); }
-    .content a { color: var(--brand); }
-    .button {
-      display: inline-block;
-      background: var(--brand); color: #ffffff !important;
-      padding: 12px 22px; text-decoration: none;
-      border-radius: 10px; font-weight: 600; font-size: 14px;
-      margin: 8px 0;
-    }
-    .order-table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13px; }
-    .order-table th, .order-table td { padding: 12px 10px; text-align: start; border-bottom: 1px solid var(--line-soft); color: var(--ink); }
-    .order-table th { background: var(--bg-soft); font-weight: 600; color: var(--ink-soft); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
-    .total-row { font-weight: 700; font-size: 16px; }
-    .total-row td { border-top: 2px solid var(--line); border-bottom: 0; padding-top: 14px; }
-    .address-box { background: var(--bg-soft); padding: 16px 18px; border-radius: 12px; margin: 14px 0; color: var(--ink-soft); }
-    .footer {
-      padding: 22px 28px 28px;
-      background: var(--bg-soft);
-      text-align: center;
-      font-size: 12px;
-      color: var(--ink-mute);
-      border-top: 1px solid var(--line-soft);
-    }
-    .footer p { margin: 4px 0; }
-    .footer .copyright { color: var(--ink-soft); font-weight: 500; }
-    .footer .contact-cta {
-      margin: 0 auto 14px;
-      padding: 12px 16px;
-      max-width: 460px;
-      background: var(--bg);
-      border: 1px solid var(--line-soft);
-      border-radius: 10px;
-      color: var(--ink-soft);
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    .footer .powered { margin-top: 14px; font-size: 11px; color: var(--ink-mute); }
-    @media (max-width: 480px) {
-      .header { padding: 16px 18px 14px; }
-      .content { padding: 22px 18px 4px; }
-      .footer { padding: 18px 18px 22px; }
-      .store-logo { max-height: 44px; max-width: 180px; }
-    }
-  </style>
 </head>
-<body>
-  <div class="page">
-    <div class="ribbon"></div>
-    <div class="header">${header}</div>
-    <div class="content" dir="auto">${content}</div>
-    <div class="footer">
-      ${contactBlock}
-      <p class="copyright">© ${year} ${storeName}</p>
-      ${footerLines.map(l => `<p>${l}</p>`).join('\n      ')}
-      <p class="powered">Powered by Force AI</p>
-    </div>
-  </div>
+<body dir="${dir}" bgcolor="${c.bgSoft}" style="margin:0;padding:0;width:100%;background-color:${c.bgSoft};color:${c.ink};font-family:${font};font-size:14px;line-height:1.5;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${c.bgSoft}" style="width:100%;background-color:${c.bgSoft};">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" class="page" dir="${dir}" width="${EMAIL_MAX_WIDTH}" cellpadding="0" cellspacing="0" border="0" bgcolor="${c.bg}" style="width:100%;max-width:${EMAIL_MAX_WIDTH}px;background-color:${c.bg};border:1px solid ${c.line};border-radius:16px;border-collapse:separate;">
+          <tr>
+            <td height="6" bgcolor="${brand}" style="height:6px;line-height:6px;font-size:0;background-color:${brand};border-radius:16px 16px 0 0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td class="header" align="center" bgcolor="${brandSoft}" style="padding:20px 24px 18px;text-align:center;background-color:${brandSoft};border-bottom:1px solid ${c.lineSoft};">${header}</td>
+          </tr>
+          <tr>
+            <td class="content" dir="${dir}" align="${start}" style="padding:24px 24px 8px;text-align:${start};color:${c.ink};font-family:${font};font-size:14px;line-height:1.5;">${inlineEmailStyles(
+              content,
+              { dir, brand }
+            )}</td>
+          </tr>
+          <tr>
+            <td class="footer" align="center" bgcolor="${c.bgSoft}" style="padding:22px 24px 26px;text-align:center;background-color:${c.bgSoft};border-top:1px solid ${c.lineSoft};border-radius:0 0 16px 16px;font-size:12px;color:${c.inkMute};">
+              ${contactBlock}
+              <p class="copyright" style="${footerP}color:${c.inkSoft};font-weight:500;">© ${year} ${storeName}</p>
+              ${footerLines.map(l => `<p style="${footerP}">${l}</p>`).join('\n              ')}
+              <p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">Powered by Force AI</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 }

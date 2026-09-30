@@ -27,11 +27,11 @@ export const orderRefundedTemplate = {
       <tbody>
         <tr>
           <td>Order Total</td>
-          <td style="text-align: right;">${emailMoney(d.orderTotal, d.currency, 'en')}</td>
+          <td style="text-align: end;">${emailMoney(d.orderTotal, d.currency, 'en')}</td>
         </tr>
         <tr class="total-row">
           <td>Refunded</td>
-          <td style="text-align: right;">-${emailMoney(d.refundAmount, d.currency, 'en')}</td>
+          <td style="text-align: end;">-${emailMoney(d.refundAmount, d.currency, 'en')}</td>
         </tr>
       </tbody>
     </table>
@@ -58,11 +58,11 @@ export const orderRefundedTemplate = {
       <tbody>
         <tr>
           <td>إجمالي الطلب</td>
-          <td style="text-align: right;">${emailMoney(d.orderTotal, d.currency, 'ar')}</td>
+          <td style="text-align: end;">${emailMoney(d.orderTotal, d.currency, 'ar')}</td>
         </tr>
         <tr class="total-row">
           <td>المبلغ المسترد</td>
-          <td style="text-align: right;">-${emailMoney(d.refundAmount, d.currency, 'ar')}</td>
+          <td style="text-align: end;">-${emailMoney(d.refundAmount, d.currency, 'ar')}</td>
         </tr>
       </tbody>
     </table>

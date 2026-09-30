@@ -46,19 +46,20 @@ const baseStore = (overrides: Partial<EmailStoreContext> = {}): EmailStoreContex
 describe('renderBrandedShell', () => {
   it('uses store name in header when no logo', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
-    expect(html).toContain('<div class="store-name">Wady Aljuz</div>');
+    expect(html).toMatch(/<div class="store-name"[^>]*>Wady Aljuz<\/div>/);
     expect(html).toContain('© ' + new Date().getFullYear() + ' Wady Aljuz');
   });
 
   it('renders logo img when logo url present (no store-name fallback)', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore({ logo: 'https://r2.dev/logo.png' }));
     expect(html).toContain('<img src="https://r2.dev/logo.png"');
-    expect(html).not.toContain('<div class="store-name">Wady Aljuz</div>');
+    expect(html).not.toMatch(/<div class="store-name"[^>]*>Wady Aljuz<\/div>/);
   });
 
   it('uses store theme primary color when set as hex (canonical primaryColor key)', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore({ theme: { primaryColor: '#2D1418' } }));
-    expect(html).toContain('--brand: #2D1418');
+    // Inline, solid hex: Gmail drops CSS custom properties with the <style> block.
+    expect(html).toContain('background-color:#2D1418');
   });
 
   it('uses HSL components when theme primaryColor is the Tailwind-token format', () => {
@@ -66,9 +67,11 @@ describe('renderBrandedShell', () => {
       '<p>hi</p>',
       baseStore({ theme: { primaryColor: '348 68% 25%' } })
     );
-    expect(html).toContain('--brand: hsl(348 68% 25%)');
-    // soft tint should derive an hsla from the same components
-    expect(html).toContain('hsla(348 68% 25% / 0.06)');
+    // HSL components are converted to hex (email clients mis-parse
+    // space-separated hsl()); the soft header tint is a solid hex mix.
+    expect(html).toContain('background-color:#6b1426');
+    expect(html).toContain('bgcolor="#f6f1f2"');
+    expect(html).not.toMatch(/hsla?\(/);
   });
 
   it('falls back to platform orange when theme color is invalid', () => {
@@ -76,12 +79,13 @@ describe('renderBrandedShell', () => {
       '<p>hi</p>',
       baseStore({ theme: { primaryColor: 'rm -rf /' } })
     );
-    expect(html).toContain('--brand: #ff6e00');
+    expect(html).toContain('background-color:#ff6e00');
+    expect(html).not.toContain('rm -rf');
   });
 
   it('accepts legacy `primary` key for backward compat', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore({ theme: { primary: '#2D1418' } }));
-    expect(html).toContain('--brand: #2D1418');
+    expect(html).toContain('background-color:#2D1418');
   });
 
   it('renders RTL when defaultLanguage is ar', () => {
@@ -89,9 +93,11 @@ describe('renderBrandedShell', () => {
     expect(html).toContain('dir="rtl"');
   });
 
-  it('wraps content in dir="auto" so per-paragraph direction is preserved', () => {
+  it('sets the content direction explicitly (rtl + physical right alignment for Arabic)', () => {
+    // dir="auto" took direction from the first strong character, so an Arabic
+    // email opening with a Latin store name or order number rendered LTR.
     const html = renderBrandedShell('<p>hi</p>', baseStore({ defaultLanguage: 'ar' }));
-    expect(html).toContain('class="content" dir="auto"');
+    expect(html).toContain('class="content" dir="rtl" align="right"');
   });
 
   it('includes powered-by line in footer', () => {

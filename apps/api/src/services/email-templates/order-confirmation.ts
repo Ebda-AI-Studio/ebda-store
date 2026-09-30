@@ -43,7 +43,7 @@ function totalsRows(d: OrderEmailData, locale: 'en' | 'ar'): string {
   const row = (label: string, value: string, cls = '') =>
     `<tr${cls ? ` class="${cls}"` : ''}>
           <td colspan="2">${label}</td>
-          <td style="text-align: right;">${value}</td>
+          <td style="text-align: end;">${value}</td>
         </tr>`;
   const promotionName = locale === 'ar' ? d.promotionNameAr || d.promotionName : d.promotionName;
   const coupon = d.couponDiscount ?? 0;
@@ -85,7 +85,7 @@ function totalsRows(d: OrderEmailData, locale: 'en' | 'ar'): string {
     row(L.total, money(d.total), 'total-row'),
     includedTaxCaption !== null
       ? `<tr class="tax-included">
-          <td colspan="3" style="text-align: right; color: #6b7280; font-size: 12px;">${L.taxIncluded} ${money(includedTaxCaption)}</td>
+          <td colspan="3" style="text-align: end; color: #6b7280; font-size: 12px;">${L.taxIncluded} ${money(includedTaxCaption)}</td>
         </tr>`
       : '',
   ]
@@ -106,7 +106,7 @@ export const orderConfirmationTemplate = {
       <tr>
         <td>${escapeHtml(item.name)}</td>
         <td style="text-align: center;">${item.quantity}</td>
-        <td style="text-align: right;">${emailMoney(item.price, d.currency, 'en')}</td>
+        <td style="text-align: end;">${emailMoney(item.price, d.currency, 'en')}</td>
       </tr>`
       )
       .join('');
@@ -123,7 +123,7 @@ export const orderConfirmationTemplate = {
         <tr>
           <th>Item</th>
           <th style="text-align: center;">Qty</th>
-          <th style="text-align: right;">Price</th>
+          <th style="text-align: end;">Price</th>
         </tr>
       </thead>
       <tbody>${itemsHtml}</tbody>
@@ -150,7 +150,7 @@ export const orderConfirmationTemplate = {
       <tr>
         <td>${escapeHtml(item.nameAr || item.name)}</td>
         <td style="text-align: center;">${item.quantity}</td>
-        <td style="text-align: right;">${emailMoney(item.price, d.currency, 'ar')}</td>
+        <td style="text-align: end;">${emailMoney(item.price, d.currency, 'ar')}</td>
       </tr>`
       )
       .join('');
@@ -167,7 +167,7 @@ export const orderConfirmationTemplate = {
         <tr>
           <th>الصنف</th>
           <th style="text-align: center;">الكمية</th>
-          <th style="text-align: right;">السعر</th>
+          <th style="text-align: end;">السعر</th>
         </tr>
       </thead>
       <tbody>${itemsHtml}</tbody>
