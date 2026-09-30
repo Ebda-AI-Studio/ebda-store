@@ -20,6 +20,8 @@ export interface BackorderedEntry {
   productId: string;
   variantId?: string | null;
   quantity: number;
+  /** Units checkout actually took from stock for this entry (#2299). */
+  stockTaken?: number;
 }
 
 export interface OrderLineRef {
@@ -32,9 +34,9 @@ export interface OrderLineRef {
 export function pairBackorderedLines<L extends OrderLineRef>(
   lines: readonly L[],
   backordered: readonly BackorderedEntry[]
-): Array<{ line: L; quantity: number }> {
+): Array<{ line: L; quantity: number; stockTaken?: number }> {
   const unpaired = [...lines];
-  const pairs: Array<{ line: L; quantity: number }> = [];
+  const pairs: Array<{ line: L; quantity: number; stockTaken?: number }> = [];
   for (const entry of backordered) {
     const sameSku = (l: L) =>
       l.productId === entry.productId && (l.variantId ?? null) === (entry.variantId ?? null);
@@ -42,7 +44,7 @@ export function pairBackorderedLines<L extends OrderLineRef>(
     if (idx === -1) idx = unpaired.findIndex(sameSku);
     if (idx === -1) continue;
     const [line] = unpaired.splice(idx, 1);
-    pairs.push({ line, quantity: entry.quantity });
+    pairs.push({ line, quantity: entry.quantity, stockTaken: entry.stockTaken });
   }
   return pairs;
 }

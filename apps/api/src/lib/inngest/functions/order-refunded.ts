@@ -8,6 +8,7 @@ import { LoyaltyService } from '../../../services/loyalty.service';
 import { WalletService } from '../../../services/wallet.service';
 import { WarehouseService } from '../../../services/warehouse.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
+import { BACKORDER_CANCEL_MARKER } from '../../../services/accounting/posting/prior-reversed-qty';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -299,6 +300,26 @@ export async function handleOrderRefunded(
           select: { metadata: true },
         });
         const alreadyRestored = new Map<string, number>();
+        // A single-line backorder cancel heals the line's negative stock debt
+        // up to 0 (#2277, ruling AP-5c) and records the units it put back as
+        // `stockRestored` on its marker. Those units are already on the row;
+        // restoring the item's full quantity again would invent stock.
+        const backorderMarkers = await tx.orderEvent.findMany({
+          where: { storeId, orderId, toStatus: BACKORDER_CANCEL_MARKER },
+          select: { metadata: true },
+        });
+        for (const m of backorderMarkers) {
+          const meta = m.metadata as {
+            stockRestored?: unknown;
+            items?: Array<{ orderItemId?: unknown }>;
+          } | null;
+          const orderItemId = meta?.items?.[0]?.orderItemId;
+          const healed = meta?.stockRestored;
+          if (typeof orderItemId !== 'string' || typeof healed !== 'number' || healed <= 0) {
+            continue;
+          }
+          alreadyRestored.set(orderItemId, (alreadyRestored.get(orderItemId) ?? 0) + healed);
+        }
         for (const m of partialMarkers) {
           const items = (
             m.metadata as { items?: Array<{ orderItemId?: string; quantity?: number }> } | null
@@ -313,8 +334,27 @@ export async function handleOrderRefunded(
           }
         }
 
+        // Units checkout never took (#2299, ruling AP-5d). A backordered
+        // VARIANT line is floored at 0 at checkout (2 on hand, 5 ordered → it
+        // took 2), so giving the full line quantity back invented the
+        // shortfall (→ 5). `stockTaken` records what was really taken; a
+        // non-variant line took all of it (its shortfall is negative debt),
+        // and a pre-2299 row (NULL) is treated as fully taken, as before.
+        const backorderLines = await tx.backorderLine.findMany({
+          where: { storeId, orderItem: { orderId } },
+          select: { orderItemId: true, qty: true, stockTaken: true },
+        });
+        const neverTaken = new Map<string, number>();
+        for (const bl of backorderLines) {
+          const untaken = Math.max(0, bl.qty - (bl.stockTaken ?? bl.qty));
+          if (untaken > 0) {
+            neverTaken.set(bl.orderItemId, (neverTaken.get(bl.orderItemId) ?? 0) + untaken);
+          }
+        }
+
         for (const item of order.items) {
-          const qty = item.quantity - (alreadyRestored.get(item.id) ?? 0);
+          const qty =
+            item.quantity - (alreadyRestored.get(item.id) ?? 0) - (neverTaken.get(item.id) ?? 0);
           if (qty <= 0) continue;
           await restoreLine(item, qty, orderId, 'Order refunded');
         }

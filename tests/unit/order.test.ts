@@ -1012,8 +1012,10 @@ describe('OrderService', () => {
     // Exposed so individual tests can override the per-user coupon count
     // (`tx.order.count`) without rebuilding the whole $transaction mock.
     const txOrderCount = vi.fn().mockResolvedValue(0);
+    const txCouponReserve = vi.fn().mockResolvedValue({ count: 1 });
 
     beforeEach(() => {
+      txCouponReserve.mockReset().mockResolvedValue({ count: 1 });
       vi.mocked(prisma.product.findMany).mockResolvedValue([mockProductForAdmin] as any);
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
       txOrderCount.mockReset().mockResolvedValue(0);
@@ -1024,6 +1026,9 @@ describe('OrderService', () => {
               create: vi.fn().mockResolvedValue(mockOrder),
               count: txOrderCount,
             },
+            // The atomic redemption reservation (#1370): admin orders now
+            // count toward usageCount like checkout.
+            coupon: { updateMany: txCouponReserve },
             // Not used by createAdminOrder itself, but this mock
             // implementation persists on `prisma.$transaction` after this
             // describe block's tests run (vi.clearAllMocks() clears call
@@ -1087,6 +1092,11 @@ describe('OrderService', () => {
         isActive: true,
         startsAt: null,
         expiresAt: null,
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
       } as any);
       const create = vi.fn().mockResolvedValue(mockOrder);
       vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: any) =>
@@ -1128,6 +1138,12 @@ describe('OrderService', () => {
         isActive: true,
         startsAt: new Date(Date.now() - 86400000),
         expiresAt: new Date(Date.now() + 86400000),
+        // Targeting (#1370): admin orders now run the checkout rules.
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
       };
 
       const couponAdminOrderData = { ...baseAdminOrderData, couponCode: 'SAVE10' };
@@ -1167,6 +1183,11 @@ describe('OrderService', () => {
         });
 
         expect(result.orderNumber).toBeDefined();
+        // The use is reserved in the order transaction (#1370).
+        expect(txCouponReserve).toHaveBeenCalledWith({
+          where: { id: 'coupon-1', isActive: true },
+          data: { usageCount: { increment: 1 } },
+        });
       });
 
       it('guest admin order identified by shipping email already at the per-user limit → rejects', async () => {

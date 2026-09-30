@@ -1,0 +1,17 @@
+-- Migration: backorder_line_stock_taken
+--
+-- Issue 2299 (ruling AP-5d): a whole-order cancel of a VARIANT backorder put
+-- back units checkout never took. Checkout floors a variant row at 0
+-- (2 on hand, 5 ordered → 0: it took 2), but the order-refunded inventory
+-- restore returned the full line quantity (→ 5), inventing 3 units.
+--
+-- stock_taken records how many of the line's units checkout ACTUALLY took from
+-- stock when it force-decremented: the full qty for a non-variant line
+-- (unfloored, the rest is negative debt), min(qty, on-hand) for a variant.
+-- The whole-order restore subtracts (qty − stock_taken) per line.
+--
+-- NULL = a line written before this column existed: unknown, treated as
+-- "took the full qty" — exactly the old restore behaviour, so no existing row
+-- changes meaning. Additive, nullable, no default, no backfill: safe to deploy
+-- before or after the code.
+ALTER TABLE "backorder_lines" ADD COLUMN "stock_taken" INTEGER;

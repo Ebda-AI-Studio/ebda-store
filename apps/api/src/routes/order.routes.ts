@@ -6,6 +6,7 @@ import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { OrderService, assertValidTransition } from '../services/order.service';
+import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -1517,24 +1518,50 @@ const adminOrderItemSchema = z.object({
   variantId: z.string().uuid().optional(),
   quantity: z.number().int().min(1).max(999),
 });
-const adminOrderSchema = z.object({
-  customerId: z.string().uuid().optional(),
-  shippingAddress: z.record(z.unknown()),
-  billingAddress: z.record(z.unknown()).optional(),
-  items: z.array(adminOrderItemSchema).min(1),
-  paymentMethod: z.enum(['online', 'cod']).optional(),
-  paymentProvider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
-  notes: z.string().optional(),
-  couponCode: z.string().optional(),
-  currency: z.string().optional(),
-  /**
-   * Optional shipping fee override in integer fils (KWD × 1000).
-   * When set, it replaces the ShippingService-computed fee for this order.
-   * Intended for phone orders where the merchant negotiates a custom rate.
-   * The admin UI collects KWD and converts to fils before sending.
-   */
-  shippingOverride: z.number().int().min(0).optional(),
-});
+const adminOrderSchema = z
+  .object({
+    customerId: z.string().uuid().optional(),
+    shippingAddress: z.record(z.unknown()),
+    billingAddress: z.record(z.unknown()).optional(),
+    items: z.array(adminOrderItemSchema).min(1),
+    paymentMethod: z.enum(['online', 'cod']).optional(),
+    paymentProvider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
+    notes: z.string().optional(),
+    couponCode: z.string().optional(),
+    currency: z.string().optional(),
+    /**
+     * Optional shipping fee override in integer fils (KWD × 1000).
+     * When set, it replaces the ShippingService-computed fee for this order.
+     * Intended for phone orders where the merchant negotiates a custom rate.
+     * The admin UI collects KWD and converts to fils before sending.
+     */
+    shippingOverride: z.number().int().min(0).optional(),
+    /**
+     * Apply `couponCode` outside its rules (owner decision 2026-09-25, #1370,
+     * ruling M-OVR-1). Rules are ENFORCED by default. Honoured only for
+     * store_admin/super_admin (403 for staff, in OrderService.createAdminOrder)
+     * and only with a reason, which is recorded with the actor.
+     */
+    overrideCouponRules: z.boolean().optional(),
+    couponOverrideReason: z.string().trim().min(3).max(500).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.overrideCouponRules !== true) return;
+    if (!v.couponCode) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['couponCode'],
+        message: 'couponCode is required to override coupon rules',
+      });
+    }
+    if (!v.couponOverrideReason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['couponOverrideReason'],
+        message: 'A reason is required to override coupon rules',
+      });
+    }
+  });
 
 router.post(
   '/admin',
@@ -1548,7 +1575,9 @@ router.post(
       const user = getAuthUser(req);
       const data = adminOrderSchema.parse(req.body ?? {});
 
-      const order = await OrderService.createAdminOrder(storeId, user.userId, data);
+      const order = await OrderService.createAdminOrder(storeId, user.userId, data, {
+        role: user.role,
+      });
 
       res.json({
         success: true,
@@ -1811,6 +1840,9 @@ router.get(
 
       const auditKinds = new Set<string>();
       for (const a of audits) {
+        // A coupon-rule override (#1370) is the merchant's internal record —
+        // who waived which rule and why — never shown to the customer.
+        if (!isStoreViewer && a.action === COUPON_OVERRIDE_AUDIT_ACTION) continue;
         auditKinds.add(a.action);
         const d = a.details as Record<string, any>;
         rows.push({

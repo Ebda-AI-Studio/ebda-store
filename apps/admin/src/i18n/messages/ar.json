@@ -1124,7 +1124,10 @@
       },
       "notesSection": {
         "couponLabel": "كود الكوبون (اختياري)",
-        "notesLabel": "ملاحظات (اختياري)"
+        "notesLabel": "ملاحظات (اختياري)",
+        "overrideLabel": "تجاوز شروط الكوبون",
+        "overrideHint": "طبّق هذا الكوبون حتى لو خالف الطلب شروطه (فئة العميل، الطلب الأول، المنتجات، التواريخ، حدود الاستخدام). يُسجَّل اسمك والسبب على الطلب.",
+        "overrideReasonLabel": "سبب التجاوز"
       },
       "footer": {
         "itemCount": "{count, plural, zero {# عنصر} one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصرًا} other {# عنصر}}",
@@ -1136,7 +1139,8 @@
         "noItems": "أضف منتجًا واحدًا على الأقل قبل إتمام الطلب",
         "missingRequired": "الاسم الأول والهاتف مطلوبان",
         "createFailed": "تعذّر إنشاء الطلب",
-        "unknownError": "خطأ غير معروف"
+        "unknownError": "خطأ غير معروف",
+        "overrideReasonRequired": "أدخل سببًا (3 أحرف على الأقل) لتجاوز شروط الكوبون"
       },
       "toast": {
         "created": "تم إنشاء الطلب {orderNumber}"

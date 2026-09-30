@@ -29,6 +29,10 @@ const tx = {
   orderEvent: { create: vi.fn(), findMany: vi.fn() },
   order: { findUniqueOrThrow: vi.fn() },
   return: { findMany: vi.fn() },
+  // The #2277 debt heal locks the product row; not negative here → no heal
+  // (the heal itself is proven against a real DB in
+  // tests/integration/accounting/backorder-cancel-stock-heal.test.ts).
+  $queryRaw: vi.fn(),
 };
 
 vi.mock('@force/database', () => ({
@@ -54,6 +58,7 @@ vi.mock('@force/database', () => ({
 vi.mock('@api/services/order.service', () => ({
   OrderService: { applyRefundEffects: h.applyRefundEffects },
 }));
+vi.mock('@api/lib/public-cache', () => ({ invalidateStoreProductCaches: vi.fn() }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -64,8 +69,11 @@ beforeEach(() => {
   h.findFirst.mockResolvedValue({
     id: 'bo1',
     orderItemId: 'oi1',
+    productId: 'p1',
+    variantId: null,
     orderItem: { id: 'oi1', orderId: 'o1' },
   });
+  tx.$queryRaw.mockResolvedValue([{ inventory: 0, track_inventory: true }]);
   tx.backorderLine.updateMany.mockResolvedValue({ count: 1 });
   tx.backorderLine.findUniqueOrThrow.mockResolvedValue({ qty: 2, qtyFulfilled: 0 });
   tx.backorderLine.count.mockResolvedValue(0);

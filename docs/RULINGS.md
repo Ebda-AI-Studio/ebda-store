@@ -3908,3 +3908,78 @@ alerts are unchanged. Its new partial-return stuck sweep never arms an
 amount-only event (`restoreInventory: false`, and no Return row has a
 `refund:<id>` key), so a refund outside a return has no sweep behind it (OMD-4).
 Cost if wrong: none known beyond OMD-4's.
+
+## 2026-10-01 — owner decisions #2277 + #1370 (branch `fix/owner-decisions-2277-1370`)
+
+**Ruling AP-5c — cancelling a backorder line heals its stock debt up to 0, never above (owner
+decision, Ahmad 2026-10-01, #2277).** Settles the question BS-8(c) left open. AP-5 left `restoreInventory: false` on the grounds that no stock
+was reserved for a backordered unit. That is true for variant lines only: checkout FORCE-decrements a
+NON-variant product unfloored, so the shortfall sits on `products.inventory` as a negative debt that no
+cancel ever cleared — the product read out of stock and stayed on reorder reports for units that will
+never ship, while the GL adjustment debited Inventory 1200 for them. Of the three options put to the
+owner (restore all the units / restore only the negative part / leave it), the decision was the middle
+one. `cancelBackorder` now restores `min(qty − qtyFulfilled, −inventory)` inside the same `withMoneyTx`
+and under the same `cancelledAt: null` claim, so it happens exactly once per line; writes a
+`return_stock` InventoryHistory row (`reference` = `backorder:<lineId>`, NOT the orderId, which the
+whole-order restore reads as "already restored"; `createdBy` = the cancelling user); records the healed
+units as `stockRestored` on the existing `backorder_line_cancelled` marker; and busts the storefront
+product caches after the write. A product that is not negative, or does not track inventory, gets
+nothing — a line that left no debt cannot add phantom units. The whole-order inventory restore
+(`order-refunded` `restore-inventory`) subtracts `stockRestored` per item, or a later full cancel would
+put the healed units back a second time (measured: 2 on hand, 5 backordered → −3 → line cancel → 0 →
+full cancel → 2, not 5). **Variant path checked: no heal.** Checkout floors variant rows at 0
+(`forceDecrementVariantInventory`), so a variant backorder never drives stock negative and has no debt
+of its own to heal; the heal returns 0 for a variant line rather than touch a row checkout never pushed
+below zero. Proven in `tests/integration/accounting/backorder-cancel-stock-heal.test.ts` (8 tests,
+through the real checkout); 5 mutations (no heal, unbounded heal, no track-inventory guard, no
+whole-order subtraction, no cache bust) each turned a test red. Cost if wrong: the units that were
+really on hand when the line was backordered (2 in the example) are not returned to stock by the line
+cancel — the owner chose that over ever inflating stock; a stock count corrects it.
+
+**Ruling AP-5d — the other two backorder stock paths, fixed in the same PR (issue 2299, coordinator
+direction 2026-10-01).** (1) PO receive FIFO-clears a backorder line without adding the received units
+to on-hand (they go to the customer), so a NON-variant debt from a FULFILLED backorder never healed. It
+now heals `min(fulfilled units, −inventory)` per cleared line with the AP-5c rule and helper
+(`healBackorderStockDebt`, `accounting/backorder-stock-heal.ts`; `return_stock` row referenced
+`po-backorder:<lineId>`); the rest of the receipt goes on the shelf as before. No marker is written for
+a PO heal and the whole-order restore does not subtract it: after a PO fulfils the line, a cancel's
+restore is units coming back from the customer, which are real. (2) A whole-order cancel of a VARIANT
+backorder restored the full line quantity onto a row checkout only floored to 0 (2 on hand, 5 ordered
+→ 0 → cancel → 5). New nullable column `backorder_lines.stock_taken` (migration
+`20261001120000_backorder_line_stock_taken`) records what checkout actually took — full qty for a
+non-variant line, `min(qty, on-hand)` for a variant — and the restore subtracts `qty − stock_taken`
+per line. `forceDecrementVariantInventory` now reads the real previous stock under the row lock (it
+reconstructed it as `newStock + qty`), so the variant sale's ledger row reads 2 → 0, not 5 → 0 (its
+`quantity` stays the units sold, −5). NULL `stock_taken` (pre-migration lines) means "fully taken",
+the old behaviour, so no existing row changes meaning. Proven in
+`tests/integration/accounting/backorder-cancel-stock-heal.test.ts` (4 more tests, 12 total); 5
+mutations (no PO heal, no never-taken subtraction, `stock_taken` not recorded, reconstructed previous
+stock, unbounded heal in the shared helper) each turned a test red. Cost if wrong: with the heal-to-0
+rule a PO-fulfilled non-variant backorder, like a cancelled one, does not return the units that were
+really on hand when it was backordered — stock can read low by up to that amount, never high; and a
+pre-migration variant backorder cancelled whole still over-restores, as before.
+
+**Ruling M-OVR-1 — admin/manual orders ENFORCE a coupon's rules by default; a store admin may override
+them, recorded (owner decision, Ahmad 2026-09-25, #1370).** `createAdminOrder` used to check only the
+coupon's dates, store-wide limit and minimum, never its targeting, and discounted the WHOLE subtotal —
+so a scoped, customer-group or first-order coupon applied to anything typed into the phone-order form.
+It now runs the checkout rules: dates, store-wide usage limit, minimum order, customer group, first
+order, minimum quantity, product/category scope (`CouponService.adminOrderCouponViolations`, the
+customer context from `resolveCustomerContext`), the per-customer limit inside the order transaction,
+and a scoped coupon discounts only its in-scope lines. A broken rule is a 400 with the checkout's error
+code. The override (`overrideCouponRules: true` + `couponOverrideReason`, 3–500 chars, Zod-validated at
+the route) is honoured only for `store_admin`/`super_admin` — the role comes from the verified token and
+the service answers staff with 403 `COUPON_OVERRIDE_FORBIDDEN`. It bypasses every eligibility rule but
+never the merchant's own on/off switch (an inactive coupon stays a 404). Under override a scoped coupon
+still discounts only its in-scope lines when the order has any; when it has none, it applies to the
+whole order — that is the scope rule being overridden. The override is written as a `coupon_override`
+orderEvent IN the order transaction (actor, role, reason, the rules actually broken, the discount) and
+as an `order.coupon_override` audit-log row the merchant sees on the order timeline (hidden from the
+customer's view of it). Admin orders now also RESERVE the redemption (`usageCount` +1, atomically, with
+the `< usageLimit` guard unless overridden): they never counted, yet cancelling one ran the fanout's
+reverse-coupon step and decremented the count — handing another customer's redemption back. Proven in
+`tests/integration/admin-order-coupon-rules.test.ts` (10 tests) and
+`tests/unit/admin-order-coupon-override-route.test.ts` (8); 8 mutations each turned a test red. One
+mutation survived by design: dropping `isActive` from the coupon lookup leaves the reservation's own
+`isActive: true` guard to refuse an inactive coupon (404), so the belt holds without the braces. Cost if
+wrong: a store admin can still give any coupon to any order — but never silently, and never as staff.

@@ -2,6 +2,33 @@ import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
+/** One coupon rule an admin order broke. `code` is the checkout error code. */
+export interface CouponRuleViolation {
+  code:
+    | 'COUPON_NOT_STARTED'
+    | 'COUPON_EXPIRED'
+    | 'COUPON_LIMIT_REACHED'
+    | 'MIN_ORDER_NOT_MET'
+    | 'COUPON_NOT_ELIGIBLE';
+  message: string;
+}
+
+type AdminCouponRow = {
+  type: 'percentage' | 'fixed' | 'free_shipping';
+  value: number;
+  maxDiscount: number | null;
+  startsAt: Date | null;
+  expiresAt: Date | null;
+  usageLimit: number | null;
+  usageCount: number;
+  customerGroupId: string | null;
+  firstOrderOnly: boolean;
+  minOrderAmount: number | null;
+  minQuantity: number | null;
+  scopeProductIds: string[];
+  scopeCategoryIds: string[];
+};
+
 interface CreateCouponData {
   code: string;
   name: string;
@@ -267,6 +294,84 @@ export class CouponService {
     // free_shipping is handled separately
 
     return discount;
+  }
+
+  /**
+   * Every rule an admin/manual order breaks for this coupon, in the order the
+   * checkout reports them: dates, store-wide usage limit, minimum order,
+   * targeting (customer group, first order, min quantity, product/category
+   * scope). The per-customer limit needs the order transaction and is
+   * checked there. Pure — no DB access.
+   *
+   * Empty = the coupon applies exactly as it would at checkout.
+   */
+  static adminOrderCouponViolations(
+    coupon: AdminCouponRow,
+    ctx: TargetingCtx,
+    subtotal: number,
+    now: Date = new Date()
+  ): CouponRuleViolation[] {
+    const out: CouponRuleViolation[] = [];
+    if (coupon.startsAt && now < coupon.startsAt) {
+      out.push({ code: 'COUPON_NOT_STARTED', message: 'Coupon is not yet active' });
+    }
+    if (coupon.expiresAt && now > coupon.expiresAt) {
+      out.push({ code: 'COUPON_EXPIRED', message: 'Coupon has expired' });
+    }
+    if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+      out.push({ code: 'COUPON_LIMIT_REACHED', message: 'Coupon usage limit reached' });
+    }
+    if (coupon.minOrderAmount && subtotal < coupon.minOrderAmount) {
+      out.push({
+        code: 'MIN_ORDER_NOT_MET',
+        message: `Minimum order amount of ${(coupon.minOrderAmount / 1000).toFixed(
+          3
+        )} KWD required for this coupon`,
+      });
+    }
+    if (!CouponService.evaluateForCart(coupon, ctx).eligible) {
+      out.push({
+        code: 'COUPON_NOT_ELIGIBLE',
+        message: 'This coupon does not apply to this order.',
+      });
+    }
+    return out;
+  }
+
+  /**
+   * The cart discount an admin/manual order gets from a coupon.
+   *
+   * Rules enforced (the default): exactly the checkout discount —
+   * `evaluateForCart`, so a scoped coupon discounts only its in-scope lines.
+   *
+   * Rules overridden (ruling M-OVR-1): the eligibility gates (customer group,
+   * first order, minimums, dates, usage limits) are ignored. A scoped coupon
+   * still discounts only its in-scope lines when the order has any; when it
+   * has none, the override applies it to the whole order — that is the scope
+   * rule being overridden.
+   *
+   * `free_shipping` returns 0: its benefit is the shipping line.
+   */
+  static adminOrderCouponDiscount(
+    coupon: AdminCouponRow,
+    ctx: TargetingCtx,
+    subtotal: number,
+    override: boolean
+  ): number {
+    if (!override) return CouponService.evaluateForCart(coupon, ctx).discount;
+    const scopeOnly = matchesTargeting(
+      {
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minOrderAmount: null,
+        minQuantity: null,
+        scopeProductIds: coupon.scopeProductIds,
+        scopeCategoryIds: coupon.scopeCategoryIds,
+      },
+      ctx
+    );
+    const base = scopeOnly.eligible ? scopeOnly.matchingSubtotal : subtotal;
+    return computeDiscount(coupon.type, coupon.value, coupon.maxDiscount, base);
   }
 
   /**

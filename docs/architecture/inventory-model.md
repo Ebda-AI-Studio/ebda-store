@@ -114,7 +114,8 @@ if (item.variantId) {
 ```
 
 Every stock writer follows this shape: checkout, refund restore, the
-payment-failure rollback, PO receive, stock adjustments.
+payment-failure rollback, PO receive, stock adjustments, the backorder-line
+cancel's debt heal.
 
 Consequences worth stating explicitly:
 
@@ -150,7 +151,9 @@ product.costPrice`. Order lines snapshot it at sale time
   Known gap, not yet closed: the manual stock-adjustment form and the
   cycle-count reconcile still send product-level lines without a `variantId`.
 - **A non-variant product may legitimately go negative** — that is real
-  backorder debt. Only variant rows are floored at 0.
+  backorder debt. Only variant rows are floored at 0. Cancelling the
+  backorder line that created the debt heals it back up to 0, never above
+  (next section).
 
 ## Cancelling one backorder line
 
@@ -169,17 +172,61 @@ fires the ITEM-LEVEL `order/refunded` event (`partial`, refundKey
   VAT share, its COGS. The sale entry itself stays posted. Shipping is not
   reversed; a whole-order cancel still reverses the whole sale and backs these
   adjustments out first.
-- no stock moves, and coupon, affiliate, loyalty and wallet stay as they are —
-  the order is still live. For a VARIANT line that is exact: checkout floors
-  the variant at 0, so the backordered units were never taken. For a
-  NON-variant line it is a known residual (issue 2277, open for the owner):
-  checkout force-decremented the units, so `products.inventory` holds them as
-  a negative backorder debt that this cancel does not clear — the product keeps
-  reading out of stock and stays on low-stock / reorder reports for units that
-  will never ship, while the GL adjustment debits Inventory 1200 for their cost.
+- coupon, affiliate, loyalty and wallet stay as they are — the order is
+  still live. The item's other open backorder lines stay open.
 - a line whose allocation is 0 (its units already reversed, or a fully
   discounted order) is still posted but tells the customer nothing (issue 2274).
-  The item's other open backorder lines stay open.
+
+**Stock: the debt is healed up to 0, never above** (owner decision
+2026-10-01, #2277, ruling AP-5c). A NON-variant backordered checkout
+force-decrements `products.inventory` unfloored, so the shortfall sits on the
+row as a negative debt. In the same transaction and under the same claim, the
+cancel restores `min(qty − qtyFulfilled, −inventory)`:
+
+| Before cancel | Line's unfulfilled units | After cancel |
+| ------------- | ------------------------ | ------------ |
+| −3            | 5                        | 0            |
+| −7            | 5                        | −2           |
+| 4             | 3                        | 4 (nothing)  |
+
+- It writes a `return_stock` InventoryHistory row with `reference`
+  `backorder:<lineId>` (never the orderId — the whole-order restore reads an
+  orderId-referenced `return_stock` row as "this order was already restored")
+  and `createdBy` = the cancelling user, and busts the storefront product
+  caches.
+- It records the healed units as `stockRestored` on the
+  `backorder_line_cancelled` marker. A later whole-order cancel/refund
+  restores each item's quantity MINUS those units, so they are never put back
+  twice (2 on hand, 5 backordered → −3 → line cancel → 0 → full cancel → 2).
+- An untracked product, or one that is not negative, gets nothing: a line that
+  left no debt cannot add phantom units. The units that were really on hand
+  when the line was backordered are not returned by the line cancel — the
+  owner chose that over ever inflating stock.
+- **Variant lines heal nothing.** Checkout floors variant rows at 0
+  (`forceDecrementVariantInventory`), so a variant backorder never drives stock
+  negative and has no debt to heal.
+- The `order/refunded` event itself still carries `restoreInventory: false`;
+  the heal is done once, under the claim, not by the fanout.
+
+**The two other ways a backorder leaves the backlog** (#2299, ruling AP-5d):
+
+- **A PO receipt that fulfils a backorder heals the same debt, by the same
+  rule.** The received units go to the customer, not the shelf, so PO receive
+  clears the line without adding them to on-hand — and before this, left the
+  non-variant debt on the row forever. It now heals `min(fulfilled units,
+−inventory)` per cleared line (`return_stock` row, `reference`
+  `po-backorder:<lineId>`); any remainder of the receipt goes on the shelf as
+  before (0 on hand, 4 backordered → −4 → receive 7 → 0 + 3 = 3). Shared
+  helper: `healBackorderStockDebt` (`accounting/backorder-stock-heal.ts`).
+- **A whole-order cancel returns only what checkout actually took.**
+  `backorder_lines.stock_taken` records it at checkout: the full qty for a
+  non-variant line (the shortfall is negative debt), `min(qty, on-hand)` for a
+  variant line (floored at 0). The whole-order restore subtracts
+  `qty − stock_taken` per line, so a variant backorder no longer comes back
+  with phantom units (2 on hand, 5 ordered → 0 → cancel → 2, was 5). NULL
+  (lines written before the column) is treated as fully taken — the old
+  behaviour. The variant sale's InventoryHistory row now records the real
+  previous stock (2 → 0, not 5 → 0).
 
 Every later item-level allocation — the GL, a return's provider refund, its
 store credit — counts those units as already taken back

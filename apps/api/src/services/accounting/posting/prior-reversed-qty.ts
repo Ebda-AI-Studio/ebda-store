@@ -5,7 +5,9 @@ import type { DbClient } from '@force/database';
  * that cancels the line. It is the backorder twin of a COMPLETED Return row:
  * the durable, committed-before-the-event record of what one single-line
  * cancellation took back. `metadata` = `{ refundKey, backorderLineId, reason,
- * items: [{ orderItemId, quantity }] }`.
+ * items: [{ orderItemId, quantity }], stockRestored }` — `stockRestored` is the
+ * units of negative stock debt the cancel healed (up to 0, #2277); the
+ * whole-order inventory restore subtracts it.
  */
 export const BACKORDER_CANCEL_MARKER = 'backorder_line_cancelled';
 

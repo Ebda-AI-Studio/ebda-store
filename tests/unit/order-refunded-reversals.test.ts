@@ -68,6 +68,9 @@ const txClient = {
     update: h.orderEventUpdate,
   },
   coupon: { updateMany: h.couponUpdateMany },
+  // The whole-order restore reads the order's backorder lines for units
+  // checkout never took (#2299); none here → the full quantity is restored.
+  backorderLine: { findMany: vi.fn().mockResolvedValue([]) },
   $queryRaw: h.queryRaw,
 };
 

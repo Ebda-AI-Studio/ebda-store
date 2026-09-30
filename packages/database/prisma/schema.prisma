@@ -3593,6 +3593,11 @@ model BackorderLine {
   variantId           String?   @map("variant_id")
   qty                 Int
   qtyFulfilled        Int       @default(0) @map("qty_fulfilled")
+  /// Units checkout actually took from stock for this line (#2299): the full
+  /// qty for a non-variant line, min(qty, on-hand) for a variant (floored at
+  /// 0). NULL = pre-2299 row, treated as qty. The whole-order restore
+  /// subtracts qty − stockTaken so it never returns units never taken.
+  stockTaken          Int?      @map("stock_taken")
   fulfilledByPoItemId String?   @map("fulfilled_by_po_item_id")
   fulfilledAt         DateTime? @map("fulfilled_at")
   cancelledAt         DateTime? @map("cancelled_at")

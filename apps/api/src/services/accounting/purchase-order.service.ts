@@ -8,6 +8,7 @@ import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
 import { effectiveInventory } from '../../lib/effective-inventory';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
+import { healBackorderStockDebt } from './backorder-stock-heal';
 
 export interface CreatePoInput {
   storeId: string;
@@ -195,6 +196,22 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
             qtyFulfilled: newQtyFulfilled,
             ...(isFullyFulfilled ? { fulfilledAt: new Date(), fulfilledByPoItemId: item.id } : {}),
           },
+        });
+
+        // Heal the backorder stock debt these units leave behind (#2299,
+        // ruling AP-5d, same heal-to-0 rule as a line cancel, AP-5c): the
+        // received units go to the customer, not the shelf, so without this a
+        // NON-variant product backordered at checkout kept its negative
+        // on-hand forever after the PO fulfilled it. Variant lines heal
+        // nothing (checkout floors them at 0).
+        await healBackorderStockDebt(tx, {
+          storeId: input.storeId,
+          productId: item.productId,
+          variantId: item.variantId ?? null,
+          quantity: fulfilQty,
+          reference: `po-backorder:${bo.id}`,
+          reason: `PO receive ${po.poNumber} — backorder fulfilled, stock debt healed to 0`,
+          userId: input.receivedBy ?? null,
         });
 
         // Track the cleared backorder for journal posting

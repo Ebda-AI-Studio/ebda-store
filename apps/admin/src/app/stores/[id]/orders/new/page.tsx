@@ -8,6 +8,7 @@ import { useLocale } from 'next-intl';
 import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { useAuth } from '../../../../../lib/auth';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { effectiveVariantPrice } from '@/lib/variant-price';
@@ -74,6 +75,8 @@ export default function NewOrderPage() {
   const locale = useLocale();
   const isRtl = locale === 'ar';
   const t = useT('orders.new');
+  const { user } = useAuth();
+  const canOverrideCoupon = user?.role === 'store_admin' || user?.role === 'super_admin';
   const tCommon = useT('common');
 
   // Customer state — either an existing User.id (selected from search)
@@ -95,6 +98,10 @@ export default function NewOrderPage() {
   const [country, setCountry] = useState('Kuwait');
   const [notes, setNotes] = useState('');
   const [couponCode, setCouponCode] = useState('');
+  // Coupon rules are ENFORCED by default (#1370). A store admin may override
+  // them with a reason; the API rejects the flag for staff (403).
+  const [overrideCouponRules, setOverrideCouponRules] = useState(false);
+  const [couponOverrideReason, setCouponOverrideReason] = useState('');
 
   // Shipping preview state (live-computed after governorate+area chosen).
   const [shippingPreview, setShippingPreview] = useState<ShippingPreview | null>(null);
@@ -342,6 +349,11 @@ export default function NewOrderPage() {
       toastError(t('errors.missingRequired'));
       return;
     }
+    const overriding = canOverrideCoupon && overrideCouponRules && !!couponCode.trim();
+    if (overriding && couponOverrideReason.trim().length < 3) {
+      toastError(t('errors.overrideReasonRequired'));
+      return;
+    }
     setIsSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
@@ -366,6 +378,10 @@ export default function NewOrderPage() {
         notes: notes || undefined,
         couponCode: couponCode || undefined,
       };
+      if (overriding) {
+        payload.overrideCouponRules = true;
+        payload.couponOverrideReason = couponOverrideReason.trim();
+      }
       // shippingOverride — integer fils, omitted when blank.
       if (typeof shippingOverrideFils === 'number') {
         payload.shippingOverride = shippingOverrideFils;
@@ -402,6 +418,9 @@ export default function NewOrderPage() {
     items,
     notes,
     couponCode,
+    canOverrideCoupon,
+    overrideCouponRules,
+    couponOverrideReason,
     shippingOverrideFils,
     router,
     toastSuccess,
@@ -805,6 +824,34 @@ export default function NewOrderPage() {
             />
             <Input label={t('notesSection.notesLabel')} value={notes} onChange={setNotes} />
           </div>
+          {canOverrideCoupon && couponCode.trim() && (
+            <div className="mt-3 flex flex-col gap-2">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={overrideCouponRules}
+                  onChange={e => setOverrideCouponRules(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-border"
+                />
+                <span>
+                  <span className="font-medium text-foreground">
+                    {t('notesSection.overrideLabel')}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t('notesSection.overrideHint')}
+                  </span>
+                </span>
+              </label>
+              {overrideCouponRules && (
+                <Input
+                  label={t('notesSection.overrideReasonLabel')}
+                  value={couponOverrideReason}
+                  onChange={setCouponOverrideReason}
+                  required
+                />
+              )}
+            </div>
+          )}
         </section>
 
         {/* Submit footer — lifted above the fixed MobileBottomNav (h-14 =

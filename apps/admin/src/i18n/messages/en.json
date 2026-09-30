@@ -1124,7 +1124,10 @@
       },
       "notesSection": {
         "couponLabel": "Coupon code (optional)",
-        "notesLabel": "Notes (optional)"
+        "notesLabel": "Notes (optional)",
+        "overrideLabel": "Override coupon rules",
+        "overrideHint": "Apply this coupon even if the order breaks its rules (customer group, first order, products, dates, usage limits). Your name and reason are recorded on the order.",
+        "overrideReasonLabel": "Reason for the override"
       },
       "footer": {
         "itemCount": "{count, plural, one {# item} other {# items}}",
@@ -1136,7 +1139,8 @@
         "noItems": "Add at least one product before placing the order",
         "missingRequired": "First name and phone are required",
         "createFailed": "Failed to create order",
-        "unknownError": "Unknown error"
+        "unknownError": "Unknown error",
+        "overrideReasonRequired": "Enter a reason (at least 3 characters) to override the coupon rules"
       },
       "toast": {
         "created": "Order {orderNumber} created"

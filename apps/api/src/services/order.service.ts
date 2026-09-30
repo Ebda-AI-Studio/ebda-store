@@ -9,7 +9,12 @@ import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { resolveBundle } from './bundle.service';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
-import { CouponService } from './coupon.service';
+import { CouponService, type CouponRuleViolation } from './coupon.service';
+import {
+  COUPON_OVERRIDE_AUDIT_ACTION,
+  COUPON_OVERRIDE_EVENT,
+  COUPON_OVERRIDE_ROLES,
+} from '../lib/coupon-override';
 import { resolveCustomerContext, resolveBestPromotion } from './promotion-resolver';
 import { socketService } from './socket.service';
 import { featureService } from './feature.service';
@@ -832,8 +837,12 @@ export class OrderService {
       // a BackorderLine row created after the order is persisted (further down
       // in this transaction). When the feature is disabled, out-of-stock items
       // are rejected regardless of the per-product allowBackorder flag.
-      const backorderedItems: Array<{ productId: string; variantId?: string; quantity: number }> =
-        [];
+      const backorderedItems: Array<{
+        productId: string;
+        variantId?: string;
+        quantity: number;
+        stockTaken: number;
+      }> = [];
 
       // Expand every cart bundle into its component OrderItem specs, ONE
       // bundleGroupId per BOX (never per bundle-in-cart) so a single box can
@@ -975,7 +984,16 @@ export class OrderService {
             const newStock = row?.inventory ?? 0;
             res = { ok: true, previousStock: newStock + qty, newStock };
           }
-          backorderedItems.push({ productId, variantId, quantity: qty });
+          // What checkout actually took from stock (#2299): all of it for a
+          // non-variant row (the rest is negative debt), only what was on hand
+          // for a variant row (floored at 0). The whole-order restore gives
+          // back no more than this.
+          backorderedItems.push({
+            productId,
+            variantId,
+            quantity: qty,
+            stockTaken: Math.max(0, res.previousStock - res.newStock),
+          });
         }
         return { previousStock: res.previousStock, newStock: res.newStock };
       };
@@ -1290,7 +1308,7 @@ export class OrderService {
       // N bundle boxes sharing a product cannot each claim the same shortfall
       // (see lib/backorder-pairing.ts, #1552).
       if (backorderedItems.length > 0) {
-        for (const { line: newItem, quantity } of pairBackorderedLines(
+        for (const { line: newItem, quantity, stockTaken } of pairBackorderedLines(
           newOrder.items,
           backorderedItems
         )) {
@@ -1301,6 +1319,7 @@ export class OrderService {
               productId: newItem.productId,
               variantId: newItem.variantId,
               qty: quantity,
+              stockTaken: stockTaken ?? null,
             },
           });
           await tx.orderItem.update({
@@ -2145,7 +2164,17 @@ export class OrderService {
        * Used for negotiated phone-order rates.
        */
       shippingOverride?: number;
-    }
+      /**
+       * Apply `couponCode` outside its rules (owner decision 2026-09-25,
+       * #1370, ruling M-OVR-1). Honoured only for `actorRole` in
+       * COUPON_OVERRIDE_ROLES and only with a `couponOverrideReason`; the
+       * override, who made it and why are written to the order's event and
+       * audit log.
+       */
+      overrideCouponRules?: boolean;
+      couponOverrideReason?: string;
+    },
+    actor: { role?: string } = {}
   ) {
     if (data.items.length === 0) {
       throw new AppError(400, 'NO_ITEMS', 'Order must have at least one item');
@@ -2178,6 +2207,8 @@ export class OrderService {
       where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
       include: {
         variants: true,
+        // Category ids feed the coupon's category scope (#1370).
+        categories: { select: { categoryId: true } },
       },
     });
     const productMap = new Map(products.map(p => [p.id, p]));
@@ -2271,35 +2302,84 @@ export class OrderService {
       );
     }
 
-    // Coupon: resolved server-side via CouponService just like the
-    // public flow.
+    // Coupon — owner decision 2026-09-25 (#1370, ruling M-OVR-1): an admin /
+    // phone order ENFORCES the coupon's rules by default, exactly like
+    // checkout — dates, store-wide and per-customer usage limits, minimum
+    // order, customer group, first order, minimum quantity, product/category
+    // scope — and a scoped coupon discounts only its in-scope lines. A
+    // store_admin/super_admin may override the rules with a reason; the
+    // override is recorded (order event + audit log) with who and why.
     let couponDiscount = 0;
     let couponCode: string | undefined;
     // Kept in outer scope (not just `couponCode`) so the per-user usage
     // check inside the transaction below can read `usageLimitPerUser` —
     // mirrors `appliedCoupon` in OrderService.create.
     let appliedCoupon: Awaited<ReturnType<typeof CouponService.getByCode>> | null = null;
-    if (data.couponCode) {
-      appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
-      if (appliedCoupon.minOrderAmount && subtotal < appliedCoupon.minOrderAmount) {
+    const overrideCoupon = !!data.couponCode && data.overrideCouponRules === true;
+    const overrideReason = data.couponOverrideReason?.trim() ?? '';
+    const couponViolations: CouponRuleViolation[] = [];
+    if (overrideCoupon) {
+      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role)) {
+        throw new AppError(
+          403,
+          'COUPON_OVERRIDE_FORBIDDEN',
+          'Only a store admin can override coupon rules'
+        );
+      }
+      if (!overrideReason) {
         throw new AppError(
           400,
-          'MIN_ORDER_NOT_MET',
-          `Minimum order amount of ${(appliedCoupon.minOrderAmount / 1000).toFixed(
-            3
-          )} KWD required for this coupon`
+          'COUPON_OVERRIDE_REASON_REQUIRED',
+          'A reason is required to override coupon rules'
         );
+      }
+    }
+    if (data.couponCode) {
+      // Active coupons of THIS store only — an override bypasses the rules,
+      // never the merchant's own on/off switch.
+      appliedCoupon = await prisma.coupon.findFirst({
+        where: {
+          storeId,
+          code: { equals: data.couponCode, mode: 'insensitive' },
+          isActive: true,
+        },
+      });
+      if (!appliedCoupon) {
+        throw new AppError(404, 'NOT_FOUND', 'Coupon not found or inactive');
+      }
+      const idPhone =
+        typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null;
+      const idEmail =
+        typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null;
+      const custCtx = await resolveCustomerContext(storeId, {
+        phone: idPhone,
+        email: idEmail,
+        customerId: data.customerId ?? null,
+      });
+      const targetingCtx = {
+        ...custCtx,
+        cartItems: resolved.map(r => ({
+          productId: r.productId,
+          categoryIds: (productMap.get(r.productId)?.categories ?? []).map(c => c.categoryId),
+          quantity: r.quantity,
+          lineTotal: r.lineTotal,
+        })),
+      };
+      couponViolations.push(
+        ...CouponService.adminOrderCouponViolations(appliedCoupon, targetingCtx, subtotal)
+      );
+      if (couponViolations.length > 0 && !overrideCoupon) {
+        const first = couponViolations[0];
+        throw new AppError(400, first.code, first.message);
       }
       if (appliedCoupon.type === 'free_shipping') {
         shipping = 0;
       } else {
-        couponDiscount = CouponService.calculateDiscount(
-          {
-            type: appliedCoupon.type,
-            value: appliedCoupon.value,
-            maxDiscount: appliedCoupon.maxDiscount,
-          },
-          subtotal
+        couponDiscount = CouponService.adminOrderCouponDiscount(
+          appliedCoupon,
+          targetingCtx,
+          subtotal,
+          overrideCoupon
         );
       }
       couponCode = appliedCoupon.code;
@@ -2368,8 +2448,37 @@ export class OrderService {
             },
           });
           if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
-            throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+            if (!overrideCoupon) {
+              throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+            }
+            couponViolations.push({
+              code: 'COUPON_LIMIT_REACHED',
+              message: 'Per-customer coupon usage limit reached',
+            });
           }
+        }
+      }
+
+      // Reserve the redemption atomically, like checkout. Admin orders never
+      // counted toward `usageCount`, yet cancelling one ran the fanout's
+      // reverse-coupon step and DEcremented it — handing another customer's
+      // redemption back to the limit. An override still counts the use; it
+      // only skips the `< usageLimit` guard.
+      if (appliedCoupon) {
+        const reserve = await tx.coupon.updateMany({
+          where: {
+            id: appliedCoupon.id,
+            isActive: true,
+            ...(!overrideCoupon && appliedCoupon.usageLimit
+              ? { usageCount: { lt: appliedCoupon.usageLimit } }
+              : {}),
+          },
+          data: { usageCount: { increment: 1 } },
+        });
+        if (reserve.count === 0) {
+          throw overrideCoupon
+            ? new AppError(404, 'NOT_FOUND', 'Coupon not found or inactive')
+            : new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
         }
       }
 
@@ -2418,6 +2527,29 @@ export class OrderService {
           },
         },
       });
+
+      // The durable record of a coupon override — in the order transaction,
+      // so an overridden order can never exist without it. The audit-log row
+      // below is best-effort (auditLog swallows its own failures).
+      if (overrideCoupon && couponCode) {
+        await tx.orderEvent.create({
+          data: {
+            storeId,
+            orderId: created.id,
+            fromStatus: null,
+            toStatus: COUPON_OVERRIDE_EVENT,
+            actorId: adminUserId,
+            metadata: {
+              couponCode,
+              reason: overrideReason,
+              actorRole: actor.role ?? null,
+              // Rules the order actually broke (empty = override was not needed).
+              violations: couponViolations.map(v => v.code),
+              discount: couponDiscount,
+            },
+          },
+        });
+      }
       return created;
     });
 
@@ -2432,6 +2564,25 @@ export class OrderService {
         total,
       },
     });
+
+    if (overrideCoupon && couponCode) {
+      // storeId set so the merchant's order timeline shows it (the customer's
+      // view of the timeline filters it out — order.routes.ts).
+      await auditLog({
+        action: COUPON_OVERRIDE_AUDIT_ACTION,
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: order.id,
+        details: {
+          orderNumber: order.orderNumber,
+          couponCode,
+          description: overrideReason,
+          violations: couponViolations.map(v => v.code),
+          discount: couponDiscount,
+        },
+      });
+    }
 
     logger.info(
       {

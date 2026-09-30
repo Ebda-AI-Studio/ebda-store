@@ -85,11 +85,19 @@ export async function forceDecrementVariantInventory(
   variantId: string,
   qty: number
 ): Promise<DecrementResult> {
+  // Read the real pre-decrement stock under the row lock (#2299). It used to
+  // be reconstructed as `newStock + qty`, which is wrong exactly when the
+  // floor bites (2 on hand, 5 ordered → 0 reported a previous stock of 5): the
+  // sale's ledger row overstated the movement, and the backorder line could
+  // not know that checkout took only 2.
+  const [cur] = await tx.$queryRaw<Array<{ inventory: number }>>`
+    SELECT inventory FROM public.product_variants WHERE id = ${variantId} FOR UPDATE
+  `;
   const [row] = await tx.$queryRaw<Array<{ inventory: number }>>`
     UPDATE public.product_variants SET inventory = GREATEST(0, inventory - ${qty})
     WHERE id = ${variantId}
     RETURNING inventory
   `;
   const newStock = row?.inventory ?? 0;
-  return { ok: true, previousStock: newStock + qty, newStock };
+  return { ok: true, previousStock: cur?.inventory ?? newStock + qty, newStock };
 }
