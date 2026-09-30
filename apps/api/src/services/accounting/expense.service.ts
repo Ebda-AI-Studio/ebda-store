@@ -1,5 +1,5 @@
 import { assertStoreOwnsInTenantScope } from './assert-store-owns';
-import { prisma } from '@force/database';
+import { prisma, hasTenantContext, runInTenantContext } from '@force/database';
 import type { Expense } from '@prisma/client';
 import {
   isCashOrBankAccount,
@@ -56,6 +56,20 @@ export type ExpenseWithRelations = Expense & {
  * Status is always 'draft' on creation.
  */
 export async function createExpense(input: CreateExpenseInput): Promise<ExpenseWithRelations> {
+  // Issue 2291: with no ambient tenant transaction (the expense-OCR Inngest
+  // job) the guard below opened its own transient transaction, but every
+  // statement after it — the paid-from lookup and the INSERT, both on STRICT
+  // RLS tables — ran GUC-less: under force_app the lookup reads nothing (a
+  // misleading 400 INVALID_PAID_FROM) and the insert is rejected. The whole
+  // body now runs in ONE store-scoped transaction, which also closes the
+  // guard-vs-write window. The HTTP route already wraps it, so there it joins.
+  if (!hasTenantContext()) {
+    return runInTenantContext(input.storeId, () => createExpenseInScope(input));
+  }
+  return createExpenseInScope(input);
+}
+
+async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseWithRelations> {
   // paidFromAccountId is validated against this store a few lines down, but
   // supplierId and expenseAccountId were written straight from the body — the
   // asymmetry is the bug. A foreign account/supplier id leaks its code and

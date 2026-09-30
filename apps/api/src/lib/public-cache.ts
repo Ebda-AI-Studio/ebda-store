@@ -312,7 +312,9 @@ export function customersCacheKey(storeId: string): string {
   // for up to the 300s TTL — the version bump makes it a clean miss instead.
   // v3 (PR 2301): gained `ordersTruncated`/`zeroOrderTruncated`; a v2 entry
   // would drop the export's truncation notice rows.
-  return `customers-agg:v3:${storeId}`;
+  // v4 (issue 2235): spend/repeat-rate now exclude failed-payment orders; a
+  // v3 entry would show the old population for up to its TTL.
+  return `customers-agg:v4:${storeId}`;
 }
 
 /**

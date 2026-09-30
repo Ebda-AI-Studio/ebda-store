@@ -348,6 +348,7 @@ export class AnalyticsService {
       deletedAt: null,
       createdAt: { gte: startDate, lte: endDate },
       status: { notIn: ['cancelled', 'refunded'] },
+      paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
     };
 
     // Use aggregate for revenue and order count — avoids loading all rows into JS
@@ -387,6 +388,7 @@ export class AnalyticsService {
           AND o.created_at >= ${startDate}
           AND o.created_at <= ${endDate}
           AND o.status NOT IN ('cancelled', 'refunded')
+          AND o.payment_status <> 'failed'
       `,
     ]);
 
@@ -472,6 +474,7 @@ export class AnalyticsService {
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
         AND status NOT IN ('cancelled', 'refunded')
+        AND payment_status <> 'failed'
       GROUP BY period
       ORDER BY period ASC
     `;
@@ -524,6 +527,7 @@ export class AnalyticsService {
           storeId,
           createdAt: { gte: startDate, lte: endDate },
           status: { notIn: ['cancelled', 'refunded'] },
+          paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
       },
       _sum: { quantity: true, total: true },
@@ -590,6 +594,7 @@ export class AnalyticsService {
           storeId,
           createdAt: { gte: startDate, lte: endDate },
           status: { notIn: ['cancelled', 'refunded'] },
+          paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
       },
       _sum: { total: true },
@@ -713,6 +718,7 @@ export class AnalyticsService {
           storeId,
           deletedAt: null,
           status: { notIn: ['cancelled', 'refunded'] },
+          paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
         _sum: { total: true },
         _count: true,
@@ -826,7 +832,10 @@ export class AnalyticsService {
   }
 
   /**
-   * Get revenue by payment status
+   * Revenue by payment status — DELIBERATELY the full population, failed payments included (issue 2235,
+   * ruling AUI-1a): this is a breakdown BY payment status and the failed
+   * bucket is its point. Its `total`/`percentage` are therefore NOT comparable
+   * with the headline revenue KPIs, which exclude failed payments.
    */
   static async getRevenueByPaymentStatus(storeId: string, dateRange?: DateRange) {
     const now = new Date();

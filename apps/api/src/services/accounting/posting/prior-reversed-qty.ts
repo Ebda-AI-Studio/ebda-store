@@ -32,8 +32,11 @@ export function backorderRefundKey(backorderLineId: string): string {
  * card disagree by the discount/tax share.
  *
  * Backorder lines cancelled by the refund FANOUT (a return or refund
- * releasing demand) carry no marker and are not counted here: their
- * quantity is already the Return row's, or the sale was reversed whole.
+ * releasing demand) carry no `backorder_line_cancelled` marker and are not
+ * counted here: their quantity is already the Return row's, or the sale was
+ * reversed whole. (A partial release that healed stock debt writes its own
+ * `backorder_release_healed` marker for the inventory restore only — issue
+ * 2302 — which this reader deliberately ignores.)
  *
  * `reasons` maps each reversal key (Return id / backorder refundKey) to its
  * merchant-entered reason, for the journal memo.

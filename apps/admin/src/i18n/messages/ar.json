@@ -1894,7 +1894,7 @@
         "repeatSub": "{repeat} من {buyers} مشترين طلبوا مجددًا",
         "noBuyersSub": "لا توجد طلبات بعد",
         "ordersSub": "{count, plural, one {من طلب واحد} two {من طلبين} few {من {count, number, latn} طلبات} many {من {count, number, latn} طلبًا} other {من {count, number, latn} طلب}}",
-        "spentSub": "كل الطلبات عدا الملغاة والمستردة — مدفوعة أو غير مدفوعة"
+        "spentSub": "كل الطلبات عدا الملغاة والمستردة وفاشلة الدفع (يُحتسب الدفع عند الاستلام غير المحصَّل)"
       }
     },
     "detail": {
@@ -1981,6 +1981,7 @@
         "colNote": "ملاحظة",
         "refOrder": "طلب {number}",
         "refReturn": "مرتجع {number}",
+        "erasureWriteOff": "شُطب رصيد المحفظة بعد أن حذف العميل حسابه",
         "types": {
           "credit": "إضافة رصيد",
           "debit": "خصم",
@@ -3867,7 +3868,8 @@
       "recovered": "تم الاستعادة",
       "recoveryRate": "معدل الاستعادة",
       "recoveredRevenue": "الإيرادات المستعادة",
-      "kwdValue": "{amount} د.ك"
+      "kwdValue": "{amount} د.ك",
+      "recoveryNotTracked": "غير متتبَّع"
     },
     "status": {
       "pending": "قيد الانتظار",
@@ -6695,6 +6697,7 @@
     "retrying": "جارٍ إعادة المحاولة…",
     "confirmRetry": "إعادة كل الرسائل الفاشلة إلى القائمة؟ افعل ذلك فقط بعد تعافي مزوّد البريد.",
     "retrySuccess": "أُعيدت {count} رسالة إلى القائمة",
+    "retryPartial": "أُعيدت {count} رسالة إلى القائمة؛ وتعذّرت قراءة {skipped} إدخال فنُقل جانبًا",
     "retryFailed": "فشلت إعادة المحاولة: {message}",
     "loading": "جارٍ التحميل…",
     "empty": "لا توجد رسائل فاشلة",

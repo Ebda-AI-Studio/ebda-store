@@ -39,9 +39,17 @@ import {
  * sentinel. The every-15-minutes cadence used to page a P1 ~670 times per
  * claim over its week, which is how a real P0 gets scrolled past.
  *
- * Bounded read (issue 2028): up to CLAIM_SCAN_LIMIT claims oldest-first, then
- * the resolutions for only those payments — never an unbounded cross-tenant
- * fetch of every refund event in the window.
+ * Bounded read (issue 2028): claims are read oldest-first in pages of
+ * CLAIM_PAGE_SIZE, each page followed by the resolutions for only that page's
+ * payments — never an unbounded cross-tenant fetch of every refund event.
+ *
+ * The bound is on UNRESOLVED claims, not raw rows (issue 2296): every
+ * successful refund writes a claim too, so a single 500-row read was spent
+ * almost entirely on resolved claims once refund volume passed ~500/week, and
+ * a genuinely stuck claim newer than the 500th never surfaced. Paging
+ * continues until CLAIM_SCAN_LIMIT unresolved claims are found, the window is
+ * exhausted, or CLAIM_MAX_PAGES pages were read — and only the last two cases
+ * can hide one, which is logged at warn, never silent.
  */
 
 /** Old enough that the request that made the claim is certainly over. */
@@ -51,8 +59,12 @@ const STUCK_AFTER_MINUTES = Number(process.env.REFUND_CLAIM_STUCK_MINUTES) || 15
  * is either reconciled by hand or not going to be because of this alert.
  */
 const MAX_AGE_MINUTES = Number(process.env.REFUND_CLAIM_MAX_AGE_MINUTES) || 7 * 24 * 60;
-/** Claims read per tick, oldest first. A truncated read is logged, never silent. */
+/** Unresolved claims collected per tick, oldest first. A truncated read is logged, never silent. */
 const CLAIM_SCAN_LIMIT = 500;
+/** Claim rows (resolved or not) read per page. */
+const CLAIM_PAGE_SIZE = 500;
+/** Hard ceiling on pages per tick (CLAIM_PAGE_SIZE × this raw rows). */
+const CLAIM_MAX_PAGES = 20;
 /** Ages (minutes) at which one claim is alerted — once each. */
 const ESCALATION_STAGES_MINUTES = [STUCK_AFTER_MINUTES, 24 * 60, 72 * 60];
 /** Resolution events: the claim's outcome is known. */
@@ -76,49 +88,67 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
   const floor = new Date(Date.now() - MAX_AGE_MINUTES * 60_000);
 
   const stuck: StuckClaim[] = await step.run('find-stuck-refund-claims', async () => {
-    const claimRows = await withRlsBypass(tx =>
-      tx.paymentEvent.findMany({
-        where: {
-          eventType: REFUND_CLAIM_EVENT,
-          occurredAt: { gt: floor, lt: new Date(cutoff) },
-        },
-        select: { paymentId: true, storeId: true, orderId: true, details: true, occurredAt: true },
-        orderBy: { occurredAt: 'asc' },
-        take: CLAIM_SCAN_LIMIT,
-      })
-    );
-    if (claimRows.length === CLAIM_SCAN_LIMIT) {
-      logger.warn(
-        { limit: CLAIM_SCAN_LIMIT },
-        '[refund-claim-stuck-sweep] claim scan hit its limit — newer claims are read on later ticks'
-      );
-    }
-    if (claimRows.length === 0) return [];
-    const paymentIds = [...new Set(claimRows.map(c => c.paymentId))];
-    const resolutionRows = await withRlsBypass(tx =>
-      tx.paymentEvent.findMany({
-        where: { eventType: { in: RESOLVING_EVENTS }, paymentId: { in: paymentIds } },
-        select: { details: true },
-      })
-    );
-    const resolved = new Set<string>();
-    for (const e of resolutionRows) {
-      const claimId = ((e.details ?? {}) as Record<string, unknown>).claimId;
-      if (typeof claimId === 'string') resolved.add(claimId);
-    }
     const claims: StuckClaim[] = [];
-    for (const e of claimRows) {
-      const details = (e.details ?? {}) as Record<string, unknown>;
-      const claimId = typeof details.claimId === 'string' ? details.claimId : null;
-      if (!claimId || resolved.has(claimId)) continue;
-      claims.push({
-        claimId,
-        paymentId: e.paymentId,
-        storeId: e.storeId,
-        orderId: e.orderId,
-        amount: typeof details.amount === 'number' ? details.amount : null,
-        claimedAt: e.occurredAt.toISOString(),
-      });
+    let cursorId: string | null = null;
+    let windowExhausted = false;
+    for (let page = 0; page < CLAIM_MAX_PAGES && claims.length < CLAIM_SCAN_LIMIT; page++) {
+      const claimRows = await withRlsBypass(tx =>
+        tx.paymentEvent.findMany({
+          where: {
+            eventType: REFUND_CLAIM_EVENT,
+            occurredAt: { gt: floor, lt: new Date(cutoff) },
+          },
+          select: {
+            id: true,
+            paymentId: true,
+            storeId: true,
+            orderId: true,
+            details: true,
+            occurredAt: true,
+          },
+          // `id` breaks occurredAt ties so the cursor is total.
+          orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+          take: CLAIM_PAGE_SIZE,
+          ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+        })
+      );
+      if (claimRows.length < CLAIM_PAGE_SIZE) windowExhausted = true;
+      if (claimRows.length === 0) break;
+      cursorId = claimRows[claimRows.length - 1].id;
+
+      const paymentIds = [...new Set(claimRows.map(c => c.paymentId))];
+      const resolutionRows = await withRlsBypass(tx =>
+        tx.paymentEvent.findMany({
+          where: { eventType: { in: RESOLVING_EVENTS }, paymentId: { in: paymentIds } },
+          select: { details: true },
+        })
+      );
+      const resolved = new Set<string>();
+      for (const e of resolutionRows) {
+        const claimId = ((e.details ?? {}) as Record<string, unknown>).claimId;
+        if (typeof claimId === 'string') resolved.add(claimId);
+      }
+      for (const e of claimRows) {
+        const details = (e.details ?? {}) as Record<string, unknown>;
+        const claimId = typeof details.claimId === 'string' ? details.claimId : null;
+        if (!claimId || resolved.has(claimId)) continue;
+        claims.push({
+          claimId,
+          paymentId: e.paymentId,
+          storeId: e.storeId,
+          orderId: e.orderId,
+          amount: typeof details.amount === 'number' ? details.amount : null,
+          claimedAt: e.occurredAt.toISOString(),
+        });
+        if (claims.length >= CLAIM_SCAN_LIMIT) break;
+      }
+      if (windowExhausted) break;
+    }
+    if (!windowExhausted) {
+      logger.warn(
+        { unresolvedLimit: CLAIM_SCAN_LIMIT, maxPages: CLAIM_MAX_PAGES, found: claims.length },
+        '[refund-claim-stuck-sweep] claim scan stopped before the window ended — newer unresolved claims are read on later ticks'
+      );
     }
     return claims;
   });

@@ -60,11 +60,19 @@ export default function EmailQueuePage() {
     setRetrying(true);
     setMessage(null);
     // apiPost resolves { data, error } (never throws), so branch on error.
-    const res = await apiPost<{ retried: number }>('/admin/email-queue/failed/retry', {});
+    const res = await apiPost<{ retried: number; skipped?: number }>(
+      '/admin/email-queue/failed/retry',
+      {}
+    );
     if (res.error) {
       setMessage(t('retryFailed', { message: res.error.message || 'error' }));
     } else {
-      setMessage(t('retrySuccess', { count: res.data?.retried ?? 0 }));
+      const skipped = res.data?.skipped ?? 0;
+      setMessage(
+        skipped > 0
+          ? t('retryPartial', { count: res.data?.retried ?? 0, skipped })
+          : t('retrySuccess', { count: res.data?.retried ?? 0 })
+      );
       await fetchFailed();
     }
     setRetrying(false);

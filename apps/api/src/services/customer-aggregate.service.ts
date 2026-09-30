@@ -94,6 +94,16 @@ export function formatShippingAddress(addr: ShippingAddressShape | null): string
 const KPI_EXCLUDED_STATUSES = new Set(['cancelled', 'refunded']);
 
 /**
+ * An order counts toward spend unless it is cancelled/refunded OR its payment
+ * FAILED (owner decision 2026-10-01, issue 2235, ruling AUI-1a). An unpaid
+ * order whose payment has not failed — a COD order not yet delivered — still
+ * counts. Same population as `analytics.service.ts` revenue.
+ */
+export function countsTowardSpend(status: string, paymentStatus: string): boolean {
+  return !KPI_EXCLUDED_STATUSES.has(status) && paymentStatus !== 'failed';
+}
+
+/**
  * Store-wide KPI strip for the Customers page. Computed over the WHOLE
  * aggregated set (never the current page, search or segment), so it
  * describes the store. A rate/average with no denominator is `null` —
@@ -328,7 +338,7 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
     }
     if (status) statusSet.add(status);
 
-    if (!KPI_EXCLUDED_STATUSES.has(status)) {
+    if (countsTowardSpend(status, paymentStatus)) {
       const counted = countedByKey.get(key) ?? { orders: 0, spent: 0 };
       counted.orders += 1;
       counted.spent += order.total;

@@ -274,7 +274,7 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     });
 
     await expect(
-      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID)
     ).rejects.toThrow('Cannot transition from cancelled to refunded');
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('cancelled', 'refunded');
@@ -292,7 +292,7 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     });
     assertValidTransitionMock.mockImplementation(() => undefined);
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('shipped', 'refunded');
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
@@ -321,7 +321,7 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     applyRefundEffects.mockRejectedValueOnce(new Error('GL reversal failed'));
 
     await expect(
-      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID)
     ).rejects.toThrow('GL reversal failed');
 
     // The order flip and the durable idempotency write both sit AFTER the
@@ -345,7 +345,7 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     });
 
     await expect(
-      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID)
     ).rejects.toThrow('Cannot transition from refunded to confirmed');
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('refunded', 'confirmed');
@@ -364,7 +364,7 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     });
     assertValidTransitionMock.mockImplementation(() => undefined);
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('pending', 'confirmed');
     expect(orderUpdate).toHaveBeenCalledWith({
@@ -425,7 +425,7 @@ describe('handleWebhook write ordering — payment write vs order-transition ass
     });
 
     await expect(
-      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID)
     ).rejects.toThrow('Cannot transition from cancelled to confirmed');
 
     expect(orderUpdate).not.toHaveBeenCalled();
@@ -445,7 +445,7 @@ describe('handleWebhook write ordering — payment write vs order-transition ass
     applyRefundEffects.mockRejectedValueOnce(new Error('inngest event API down'));
 
     await expect(
-      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID)
     ).rejects.toThrow('inngest event API down');
 
     // metadata.refundStatus (the branch's idempotency key) must NOT be
@@ -465,7 +465,7 @@ describe('handleWebhook write ordering — payment write vs order-transition ass
     orderUpdate.mockRejectedValueOnce(new Error('connection reset'));
 
     await expect(
-      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID)
     ).rejects.toThrow('connection reset');
 
     expect(paymentUpdate).not.toHaveBeenCalled();
@@ -482,7 +482,7 @@ describe('handleWebhook write ordering — payment write vs order-transition ass
     applyRefundEffects.mockResolvedValue(undefined);
     orderUpdate.mockResolvedValue({});
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(applyRefundEffects).toHaveBeenCalled();
     expect(paymentUpdate).toHaveBeenCalled();
@@ -565,7 +565,7 @@ describe('refund webhook — refundedAmount is a cumulative budget, not a scratc
     assertValidTransitionMock.mockImplementation(() => undefined);
     applyRefundEffects.mockResolvedValue(undefined);
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(refundWrite()?.status, 'the payment is settled').toBe('refunded');
     expect(
@@ -594,7 +594,7 @@ describe('refund webhook — refundedAmount is a cumulative budget, not a scratc
     });
     assertValidTransitionMock.mockImplementation(() => undefined);
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(applyRefundEffects, 'the order is already reversed').not.toHaveBeenCalled();
   });
@@ -603,7 +603,7 @@ describe('refund webhook — refundedAmount is a cumulative budget, not a scratc
     // 3000 already refunded in-band; this webhook reports its own 2000 slice.
     paymentWith(3000, 'partially_refunded');
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     const w = refundWrite();
     expect(w?.refundedAmount, 'writing 2000 here would erase 1000 of real refunds').toBe(3000);
@@ -612,7 +612,7 @@ describe('refund webhook — refundedAmount is a cumulative budget, not a scratc
   it('does not force a terminal status while a balance remains', async () => {
     paymentWith(3000, 'partially_refunded');
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     // 3000 of 5000 refunded — still partially refunded, so ReturnService can
     // still accept it for the remaining 2000.
@@ -624,7 +624,7 @@ describe('refund webhook — refundedAmount is a cumulative budget, not a scratc
     // this webhook is the first evidence of it.
     paymentWith(0, 'completed');
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(refundWrite()?.refundedAmount).toBe(2000);
     expect(refundWrite()?.status).toBe('partially_refunded');
@@ -651,7 +651,7 @@ describe('refund webhook — refundedAmount is a cumulative budget, not a scratc
       refund: { status: 'completed', refundId: 'rf_full', amount: 5000 }, // the whole payment
     });
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(applyRefundEffects).toHaveBeenCalledOnce();
     expect(refundWrite()?.status).toBe('refunded');
@@ -660,7 +660,7 @@ describe('refund webhook — refundedAmount is a cumulative budget, not a scratc
   it('marks the payment refunded only when the arithmetic says it is settled', async () => {
     paymentWith(5000, 'partially_refunded');
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(refundWrite()?.status).toBe('refunded');
     expect(refundWrite()?.refundedAmount).toBe(5000);
@@ -717,7 +717,7 @@ describe('refund webhook — whole-order effects only for a refund that exhausts
   it('a PARTIAL out-of-band refund runs no whole-order reversal and does not flip the order', async () => {
     outOfBandRefundOf(2000);
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(
       applyRefundEffects,
@@ -732,7 +732,7 @@ describe('refund webhook — whole-order effects only for a refund that exhausts
   it('a refund that EXHAUSTS the payment still runs the whole-order reversal + order flip', async () => {
     outOfBandRefundOf(5000);
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
     expect(orderUpdate).toHaveBeenCalledWith({
@@ -749,7 +749,7 @@ describe('refund webhook — whole-order effects only for a refund that exhausts
     // its worst form (whole-order reversal ran, full amount still refundable).
     outOfBandRefundOf(undefined);
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
     expect(refundWrite()?.status).toBe('refunded');
@@ -810,7 +810,7 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
       { refundId: 'rf_new' }
     );
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(await alertSources()).toContain('payment.refund.held_unaccounted');
   });
@@ -825,7 +825,7 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
       { refundId: 'rf_new', amount: 3000 }
     );
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(await alertSources()).toContain('payment.refund.held_provenance_unknown');
     expect(await alertSources()).not.toContain('payment.refund.held_unaccounted');
@@ -841,7 +841,7 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
       { refundId: 'rf_a', amount: 2000 }
     );
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(await alertSources()).toEqual([]);
   });
@@ -860,7 +860,7 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
       }
     );
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(recordRefundOutsideReturn).toHaveBeenCalledOnce();
     expect(recordRefundOutsideReturn).toHaveBeenCalledWith(STORE_ID, ORDER_ID, {
@@ -881,7 +881,7 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
       { refundId: 'rf_p', amount: 2000 }
     );
 
-    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig', STORE_ID);
 
     expect(recordRefundOutsideReturn).not.toHaveBeenCalled();
   });
@@ -976,7 +976,7 @@ describe('handleWebhook — a provider id matching MORE than one payment is refu
     paymentFindManyOverride = async () => [row('pay-a', 'store-a'), row('pay-b', 'store-b')];
     try {
       await expect(
-        PaymentService.handleWebhook('myfatoorah', { fake: true })
+        PaymentService.handleWebhook('myfatoorah', { fake: true }, 'sig')
       ).rejects.toMatchObject({ statusCode: 409, code: 'AMBIGUOUS_PAYMENT' });
       expect(paymentUpdateMany).not.toHaveBeenCalled();
       expect(paymentUpdate).not.toHaveBeenCalled();
@@ -999,4 +999,30 @@ describe('handleWebhook — a provider id matching MORE than one payment is refu
       paymentFindManyOverride = null;
     }
   });
+});
+
+/**
+ * Issue 2065 (owner decision 2026-10-01, ruling RL-2a): a webhook is saved
+ * first but NEVER acted on until its signature verifies. `handleWebhook` used
+ * to skip verification entirely when no signature was passed (fail-open).
+ * Mutation-proof: restoring `if (signature) { verify }` reddens the first case.
+ */
+describe('PaymentService.handleWebhook — never acts before a signature verifies (issue 2065)', () => {
+  it.each([undefined, ''])(
+    'signature %j is refused before anything is read or written',
+    async sig => {
+      vi.clearAllMocks();
+      await expect(
+        PaymentService.handleWebhook(
+          'myfatoorah',
+          { fake: true },
+          sig as string | undefined,
+          STORE_ID
+        )
+      ).rejects.toMatchObject({ statusCode: 400, code: 'MISSING_SIGNATURE' });
+      expect(providerParseWebhook).not.toHaveBeenCalled();
+      expect(paymentUpdateMany).not.toHaveBeenCalled();
+      expect(paymentUpdate).not.toHaveBeenCalled();
+    }
+  );
 });

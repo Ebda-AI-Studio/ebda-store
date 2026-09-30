@@ -15,6 +15,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { withRlsBypass } from '@force/database';
 import { OrderService } from '@api/services/order.service';
+import {
+  handleOrderRefunded,
+  ADMIN_COUPON_RESERVE_CUTOVER,
+} from '@api/lib/inngest/functions/order-refunded';
 import { CouponService } from '@api/services/coupon.service';
 import { hasDb, seedBundleStore, DEFAULT_TEST_SHIPPING_ADDRESS } from '../helpers/bundle-fixtures';
 
@@ -240,5 +244,41 @@ describe.skipIf(!hasDb)('admin order coupon rules (#1370)', () => {
     await expect(
       order(fx, { overrideCouponRules: true, couponOverrideReason: 'try anyway' })
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+// issue 2303 — an admin order created BEFORE admin orders reserved their
+// coupon never incremented usageCount, so its cancel must not decrement:
+// that handed another customer's live redemption back to the limit.
+describe.skipIf(!hasDb)('cancelling a pre-cutover admin order (issue 2303)', () => {
+  const stepStub = { run: <T>(_id: string, fn: () => Promise<T>) => fn() };
+  const before = new Date(ADMIN_COUPON_RESERVE_CUTOVER.getTime() - 86_400_000);
+
+  it('does not give back a redemption the order never took', async () => {
+    const fx = await fixture();
+    const o = await order(fx);
+    // Recreate the pre-cutover state: the order is older than the cutover and
+    // its create did not count — the 3 uses on the coupon are other customers'.
+    await withRlsBypass(async tx => {
+      await tx.order.update({ where: { id: o.id }, data: { createdAt: before } });
+      await tx.coupon.update({ where: { id: fx.couponId }, data: { usageCount: 3 } });
+      await tx.auditLog.create({
+        data: { action: 'order.admin_created', resourceType: 'order', resourceId: o.id },
+      });
+    });
+
+    await handleOrderRefunded(o.id, fx.storeId, false, false, stepStub);
+    expect(await usage(fx.couponId)).toBe(3);
+    // Redelivery is a no-op too.
+    await handleOrderRefunded(o.id, fx.storeId, false, false, stepStub);
+    expect(await usage(fx.couponId)).toBe(3);
+  });
+
+  it('a post-cutover admin order reserved its use, so its cancel gives it back', async () => {
+    const fx = await fixture();
+    const o = await order(fx);
+    expect(await usage(fx.couponId)).toBe(1);
+    await handleOrderRefunded(o.id, fx.storeId, false, false, stepStub);
+    expect(await usage(fx.couponId)).toBe(0);
   });
 });

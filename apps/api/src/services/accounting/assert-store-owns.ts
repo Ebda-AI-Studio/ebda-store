@@ -124,9 +124,13 @@ export async function assertStoreOwns(
  *   `runInTenantContext` would take a SECOND pool connection while the outer
  *   one is held (the double-nest `routes/index.ts` warns about) and read a
  *   different snapshot from the writes it guards.
- * - No ambient context (Inngest: expense OCR, reorder suggestions): open a
- *   tenant-scoped transaction for the guard alone, so a GUC-less read under
- *   RLS cannot 404 every legitimately-owned id.
+ * - No ambient context: open a tenant-scoped transaction for the GUARD ALONE,
+ *   so a GUC-less read under RLS cannot 404 every legitimately-owned id.
+ *   This does NOT scope the caller's writes (issue 2291) — a service that can
+ *   be reached with no ambient context must scope its whole body itself
+ *   (`createExpense` wraps itself in `runInTenantContext`; the purchase-order
+ *   and stock-adjustment writers are only reached through routes that wrap
+ *   the call).
  */
 export async function assertStoreOwnsInTenantScope(
   storeId: string,

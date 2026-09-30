@@ -512,7 +512,17 @@ export async function postAmountOnlyRefundJournal(args: {
     where: { storeId, source: 'order', sourceId },
     select: { id: true },
   });
-  if (existing) return { posted: 0, skipped: 'already-posted' };
+  if (existing) {
+    // Observable, not silent (issue 2310): a skip here means the SAME key was
+    // booked before. If two paths ever disagree on the key for one refund,
+    // the second books under a different key and this line never fires —
+    // which is why the in-band path refuses to invent a key at all.
+    logger.warn(
+      { storeId, orderId, sourceId, amount },
+      '[partial-return-posting] amount-only refund already booked under this key — skipped'
+    );
+    return { posted: 0, skipped: 'already-posted' };
+  }
 
   const sale = await tx.journalEntry.findFirst({
     where: { storeId, source: 'order', sourceId: orderId },

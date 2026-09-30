@@ -414,6 +414,7 @@ interface AdvancedSearchOptions {
   tags?: string[];
   minPrice?: number;
   maxPrice?: number;
+  /** Tri-state: undefined = no filter; true / false filter (false = complement). */
   inStock?: boolean;
   onSale?: boolean;
   isNew?: boolean;
@@ -2065,36 +2066,43 @@ export class ProductService {
     // negative), so filtering on that column alone excluded EVERY variant
     // product from in-stock results, permanently. Expressed as relation
     // filters so this stays one query. See lib/effective-inventory.ts.
+    //
+    // Tri-state (issues 2318 / 2325): the route forwards `undefined | true |
+    // false` and documents `false` as a filter, so every flag below honours
+    // `false` as the exact complement of its `true` branch — never as "no
+    // filter", which answered `?featured=false` with every product.
+    const inStockBranches: Prisma.ProductWhereInput[] = [
+      // No variants: the product column is the stock.
+      { variants: { none: {} }, inventory: { gt: 0 } },
+      // Has variants: at least one ACTIVE one carries stock (#1103).
+      { variants: { some: { isActive: true, inventory: { gt: 0 } } } },
+    ];
+    const and = (extra: Prisma.ProductWhereInput) => {
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), extra];
+    };
     if (inStock === true) {
-      where.OR = [
-        ...(where.OR || []),
-        { trackInventory: false },
-        // No variants: the product column is the stock.
-        { variants: { none: {} }, inventory: { gt: 0 } },
-        // Has variants: at least one ACTIVE one carries stock (#1103).
-        { variants: { some: { isActive: true, inventory: { gt: 0 } } } },
-      ];
+      where.OR = [...(where.OR || []), { trackInventory: false }, ...inStockBranches];
+    } else if (inStock === false) {
+      // Complement of the OR above: tracked, and neither stock branch holds.
+      and({ trackInventory: true, NOT: inStockBranches });
     }
 
-    // On sale filter (has compare price higher than regular price)
+    // On sale filter (has a compare-at price)
     if (onSale === true) {
       where.compareAtPrice = { not: null };
-      where.AND = [
-        ...(Array.isArray(where.AND) ? where.AND : []),
-        {
-          compareAtPrice: { gt: 0 },
-        },
-      ];
+      and({ compareAtPrice: { gt: 0 } });
+    } else if (onSale === false) {
+      and({ OR: [{ compareAtPrice: null }, { compareAtPrice: { lte: 0 } }] });
     }
 
     // New arrivals filter
-    if (isNew === true) {
-      where.isNew = true;
+    if (isNew !== undefined) {
+      where.isNew = isNew;
     }
 
     // Featured filter
-    if (featured === true) {
-      where.featured = true;
+    if (featured !== undefined) {
+      where.featured = featured;
     }
 
     // Build order by clause

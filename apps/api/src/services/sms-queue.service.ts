@@ -279,28 +279,42 @@ class SmsQueueService {
   }
 
   /**
-   * Retry failed SMS messages
+   * Re-queue every dead-lettered SMS. Same hardening as the email queue's
+   * `retryFailed` (issue 2292): each entry parsed on its own, an unreadable
+   * one moved to `sms:failed:corrupt` instead of being destroyed by a throw
+   * after `rpop`, and the loop bounded by the list length at the start.
    */
-  async retryFailed(): Promise<number> {
-    if (!redis.isAvailable()) return 0;
+  async retryFailed(): Promise<{ retried: number; skipped: number }> {
+    if (!redis.isAvailable()) return { retried: 0, skipped: 0 };
 
     const client = redis.getClient();
+    if (!client) return { retried: 0, skipped: 0 };
     let retried = 0;
+    let skipped = 0;
 
-    while (true) {
-      const smsJson = await client?.rpop(FAILED_KEY);
+    const total = await client.llen(FAILED_KEY);
+    for (let i = 0; i < total; i++) {
+      const smsJson = await client.rpop(FAILED_KEY);
       if (!smsJson) break;
 
-      const sms: QueuedSms = JSON.parse(smsJson);
+      let sms: QueuedSms;
+      try {
+        sms = JSON.parse(smsJson) as QueuedSms;
+        if (!sms || typeof sms !== 'object') throw new Error('bad shape');
+      } catch {
+        await client.lpush(`${FAILED_KEY}:corrupt`, smsJson);
+        skipped++;
+        continue;
+      }
       sms.attempts = 0;
       sms.error = undefined;
 
-      await client?.lpush(QUEUE_KEY, JSON.stringify(sms));
+      await client.lpush(QUEUE_KEY, JSON.stringify(sms));
       retried++;
     }
 
-    logger.info({ retried }, '[SMS QUEUE] Retrying failed SMS messages');
-    return retried;
+    logger.info({ retried, skipped }, '[SMS QUEUE] Retrying failed SMS messages');
+    return { retried, skipped };
   }
 }
 

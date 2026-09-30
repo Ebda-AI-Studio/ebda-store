@@ -27,6 +27,10 @@ import {
   type EmailDir,
 } from './email-templates/_layout';
 import { orderRefundedTemplate } from './email-templates/order-refunded';
+import {
+  orderCancelledNotChargedTemplate,
+  type OrderCancelledEmailData,
+} from './email-templates/order-cancelled-not-charged';
 import { paymentSuccessTemplate } from './email-templates/payment-success';
 import { paymentFailedTemplate } from './email-templates/payment-failed';
 import { orderShippedTemplate } from './email-templates/order-shipped';
@@ -468,6 +472,39 @@ export class EmailService {
     await this.sendForStore(
       storeId,
       { to: data.customerEmail, subject, content, language: lang },
+      { queue: true }
+    );
+  }
+
+  /**
+   * The customer's notice when an order is cancelled before any refund has
+   * moved (issue 1948): "You were not charged." when the payment was never
+   * captured, "Your refund is being processed." when it was (`data.charged`).
+   */
+  static async sendOrderCancelledNotCharged(
+    storeId: string,
+    data: OrderCancelledEmailData,
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    if (!data.customerEmail) return;
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, settings: true },
+    });
+    if (!store) throw new Error(`Store ${storeId} not found`);
+    const lang: 'en' | 'ar' =
+      language ??
+      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
+        ? 'ar'
+        : 'en');
+    await this.sendForStore(
+      storeId,
+      {
+        to: data.customerEmail,
+        subject: orderCancelledNotChargedTemplate.subject[lang](data),
+        content: orderCancelledNotChargedTemplate[lang](data),
+        language: lang,
+      },
       { queue: true }
     );
   }

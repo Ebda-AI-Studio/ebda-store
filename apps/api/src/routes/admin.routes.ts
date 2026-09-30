@@ -1391,6 +1391,32 @@ router.get(
 );
 
 /**
+ * Every snapshot row of the newest `months` distinct periods (issue 2329).
+ *
+ * The period pick is a `groupBy`, which Postgres evaluates as a
+ * GROUP BY … ORDER BY … LIMIT. The previous `findMany({ distinct, take })`
+ * returned ONE period for months=3 over 3 stores × 3 months — reproduced on
+ * Postgres (tests/integration/usage-history-periods.test.ts): Prisma's
+ * in-memory `distinct` over this `@db.Date` column did not collapse the
+ * newest month's rows, so the viewer showed one period as the whole history.
+ * (A string-key sibling — the warehouse backfill's `distinct` + `skip` /
+ * `take` over 240 rows — was checked the same way and pages correctly.)
+ */
+export async function loadUsageHistoryRows(tx: Prisma.TransactionClient, months: number) {
+  const periods = await tx.storeUsageSnapshot.groupBy({
+    by: ['periodStart'],
+    orderBy: { periodStart: 'desc' },
+    take: months,
+  });
+  if (periods.length === 0) return [];
+  return tx.storeUsageSnapshot.findMany({
+    where: { periodStart: { in: periods.map(p => p.periodStart) } },
+    orderBy: [{ periodStart: 'desc' }],
+    include: { store: { select: { slug: true, name: true, plan: true } } },
+  });
+}
+
+/**
  * GET /admin/super-admin/usage-history?months=12
  *
  * The per-store monthly usage history written by the `store-usage-snapshot`
@@ -1416,20 +1442,7 @@ router.get(
       // a platform past 200 stores, so older months came back silently partial
       // while the viewer rendered them as complete. Pick the newest `months`
       // distinct periods first, then read every row of those periods.
-      const rows = await withRlsBypass(async tx => {
-        const periods = await tx.storeUsageSnapshot.findMany({
-          distinct: ['periodStart'],
-          orderBy: [{ periodStart: 'desc' }],
-          take: months,
-          select: { periodStart: true },
-        });
-        if (periods.length === 0) return [];
-        return tx.storeUsageSnapshot.findMany({
-          where: { periodStart: { in: periods.map(p => p.periodStart) } },
-          orderBy: [{ periodStart: 'desc' }],
-          include: { store: { select: { slug: true, name: true, plan: true } } },
-        });
-      });
+      const rows = await withRlsBypass(tx => loadUsageHistoryRows(tx, months));
 
       const byPeriod = new Map<string, Array<Record<string, unknown>>>();
       for (const r of rows) {
@@ -2063,17 +2076,17 @@ router.post(
   requireRole(['super_admin']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const retried = await emailQueue.retryFailed();
+      const { retried, skipped } = await emailQueue.retryFailed();
       await auditLog({
         action: 'email_queue.retry_failed',
         userId: req.user!.userId,
         resourceType: 'setting',
         resourceId: 'email:failed',
-        details: { retried },
+        details: { retried, skipped },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res.json({ success: true, data: { retried } });
+      res.json({ success: true, data: { retried, skipped } });
     } catch (err) {
       next(err);
     }

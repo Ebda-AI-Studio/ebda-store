@@ -3741,6 +3741,17 @@ platform-wide one-at-a-time would undo #1955. Cost if wrong: a skipped pacer
 slot is a one-interval gap in the platform cadence, never a burst, and a very
 large campaign takes more (short) steps.
 
+**Amended (issues 2298, 2297, backlog batch x-api):** the cost-if-wrong above was false. The pacer
+reserved the slot BEFORE deciding to defer, so each deferral removed one platform slot for zero
+emails; under load every deferral pushed the shared horizon further out and no store sent again. The
+reservation is now conditional (the Lua script and the in-process twin both leave the horizon
+untouched when the wait exceeds the caller's budget), so a deferral costs nothing. And a run whose
+leftover passes hit their cap (200 passes, now also 400 leftover steps) used to finalize the campaign
+as `sent` with recipients still `queued`, uncounted and unalerted; `finalize` now fails them with
+`SEND_WINDOW_EXHAUSTED` and raises a P1 (`campaign.send.window_exhausted`). Cost if wrong: a campaign
+that genuinely cannot get a slot for 400 steps ends with those recipients failed, not retried
+automatically — the merchant sees them in the failed count and the operator is paged.
+
 **Ruling CL-14 — disabling a stocked variant is recorded and its value shown,
 but no journal entry is posted (issue 2146).** The flip writes a zero-quantity
 `inventory_history` marker and the finance dashboard shows "held on disabled
@@ -3803,7 +3814,15 @@ and replayable at the super-admin page `/email-queue` (R2-8's "no UI" residual i
 Redis down, the inline send now rejects to its caller, so the #1935 gate and Inngest step retries
 see that failure. The `refund_notified` claim is NOT released on a delivery failure — replaying the
 dead-lettered email from `/email-queue` is the recovery, and it cannot double-notify. Cost if wrong:
-the customer is told late — after the P1 alert and an operator's replay.
+the customer is told late — after the P1 alert and an operator's replay. **Amended (issue 2292,
+backlog batch x-api):** an email whose re-queue PUSH is rejected while Redis is still reachable is
+now parked in `email:failed` before the P1 (it used to page the operator to a page that could not
+list it), and the alert says so when it truly could not be saved (Redis gone). The page's "Retry
+all" parses each entry on its own: an unreadable entry is moved to `email:failed:corrupt` and
+counted as skipped (shown as a partial result, EN + AR) instead of being destroyed by a throw that
+also stranded every entry behind it. Cost if wrong: an entry in `email:failed:corrupt` is never
+replayed automatically — it has no UI and needs `railway connect Redis` to inspect. Setting entries aside raises a P1 (`email.queue.corrupt_entries`) naming the count and the list (PR
+2335 audit), so it is never silent.
 
 **Ruling BS-4 — issues 1989 / 1991 amend SN-4: the one retry now matches the error Prisma really
 throws, and it is suspended for 5s after a read whose retry also failed; there is still no
@@ -3992,6 +4011,18 @@ writes the payment row in the request, so its event rides the request commit.
 A failed send on the order-page path raises the `partial_no_gl` P1 instead of
 failing a refund that already happened; no sweep re-sends it. Cost if wrong:
 that one refund's GL entry is booked by hand from the alert.
+**Amended (issue 2310, backlog batch x-api):** the order-page path no longer books under an invented
+key. When the provider returns NO refund id it used to fall back to `claim-<claimId>`, a key the
+provider's settle webhook (which carries the real id) never repeats — so one refund could book
+twice. With no id there is no key both paths share, so the in-band path books nothing and raises the
+`partial_no_gl` P1 (saying why); the settle webhook, if the provider sends one, books it under the
+real id. `postAmountOnlyRefundJournal` now logs its `already-posted` skip at warn with the amount.
+Residual, unchanged by this: the same id-less refund's settle webhook is also read as a NEW refund
+by `resolveRefundSettlement` (the id was never filed in `refundEventIds`), so the payment's
+`refundedAmount` can count it twice. Cost if wrong: an id-less partial refund is booked by hand, or
+by its webhook, and its payment balance may read short by that amount until reconciled — none of
+the four provider adapters is written to expect an id-less answer (each reads one from the refund
+response; whether a provider can omit it was not verified against its docs).
 
 **Ruling OMD-5 — 2150 Customer Wallet Liability only ever grows.** It is
 credited by partial returns into the wallet (store credit with the wallet on,
@@ -4087,6 +4118,23 @@ rule a PO-fulfilled non-variant backorder, like a cancelled one, does not return
 really on hand when it was backordered — stock can read low by up to that amount, never high; and a
 pre-migration variant backorder cancelled whole still over-restores, as before.
 
+**Ruling AP-5e — the two backorder surfaces AP-5c/AP-5d did not reach (issues 2302, 2316, backlog
+batch x-api).** (1) AP-5d stated that after a PO fulfils a line "a cancel's restore is units coming
+back from the customer, which are real", but the whole-order restore subtracted `qty − stock_taken`
+unconditionally, so a PO-fulfilled variant backorder cancelled whole restored 2 of 5 real units. It now
+subtracts `qty − stock_taken − qty_fulfilled` (floored at 0), which is what AP-5d said. (2) A PARTIAL
+return's `cancel-backorders` step released the returned item's open backorder lines with a bare
+`updateMany`, so a non-variant product kept the released units' negative debt for ever — the AP-5c
+defect on a surface AP-5c did not name. The step now claims each released line, heals it with the
+AP-5c rule and helper in the same `withMoneyTx`, and records `stockRestored` on a new
+`backorder_release_healed` orderEvent that the whole-order restore subtracts. It is deliberately not
+the `backorder_line_cancelled` marker, which `loadPriorReversedQty` counts for the GL: a fanout release
+is already the Return row's quantity there. Proven in
+`tests/integration/accounting/backorder-cancel-stock-heal.test.ts` (3 more tests, 15 total); reverting
+`order-refunded.ts` turns all three red. Cost if wrong: same as AP-5c — the units really on hand when
+the line was backordered are not returned by the release, so stock can read low by up to that amount,
+never high.
+
 **Ruling M-OVR-1 — admin/manual orders ENFORCE a coupon's rules by default; a store admin may override
 them, recorded (owner decision, Ahmad 2026-09-25, #1370).** `createAdminOrder` used to check only the
 coupon's dates, store-wide limit and minimum, never its targeting, and discounted the WHOLE subtotal —
@@ -4117,6 +4165,22 @@ mutation survived by design: dropping `isActive` from the coupon lookup leaves t
 `isActive: true` guard to refuse an inactive coupon (404), so the belt holds without the braces. Cost if
 wrong: a store admin can still give any coupon to any order — but never silently, and never as staff.
 
+**Ruling M-OVR-1a — cancelling an admin order created before admin orders reserved their coupon does
+not decrement `usageCount` (issue 2303, backlog batch x-api).** M-OVR-1 made admin orders reserve the
+redemption from PR 2300 on, but every earlier admin order never counted, and the fanout's
+reverse-coupon step still decremented on its cancel — handing another customer's live redemption back
+to the limit, the defect M-OVR-1 says it closes. No forward marker can fix rows that already exist, and
+a backfill would be a production data write, so the step now classifies the legacy row instead: an
+order created before `ADMIN_COUPON_RESERVE_CUTOVER` (the PR 2300 merge, 2026-09-30T11:47:49Z) that has
+an `order.admin_created` audit row is skipped and marked `coupon_reversed` (`metadata.skipped =
+admin_order_never_reserved`) so a redelivery skips it cheaply. Checkout orders always reserved and are
+unchanged. `rollbackForPaymentFailure`'s decrement gained the same `usageCount > 0` floor as the fanout.
+Proven in `tests/integration/admin-order-coupon-rules.test.ts` (2 more tests); disabling the guard turns
+the pre-cutover test red. Cost if wrong: two residual windows, both the old behaviour — an admin order
+created between the PR 2300 merge and its deploy did not reserve but is treated as reserved (its cancel
+still decrements), and a pre-cutover admin order whose best-effort audit row failed to write is
+treated as a checkout order (same).
+
 ## Backlog batch d-routes-mcp (2026-10-01)
 
 **Ruling DRM-1 — the AI product feed keeps its 600s cache and 24h edge SWR across a bundle's
@@ -4130,6 +4194,14 @@ change. Every selling path (cart add, order-create) re-resolves the bundle live 
 expired one. The WhatsApp catalogue calls `listPurchasableBundles` uncached, so it is exact.
 Cost if wrong: an AI shopping agent can recommend a promotional bundle for up to ~10 minutes (edge
 SWR aside) after it expired, and the shopper is refused at add-to-cart.
+**Superseded (issues 2327, 2328, backlog batch x-api):** the feed now does what the bundle routes do.
+Its cache key is `public:products:<id>:feed:v2` and holds the feed's INPUTS with each bundle's
+window (`listSellableBundles`), not the built feed; `withinSaleWindow` is applied per request, and
+the edge `s-maxage` + `stale-while-revalidate` are capped so they end before the nearest future
+`startsAt`/`expiresAt` (`nextSaleWindowBoundarySeconds`) — a store with no dated bundle keeps
+600s / 24h. The WhatsApp catalogue keeps `listPurchasableBundles` (uncached, window applied at
+call time). Cost if wrong: a store with a boundary coming up gets edge misses on its feed until it
+passes (at most one origin render per request in the last seconds before it).
 
 **Ruling DRM-2 — receipt uploads keep the shared 2000px ceiling (issue 1049, declined with a
 measurement).** The finding was reasoning-only ("may degrade OCR"), so it was measured on
@@ -4395,3 +4467,96 @@ so it can run before the code that reads it ships. Proven: every surface with th
 pixel-identical to origin/main (screenshot diff = 0). Cost if wrong: if the script is not run (or its
 edge-cache check not waited for) before deploy, pecannbee shows the top-corner badge until the flag
 lands — the run order in the PR body is the control.
+
+## Backlog batch x-api (2026-10-01, branch `fix/backlog-x-api`)
+
+Amendments made in this batch are written next to the rulings they amend: CL-13 (issues 2297,
+2298), AP-5e (issues 2302, 2316), M-OVR-1a (issue 2303), DRM-1 (issues 2327, 2328), BS-3 (issue
+2292), OMD-4 (issue 2310).
+
+**Ruling XAPI-1 — an unrecognised boolean query value is a 400, not a silent `false` (issue 2319,
+accepted residual).** `parseOptionalBooleanQuery` accepts only `true`/`false` on
+`GET /public/products` (`featured`) and the admin product list/search (`featured`, `inStock`,
+`onSale`, `isNew`); anything else (`''`, `1`, `0`, `yes`, `TRUE`, a repeated param) answers 400
+`VALIDATION_ERROR`, where before PR 2315 it silently meant "no filter". Every in-repo caller was
+checked and sends only the literal `true`/`false` (the audit's own enumeration: web `api.ts`,
+`ProductsClient`, `HomePageBody`, `rls-payload-parity.mjs`; nothing in admin sends these params).
+Not checked, because this lane may not read production logs: out-of-repo callers — the WhatsApp
+bridge repo, merchant integrations, saved links carrying `?featured=1`. Coercing legacy values was
+declined: `1` never meant "featured only" before (it meant no filter), so any coercion would change
+an answer silently, which is the defect PR 2315 fixed. Cost if wrong: an out-of-repo caller sending
+a legacy value gets a 400 on a listing that used to return 200; settle it by grepping 7 days of
+API/Cloudflare logs for `featured=` values other than `true`/`false`.
+
+**Ruling XAPI-2 — a process killed between the denial row's insert and its pointer publish still
+suppresses that window's count for up to 45s (issue 2330, accepted residual).** The fix releases
+the `pending` reservation whenever the publish FAILS, so a Redis error falls back to per-attempt
+rows. A process terminated between the insert and the publish (a deploy mid-flood) cannot run that
+release; the reservation then expires on its own TTL (`DENIAL_ROW_PENDING_TTL_SECONDS`, 45s — kept
+longer than the insert's 40s transaction envelope so a slow insert cannot lose its slot). A shorter
+"stale pending" takeover was declined: under a flood with a contended pool it would make every
+repeat open its own tenant transaction, the DoS surface the coalescing exists to close. Cost if
+wrong: one flood window reads `count: 1` for ≤45s if the API is killed at that exact moment.
+
+**Owner decisions of 2026-10-01 (Ahmad: "do what you recommend"), implemented in this batch.**
+
+**Ruling TAX-1 — VAT is charged on `Store.taxEnabled` alone, at the SUM of the active rates
+(issues 2166, 2114; amends M3-9 and CL-11).** Collection is a legal obligation, not a plan feature:
+`resolveActiveTaxRate` no longer reads the plan-derived `tax` feature, so a store that lapses to
+`free` keeps collecting (the feature still gates the admin tax pages). Several active rates are
+charged as their sum (5% + 2% → 7%, summed in hundredths so 0.1 + 0.2 = 0.3), and the storefront
+label shows that same figure. `country`/`state`, `isCompound` and `TaxSettings.defaultTaxRate` are
+still not read. Production has 0 `tax_rates` rows and `taxEnabled: false` on every live store
+(M3-9), so nothing charged today changes. Cost if wrong: a merchant who configured a compound or
+country-specific rate is charged the plain sum; a free-plan merchant cannot open the tax page to
+switch VAT off (they can ask support, or upgrade).
+
+**Ruling AUI-1a — revenue excludes FAILED payments; unpaid COD still counts (issue 2235; amends
+AUI-1).** The dashboard (`getPeriodStats`, profit, sales series, top products, top categories, top
+customers) and the Customers KPI strip (`countsTowardSpend`) move together, as AUI-1 requires.
+`getRevenueByPaymentStatus` is deliberately unchanged: it is a breakdown BY payment status and
+must keep its failed bucket. The KPI copy says so (EN + AR); `customers-agg` is bumped to `v4`.
+Cost if wrong: a store whose gateway marks recoverable declines as `failed` sees them leave
+revenue until they are retried and paid.
+
+**Ruling RL-2a — a payment webhook is saved first but never acted on before its signature
+verifies (issue 2065; amends RL-2).** The persist-first inbox is kept (every delivery is replayable
+from `/webhook-events`). The fail-open was in the consumer: `handleWebhook` skipped verification
+when called with no signature. A missing signature is now refused (`400 MISSING_SIGNATURE`) before
+the payload is parsed or any payment is read, exactly like a wrong one. NOT done: a dedicated
+per-IP limiter on the webhook mount (RL-2's flood bound) — the owner's decision did not ask for
+it. Cost if wrong: a flood of unsigned-but-headered calls still costs one inbox row each, bounded
+by the shared limiter.
+
+**Ruling R2-5a — an order cancelled before any refund moved gets a cancellation notice that is TRUE
+for its case (issue 1948; settles R2-5).** A whole-order `order/refunded` event that moved no money
+(order not `refunded`, no refunded amount on its payment) sends ONE notice (EN or AR, claimed once
+per order via `cancel_notified`) and no longer spends the once-per-order `refund_notified` claim, so
+the real settlement still sends "Refund issued". The wording follows whether money was actually
+taken — `hasCapturedPayment` (order `paid`, or a `completed` payment row), the one shared signal,
+never the provider: captured → "Your order was cancelled. Your refund is being processed.";
+nothing taken (auth-only, voided, unpaid, or COD not yet collected, `cod_pending`) → "Your order was
+cancelled. You were not charged." **COD carve-out, corrected (PR 2335 audit P1):** cash on delivery
+counts as captured once collected — `POST …/orders/:orderId/mark-paid` sets the COD payment
+`completed` and the order `paid` — so a collected-cash cancel says a refund is being processed. (A
+`delivered` order cannot be cancelled; the status machine allows only `refunded` from it, which is
+the money-moved path.) No refund channel is claimed on a cancel: WhatsApp/SMS carry the status
+fanout's own `order_cancelled`, and the merchant "refund" admin push is deliberately dropped because
+nothing was refunded and every cancel path today is the merchant's own admin action — revisit if a
+customer- or gateway-initiated cancel is added. Cost if wrong: a COD order whose courier collected
+but nobody pressed "mark paid" is told "not charged"; the merchant's records say so too.
+
+**Ruling ACR-1 — the abandoned-cart recovery link is removed; the report stays (issue 2035).**
+Reminders link to the store's plain `/cart`; the unused public `…/cart/recover/:id` endpoint is
+deleted. The report keeps its counts; recovered / recovery rate / recovered revenue are `null`
+("Not tracked", EN + AR), not 0, because nothing attributes an order to a reminder
+(`markRecovered` has no caller). Cost if wrong: a shopper opening a reminder on a new device sees an
+empty cart and must re-add items.
+
+**Ruling W-7a — the merchant sees an erasure write-off as ONE line on the customer's wallet history
+(issue 2126; amends W-7).** The admin ledger flags the entry `forfeitOnErasure` writes
+(`erasureWriteOff`), and the card renders "Wallet balance written off after the customer deleted
+their account" (EN + AR) instead of the internal note. The audit log stays super-admin only.
+Residual: an erased customer who never placed an order has no customer detail page (the lookup
+excludes `deletedAt`), so their line is not reachable. Cost if wrong: that population's write-off
+is visible only as the store's wallet total dropping.

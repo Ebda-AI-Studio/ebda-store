@@ -61,14 +61,32 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
   }
 
   const sub = guestCheckout ? tGuest('registeredOnly') : undefined;
+  // Recovery is not tracked (issue 2035): the API answers null, which is
+  // unknown — shown as a note, never as 0 / 0% / 0 KWD.
+  const notTracked = t('recoveryNotTracked');
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard label={t('totalAbandoned')} value={stats?.totalAbandoned ?? 0} sub={sub} />
-      <StatCard label={t('recovered')} value={stats?.totalRecovered ?? 0} sub={sub} />
-      <StatCard label={t('recoveryRate')} value={`${stats?.recoveryRate ?? 0}%`} sub={sub} />
+      <StatCard
+        label={t('recovered')}
+        value={stats?.totalRecovered ?? notTracked}
+        muted={stats?.totalRecovered == null}
+        sub={sub}
+      />
+      <StatCard
+        label={t('recoveryRate')}
+        value={stats?.recoveryRate != null ? `${stats.recoveryRate}%` : notTracked}
+        muted={stats?.recoveryRate == null}
+        sub={sub}
+      />
       <StatCard
         label={t('recoveredRevenue')}
-        value={t('kwdValue', { amount: formatKwd(stats?.recoveredRevenue ?? 0) })}
+        value={
+          stats?.recoveredRevenue != null
+            ? t('kwdValue', { amount: formatKwd(stats.recoveredRevenue) })
+            : notTracked
+        }
+        muted={stats?.recoveredRevenue == null}
         sub={sub}
       />
     </div>

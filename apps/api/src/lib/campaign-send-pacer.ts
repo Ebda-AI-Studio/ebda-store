@@ -41,43 +41,63 @@ export function campaignPlatformSendIntervalMs(): number {
   return Number.isFinite(n) && n >= 0 ? n : 1000;
 }
 
-// KEYS[1] = pacer key; ARGV[1] = interval ms; ARGV[2] = key TTL ms.
-// Returns how long the caller must wait before its reserved slot, in ms.
+// KEYS[1] = pacer key; ARGV[1] = interval ms; ARGV[2] = key TTL ms;
+// ARGV[3] = max wait ms the caller can afford (-1 = unbounded).
+// Returns { wait ms, 1 if the slot was reserved else 0 }.
+//
+// The reservation is CONDITIONAL (issue 2298): a caller that cannot afford the
+// wait leaves the horizon untouched. Reserving first and then deferring
+// consumed one platform slot per deferral for zero emails, so under load every
+// deferral pushed the horizon further out and no store ever sent again.
 const RESERVE_SLOT_LUA = `
 local t = redis.call('TIME')
 local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
 local nextSlot = tonumber(redis.call('GET', KEYS[1]) or '0')
 local slot = math.max(now, nextSlot)
+local maxWait = tonumber(ARGV[3])
+if maxWait >= 0 and (slot - now) > maxWait then
+  return { slot - now, 0 }
+end
 redis.call('SET', KEYS[1], tostring(slot + tonumber(ARGV[1])), 'PX', ARGV[2])
-return slot - now
+return { slot - now, 1 }
 `;
 
 let localNextSlot = 0;
 
-function reserveLocalSlot(intervalMs: number): number {
-  const now = Date.now();
-  const slot = Math.max(now, localNextSlot);
-  localNextSlot = slot + intervalMs;
-  return slot - now;
+interface Reservation {
+  waitMs: number;
+  reserved: boolean;
 }
 
-async function reserveSlot(intervalMs: number): Promise<number> {
+/** In-process twin of RESERVE_SLOT_LUA — same conditional reservation. */
+function reserveLocalSlot(intervalMs: number, maxWaitMs: number): Reservation {
+  const now = Date.now();
+  const slot = Math.max(now, localNextSlot);
+  if (slot - now > maxWaitMs) return { waitMs: slot - now, reserved: false };
+  localNextSlot = slot + intervalMs;
+  return { waitMs: slot - now, reserved: true };
+}
+
+async function reserveSlot(intervalMs: number, maxWaitMs: number): Promise<Reservation> {
   const client = redis.getClient();
   if (client && redis.isAvailable()) {
     try {
-      const wait = await client.eval(
+      const res = (await client.eval(
         RESERVE_SLOT_LUA,
         1,
         PACER_KEY,
         String(intervalMs),
-        String(PACER_KEY_TTL_MS)
-      );
-      return Math.max(0, Number(wait) || 0);
+        String(PACER_KEY_TTL_MS),
+        String(Number.isFinite(maxWaitMs) ? Math.max(0, Math.floor(maxWaitMs)) : -1)
+      )) as unknown;
+      const waitMs = Math.max(0, Number(Array.isArray(res) ? res[0] : res) || 0);
+      const reserved = Array.isArray(res) ? Number(res[1]) === 1 : waitMs <= maxWaitMs;
+      return { waitMs, reserved };
     } catch (err) {
       logger.warn({ err }, '[CAMPAIGN] send pacer: Redis reserve failed, using in-process slot');
     }
   }
-  return reserveLocalSlot(intervalMs);
+  return reserveLocalSlot(intervalMs, maxWaitMs);
 }
 
 /**
@@ -87,16 +107,17 @@ async function reserveSlot(intervalMs: number): Promise<number> {
  * `maxWaitMs` (issue 2115): the wait grows with the number of stores sending
  * at once (one shared slot per interval), and the caller is inside ONE
  * Inngest step = one HTTP request behind Cloudflare's 100s edge timeout. When
- * the reserved slot is further away than the caller can afford, this returns
- * `false` WITHOUT waiting (the slot is simply skipped — a gap in the cadence,
- * never a burst) so the caller can end its step and resume in the next one.
- * Returns `true` when the caller may send now.
+ * the next slot is further away than the caller can afford, this returns
+ * `false` WITHOUT waiting and WITHOUT reserving — the shared horizon is left
+ * exactly where it was (issue 2298), so a deferral never removes capacity
+ * from the other stores — and the caller ends its step and resumes in the
+ * next one. Returns `true` when the caller may send now.
  */
 export async function awaitCampaignSendSlot(maxWaitMs = Infinity): Promise<boolean> {
   const intervalMs = campaignPlatformSendIntervalMs();
   if (intervalMs <= 0) return true;
-  const wait = await reserveSlot(intervalMs);
-  if (wait > maxWaitMs) {
+  const { waitMs: wait, reserved } = await reserveSlot(intervalMs, maxWaitMs);
+  if (!reserved) {
     logger.info(
       { waitMs: wait, maxWaitMs },
       "[CAMPAIGN] send pacer: next slot is past this step's budget — resuming in the next step"

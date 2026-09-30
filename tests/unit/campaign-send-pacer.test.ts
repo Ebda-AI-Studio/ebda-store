@@ -101,7 +101,7 @@ describe('campaign send pacer (#1955)', () => {
   });
 
   it('uses the shared Redis slot when Redis is available', async () => {
-    const evalFn = vi.fn(async () => 250);
+    const evalFn = vi.fn(async () => [250, 1]);
     redisState.client = { eval: evalFn };
     redisState.available = true;
 
@@ -132,8 +132,8 @@ describe('campaign send pacer (#1955)', () => {
 });
 
 describe('campaign send pacer — bounded wait (issue 2115)', () => {
-  it('returns false WITHOUT waiting when the reserved slot is past maxWaitMs', async () => {
-    const evalFn = vi.fn(async () => 5_000);
+  it('returns false WITHOUT waiting when the next slot is past maxWaitMs', async () => {
+    const evalFn = vi.fn(async () => [5_000, 0]);
     redisState.client = { eval: evalFn };
     redisState.available = true;
     const start = Date.now();
@@ -142,11 +142,40 @@ describe('campaign send pacer — bounded wait (issue 2115)', () => {
   });
 
   it('waits and returns true when the slot fits the budget', async () => {
-    const evalFn = vi.fn(async () => 250);
+    const evalFn = vi.fn(async () => [250, 1]);
     redisState.client = { eval: evalFn };
     redisState.available = true;
     const p = awaitCampaignSendSlot(1_000);
     await vi.advanceTimersByTimeAsync(250);
     await expect(p).resolves.toBe(true);
+  });
+});
+
+// issue 2298 — a deferral must not consume a platform slot. Reserving first
+// and deferring after moved the shared horizon 1 interval per deferral for
+// zero emails, so under load every deferral made the next one likelier and
+// no store ever sent again.
+describe('campaign send pacer — a deferral leaves the horizon untouched (issue 2298)', () => {
+  it('in-process: a deferred caller does not push the next slot out', async () => {
+    await expect(awaitCampaignSendSlot()).resolves.toBe(true); // takes now; next = +1000
+    for (let i = 0; i < 5; i++) {
+      await expect(awaitCampaignSendSlot(0)).resolves.toBe(false);
+    }
+    // Still exactly one interval away — five deferrals removed no capacity.
+    const start = Date.now();
+    const p = awaitCampaignSendSlot();
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(p).resolves.toBe(true);
+    expect(Date.now() - start).toBe(1_000);
+  });
+
+  it('Redis: passes the caller budget into the script so it can decline to reserve', async () => {
+    const evalFn = vi.fn(async () => [5_000, 0]);
+    redisState.client = { eval: evalFn };
+    redisState.available = true;
+    await awaitCampaignSendSlot(1_000);
+    expect(evalFn.mock.calls[0][5]).toBe('1000');
+    await awaitCampaignSendSlot();
+    expect(evalFn.mock.calls[1][5]).toBe('-1'); // unbounded
   });
 });

@@ -278,14 +278,21 @@ export async function handleOrderStatusChanged(
   // before the side effects; this stamp says they all SUCCEEDED. A claimed
   // transition that never gets it — every retry of some step failed — is what
   // order-status-fanout-stuck-sweep now reports, instead of it being invisible
-  // behind its own claim. Scoped to the transition this run claimed.
+  // behind its own claim. Scoped to the transition this run claimed: keyed on
+  // `statusFanoutRequestedStatus`, NOT the live `status` (issue 2295). Four
+  // writers move `orders.status` without re-arming (gateway refunds, refresh-
+  // refund-status, payment confirm); keyed on the live status, one of them
+  // landing mid-run made this match 0 rows and the sweep then paged a
+  // "failed after claim" P1 for a fanout whose every step succeeded. A newer
+  // `updateStatus` re-arm nulls `statusFanoutClaimedAt`, so that case still
+  // matches 0 rows, correctly.
   await step.run('complete-status-fanout', () =>
     runInTenantContext(storeId, () =>
       prisma.order.updateMany({
         where: {
           id: orderId,
           storeId,
-          status: status as OrderStatus,
+          statusFanoutRequestedStatus: status,
           statusFanoutClaimedAt: { not: null },
           statusFanoutCompletedAt: null,
         },

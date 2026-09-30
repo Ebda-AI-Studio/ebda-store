@@ -254,6 +254,9 @@ router.get(
 // GET /stores/:storeId/products/search - Advanced search with filters.
 // Admin-only — same reasoning as the list endpoint above. Public search
 // goes through /public/products/search which filters status='active'.
+// `inStock` / `onSale` / `isNew` / `featured` are tri-state: omit for no
+// filter, 'true' or 'false' to filter (false = the exact complement, issues
+// 2318 / 2325), anything else is a 400.
 router.get(
   '/search',
   authenticate,

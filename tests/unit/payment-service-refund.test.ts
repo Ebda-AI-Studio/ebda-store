@@ -551,3 +551,48 @@ describe('PaymentService.refund — a transaction id matching more than one paym
     }
   });
 });
+
+/**
+ * Issue 2310 — a partial refund outside a return is booked under the
+ * provider's refund id. When the provider returned NO id, the old fallback
+ * `claim-<claimId>` booked it under a key the settle webhook (which carries
+ * the REAL id) would never repeat — one refund, two journal entries. Now it
+ * books nothing and pages. Mutation-proof: restoring the fallback reddens it.
+ */
+describe('PaymentService.refund — never invents a GL key (issue 2310)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('a provider refund with no refund id is NOT booked, and a P1 is raised', async () => {
+    const { sendAlert } = await import('@api/services/alerts.service');
+    mockHappyPathUpToEffects();
+    providerRefund.mockResolvedValue({
+      success: true,
+      provider: 'myfatoorah',
+      refundId: '',
+      transactionId: TRANSACTION_ID,
+      amount: 1000,
+      status: 'completed',
+    });
+
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 });
+
+    expect(recordRefundOutsideReturn).not.toHaveBeenCalled();
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'payment.refund.partial_no_gl' })
+    );
+  });
+
+  it('with a provider refund id it books under exactly that id (control)', async () => {
+    mockHappyPathUpToEffects();
+    recordRefundOutsideReturn.mockResolvedValue(undefined);
+
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 });
+
+    expect(recordRefundOutsideReturn).toHaveBeenCalledWith(
+      STORE_ID,
+      ORDER_ID,
+      { providerRefundId: 'rf_123', amount: 1000 },
+      { sendNow: true }
+    );
+  });
+});

@@ -129,6 +129,11 @@ function assertValidInput(input: ApplyEntryInput): void {
  */
 const ERASURE_FORFEIT_NOTE = 'Forfeited on account erasure';
 
+/** The `expire` entry `forfeitOnErasure` writes — and only that one (issue 2126). */
+export function isErasureWriteOff(t: { type: string; note: string | null }): boolean {
+  return t.type === 'expire' && t.note === ERASURE_FORFEIT_NOTE;
+}
+
 export class WalletService {
   /**
    * Apply one signed ledger entry. See the file header for the locking and
@@ -267,10 +272,16 @@ export class WalletService {
       },
     });
     const hasMore = rows.length > limit;
-    const transactions = hasMore ? rows.slice(0, limit) : rows;
+    const page = hasMore ? rows.slice(0, limit) : rows;
     return {
-      transactions,
-      nextCursor: hasMore ? transactions[transactions.length - 1].id : null,
+      // `erasureWriteOff` (owner decision 2026-10-01, issue 2126): the balance
+      // written off because the customer deleted their account. The merchant
+      // sees one narrow line for it on this history — not the audit log.
+      transactions: page.map(t => ({
+        ...t,
+        erasureWriteOff: isErasureWriteOff(t),
+      })),
+      nextCursor: hasMore ? page[page.length - 1].id : null,
     };
   }
 

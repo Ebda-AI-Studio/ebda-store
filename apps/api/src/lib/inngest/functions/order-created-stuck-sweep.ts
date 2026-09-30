@@ -34,7 +34,7 @@ interface StuckOrder {
   id: string;
   storeId: string;
   locale: string | null;
-  createdAt: Date;
+  createdAt: Date | string; // ISO string once replayed from step memo
 }
 
 const STUCK_ORDER_NOTIFY_MINUTES = Number(process.env.STUCK_ORDER_NOTIFY_MINUTES) || 10;
@@ -113,7 +113,9 @@ export async function handleOrderCreatedStuckSweep(
   // Orders still unnotified past 3× the window mean the re-send itself isn't
   // landing (persistent Inngest delivery problem) — page an operator.
   const veryStaleCutoff = Date.now() - 3 * STUCK_ORDER_NOTIFY_MINUTES * 60_000;
-  const veryStale = stuck.filter(o => o.createdAt.getTime() < veryStaleCutoff);
+  // new Date(): `stuck` is a memoized step.run result, so createdAt is an ISO
+  // string on replay, not a Date (issue 2284's class).
+  const veryStale = stuck.filter(o => new Date(o.createdAt).getTime() < veryStaleCutoff);
   if (veryStale.length > 0) {
     await step.run('alert-very-stale', async () => {
       await sendAlert({
@@ -128,7 +130,9 @@ export async function handleOrderCreatedStuckSweep(
           `investigate Inngest delivery.`,
         context: {
           ids: veryStale.slice(0, 20).map(o => o.id),
-          oldestCreatedAt: veryStale[0]?.createdAt?.toISOString(),
+          oldestCreatedAt: veryStale[0]
+            ? new Date(veryStale[0].createdAt).toISOString()
+            : undefined,
         },
       }).catch(() => undefined);
     });

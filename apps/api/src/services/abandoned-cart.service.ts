@@ -668,7 +668,7 @@ class AbandonedCartService {
 
     for (const abandonedCart of pending) {
       try {
-        // Check if cart was already recovered (order placed using recovery URL)
+        // Only carts still in the reminder sequence get their next step.
         if (
           abandonedCart.status === 'pending' ||
           abandonedCart.status === 'step1_sent' ||
@@ -717,17 +717,16 @@ class AbandonedCartService {
       return this.sendStep(abandonedCart, nextEnabledStep);
     }
 
-    // Build recovery URL with HMAC signature
-    const sig = crypto
-      .createHmac('sha256', config.encryptionKey)
-      .update(abandonedCart.id)
-      .digest('hex');
-
+    // The reminder links to the store's cart page — no `?recover=&sig=`
+    // params (owner decision 2026-10-01, issue 2035). Nothing on the
+    // storefront ever read them, the snapshot could not restore a cart (no
+    // product/variant ids), and the signed link never expired, so the
+    // recovery flow they implied did not exist.
     const storeDomain = abandonedCart.store?.domain
       ? `https://${abandonedCart.store.domain}`
       : `${config.webUrl}/${abandonedCart.store?.slug ?? ''}`;
 
-    const recoveryUrl = `${storeDomain}/cart?recover=${abandonedCart.id}&sig=${sig}`;
+    const cartUrl = `${storeDomain}/cart`;
 
     // Step 3: generate a coupon if auto-coupon is enabled
     let couponCode: string | null = null;
@@ -747,7 +746,7 @@ class AbandonedCartService {
       orderNumber: abandonedCart.id, // no order number at abandonment stage; use record ID
       storeId,
       storeName: abandonedCart.store?.name ?? '',
-      cartUrl: recoveryUrl,
+      cartUrl,
       cartTotal: cartTotalFormatted,
       cartItemCount: abandonedCart.cartItemCount,
       couponCode: couponCode ?? undefined,
@@ -935,12 +934,19 @@ class AbandonedCartService {
   // Stats
   // ──────────────────────────────────────────
 
+  /**
+   * The abandoned-cart report. Recovery figures are `null` — UNKNOWN, never 0
+   * (owner decision 2026-10-01, issue 2035): no flow attributes an order to
+   * a reminder (the recovery link was removed, and nothing calls
+   * `markRecovered`), so a "0% recovered" would be a claim, not a
+   * measurement. `totalAbandoned` and `byStatus` are real counts.
+   */
   async getStats(storeId: string): Promise<{
     byStatus: Record<string, number>;
     totalAbandoned: number;
-    totalRecovered: number;
-    recoveryRate: number;
-    recoveredRevenue: number;
+    totalRecovered: null;
+    recoveryRate: null;
+    recoveredRevenue: null;
   }> {
     const grouped = await prisma.abandonedCart.groupBy({
       by: ['status'],
@@ -950,43 +956,17 @@ class AbandonedCartService {
 
     const byStatus: Record<string, number> = {};
     let totalAbandoned = 0;
-    let totalRecovered = 0;
-
     for (const row of grouped) {
       byStatus[row.status] = row._count.id;
       totalAbandoned += row._count.id;
-      if (row.status === 'recovered') {
-        totalRecovered = row._count.id;
-      }
     }
-
-    // Sum up recovered order totals
-    const recoveredRecords = await prisma.abandonedCart.findMany({
-      where: { storeId, status: 'recovered', recoveredOrderId: { not: null } },
-      select: { recoveredOrderId: true },
-    });
-
-    let recoveredRevenue = 0;
-    if (recoveredRecords.length > 0) {
-      const orderIds = recoveredRecords.map(r => r.recoveredOrderId).filter(Boolean) as string[];
-
-      const orders = await prisma.order.findMany({
-        where: { id: { in: orderIds } },
-        select: { total: true },
-      });
-
-      recoveredRevenue = orders.reduce((sum, o) => sum + o.total, 0);
-    }
-
-    const recoveryRate =
-      totalAbandoned > 0 ? Math.round((totalRecovered / totalAbandoned) * 100 * 100) / 100 : 0;
 
     return {
       byStatus,
       totalAbandoned,
-      totalRecovered,
-      recoveryRate,
-      recoveredRevenue,
+      totalRecovered: null,
+      recoveryRate: null,
+      recoveredRevenue: null,
     };
   }
 

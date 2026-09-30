@@ -392,8 +392,9 @@ app.use(
   })
 );
 
-// issue 2063: the Inngest serve path's own bucket — counts only requests
-// answered ≥400 (forged/unsigned calls), and sits BEFORE the body parser so a
+// issue 2063: the Inngest serve path's own bucket — counts only caller-fault
+// answers (4xx except 429: forged/unsigned/malformed calls; never a failing
+// step's 5xx, issue 2314), and sits BEFORE the body parser so a
 // capped caller is refused before its body is read. See inngestLimiter.
 app.use('/api/v1/inngest', inngestLimiter);
 

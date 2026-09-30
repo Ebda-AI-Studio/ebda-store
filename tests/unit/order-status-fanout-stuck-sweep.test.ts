@@ -44,7 +44,15 @@ vi.mock('@api/lib/logger', () => ({
 
 import { handleOrderStatusFanoutStuckSweep } from '@api/lib/inngest/functions/order-status-fanout-stuck-sweep';
 
-const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
+// JSON round-trips the result the way Inngest memoizes step output: on every
+// re-invocation a Date comes back as an ISO string (issue 2284). A stub that
+// hands back the raw object hides every `.getTime()` on a memoized value.
+const stepStub = {
+  run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => {
+    const v = await fn();
+    return v === undefined ? v : (JSON.parse(JSON.stringify(v)) as T);
+  },
+};
 const minsAgo = (m: number) => new Date(Date.now() - m * 60_000);
 
 beforeEach(() => {

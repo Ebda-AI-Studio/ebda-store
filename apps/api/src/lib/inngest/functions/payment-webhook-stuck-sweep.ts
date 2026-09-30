@@ -39,7 +39,7 @@ interface StuckRow {
   storeId: string | null;
   status: string;
   attempts: number;
-  receivedAt: Date;
+  receivedAt: Date | string; // ISO string once replayed from step memo
 }
 
 const STUCK_WEBHOOK_MINUTES = Number(process.env.STUCK_WEBHOOK_MINUTES) || 10;
@@ -142,7 +142,11 @@ export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunct
             `Replay from the webhook_events rows.`,
           context: {
             ids: wedged.slice(0, 20).map(r => r.id),
-            oldestReceivedAt: wedged[0]?.receivedAt?.toISOString(),
+            // new Date(): `wedged` derives from a memoized step.run result, so
+            // receivedAt is an ISO string on replay (issue 2284's class).
+            oldestReceivedAt: wedged[0]?.receivedAt
+              ? new Date(wedged[0].receivedAt).toISOString()
+              : undefined,
           },
         }).catch(() => undefined);
       });

@@ -923,16 +923,31 @@ export const resetEmailLimiter = rateLimit({
  * pool legitimately exceeds it. But the bypass keys on a header NAME, so
  * without this an unsigned caller sending `x-inngest-signature: x` was
  * unbounded — each request a full 10 MB JSON parse plus an HMAC before the
- * SDK's 401. `skipSuccessfulRequests` means only requests answered ≥400 are
- * counted: real signed traffic never spends this budget, forged traffic is
- * capped at 300 per 15 minutes per IP. Mounted in index.ts BEFORE the body
- * parser, so a capped caller is refused before its body is read.
+ * SDK's 401. Only a CALLER-fault answer (4xx other than 429) is counted:
+ * forged traffic (401) and malformed traffic (400/405/413) are capped at 300
+ * per 15 minutes per IP, while signed traffic never spends the budget.
+ *
+ * Issue 2314: this used to count every answer ≥400. During an incident (Redis
+ * down, Neon failover, a bad deploy) a failing step answers 5xx so Inngest
+ * retries — and Inngest Cloud delivers EVERY function from a small shared IP
+ * pool, so 300 real failures in 15 minutes made the limiter refuse healthy
+ * signed callbacks (refund reversals, status fanout, the stuck sweeps that
+ * would recover them) for the rest of the window. Its own 429 was counted
+ * too, so the bucket stayed saturated. A 5xx is our failure, not the
+ * caller's, and a 429 is the limiter's own answer: neither is counted now.
+ * Mounted in index.ts BEFORE the body parser, so a capped caller is refused
+ * before its body is read.
  */
+export function inngestRequestWasSuccessful(statusCode: number): boolean {
+  return !(statusCode >= 400 && statusCode < 500 && statusCode !== 429);
+}
+
 export const inngestLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'inngest'),
   windowMs: 15 * 60 * 1000,
   max: 300,
   skipSuccessfulRequests: true,
+  requestWasSuccessful: (_req, res) => inngestRequestWasSuccessful(res.statusCode),
   message: {
     success: false,
     error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },

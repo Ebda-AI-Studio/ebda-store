@@ -1252,8 +1252,28 @@ export class PaymentService {
     // rollback of the request must not drop the ledger entry of a refund that
     // stands. A failed send is raised for a human instead of failing the
     // caller — the money has moved either way.
-    if (!flipsOrder && !request.refundKey && moneyStoreId && payment.orderId) {
-      const providerRefundId = response.refundId || `claim-${claimId}`;
+    if (
+      !flipsOrder &&
+      !request.refundKey &&
+      moneyStoreId &&
+      payment.orderId &&
+      !response.refundId
+    ) {
+      // Issue 2310: never invent a GL key the provider will not repeat. The
+      // old `claim-<claimId>` fallback booked this refund under one key and
+      // its settle webhook (carrying the provider's REAL id) under another,
+      // so one refund booked twice. With no provider id there is nothing
+      // both paths share: book nothing here, and page a human.
+      const orderRef = payment.order?.orderNumber ?? payment.orderId;
+      await alertUnbookedRefund({
+        kind: 'partial_no_gl',
+        store: { id: moneyStoreId, name: payment.order?.store?.name ?? moneyStoreId },
+        orderRef,
+        body: `Order ${orderRef}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return, but the provider returned no refund id, so it was NOT booked here (a made-up key would double-book it when the provider's settle notice arrives). Check the provider dashboard; if no settle notice books it, book it by hand.`,
+        context: { paymentId: payment.id, orderId: payment.orderId, claimId },
+      });
+    } else if (!flipsOrder && !request.refundKey && moneyStoreId && payment.orderId) {
+      const providerRefundId = response.refundId as string;
       try {
         await OrderService.recordRefundOutsideReturn(
           moneyStoreId,
@@ -1328,10 +1348,20 @@ export class PaymentService {
   ): Promise<{ success: boolean; status?: string; orderId?: string }> {
     const p = await factory.getProvider(provider, storeId);
 
-    // Verify signature against the raw body string when available (required for
-    // correct HMAC calculation). Fall back to the payload object for providers
-    // that do not use raw-body HMAC.
-    if (signature) {
+    // Owner decision 2026-10-01 (issue 2065, ruling RL-2a): a webhook is SAVED
+    // first (the durable inbox row, replayable from /webhook-events) but is
+    // NEVER acted on until its signature verifies. This used to be
+    // `if (signature) { verify }` — fail-OPEN: a call with no signature (an
+    // inbox row stored with an empty one, a replay, any future caller) skipped
+    // verification and went straight on to move money. No signature is now a
+    // rejection, exactly like a wrong one.
+    if (!signature) {
+      throw new AppError(400, 'MISSING_SIGNATURE', 'Webhook signature is required');
+    }
+    {
+      // Verify against the raw body string when available (required for a
+      // correct HMAC). Fall back to the payload object for providers that do
+      // not use raw-body HMAC.
       const verifyTarget: unknown = rawBody !== undefined ? rawBody : payload;
       if (!p.verifyWebhook(verifyTarget, signature)) {
         // HMAC verification failed — could be a single misconfigured test

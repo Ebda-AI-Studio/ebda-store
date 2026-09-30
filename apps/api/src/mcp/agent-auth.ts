@@ -545,12 +545,16 @@ async function readAttemptCount(key: string): Promise<number | null> {
  * attempts belonging to THAT row — and the rows of a flood sum to the real
  * attempt count instead of a multiple of it.
  */
-async function rememberDenialRow(key: string, value: string): Promise<void> {
-  if (!redis.isAvailable()) return;
+async function rememberDenialRow(key: string, value: string): Promise<boolean> {
+  if (!redis.isAvailable()) return false;
   try {
-    await redis.getClient()?.set(`${key}:row`, value, 'EX', DENIAL_COALESCE_WINDOW_SECONDS);
+    const client = redis.getClient();
+    if (!client) return false;
+    await client.set(`${key}:row`, value, 'EX', DENIAL_COALESCE_WINDOW_SECONDS);
+    return true;
   } catch (err) {
     logger.warn({ err: (err as Error).message }, '[mcp agent-auth] denial-row cache set failed');
+    return false;
   }
 }
 
@@ -827,7 +831,14 @@ export async function auditAgentWrite(params: {
       });
       return;
     }
-    await rememberDenialRow(dedupeKey, encodeDenialRow(rowId, base));
+    const published = await rememberDenialRow(dedupeKey, encodeDenialRow(rowId, base));
+    // Issue 2330: a failed publish left `<key>:row` at `pending` for its whole
+    // TTL, and every repeat that reads `pending` writes NOTHING (it trusts this
+    // writer to flush) — so one Redis blip turned a flood into `count: 1`.
+    // Drop the reservation instead: the window falls back to per-attempt rows
+    // (the documented fail-open), and the flush below still carries every
+    // repeat that already saw `pending`.
+    if (!published && reservation === 'reserved') await releaseDenialRow(dedupeKey);
 
     // Carry every repeat that saw our reservation while we were inserting.
     // Read AFTER the pointer is published: any attempt that observed `pending`

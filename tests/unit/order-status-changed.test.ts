@@ -229,8 +229,24 @@ describe('order-status-changed fanout — completion stamp (issue 2071)', () => 
     await handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub);
     expect(stampCalls()).toHaveLength(1);
     expect(stampCalls()[0][0]).toMatchObject({
-      where: { id: 'o1', storeId: 's1', status: 'shipped', statusFanoutCompletedAt: null },
+      where: {
+        id: 'o1',
+        storeId: 's1',
+        statusFanoutRequestedStatus: 'shipped',
+        statusFanoutClaimedAt: { not: null },
+        statusFanoutCompletedAt: null,
+      },
     });
+  });
+
+  // issue 2295 — a direct status writer (gateway refund, payment confirm) can
+  // move orders.status mid-run without re-arming; keyed on the live status the
+  // stamp then missed and the sweep paged a false "failed after claim" P1.
+  it('keys the stamp on the claimed transition, never the live status', async () => {
+    await handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub);
+    const where = (stampCalls()[0][0] as { where: Record<string, unknown> }).where;
+    expect(where).not.toHaveProperty('status');
+    expect(where.statusFanoutRequestedStatus).toBe('shipped');
   });
 
   it('does NOT stamp when a side effect failed — the sweep must be able to see it', async () => {

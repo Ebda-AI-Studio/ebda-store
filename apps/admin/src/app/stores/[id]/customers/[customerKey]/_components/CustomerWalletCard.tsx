@@ -22,6 +22,8 @@ export interface WalletEntryRow {
     | 'admin_adjust'
     | 'expire';
   note: string | null;
+  /** The balance written off when the customer deleted their account (issue 2126). */
+  erasureWriteOff?: boolean;
   createdAt: string;
   order: { id: string; orderNumber: string } | null;
   return: { id: string; returnNumber: string } | null;
@@ -162,8 +164,16 @@ export function CustomerWalletCard({
                   </td>
                   <td className="px-4 py-2 text-foreground">
                     {t(`types.${row.type}`)}
-                    {row.note && (
-                      <p className="mt-0.5 text-xs text-muted-foreground break-words">{row.note}</p>
+                    {row.erasureWriteOff ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground break-words">
+                        {t('erasureWriteOff')}
+                      </p>
+                    ) : (
+                      row.note && (
+                        <p className="mt-0.5 text-xs text-muted-foreground break-words">
+                          {row.note}
+                        </p>
+                      )
                     )}
                   </td>
                   <td className="px-4 py-2 hidden md:table-cell">

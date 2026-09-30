@@ -1,5 +1,7 @@
 # Phase 2: Abandoned Cart Recovery — Design Spec
 
+> **Superseded in part (2026-10-01, issue 2035, owner decision):** the signed recovery link (`/cart?recover=&sig=`) and the public `…/cart/recover/:id` endpoint were removed — nothing on the storefront consumed them. Reminders link to the store's plain `/cart`; the abandoned-cart report keeps its counts but shows recovery figures as _not tracked_ (`null`), since nothing attributes an order to a reminder.
+
 ## Overview
 
 A cron-driven system that detects carts inactive for 1+ hour, marks them abandoned, and sends up to 3 configurable reminder messages via the Communication Hub (WhatsApp, SMS, Email, Push). Step 3 can optionally auto-generate a single-use discount coupon. The coupon is independently toggleable — stores can send the Step 3 message without a coupon. Toggleable per store via Feature Toggle Engine (`abandoned_cart` feature key).

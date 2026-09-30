@@ -26,6 +26,43 @@ import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 // aborted the transaction and silently doomed every later block's writes.
 import { withSavepoint } from '../../lib/savepoint';
 
+/**
+ * Rows per savepoint on the per-row UPDATE loops (issue 2293). A savepoint
+ * per row issued SAVEPOINT + UPDATE + RELEASE — three round trips per row —
+ * inside one tenant transaction with a 30s hard timeout, so a store with a
+ * few thousand RFM rows could time out the whole rollup. A chunk shares one
+ * savepoint; only a chunk that fails is replayed row by row, so one bad row
+ * still costs only itself.
+ */
+const ROLLUP_WRITE_CHUNK = 100;
+
+export async function writeInChunks<T>(
+  items: T[],
+  write: (item: T) => Promise<unknown>,
+  onRowError: (err: unknown, item: T) => void
+): Promise<number> {
+  let written = 0;
+  for (let i = 0; i < items.length; i += ROLLUP_WRITE_CHUNK) {
+    const chunk = items.slice(i, i + ROLLUP_WRITE_CHUNK);
+    try {
+      await withSavepoint(async () => {
+        for (const item of chunk) await write(item);
+      });
+      written += chunk.length;
+    } catch {
+      for (const item of chunk) {
+        try {
+          await withSavepoint(() => write(item));
+          written++;
+        } catch (err) {
+          onRowError(err, item);
+        }
+      }
+    }
+  }
+  return written;
+}
+
 // ---------------------------------------------------------------------------
 // Public result type
 // ---------------------------------------------------------------------------
@@ -353,28 +390,25 @@ export async function runCohortRollup(storeId: string): Promise<number> {
       }
     }
 
-    for (const { id, row } of toUpdate) {
-      try {
-        await withSavepoint(() =>
-          prisma.customerCohortSnapshot.update({
-            where: { id },
-            data: {
-              customersTotal: row.customersTotal,
-              customersActive: row.customersActive,
-              ordersInPeriod: row.ordersInPeriod,
-              revenueInPeriod: row.revenueInPeriod,
-              computedAt: new Date(),
-            },
-          })
-        );
-        rowsWritten++;
-      } catch (err) {
+    rowsWritten += await writeInChunks(
+      toUpdate,
+      ({ id, row }) =>
+        prisma.customerCohortSnapshot.update({
+          where: { id },
+          data: {
+            customersTotal: row.customersTotal,
+            customersActive: row.customersActive,
+            ordersInPeriod: row.ordersInPeriod,
+            revenueInPeriod: row.revenueInPeriod,
+            computedAt: new Date(),
+          },
+        }),
+      (err, { row }) =>
         logger.error(
           { err, storeId, cohortYm: row.cohortMonth, offset: row.periodOffset },
           'cohort-rollup: failed to write snapshot row'
-        );
-      }
-    }
+        )
+    );
   }
 
   logger.info({ storeId, rowsWritten }, 'cohort-rollup completed');
@@ -511,31 +545,28 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
       }
     }
 
-    for (const { id, row } of toUpdate) {
-      try {
-        await withSavepoint(() =>
-          prisma.funnelSnapshot.update({
-            where: { id },
-            data: {
-              productViews: row.productViews,
-              cartsCreated: row.cartsCreated,
-              cartItemsAdded: row.cartItemsAdded,
-              checkoutsStarted: row.checkoutsStarted,
-              ordersCompleted: row.ordersCompleted,
-              ordersAbandoned: row.ordersAbandoned,
-              revenueFils: row.revenueFils,
-              computedAt: new Date(),
-            },
-          })
-        );
-        rowsWritten++;
-      } catch (err) {
+    rowsWritten += await writeInChunks(
+      toUpdate,
+      ({ id, row }) =>
+        prisma.funnelSnapshot.update({
+          where: { id },
+          data: {
+            productViews: row.productViews,
+            cartsCreated: row.cartsCreated,
+            cartItemsAdded: row.cartItemsAdded,
+            checkoutsStarted: row.checkoutsStarted,
+            ordersCompleted: row.ordersCompleted,
+            ordersAbandoned: row.ordersAbandoned,
+            revenueFils: row.revenueFils,
+            computedAt: new Date(),
+          },
+        }),
+      (err, { row }) =>
         logger.error(
           { err, storeId, dayStart: row.periodDate },
           'funnel-rollup: failed to write snapshot row'
-        );
-      }
-    }
+        )
+    );
   }
 
   logger.info({ storeId, daysBack, rowsWritten }, 'funnel-rollup completed');
@@ -699,31 +730,28 @@ export async function runRfmRollup(storeId: string): Promise<number> {
       }
     }
 
-    for (const { id, row, previousSegment } of toUpdate) {
-      try {
-        await withSavepoint(() =>
-          prisma.customerRfmSnapshot.update({
-            where: { id },
-            data: {
-              isGuest: row.isGuest,
-              recencyDays: row.recencyDays,
-              frequencyOrders: row.frequencyOrders,
-              monetaryFils: row.monetaryFils,
-              rfmScore: row.rfmScore,
-              segment: row.segment,
-              previousSegment,
-              computedAt: new Date(),
-            },
-          })
-        );
-        rowsWritten++;
-      } catch (err) {
+    rowsWritten += await writeInChunks(
+      toUpdate,
+      ({ id, row, previousSegment }) =>
+        prisma.customerRfmSnapshot.update({
+          where: { id },
+          data: {
+            isGuest: row.isGuest,
+            recencyDays: row.recencyDays,
+            frequencyOrders: row.frequencyOrders,
+            monetaryFils: row.monetaryFils,
+            rfmScore: row.rfmScore,
+            segment: row.segment,
+            previousSegment,
+            computedAt: new Date(),
+          },
+        }),
+      (err, { row }) =>
         logger.error(
           { err, storeId, customerKey: row.customerId },
           'rfm-rollup: failed to write snapshot row'
-        );
-      }
-    }
+        )
+    );
   }
 
   // Stale-row sweep. A snapshot whose key no paid order produces any more —

@@ -6,7 +6,7 @@
  * custom domain, and NOTHING in the middleware chain strips inbound headers
  * (`trust proxy` is a hop COUNT, not a filter). The resulting feed — every
  * `link` pointing at the attacker's host — was then cached in Redis under
- * `public:products:<storeId>:feed:v1` (a key with no host in it) for 600s AND
+ * `public:products:<storeId>:feed:v2` (a key with no host in it) for 600s AND
  * at the CDN for 600s + 86400s SWR. One request poisoned every subsequent AI
  * agent's product links for the store, and `X-Store-ID`/`x-store-domain` let
  * the attacker choose ANY active store as the target.
@@ -55,7 +55,9 @@ vi.mock('@api/services/product.service', () => ({
 }));
 
 vi.mock('@api/services/bundle.service', () => ({
-  listPurchasableBundles: vi.fn().mockResolvedValue([]),
+  listSellableBundles: vi.fn().mockResolvedValue([]),
+  withinSaleWindow: vi.fn(() => true),
+  nextSaleWindowBoundarySeconds: vi.fn(() => Infinity),
   describeBundleContents: vi.fn(() => ({ description: '', descriptionAr: '' })),
 }));
 

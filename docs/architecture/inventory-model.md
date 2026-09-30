@@ -238,7 +238,19 @@ cancel restores `min(qty − qtyFulfilled, −inventory)`:
   with phantom units (2 on hand, 5 ordered → 0 → cancel → 2, was 5). NULL
   (lines written before the column) is treated as fully taken — the old
   behaviour. The variant sale's InventoryHistory row now records the real
-  previous stock (2 → 0, not 5 → 0).
+  previous stock (2 → 0, not 5 → 0). Units a PO receipt later FULFILLED are
+  not "never taken" (issue 2316): they went to the customer without touching
+  the row, so the restore subtracts `qty − stock_taken − qty_fulfilled`
+  (2 on hand, 5 ordered, PO fulfils 5 → cancel → 5, was 2).
+- **A partial return that releases a backordered item's open line heals the
+  same debt** (issue 2302). The fanout's `cancel-backorders` step claims each
+  released line, heals `min(qty − qtyFulfilled, −inventory)` with the same
+  helper (`return_stock` row, `reference` `backorder:<lineId>`) and records it
+  as `stockRestored` on a `backorder_release_healed` orderEvent — a marker of
+  its own, NOT `backorder_line_cancelled`, which feeds the GL's prior-reversed
+  quantities. The whole-order restore subtracts it like the line-cancel one
+  (2 on hand, 5 ordered → −3 → return 2 → −1 → release heals → 0 → full cancel
+  → 2).
 
 Every later item-level allocation — the GL, a return's provider refund, its
 store credit — counts those units as already taken back

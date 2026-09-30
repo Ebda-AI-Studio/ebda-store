@@ -114,7 +114,9 @@ export function buildProductFeed(
 
   // Bundles are only ever passed in when the `bundles` feature is enabled
   // for the store (see public.routes.ts) AND already filtered to
-  // `isPurchasable` (see listPurchasableBundles) — this function trusts its
+  // purchasable-right-now — sellable (`listSellableBundles`) and inside the
+  // sale window, applied per request after the cache read (issues 2327 /
+  // 2328) — this function trusts its
   // input rather than re-deriving that gate, same as it trusts `products`
   // is already limited to active ones.
   const bundleItems = bundles.map((b): ProductFeedItem => {

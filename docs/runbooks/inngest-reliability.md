@@ -243,9 +243,13 @@ signatures (it is in dev mode, verifying nothing, whenever `NODE_ENV` is not
 `production`). Boot logs an error and pages P1 if the key is missing in
 production. Header presence is not a secret, so the path has its own bucket,
 `inngestLimiter` (`middleware/security.ts`), mounted before the body parser:
-300 per 15 minutes per IP, counting ONLY requests answered ≥400
-(`skipSuccessfulRequests`) — signed step callbacks never spend it, forged
-ones are capped. `tests/unit/inngest-serve-rejects-unsigned.test.ts` drives the
+300 per 15 minutes per IP, counting ONLY caller-fault answers — a 4xx other
+than 429 (`inngestRequestWasSuccessful`) — so forged (401) and malformed
+(400/405/413) calls are capped while signed step callbacks never spend it. A
+5xx from a genuinely failing step and the limiter's own 429 are NOT counted
+(issue 2314): Inngest delivers every function from a small shared IP pool,
+so counting them let an incident's retries lock out healthy callbacks —
+including the stuck sweeps that recover from it — for the whole window. `tests/unit/inngest-serve-rejects-unsigned.test.ts` drives the
 REAL `inngest/express` handler in cloud mode and asserts a forged or missing
 signature is a 401 with no function run, so an SDK upgrade cannot quietly
 change the assumption.

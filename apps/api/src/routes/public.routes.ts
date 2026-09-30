@@ -29,7 +29,12 @@ import { getCached } from '../lib/public-cache';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
-import { listPurchasableBundles, describeBundleContents } from '../services/bundle.service';
+import {
+  listSellableBundles,
+  describeBundleContents,
+  withinSaleWindow,
+  nextSaleWindowBoundarySeconds,
+} from '../services/bundle.service';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { resolveActiveTaxRate } from '../lib/order-tax';
 import { publicStoreSettings } from '../lib/public-store-settings';
@@ -364,7 +369,7 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     // storefront. No request-supplied header can influence the output any more.
     //
     // Cache tail after deploy: the old value survives in
-    // `public:products:<storeId>:feed:v1` for up to 600s and at the CDN for
+    // `public:products:<storeId>:feed:v2` (v1 before issue 2327) for up to 600s and at the CDN for
     // 600s + 86400s stale-while-revalidate. "Fixed" and "visible" are not the
     // same instant.
     const baseUrl = store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;
@@ -375,7 +380,13 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     // one round trip (featureService coalesces concurrent per-store reads).
     const bundlesEnabled = await featureService.isFeatureEnabled(storeId, 'bundles');
     // Cache key under public:products:<storeId>:* so invalidateStoreProductCaches busts it on product writes.
-    const feed = await getCached(`public:products:${storeId}:feed:v1`, 600, async () => {
+    //
+    // v2 (issues 2327 / 2328): the cached value holds the feed's INPUTS with
+    // each bundle's sale window, not the built feed. A window boundary is not
+    // a write and busts no cache, so the window is applied per request below
+    // and the edge lifetime is capped at the next boundary. A v1 entry (a
+    // built feed) must be a miss for the v2 reader.
+    const inputs = await getCached(`public:products:${storeId}:feed:v2`, 600, async () => {
       // listPublic() internally caps limit at 100 (Math.min(100, ...)) — the
       // feed is bounded to a store's first 100 active products until a
       // dedicated paginated/full-catalog feed path is built.
@@ -396,14 +407,24 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
       // feed byte-for-byte (buildProductFeed's `bundles` param defaults to
       // `[]` too — the explicit `[]` here just makes the branch visible).
       const bundles = bundlesEnabled
-        ? (await listPurchasableBundles(prisma, storeId)).map(b => {
+        ? (await listSellableBundles(prisma, storeId)).map(b => {
             const { description, descriptionAr } = describeBundleContents(b);
             return { ...b, description, descriptionAr };
           })
         : [];
-      return buildProductFeed(store, products, baseUrl, bundles);
+      return { products, bundles };
     });
-    setEdgeCache(res, { sMaxAge: 600, staleWhileRevalidate: 86400 });
+    const now = new Date();
+    const live = inputs.bundles.filter(b => withinSaleWindow(b, now));
+    const feed = buildProductFeed(store, inputs.products, baseUrl, live);
+    // Never let the edge serve this body past the next window boundary: the
+    // fresh window AND the stale-while-revalidate tail both end before it.
+    const nextBoundarySec = nextSaleWindowBoundarySeconds(inputs.bundles, now);
+    const sMaxAge = Math.max(1, Math.min(600, nextBoundarySec));
+    setEdgeCache(res, {
+      sMaxAge,
+      staleWhileRevalidate: Math.min(86400, Math.max(0, nextBoundarySec - sMaxAge)),
+    });
     res.json(feed);
   } catch (err) {
     next(err);
@@ -1522,7 +1543,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         settings: publicStoreSettings(store.settings),
         // The checkout/cart tax line needs the rate, not just the
         // enabled/included booleans already on the Store row. Gated on
-        // `taxEnabled` + the `tax` feature (ruling M3-9, docs/RULINGS.md) —
+        // `taxEnabled` only, at the sum of active rates (rulings M3-9, TAX-1) —
         // the SAME resolver order creation charges against, so a merchant
         // with tax off is never shown a VAT line NOR charged one, even if
         // old TaxRate rows are still `isActive: true`.

@@ -47,6 +47,7 @@ import { resendVerificationTemplate } from '@api/services/email-templates/resend
 import { duplicateRegistrationTemplate } from '@api/services/email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from '@api/services/email-templates/order-confirmation';
 import { orderRefundedTemplate } from '@api/services/email-templates/order-refunded';
+import { orderCancelledNotChargedTemplate } from '@api/services/email-templates/order-cancelled-not-charged';
 import { orderShippedTemplate } from '@api/services/email-templates/order-shipped';
 import { paymentSuccessTemplate } from '@api/services/email-templates/payment-success';
 import { paymentFailedTemplate } from '@api/services/email-templates/payment-failed';
@@ -130,6 +131,7 @@ const TEMPLATES: Record<string, Tpl> = {
   duplicateRegistration: duplicateRegistrationTemplate,
   orderConfirmation: orderConfirmationTemplate,
   orderRefunded: orderRefundedTemplate,
+  orderCancelledNotCharged: orderCancelledNotChargedTemplate,
   orderShipped: orderShippedTemplate,
   paymentSuccess: paymentSuccessTemplate,
   paymentFailed: paymentFailedTemplate,

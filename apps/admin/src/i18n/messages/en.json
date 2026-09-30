@@ -1894,7 +1894,7 @@
         "repeatSub": "{repeat} of {buyers} buyers ordered again",
         "noBuyersSub": "No orders yet",
         "ordersSub": "{count, plural, one {Across {count, number, latn} order} other {Across {count, number, latn} orders}}",
-        "spentSub": "All orders except cancelled and refunded — paid or not"
+        "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts)"
       }
     },
     "detail": {
@@ -1981,6 +1981,7 @@
         "colNote": "Note",
         "refOrder": "Order {number}",
         "refReturn": "Return {number}",
+        "erasureWriteOff": "Wallet balance written off after the customer deleted their account",
         "types": {
           "credit": "Credit",
           "debit": "Debit",
@@ -3867,7 +3868,8 @@
       "recovered": "Recovered",
       "recoveryRate": "Recovery Rate",
       "recoveredRevenue": "Revenue Recovered",
-      "kwdValue": "{amount} KWD"
+      "kwdValue": "{amount} KWD",
+      "recoveryNotTracked": "Not tracked"
     },
     "status": {
       "pending": "Pending",
@@ -6695,6 +6697,7 @@
     "retrying": "Retrying…",
     "confirmRetry": "Put every failed email back on the queue? Only do this once the email provider has recovered.",
     "retrySuccess": "Re-queued {count} email(s)",
+    "retryPartial": "Re-queued {count} email(s); {skipped} unreadable entr(ies) could not be re-queued and were set aside",
     "retryFailed": "Retry failed: {message}",
     "loading": "Loading…",
     "empty": "No failed emails",

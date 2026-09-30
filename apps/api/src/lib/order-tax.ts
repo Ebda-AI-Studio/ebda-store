@@ -1,5 +1,4 @@
 import { prisma } from '@force/database';
-import { featureService } from '../services/feature.service';
 
 /**
  * `computeOrderTax` now lives in `@force/shared` so the storefront checkout
@@ -11,36 +10,28 @@ import { featureService } from '../services/feature.service';
 export { computeOrderTax } from '@force/shared';
 
 /**
- * The store's active tax rate as a percentage (e.g. 5 for 5%) and whether
- * its listed prices already include it — the two facts `computeOrderTax`
- * needs. ONE resolver for both the CHARGE (order creation) and the DISPLAY
- * (the public storefront payload), so they cannot drift apart again
- * (overriding ruling M3-7's accepted residual — see M3-9, docs/RULINGS.md,
- * 2026-09-26: production has 0 rows in `tax_rates` and `taxEnabled: false`
- * on all 3 live stores, so gating the charge the same way as the display
- * changes nothing charged today).
+ * The store's tax rate as a percentage (e.g. 5 for 5%) and whether its listed
+ * prices already include it — the two facts `computeOrderTax` needs. ONE
+ * resolver for both the CHARGE (order creation) and the DISPLAY (the public
+ * storefront payload), so they cannot drift apart (ruling M3-9).
  *
- * Gated on BOTH `Store.taxEnabled` and the `tax` feature, so a merchant who
- * flips "Enable tax" off (which only PATCHes `taxEnabled`; existing `TaxRate`
- * rows keep `isActive: true`) is neither shown a VAT line NOR charged one.
- * (An earlier version of this comment claimed parity with
- * `TaxService.calculateTax`; that was false — it gated on the feature only,
- * summed rates and read `defaultTaxRate` — and it has been deleted, issue
- * 2167 / issue 2211. There is no other order-tax resolver in the API.)
+ * Gated on `Store.taxEnabled` ONLY (owner decision 2026-10-01, issue 2166,
+ * ruling TAX-1). VAT collection is a legal obligation, not a billing feature:
+ * the plan-derived `tax` feature used to gate the charge too, and `free` (the
+ * lapsed-payment grace plan) does not carry it, so a merchant whose
+ * subscription lapsed silently stopped collecting VAT. The `tax` feature still
+ * gates the admin tax PAGES; it can no longer switch collection off. A
+ * merchant who flips "Enable tax" off (`taxEnabled: false`) is neither shown
+ * a VAT line nor charged one.
  *
- * What it charges: the single highest-priority ACTIVE rate. It does not read
- * `country`/`state`, `isCompound`, or `TaxSettings.defaultTaxRate`; whether
- * a store with several active rates should be charged their sum is an open
- * owner question (issue 2114).
+ * What it charges: the SUM of every ACTIVE rate (owner decision 2026-10-01,
+ * issue 2114, ruling TAX-1) — 5% + 2% charges and shows 7%, matching what the
+ * admin tax page lets a merchant configure. It does not read
+ * `country`/`state`, `isCompound` or `TaxSettings.defaultTaxRate`: every
+ * active rate applies additively to the taxable amount.
  *
- * Deterministically ordered (`priority desc, createdAt asc, id asc`,
- * `take: 1`) so a store with more than one active rate charges — and
- * shows — the SAME row every call, rather than whatever order Postgres
- * happens to return with no ORDER BY.
- *
- * Returns `{ ratePercent: 0, includedInPrice: false }` when disabled OR
- * there is no active tax rate — identical to before for every store with
- * tax off.
+ * Returns `{ ratePercent: 0, includedInPrice }` when disabled OR there is no
+ * active tax rate — identical to before for every store with tax off.
  */
 export interface ActiveTaxRate {
   ratePercent: number;
@@ -48,24 +39,23 @@ export interface ActiveTaxRate {
 }
 
 export async function resolveActiveTaxRate(storeId: string): Promise<ActiveTaxRate> {
-  const [store, taxFeatureEnabled, rates] = await Promise.all([
+  const [store, rates] = await Promise.all([
     prisma.store.findUnique({
       where: { id: storeId },
       select: { taxEnabled: true, taxIncludedInPrice: true },
     }),
-    featureService.isFeatureEnabled(storeId, 'tax'),
     prisma.taxRate.findMany({
       where: { storeId, isActive: true },
       select: { rate: true },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
-      take: 1,
     }),
   ]);
 
-  const enabled = !!store?.taxEnabled && taxFeatureEnabled;
+  // Rates are Decimal(5,2)-shaped percentages; sum in hundredths so 0.1 + 0.2
+  // is exactly 0.3, never 0.30000000000000004.
+  const sumHundredths = rates.reduce((n, r) => n + Math.round(Number(r.rate) * 100), 0);
 
   return {
-    ratePercent: enabled && rates.length > 0 ? Number(rates[0].rate) : 0,
+    ratePercent: store?.taxEnabled ? sumHundredths / 100 : 0,
     includedInPrice: !!store?.taxIncludedInPrice,
   };
 }

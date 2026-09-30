@@ -79,18 +79,20 @@ describe('store_usage_snapshots RLS follow-up (#1059)', () => {
     ).toBeLessThan(2000);
 
     const admin = readFileSync(resolve(ROOT, 'apps/api/src/routes/admin.routes.ts'), 'utf8');
-    const findManyIdx = admin.indexOf('storeUsageSnapshot.findMany');
-    const nearestWithRlsBypassBeforeRead = admin.lastIndexOf('withRlsBypass', findManyIdx);
-    expect(
-      findManyIdx,
-      'storeUsageSnapshot.findMany call moved — re-point this test'
-    ).toBeGreaterThan(-1);
-    expect(
-      // Must be close (same call), not just "appears somewhere earlier" —
-      // 500 chars comfortably covers `withRlsBypass(tx =>\n  tx....findMany(`
-      // while still failing if the read moved to an unrelated, unguarded call.
-      findManyIdx - nearestWithRlsBypassBeforeRead,
-      'admin usage-history read moved outside withRlsBypass'
-    ).toBeLessThan(500);
+    // The usage-history reads live in `loadUsageHistoryRows(tx, months)`
+    // (issue 2329), which takes the transaction client it must read on. Two
+    // things must hold: the ONLY caller hands it a withRlsBypass tx, and the
+    // helper reads the table through that `tx`, never the bare `prisma`.
+    expect(admin, 'the usage-history route no longer reads inside withRlsBypass').toContain(
+      'withRlsBypass(tx => loadUsageHistoryRows(tx, months))'
+    );
+    expect(admin.split('loadUsageHistoryRows(').length - 1, 'a second caller appeared').toBe(2);
+    const helper = admin.slice(
+      admin.indexOf('export async function loadUsageHistoryRows('),
+      admin.indexOf('\n}\n', admin.indexOf('export async function loadUsageHistoryRows('))
+    );
+    expect(helper).toContain('tx.storeUsageSnapshot.groupBy');
+    expect(helper).toContain('tx.storeUsageSnapshot.findMany');
+    expect(admin).not.toMatch(/\bprisma\.storeUsageSnapshot\./);
   });
 });

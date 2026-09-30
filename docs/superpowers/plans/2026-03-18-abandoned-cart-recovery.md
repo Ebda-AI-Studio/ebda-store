@@ -1,5 +1,7 @@
 # Abandoned Cart Recovery Implementation Plan
 
+> **Superseded in part (2026-10-01, issue 2035, owner decision):** the signed recovery link (`/cart?recover=&sig=`) and the public `…/cart/recover/:id` endpoint were removed — nothing on the storefront consumed them. Reminders link to the store's plain `/cart`; the abandoned-cart report keeps its counts but shows recovery figures as _not tracked_ (`null`), since nothing attributes an order to a reminder.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a cron-driven abandoned cart recovery system that detects inactive carts and sends up to 3 configurable reminder messages via WhatsApp/SMS/Email/Push, with optional auto-coupon on the final step.

@@ -1,4 +1,5 @@
 import type { InngestFunction } from 'inngest';
+import { runInStoreScope } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { processExpenseReceipt } from '../../../services/accounting/expense-ocr.service';
@@ -50,8 +51,12 @@ export const accountingExpenseOcrProcess: InngestFunction.Any = inngest.createFu
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.expenses' };
     }
 
+    // runInStoreScope (issue 2291): the OCR path reads accounts and writes the
+    // draft's OCR metadata on STRICT-RLS tables with a Gemini call in between,
+    // so it gets per-query store scoping — never one transaction held across
+    // the AI call. `createExpense` itself runs in one tenant transaction.
     const result = await step.run('process-ocr', () =>
-      processExpenseReceipt({ storeId, receiptUrl, uploadedBy })
+      runInStoreScope(storeId, () => processExpenseReceipt({ storeId, receiptUrl, uploadedBy }))
     );
 
     logger.info({ storeId, expenseId: result.expenseId }, 'accountingExpenseOcrProcess: done');

@@ -1,5 +1,11 @@
 import { NonRetriableError, type InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@force/database';
+import {
+  prisma,
+  runInTenantContext,
+  withMoneyTx,
+  withRlsBypass,
+  type Prisma,
+} from '@force/database';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -7,8 +13,10 @@ import { affiliateService } from '../../../services/affiliate.service';
 import { LoyaltyService } from '../../../services/loyalty.service';
 import { WalletService } from '../../../services/wallet.service';
 import { WarehouseService } from '../../../services/warehouse.service';
+import { hasCapturedPayment } from '../../../services/order-refund-gating';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { BACKORDER_CANCEL_MARKER } from '../../../services/accounting/posting/prior-reversed-qty';
+import { healBackorderStockDebt } from '../../../services/accounting/backorder-stock-heal';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -49,6 +57,29 @@ export interface PartialRefund {
 // deliberately does NOT read it (it derives prior returned quantities from
 // completed Return rows instead, see partial-return-posting.ts / issue 1189).
 const PARTIAL_RESTORE_MARKER = 'partial_return_restored';
+
+/**
+ * orderEvent.toStatus written by `cancel-backorders` when a PARTIAL return
+ * releases a returned item's open backorder line and heals that line's
+ * negative stock debt (issue 2302, ruling AP-5c). metadata = `{ refundKey,
+ * backorderLineId, items: [{ orderItemId, quantity }], stockRestored }` — the
+ * same shape as BACKORDER_CANCEL_MARKER, so the whole-order restore subtracts
+ * `stockRestored` the same way. Deliberately NOT BACKORDER_CANCEL_MARKER: that
+ * one feeds the GL's prior-reversed quantities (prior-reversed-qty.ts), and a
+ * fanout release is already the Return row's quantity there.
+ */
+const BACKORDER_RELEASE_HEAL_MARKER = 'backorder_release_healed';
+
+/** orderEvent.toStatus claiming the once-per-order cancellation notice (issue 1948). */
+const CANCEL_NOTIFIED_MARKER = 'cancel_notified';
+
+/**
+ * When admin/manual orders started RESERVING their coupon redemption
+ * (`usageCount` +1 in `createAdminOrder`, ruling M-OVR-1, PR 2300 merged
+ * 2026-09-30T11:47:49Z). An admin order created before this never counted, so
+ * its cancel must not decrement (issue 2303). Checkout orders always reserved.
+ */
+export const ADMIN_COUPON_RESERVE_CUTOVER = new Date('2026-09-30T11:47:49Z');
 
 /**
  * The shape `OrderService.rollbackForPaymentFailure` wrote from 2026-04-25
@@ -304,8 +335,13 @@ export async function handleOrderRefunded(
         // up to 0 (#2277, ruling AP-5c) and records the units it put back as
         // `stockRestored` on its marker. Those units are already on the row;
         // restoring the item's full quantity again would invent stock.
+        // A partial return's backorder release heals the same way (issue 2302).
         const backorderMarkers = await tx.orderEvent.findMany({
-          where: { storeId, orderId, toStatus: BACKORDER_CANCEL_MARKER },
+          where: {
+            storeId,
+            orderId,
+            toStatus: { in: [BACKORDER_CANCEL_MARKER, BACKORDER_RELEASE_HEAL_MARKER] },
+          },
           select: { metadata: true },
         });
         for (const m of backorderMarkers) {
@@ -340,13 +376,19 @@ export async function handleOrderRefunded(
         // shortfall (→ 5). `stockTaken` records what was really taken; a
         // non-variant line took all of it (its shortfall is negative debt),
         // and a pre-2299 row (NULL) is treated as fully taken, as before.
+        //
+        // Units a PO receipt later supplied are NOT "never taken" (issue
+        // 2316): `receivePurchaseOrder` sends fulfilled units straight to the
+        // customer without touching the stock row, so on a cancel they come
+        // back from the customer and are real. Subtract `qtyFulfilled` from
+        // the shortfall: 5 ordered / 2 taken / 5 fulfilled restores all 5.
         const backorderLines = await tx.backorderLine.findMany({
           where: { storeId, orderItem: { orderId } },
-          select: { orderItemId: true, qty: true, stockTaken: true },
+          select: { orderItemId: true, qty: true, stockTaken: true, qtyFulfilled: true },
         });
         const neverTaken = new Map<string, number>();
         for (const bl of backorderLines) {
-          const untaken = Math.max(0, bl.qty - (bl.stockTaken ?? bl.qty));
+          const untaken = Math.max(0, bl.qty - (bl.stockTaken ?? bl.qty) - (bl.qtyFulfilled ?? 0));
           if (untaken > 0) {
             neverTaken.set(bl.orderItemId, (neverTaken.get(bl.orderItemId) ?? 0) + untaken);
           }
@@ -394,6 +436,34 @@ export async function handleOrderRefunded(
           select: { id: true },
         });
         if (legacyRollback) return { skipped: true };
+
+        // An admin order created before admin orders reserved their coupon
+        // never incremented `usageCount`; decrementing on its cancel handed a
+        // live redemption back to the merchant's limit (issue 2303, ruling
+        // M-OVR-1a). The `order.admin_created` audit row is the durable record
+        // of an admin-created order (cross-store actor row, so read bypassed).
+        // Marked like a reversal so a redelivery skips it cheaply.
+        if (new Date(order.createdAt) < ADMIN_COUPON_RESERVE_CUTOVER) {
+          const adminCreated = await withRlsBypass(b =>
+            b.auditLog.findFirst({
+              where: { action: 'order.admin_created', resourceType: 'order', resourceId: orderId },
+              select: { id: true },
+            })
+          );
+          if (adminCreated) {
+            await tx.orderEvent.create({
+              data: {
+                storeId,
+                orderId,
+                fromStatus: null,
+                toStatus: 'coupon_reversed',
+                actorId: null,
+                metadata: { skipped: 'admin_order_never_reserved' },
+              },
+            });
+            return { skipped: true };
+          }
+        }
 
         // Decrement back to zero floor — concurrent refunds shouldn't push
         // usageCount negative.
@@ -471,26 +541,101 @@ export async function handleOrderRefunded(
   // never be fulfilled, so outstanding backorder demand must be released so
   // purchase-order demand planning stays accurate. Idempotent via the
   // fulfilledAt/cancelledAt null guards.
-  await step.run('cancel-backorders', () =>
+  await step.run('cancel-backorders', async () => {
     // Backorder single-line cancel: its line is already cancelled; releasing
     // the item's OTHER open lines would cancel demand still owed.
-    partial?.backorderLineId
-      ? Promise.resolve({ count: 0 })
-      : runInTenantContext(storeId, () =>
-          prisma.backorderLine.updateMany({
-            // Partial return: only the returned lines' open backorder demand is
-            // released — the rest of the order may still be fulfilled.
-            where: {
-              orderItem: isPartial
-                ? { orderId, id: { in: partial!.items.map(i => i.orderItemId) } }
-                : { orderId },
-              fulfilledAt: null,
-              cancelledAt: null,
-            },
+    if (partial?.backorderLineId) return { count: 0 };
+
+    // Whole order: every open line is released. No heal — the whole-order
+    // restore above already gave back each item's full taken quantity, which
+    // covers a non-variant line's negative debt.
+    if (!isPartial) {
+      return runInTenantContext(storeId, () =>
+        prisma.backorderLine.updateMany({
+          where: { orderItem: { orderId }, fulfilledAt: null, cancelledAt: null },
+          data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
+        })
+      );
+    }
+
+    // Partial return: only the returned lines' open backorder demand is
+    // released — the rest of the order may still be fulfilled. Each released
+    // line heals the negative stock debt it left, up to 0, exactly as the
+    // merchant-driven `cancelBackorder` does (issue 2302, ruling AP-5c): the
+    // partial restore above gave back only the RETURNED units, so without
+    // this a non-variant product kept the released units' debt forever and
+    // read out of stock. Claim + heal + marker share one transaction, so a
+    // retry finds no open line and heals nothing twice.
+    const released = await runInTenantContext(storeId, () =>
+      withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+        const open = await tx.backorderLine.findMany({
+          where: {
+            storeId,
+            orderItem: { orderId, id: { in: partial!.items.map(i => i.orderItemId) } },
+            fulfilledAt: null,
+            cancelledAt: null,
+          },
+          select: {
+            id: true,
+            orderItemId: true,
+            productId: true,
+            variantId: true,
+            qty: true,
+            qtyFulfilled: true,
+          },
+          orderBy: { id: 'asc' },
+        });
+        let count = 0;
+        let healed = 0;
+        for (const line of open) {
+          const claim = await tx.backorderLine.updateMany({
+            where: { id: line.id, storeId, fulfilledAt: null, cancelledAt: null },
             data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
-          })
+          });
+          if (claim.count === 0) continue;
+          count += 1;
+          const quantity = Math.max(0, line.qty - line.qtyFulfilled);
+          const stockRestored = await healBackorderStockDebt(tx, {
+            storeId,
+            productId: line.productId,
+            variantId: line.variantId,
+            quantity,
+            reference: `backorder:${line.id}`,
+            reason: 'Backorder line released by a return — stock debt healed to 0',
+          });
+          if (stockRestored <= 0) continue;
+          healed += stockRestored;
+          await tx.orderEvent.create({
+            data: {
+              storeId,
+              orderId,
+              fromStatus: null,
+              toStatus: BACKORDER_RELEASE_HEAL_MARKER,
+              actorId: null,
+              metadata: {
+                refundKey: partial!.refundKey,
+                backorderLineId: line.id,
+                items: [{ orderItemId: line.orderItemId, quantity }],
+                stockRestored,
+              },
+            },
+          });
+        }
+        return { count, healed };
+      })
+    );
+    // Inventory is never-stale; the restore step's cache bust only runs when
+    // goods came back, so bust here for a heal. Best-effort, as there.
+    if (released.healed > 0 && !restoreInventory) {
+      await invalidateStoreProductCaches(storeId).catch(err =>
+        logger.error(
+          { err, orderId, storeId },
+          '[order-refunded] product cache invalidation failed'
         )
-  );
+      );
+    }
+    return released;
+  });
 
   // Refund amount: prefer the latest payment's refundedAmount (set by
   // payment.factory.refund), fall back to order total for status-button
@@ -570,51 +715,128 @@ export async function handleOrderRefunded(
   // independent `order/refunded` for the order as well. A claim row with no
   // `released` list (including every row written before this change) means
   // every channel was sent.
+  // Issue 1948 (owner decision 2026-10-01): a whole-order event that moved NO
+  // money — a paid order CANCELLED before any refund was executed — is not a
+  // refund and must not spend the once-per-order "Refund issued" claim. It
+  // used to: the cancel emailed "Refund issued" for the order total before a
+  // fils moved, took the claim, and the real settlement later found the claim
+  // and told the customer nothing. The cancel now sends its own notice
+  // ("Your order was cancelled. You were not charged.", en/ar, claimed once
+  // via `cancel_notified`), and "Refund issued" waits for the event that moved
+  // money: the order refunded, or its payment carrying a refunded amount.
+  // The cancel notice's wording follows whether the payment was captured.
+  const wholeOrderMoneyMoved =
+    order.status === 'refunded' || (latestPayment?.refundedAmount ?? 0) > 0;
+  const cancelNoticeOnly = notify && !isPartial && !wholeOrderMoneyMoved;
+  // Which cancel notice is TRUE (issue 1948, ruling R2-5a): the wording
+  // follows whether money was actually taken — `hasCapturedPayment`, the one
+  // shared signal (order `paid`, or a `completed` payment row) — never the
+  // provider. Captured → "Your refund is being processed."; nothing taken
+  // (auth-only, voided, unpaid, or COD not yet collected: `cod_pending`) →
+  // "You were not charged." Cash on delivery IS captured once collected:
+  // `POST …/orders/:orderId/mark-paid` sets the COD payment `completed` and
+  // the order `paid`, and that customer is owed a refund. (A `delivered`
+  // order cannot be cancelled — the status machine allows only `refunded`
+  // from it — so delivery is not a separate signal here.)
+  const cancelWasCharged = hasCapturedPayment(order);
+  let cancelNoticeFailed = false;
+  if (cancelNoticeOnly) {
+    const claimedCancel = await step.run('claim-cancel-notification', () =>
+      runInTenantContext(storeId, () =>
+        withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+          await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+          const sent = await tx.orderEvent.findFirst({
+            where: { storeId, orderId, toStatus: CANCEL_NOTIFIED_MARKER },
+            select: { id: true },
+          });
+          if (sent) return false;
+          await tx.orderEvent.create({
+            data: {
+              storeId,
+              orderId,
+              fromStatus: null,
+              toStatus: CANCEL_NOTIFIED_MARKER,
+              actorId: null,
+              metadata: {},
+            },
+          });
+          return true;
+        })
+      )
+    );
+    if (claimedCancel) {
+      await step
+        .run('send-customer-cancel-email', () =>
+          EmailService.sendOrderCancelledNotCharged(
+            storeId,
+            {
+              orderNumber: order.orderNumber,
+              customerName,
+              customerEmail,
+              charged: cancelWasCharged,
+            },
+            orderLocale
+          )
+        )
+        .catch(err => {
+          logger.error({ err, orderId }, 'order/refunded: customer cancel notice failed');
+          cancelNoticeFailed = true;
+        });
+    }
+  }
+
   if (notify && isPartial && !partialAmountKnown) {
     logger.warn(
       { orderId, storeId, refundKey: partial?.refundKey },
       'order/refunded: partial event with no positive refundAmount — no refund notification sent'
     );
   }
-  const claimed: RefundNotifyChannel[] | boolean = !notify
-    ? []
-    : isPartial
-      ? partialAmountKnown
-        ? [...REFUND_NOTIFY_CHANNELS]
-        : []
-      : await step.run('claim-refund-notification', () =>
-          runInTenantContext(storeId, () =>
-            withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-              await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
-              const sent = await tx.orderEvent.findFirst({
-                where: { storeId, orderId, toStatus: 'refund_notified' },
-                select: { id: true, metadata: true },
-              });
-              if (!sent) {
-                await tx.orderEvent.create({
-                  data: {
-                    storeId,
-                    orderId,
-                    fromStatus: null,
-                    toStatus: 'refund_notified',
-                    actorId: null,
-                    metadata: {},
-                  },
+  // Cancel notice only (issue 1948): no refund channel is claimed — the
+  // customer's notice is the cancel email above, WhatsApp/SMS carry the
+  // status fanout's own `order_cancelled`, and the merchant admin push for a
+  // "refund" is deliberately NOT sent: nothing was refunded, and every cancel
+  // path today is the merchant's own admin action. Revisit if a customer- or
+  // gateway-initiated cancel is added.
+  const claimed: RefundNotifyChannel[] | boolean =
+    !notify || cancelNoticeOnly
+      ? []
+      : isPartial
+        ? partialAmountKnown
+          ? [...REFUND_NOTIFY_CHANNELS]
+          : []
+        : await step.run('claim-refund-notification', () =>
+            runInTenantContext(storeId, () =>
+              withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+                await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+                const sent = await tx.orderEvent.findFirst({
+                  where: { storeId, orderId, toStatus: 'refund_notified' },
+                  select: { id: true, metadata: true },
                 });
-                return [...REFUND_NOTIFY_CHANNELS];
-              }
-              const meta = (sent.metadata ?? {}) as Record<string, unknown>;
-              const released = releasedChannels(meta);
-              if (released.length === 0) return [];
-              // Re-claim exactly the released channels.
-              await tx.orderEvent.update({
-                where: { id: sent.id },
-                data: { metadata: { ...meta, released: [] } as Prisma.InputJsonValue },
-              });
-              return released;
-            })
-          )
-        );
+                if (!sent) {
+                  await tx.orderEvent.create({
+                    data: {
+                      storeId,
+                      orderId,
+                      fromStatus: null,
+                      toStatus: 'refund_notified',
+                      actorId: null,
+                      metadata: {},
+                    },
+                  });
+                  return [...REFUND_NOTIFY_CHANNELS];
+                }
+                const meta = (sent.metadata ?? {}) as Record<string, unknown>;
+                const released = releasedChannels(meta);
+                if (released.length === 0) return [];
+                // Re-claim exactly the released channels.
+                await tx.orderEvent.update({
+                  where: { id: sent.id },
+                  data: { metadata: { ...meta, released: [] } as Prisma.InputJsonValue },
+                });
+                return released;
+              })
+            )
+          );
   // A run that started before this change replays the memoized claim step's
   // old boolean answer: true meant "send the whole set".
   const notifyChannels: RefundNotifyChannel[] = Array.isArray(claimed)
@@ -835,6 +1057,24 @@ export async function handleOrderRefunded(
   // email and nothing else; the reversals and the refundReversedAt stamp are
   // idempotent. A partial return is never claimed, so its replay re-sends as
   // it is.
+  // Same contract for the cancel notice: hand the claim back, then fail the
+  // run so a replay sends it (the reversals above are idempotent).
+  if (cancelNoticeFailed) {
+    await step.run('release-cancel-notification-claim', () =>
+      runInTenantContext(storeId, () =>
+        withMoneyTx(prisma, (tx: Prisma.TransactionClient) =>
+          tx.orderEvent.deleteMany({
+            where: { storeId, orderId, toStatus: CANCEL_NOTIFIED_MARKER },
+          })
+        )
+      )
+    );
+    throw new NonRetriableError(
+      `order/refunded: the customer cancellation email for order ${orderId} was not sent. ` +
+        'Replay this event to notify the customer.'
+    );
+  }
+
   if (customerEmailFailed) {
     if (!isPartial) {
       // Release ONLY the email channel (issue 2138 / issue 2135): the

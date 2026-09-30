@@ -408,9 +408,11 @@ router.post(
             },
           });
 
-          // Payment record created — clear rollback context so we never undo a
-          // successfully-initiated payment, even if a downstream step throws.
-          rollbackContext = null;
+          // NOT cleared here (issue 2306): this callback runs inside the
+          // wrap's transaction, and the Payment row above is not durable
+          // until that transaction COMMITs after the callback returns. A
+          // COMMIT failure/timeout must still reach the outer catch with the
+          // rollback armed. Cleared after `runInTenantContext` resolves.
 
           await recordPaymentEvent({
             paymentId: payment.id,
@@ -521,10 +523,10 @@ router.post(
           order.storeId
         );
 
-        // Payment provider accepted the request — clear rollback context so we
-        // never undo a successfully-initiated payment, even if audit-log writing
-        // throws below.
-        rollbackContext = null;
+        // Provider accepted — but the rollback context is NOT cleared here
+        // (issue 2306, same class as the agent path in mcp/tools/order.tools.ts):
+        // the Payment row is only durable after this wrap COMMITs, so a COMMIT
+        // failure/timeout must still roll the order back in the outer catch.
 
         // Audit log
         await auditLog({
@@ -556,8 +558,15 @@ router.post(
         };
       });
 
-      // COMMITTED. Only now do the bytes go out, so a 200 here means the
-      // payment row is durable and visible to every other connection.
+      // COMMITTED. The payment (or the COD-unavailable rollback the callback
+      // already ran) is durable, so the compensating rollback is disarmed only
+      // now — never inside the wrap, where a failed COMMIT would have left a
+      // pending order with stock decremented, the cart cleared and no Payment
+      // row (issue 2306).
+      rollbackContext = null;
+
+      // Only now do the bytes go out, so a 200 here means the payment row is
+      // durable and visible to every other connection.
       res.status(paymentResponse.status).json(paymentResponse.body);
     } catch (error) {
       // Compensating rollback: if the order was committed (cart cleared,

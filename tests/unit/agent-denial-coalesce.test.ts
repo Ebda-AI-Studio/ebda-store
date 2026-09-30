@@ -454,6 +454,33 @@ describe('#1644 / #1649 auditAgentWrite — denial coalescing WITH a count', () 
     expect(mockAuditLogCreate).toHaveBeenCalledTimes(3);
   });
 
+  // Issue 2330: the reserving writer's pointer PUBLISH (a Redis SET) can fail
+  // after its insert succeeded. The key then sat at `pending` for its whole
+  // TTL, and every repeat that read `pending` wrote nothing — a flood read as
+  // `count: 1`. The reservation is now released so repeats keep being counted.
+  it('a failed pointer publish never leaves the window suppressed at pending', async () => {
+    const cache = fakeRedisRowCache();
+    fakeCounter();
+    // First SET (the NX reservation) succeeds; the publish SET after the
+    // insert rejects; later SETs behave normally.
+    const realSet = mockRedisSet.getMockImplementation()!;
+    let sets = 0;
+    mockRedisSet.mockImplementation(async (...a: unknown[]) => {
+      sets += 1;
+      if (sets === 2) throw new Error('Connection is closed.');
+      return realSet(...(a as [string, string]));
+    });
+
+    for (let i = 0; i < 10; i++) {
+      await auditAgentWrite({ store, tool: 'add_to_cart', outcome: 'denied', context });
+    }
+
+    expect([...cache.values()]).not.toContain('pending');
+    const rows = await materialiseRows();
+    // Every attempt is accounted for across the rows the watcher reads.
+    expect(rows.reduce((n, r) => n + (r.count ?? 1), 0)).toBe(10);
+  });
+
   // Issue 2141 (second report): `incrementRateLimit` guards only
   // `isAvailable()`; a command that fails mid-flight REJECTS, and that
   // rejection used to escape to the outer catch — no row at all.

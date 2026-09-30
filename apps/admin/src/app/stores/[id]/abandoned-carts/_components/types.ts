@@ -1,8 +1,9 @@
 export interface AbandonedCartStats {
   totalAbandoned: number;
-  totalRecovered: number;
-  recoveryRate: number;
-  recoveredRevenue: number;
+  /** `null` = not tracked (issue 2035): nothing attributes an order to a reminder. */
+  totalRecovered: number | null;
+  recoveryRate: number | null;
+  recoveredRevenue: number | null;
 }
 
 export interface AbandonedCartConfig {

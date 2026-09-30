@@ -189,5 +189,119 @@ describe.skipIf(!hasDb)('optional boolean query params: featured filter', () => 
       expect(res.status).toBe(200);
       expect(names(res)).toEqual([FEATURED]);
     });
+
+    // issues 2318 / 2325 — `false` is a filter on /search too, the exact
+    // complement of `true`, not "no filter" (which answered with every row).
+    it('featured=false returns only the non-featured product', async () => {
+      const res = await admin(`/search?q=${encodeURIComponent(suffix)}&featured=false`);
+      expect(res.status).toBe(200);
+      expect(names(res)).toEqual([PLAIN]);
+    });
   });
 });
+
+describe.skipIf(!hasDb)(
+  'admin advanced search: every boolean filter honours false (issues 2318/2325)',
+  () => {
+    const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    const PLAIN = `as-plain-${suffix}`; // in stock, not on sale, not new
+    const SPECIAL = `as-special-${suffix}`; // out of stock, on sale, new
+    const VAR_OOS = `as-varoos-${suffix}`; // variant product: only a DISABLED variant has stock
+    let storeId: string;
+    let app: Express;
+
+    beforeAll(async () => {
+      await withRlsBypass(async tx => {
+        const owner = await tx.user.create({
+          data: {
+            email: `as-owner-${suffix}@example.com`,
+            passwordHash: 'not-a-real-hash',
+            role: 'store_admin',
+            firstName: 'AS',
+            lastName: 'Owner',
+          },
+        });
+        const store = await tx.store.create({
+          data: {
+            name: 'as-test-store',
+            slug: `as-test-${suffix}`,
+            template: 'modern',
+            currency: 'KWD',
+            ownerId: owner.id,
+            status: 'active',
+          },
+        });
+        storeId = store.id;
+        await tx.product.create({
+          data: { storeId, name: PLAIN, slug: PLAIN, price: 1000, inventory: 5, status: 'active' },
+        });
+        await tx.product.create({
+          data: {
+            storeId,
+            name: SPECIAL,
+            slug: SPECIAL,
+            price: 1000,
+            compareAtPrice: 1500,
+            inventory: 0,
+            trackInventory: true,
+            isNew: true,
+            status: 'active',
+          },
+        });
+        await tx.product.create({
+          data: {
+            storeId,
+            name: VAR_OOS,
+            slug: VAR_OOS,
+            price: 1000,
+            inventory: 0,
+            hasVariants: true,
+            status: 'active',
+            variants: { create: [{ title: 'Off', price: 1000, inventory: 9, isActive: false }] },
+          },
+        });
+      });
+      const { default: productRoutes } = await import('@api/routes/product.routes');
+      const { errorHandler } = await import('@api/middleware/error-handler');
+      app = express();
+      app.use(express.json());
+      app.use('/api/v1/stores/:storeId/products', productRoutes);
+      app.use((err: unknown, req: Request, res: Response, next: NextFunction) =>
+        errorHandler(err as any, req, res, next)
+      );
+    });
+
+    afterAll(async () => {
+      await withRlsBypass(async tx => {
+        await tx.productVariant.deleteMany({ where: { product: { storeId } } }).catch(() => {});
+        await tx.product.deleteMany({ where: { storeId } }).catch(() => {});
+        await tx.store.deleteMany({ where: { id: storeId } }).catch(() => {});
+        await tx.user.deleteMany({ where: { email: { contains: suffix } } }).catch(() => {});
+      });
+    });
+
+    const search = async (qs: string) => {
+      const res = await request(app).get(
+        `/api/v1/stores/${storeId}/products/search?q=${encodeURIComponent(suffix)}&${qs}`
+      );
+      expect(res.status).toBe(200);
+      return (res.body.data.products as Array<{ name: string }>).map(p => p.name).sort();
+    };
+
+    it('inStock=true / false split the catalogue, variant-aware', async () => {
+      expect(await search('inStock=true')).toEqual([PLAIN]);
+      // A variant product whose only stocked variant is disabled is NOT stock.
+      expect(await search('inStock=false')).toEqual([SPECIAL, VAR_OOS].sort());
+    });
+
+    it('onSale=true / false split the catalogue', async () => {
+      expect(await search('onSale=true')).toEqual([SPECIAL]);
+      expect(await search('onSale=false')).toEqual([PLAIN, VAR_OOS].sort());
+    });
+
+    it('isNew=true / false split the catalogue', async () => {
+      expect(await search('isNew=true')).toEqual([SPECIAL]);
+      expect(await search('isNew=false')).toEqual([PLAIN, VAR_OOS].sort());
+    });
+  }
+);

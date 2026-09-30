@@ -23,6 +23,8 @@ export interface QueuedEmail {
 
 const QUEUE_KEY = 'email:queue';
 const FAILED_KEY = 'email:failed';
+/** Dead-lettered entries that could not be parsed on replay (issue 2292) — kept, never re-popped. */
+const FAILED_CORRUPT_KEY = 'email:failed:corrupt';
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5000;
 
@@ -149,22 +151,40 @@ class EmailQueueService {
           if (!client) {
             // Redis went away between the failure and the retry: the email
             // would vanish here, so it is a permanent failure, loudly.
-            void this.reportPermanentFailure(email, 'redis unavailable at retry');
+            void this.reportPermanentFailure(email, 'redis unavailable at retry', 'lost');
             return;
           }
-          client.lpush(QUEUE_KEY, JSON.stringify(email)).catch(err => {
-            void this.reportPermanentFailure(email, `re-queue failed: ${String(err)}`);
+          client.lpush(QUEUE_KEY, JSON.stringify(email)).catch(async err => {
+            // Redis is still reachable (only this push was rejected), so park
+            // the email in the dead-letter list before paging: the P1 sends
+            // the operator to the Email queue page, which lists ONLY
+            // `email:failed` — without this push it was empty (issue 2292).
+            const parked = await client
+              .lpush(FAILED_KEY, JSON.stringify(email))
+              .then(() => true)
+              .catch(() => false);
+            void this.reportPermanentFailure(
+              email,
+              `re-queue failed: ${String(err)}`,
+              parked ? 'listed' : 'lost'
+            );
           });
         }, RETRY_DELAY_MS * email.attempts);
       } else {
         // Move to failed queue
+        let parked = false;
         if (redis.isAvailable()) {
-          await redis
-            .getClient()
-            ?.lpush(FAILED_KEY, JSON.stringify(email))
-            .catch(() => undefined);
+          parked = await (
+            redis.getClient()?.lpush(FAILED_KEY, JSON.stringify(email)) ?? Promise.resolve(null)
+          )
+            .then(r => r !== null)
+            .catch(() => false);
         }
-        await this.reportPermanentFailure(email, 'max attempts reached');
+        await this.reportPermanentFailure(
+          email,
+          'max attempts reached',
+          parked ? 'listed' : 'lost'
+        );
       }
     }
   }
@@ -177,9 +197,15 @@ class EmailQueueService {
    * `email:failed`, listed and replayable at the super-admin Email queue page
    * (`GET /admin/email-queue/failed`). No recipient address in the alert.
    */
-  private async reportPermanentFailure(email: QueuedEmail, why: string): Promise<void> {
+  private async reportPermanentFailure(
+    email: QueuedEmail,
+    why: string,
+    // Whether the email is in `email:failed` (replayable from the page) — the
+    // alert must never send the operator to a page that cannot show it.
+    where: 'listed' | 'lost'
+  ): Promise<void> {
     logger.error(
-      { emailId: email.id, storeId: email.storeId, attempts: email.attempts, why },
+      { emailId: email.id, storeId: email.storeId, attempts: email.attempts, why, where },
       '[EMAIL QUEUE] Email failed permanently'
     );
     await sendAlert({
@@ -188,7 +214,10 @@ class EmailQueueService {
       title: 'Queued email failed permanently',
       body:
         `Email ${email.id} was not delivered after ${email.attempts} attempt(s) (${why}). ` +
-        'Replay it from the super-admin Email queue page once the provider recovers.',
+        (where === 'listed'
+          ? 'Replay it from the super-admin Email queue page once the provider recovers.'
+          : 'It could NOT be saved to the Email queue page (Redis unavailable) — use the ' +
+            'subject and store below to identify the order and resend it by hand.'),
       context: {
         emailId: email.id,
         storeId: email.storeId,
@@ -243,28 +272,64 @@ class EmailQueueService {
   }
 
   /**
-   * Retry failed emails
+   * Re-queue every dead-lettered email.
+   *
+   * Issue 2292: a single unreadable entry used to throw out of the loop AFTER
+   * `rpop` had removed it — that record destroyed, everything behind it never
+   * retried, the route 500ing with no audit row. Each entry is now parsed on
+   * its own; an unreadable one is moved to `email:failed:corrupt` (kept, never
+   * re-popped here) and counted as skipped. The loop is bounded by the list's
+   * length when it started, so it always terminates.
    */
-  async retryFailed(): Promise<number> {
-    if (!redis.isAvailable()) return 0;
+  async retryFailed(): Promise<{ retried: number; skipped: number }> {
+    if (!redis.isAvailable()) return { retried: 0, skipped: 0 };
 
     const client = redis.getClient();
+    if (!client) return { retried: 0, skipped: 0 };
     let retried = 0;
+    let skipped = 0;
 
-    while (true) {
-      const emailJson = await client?.rpop(FAILED_KEY);
+    const total = await client.llen(FAILED_KEY);
+    for (let i = 0; i < total; i++) {
+      const emailJson = await client.rpop(FAILED_KEY);
       if (!emailJson) break;
 
-      const email: QueuedEmail = JSON.parse(emailJson);
+      let email: QueuedEmail;
+      try {
+        email = JSON.parse(emailJson) as QueuedEmail;
+        if (!email || typeof email !== 'object' || !email.options) throw new Error('bad shape');
+      } catch {
+        await client.lpush(FAILED_CORRUPT_KEY, emailJson);
+        skipped++;
+        logger.error(
+          { bytes: emailJson.length },
+          '[EMAIL QUEUE] unreadable dead-lettered email moved to email:failed:corrupt'
+        );
+        continue;
+      }
       email.attempts = 0;
       email.error = undefined;
 
-      await client?.lpush(QUEUE_KEY, JSON.stringify(email));
+      await client.lpush(QUEUE_KEY, JSON.stringify(email));
       retried++;
     }
 
-    logger.info({ retried }, '[EMAIL QUEUE] Retrying failed emails');
-    return retried;
+    logger.info({ retried, skipped }, '[EMAIL QUEUE] Retrying failed emails');
+    if (skipped > 0) {
+      // Set aside is not silent (PR 2335 audit): an operator is told how many
+      // unreadable entries were parked and where, so they are not invisible.
+      await sendAlert({
+        level: 'p1',
+        source: 'email.queue.corrupt_entries',
+        title: 'Unreadable dead-lettered emails set aside',
+        body:
+          `${skipped} dead-lettered email entr(ies) could not be parsed during "Retry all" and ` +
+          `were moved to Redis list \`${FAILED_CORRUPT_KEY}\` (not replayed). Inspect with ` +
+          '`railway connect Redis` → `LRANGE email:failed:corrupt 0 -1`.',
+        context: { skipped, list: FAILED_CORRUPT_KEY },
+      }).catch(() => undefined);
+    }
+    return { retried, skipped };
   }
 }
 

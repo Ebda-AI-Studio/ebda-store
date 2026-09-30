@@ -209,13 +209,14 @@ describe('Email Queue Service', () => {
         error: 'Failed',
       };
 
+      mockRedisClient.llen.mockResolvedValueOnce(1);
       mockRedisClient.rpop
         .mockResolvedValueOnce(JSON.stringify(failedEmail))
         .mockResolvedValueOnce(null);
 
       const count = await emailQueue.retryFailed();
 
-      expect(count).toBe(1);
+      expect(count).toEqual({ retried: 1, skipped: 0 });
       expect(mockRedisClient.lpush).toHaveBeenCalledWith(
         'email:queue',
         expect.stringContaining('"attempts":0') // Reset attempts
@@ -233,6 +234,7 @@ describe('Email Queue Service', () => {
         error: 'Some error',
       };
 
+      mockRedisClient.llen.mockResolvedValueOnce(1);
       mockRedisClient.rpop
         .mockResolvedValueOnce(JSON.stringify(failedEmail))
         .mockResolvedValueOnce(null);
@@ -248,7 +250,46 @@ describe('Email Queue Service', () => {
 
       const count = await emailQueue.retryFailed();
 
-      expect(count).toBe(0);
+      expect(count).toEqual({ retried: 0, skipped: 0 });
+    });
+
+    // Issue 2292: one unreadable entry used to throw AFTER rpop removed it —
+    // that record destroyed, everything behind it never retried, a 500.
+    it('sets a corrupt entry aside and still retries the entries behind it', async () => {
+      const good = (id: string): QueuedEmail => ({
+        id,
+        storeId: 'store-1',
+        options: { to: 'x@example.com', subject: 'S', html: '<p>x</p>' },
+        attempts: 3,
+        maxAttempts: 3,
+        createdAt: new Date().toISOString(),
+      });
+      mockRedisClient.llen.mockResolvedValueOnce(3);
+      mockRedisClient.rpop
+        .mockResolvedValueOnce(JSON.stringify(good('a')))
+        .mockResolvedValueOnce('{"truncated":')
+        .mockResolvedValueOnce(JSON.stringify(good('b')))
+        .mockResolvedValueOnce(null);
+
+      const res = await emailQueue.retryFailed();
+
+      expect(res).toEqual({ retried: 2, skipped: 1 });
+      expect(mockRedisClient.lpush).toHaveBeenCalledWith('email:failed:corrupt', '{"truncated":');
+      expect(mockRedisClient.rpop).toHaveBeenCalledTimes(3); // bounded by the starting length
+      // PR 2335 audit: set aside is never silent — an operator is told where.
+      expect(sendAlertMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'email.queue.corrupt_entries',
+          context: { skipped: 1, list: 'email:failed:corrupt' },
+        })
+      );
+    });
+
+    it('raises no set-aside alert when every entry was readable', async () => {
+      sendAlertMock.mockClear();
+      mockRedisClient.llen.mockResolvedValueOnce(0);
+      await emailQueue.retryFailed();
+      expect(sendAlertMock).not.toHaveBeenCalled();
     });
   });
 });
@@ -342,6 +383,38 @@ describe('Email queue — terminal failure is loud (issue 2142)', () => {
     expect(alert).toMatchObject({ level: 'p1', source: 'email.queue.permanent_failure' });
     // No recipient address in the alert.
     expect(JSON.stringify(alert)).not.toContain('buyer@example.com');
+  });
+
+  // Issue 2292 (second report): when the retry's re-queue push is rejected
+  // (Redis still reachable), the email is parked in email:failed BEFORE the
+  // P1 — the alert sends the operator to the page that lists only that list.
+  it('a rejected re-queue parks the email in email:failed before paging', async () => {
+    vi.useFakeTimers();
+    try {
+      const retrying: QueuedEmail = {
+        id: 'email_2',
+        storeId: 'store-1',
+        options: { to: 'buyer@example.com', subject: 'Order shipped', html: '<p/>' },
+        attempts: 0,
+        maxAttempts: 3,
+        createdAt: new Date().toISOString(),
+      };
+      client.rpop.mockResolvedValueOnce(JSON.stringify(retrying));
+      vi.mocked(EmailService.sendRaw).mockRejectedValue(new Error('resend 503'));
+      client.lpush.mockImplementation(async (key: string) => {
+        if (key === 'email:queue') throw new Error('OOM command not allowed');
+        return 1;
+      });
+
+      await (emailQueue as any).processQueue();
+      await vi.runOnlyPendingTimersAsync();
+      await vi.waitFor(() => expect(sendAlertMock).toHaveBeenCalledTimes(1));
+
+      expect(client.lpush).toHaveBeenCalledWith('email:failed', expect.any(String));
+      expect(sendAlertMock.mock.calls[0][0].body).toContain('Email queue page');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('with Redis unavailable, a failed inline send REJECTS enqueue (no silent success)', async () => {

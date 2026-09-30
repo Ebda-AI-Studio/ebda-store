@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
@@ -187,63 +186,8 @@ router.get(
   }
 );
 
-// ==========================================
-// Public Route — Cart Recovery
-// ==========================================
-
-// GET /stores/public/:storeId/cart/recover/:abandonedCartId — the literal
-// '/public' segment plus the '/stores' mount gives the same
-// '/stores/public/...' storefront shape as shipping/coupons/wallet.
-router.get(
-  '/public/:storeId/cart/recover/:abandonedCartId',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId, abandonedCartId } = req.params;
-      const { sig } = req.query;
-
-      // HMAC verification
-      const expected = crypto
-        .createHmac('sha256', config.encryptionKey)
-        .update(abandonedCartId)
-        .digest('hex');
-
-      if (sig !== expected) {
-        res.status(403).json({
-          success: false,
-          error: { code: 'INVALID_SIGNATURE', message: 'Invalid or expired recovery link' },
-        });
-        return;
-      }
-
-      // Load abandoned cart
-      const abandonedCart = await prisma.abandonedCart.findUnique({
-        where: { id: abandonedCartId },
-        include: {
-          coupon: {
-            select: { code: true },
-          },
-        },
-      });
-
-      if (!abandonedCart || abandonedCart.storeId !== storeId) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Recovery link not found' },
-        });
-        return;
-      }
-
-      res.json({
-        success: true,
-        data: {
-          cartItems: abandonedCart.cartItems,
-          couponCode: abandonedCart.coupon?.code ?? null,
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+// The public `GET /stores/public/:storeId/cart/recover/:abandonedCartId`
+// endpoint was removed (owner decision 2026-10-01, issue 2035): nothing called
+// it, and reminder emails no longer carry a recovery link.
 
 export default router;

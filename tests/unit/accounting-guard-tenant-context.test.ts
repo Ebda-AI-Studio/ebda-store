@@ -64,8 +64,10 @@ const mockWithRlsBypass = vi.fn(async (fn: (tx: typeof mockTx) => unknown) => {
   }
 });
 
+const ambient = { value: true };
 vi.mock('@force/database', () => ({
   prisma: {},
+  hasTenantContext: () => ambient.value,
   Prisma: {},
   withMoneyTx: vi.fn(),
   withRlsBypass: (...args: unknown[]) => mockWithRlsBypass(...(args as [(tx: unknown) => unknown])),
@@ -92,6 +94,7 @@ const STORE_ID = 'store-1';
 
 beforeEach(() => {
   order.length = 0;
+  ambient.value = true;
   vi.clearAllMocks();
 });
 
@@ -152,6 +155,34 @@ describe('#1241 — the tenant-ownership guard runs INSIDE a tenant-scoped conte
     expect(mockRunInTenantContext).not.toHaveBeenCalled();
     expect(mockAssertInScope).toHaveBeenCalledWith(STORE_ID, expect.any(Object));
     expect(order).toEqual(['assertStoreOwnsInTenantScope']);
+  });
+
+  // Issue 2291: with NO ambient context (the expense-OCR Inngest job) the
+  // guard's own transient transaction scoped only the guard; the paid-from
+  // lookup and the INSERT after it ran GUC-less. The whole body now runs in
+  // one tenant transaction — the guard runs INSIDE it.
+  it('expense.createExpense with no ambient context scopes its WHOLE body in one tenant transaction', async () => {
+    ambient.value = false;
+    const { createExpense } = await import('@api/services/accounting/expense.service');
+
+    await expect(
+      createExpense({
+        storeId: STORE_ID,
+        expenseAccountId: 'acct-1',
+        paidFromAccountId: 'acct-2',
+        amount: 1000,
+        currency: 'KWD',
+        expenseDate: new Date().toISOString(),
+      } as never)
+    ).rejects.toBe(STOP);
+
+    expect(mockRunInTenantContext).toHaveBeenCalledTimes(1);
+    expect(mockRunInTenantContext.mock.calls[0][0]).toBe(STORE_ID);
+    expect(order).toEqual([
+      'runInTenantContext:enter',
+      'assertStoreOwnsInTenantScope',
+      'runInTenantContext:exit',
+    ]);
   });
 
   it('bank-reconcile.importBankStatement runs assertStoreOwns against the withRlsBypass tx, not the bare client', async () => {

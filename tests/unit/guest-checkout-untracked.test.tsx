@@ -89,6 +89,25 @@ describe('abandoned-cart StatsGrid', () => {
     expect(html).toContain('>4<');
     expect(html).toContain('components.guestCheckout.registeredOnly');
   });
+
+  // issue 2035: the API reports recovery as null (not tracked). The three
+  // recovery cards must say so — never "0", "0%" or "0.000 KWD".
+  it('null recovery figures render "not tracked", never a false 0', () => {
+    const html = renderToStaticMarkup(
+      <StatsGrid
+        stats={{
+          totalAbandoned: 7,
+          totalRecovered: null,
+          recoveryRate: null,
+          recoveredRevenue: null,
+        }}
+        guestCheckout={false}
+      />
+    );
+    expect(html).toContain('>7<');
+    expect(html.match(/abandonedCarts\.stats\.recoveryNotTracked/g)).toHaveLength(3);
+    expect(html).not.toMatch(/>0<|>0%<|kwdValue/);
+  });
 });
 
 describe('storeTakesGuestOrders', () => {

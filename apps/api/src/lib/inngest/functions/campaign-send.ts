@@ -7,6 +7,7 @@ import { chunk } from '../batch-utils';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
 import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
 import { ResendService, ResendSendError } from '../../../services/resend.service';
+import { sendAlert } from '../../../services/alerts.service';
 import {
   CAMPAIGN_STORE_SELECT,
   buildCampaignAudience,
@@ -154,6 +155,14 @@ function campaignBatchWallBudgetMs(): number {
 
 /** Upper bound on leftover passes after the main batches (each is ≥1 step). */
 const CAMPAIGN_LEFTOVER_MAX_PASSES = 200;
+/**
+ * Upper bound on STEPS spent in leftover passes (issue 2297). The pass cap
+ * alone allowed ~200 × (1 + ⌈N/20⌉) steps — >10,000 for a 1,000-recipient
+ * campaign, far past what one Inngest run can hold — so a long deferral
+ * episode would fail the run mid-campaign. Whatever is still queued when
+ * either cap is hit is failed loudly in `finalize`, never left queued.
+ */
+const CAMPAIGN_LEFTOVER_MAX_STEPS = 400;
 
 const campaignSendFn = inngest.createFunction(
   {
@@ -457,7 +466,16 @@ const campaignSendFn = inngest.createFunction(
     // are still `queued`. Re-list and send them in further steps until none
     // remain. Only runs when a step actually deferred, so a normal campaign
     // takes no extra steps.
-    for (let pass = 0; anyDeferred && !cancelled && pass < CAMPAIGN_LEFTOVER_MAX_PASSES; pass++) {
+    let leftoverSteps = 0;
+    for (
+      let pass = 0;
+      anyDeferred &&
+      !cancelled &&
+      pass < CAMPAIGN_LEFTOVER_MAX_PASSES &&
+      leftoverSteps < CAMPAIGN_LEFTOVER_MAX_STEPS;
+      pass++
+    ) {
+      leftoverSteps += 1;
       const left: string[] = await step.run(`leftover-list-${pass}`, () =>
         runInTenantContext(storeId, async () =>
           (
@@ -473,6 +491,8 @@ const campaignSendFn = inngest.createFunction(
       anyDeferred = false;
       const leftBatches = chunk(left, CAMPAIGN_SEND_BATCH_SIZE);
       for (let j = 0; j < leftBatches.length; j++) {
+        if (leftoverSteps >= CAMPAIGN_LEFTOVER_MAX_STEPS) break;
+        leftoverSteps += 1;
         const result: BatchResult = await step.run(`leftover-${pass}-batch-${j}`, () =>
           sendBatch(leftBatches[j])
         );
@@ -489,8 +509,25 @@ const campaignSendFn = inngest.createFunction(
     }
 
     // 6. Finalize counts + status.
-    return step.run('finalize', () =>
+    //
+    // Stranded recipients (issue 2297): if the leftover passes hit a cap with
+    // recipients still `queued`, they were never mailed. `computeRecipientCounts`
+    // does not count `queued`, so they used to vanish behind a `sent` campaign
+    // with no alert and no retry. They are failed here with an explicit reason
+    // (the same shape `onFailure` uses) and a P1 names the campaign — only
+    // while the campaign is still `sending`, so a cancel keeps its own reason.
+    const finalized = await step.run('finalize', () =>
       runInTenantContext(storeId, async () => {
+        const live = await prisma.campaign.findFirst({
+          where: { id: campaignId, storeId, status: 'sending' },
+          select: { id: true },
+        });
+        const stranded = live
+          ? await prisma.campaignRecipient.updateMany({
+              where: { campaignId, storeId, status: 'queued' },
+              data: { status: 'failed', error: 'SEND_WINDOW_EXHAUSTED' },
+            })
+          : { count: 0 };
         const counts = await computeRecipientCounts(storeId, campaignId);
         const done = await prisma.campaign.updateMany({
           where: { id: campaignId, storeId, status: 'sending' },
@@ -505,9 +542,34 @@ const campaignSendFn = inngest.createFunction(
           // Cancelled mid-send: keep `cancelled`, record what did go out.
           await prisma.campaign.updateMany({ where: { id: campaignId, storeId }, data: counts });
         }
-        return counts;
+        return { ...counts, stranded: stranded.count };
       })
     );
+    if (finalized.stranded > 0) {
+      await step.run('alert-stranded-recipients', async () => {
+        logger.error(
+          { campaignId, storeId, stranded: finalized.stranded },
+          '[CAMPAIGN] recipients still queued after the send window — marked failed'
+        );
+        await sendAlert({
+          level: 'p1',
+          scope: 'store',
+          store: { id: storeId, name: storeId },
+          source: 'campaign.send.window_exhausted',
+          title: 'Email campaign ended with recipients never mailed',
+          body:
+            `${finalized.stranded} recipient(s) of campaign ${campaignId} were still queued when ` +
+            `the send job ran out of leftover passes (the platform send pacer kept deferring). ` +
+            `They are marked failed (SEND_WINDOW_EXHAUSTED) and were NOT emailed.`,
+          context: { campaignId, stranded: finalized.stranded },
+        }).catch(() => undefined);
+      });
+    }
+    return {
+      recipientCount: finalized.recipientCount,
+      sentCount: finalized.sentCount,
+      failedCount: finalized.failedCount,
+    };
   }
 );
 

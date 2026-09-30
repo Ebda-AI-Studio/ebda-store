@@ -49,7 +49,7 @@ interface StuckTransition {
   storeId: string;
   status: string;
   paymentStatus: string;
-  statusFanoutRequestedAt: Date | null;
+  statusFanoutRequestedAt: Date | string | null; // ISO string once replayed from step memo
   statusFanoutRequestedStatus: string | null;
 }
 
@@ -196,7 +196,10 @@ export async function handleOrderStatusFanoutStuckSweep(
   // Still unclaimed past 3× the window: the re-send itself is not landing.
   const veryStaleCutoff = Date.now() - 3 * ORDER_STATUS_FANOUT_STUCK_MINUTES * 60_000;
   const veryStale = resendable.filter(
-    o => (o.statusFanoutRequestedAt?.getTime() ?? Date.now()) < veryStaleCutoff
+    // new Date(): a memoized step.run result — an ISO string on replay (issue 2284's class).
+    o =>
+      (o.statusFanoutRequestedAt ? new Date(o.statusFanoutRequestedAt).getTime() : Date.now()) <
+      veryStaleCutoff
   );
   if (veryStale.length > 0) {
     await step.run('alert-very-stale', async () => {
@@ -212,7 +215,9 @@ export async function handleOrderStatusFanoutStuckSweep(
           `investigate Inngest delivery.`,
         context: {
           ids: veryStale.slice(0, 20).map(o => o.id),
-          oldestRequestedAt: veryStale[0]?.statusFanoutRequestedAt?.toISOString(),
+          oldestRequestedAt: veryStale[0]?.statusFanoutRequestedAt
+            ? new Date(veryStale[0].statusFanoutRequestedAt).toISOString()
+            : undefined,
         },
       }).catch(() => undefined);
     });

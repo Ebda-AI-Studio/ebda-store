@@ -67,6 +67,9 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+const { sendAlert } = vi.hoisted(() => ({ sendAlert: vi.fn(async () => 'sent') }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
+
 import { ResendSendError } from '@api/services/resend.service';
 import '@api/lib/inngest/functions/campaign-send';
 
@@ -456,5 +459,52 @@ describe('campaign-send — batch wall-clock budget (issue 2115)', () => {
     expect(Number.isFinite(maxWait)).toBe(true);
     expect(maxWait).toBeLessThanOrEqual(60_000);
     expect(maxWait).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * issue 2297 — when the leftover passes run out with recipients still
+ * `queued`, those recipients were never mailed. They used to be invisible:
+ * the campaign finalized as `sent`, the counts ignored `queued`, and nothing
+ * alerted. Mutation-proof: dropping the stranded-recipient update in
+ * `finalize` leaves them queued and reddens this.
+ */
+describe('campaign-send — leftover cap exhaustion (issue 2297)', () => {
+  beforeEach(() => sendAlert.mockClear());
+  it('fails still-queued recipients loudly instead of hiding them behind a sent campaign', async () => {
+    seed(['a@x.test', 'b@x.test', 'c@x.test']);
+    // Only the very first slot is ever granted; every later one defers.
+    let calls = 0;
+    awaitCampaignSendSlot.mockImplementation(async () => ++calls === 1);
+
+    await runJob();
+
+    expect(sentTo()).toHaveLength(1);
+    expect(db.recipients.some(r => r.status === 'queued')).toBe(false);
+    const stranded = db.recipients.filter(r => r.error === 'SEND_WINDOW_EXHAUSTED');
+    expect(stranded).toHaveLength(2);
+    expect(campaign()).toMatchObject({ recipientCount: 3, sentCount: 1, failedCount: 2 });
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'campaign.send.window_exhausted' })
+    );
+  });
+
+  it('bounds the steps one run can spend on leftover passes', async () => {
+    seed(['a@x.test', 'b@x.test']);
+    awaitCampaignSendSlot.mockImplementation(async () => false);
+    const memo = new Map<string, unknown>();
+    const step = makeStep(memo);
+    await captured.handler({
+      event: { data: { campaignId, storeId: STORE_A, scheduledAt: scheduledAt.toISOString() } },
+      step,
+    });
+    const leftoverSteps = [...memo.keys()].filter(k => k.startsWith('leftover-'));
+    expect(leftoverSteps.length).toBeLessThanOrEqual(400);
+  });
+
+  it('a normal campaign raises no stranded alert', async () => {
+    seed(['a@x.test']);
+    await runJob();
+    expect(sendAlert).not.toHaveBeenCalled();
   });
 });

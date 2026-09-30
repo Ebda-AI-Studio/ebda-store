@@ -11,9 +11,9 @@
  *                               `insights/rollup-requested` (super_admin via
  *                               POST /:storeId/insights/rollup/run-now).
  *
- * Both delegate to `runDailyRollup()` from analytics-rollup.service.ts.
- * Each per-store step is wrapped in step.run() so Inngest retries only the
- * failing store without re-running healthy ones.
+ * Both run the three rollups via `runStoreRollupSteps` — one step and one
+ * tenant transaction per rollup per store — so Inngest retries only the
+ * failing rollup without re-running healthy ones (issue 2293).
  *
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
@@ -22,7 +22,42 @@ import type { InngestFunction } from 'inngest';
 import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
-import { runDailyRollup } from '../../../services/accounting/analytics-rollup.service';
+import {
+  runCohortRollup,
+  runFunnelRollup,
+  runRfmRollup,
+  type RollupResult,
+} from '../../../services/accounting/analytics-rollup.service';
+
+interface RollupStep {
+  run<T>(id: string, fn: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * One store's three rollups, each in its OWN step and its own tenant
+ * transaction (issue 2293). They used to share one `runInTenantContext`
+ * (30s hard timeout): a long RFM pass timed out the transaction and took
+ * the cohort and funnel writes down with it — the all-or-nothing failure
+ * the per-row savepoints were added to prevent — and a retry re-ran all
+ * three. Now each has the full budget and a retry re-runs only the one that
+ * failed.
+ */
+export async function runStoreRollupSteps(
+  step: RollupStep,
+  storeId: string,
+  prefix: string
+): Promise<RollupResult> {
+  const cohortRows = await step.run(`${prefix}-cohort`, () =>
+    runInTenantContext(storeId, () => runCohortRollup(storeId))
+  );
+  const funnelDays = await step.run(`${prefix}-funnel`, () =>
+    runInTenantContext(storeId, () => runFunnelRollup(storeId))
+  );
+  const rfmCustomers = await step.run(`${prefix}-rfm`, () =>
+    runInTenantContext(storeId, () => runRfmRollup(storeId))
+  );
+  return { cohortRows, funnelDays, rfmCustomers };
+}
 
 // ---------------------------------------------------------------------------
 // Nightly cron — 02:00 Kuwait (= 23:00 UTC)
@@ -51,11 +86,9 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
     const totals = { cohortRows: 0, funnelDays: 0, rfmCustomers: 0 };
 
     for (const store of stores) {
-      // runDailyRollup uses bare prisma internally. Wrap in runInTenantContext
-      // so FORCE RLS policies see the correct store GUC for all reads/writes.
-      const result = await step.run(`rollup-${store.id}`, () =>
-        runInTenantContext(store.id, () => runDailyRollup(store.id))
-      );
+      // The rollups use bare prisma internally; each step wraps its own
+      // runInTenantContext so FORCE RLS sees the store GUC (issue 2293).
+      const result = await runStoreRollupSteps(step, store.id, `rollup-${store.id}`);
       totals.cohortRows += result.cohortRows;
       totals.funnelDays += result.funnelDays;
       totals.rfmCustomers += result.rfmCustomers;
@@ -86,9 +119,7 @@ export const analyticsRollupOnDemand: InngestFunction.Any = inngest.createFuncti
 
     // On-demand also runs without HTTP tenant context — wrap so FORCE RLS
     // sees the correct GUC.
-    const result = await step.run('rollup', () =>
-      runInTenantContext(storeId, () => runDailyRollup(storeId))
-    );
+    const result = await runStoreRollupSteps(step, storeId, 'rollup');
     logger.info({ storeId, ...result }, 'analytics-rollup-on-demand: completed');
     return result;
   }

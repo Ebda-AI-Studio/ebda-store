@@ -1549,8 +1549,9 @@ export class OrderService {
 
       // 2. Roll back coupon usage if one was reserved
       if (order.couponCode) {
+        // Zero floor, like the fanout's reverse-coupon step (issue 2303).
         await tx.coupon.updateMany({
-          where: { storeId, code: order.couponCode },
+          where: { storeId, code: order.couponCode, usageCount: { gt: 0 } },
           data: { usageCount: { decrement: 1 } },
         });
 

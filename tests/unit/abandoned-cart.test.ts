@@ -1,6 +1,6 @@
 /**
  * Abandoned Cart Recovery — Unit Tests
- * Tests notification events, templates, deterministic coupon codes, and HMAC verification.
+ * Tests notification events, templates and deterministic coupon codes.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -131,49 +131,8 @@ describe('Deterministic coupon code generation', () => {
   });
 });
 
-// ─── 6. HMAC verification ─────────────────────────────────────────────────────
-
-describe('HMAC recovery URL signature', () => {
-  const encryptionKey = 'test-encryption-key-32-chars-long!!';
-  const abandonedCartId = 'abandoned-cart-id-999';
-
-  function generateSig(id: string, key: string): string {
-    return crypto.createHmac('sha256', key).update(id).digest('hex');
-  }
-
-  function verifySig(id: string, sig: string, key: string): boolean {
-    const expected = generateSig(id, key);
-    try {
-      return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
-    } catch {
-      return false;
-    }
-  }
-
-  it('valid signature passes verification', () => {
-    const sig = generateSig(abandonedCartId, encryptionKey);
-    expect(verifySig(abandonedCartId, sig, encryptionKey)).toBe(true);
-  });
-
-  it('invalid signature fails verification', () => {
-    const fakeSig = 'a'.repeat(64); // 64 hex chars = 32 bytes
-    expect(verifySig(abandonedCartId, fakeSig, encryptionKey)).toBe(false);
-  });
-
-  it('signature for a different ID fails verification', () => {
-    const sig = generateSig('different-cart-id', encryptionKey);
-    expect(verifySig(abandonedCartId, sig, encryptionKey)).toBe(false);
-  });
-
-  it('same ID and key always produces the same signature', () => {
-    const sig1 = generateSig(abandonedCartId, encryptionKey);
-    const sig2 = generateSig(abandonedCartId, encryptionKey);
-    expect(sig1).toBe(sig2);
-  });
-
-  it('signature is a 64-character hex string', () => {
-    const sig = generateSig(abandonedCartId, encryptionKey);
-    expect(sig).toHaveLength(64);
-    expect(sig).toMatch(/^[0-9a-f]{64}$/);
-  });
-});
+// ─── 6. (removed) HMAC recovery-link signature ───────────────────────────────
+// The signed `?recover=&sig=` link and its public endpoint were removed (owner
+// decision 2026-10-01, issue 2035). What replaces these tests — the reminder
+// links to the plain cart page and the endpoint is gone — is pinned in
+// tests/unit/abandoned-cart-no-recovery-link.test.ts.

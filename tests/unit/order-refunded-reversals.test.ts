@@ -49,6 +49,7 @@ const h = vi.hoisted(() => ({
   invalidateStoreProductCaches: vi.fn().mockResolvedValue(undefined),
   loggerError: vi.fn(),
   sendOrderRefunded: vi.fn(),
+  sendOrderCancelledNotCharged: vi.fn(),
   dispatch: vi.fn(),
   notifyAdminsOfRefund: vi.fn(),
   // Spy (not an inline passthrough) so tests can assert the FORCE-RLS side
@@ -87,7 +88,10 @@ vi.mock('@force/database', () => ({
 }));
 
 vi.mock('@api/services/email.service', () => ({
-  EmailService: { sendOrderRefunded: h.sendOrderRefunded },
+  EmailService: {
+    sendOrderRefunded: h.sendOrderRefunded,
+    sendOrderCancelledNotCharged: h.sendOrderCancelledNotCharged,
+  },
 }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({
   notificationDispatcher: { dispatch: h.dispatch },
@@ -132,6 +136,10 @@ const ORDER = {
   id: 'o1',
   storeId: 's1',
   orderNumber: 'ORD-1',
+  // A REFUNDED order by default: money moved, so "Refund issued" is the
+  // notice. The cancel-before-any-refund path (issue 1948) is exercised
+  // explicitly below with status 'cancelled'.
+  status: 'refunded',
   total: 5000,
   currency: 'KWD',
   locale: 'en',
@@ -979,5 +987,148 @@ describe('order-refunded fanout — orders rolled back before the canonical mark
     await handleOrderRefunded('o1', 's1', true, true, stepStub);
     expect(h.productUpdate).toHaveBeenCalled();
     expect(h.couponUpdateMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Issue 1948 (owner decision 2026-10-01): a paid order CANCELLED before any
+ * refund moved gets "Your order was cancelled. You were not charged." — not
+ * "Refund issued" — and does NOT spend the once-per-order refund claim, so the
+ * real settlement later still tells the customer. Mutation-proof: dropping
+ * the `cancelNoticeOnly` gate sends "Refund issued" at the cancel again and
+ * reddens the first case.
+ */
+describe('order-refunded fanout — cancel before any refund moved (issue 1948)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.inventoryHistoryFindFirst.mockImplementation(canonicalStockMarkerOnly);
+    h.orderEventFindFirst.mockResolvedValue(null);
+  });
+
+  const createdMarkers = () =>
+    h.orderEventCreate.mock.calls.map(c => (c[0] as { data: { toStatus: string } }).data.toStatus);
+
+  it('sends the cancellation notice, not "Refund issued", and keeps the refund claim unspent', async () => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      status: 'cancelled',
+      payments: [{ refundedAmount: 0, provider: 'myfatoorah', metadata: {} }],
+      couponCode: null,
+      customerId: null,
+    });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.sendOrderCancelledNotCharged).toHaveBeenCalledTimes(1);
+    expect(h.sendOrderCancelledNotCharged.mock.calls[0][1]).toMatchObject({
+      orderNumber: 'ORD-1',
+      customerEmail: 'buyer@test.com',
+    });
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
+    expect(createdMarkers()).toContain('cancel_notified');
+    expect(createdMarkers()).not.toContain('refund_notified');
+  });
+
+  // Coordinator correction to 1948: the notice must be TRUE for the case.
+  it.each([
+    [
+      'a captured card payment → refund pending',
+      'paid',
+      [{ provider: 'myfatoorah', status: 'completed', refundedAmount: 0, metadata: {} }],
+      true,
+    ],
+    [
+      'an unpaid order → not charged',
+      'unpaid',
+      [{ provider: 'myfatoorah', status: 'pending', refundedAmount: 0, metadata: {} }],
+      false,
+    ],
+    [
+      'an auth-only / voided payment → not charged',
+      'unpaid',
+      [{ provider: 'tap', status: 'cancelled', refundedAmount: 0, metadata: {} }],
+      false,
+    ],
+    // PR 2335 audit P1: COD whose cash was COLLECTED (mark-paid → order paid,
+    // payment completed) is owed a refund — never "not charged".
+    [
+      'cash on delivery, cash collected → refund pending',
+      'paid',
+      [{ provider: 'cod', status: 'completed', refundedAmount: 0, metadata: {} }],
+      true,
+    ],
+    [
+      'cash on delivery, not yet collected → not charged',
+      'unpaid',
+      [{ provider: 'cod', status: 'cod_pending', refundedAmount: 0, metadata: {} }],
+      false,
+    ],
+  ])('%s', async (_name, paymentStatus, payments, charged) => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      status: 'cancelled',
+      paymentStatus,
+      payments,
+      couponCode: null,
+      customerId: null,
+    });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.sendOrderCancelledNotCharged).toHaveBeenCalledTimes(1);
+    expect(h.sendOrderCancelledNotCharged.mock.calls[0][1]).toMatchObject({ charged });
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+  });
+
+  it('once money moved (a refunded amount on the payment), the refund notice goes out', async () => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      status: 'cancelled',
+      payments: [{ refundedAmount: 5000, provider: 'myfatoorah', metadata: {} }],
+      couponCode: null,
+      customerId: null,
+    });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.sendOrderRefunded).toHaveBeenCalledTimes(1);
+    expect(h.sendOrderCancelledNotCharged).not.toHaveBeenCalled();
+    expect(createdMarkers()).toContain('refund_notified');
+  });
+
+  it('the cancellation notice is sent once per order', async () => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      status: 'cancelled',
+      couponCode: null,
+      customerId: null,
+    });
+    h.orderEventFindFirst.mockImplementation(async (args: { where: { toStatus?: string } }) =>
+      args.where.toStatus === 'cancel_notified' ? { id: 'already' } : null
+    );
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.sendOrderCancelledNotCharged).not.toHaveBeenCalled();
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+  });
+
+  it('a failed cancellation email hands the claim back and fails the run for a replay', async () => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      status: 'cancelled',
+      couponCode: null,
+      customerId: null,
+    });
+    h.sendOrderCancelledNotCharged.mockRejectedValueOnce(new Error('render failed'));
+
+    await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).rejects.toThrow(
+      /cancellation email/
+    );
+    expect(h.orderEventDeleteMany).toHaveBeenCalledWith({
+      where: { storeId: 's1', orderId: 'o1', toStatus: 'cancel_notified' },
+    });
   });
 });

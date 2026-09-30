@@ -48,12 +48,21 @@ interface StuckReversal {
   id: string;
   storeId: string;
   status: string;
-  updatedAt: Date;
-  refundReversalRequestedAt: Date | null;
+  updatedAt: Date | string;
+  // Date on the first execution, ISO string once replayed from step memo.
+  refundReversalRequestedAt: Date | string | null;
 }
 
-/** When the reversal was requested — the immutable clock when we have one. */
-const requestedAt = (o: StuckReversal): Date => o.refundReversalRequestedAt ?? o.updatedAt;
+/**
+ * When the reversal was requested — the immutable clock when we have one.
+ *
+ * `new Date(...)` is load-bearing: `stuck` is a `step.run` result, and Inngest
+ * memoizes step results as JSON, so on every re-invocation these fields arrive
+ * as ISO STRINGS, not Dates (issue 2284). Calling `.getTime()` on the raw value
+ * throws and kills the P1 plus every sweep after it on the same tick.
+ */
+const requestedAt = (o: StuckReversal): Date =>
+  new Date(o.refundReversalRequestedAt ?? o.updatedAt);
 
 const REFUND_REVERSAL_STUCK_MINUTES = Number(process.env.REFUND_REVERSAL_STUCK_MINUTES) || 10;
 
@@ -205,7 +214,8 @@ interface StuckPartialReturn {
   storeId: string;
   orderId: string;
   refundAmount: number;
-  reversalRequestedAt: Date | null;
+  // Date on the first execution, ISO string once replayed from step memo.
+  reversalRequestedAt: Date | string | null;
   items: Array<{ orderItemId: string; quantity: number }>;
 }
 
@@ -275,7 +285,8 @@ export async function handlePartialReturnReversalSweep(
 
   const veryStaleCutoff = Date.now() - 3 * REFUND_REVERSAL_STUCK_MINUTES * 60_000;
   const veryStale = stuck.filter(
-    r => r.reversalRequestedAt && r.reversalRequestedAt.getTime() < veryStaleCutoff
+    // new Date(): the value crossed step.run as JSON (issue 2284).
+    r => r.reversalRequestedAt && new Date(r.reversalRequestedAt).getTime() < veryStaleCutoff
   );
   if (veryStale.length > 0) {
     await step.run('alert-very-stale-partial', async () => {

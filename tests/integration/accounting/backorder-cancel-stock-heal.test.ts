@@ -358,6 +358,53 @@ describe.skipIf(!hasDb)('issue 2299 — the other two backorder stock paths', ()
     expect(await variantStock()).toBe(2); // was 5: three phantom units
   });
 
+  // issue 2316 — PO-fulfilled units went to the customer without touching
+  // the variant row, so on a whole-order cancel they come back and are real.
+  it('(b) a variant backorder PO-fulfilled then cancelled restores every unit', async () => {
+    const store = await backorderStore();
+    const suffix = uid();
+    const vp = await withRlsBypass(tx =>
+      tx.product.create({
+        data: {
+          storeId: store.storeId,
+          name: `heal-v2316-${suffix}`,
+          slug: `heal-v2316-${suffix}`,
+          price: 1000,
+          inventory: 0,
+          hasVariants: true,
+          status: 'active',
+          variants: {
+            create: [{ title: 'Only', price: 1000, inventory: 2, allowBackorder: true }],
+          },
+        },
+        include: { variants: true },
+      })
+    );
+    const variant = vp.variants[0];
+    const { order, backorders } = await checkout(store.storeId, [
+      { productId: vp.id, variantId: variant.id, quantity: 5 },
+    ]);
+    expect(backorders[0].stockTaken).toBe(2);
+    // The PO receipt fulfils the whole line: those units ship to the customer.
+    await withRlsBypass(tx =>
+      tx.backorderLine.update({
+        where: { id: backorders[0].id },
+        data: { qtyFulfilled: 5, fulfilledAt: new Date() },
+      })
+    );
+    const variantStock = async () =>
+      (
+        await withRlsBypass(tx =>
+          tx.productVariant.findUniqueOrThrow({ where: { id: variant.id } })
+        )
+      ).inventory;
+    expect(await variantStock()).toBe(0);
+
+    await handleOrderRefunded(order.id, store.storeId, true, false, stepStub);
+
+    expect(await variantStock()).toBe(5); // was 2: three real units lost
+  });
+
   it('(b) a non-variant whole-order cancel still returns everything checkout took', async () => {
     const store = await backorderStore();
     const p = await simpleProduct(store.storeId, 2);
@@ -367,3 +414,54 @@ describe.skipIf(!hasDb)('issue 2299 — the other two backorder stock paths', ()
     expect(await stock(p.id)).toBe(2);
   });
 });
+
+// issue 2302 — a PARTIAL return releases the returned item's open backorder
+// line; that release must heal the line's debt the same way a merchant's
+// single-line cancel does, or the product reads out of stock forever.
+describe.skipIf(!hasDb)(
+  'issue 2302 — a partial return releasing a backorder heals its debt',
+  () => {
+    it('heals the released line to 0 and a later whole-order cancel does not double it', async () => {
+      const store = await backorderStore();
+      const p = await simpleProduct(store.storeId, 2);
+      const { order, backorders } = await checkout(store.storeId, [
+        { productId: p.id, quantity: 5 },
+      ]);
+      expect(await stock(p.id)).toBe(-3);
+      const orderItemId = backorders[0].orderItemId;
+
+      // Return 2 of the 5: restores the 2 returned units (→ −1), releases the
+      // line's open demand, and heals the remaining −1 of debt (→ 0).
+      await handleOrderRefunded(order.id, store.storeId, true, false, stepStub, {
+        items: [{ orderItemId, quantity: 2 }],
+        refundKey: `ret-${uid()}`,
+      });
+      expect(await stock(p.id)).toBe(0);
+      const line = await withRlsBypass(tx =>
+        tx.backorderLine.findUniqueOrThrow({ where: { id: backorders[0].id } })
+      );
+      expect(line.cancelledAt).not.toBeNull();
+      const heal = (await healRows(p.id)).find(r => r.reference === `backorder:${line.id}`);
+      expect(heal).toMatchObject({ quantity: 1, previousStock: -1, newStock: 0 });
+
+      // Whole-order cancel afterwards: 5 taken − 2 already returned − 1 healed.
+      await handleOrderRefunded(order.id, store.storeId, true, false, stepStub);
+      expect(await stock(p.id)).toBe(2);
+    });
+
+    it('is idempotent: a redelivered partial event heals nothing more', async () => {
+      const store = await backorderStore();
+      const p = await simpleProduct(store.storeId, 2);
+      const { order, backorders } = await checkout(store.storeId, [
+        { productId: p.id, quantity: 5 },
+      ]);
+      const partial = {
+        items: [{ orderItemId: backorders[0].orderItemId, quantity: 2 }],
+        refundKey: `ret-${uid()}`,
+      };
+      await handleOrderRefunded(order.id, store.storeId, true, false, stepStub, partial);
+      await handleOrderRefunded(order.id, store.storeId, true, false, stepStub, partial);
+      expect(await stock(p.id)).toBe(0);
+    });
+  }
+);

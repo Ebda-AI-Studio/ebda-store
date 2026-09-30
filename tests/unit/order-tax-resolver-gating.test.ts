@@ -2,8 +2,9 @@
  * Ruling M3-9 (docs/RULINGS.md, overriding M3-7's accepted residual): the
  * CHARGE must use the SAME gate as the DISPLAY. `resolveActiveTaxRate` is
  * now the ONE resolver both `order.service.ts` (the charge) and
- * `public.routes.ts` (the public storefront payload) call — gated on BOTH
- * `Store.taxEnabled` and the `tax` feature. A single function means
+ * `public.routes.ts` (the public storefront payload) call — gated on
+ * `Store.taxEnabled` only (issue 2166) and summing every active rate
+ * (issue 2114). A single function means
  * the charge and the display cannot drift apart again — there is only one
  * place left for either to read the wrong thing.
  *
@@ -38,66 +39,67 @@ describe('resolveActiveTaxRate — ONE resolver, same gate for charge and displa
     taxRateFindMany.mockResolvedValue([{ rate: '5.00' }]);
   });
 
-  it('taxEnabled=false + an active rate row: rate is 0 (charged AND displayed)', () => {
+  it('taxEnabled=false + an active rate row: rate is 0 (charged AND displayed)', async () => {
     storeFindUnique.mockResolvedValue({ taxEnabled: false, taxIncludedInPrice: false });
-    isFeatureEnabled.mockResolvedValue(true);
-    return resolveActiveTaxRate('store-1').then(result => {
-      expect(result).toEqual({ ratePercent: 0, includedInPrice: false });
+    expect(await resolveActiveTaxRate('store-1')).toEqual({
+      ratePercent: 0,
+      includedInPrice: false,
     });
   });
 
-  it('the `tax` feature off + an active rate row: rate is 0, even with taxEnabled true', () => {
+  // issue 2166 (owner 2026-10-01, ruling TAX-1): VAT is a legal obligation,
+  // not a plan feature. A store that lapsed to `free` (no `tax` feature)
+  // keeps collecting. Mutation-proof: re-adding the feature gate reddens it.
+  it('collects VAT whatever the plan: the `tax` feature is never consulted', async () => {
     storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
-    isFeatureEnabled.mockResolvedValue(false);
-    return resolveActiveTaxRate('store-1').then(result => {
-      expect(result).toEqual({ ratePercent: 0, includedInPrice: false });
+    isFeatureEnabled.mockResolvedValue(false); // e.g. a store on the `free` plan
+    expect(await resolveActiveTaxRate('store-1')).toEqual({
+      ratePercent: 5,
+      includedInPrice: false,
     });
+    expect(isFeatureEnabled).not.toHaveBeenCalled();
   });
 
-  it('taxEnabled=true + the `tax` feature on + an active rate row: the real rate (charged AND displayed)', () => {
+  it('taxEnabled=true + an active rate row: the real rate (charged AND displayed)', async () => {
     storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
-    isFeatureEnabled.mockResolvedValue(true);
-    return resolveActiveTaxRate('store-1').then(result => {
-      expect(result).toEqual({ ratePercent: 5, includedInPrice: false });
+    expect(await resolveActiveTaxRate('store-1')).toEqual({
+      ratePercent: 5,
+      includedInPrice: false,
     });
   });
 
-  it('no active rate row at all: 0 regardless of the gates', () => {
+  // issue 2114 (owner 2026-10-01, ruling TAX-1): several active rates are
+  // charged as their SUM. Mutation-proof: taking one row reddens it.
+  it('several active rates charge their SUM (5% + 2% = 7%), exactly', async () => {
+    storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
+    taxRateFindMany.mockResolvedValue([{ rate: '5.00' }, { rate: '2.00' }]);
+    expect((await resolveActiveTaxRate('store-1')).ratePercent).toBe(7);
+    taxRateFindMany.mockResolvedValue([{ rate: '0.10' }, { rate: '0.20' }]);
+    expect((await resolveActiveTaxRate('store-1')).ratePercent).toBe(0.3);
+  });
+
+  it('reads every active rate, not one', async () => {
+    storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
+    await resolveActiveTaxRate('store-1');
+    const args = taxRateFindMany.mock.calls[0][0];
+    expect(args.where).toEqual({ storeId: 'store-1', isActive: true });
+    expect(args.take).toBeUndefined();
+  });
+
+  it('no active rate row at all: 0', async () => {
     taxRateFindMany.mockResolvedValue([]);
     storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
-    isFeatureEnabled.mockResolvedValue(true);
-    return resolveActiveTaxRate('store-1').then(result => {
-      expect(result).toEqual({ ratePercent: 0, includedInPrice: false });
+    expect(await resolveActiveTaxRate('store-1')).toEqual({
+      ratePercent: 0,
+      includedInPrice: false,
     });
   });
 
-  it('reports includedInPrice regardless of the enabled gate (a disabled store still needs the flag it just zeroed to make sense of)', () => {
+  it('reports includedInPrice regardless of the enabled gate', async () => {
     storeFindUnique.mockResolvedValue({ taxEnabled: false, taxIncludedInPrice: true });
-    isFeatureEnabled.mockResolvedValue(true);
-    return resolveActiveTaxRate('store-1').then(result => {
-      expect(result).toEqual({ ratePercent: 0, includedInPrice: true });
-    });
-  });
-
-  it('resolves with a deterministic ORDER BY, not an unordered pick', () => {
-    storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
-    isFeatureEnabled.mockResolvedValue(true);
-    return resolveActiveTaxRate('store-1').then(() => {
-      expect(taxRateFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { storeId: 'store-1', isActive: true },
-          orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
-          take: 1,
-        })
-      );
-    });
-  });
-
-  it('checks the `tax` feature key specifically', () => {
-    storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
-    isFeatureEnabled.mockResolvedValue(true);
-    return resolveActiveTaxRate('store-1').then(() => {
-      expect(isFeatureEnabled).toHaveBeenCalledWith('store-1', 'tax');
+    expect(await resolveActiveTaxRate('store-1')).toEqual({
+      ratePercent: 0,
+      includedInPrice: true,
     });
   });
 });

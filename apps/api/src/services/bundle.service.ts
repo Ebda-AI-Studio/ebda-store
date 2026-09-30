@@ -152,6 +152,27 @@ export function withinSaleWindow(
     (w.expiresAt == null || t <= new Date(w.expiresAt).getTime())
   );
 }
+/**
+ * Seconds until the nearest FUTURE `startsAt`/`expiresAt` across `windows`
+ * (Infinity when none) — how long a response computed at `now` stays exact
+ * with respect to bundle sale windows. Used to cap edge caching on a cached
+ * advertising surface (the AI product feed, issues 2327 / 2328).
+ */
+export function nextSaleWindowBoundarySeconds(
+  windows: Array<{ startsAt?: Date | string | null; expiresAt?: Date | string | null }>,
+  now: Date = new Date()
+): number {
+  const t = now.getTime();
+  let next = Infinity;
+  for (const w of windows) {
+    for (const bound of [w.startsAt, w.expiresAt]) {
+      if (bound == null) continue;
+      const at = new Date(bound).getTime();
+      if (at > t && at < next) next = at;
+    }
+  }
+  return next === Infinity ? Infinity : Math.ceil((next - t) / 1000);
+}
 
 /**
  * Load a bundle for `storeId` with everything the cart/checkout/admin need:
@@ -345,6 +366,22 @@ export interface PurchasableBundleSummary extends ResolvedBundle {
  */
 export async function listPurchasableBundles(
   client: DbClient,
+  storeId: string,
+  now: Date = new Date()
+): Promise<PurchasableBundleSummary[]> {
+  return (await listSellableBundles(client, storeId)).filter(b => withinSaleWindow(b, now));
+}
+
+/**
+ * `listPurchasableBundles` WITHOUT the sale-window clause: every bundle that
+ * is sellable at SOME instant, carrying its `startsAt`/`expiresAt` so the
+ * caller applies `withinSaleWindow` per request. For a CACHED surface (the AI
+ * product feed, issues 2327 / 2328): crossing a window boundary is not a write
+ * and busts no cache, so a cached `isPurchasable` would keep advertising an
+ * expired bundle (and hide one whose window just opened) until the TTL.
+ */
+export async function listSellableBundles(
+  client: DbClient,
   storeId: string
 ): Promise<PurchasableBundleSummary[]> {
   const rows = await client.bundle.findMany({
@@ -360,7 +397,7 @@ export async function listPurchasableBundles(
       rows.map(async row => {
         try {
           const bundle = await resolveBundle(client, storeId, row.id);
-          return bundle.isPurchasable ? bundle : null;
+          return bundle.sellableIgnoringWindow ? bundle : null;
         } catch (err) {
           if (err instanceof AppError && err.statusCode === 404) return null;
           throw err;

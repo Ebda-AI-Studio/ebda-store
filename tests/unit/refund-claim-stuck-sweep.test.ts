@@ -15,6 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Ev = {
+  id: string;
   eventType: string;
   paymentId: string;
   storeId: string;
@@ -39,6 +40,8 @@ h.findMany.mockImplementation(
       paymentId?: { in: string[] };
     };
     take?: number;
+    cursor?: { id: string };
+    skip?: number;
   }) => {
     const w = args.where;
     let rows = h.events.filter(e =>
@@ -49,7 +52,13 @@ h.findMany.mockImplementation(
     if (w.occurredAt?.gt) rows = rows.filter(e => e.occurredAt > w.occurredAt!.gt!);
     if (w.occurredAt?.lt) rows = rows.filter(e => e.occurredAt < w.occurredAt!.lt!);
     if (w.paymentId) rows = rows.filter(e => w.paymentId!.in.includes(e.paymentId));
-    rows = [...rows].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+    rows = [...rows].sort(
+      (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime() || a.id.localeCompare(b.id)
+    );
+    if (args.cursor) {
+      const at = rows.findIndex(e => e.id === args.cursor!.id);
+      rows = rows.slice(at + (args.skip ?? 0));
+    }
     return args.take ? rows.slice(0, args.take) : rows;
   }
 );
@@ -76,8 +85,11 @@ import { handleStuckRefundClaimSweep } from '@api/lib/inngest/functions/refund-c
 const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);
 
+let seq = 0;
 function event(eventType: string, claimId: string, at: Date, paymentId = 'pay-1'): Ev {
+  seq += 1;
   return {
+    id: `ev-${String(seq).padStart(6, '0')}`,
     eventType,
     paymentId,
     storeId: 'store-1',
@@ -168,11 +180,31 @@ describe('handleStuckRefundClaimSweep', () => {
     const [claimsCall, resolutionsCall] = h.findMany.mock.calls.map(c => c[0]);
     expect(claimsCall.where.eventType).toBe('refund_initiated');
     expect(claimsCall.take).toBeGreaterThan(0);
-    expect(claimsCall.orderBy).toEqual({ occurredAt: 'asc' });
+    expect(claimsCall.orderBy).toEqual([{ occurredAt: 'asc' }, { id: 'asc' }]);
     expect(claimsCall.where.occurredAt.gt).toBeInstanceOf(Date);
     expect(resolutionsCall.where.paymentId).toEqual({ in: ['pay-1'] });
     expect(resolutionsCall.where.eventType).toEqual({
       in: ['refund_completed', 'refund_failed', 'refund_reconciled'],
     });
+  });
+
+  // issue 2296 — every successful refund writes a claim, so the window is
+  // dominated by RESOLVED claims. A 500-row read spent on them hid a genuinely
+  // stuck claim newer than the 500th. The bound must be on unresolved claims.
+  it('finds a stuck claim behind more than one page of resolved claims', async () => {
+    const events: Ev[] = [];
+    for (let i = 0; i < 1200; i++) {
+      const at = minutesAgo(2 * 24 * 60 - i);
+      events.push(event('refund_initiated', `ok-${i}`, at, `pay-${i}`));
+      events.push(event('refund_completed', `ok-${i}`, at, `pay-${i}`));
+    }
+    events.push(event('refund_initiated', 'stuck-1', minutesAgo(60), 'pay-stuck'));
+    h.events = events;
+
+    const res = await handleStuckRefundClaimSweep(stepStub);
+
+    expect(res.stuck).toBe(1);
+    expect(h.sendAlert).toHaveBeenCalledOnce();
+    expect(h.sendAlert.mock.calls[0][0].context.claims[0].paymentId).toBe('pay-stuck');
   });
 });

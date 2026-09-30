@@ -51,7 +51,7 @@ vi.mock('@api/middleware/security', () => ({
 }));
 vi.mock('@api/lib/public-cache', () => ({
   getCached: (_key: string, _ttl: number, loader: () => Promise<unknown>) => loader(),
-  customersCacheKey: (storeId: string) => `customers-agg:v3:${storeId}`,
+  customersCacheKey: (storeId: string) => `customers-agg:v4:${storeId}`,
   invalidateCustomersCache: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('exceljs', () => ({ default: {} }));
@@ -147,6 +147,24 @@ describe('GET /customers — KPI summary', () => {
       orders: 4,
       totalSpent: 40000,
       avgOrderValue: 10000,
+    });
+  });
+
+  // issue 2235 (owner 2026-10-01, ruling AUI-1a): a FAILED payment is not
+  // spend; an unpaid COD order (payment not failed) still is. Mutation-proof:
+  // dropping the paymentStatus check from countsTowardSpend reddens this.
+  it('excludes failed-payment orders but still counts unpaid COD', async () => {
+    h.orderFindMany.mockResolvedValue([
+      { ...order('p1', 'u1', 10000), paymentStatus: 'failed' },
+      { ...order('p2', 'u1', 10000), paymentStatus: 'failed' },
+      { ...order('p3', 'u2', 7000, 'pending'), paymentStatus: 'unpaid' }, // COD, not delivered
+    ]);
+    const res = await request(app).get(`/api/v1/stores/${STORE}/customers?perPage=1`);
+    expect(res.body.data.meta.summary).toMatchObject({
+      buyers: 1, // only u2 — u1's two failed attempts are not purchases
+      repeatBuyers: 0,
+      orders: 1,
+      totalSpent: 7000,
     });
   });
 
