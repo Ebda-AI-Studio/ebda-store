@@ -4155,6 +4155,48 @@ truncation notices until the TTL ran out. `withinSaleWindow` also treats an abse
 unbounded (`== null`). The Next data cache and the CF edge hold API RESPONSES, whose shape is
 unchanged, so they need no bump. Cost if wrong: one cache miss per store at deploy.
 
+## 2026-09-30 — single-variant products (branch `fix/single-variant-products`)
+
+Context: owner report (pecannbee) — a product whose ONLY variant is e.g. "Size: 380 Gram" shows a
+one-option picker and a disabled "اختر الخيارات" button until the shopper taps it. Part A is a
+one-off data script (`scripts/flatten-single-variant-products-2026-09-30.ts`, NOT applied — the
+owner reviews the dry run); Part B is the PDP auto-select.
+
+**Ruling SVF-1 — flattening DELETES the variant row; it does not disable it.** Every stock reader
+keys "variant product" on the existence of ANY variant row, disabled ones included
+(`effectiveInventory`, `ON_HAND_SQL`, `STOCK_VALUE_SQL`, #2147): a product whose only variant is
+disabled has stock 0 and cannot be ordered. Soft-disabling would therefore make these products
+unsellable. Deleting is what the platform's own "delete option" action already does
+(`VariantService.deleteOption`). Cost if wrong: order lines lose the FK link to a variant row that no
+longer exists; their snapshot (`variant_name`, `sku`, `price`, `cost_price`) is untouched.
+
+**Ruling SVF-2 — order lines are unlinked only with `--unlink-order-lines`; without it the product
+is blocked.** The brief said "do not hard-delete a variant an order references"; SVF-1 makes that
+incompatible with flattening, so the default honours the brief and lists the product (29 of 58 on
+pecannbee, 2026-09-30). With the flag, `order_items.variant_id` is set to NULL (what the FK's
+`ON DELETE SET NULL` does anyway) and every id is kept in the backup for `--restore`. NULL is also
+what the stock writers need afterwards: a cancel/return of that order restores onto
+`products.inventory`, the row that now holds the stock. Cost if wrong: a report joining order lines
+to variants shows those historical lines without a variant row.
+
+**Ruling SVF-3 — the PDP pre-selects a single variant only when its pill is tappable, and the
+pre-selection never swaps the gallery.** Owner instruction 2026-09-30: nothing may look different
+except the selected pill and the enabled button. Rule = exactly one variant listed, every picker
+axis has a value, and the same availability test the pill uses for `disabled` (untracked or
+inventory > 0) — so the pre-selected state is byte-for-byte what a tap produces. 14 live
+single-variant products have a variant image that is NOT in the product gallery; a tap swaps the
+main image to it, so the swap is tied to `onShopperSelect` (a real tap), not to the pre-selection.
+Proved by before/after screenshots (en/ar × desktop/mobile, two products): page heights identical,
+the only pixels that change are the option row and the button. Cost if wrong: a sold-out single
+variant still shows "Select Options"/disabled, exactly as today.
+
+**Ruling SVF-4 — product cards, the carousel quick-add and "Frequently Bought Together" are NOT
+changed.** A variant product's card CTA is the "View"/"عرض" button and quick-add is hidden for it;
+turning either into Add to Cart changes the card's copy and layout, which the owner's no-visual-change
+instruction forbids. FBT's recommendation payload carries only `{id, price}` per variant (no
+`isActive`, no stock), so it cannot apply SVF-3's tappable rule without an API change. After the
+Part A flatten these products are simple products and every card path adds them directly. Cost if
+wrong: until Part A is applied, a single-variant product still needs a PDP visit to be added.
 ## Backlog batch y-web-admin (2026-10-01)
 
 **Ruling YWA-1: the tinted-pill gate measures resolved pairs per theme. Bare role text on a plain

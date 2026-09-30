@@ -138,6 +138,8 @@ loadtests/.loadtest-store-ids.txt
 # .env.bak-* covers dated hand-made backups (e.g. .env.bak-20260808, which holds PROD creds).
 *.prebackup
 .env.bak*
+# Row backups written by one-off data scripts before they write (hold prod rows).
+scripts/backups/
 
 # runtime / test artifacts (never commit — added 2026-06-08)
 dump.rdb

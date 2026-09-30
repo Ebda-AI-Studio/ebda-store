@@ -27,6 +27,7 @@ import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { recordFocusProduct, getLastListing } from '@/lib/last-listing';
 import { VariantSelector } from '../../../components/VariantSelector';
+import { autoSelectVariant } from '@/lib/single-variant';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { useNumerals } from '../../../hooks/useNumerals';
 import { toTemplateProduct } from '../../../templates/adapters';
@@ -156,8 +157,23 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  // Selected variant from VariantSelector (null = no variant chosen or invalid combo)
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  // Selected variant from VariantSelector (null = no variant chosen or invalid combo).
+  // A product with exactly one tappable variant starts with it selected — the
+  // same rule VariantSelector uses for its initial pick — so the server render
+  // already has Add to Cart enabled instead of flipping on after hydration.
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(() =>
+    autoSelectVariant(
+      initialProduct?.variants,
+      (initialProduct?.options ?? []).map(o => o.name)
+    )
+  );
+
+  // True once the shopper has tapped an option pill. An auto-selected single
+  // variant (above) must not swap the gallery to its own image: the owner's
+  // rule is that auto-selection changes nothing visible except the pill state
+  // and the Add to Cart button — a tap still swaps it exactly as before.
+  const [shopperPickedVariant, setShopperPickedVariant] = useState(false);
+  const galleryVariant = shopperPickedVariant ? selectedVariant : null;
 
   // Reset the gallery to the first image whenever the variant image changes —
   // INCLUDING when a variant is deselected (imageUrl → undefined). That also
@@ -165,7 +181,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // array shrinks back (which would scroll the track into empty space).
   useEffect(() => {
     setSelectedImage(0);
-  }, [selectedVariant?.imageUrl]);
+  }, [galleryVariant?.imageUrl]);
 
   // Swipeable image gallery: the hero is a horizontal scroll-snap track showing
   // one image per "page" (swipe left/right on touch, scroll on desktop). Keep the
@@ -441,14 +457,14 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const productImages = product.images || [];
   // When the shopper picks a variant that has its own imageUrl, swap the
   // gallery's main image to that URL by prepending a synthetic image entry.
-  const images = selectedVariant?.imageUrl
+  const images = galleryVariant?.imageUrl
     ? [
         {
-          id: `variant-${selectedVariant.id}`,
-          url: selectedVariant.imageUrl,
-          alt: selectedVariant.name,
+          id: `variant-${galleryVariant.id}`,
+          url: galleryVariant.imageUrl,
+          alt: galleryVariant.name,
         },
-        ...productImages.filter(img => img.url !== selectedVariant.imageUrl),
+        ...productImages.filter(img => img.url !== galleryVariant.imageUrl),
       ]
     : productImages;
   const cat0 = product.categories?.[0];
@@ -772,6 +788,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   variants={productVariants}
                   options={productOptions}
                   onVariantSelect={setSelectedVariant}
+                  onShopperSelect={() => setShopperPickedVariant(true)}
                 />
               )}
 

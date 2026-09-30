@@ -245,6 +245,26 @@ store credit — counts those units as already taken back
 (`loadPriorReversedQty`, `accounting/posting/prior-reversed-qty.ts`), and
 `ReturnService.create` does not let them be returned.
 
+## Turning a single-variant product into a simple product
+
+A product with exactly one variant can be flattened onto the product row by
+`scripts/flatten-single-variant-products-2026-09-30.ts` (one-off, owner-applied).
+It follows this page's rules:
+
+- the variant's stock moves to `products.inventory` and the variant row is
+  **deleted**, never disabled — a disabled variant still makes the product a
+  variant product with stock 0 (Rulings SVF-1/SVF-2 in `docs/RULINGS.md`);
+- price, compare-at, cost, SKU, barcode, weight and backorder flag move with
+  it, `has_variants` becomes false, and the option ("Size: 380 Gram" /
+  "الحجم: 380 جرام") is appended to both descriptions unless already stated;
+- every row that pointed at the variant is moved first (cart lines, the
+  warehouse shadow, reorder rules; order lines only with
+  `--unlink-order-lines`); PO / stock-adjustment / backorder / bundle /
+  count lines block the product;
+- a zero-quantity `adjustment` InventoryHistory row records the move
+  (`reference = flatten-variant:<variantId>`), and the product caches are
+  busted — `--restore <backup>` reverses it with the original ids.
+
 ## Cache
 
 Variant stock is serialized into the storefront product list, detail and

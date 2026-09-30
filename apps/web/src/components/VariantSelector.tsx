@@ -5,17 +5,32 @@ import Image from 'next/image';
 import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
+import { autoSelection } from '@/lib/single-variant';
 
 interface VariantSelectorProps {
   variants: ProductVariant[];
   options: ProductOption[];
   onVariantSelect: (variant: ProductVariant | null) => void;
+  /** Fires when the shopper taps a pill (never for the auto-selected single
+   *  variant), so the page can tell a real pick from the pre-selection. */
+  onShopperSelect?: () => void;
 }
 
-export function VariantSelector({ variants, options, onVariantSelect }: VariantSelectorProps) {
+export function VariantSelector({
+  variants,
+  options,
+  onVariantSelect,
+  onShopperSelect,
+}: VariantSelectorProps) {
   const { t, isRtl } = useLanguage();
-  // Track selected value per option name
-  const [selected, setSelected] = useState<Record<string, string>>({});
+  // Track selected value per option name. A product with exactly one
+  // (tappable) variant starts with it picked — there is nothing to choose.
+  const [selected, setSelected] = useState<Record<string, string>>(() =>
+    autoSelection(
+      variants,
+      options.map(o => o.name)
+    )
+  );
 
   // Derive the matching variant whenever selections change
   useEffect(() => {
@@ -34,6 +49,7 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
   if (!options || options.length === 0) return null;
 
   function handleSelect(optionName: string, value: string) {
+    onShopperSelect?.();
     // Toggle: clicking an already-selected pill clears it. Customer
     // feedback was that a single-axis product (e.g. "4 liters / 6 liters")
     // looked like a forced choice with no escape — they expected to be

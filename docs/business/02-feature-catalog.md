@@ -31,7 +31,7 @@ The discounted price is derived and displayed automatically on the storefront as
 
 Products are organized in a nested category grid — main categories with subcategories underneath, displayed in sizes calibrated for how GCC merchants actually photograph products. On any product page, shoppers can:
 
-- Pick a product variant (size, color, flavor, etc.)
+- Pick a product variant (size, color, flavor, etc.) — a product with only one option available starts with it selected, so Add to Cart works straight away
 - See "Frequently Bought Together" suggestions based on real co-purchase data from your orders
 - Read verified-purchase reviews with star ratings in Arabic and English
 - View cross-sell and upsell recommendations you configure
