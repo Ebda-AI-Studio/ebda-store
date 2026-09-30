@@ -153,6 +153,9 @@ function MinimalProductCard({
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    // Issue #1998 — top-corner sale badge unless the store keeps the legacy
+    // bottom-left corner (per-store StoreTheme DATA, never a slug check).
+    saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true,
     discountOccupiesCorner: false,
     // Issues #1609/#1611/#548 — minimal has no add-to-wishlist heart, only
     // the optional compare (top-start) / remove-from-wishlist (top-end)

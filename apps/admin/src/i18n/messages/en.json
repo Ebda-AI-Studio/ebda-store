@@ -1526,8 +1526,11 @@
         "discountBadgeColorHint": "Unset = platform default red/destructive color.",
         "customBadgeColorHint": "Unset = platform primary color.",
         "discountBadgeTitle": "Discount / sale badge",
+        "saleBadgeLegacyCornerTitle": "Keep the original sale-badge corner",
+        "saleBadgeLegacyCornerHint": "Off (recommended): when no position is chosen below, the sale badge sits in the top corner of the image, on the side the text starts, so the Add-to-cart bar never covers it. On: it stays in the bottom-left corner, as before.",
         "badgePositionLabel": "Badge position",
         "positionBottomLeftDefault": "Bottom left (default)",
+        "positionTopStartDefault": "Top corner, reading-start side (default)",
         "positionBottomRightDefault": "Bottom right (default)",
         "positionTopLeft": "Top left",
         "positionTopRight": "Top right",
@@ -4688,7 +4691,9 @@
       "testModeOn": "Test Mode On",
       "testModeOff": "Test Mode Off",
       "testModeDescriptionOn": "Using test credentials — no real payments processed",
-      "testModeDescriptionOff": "Live mode — real payments will be processed"
+      "testModeDescriptionOff": "Live mode — real payments will be processed",
+      "savedValue": "Saved: {value}",
+      "savedResaveToShow": "Saved: **** — re-save the key to show its last 4 characters."
     },
     "messages": {
       "savedSuccess": "Saved successfully",
@@ -6422,7 +6427,11 @@
         "notesArLabel": "Notes (Arabic)",
         "notesPlaceholder": "Optional notes",
         "colProduct": "Product",
-        "lineItemsTableLabel": "Line items"
+        "lineItemsTableLabel": "Line items",
+        "variant": "Variant",
+        "selectProduct": "Select product",
+        "selectVariant": "Select variant",
+        "variantRequired": "Choose a variant for every line whose product has variants."
       },
       "detail": {
         "qtyReceived": "Received",
@@ -6484,7 +6493,8 @@
         "urgency": "Urgency",
         "urgencyDays": "{days} days",
         "draftPo": "Draft PO",
-        "dismiss": "Dismiss"
+        "dismiss": "Dismiss",
+        "variantLabel": "Variant"
       },
       "draftPo": {
         "created": "Draft PO created.",

@@ -364,6 +364,9 @@ export function ProductCarousel({
                 orderable,
                 customPosition: cardDefaults?.customBadge?.position,
                 discountPosition: cardDefaults?.discountBadge?.position,
+                // Issue #1998 — top-corner sale badge unless the store keeps the legacy
+                // bottom-left corner (per-store StoreTheme DATA, never a slug check).
+                saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true,
                 // Issue #1997 — the carousel has no heart/compare button (so
                 // topStartReserved/topEndReserved are never set here), but
                 // the NEW badge / brand pill below still unconditionally
@@ -510,8 +513,8 @@ export function ProductCarousel({
                             BUG 2 fix: show when OOS too. Corner + color are
                             merchant-configurable via
                             productCardDefaults.discountBadge (default
-                            bottom-left, physical — never mirrors with RTL;
-                            clears the top OOS ribbon by design). */}
+                            bottom-left only when theme.saleBadgeLegacyCorner,
+                            else top corner, physical — #1998). */}
                         {onSale && discountBadgeAllowed && discountBadgeText && (
                           <span
                             className={cn(

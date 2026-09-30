@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
@@ -13,7 +14,10 @@ import { formatPrice, filsToKwd } from '@/lib/format';
 interface POItem {
   id: string;
   productId: string;
-  productName: string;
+  // getPurchaseOrder includes these relations; there is no flat
+  // `productName` on the row (reading one rendered an empty cell).
+  product?: { name: string; sku: string | null } | null;
+  variant?: { id: string; title: string; titleAr: string | null } | null;
   qty: number;
   qtyReceived: number;
   unitCost: number; // fils
@@ -52,6 +56,7 @@ export default function PurchaseOrderDetailPage() {
   const t = useT('stock.purchaseOrders');
   const tDetail = useT('stock.purchaseOrders.detail');
   const tc = useT('common');
+  const isAr = useLocale() === 'ar';
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -173,7 +178,16 @@ export default function PurchaseOrderDetailPage() {
     {
       header: tDetail('colProduct'),
       primaryOnMobile: true,
-      cell: item => <span className="truncate max-w-[12rem] block">{item.productName}</span>,
+      cell: item => (
+        <span className="truncate max-w-[12rem] block">
+          {item.product?.name ?? '—'}
+          {item.variant && (
+            <span className="block text-xs text-muted-foreground truncate">
+              {(isAr && item.variant.titleAr) || item.variant.title}
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       header: tDetail('colOrdered'),

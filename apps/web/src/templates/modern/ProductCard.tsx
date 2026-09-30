@@ -166,6 +166,9 @@ function ModernProductCard({
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    // Issue #1998 — top-corner sale badge unless the store keeps the legacy
+    // bottom-left corner (per-store StoreTheme DATA, never a slug check).
+    saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true,
     // Compare button renders at top-start; the wishlist heart (below)
     // renders at top-end whenever it — or its wishlist-page substitute,
     // RemoveFromWishlistButton — is shown.
@@ -294,8 +297,8 @@ function ModernProductCard({
             </ProductBadgeGroup>
           )}
           {/* Sale badge — pulled OUT of the NEW badge group so only IT moves
-              to the merchant-configured corner (default bottom-left,
-              physical — never mirrors with RTL). BUG 1 fix: helper text.
+              to the merchant-configured corner (physical; unset = top corner, or
+              bottom-left when theme.saleBadgeLegacyCorner, #1998). BUG 1 fix: helper text.
               BUG 2 fix: no inStock gate. */}
           {discountBadgeAllowed && discountBadgeText && (
             <span

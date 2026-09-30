@@ -254,6 +254,97 @@ export function getCustomBadgeText(product: CustomBadgeProductLike, isRtl: boole
   return (isRtl ? (ar ?? en) : (en ?? ar)) ?? null;
 }
 
+/**
+ * Issue #1998 — where the DEFAULT sale badge sits. Every surface passes
+ * `saleBadgeTopCorner: theme.saleBadgeLegacyCorner !== true`, so this is the
+ * platform default; a store that keeps `StoreTheme.saleBadgeLegacyCorner`
+ * (owner, 2026-09-30 — per-store data, never a slug branch) gets the
+ * bottom-left path below, byte-identical to before #1998.
+ *
+ * The old default was the physical bottom-left corner, lifted ~96px on the
+ * five theme cards to clear the mobile add-to-cart band. That band (and the
+ * modern/elegant heart) is `lg:opacity-0` until hover, so on a desktop grid at
+ * rest the chip floated a third of the way up the photo with nothing under it,
+ * on every store that never picked a corner. Dropping it back to the bottom on
+ * desktop would put it under the band the moment the shopper hovers.
+ *
+ * The chip is therefore pinned to the image's TOP corner on the reading-START
+ * side (top-left in LTR, mirrored to top-right in RTL). The add-to-cart band
+ * only ever occupies the bottom edge, so nothing on any surface can cover it.
+ *
+ * The top edge has its own occupants, and the chip never lands on one:
+ *   - the reading-start corner can hold a NEW / brand pill (a chip, ~24px),
+ *     a compare button or Pecannbee's wishlist heart (a button, ~44px), or —
+ *     when the product is not orderable — the out-of-stock ribbon (the
+ *     diagonal corner ribbon's box is 88px);
+ *   - the reading-end corner can hold a wishlist heart / remove button.
+ * Rule: take the start corner when it is free; else the end corner when that
+ * is free; else stay on the side whose occupant is shallower (start on a tie)
+ * and sit one row BELOW it. It never drops to the bottom edge, so it can never
+ * be lifted into mid-image again.
+ *
+ * Returns the physical corner (for the rule 3/4 mutex comparisons) and the
+ * literal Tailwind classes — spelled out in full so Tailwind's source scanner
+ * keeps every rule (same discipline as `bottomCornerClass`).
+ */
+type TopDepth = 0 | 1 | 2 | 3; // 0 free · 1 chip · 2 button · 3 OOS ribbon
+
+function pinnedTopClass(h: PhysicalH, depth: TopDepth): string {
+  if (h === 'left') {
+    if (depth === 3) return 'top-[min(6rem,calc(100%-2.25rem))] left-3';
+    if (depth === 2) return 'top-16 left-3';
+    if (depth === 1) return 'top-12 left-3';
+    return 'top-3 left-3';
+  }
+  if (depth === 3) return 'top-[min(6rem,calc(100%-2.25rem))] right-3';
+  if (depth === 2) return 'top-16 right-3';
+  if (depth === 1) return 'top-12 right-3';
+  return 'top-3 right-3';
+}
+
+export function pinDefaultDiscountBadge({
+  isRtl,
+  orderable,
+  topStartReserved = false,
+  topEndReserved = false,
+  newOrBrandBadgeReserved = false,
+}: {
+  isRtl: boolean;
+  orderable: boolean;
+  topStartReserved?: boolean;
+  topEndReserved?: boolean;
+  newOrBrandBadgeReserved?: boolean;
+}): { corner: CustomBadgePosition; cls: string } {
+  // Deepest occupant of each logical top corner.
+  const startDepth: TopDepth = !orderable
+    ? 3
+    : topStartReserved
+      ? 2
+      : newOrBrandBadgeReserved
+        ? 1
+        : 0;
+  const endDepth: TopDepth = topEndReserved ? 2 : 0;
+
+  let side: 'start' | 'end';
+  let depth: TopDepth;
+  if (startDepth === 0) {
+    side = 'start';
+    depth = 0;
+  } else if (endDepth === 0) {
+    side = 'end';
+    depth = 0;
+  } else if (startDepth <= endDepth) {
+    side = 'start';
+    depth = startDepth;
+  } else {
+    side = 'end';
+    depth = endDepth;
+  }
+
+  const h: PhysicalH = (side === 'start') !== isRtl ? 'left' : 'right';
+  return { corner: `top-${h}` as CustomBadgePosition, cls: pinnedTopClass(h, depth) };
+}
+
 export interface ResolveCardBadgesInput {
   product: CustomBadgeProductLike;
   isRtl: boolean;
@@ -333,6 +424,15 @@ export interface ResolveCardBadgesInput {
    * `BadgeBottomOverlay` above. Defaults to `'none'`.
    */
   bottomOverlay?: BadgeBottomOverlay;
+  /**
+   * Issue #1998 — pass `store.theme?.saleBadgeLegacyCorner !== true`. When
+   * true, an UNSET discount corner is pinned to the image's top corner on the
+   * reading-start side (`pinDefaultDiscountBadge`). When false (the store keeps
+   * the legacy corner) the unset corner stays bottom-left exactly as before.
+   * Defaults to false so a caller that omits it keeps today's placement. A
+   * merchant-chosen `discountPosition` is never affected.
+   */
+  saleBadgeTopCorner?: boolean;
 }
 
 export interface ResolvedCardBadges {
@@ -410,16 +510,33 @@ export function resolveCardBadges({
   topEndReserved = false,
   newOrBrandBadgeReserved = false,
   bottomOverlay = 'none',
+  saleBadgeTopCorner = false,
 }: ResolveCardBadgesInput): ResolvedCardBadges {
   const label = getCustomBadgeText(product, isRtl);
 
   // Rule 2 — stock state outranks promotion.
   const customBadgeText = orderable ? label : null;
 
+  // Issue #1998 — unless the store keeps the legacy corner, an UNSET
+  // discount corner is pinned to the image's top edge (reading-start side),
+  // so it is resolved here, before rules 3/4, to the physical corner it will
+  // actually occupy. Flag off → null → the original path below, unchanged.
+  const pinnedDiscount =
+    saleBadgeTopCorner && discountPosition === undefined
+      ? pinDefaultDiscountBadge({
+          isRtl,
+          orderable,
+          topStartReserved,
+          topEndReserved,
+          newOrBrandBadgeReserved,
+        })
+      : null;
+
   // Rules 3 and 4 compare RESOLVED corners, so an unset position and its
   // explicit equivalent count as the same corner.
   const resolvedCustom = customPosition ?? CUSTOM_BADGE_DEFAULT_POSITION;
-  const resolvedDiscount = discountPosition ?? DISCOUNT_BADGE_DEFAULT_POSITION;
+  const resolvedDiscount =
+    discountPosition ?? pinnedDiscount?.corner ?? DISCOUNT_BADGE_DEFAULT_POSITION;
   const sameCorner = resolvedCustom === resolvedDiscount;
 
   const discountBadgeAllowed = !(customBadgeText && discountOccupiesCorner && sameCorner);
@@ -512,6 +629,11 @@ export function resolveCardBadges({
     // When the custom chip stacks above it, the discount chip's clamp reserves
     // the stacked row too (#1996) so a short image box cannot pin both chips
     // to the same ceiling.
-    discountBadgePositionCls: classFor(avoidedDiscount, false, stacked),
+    // Issue #1998 — unless the store keeps the legacy corner, the unset chip
+    // never takes the lifted bottom tier: it is pinned to the top edge by
+    // `pinDefaultDiscountBadge`. Flag off → `classFor` exactly as before.
+    discountBadgePositionCls: pinnedDiscount
+      ? pinnedDiscount.cls
+      : classFor(avoidedDiscount, false, stacked),
   };
 }

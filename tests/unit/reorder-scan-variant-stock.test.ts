@@ -4,11 +4,16 @@
  * every variant product since migration 20260830090000). Before the fix a
  * variant product with 500 units scanned as onHand=0 and became a false
  * reorder candidate (and a Gemini call).
+ *
+ * Owner decision 2026-10-01: the unit is now each ACTIVE variant (one
+ * suggestion per variant, keyed (store, product, variant)), so a variant's
+ * onHand is its OWN stock. The DB-backed proof is
+ * tests/integration/accounting/reorder-per-variant.test.ts.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findMany = vi.fn();
-const upserted: Array<{ productId: string; onHand: number }> = [];
+const upserted: Array<{ productId: string; variantId?: string | null; onHand: number }> = [];
 
 const tx = {
   $executeRaw: vi.fn(async () => 0),
@@ -26,10 +31,20 @@ const tx = {
   },
   reorderSuggestion: {
     findFirst: vi.fn(async () => null),
-    create: vi.fn(async ({ data }: { data: { productId: string; onHand: number } }) => {
-      upserted.push({ productId: data.productId, onHand: data.onHand });
-      return data;
-    }),
+    create: vi.fn(
+      async ({
+        data,
+      }: {
+        data: { productId: string; variantId: string | null; onHand: number };
+      }) => {
+        upserted.push({
+          productId: data.productId,
+          variantId: data.variantId,
+          onHand: data.onHand,
+        });
+        return data;
+      }
+    ),
     update: vi.fn(),
   },
 };
@@ -57,11 +72,11 @@ describe('runReorderScan — variant-aware on-hand (#1100)', () => {
     findMany.mockReset();
   });
 
-  it('asks Prisma for the variants so the stock can be summed', async () => {
+  it('asks Prisma for each variant with its stock AND isActive flag', async () => {
     findMany.mockResolvedValue([]);
     await runReorderScan('store-1');
     const select = findMany.mock.calls[0][0].select;
-    expect(select.variants).toEqual({ select: { inventory: true, isActive: true } });
+    expect(select.variants.select).toMatchObject({ id: true, inventory: true, isActive: true });
   });
 
   it('does not suggest a reorder for a well-stocked variant product whose parent column is 0', async () => {
@@ -70,7 +85,10 @@ describe('runReorderScan — variant-aware on-hand (#1100)', () => {
         ...base,
         id: 'variant-product',
         inventory: 0,
-        variants: [{ inventory: 300 }, { inventory: 200 }],
+        variants: [
+          { id: 'v1', title: 'A', inventory: 300 },
+          { id: 'v2', title: 'B', inventory: 200 },
+        ],
       },
     ]);
     const result = await runReorderScan('store-1');
@@ -82,31 +100,57 @@ describe('runReorderScan — variant-aware on-hand (#1100)', () => {
     findMany.mockResolvedValue([{ ...base, id: 'plain-product', inventory: 0, variants: [] }]);
     const result = await runReorderScan('store-1');
     expect(result.suggested).toBe(1);
-    expect(upserted).toEqual([{ productId: 'plain-product', onHand: 0 }]);
+    expect(upserted).toEqual([{ productId: 'plain-product', variantId: null, onHand: 0 }]);
   });
 
-  it('reports the variant sum as onHand when a variant product is genuinely low', async () => {
+  it('suggests each low variant with its OWN stock as onHand (not the product sum)', async () => {
     findMany.mockResolvedValue([
-      { ...base, id: 'low-variant', inventory: 0, variants: [{ inventory: 1 }, { inventory: 2 }] },
+      {
+        ...base,
+        id: 'low-variant',
+        inventory: 0,
+        variants: [
+          { id: 'v1', title: 'A', inventory: 1 },
+          { id: 'v2', title: 'B', inventory: 2 },
+        ],
+      },
     ]);
     await runReorderScan('store-1');
-    expect(upserted).toEqual([{ productId: 'low-variant', onHand: 3 }]);
+    expect(upserted).toEqual([
+      { productId: 'low-variant', variantId: 'v1', onHand: 1 },
+      { productId: 'low-variant', variantId: 'v2', onHand: 2 },
+    ]);
   });
 
   // Ruling M5-6 (#1103): a disabled variant's units are not sellable stock.
-  it('leaves a disabled variant out of onHand', async () => {
+  it('never makes a disabled variant a unit', async () => {
     findMany.mockResolvedValue([
       {
         ...base,
         id: 'disabled-variant',
         inventory: 0,
         variants: [
-          { inventory: 2, isActive: true },
-          { inventory: 500, isActive: false },
+          { id: 'v-on', title: 'On', inventory: 2, isActive: true },
+          // Low enough to be a candidate if it were scanned — it must not be.
+          { id: 'v-off', title: 'Off', inventory: 0, isActive: false },
         ],
       },
     ]);
     await runReorderScan('store-1');
-    expect(upserted).toEqual([{ productId: 'disabled-variant', onHand: 2 }]);
+    expect(upserted).toEqual([{ productId: 'disabled-variant', variantId: 'v-on', onHand: 2 }]);
+  });
+
+  it('a product whose variants are ALL disabled scans as nothing — never its parent column', async () => {
+    findMany.mockResolvedValue([
+      {
+        ...base,
+        id: 'all-off',
+        inventory: 0,
+        variants: [{ id: 'v-off', title: 'Off', inventory: 0, isActive: false }],
+      },
+    ]);
+    const result = await runReorderScan('store-1');
+    expect(result.suggested).toBe(0);
+    expect(upserted).toEqual([]);
   });
 });

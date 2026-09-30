@@ -50,6 +50,8 @@ export interface ThemeUpdates {
    *  card (Ahmad 2026-05-20: moved from branding/ThemeTab). */
   showBrandBadge?: boolean;
   showQuickAdd?: boolean;
+  /** #1998 — keep the legacy bottom-left sale-badge corner (Page Builder toggle). */
+  saleBadgeLegacyCorner?: boolean;
   /** Item 6 — hide price on all product cards store-wide. Default true. */
   showPriceOnCards?: boolean;
   /** Item 10 — force object-fit:cover on card images to create a uniform grid. Default false. */

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { useAuth } from '@/lib/auth';
@@ -13,6 +14,15 @@ import { useToast } from '@force/ui';
 interface ReorderProduct {
   id: string;
   name: string;
+  nameAr?: string | null;
+  sku: string | null;
+}
+
+/** The variant a per-variant suggestion is for (null = product with no variants). */
+interface ReorderVariant {
+  id: string;
+  title: string;
+  titleAr: string | null;
   sku: string | null;
 }
 
@@ -24,6 +34,7 @@ interface ReorderSupplier {
 interface ReorderSuggestion {
   id: string;
   productId: string;
+  variantId: string | null;
   suggestedQty: number;
   velocity7d: number;
   urgencyDays: number;
@@ -32,6 +43,7 @@ interface ReorderSuggestion {
   reasoningAr: string | null;
   status: 'open' | 'accepted' | 'dismissed' | 'expired';
   product: ReorderProduct;
+  variant: ReorderVariant | null;
   supplier: ReorderSupplier | null;
   scannedAt: string;
 }
@@ -90,6 +102,10 @@ function SuggestionCard({
 }) {
   const [accepting, setAccepting] = useState(false);
   const [dismissing, setDismissing] = useState(false);
+  const isAr = useLocale() === 'ar';
+  const productName = (isAr && item.product.nameAr) || item.product.name;
+  const variantName = item.variant ? (isAr && item.variant.titleAr) || item.variant.title : null;
+  const sku = item.variant?.sku ?? item.product.sku;
 
   async function handleAccept() {
     if (accepting || dismissing) return;
@@ -110,10 +126,14 @@ function SuggestionCard({
       {/* Header row */}
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-0.5 min-w-0">
-          <p className="font-medium text-sm truncate">{item.product.name}</p>
-          {item.product.sku && (
-            <p className="text-xs text-muted-foreground font-mono">{item.product.sku}</p>
+          <p className="font-medium text-sm truncate">{productName}</p>
+          {variantName && (
+            <p className="text-xs text-foreground truncate">
+              <span className="text-muted-foreground">{t('card.variantLabel')}: </span>
+              {variantName}
+            </p>
           )}
+          {sku && <p className="text-xs text-muted-foreground font-mono">{sku}</p>}
         </div>
         <UrgencyBadge days={item.urgencyDays} t={t} />
       </div>

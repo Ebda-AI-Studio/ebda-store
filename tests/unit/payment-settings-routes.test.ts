@@ -30,6 +30,10 @@
  *   5. Store-scoped routes 404 on an unknown store and 403 a store_admin
  *      who does not own the store (the route's own inline ownership
  *      check, defense-in-depth alongside the stubbed `requireStoreAccess`).
+ *   6. #2010 — apiKey/merchantId display as `****` + the save-time
+ *      fingerprint (last 4 of the PLAINTEXT), never any part of the
+ *      ciphertext, and no read path decrypts. A row saved before the
+ *      fingerprint existed shows `****` and flags "re-save to show".
  */
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
@@ -38,7 +42,9 @@ import request from 'supertest';
 
 // ─── Mocks (declared before the route module is dynamically imported) ─────
 
-const { mockPrisma, mockClearCache, mockAuditLog, currentUser } = vi.hoisted(() => ({
+const { mockPrisma, mockClearCache, mockAuditLog, currentUser, decryptSpy } = vi.hoisted(() => ({
+  // #2010: the read path must never decrypt — every GET asserts this spy idle.
+  decryptSpy: vi.fn(),
   mockPrisma: {
     paymentConfig: {
       findMany: vi.fn(),
@@ -101,7 +107,10 @@ vi.mock('@api/services/payment.service', () => ({
 vi.mock('@api/services/encryption.service', () => ({
   encryption: {
     encrypt: (v: string) => `CIPHERTEXT(${v})`,
-    decrypt: (v: string) => String(v).replace(/^CIPHERTEXT\(|\)$/g, ''),
+    decrypt: (v: string) => {
+      decryptSpy(v);
+      return String(v).replace(/^CIPHERTEXT\(|\)$/g, '');
+    },
     mask: (v: string, visibleChars = 4) => {
       if (!v || v.length <= visibleChars * 2) return '****';
       return `${v.substring(0, visibleChars)}****${v.substring(v.length - visibleChars)}`;
@@ -378,5 +387,101 @@ describe('POST /payment-settings/:provider/set-default', () => {
 
     expect(res.status).toBe(404);
     expect(mockPrisma.paymentConfig.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+// ─── #2010 — which key is saved, without decrypting ────────────────────────
+
+describe('#2010 — credential display fingerprint', () => {
+  it('shows ****<last4 of the plaintext> from the stored fingerprint, never the ciphertext, and never decrypts', async () => {
+    mockPrisma.paymentConfig.findMany.mockResolvedValue([
+      baseConfig({ apiKeyLast4: '_key', merchantIdLast4: '3456' }),
+    ]);
+
+    const res = await request(app).get(BASE);
+
+    expect(res.status).toBe(200);
+    const config = res.body.data.configs[0];
+    expect(config.apiKey).toBe('****_key');
+    expect(config.merchantId).toBe('****3456');
+    expect(config.apiKeyFingerprintMissing).toBe(false);
+    expect(config.merchantIdFingerprintMissing).toBe(false);
+    // The old mask was `encryption.mask(<ciphertext>)` → "CIPH****key)".
+    // No fragment of the stored value may appear, however short.
+    const raw = JSON.stringify(res.body);
+    expect(raw).not.toContain('CIPH');
+    expect(raw).not.toContain('xt)');
+    expect(decryptSpy).not.toHaveBeenCalled();
+  });
+
+  it('a row saved before the fingerprint existed shows **** and flags re-save', async () => {
+    currentUser.role = 'store_admin';
+    currentUser.userId = 'owner-1';
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'owner-1' });
+    mockPrisma.paymentConfig.findMany
+      .mockResolvedValueOnce([baseConfig({ storeId: STORE_ID, apiKeyLast4: null })])
+      .mockResolvedValueOnce([]);
+
+    const res = await request(app).get(`${BASE}/store/${STORE_ID}`);
+
+    const config = res.body.data.storeConfigs[0];
+    expect(config.apiKey).toBe('****');
+    expect(config.merchantId).toBe('****');
+    expect(config.apiKeyFingerprintMissing).toBe(true);
+    expect(config.merchantIdFingerprintMissing).toBe(true);
+    expect(JSON.stringify(res.body)).not.toContain('CIPH');
+    expect(decryptSpy).not.toHaveBeenCalled();
+  });
+
+  it('a row with no key at all returns null and no re-save flag', async () => {
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
+      baseConfig({ apiKey: null, merchantId: null })
+    );
+
+    const res = await request(app).get(`${BASE}/tap`);
+
+    expect(res.body.data.config.apiKey).toBeNull();
+    expect(res.body.data.config.apiKeyFingerprintMissing).toBe(false);
+  });
+
+  it('stores the fingerprint next to the ciphertext on create', async () => {
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
+    mockPrisma.paymentConfig.create.mockResolvedValue(baseConfig());
+
+    await request(app)
+      .post(BASE)
+      .send({ provider: 'tap', apiKey: 'sk_new_key_WXYZ', merchantId: 'merchant_987' });
+
+    expect(mockPrisma.paymentConfig.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          apiKey: 'CIPHERTEXT(sk_new_key_WXYZ)',
+          apiKeyLast4: 'WXYZ',
+          merchantId: 'CIPHERTEXT(merchant_987)',
+          merchantIdLast4: '_987',
+        }),
+      })
+    );
+  });
+
+  it('updates the fingerprint when a store key is re-saved, and leaves it alone on a masked echo', async () => {
+    currentUser.role = 'store_admin';
+    currentUser.userId = 'owner-1';
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'owner-1' });
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', storeId: STORE_ID })
+    );
+    mockPrisma.paymentConfig.update.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
+
+    await request(app).put(`${BASE}/store/${STORE_ID}/tap`).send({ apiKey: 'sk_rotated_ABCD' });
+    const saved = mockPrisma.paymentConfig.update.mock.calls[0][0].data;
+    expect(saved.apiKey).toBe('CIPHERTEXT(sk_rotated_ABCD)');
+    expect(saved.apiKeyLast4).toBe('ABCD');
+
+    mockPrisma.paymentConfig.update.mockClear();
+    await request(app).put(`${BASE}/store/${STORE_ID}/tap`).send({ apiKey: '****ABCD' });
+    const echoed = mockPrisma.paymentConfig.update.mock.calls[0][0].data;
+    expect(echoed.apiKey).toBeUndefined();
+    expect(echoed.apiKeyLast4).toBeUndefined();
   });
 });

@@ -129,6 +129,9 @@ export default function StoreLayoutPage() {
   // confirming. Ahmad 2026-05-20: "smart palette does apply automatically
   // i don't want this".
   const [pendingThemeUpdates, setPendingThemeUpdates] = useState<ThemeUpdates>({});
+  // #1998 — staged value wins over the saved theme (same pattern as showQuickAdd).
+  const saleBadgeLegacyCorner =
+    pendingThemeUpdates.saleBadgeLegacyCorner ?? storeInfo?.theme?.saleBadgeLegacyCorner === true;
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Embedded editors (Navigation, Footer & utility links) register a silent
   // save here so the main Save button persists them — no separate save button,
@@ -2876,6 +2879,30 @@ export default function StoreLayoutPage() {
                     <p className="text-sm font-semibold text-foreground">
                       {t('productCard.discountBadgeTitle')}
                     </p>
+                    {/* #1998 — per-store StoreTheme flag (shallow-merge theme PATCH on
+                        Save, via pendingThemeUpdates). Off = the unset badge sits in
+                        the image's top corner; on = the legacy bottom-left corner. */}
+                    <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background p-3 cursor-pointer">
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-foreground">
+                          {t('productCard.saleBadgeLegacyCornerTitle')}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {t('productCard.saleBadgeLegacyCornerHint')}
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={saleBadgeLegacyCorner}
+                        onChange={e =>
+                          setPendingThemeUpdates(prev => ({
+                            ...prev,
+                            saleBadgeLegacyCorner: e.target.checked,
+                          }))
+                        }
+                        className="h-5 w-5 cursor-pointer accent-primary"
+                      />
+                    </label>
                     <div>
                       <label className="block text-xs text-muted-foreground mb-1">
                         {t('productCard.badgePositionLabel')}
@@ -2905,7 +2932,11 @@ export default function StoreLayoutPage() {
                         }
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
-                        <option value="">{t('productCard.positionBottomLeftDefault')}</option>
+                        <option value="">
+                          {saleBadgeLegacyCorner
+                            ? t('productCard.positionBottomLeftDefault')
+                            : t('productCard.positionTopStartDefault')}
+                        </option>
                         <option value="top-left">{t('productCard.positionTopLeft')}</option>
                         <option value="top-right">{t('productCard.positionTopRight')}</option>
                         <option value="bottom-left">{t('productCard.positionBottomLeft')}</option>

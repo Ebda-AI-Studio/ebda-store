@@ -99,6 +99,9 @@ export function ProductListItem({
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    // Issue #1998 — top-corner sale badge unless the store keeps the legacy
+    // bottom-left corner (per-store StoreTheme DATA, never a slug check).
+    saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true,
   });
 
   // CTA shape + size extra classes.
@@ -126,8 +129,8 @@ export function ProductListItem({
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
         {/* Sale badge — BUG 1 fix: show KWD or pct text via helper.
             BUG 2 fix: no inStock gate. Corner + color are merchant-
-            configurable via productCardDefaults.discountBadge (default
-            bottom-left, physical — never mirrors with RTL). */}
+            configurable via productCardDefaults.discountBadge (physical;
+            unset = top corner, or bottom-left when theme.saleBadgeLegacyCorner, #1998). */}
         {(pricing.displayCompare || pricing.hasVariantDiscount) &&
           discountBadgeAllowed &&
           discountBadgeText && (

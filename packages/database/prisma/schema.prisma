@@ -1851,6 +1851,14 @@ model PaymentConfig {
   merchantId    String? @map("merchant_id")
   webhookSecret String? @map("webhook_secret")
 
+  // Non-secret display fingerprints (#2010): the last 4 characters of the
+  // PLAINTEXT, captured at save time next to the encrypted value, so the admin
+  // can see WHICH key is saved (`****abcd`) without any read path decrypting.
+  // Null on rows saved before this column existed — shown as `****` with a
+  // "re-save to show" hint until the key is saved again.
+  apiKeyLast4     String? @map("api_key_last4")
+  merchantIdLast4 String? @map("merchant_id_last4")
+
   // Provider-specific settings
   testMode            Boolean  @default(true) @map("test_mode")
   supportedMethods    String[] @default([]) @map("supported_methods") // knet, visa, apple_pay, etc.

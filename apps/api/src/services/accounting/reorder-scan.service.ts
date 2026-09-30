@@ -18,6 +18,15 @@
  *      every daily run: 4156 open suggestions for 143 items in prod (audit
  *      2026-09-30, finding 6).
  *
+ * The unit of a suggestion is the row that HOLDS the stock (owner decision
+ * 2026-10-01, docs/architecture/inventory-model.md): one suggestion per
+ * ACTIVE variant of a variant product, one per product for a product with no
+ * variants. The dedupe key is (store, product, variant). A product-level
+ * suggestion for a variant product drafted a PO line with no variant, and
+ * receiving it wrote the parent `products.inventory` column — which must stay
+ * 0 for a variant product. Step 1 expires any such legacy open row (and any
+ * open row for a variant that has since been disabled) on the next run.
+ *
  * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
  * Inngest jobs (no tenant GUC in context) can read reorder_suggestions,
  * purchase_order_items, backorder_lines and products without being filtered
@@ -45,7 +54,11 @@ export interface ReorderScanResult {
 // ---------------------------------------------------------------------------
 
 interface ReorderCandidate {
+  /** Unique per suggestion unit: the variant id, else the product id. */
+  key: string;
   productId: string;
+  /** Null for a product with no variants; the variant for a variant product. */
+  variantId: string | null;
   name: string;
   nameAr: string | null;
   sku: string | null;
@@ -63,7 +76,7 @@ interface ReorderCandidate {
 }
 
 interface GeminiReasoningItem {
-  productId: string;
+  key: string;
   reasoningEn: string;
   reasoningAr: string;
 }
@@ -113,19 +126,34 @@ async function getSupplierLeadTime(supplierId: string, tx: any): Promise<number 
 }
 
 // ---------------------------------------------------------------------------
-// Helper: sum OrderItem quantity for a product over the last N days (paid orders)
+// Helper: sum OrderItem quantity for a product (or ONE of its variants) over
+// the last N days (paid orders)
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function sumOrderQty(
   productId: string,
+  variantId: string | null,
   storeId: string,
   days: number,
   tx: any
 ): Promise<number> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const result = await tx.$queryRaw<{ total: bigint }[]>`
+  // A variant unit's velocity is that variant's own sales — summing the whole
+  // product would give every variant the product's total demand.
+  const result = variantId
+    ? await tx.$queryRaw<{ total: bigint }[]>`
+    SELECT COALESCE(SUM(oi.quantity), 0) AS total
+    FROM public.order_items oi
+    JOIN public.orders o ON o.id = oi.order_id
+    WHERE oi.product_id = ${productId}
+      AND oi.variant_id = ${variantId}
+      AND o.store_id = ${storeId}
+      AND o.payment_status = 'paid'
+      AND o.created_at >= ${since}
+  `
+    : await tx.$queryRaw<{ total: bigint }[]>`
     SELECT COALESCE(SUM(oi.quantity), 0) AS total
     FROM public.order_items oi
     JOIN public.orders o ON o.id = oi.order_id
@@ -144,7 +172,7 @@ async function sumOrderQty(
 
 function buildGeminiPrompt(candidates: ReorderCandidate[]): string {
   const products = candidates.map(c => ({
-    productId: c.productId,
+    key: c.key,
     name: c.name,
     nameAr: c.nameAr,
     sku: c.sku,
@@ -164,7 +192,7 @@ function buildGeminiPrompt(candidates: ReorderCandidate[]): string {
 in <=2 sentences each, explain WHY this reorder suggestion makes sense given the velocity
 + on-hand + lead time + open backlog. Output bilingual (English + Arabic).
 Return STRICT JSON:
-{ "items": [{ "productId": "...", "reasoningEn": "...", "reasoningAr": "..." }] }
+{ "items": [{ "key": "<the product's key, copied exactly>", "reasoningEn": "...", "reasoningAr": "..." }] }
 
 Products: ${JSON.stringify(products)}`;
 }
@@ -204,7 +232,30 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         AND status = 'open'
         AND scanned_at < ${expireThreshold}
     `;
-    const expired = Number(expiredResult);
+
+    // Step 1b: expire open suggestions whose unit no longer exists in the
+    // per-variant model — a product-level row (variant_id NULL) for a product
+    // that HAS variants (the pre-2026-10-01 shape: drafting a PO from it wrote
+    // the parent column), and a row for a variant that is now disabled (a
+    // disabled variant is not stock — inventory-model.md). The scan below then
+    // creates the correct per-variant rows. Runs before the per-unit upsert so
+    // the dedupe lookup can never pick a legacy row back up.
+    const unitGoneResult = await tx.$executeRaw`
+      UPDATE public.reorder_suggestions rs
+      SET status = 'expired'
+      WHERE rs.store_id = ${storeId}
+        AND rs.status = 'open'
+        AND (
+          (rs.variant_id IS NULL AND EXISTS (
+            SELECT 1 FROM public.product_variants pv WHERE pv.product_id = rs.product_id
+          ))
+          OR (rs.variant_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM public.product_variants pv
+            WHERE pv.id = rs.variant_id AND pv.is_active = false
+          ))
+        )
+    `;
+    const expired = Number(expiredResult) + Number(unitGoneResult);
 
     // -------------------------------------------------------------------------
     // Step 2: List active trackInventory products
@@ -222,16 +273,29 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         nameAr: true,
         sku: true,
         inventory: true,
-        // A variant product's stock is SUM(variants.inventory); its parent
-        // column is held at 0 (docs/architecture/inventory-model.md). Without
-        // this, every variant product scans as onHand=0 and becomes a false
-        // reorder candidate that also spends Gemini quota.
-        variants: { select: { inventory: true, isActive: true } },
-        lowStockThreshold: true,
-        reorderRules: {
-          where: { variantId: null, isActive: true },
-          take: 1,
+        // A variant product's stock lives on its variants and its parent
+        // column is held at 0 (docs/architecture/inventory-model.md), so each
+        // ACTIVE variant is scanned as its own unit. `isActive` is selected
+        // (not pre-filtered) so a product whose variants are ALL disabled is
+        // still recognised as a variant product and scans as nothing, rather
+        // than falling back to its parent column.
+        variants: {
           select: {
+            id: true,
+            title: true,
+            titleAr: true,
+            sku: true,
+            inventory: true,
+            isActive: true,
+          },
+        },
+        lowStockThreshold: true,
+        // Every active rule: the product-level one (variantId null) and any
+        // per-variant ones. A variant uses its own rule, else the product's.
+        reorderRules: {
+          where: { isActive: true },
+          select: {
+            variantId: true,
             minQty: true,
             reorderQty: true,
             leadTimeDays: true,
@@ -245,31 +309,75 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
     return { expiredCount: expired, products };
   });
 
+  // Flatten to scan UNITS: one per active variant of a variant product, one
+  // per product with no variants.
+  type ScanProduct = (typeof products)[number];
+  type ScanRule = ScanProduct['reorderRules'][number];
+  interface ScanUnit {
+    product: ScanProduct;
+    variantId: string | null;
+    name: string;
+    nameAr: string | null;
+    sku: string | null;
+    onHand: number;
+    rule: ScanRule | null;
+  }
+  const units: ScanUnit[] = [];
+  for (const product of products) {
+    const productRule = product.reorderRules.find((r: ScanRule) => r.variantId === null) ?? null;
+    const variants = product.variants ?? [];
+    if (variants.length === 0) {
+      units.push({
+        product,
+        variantId: null,
+        name: product.name,
+        nameAr: product.nameAr,
+        sku: product.sku,
+        onHand: effectiveInventory(product),
+        rule: productRule,
+      });
+      continue;
+    }
+    for (const v of variants) {
+      if (v.isActive === false) continue; // a disabled variant is not stock
+      units.push({
+        product,
+        variantId: v.id,
+        name: `${product.name} — ${v.title}`,
+        nameAr: product.nameAr ? `${product.nameAr} — ${v.titleAr ?? v.title}` : null,
+        sku: v.sku ?? product.sku,
+        // Variant rows are floored at 0 (inventory-model.md).
+        onHand: Math.max(v.inventory ?? 0, 0),
+        rule: product.reorderRules.find((r: ScanRule) => r.variantId === v.id) ?? productRule,
+      });
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Steps 3–4: Compute metrics + collect candidates in BOUNDED chunks, each in
-  // its OWN short RLS-bypass tx. The per-product fan-out (sumOrderQty ×2,
+  // its OWN short RLS-bypass tx. The per-unit fan-out (sumOrderQty ×2,
   // pickLastSupplierForProduct, 2 aggregates) over a large catalog otherwise
   // blew the 30s interactive-tx timeout → "Transaction not found" (P1
   // 2026-06-27, force-api-stock-reorder-scan-cron, stores with many products).
-  // Chunking bounds each tx's duration regardless of catalog size.
+  // Chunking bounds each tx's duration regardless of catalog size — it is by
+  // UNIT, not product, so a product with many variants cannot widen one tx.
   // -------------------------------------------------------------------------
   const candidates: ReorderCandidate[] = [];
   const SCAN_CHUNK_SIZE = 25;
-  for (let chunkStart = 0; chunkStart < products.length; chunkStart += SCAN_CHUNK_SIZE) {
-    const productSlice = products.slice(chunkStart, chunkStart + SCAN_CHUNK_SIZE);
+  for (let chunkStart = 0; chunkStart < units.length; chunkStart += SCAN_CHUNK_SIZE) {
+    const unitSlice = units.slice(chunkStart, chunkStart + SCAN_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chunkCandidates = await withRlsBypass(async (tx: any) => {
       const collected: ReorderCandidate[] = [];
 
-      for (const product of productSlice) {
-        const qty7d = await sumOrderQty(product.id, storeId, 7, tx);
-        const qty28d = await sumOrderQty(product.id, storeId, 28, tx);
+      for (const unit of unitSlice) {
+        const { product, variantId, rule, onHand } = unit;
+        const qty7d = await sumOrderQty(product.id, variantId, storeId, 7, tx);
+        const qty28d = await sumOrderQty(product.id, variantId, storeId, 28, tx);
 
         const velocity7d = qty7d / 7;
         const velocity28d = qty28d / 28;
         const velocity = Math.max(velocity7d, velocity28d);
-
-        const rule = product.reorderRules[0] ?? null;
 
         const minQty = rule?.minQty ?? product.lowStockThreshold;
         const safetyStockDays = rule?.safetyStockDays ?? 7;
@@ -277,7 +385,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         const reorderQty = rule?.reorderQty ?? defaultReorderQty;
 
         // Lead-time resolution order (per spec):
-        //   1. ReorderRule.leadTimeDays  — explicit per-product rule (wins when a rule exists)
+        //   1. ReorderRule.leadTimeDays  — explicit rule (variant's, else product's)
         //   2. supplier.leadTimeDays     — last-PO supplier when no rule is configured
         //   3. 7                         — system-wide default
         //
@@ -287,7 +395,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         let resolvedSupplierId: string | null;
 
         if (rule !== null) {
-          // A per-product rule always takes priority over the supplier's lead time.
+          // A rule always takes priority over the supplier's lead time.
           leadTimeDays = rule.leadTimeDays;
           // Supplier for the suggestion: prefer rule's explicit preferred supplier.
           resolvedSupplierId =
@@ -301,12 +409,12 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
           leadTimeDays = supplierLt ?? 7;
         }
 
-        const onHand = effectiveInventory(product);
-
         // Sum qty - qtyReceived for active PO items (status IN ('sent','partial'))
+        // on THIS unit: the variant's own lines, or the product's variant-less ones.
         const onOrderAgg = await tx.purchaseOrderItem.aggregate({
           where: {
             productId: product.id,
+            variantId,
             po: {
               storeId,
               status: { in: ['sent', 'partial'] },
@@ -323,6 +431,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         const backlogAgg = await tx.backorderLine.aggregate({
           where: {
             productId: product.id,
+            variantId,
             storeId,
             fulfilledAt: null,
             cancelledAt: null,
@@ -347,10 +456,12 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         const supplierId = resolvedSupplierId;
 
         collected.push({
+          key: variantId ?? product.id,
           productId: product.id,
-          name: product.name,
-          nameAr: product.nameAr,
-          sku: product.sku,
+          variantId,
+          name: unit.name,
+          nameAr: unit.nameAr,
+          sku: unit.sku,
           velocity7d,
           velocity28d,
           onHand,
@@ -397,7 +508,8 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         storeId,
       });
       for (const item of response.items ?? []) {
-        reasoningMap.set(item.productId, {
+        if (!item?.key) continue;
+        reasoningMap.set(item.key, {
           reasoningEn: item.reasoningEn ?? 'AI reasoning unavailable — manual review suggested',
           reasoningAr: item.reasoningAr ?? null,
         });
@@ -409,8 +521,8 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       );
       // Set fallback reasoning for all products in this chunk
       for (const c of chunk) {
-        if (!reasoningMap.has(c.productId)) {
-          reasoningMap.set(c.productId, {
+        if (!reasoningMap.has(c.key)) {
+          reasoningMap.set(c.key, {
             reasoningEn: 'AI reasoning unavailable — manual review suggested',
             reasoningAr: null,
           });
@@ -438,21 +550,22 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       let upserted = 0;
 
       for (const candidate of slice) {
-        const reasoning = reasoningMap.get(candidate.productId) ?? {
+        const reasoning = reasoningMap.get(candidate.key) ?? {
           reasoningEn: 'AI reasoning unavailable — manual review suggested',
           reasoningAr: null,
         };
 
         try {
-          // One OPEN suggestion per item: refresh it (newest first, in case
-          // pre-fix duplicates still exist) or create one. Own SAVEPOINT per
-          // candidate so a failed write cannot abort the rest of the batch.
+          // One OPEN suggestion per unit — (store, product, variant): refresh
+          // it (newest first, in case pre-fix duplicates still exist) or
+          // create one. Own SAVEPOINT per candidate so a failed write cannot
+          // abort the rest of the batch.
           await withSavepointOn(tx, async () => {
             const existing = await tx.reorderSuggestion.findFirst({
               where: {
                 storeId,
                 productId: candidate.productId,
-                variantId: null,
+                variantId: candidate.variantId,
                 status: 'open',
               },
               orderBy: { scannedAt: 'desc' },
@@ -483,7 +596,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
                 data: {
                   storeId,
                   productId: candidate.productId,
-                  variantId: null,
+                  variantId: candidate.variantId,
                   scannedAt: scanStartedAt,
                   ...payload,
                 },
@@ -493,7 +606,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
           upserted += 1;
         } catch (err) {
           logger.error(
-            { err, storeId, productId: candidate.productId },
+            { err, storeId, productId: candidate.productId, variantId: candidate.variantId },
             'reorder-scan: failed to upsert suggestion'
           );
         }

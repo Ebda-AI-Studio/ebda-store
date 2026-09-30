@@ -50,17 +50,40 @@ const updateConfigSchema = paymentConfigSchema.partial();
 // Helper Functions
 // ==========================================
 
-function maskCredentials(config: {
+/**
+ * Display fingerprint for a credential: the last 4 characters of the
+ * PLAINTEXT, taken at save time (#2010). Stored in its own column so no read
+ * path ever has to decrypt to answer "which key is saved?".
+ */
+export function credentialFingerprint(plaintext: string): string {
+  return plaintext.slice(-4);
+}
+
+/**
+ * Masked view of a PaymentConfig's credentials. Never decrypts and never
+ * returns any part of the stored ciphertext (#2010 — the old
+ * `encryption.mask(<ciphertext>)` showed ciphertext fragments that identified
+ * nothing). apiKey / merchantId show `****` + the save-time fingerprint; a row
+ * saved before the fingerprint column existed shows `****` and sets the
+ * `…FingerprintMissing` flag so the admin can say "re-save to show".
+ */
+export function maskCredentials(config: {
   apiKey?: string | null;
   secretKey?: string | null;
   merchantId?: string | null;
   webhookSecret?: string | null;
+  apiKeyLast4?: string | null;
+  merchantIdLast4?: string | null;
 }) {
+  const withFingerprint = (stored: string | null | undefined, last4: string | null | undefined) =>
+    stored ? (last4 ? `****${last4}` : '****') : null;
   return {
-    apiKey: config.apiKey ? encryption.mask(config.apiKey) : null,
+    apiKey: withFingerprint(config.apiKey, config.apiKeyLast4),
     secretKey: config.secretKey ? '****' : null,
-    merchantId: config.merchantId ? encryption.mask(config.merchantId) : null,
+    merchantId: withFingerprint(config.merchantId, config.merchantIdLast4),
     webhookSecret: config.webhookSecret ? '****' : null,
+    apiKeyFingerprintMissing: Boolean(config.apiKey) && !config.apiKeyLast4,
+    merchantIdFingerprintMissing: Boolean(config.merchantId) && !config.merchantIdLast4,
   };
 }
 
@@ -72,8 +95,10 @@ function encryptCredentials(data: {
 }) {
   return {
     apiKey: data.apiKey ? encryption.encrypt(data.apiKey) : undefined,
+    apiKeyLast4: data.apiKey ? credentialFingerprint(data.apiKey) : undefined,
     secretKey: data.secretKey ? encryption.encrypt(data.secretKey) : undefined,
     merchantId: data.merchantId ? encryption.encrypt(data.merchantId) : undefined,
+    merchantIdLast4: data.merchantId ? credentialFingerprint(data.merchantId) : undefined,
     webhookSecret: data.webhookSecret ? encryption.encrypt(data.webhookSecret) : undefined,
   };
 }
@@ -203,8 +228,10 @@ router.post(
           displayName: data.displayName,
           displayNameAr: data.displayNameAr,
           apiKey: encryptedCreds.apiKey,
+          apiKeyLast4: encryptedCreds.apiKeyLast4,
           secretKey: encryptedCreds.secretKey,
           merchantId: encryptedCreds.merchantId,
+          merchantIdLast4: encryptedCreds.merchantIdLast4,
           webhookSecret: encryptedCreds.webhookSecret,
           testMode: data.testMode,
           supportedMethods: data.supportedMethods,
@@ -290,6 +317,7 @@ router.put(
       // Encrypt new credentials if provided
       if (data.apiKey && !data.apiKey.includes('****')) {
         updateData.apiKey = encryption.encrypt(data.apiKey);
+        updateData.apiKeyLast4 = credentialFingerprint(data.apiKey);
       } else {
         delete updateData.apiKey;
       }
@@ -302,6 +330,7 @@ router.put(
 
       if (data.merchantId && !data.merchantId.includes('****')) {
         updateData.merchantId = encryption.encrypt(data.merchantId);
+        updateData.merchantIdLast4 = credentialFingerprint(data.merchantId);
       } else {
         delete updateData.merchantId;
       }
@@ -849,8 +878,10 @@ router.post(
           displayName: data.displayName,
           displayNameAr: data.displayNameAr,
           apiKey: encryptedCreds.apiKey,
+          apiKeyLast4: encryptedCreds.apiKeyLast4,
           secretKey: encryptedCreds.secretKey,
           merchantId: encryptedCreds.merchantId,
+          merchantIdLast4: encryptedCreds.merchantIdLast4,
           webhookSecret: encryptedCreds.webhookSecret,
           testMode: data.testMode,
           supportedMethods: data.supportedMethods,
@@ -960,6 +991,7 @@ router.put(
 
       if (data.apiKey && !data.apiKey.includes('****')) {
         updateData.apiKey = encryption.encrypt(data.apiKey);
+        updateData.apiKeyLast4 = credentialFingerprint(data.apiKey);
       } else {
         delete updateData.apiKey;
       }
@@ -972,6 +1004,7 @@ router.put(
 
       if (data.merchantId && !data.merchantId.includes('****')) {
         updateData.merchantId = encryption.encrypt(data.merchantId);
+        updateData.merchantIdLast4 = credentialFingerprint(data.merchantId);
       } else {
         delete updateData.merchantId;
       }

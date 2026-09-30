@@ -18,6 +18,12 @@ export interface StorePaymentConfig {
   secretKey: string | null;
   webhookSecret: string | null;
   merchantId: string | null;
+  /**
+   * #2010 — set by the API when a key is saved but was stored before the
+   * save-time fingerprint existed, so it can only show `****`.
+   */
+  apiKeyFingerprintMissing?: boolean;
+  merchantIdFingerprintMissing?: boolean;
   testMode: boolean;
   displayName?: string | null;
   displayNameAr?: string | null;
@@ -267,6 +273,7 @@ function GatewayFields({
             placeholder={t('apiKeyPlaceholder')}
             className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
+          <SavedCredentialHint value={form.apiKey} missing={form.apiKeyFingerprintMissing} />
         </div>
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
@@ -302,6 +309,10 @@ function GatewayFields({
             onChange={e => onUpdateField('merchantId', e.target.value)}
             placeholder={t('merchantIdPlaceholder')}
             className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <SavedCredentialHint
+            value={form.merchantId}
+            missing={form.merchantIdFingerprintMissing}
           />
         </div>
       </div>
@@ -347,5 +358,22 @@ function GatewayFields({
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Which credential is saved (#2010). The API returns `****` + the last 4
+ * characters of the plaintext, captured at save time — never decrypted on
+ * read. The api-key input is a password field, so the fingerprint is shown
+ * here as text. Only while the field still holds the saved (masked) value:
+ * once the merchant types a new key, the hint no longer describes the input.
+ */
+function SavedCredentialHint({ value, missing }: { value: string | null; missing?: boolean }) {
+  const t = useT('paymentSettings.gateway');
+  if (!value || !value.startsWith('****')) return null;
+  return (
+    <p className="mt-1 text-xs text-muted-foreground">
+      {missing ? t('savedResaveToShow') : t('savedValue', { value })}
+    </p>
   );
 }

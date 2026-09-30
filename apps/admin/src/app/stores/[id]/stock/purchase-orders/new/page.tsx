@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
@@ -19,6 +20,15 @@ interface ProductOption {
   id: string;
   name: string;
   sku: string | null;
+  hasVariants?: boolean;
+}
+
+interface VariantOption {
+  id: string;
+  title: string;
+  titleAr?: string | null;
+  sku?: string | null;
+  isActive?: boolean;
 }
 
 interface ProductsResponse {
@@ -28,6 +38,9 @@ interface ProductsResponse {
 
 interface POLineItem {
   productId: string;
+  // Required when the product has variants: stock lives on the variant, and a
+  // variant-less line is refused by the API (inventory-model.md, 2026-10-01).
+  variantId: string;
   qty: string;
   unitCost: string; // KWD (user types dinar; converted to fils on save)
 }
@@ -39,7 +52,7 @@ interface POCreated {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const EMPTY_LINE: POLineItem = { productId: '', qty: '', unitCost: '' };
+const EMPTY_LINE: POLineItem = { productId: '', variantId: '', qty: '', unitCost: '' };
 
 // Returns line total in FILS (qty × unitCost-in-dinar × 1000)
 function lineTotal(line: POLineItem): number {
@@ -60,6 +73,9 @@ export default function NewPurchaseOrderPage() {
 
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
+  // Variants per product id, fetched when a variant product is picked.
+  const [variantsByProduct, setVariantsByProduct] = useState<Record<string, VariantOption[]>>({});
+  const isAr = useLocale() === 'ar';
   const [supplierId, setSupplierId] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -89,6 +105,26 @@ export default function NewPurchaseOrderPage() {
     setLines(cur => cur.map((line, idx) => (idx === i ? { ...line, ...patch } : line)));
   }
 
+  function productHasVariants(productId: string): boolean {
+    return products.find(p => p.id === productId)?.hasVariants === true;
+  }
+
+  function selectProduct(i: number, productId: string) {
+    updateLine(i, { productId, variantId: '' });
+    if (!productId || !productHasVariants(productId) || variantsByProduct[productId]) return;
+    // The endpoint returns `{ product, options, variants }` with the variants
+    // at the TOP level (same shape the orders/new picker reads).
+    apiGet<{ variants: VariantOption[] }>(
+      `/api/v1/stores/${storeId}/products/${productId}/variants`
+    ).then(({ data }) => {
+      setVariantsByProduct(cur => ({
+        ...cur,
+        // A disabled variant is not stock (inventory-model.md) — not orderable here.
+        [productId]: (data?.variants ?? []).filter(v => v.isActive !== false),
+      }));
+    });
+  }
+
   function addLine() {
     setLines(cur => [...cur, { ...EMPTY_LINE }]);
   }
@@ -106,10 +142,10 @@ export default function NewPurchaseOrderPage() {
       cell: (line, i) => (
         <select
           value={line.productId}
-          onChange={e => updateLine(i, { productId: e.target.value })}
+          onChange={e => selectProduct(i, e.target.value)}
           className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
         >
-          <option value="">— Select product —</option>
+          <option value="">— {tNew('selectProduct')} —</option>
           {products.map(p => (
             <option key={p.id} value={p.id}>
               {p.sku ? `[${p.sku}] ` : ''}
@@ -118,6 +154,31 @@ export default function NewPurchaseOrderPage() {
           ))}
         </select>
       ),
+    },
+    {
+      header: tNew('variant'),
+      className: 'w-44',
+      cell: (line, i) => {
+        // Only a product WITH variants gets a picker; a plain product's line
+        // has no variant to name.
+        if (!line.productId || !productHasVariants(line.productId)) return null;
+        return (
+          <select
+            value={line.variantId}
+            onChange={e => updateLine(i, { variantId: e.target.value })}
+            className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+            aria-invalid={!line.variantId}
+          >
+            <option value="">— {tNew('selectVariant')} —</option>
+            {(variantsByProduct[line.productId] ?? []).map(v => (
+              <option key={v.id} value={v.id}>
+                {v.sku ? `[${v.sku}] ` : ''}
+                {(isAr && v.titleAr) || v.title}
+              </option>
+            ))}
+          </select>
+        );
+      },
     },
     {
       header: tNew('qty'),
@@ -193,6 +254,10 @@ export default function NewPurchaseOrderPage() {
       setError('Add at least one line item with product, quantity, and unit cost.');
       return;
     }
+    if (validLines.some(l => productHasVariants(l.productId) && !l.variantId)) {
+      setError(tNew('variantRequired'));
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -203,6 +268,7 @@ export default function NewPurchaseOrderPage() {
       notesAr: notesAr.trim() || undefined,
       items: validLines.map(l => ({
         productId: l.productId,
+        variantId: l.variantId || undefined,
         qty: parseInt(l.qty),
         unitCost: Math.round((parseFloat(l.unitCost) || 0) * 1000), // convert KWD → fils
       })),

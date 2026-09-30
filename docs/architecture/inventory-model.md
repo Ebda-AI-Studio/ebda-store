@@ -143,6 +143,18 @@ product.costPrice`. Order lines snapshot it at sale time
   (`lib/effective-inventory-sql.ts`: active variants only, each at its own
   cost) — the finance dashboard, the analytics inventory snapshot and the
   inventory page. `null` cost means unknown, never 0.
+- **A purchase-order line names the row that holds the stock** (owner
+  decision 2026-10-01). A line for a variant product must carry a
+  `variantId` that belongs to that product — `createPurchaseOrder` refuses
+  anything else with a 400 (`VARIANT_REQUIRED` / `VARIANT_PRODUCT_MISMATCH`),
+  and `receivePurchaseOrder` refuses an old-shape variant-less line on a
+  variant product (`VARIANT_REQUIRED`) instead of writing the parent column.
+  The reorder scan works in the same units: one suggestion per ACTIVE variant
+  of a variant product, one per product with no variants, deduped on
+  (store, product, variant); drafting from one carries the variant and its
+  cost. Legacy product-level suggestions for variant products, and open ones
+  for since-disabled variants, are expired by the scan's own next run
+  (`reorder-scan.service.ts`, step 1b).
 - **A product-scoped write aimed at a variant product must fail loud.**
   `InventoryService.adjustInventory` / `bulkAdjustInventory` return a 400
   (`VARIANT_PRODUCT`) rather than writing a column that moves no stock. The

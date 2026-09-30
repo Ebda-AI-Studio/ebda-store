@@ -56,7 +56,9 @@ describe('createPoFromSuggestion — cross-tenant scoping', () => {
     expect(mockReorderSuggestionFindFirst).toHaveBeenCalledWith({
       where: { id: 'sug-owned-by-store-b', storeId: STORE_A },
       include: {
-        product: { select: { costPrice: true, name: true } },
+        product: {
+          select: { costPrice: true, name: true, _count: { select: { variants: true } } },
+        },
         variant: { select: { costPrice: true } },
       },
     });
@@ -77,7 +79,7 @@ describe('createPoFromSuggestion — cross-tenant scoping', () => {
       suggestedQty: 10,
       urgencyDays: 3,
       velocity7d: 1.2,
-      product: { costPrice: 100, name: 'Widget' },
+      product: { costPrice: 100, name: 'Widget', _count: { variants: 0 } },
     });
     mockPurchaseOrderItemFindFirst.mockResolvedValue(null);
 
@@ -89,7 +91,9 @@ describe('createPoFromSuggestion — cross-tenant scoping', () => {
     expect(mockReorderSuggestionFindFirst).toHaveBeenCalledWith({
       where: { id: 'sug-1', storeId: STORE_A },
       include: {
-        product: { select: { costPrice: true, name: true } },
+        product: {
+          select: { costPrice: true, name: true, _count: { select: { variants: true } } },
+        },
         variant: { select: { costPrice: true } },
       },
     });

@@ -210,6 +210,9 @@ function PecannbeeProductCardImpl({
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    // Issue #1998 — top-corner sale badge unless the store keeps the legacy
+    // bottom-left corner (per-store StoreTheme DATA, never a slug check).
+    saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true,
     topStartReserved: true,
     // No bottom-band CTA overlay here — Pecannbee's Add-to-Cart button is a
     // normal block element below the name/price, not an image overlay.
@@ -394,8 +397,9 @@ function PecannbeeProductCardImpl({
           <BrandPill hidden={!inStock || showNewBadge} />
           {/* Sale chip — always shown when on sale (BUG 1 + BUG 2 fix),
               both stock states. Corner + color are merchant-configurable
-              via productCardDefaults.discountBadge (default bottom-left,
-              physical — never mirrors with RTL). */}
+              via productCardDefaults.discountBadge (physical; unset = top
+              corner — top-END here, since this card's heart holds top-start —
+              or bottom-left when theme.saleBadgeLegacyCorner, #1998). */}
           {onSale && discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(

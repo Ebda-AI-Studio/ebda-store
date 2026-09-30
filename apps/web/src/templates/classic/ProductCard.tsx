@@ -152,6 +152,9 @@ function ClassicProductCard({
     orderable,
     customPosition: defaults?.customBadge?.position,
     discountPosition: defaults?.discountBadge?.position,
+    // Issue #1998 — top-corner sale badge unless the store keeps the legacy
+    // bottom-left corner (per-store StoreTheme DATA, never a slug check).
+    saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true,
     topStartReserved: Boolean(onToggleCompare),
     topEndReserved: Boolean(onRemoveFromWishlist),
     // Issue #1997 — classic's NEW badge (below) only ever renders instead
@@ -284,7 +287,7 @@ function ClassicProductCard({
               both apply. BUG 1 fix: label comes from helper (KWD or pct).
               BUG 2 fix: no inStock gate. Sale badge corner + color are
               merchant-configurable via productCardDefaults.discountBadge
-              (default bottom-left, physical — never mirrors with RTL). */}
+              (physical; unset = top corner, or bottom-left when theme.saleBadgeLegacyCorner, #1998). */}
           {hasSale && discountBadgeAllowed && discountBadgeText ? (
             <span
               className={cn(

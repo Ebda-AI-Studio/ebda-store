@@ -877,7 +877,11 @@ export interface ProductCardDefaults {
    * start/end) so "bottom-left" renders at the physical bottom-left in
    * BOTH LTR and RTL storefronts — unlike oosLabelPlacement, this badge
    * must NOT mirror with reading direction. Unset position defaults to
-   * 'bottom-left' at render time (apps/web/src/templates/shared/discount-badge.ts).
+   * the image's top corner on the reading-START side at render time (#1998,
+   * `pinDefaultDiscountBadge` in apps/web/src/templates/shared/custom-badge.ts),
+   * or to the legacy 'bottom-left' when the store keeps
+   * `StoreTheme.saleBadgeLegacyCorner`. An explicit position is physical and
+   * never mirrors.
    * Unset color defaults to the platform destructive/red token.
    */
   discountBadge?: {

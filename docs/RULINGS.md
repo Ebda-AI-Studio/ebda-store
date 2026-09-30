@@ -4194,3 +4194,62 @@ orders now bail only when there is no stored token AND no `hasSessionEvidence()`
 records evidence. A signed-out iOS client still skips the call, because `clearStoredSession()`
 removes the evidence. Cost if wrong: an iOS client whose cookie also died spends one `/auth/refresh`
 (400), then signs out as before.
+
+## 2026-10-01 — owner decisions 6 / 7 / 9 (branch `fix/owner-decisions-6-7-9`)
+
+**Ruling OD-6a — receive refuses an old-shape variant-less PO line on a variant product; no
+auto-repair.** A line drafted before the per-variant rule names no variant, so there is no correct
+row to write: the parent column must stay 0 (inventory-model.md) and picking a variant would be a
+guess. `receivePurchaseOrder` throws 400 `VARIANT_REQUIRED` and the merchant cancels + redrafts.
+Cost if wrong: a merchant holding an already-sent old-shape PO must redraft it before receiving, and
+the receive screen shows an error until they do.
+
+**Ruling OD-6b — a variant with no rule of its own falls back to the product's rule, then to the
+product's `lowStockThreshold`, applied per variant.** There is no per-variant threshold column; the
+product-level rule/threshold is the only merchant input that exists. Cost if wrong: a product with
+many variants gets its product-level minimum applied to EACH variant, so reorder suggestions fire
+per variant at that threshold (a merchant who meant it as a product total sees more suggestions).
+
+**Ruling OD-7a — the fingerprint covers `merchantId` as well as `apiKey` (two nullable columns, one
+migration).** #2010 names both: `maskCredentials` masked both from ciphertext. Fixing one would
+leave the second half of the same helper showing ciphertext fragments. The fingerprint is the last 4
+characters of the plaintext as specified; it is not length-gated. Cost if wrong: a merchant id of 4
+characters or fewer is shown in full (merchant ids are identifiers the provider also prints on
+receipts, not secrets).
+
+**Ruling OD-7b — answer-engine and wbs-integration keep their current mask in this PR.** The issue's
+owner-question comment asked for one rule across `payment-settings`, `answer-engine/config.service.ts`
+(also masks ciphertext) and `wbs-integration.routes.ts` (decrypts on read, shows first+last 4).
+This PR's brief is the payment key display; the other two are different tables (and a store column)
+with their own admin surfaces. Recorded here so they do not read as fixed. Cost if wrong: the
+answer-engine key display still shows a ciphertext fragment, and the WBS GET still decrypts on every
+read, until a follow-up applies the same save-time fingerprint.
+
+**Ruling OD-9a — only the UNSET sale badge moves; a merchant-chosen corner is honoured as before.**
+An explicit `discountBadge.position` is physical and keeps its collision avoidance and its lifted
+tier over the mobile add-to-cart band. Overriding a setting the merchant made would remove a
+customisation dial (pillar 1). Cost if wrong: a store that explicitly picked a bottom corner still
+sees the chip lifted ~96px on a desktop grid at rest.
+
+**Ruling OD-9b — the custom (merchant-text) badge's default stays bottom-right and still lifts.**
+The owner decision covers the sale badge. The custom chip only renders when the merchant typed a
+label, and moving it is a separate look change. Cost if wrong: on desktop at rest a custom label
+chip still floats ~96px up the image on the five theme cards (the same shape #1998 described for
+the sale chip).
+
+**Ruling OD-9c — "not orderable" reserves the reading-start top corner for the pinned sale chip on
+every surface.** Every card path renders `OutOfStockRibbon` there by default (88px diagonal box); the
+chip moves to the end corner, or below the shallower occupant. A merchant who hid the OOS label, or
+moved its pill elsewhere, gets the chip on the end side anyway. Cost if wrong: for those stores an
+out-of-stock sale chip sits on the reading-end side even though the start corner is empty; on the
+narrow (~134px) PLP card the chip can touch the diagonal ribbon's tail (visible in the AFTER shots).
+
+**Ruling OD-9d — the new position is the platform default; pecannbee keeps the legacy corner through
+per-store DATA (`StoreTheme.saleBadgeLegacyCorner = true`), set by a one-off script BEFORE deploy.**
+Owner, 2026-09-30: every store except pecannbee gets the top corner; pecannbee must look exactly as
+now. The code never branches on a slug; it reads the flag. `scripts/set-sale-badge-legacy-corner.mjs`
+writes it through the live theme PUT, which shallow-merges an unknown key and busts the store caches,
+so it can run before the code that reads it ships. Proven: every surface with the flag set is
+pixel-identical to origin/main (screenshot diff = 0). Cost if wrong: if the script is not run (or its
+edge-cache check not waited for) before deploy, pecannbee shows the top-corner badge until the flag
+lands — the run order in the PR body is the control.

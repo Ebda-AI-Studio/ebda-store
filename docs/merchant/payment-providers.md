@@ -110,6 +110,14 @@ Hesabe is contract-based — you'll receive credentials by email from your accou
 
 ---
 
+## Which key is saved? — أي مفتاح محفوظ؟
+
+Saved keys are stored encrypted and are never shown in full. Under the **API Key** and **Merchant ID** fields the panel shows the last 4 characters of the saved value — e.g. **Saved: \*\*\*\*a1b2** — so you can match it against the key in your provider's dashboard. A key saved before this was added shows **Saved: \*\*\*\*** with a note to re-save it: paste the key again and **Save**, and its last 4 characters appear.
+
+المفاتيح المحفوظة مشفّرة ولا تُعرض كاملة أبداً. تحت حقلي **API Key** و **Merchant ID** تظهر آخر 4 أحرف من القيمة المحفوظة — مثلاً **المحفوظ: \*\*\*\*a1b2** — لتطابقها مع المفتاح في لوحة مزوّد الدفع. المفتاح المحفوظ قبل هذه الميزة يظهر **المحفوظ: \*\*\*\*** مع تنبيه بإعادة حفظه: الصق المفتاح مرة أخرى واضغط **حفظ** لتظهر آخر 4 أحرف.
+
+---
+
 ## Cash on Delivery (COD)
 
 No external account needed.

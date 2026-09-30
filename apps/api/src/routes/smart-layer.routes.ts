@@ -77,7 +77,9 @@ router.get(
           prisma.reorderSuggestion.findMany({
             where,
             include: {
-              product: { select: { id: true, name: true, sku: true } },
+              product: { select: { id: true, name: true, nameAr: true, sku: true } },
+              // Per-variant suggestions (2026-10-01): the card names the variant.
+              variant: { select: { id: true, title: true, titleAr: true, sku: true } },
               supplier: { select: { id: true, name: true } },
             },
             orderBy: { urgencyDays: 'asc' },

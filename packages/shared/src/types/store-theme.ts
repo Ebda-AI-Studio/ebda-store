@@ -464,6 +464,19 @@ export interface StoreTheme {
    * Branding → Locations. 2026-09-25 (B3).
    */
   showBranchesInFooter?: boolean;
+  /**
+   * Issue #1998 (owner, 2026-09-30) — keep the LEGACY sale-badge corner.
+   * Unset/false (every store by default): a product card's sale badge whose
+   * corner the merchant has NOT chosen is pinned to the image's top corner on
+   * the reading-start side (top-left LTR, top-right RTL), moved off the NEW
+   * pill / heart / out-of-stock ribbon, so the add-to-cart band can never cover
+   * it or lift it mid-image. true: the unset badge stays bottom-left (lifted
+   * over the mobile add-to-cart band), exactly as before #1998. Per-store DATA —
+   * set for a store by `scripts/set-sale-badge-legacy-corner.mjs` or the Page
+   * Builder toggle (Product cards → Discount / sale badge; ThemeTab is at its
+   * 7-toggle ceiling). A merchant-chosen corner is unaffected either way.
+   */
+  saleBadgeLegacyCorner?: boolean;
 }
 
 /**

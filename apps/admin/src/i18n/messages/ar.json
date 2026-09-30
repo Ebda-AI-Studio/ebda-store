@@ -1526,8 +1526,11 @@
         "discountBadgeColorHint": "غير محدد = اللون الأحمر الافتراضي للمنصة.",
         "customBadgeColorHint": "غير محدد = اللون الأساسي للمنصة.",
         "discountBadgeTitle": "شارة الخصم / التخفيض",
+        "saleBadgeLegacyCornerTitle": "الإبقاء على زاوية شارة التخفيض الأصلية",
+        "saleBadgeLegacyCornerHint": "إيقاف (موصى به): عند عدم اختيار موضع أدناه، تظهر شارة التخفيض في الزاوية العلوية من الصورة، في جهة بداية النص، فلا يغطيها شريط «أضف إلى السلة». تشغيل: تبقى في الزاوية السفلية اليسرى كما كانت.",
         "badgePositionLabel": "موضع الشارة",
         "positionBottomLeftDefault": "أسفل اليسار (افتراضي)",
+        "positionTopStartDefault": "الزاوية العلوية، جهة بداية القراءة (افتراضي)",
         "positionBottomRightDefault": "أسفل اليمين (افتراضي)",
         "positionTopLeft": "أعلى اليسار",
         "positionTopRight": "أعلى اليمين",
@@ -4688,7 +4691,9 @@
       "testModeOn": "وضع الاختبار مفعّل",
       "testModeOff": "وضع الاختبار معطّل",
       "testModeDescriptionOn": "يستخدم بيانات اختبار — لا تُعالَج مدفوعات حقيقية",
-      "testModeDescriptionOff": "الوضع المباشر — ستُعالَج مدفوعات حقيقية"
+      "testModeDescriptionOff": "الوضع المباشر — ستُعالَج مدفوعات حقيقية",
+      "savedValue": "المحفوظ: {value}",
+      "savedResaveToShow": "المحفوظ: **** — أعد حفظ المفتاح لإظهار آخر 4 أحرف منه."
     },
     "messages": {
       "savedSuccess": "تم الحفظ بنجاح",
@@ -6422,7 +6427,11 @@
         "notesArLabel": "ملاحظات (عربي)",
         "notesPlaceholder": "ملاحظات اختيارية",
         "colProduct": "المنتج",
-        "lineItemsTableLabel": "بنود الطلب"
+        "lineItemsTableLabel": "بنود الطلب",
+        "variant": "المتغير",
+        "selectProduct": "اختر المنتج",
+        "selectVariant": "اختر المتغير",
+        "variantRequired": "اختر المتغير لكل سطر منتجه له متغيرات."
       },
       "detail": {
         "qtyReceived": "المستلَم",
@@ -6484,7 +6493,8 @@
         "urgency": "الاستعجالية",
         "urgencyDays": "{days} أيام",
         "draftPo": "إنشاء أمر شراء",
-        "dismiss": "تجاهل"
+        "dismiss": "تجاهل",
+        "variantLabel": "المتغير"
       },
       "draftPo": {
         "created": "تم إنشاء أمر الشراء المسودة.",

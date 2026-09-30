@@ -1,5 +1,5 @@
 import { assertStoreOwnsInTenantScope } from './assert-store-owns';
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, withMoneyTx, hasTenantContext, runInTenantContext } from '@force/database';
 import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';
@@ -46,6 +46,9 @@ export async function createPurchaseOrder(
     input.storeId,
     input.items.map(i => i.variantId)
   );
+  // Owner decision 2026-10-01: a PO line must name the row that holds the
+  // stock — see assertPoLinesTargetStockRow.
+  await assertPoLinesTargetStockRow(input.storeId, input.items);
 
   const subtotal = input.items.reduce((s, i) => s + i.qty * i.unitCost, 0);
   const apAccountId = await getSystemAccountIdByCode(input.storeId, '2000'); // AP
@@ -99,6 +102,52 @@ async function assertVariantsActive(
       'VARIANT_INACTIVE',
       'A variant on this purchase order is disabled. Re-enable it before ordering or receiving stock for it.'
     );
+  }
+}
+
+/**
+ * A PO line must name the row that HOLDS the stock (owner decision
+ * 2026-10-01, docs/architecture/inventory-model.md):
+ *   - a line for a product WITH variants must carry a `variantId` — a
+ *     variant-less line on such a product would, on receive, write the parent
+ *     `products.inventory` column, which must stay 0 for a variant product;
+ *   - a `variantId` must belong to the line's own `productId` (store ownership
+ *     alone, checked by `assertStoreOwns`, would accept a sibling product's
+ *     variant and receive stock into the wrong product).
+ * Fails loud (400) rather than writing a column that moves no sellable stock.
+ */
+async function assertPoLinesTargetStockRow(
+  storeId: string,
+  items: { productId: string; variantId?: string | null }[]
+): Promise<void> {
+  const productIds = [...new Set(items.map(i => i.productId))];
+  // Same RLS posture as assertStoreOwnsInTenantScope: the ambient request
+  // transaction when there is one, else a tenant-scoped one (Inngest), so a
+  // GUC-less read cannot return zero variants and wave a bad line through.
+  const load = () =>
+    prisma.productVariant.findMany({
+      where: { productId: { in: productIds }, product: { storeId } },
+      select: { id: true, productId: true },
+    });
+  const variants = hasTenantContext() ? await load() : await runInTenantContext(storeId, load);
+  const variantProducts = new Set(variants.map(v => v.productId));
+  const variantOwner = new Map(variants.map(v => [v.id, v.productId]));
+  for (const item of items) {
+    if (item.variantId) {
+      if (variantOwner.get(item.variantId) !== item.productId) {
+        throw new AppError(
+          400,
+          'VARIANT_PRODUCT_MISMATCH',
+          'A purchase order line names a variant that does not belong to its product.'
+        );
+      }
+    } else if (variantProducts.has(item.productId)) {
+      throw new AppError(
+        400,
+        'VARIANT_REQUIRED',
+        'This product has variants — choose the variant for each purchase order line.'
+      );
+    }
   }
 }
 
@@ -167,6 +216,22 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
           'RECEIVE_EXCEEDS_QTY',
           `Cannot receive ${receipt.qtyReceived}; that would exceed the ordered quantity (${item.qty}).`
         );
+
+      // Old-shape guard: a variant-less line on a product that has variants
+      // (drafted before 2026-10-01, or by a client that skipped the create
+      // check) would write the parent column below. Refuse it — the merchant
+      // cancels the PO and redrafts it per variant.
+      if (!item.variantId) {
+        const variantCount = await tx.productVariant.count({
+          where: { productId: item.productId },
+        });
+        if (variantCount > 0)
+          throw new AppError(
+            400,
+            'VARIANT_REQUIRED',
+            'This line has no variant but its product has variants. Cancel this purchase order and draft it again per variant.'
+          );
+      }
 
       let remainingToProcess = receipt.qtyReceived;
 
@@ -454,8 +519,10 @@ export async function cancelPurchaseOrder(storeId: string, id: string) {
  * One-click "Draft PO from suggestion" factory used by the Reorder admin page
  * (Batch 3 Task 7). Reads the ReorderSuggestion, resolves the supplier (rule's
  * preferredSupplier > last PO supplier for this product > throw), creates a
- * draft PO with the suggested qty at the product's current costPrice, and
- * marks the suggestion accepted with the resulting poId for audit trace.
+ * draft PO for the suggestion's unit — its variant, for a variant product —
+ * with the suggested qty at that row's current cost (variant.costPrice ??
+ * product.costPrice), and marks the suggestion accepted with the resulting
+ * poId for audit trace.
  */
 export async function createPoFromSuggestion(
   suggestionId: string,
@@ -465,7 +532,13 @@ export async function createPoFromSuggestion(
   const sug = await prisma.reorderSuggestion.findFirst({
     where: { id: suggestionId, storeId },
     include: {
-      product: { select: { costPrice: true, name: true } },
+      product: {
+        select: {
+          costPrice: true,
+          name: true,
+          _count: { select: { variants: true } },
+        },
+      },
       variant: { select: { costPrice: true } },
     },
   });
@@ -475,6 +548,16 @@ export async function createPoFromSuggestion(
       409,
       'SUGGESTION_ALREADY_PROCESSED',
       `This reorder suggestion was already ${sug.status}.`
+    );
+
+  // A product-level suggestion for a variant product is the pre-2026-10-01
+  // shape. The next reorder scan expires it and writes one per variant;
+  // drafting from it would need a variant it does not carry.
+  if (!sug.variantId && sug.product._count.variants > 0)
+    throw new AppError(
+      409,
+      'SUGGESTION_OUTDATED',
+      'This suggestion predates per-variant reordering. Run the reorder scan again to get one suggestion per variant.'
     );
 
   const supplierId = sug.supplierId ?? (await pickLastSupplierForProduct(sug.productId));
