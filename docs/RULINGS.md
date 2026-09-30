@@ -4107,7 +4107,12 @@ customer's view of it). Admin orders now also RESERVE the redemption (`usageCoun
 the `< usageLimit` guard unless overridden): they never counted, yet cancelling one ran the fanout's
 reverse-coupon step and decremented the count — handing another customer's redemption back. Proven in
 `tests/integration/admin-order-coupon-rules.test.ts` (10 tests) and
-`tests/unit/admin-order-coupon-override-route.test.ts` (8); 8 mutations each turned a test red. One
+`tests/unit/admin-order-coupon-override-route.test.ts` (8); 8 mutations each turned a test red. Those
+were one-off manual runs; the three that matter most are now committed defences re-run on every
+relevant PR by `npm run test:defence-mutations` (issues 2304/2317): `money-admin-coupon-rules-enforced`
+(the enforcement throw), `money-admin-coupon-override-role-gate` (the 403 for non-admin roles) and
+`money-admin-coupon-atomic-reservation` (the `usageCount < usageLimit` reservation guard, proven by a
+test that stubs the pre-check to simulate the losing side of a last-use race). One
 mutation survived by design: dropping `isActive` from the coupon lookup leaves the reservation's own
 `isActive: true` guard to refuse an inactive coupon (404), so the belt holds without the braces. Cost if
 wrong: a store admin can still give any coupon to any order — but never silently, and never as staff.
@@ -4155,6 +4160,100 @@ truncation notices until the TTL ran out. `withinSaleWindow` also treats an abse
 unbounded (`== null`). The Next data cache and the CF edge hold API RESPONSES, whose shape is
 unchanged, so they need no bump. Cost if wrong: one cache miss per store at deploy.
 
+## 2026-10-01 — backlog batch z-ci-other (branch `fix/backlog-z-ci-other`)
+
+**Ruling MIG-ORD-1 — a new migration folder must sort strictly after main's newest, and no two
+folders may share a 14-digit timestamp; enforced in CI, with the two existing production collisions
+grandfathered by exact folder set.** Prisma orders migrations by folder name and production has
+already applied main's newest, so a back-dated or same-stamp folder runs in a different order on a
+fresh database (CI, restore, new branch) than it did in production. The live case: open PR #2311
+adds `20261001120000_payment_config_key_fingerprint` while main has
+`20261001120000_backorder_line_stock_taken` — `scripts/check-migration-order.mjs` reports it (exit 1)
+when run in that PR's worktree. The gate runs as the first step of CI's required `Lint` job (no
+`needs`, runs on every PR) against a freshly fetched `origin/main`, and fails closed (exit 2) when it
+cannot read main. `20260615000000_*` (5 folders) and `20260925160000_*` (2) are already applied in
+production and cannot be renamed — the folder name is the key in `_prisma_migrations` — so they are
+allow-listed by exact set; a new folder joining either timestamp still fails, and a unit test fails
+if the list and the on-disk collisions ever disagree. **The fetch never goes shallow outside GitHub Actions (2026-09-30, twice).** The first version of the
+CI step ran a bare `git fetch --depth=1 origin +refs/heads/main:...`. Run by hand or by an agent in
+the shared developer repo — all worktrees share one `.git` — it wrote `.git/shallow` at origin/main's
+current tip (no reflog entry, because the ref did not move), and every worktree's merge then failed
+with "unrelated histories" (17:30 at 0e59048b, 19:10 at 925b9f76). The fetch now lives inside the
+script (`--fetch`); `fetchArgs` adds `--depth=1` only when `CI=true` and `GITHUB_ACTIONS=true`, and
+`migration-order-gate.test.ts` proves a local run leaves a full clone full (with a positive control
+that the Actions env does go shallow) and forbids a bare shallow `git fetch` in any workflow, script
+or hook. Residual: a PR that passed and then sat while
+main gained a newer migration is only re-checked on its next push or re-run. Cost if wrong: one PR a
+month renames a folder it did not need to.
+
+**Ruling ZAP-F-1 — "no scan ran" is detected OUTSIDE the scan's run; the in-run `cancelled()`
+branch stays but is no longer described as covering a queued cancel (issue 2289).**
+`notify-failure` inside `zap-baseline.yml` only runs if it is dispatched and gets a runner. The
+run history shows it IS evaluated after a zap-job timeout (runs 35967069299, 35829519117: notify
+`skipped` under the old `failure()`-only condition, not dropped), but nothing in the run can report
+a run cancelled before dispatch or a runner that never comes. `zap-freshness-check.yml` asks the
+Actions API once a day whether any `zap-baseline` run on `main` concluded `success`/`failure` in
+26h and alerts on Telegram when none did; it exits 2 (fails) when the API is unreadable and 0 when
+`ZAP_TARGET` is unset (the scan is dormant by design). Verified live against the API on
+2026-10-01 (fresh: run 36685419137 concluded failure). Its own concurrency group is keyed on the event (a dispatch cannot cancel the cron), and
+its alert fires on `cancelled()` too, worded as UNKNOWN — as it is when the API is unreadable
+(exit 2 → `state=unknown`), so a token failure never pages as "no scan ran" (PR 2333 audit). Residual: it rides the same self-hosted
+runner (cloud minutes are billing-blocked), so a DOWN runner silences both — that is
+`ci-runner-guard.sh` on the Mac. `railway-deploy.yml`'s `failure()`-only `notify-failure` is left as
+is: a cancelled or never-run deploy there is already caught out-of-run by
+`railway-deploy-drift-check.yml` (stalled-pipeline alert after 90 min). The claim that the in-run
+branch fires for a concurrency-cancelled QUEUED run was not exercised (it would mean cancelling a
+real nightly scan); the out-of-run check makes the answer not matter. Cost if wrong: one extra
+Telegram message on a night the scan really did run late.
+
+**Ruling R2-VIS-1 — the RLS-visibility guard is required before any BULK R2 delete and any orphan
+REPORT, not before the per-URL `deleteR2ObjectIfOrphan` check (issue 2288).**
+`assertStrictTablesVisible` moved to `apps/api/src/lib/r2-references.ts`; it now ANALYZEs a STRICT
+table that reads 0 rows before trusting the catalog, treats `reltuples = -1` (never analyzed — a
+fresh branch/restore, or a small table below autovacuum's threshold) as UNKNOWN and refuses, and
+also counts `n_live_tup`. Measured on Postgres 16: a new table with 3 rows reads `reltuples -1,
+n_live_tup 0` — the old `GREATEST(reltuples, 0)` passed it — and `3` after `ANALYZE`. Both bulk
+collectors run it: `scripts/r2-orphan-audit.ts` before the report is printed (dry run too), and the
+`r2-orphan-sweep` Inngest cron, which refuses to delete and marks its Telegram report "NOT
+TRUSTWORTHY" (P1) on failure. The per-URL check in `r2-cleanup.service.ts` runs one indexed probe
+per deleted file under `withRlsBypass` (pinned by defence `r2-cleanup-isstillreferenced-rls-bypass`);
+adding four `count(*)` + possible `ANALYZE`s to every single-file delete is disproportionate, and a
+wrong bypass there is already a mutation-gated defect. Not verified: the guard end-to-end under a
+role actually subject to RLS (the scratch DB connects as a superuser). Cost if wrong: one
+still-referenced file deleted by a per-URL cleanup if the bypass itself is ever broken.
+
+**Issue ownership after #2309 merged mid-batch.** Issue 2010 (masked payment key is a ciphertext
+fragment) is fixed by open PR #2311 (`Fixes #2010`), which must first rename its
+`20261001120000_payment_config_key_fingerprint` migration under MIG-ORD-1. Issue 2281 was closed
+by #2309 (its own ruling I18N-G2 keeps the PWA name unlocalized), so this batch's overlapping i18n
+commit was dropped on rebase. Issue 2312 became fixable on main once #2309 landed. This batch fixed it, and batch y-web-admin
+(#2334) fixed the same class in parallel (issues 2313/2322/2323, Ruling YWA-1) with a per-theme
+resolver that also bans the malformed `/30/30` and off-scale `/8` spellings. On merging main, #2334's
+gate and `design.md` wording were kept and this batch's detector was dropped — one gate, not two; the
+pill sweeps agree (every dark half on `-ink`).
+
+**Ruling CI-SPARSE-1 — no workflow uses sparse-checkout, and every self-hosted checkout job
+disables an inherited sparse config before it checks out (production deploy failure,
+2026-09-30).** The orders PWA deploy failed twice on `fwb-ci6-force-website-builder-2` with
+`npm ci: no package-lock.json`: `railway-deploy.yml`'s hourly `guest-checkout-probe` checked out
+sparse, the persistent self-hosted workspace kept `core.sparseCheckout` in `.git/config`, and the
+next job's plain `actions/checkout` reused it — a tree of only `.git` + `scripts/`. Fixed in two
+layers: (1) the probe and the new `zap-freshness-check.yml` (which had copied the same pattern
+earlier in this batch) now do a full shallow checkout; (2) the shared pre-checkout guard step,
+already required before checkout in every self-hosted job by `ci-trufflehog-scratch-guard.test.ts`,
+now runs `git sparse-checkout disable` and clears the sparse config when a prior job left one — all
+35 copies across 16 workflows. `tests/unit/ci-no-sparse-checkout-leak.test.ts` forbids
+`sparse-checkout` in any checkout step, requires the reset in every guard, and runs the guard's own
+script against a real repo that reproduces the leak (package-lock.json absent → present).
+Mutation-proved: removing the reset reddens 3 tests; re-adding sparse to the probe reddens 1. The same PR's audit caught the class next door: the migration gate ran `node` BEFORE
+`setup-node` in the Lint job (exit 127 on the self-hosted runner). `workflow-node-available.test.ts`
+now asserts ORDER, not just presence, in every job of every workflow (mutation-proved against the
+audited commit). Other
+persistent-workspace state found by the sweep: `ai-review.yml` writes a local `git config
+user.name/user.email` into the workspace — left as is, since no other job commits from that
+workspace and `actions/checkout` does not read identity. Cost if wrong: one extra full-tree write
+per job on a workspace that was actually sparse on purpose (none are).
+
 ## 2026-09-30 — single-variant products (branch `fix/single-variant-products`)
 
 Context: owner report (pecannbee) — a product whose ONLY variant is e.g. "Size: 380 Gram" shows a
@@ -4197,6 +4296,7 @@ instruction forbids. FBT's recommendation payload carries only `{id, price}` per
 `isActive`, no stock), so it cannot apply SVF-3's tappable rule without an API change. After the
 Part A flatten these products are simple products and every card path adds them directly. Cost if
 wrong: until Part A is applied, a single-variant product still needs a PDP visit to be added.
+
 ## Backlog batch y-web-admin (2026-10-01)
 
 **Ruling YWA-1: the tinted-pill gate measures resolved pairs per theme. Bare role text on a plain

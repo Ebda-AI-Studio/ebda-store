@@ -451,6 +451,92 @@ export type R2ReferenceRunner = <T>(fn: (db: R2ReferenceDb) => Promise<T>) => Pr
 
 const q = (ident: string): string => `"${ident.replace(/"/g, '""')}"`;
 
+/**
+ * Registry tables whose RLS policy is STRICT — no contextless allowance, so a
+ * read without the bypass sees nothing (the pinned list is STRICT_TABLES in
+ * tests/integration/rls-force-app.test.ts; tests/unit/r2-orphan-classify.test.ts
+ * keeps this in step with it and the registry).
+ */
+export const STRICT_R2_TABLES: readonly string[] = [
+  'blog_posts',
+  'expenses',
+  'stock_adjustments',
+  'store_howtos',
+];
+
+/** A catalog handle: reads pg_class/pg_stat and may run ANALYZE. */
+export interface R2CatalogDb extends R2ReferenceDb {
+  $executeRawUnsafe(query: string, ...values: unknown[]): Promise<number>;
+}
+
+/**
+ * Last line before an irreversible bulk R2 delete (issues 2251, 2288), and a
+ * validity check on any orphan REPORT an operator will act on.
+ *
+ * Through the SAME runner the collection used, every STRICT registered table
+ * must show rows whenever the table has any. Zero visible rows over a
+ * non-empty table means the read was filtered by RLS, the referenced set is
+ * incomplete, and every key those rows point to would be deleted as an
+ * "orphan". Refuse instead.
+ *
+ * "Has any" cannot come from a count on another connection — that count is
+ * subject to the very policy under test. It comes from the catalog, which RLS
+ * does not filter, and the catalog's answer can be UNKNOWN: `pg_class.reltuples`
+ * is -1 on PostgreSQL 14+ for a table never vacuumed or analyzed — exactly a
+ * freshly branched/restored database, or a small per-tenant table that sits
+ * below autovacuum's analyze threshold forever. The old check collapsed -1 to 0
+ * with GREATEST(), read "empty", and passed having proved nothing (issue 2288).
+ * So: ANALYZE the table first (cheap for the small tables this is about, and
+ * not filtered by RLS), then read reltuples AND the stats collector's
+ * n_live_tup. Either one positive → non-empty. reltuples still -1 → UNKNOWN →
+ * refuse. Only a table the catalog positively knows is empty passes with 0
+ * visible rows.
+ */
+export async function assertStrictTablesVisible(
+  run: R2ReferenceRunner,
+  catalog: R2CatalogDb,
+  tables: readonly string[] = STRICT_R2_TABLES
+): Promise<void> {
+  for (const table of tables) {
+    const [seen] = await run(db =>
+      db.$queryRawUnsafe<Array<{ n: number }>>(`SELECT count(*)::int AS n FROM ${q(table)}`)
+    );
+    if (Number(seen?.n ?? 0) > 0) continue;
+
+    try {
+      // Not owner → Postgres skips with a WARNING (no throw) and reltuples
+      // stays as it was; a -1 then refuses below. Any other failure: same.
+      await catalog.$executeRawUnsafe(`ANALYZE ${q(table)}`);
+    } catch {
+      /* fall through to what the catalog already knows */
+    }
+    const [stat] = await catalog.$queryRawUnsafe<Array<{ reltuples: number; live: number }>>(
+      `SELECT c.reltuples::float8 AS reltuples, COALESCE(s.n_live_tup, 0)::float8 AS live
+         FROM pg_class c LEFT JOIN pg_stat_all_tables s ON s.relid = c.oid
+        WHERE c.oid = $1::regclass`,
+      `public.${table}`
+    );
+    const reltuples = Number(stat?.reltuples ?? -1);
+    const live = Number(stat?.live ?? 0);
+    if (reltuples > 0 || live > 0) {
+      throw new Error(
+        `REFUSING: "${table}" shows 0 rows to the collector while the catalog says it has rows ` +
+          `(reltuples ${reltuples}, n_live_tup ${live}). RLS is filtering the registry read, so ` +
+          `its R2 references are missing and would be treated as orphans. Check the connection ` +
+          `role / app.bypass_rls.`
+      );
+    }
+    if (reltuples !== 0) {
+      throw new Error(
+        `REFUSING: "${table}" shows 0 rows to the collector and the catalog cannot say whether ` +
+          `it is empty (reltuples ${reltuples}: never analyzed, and ANALYZE did not update it — ` +
+          `the connection role may not own the table). Run ANALYZE "${table}" as the owner, ` +
+          `then retry.`
+      );
+    }
+  }
+}
+
 /** Registered columns grouped by table, in registry order. */
 export function columnsByTable(
   columns: readonly R2ReferenceColumn[] = R2_REFERENCE_COLUMNS

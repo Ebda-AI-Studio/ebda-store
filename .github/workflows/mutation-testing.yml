@@ -182,6 +182,18 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
+          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
+          # self-hosted workspace left core.sparseCheckout in .git/config, and
+          # the next plain actions/checkout reused it, so orders' deploy got a
+          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
+          # inherited sparse config BEFORE checkout, in every job.
+          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
+            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
+            git sparse-checkout disable 2>/dev/null || true
+            git config --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
           leftovers=(trufflehog-*)
           if [ ${#leftovers[@]} -eq 0 ]; then
             exit 0
@@ -230,8 +242,8 @@ jobs:
   # money/payment/refund, consent, erasure). It is cheap (~1-2 min for all 78
   # defences, measured 2026-09-25) and gates on a SURVIVED defence, so it runs
   # on every PR that touches a defended source or the spec itself. Runs
-  # --tier=all (unit AND the integration-tier entries — three today, named in
-  # the services comment below) in this SAME job; a Postgres service is enough
+  # --tier=all (unit AND every integration-tier entry, each named in the
+  # services comment below) in this SAME job; a Postgres service is enough
   # (see below), so no separate integration job or schedule is needed.
   defence-mutations:
     name: Defence mutation record
@@ -242,9 +254,10 @@ jobs:
     # to 20) even after the postgres service + --tier=all integration-tier
     # defence below were added, since those only add work, not headroom.
     timeout-minutes: 30
-    # Postgres only, no Redis, no API server. The spec has THREE
+    # Postgres only, no Redis, no API server. The spec has SIX
     # integration-tier defences (issues 2184/2187 — this comment used to say
-    # "the one"); tests/unit/mutation-gate-trigger-coverage.test.ts fails if
+    # "the one"; the three admin-coupon entries were added for issues
+    # 2304/2317); tests/unit/mutation-gate-trigger-coverage.test.ts fails if
     # an integration-tier id is added to docs/security/defence-mutations.json
     # without being named and reasoned about here:
     #   - password-reset-bumps-token-version (tests/integration/refresh-token-
@@ -259,8 +272,17 @@ jobs:
     #   - money-loyalty-reversal-index (tests/integration/partial-unique-
     #     indexes.test.ts): needs only the migrated schema (it reads
     #     pg_indexes and exercises the partial unique index).
-    # Measured, not assumed: run 36667422016 (2026-09-30) scored all three
-    # KILLED in this exact environment. If one ever scores ERROR here, the
+    #   - money-admin-coupon-rules-enforced,
+    #     money-admin-coupon-override-role-gate,
+    #     money-admin-coupon-atomic-reservation (all three:
+    #     tests/integration/admin-order-coupon-rules.test.ts): drive
+    #     OrderService.createAdminOrder IN-PROCESS against Prisma with their
+    #     own seedBundleStore fixtures — no HTTP, no API server, no seed; the
+    #     reservation test stubs the rules pre-check with vi.spyOn, not Redis.
+    #     Measured KILLED against a migrated Postgres 16 with REDIS_URL unset
+    #     (2026-10-01, batch z-ci-other).
+    # Measured, not assumed: run 36667422016 (2026-09-30) scored the first
+    # three KILLED in this exact environment. If one ever scores ERROR here, the
     # environment is short a dependency — provision it; do not drop the tier.
     services:
       postgres:
@@ -287,6 +309,18 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
+          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
+          # self-hosted workspace left core.sparseCheckout in .git/config, and
+          # the next plain actions/checkout reused it, so orders' deploy got a
+          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
+          # inherited sparse config BEFORE checkout, in every job.
+          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
+            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
+            git sparse-checkout disable 2>/dev/null || true
+            git config --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
           leftovers=(trufflehog-*)
           if [ ${#leftovers[@]} -eq 0 ]; then
             exit 0

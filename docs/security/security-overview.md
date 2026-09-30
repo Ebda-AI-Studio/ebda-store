@@ -148,11 +148,14 @@ survives its mutation, i.e. if a test would pass with the control deleted.
 
 **Scope, precisely:** this per-defence record proves query-level guards — a
 `WHERE storeId` clause, a permission check, a CAS on a claim column — mostly
-at the `unit` tier. Three `integration`-tier entries run against a real,
+at the `unit` tier. Six `integration`-tier entries run against a real,
 migrated Postgres in the same CI job: `password-reset-bumps-token-version`
 (`tests/integration/refresh-token-rotation.test.ts`), `money-wallet-row-lock`
-(`tests/integration/customer-wallet.test.ts`) and
+(`tests/integration/customer-wallet.test.ts`),
 `money-loyalty-reversal-index` (`tests/integration/partial-unique-indexes.test.ts`)
+and the three admin/manual-order coupon controls — `money-admin-coupon-rules-enforced`,
+`money-admin-coupon-override-role-gate` and `money-admin-coupon-atomic-reservation`
+(`tests/integration/admin-order-coupon-rules.test.ts`, issues 2304/2317)
 — the per-entry dependency reasoning is in `mutation-testing.yml`'s services
 comment, which a unit test keeps in step with the spec. For **tenant/RLS**
 specifically, it covers 7 such query-level guards; it does **not** cover the

@@ -31,6 +31,18 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
+          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
+          # self-hosted workspace left core.sparseCheckout in .git/config, and
+          # the next plain actions/checkout reused it, so orders' deploy got a
+          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
+          # inherited sparse config BEFORE checkout, in every job.
+          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
+            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
+            git sparse-checkout disable 2>/dev/null || true
+            git config --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
           leftovers=(trufflehog-*)
           if [ ${#leftovers[@]} -eq 0 ]; then
             exit 0

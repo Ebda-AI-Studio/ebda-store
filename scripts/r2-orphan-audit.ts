@@ -36,7 +36,9 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  assertStrictTablesVisible,
   collectReferencedR2Keys,
+  STRICT_R2_TABLES,
   type R2ReferenceDb,
   type R2ReferenceRunner,
 } from '../apps/api/src/lib/r2-references';
@@ -141,7 +143,8 @@ async function collectReferencedKeys(
 /**
  * The same privilege the weekly sweep uses (`withRlsBypass`,
  * r2-orphan-sweep.ts), rebuilt on this script's own client so it does not pull
- * in the API. This is the only delete-capable collector, and it used to read
+ * in the API. This script (with --apply) and the sweep (with
+ * R2_ORPHAN_SWEEP_APPLY=true) are the two bulk-delete collectors; this one used to read
  * the registry with a bare client — no tenant context, no bypass (issue 2251).
  * Harmless while production connects as the table owner; the moment the
  * Phase 3 force_app cutover flips DATABASE_URL, a contextless read of a STRICT
@@ -164,43 +167,9 @@ export function rlsBypassRunner(prisma: Pick<PrismaClient, '$transaction'>): R2R
     );
 }
 
-/**
- * Registry tables whose RLS policy is STRICT — no contextless allowance, so a
- * read without the bypass sees nothing (the pinned list is STRICT_TABLES in
- * tests/integration/rls-force-app.test.ts; tests/unit/r2-orphan-classify.test.ts
- * keeps this in step with it and the registry).
- */
-export const STRICT_R2_TABLES = ['blog_posts', 'expenses', 'stock_adjustments', 'store_howtos'];
-
-/**
- * Last line before an irreversible delete (issue 2251): through the SAME
- * runner the collection used, every STRICT registered table must show rows
- * whenever the catalog (pg_class.reltuples, which RLS does not filter) says it
- * has any. Zero visible rows over a non-empty table means the read was
- * filtered, the referenced set is incomplete, and every key those rows point
- * to would be deleted as an "orphan". Refuse instead.
- */
-export async function assertStrictTablesVisible(
-  run: R2ReferenceRunner,
-  catalog: R2ReferenceDb
-): Promise<void> {
-  for (const table of STRICT_R2_TABLES) {
-    const [seen] = await run(db =>
-      db.$queryRawUnsafe<Array<{ n: number }>>(`SELECT count(*)::int AS n FROM "${table}"`)
-    );
-    const [est] = await catalog.$queryRawUnsafe<Array<{ n: number }>>(
-      `SELECT GREATEST(c.reltuples, 0)::int AS n FROM pg_class c WHERE c.oid = $1::regclass`,
-      `public.${table}`
-    );
-    if ((seen?.n ?? 0) === 0 && (est?.n ?? 0) > 0) {
-      throw new Error(
-        `REFUSING --apply: "${table}" shows 0 rows to the collector while the catalog estimates ` +
-          `${est!.n}. RLS is filtering the registry read, so its R2 references are missing and ` +
-          `would be deleted as orphans. Check the connection role / app.bypass_rls.`
-      );
-    }
-  }
-}
+// The visibility guard lives in the shared registry so the Inngest sweep
+// (the other bulk-delete collector) runs the same check (issue 2288).
+export { STRICT_R2_TABLES, assertStrictTablesVisible };
 
 /**
  * Read CLI flags so the same script can run as a read-only audit OR
@@ -317,8 +286,15 @@ async function audit(): Promise<AuditResult> {
       Date.now()
     );
 
-    if (apply && orphans.length > 0) {
+    // Validate the collection BEFORE the report is printed or acted on, in the
+    // dry run too (issue 2288): an operator reviews the dry-run list and then
+    // runs --apply, so a list built from an RLS-filtered read is already the
+    // harm. Only needed when something would be called an orphan.
+    if (orphans.length > 0) {
       await assertStrictTablesVisible(run, prisma);
+    }
+
+    if (apply && orphans.length > 0) {
       console.log(
         `\n--apply set: deleting ${orphans.length} orphan keys (min-age ${minAgeHours}h)…`
       );

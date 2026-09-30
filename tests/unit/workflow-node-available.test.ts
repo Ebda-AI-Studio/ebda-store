@@ -83,10 +83,15 @@ function jobs(): Job[] {
  * indentation explicitly instead of guessing from indent alone.
  */
 function runLinesNeedingNode(job: Job): string[] {
-  const matches: string[] = [];
+  return runLineIndicesNeedingNode(job).map(i => job.lines[i]);
+}
+
+/** Same walk as runLinesNeedingNode, returning each match's index in job.lines. */
+function runLineIndicesNeedingNode(job: Job): number[] {
+  const matches: number[] = [];
   let blockIndent = -1; // -1 = not inside a multi-line run: block
 
-  for (const l of job.lines) {
+  for (const [idx, l] of job.lines.entries()) {
     if (/^\s*#/.test(l.trim())) continue;
 
     // Start (or single-line form) of a `run:` step.
@@ -97,7 +102,7 @@ function runLinesNeedingNode(job: Job): string[] {
     }
     if (/^\s+(?:-\s+)?run:\s*\S/.test(l)) {
       blockIndent = -1; // single-line run: — no block follows
-      if (NEEDS_NODE.test(l)) matches.push(l);
+      if (NEEDS_NODE.test(l)) matches.push(idx);
       continue;
     }
 
@@ -105,7 +110,7 @@ function runLinesNeedingNode(job: Job): string[] {
       if (l.trim() === '') continue; // blank line inside the block
       const indent = /^(\s*)\S/.exec(l)?.[1].length ?? 0;
       if (indent > blockIndent) {
-        if (NEEDS_NODE.test(l)) matches.push(l);
+        if (NEEDS_NODE.test(l)) matches.push(idx);
         continue;
       }
       blockIndent = -1; // dedented back to step level — block ended
@@ -134,6 +139,27 @@ describe('every job that runs node installs node', () => {
     expect(
       offenders,
       'these jobs run node/npm/npx but never install a Node toolchain. On the self-hosted runner `node` is not on the Actions shell PATH, so the step dies with `command not found` (exit 127) — which is how the ZAP baseline DAST silently stopped running for two nights. Add `actions/setup-node`, or register the job in DELIBERATE with the reason its runtime is already present.'
+    ).toEqual([]);
+  });
+
+  it('no step invokes node/npm/npx BEFORE the job has run setup-node (PR 2333 audit P1)', () => {
+    // Presence is not enough: setup-node only puts node on PATH for the steps
+    // AFTER it. PR 2333 added a migration gate that ran `node` between
+    // checkout and setup-node in ci.yml's Lint job — the job "installs node",
+    // so the check above passed, and on the self-hosted runner every PR's
+    // required Lint check would have died with exit 127.
+    const offenders = jobs()
+      .filter(j => installsNode(j) && !usesContainer(j))
+      .filter(j => !(`${j.file}:${j.name}` in DELIBERATE))
+      .flatMap(j => {
+        const setupAt = j.lines.findIndex(l => /uses:\s*actions\/setup-node@/.test(l));
+        return runLineIndicesNeedingNode(j)
+          .filter(i => i < setupAt)
+          .map(i => `${j.file}:${j.name} line ${j.startLine + i}: ${j.lines[i].trim()}`);
+      });
+    expect(
+      offenders,
+      'these steps run node/npm/npx before setup-node in their job — node is not on PATH yet on the self-hosted runner (exit 127). Move the step after setup-node.'
     ).toEqual([]);
   });
 

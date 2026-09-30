@@ -271,6 +271,14 @@ cd packages/database
 npx prisma migrate deploy
 ```
 
+**Naming a new migration (Ruling MIG-ORD-1, CI-enforced).** A new folder's 14-digit timestamp must
+sort strictly after the newest migration on `main`, and must not be shared with any other folder.
+CI's `Lint` job runs `node scripts/check-migration-order.mjs --fetch --base origin/main` and fails the PR
+otherwise; run it locally before pushing (`--fetch` never makes a local repo shallow — `--depth` is used only inside GitHub Actions). If `main` gained a newer migration while your PR was open,
+rename your folder to a later timestamp (it has not been applied anywhere yet). The two collisions
+already applied in production (`20260615000000_*`, `20260925160000_*`) are allow-listed in the script
+and cannot be renamed.
+
 ---
 
 ## Rollback Procedures

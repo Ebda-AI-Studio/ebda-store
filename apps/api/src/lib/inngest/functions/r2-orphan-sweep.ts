@@ -1,12 +1,12 @@
 import type { InngestFunction } from 'inngest';
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import { withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { config } from '../../../config';
 import { urlToR2Key } from '../../../services/r2-cleanup.service';
-import { collectReferencedR2Keys } from '../../r2-references';
+import { assertStrictTablesVisible, collectReferencedR2Keys } from '../../r2-references';
 
 /**
  * Weekly R2 orphan sweep — cron 0 4 * * 0 (Sunday 04:00 UTC).
@@ -29,6 +29,10 @@ import { collectReferencedR2Keys } from '../../r2-references';
  *    cleanly if not.
  *  - Cross-tenant DB queries run via withRlsBypass so FORCE RLS policies
  *    (set per HTTP request, absent on cron) don't filter rows to 0.
+ *  - …and that is PROVEN before any orphan is reported or deleted:
+ *    assertStrictTablesVisible (lib/r2-references.ts, issue 2288) refuses the
+ *    delete — and marks a report untrustworthy — when a STRICT registry table
+ *    reads 0 rows while the catalog says it has rows or cannot say.
  */
 
 /** Objects younger than this are skipped regardless of DB reference state. */
@@ -203,6 +207,31 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
 
     logger.info(summary, 'r2-orphan-sweep: computed orphans');
 
+    // ── Step 3b: prove the registry read was not filtered by RLS ─────────
+    // Same guard as scripts/r2-orphan-audit.ts (issues 2251/2288): a STRICT
+    // registry table that reads 0 rows while the catalog says it has rows (or
+    // cannot say) means its references are missing and its images would be
+    // called orphans. With deletes on, refuse — the throw fails the run
+    // loudly and nothing is deleted. In report-only mode the report is still
+    // sent, marked as untrustworthy, because the operator acts on it.
+    let visibilityError: string | null = null;
+    if (orphans.length > 0) {
+      visibilityError = await step.run('assert-strict-tables-visible', async () => {
+        try {
+          await assertStrictTablesVisible(fn => withRlsBypass(tx => fn(tx)), prisma);
+          return null;
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+      });
+      if (visibilityError && applyDeletes) {
+        throw new Error(`r2-orphan-sweep: not deleting — ${visibilityError}`);
+      }
+      if (visibilityError) {
+        logger.error({ visibilityError }, 'r2-orphan-sweep: orphan report is not trustworthy');
+      }
+    }
+
     // ── Step 4: optional batch delete ────────────────────────────────────
     let deleted = 0;
     if (applyDeletes && orphans.length > 0) {
@@ -232,6 +261,9 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
       const sample = orphans.slice(0, ALERT_SAMPLE);
       const moreCount = orphans.length - sample.length;
       const lines = [
+        ...(visibilityError
+          ? [`⚠️ REPORT NOT TRUSTWORTHY — do not act on it: ${visibilityError}`, '']
+          : []),
         `Orphans found: ${orphans.length} (${formatBytes(orphanBytes)})`,
         `Total bucket: ${objects.length} objects (${formatBytes(totalBytes)})`,
         `Skipped (< 24 h): ${skippedYoung}`,
@@ -243,7 +275,7 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
       ];
 
       void sendAlert({
-        level: orphans.length > 100 ? 'p1' : 'info',
+        level: visibilityError || orphans.length > 100 ? 'p1' : 'info',
         scope: 'platform',
         source: 'r2-orphan-sweep',
         title: `R2 orphan sweep: ${orphans.length} orphan object${

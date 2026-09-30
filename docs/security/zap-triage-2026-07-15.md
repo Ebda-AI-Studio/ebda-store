@@ -87,11 +87,18 @@ space. Free space left: 17 MB` plus `docker failed with exit code 2`. The
   self-hosted runner disk space — filed as its own follow-up; it is not fixed
   by anything in `.zap/rules.tsv`.** A `concurrency` group was added to
   `zap-baseline.yml` so a stale queued run no longer competes with a fresh one
-  for the same runner. Since issue 2099 that cancellation is **not** silent:
-  `notify-failure` fires on `cancelled` too, with a distinct "DID NOT RUN"
-  message, and the group is keyed on the event so a manual dispatch and the
-  nightly cannot cancel each other. `cancelled` in `gh run list` therefore
-  still means "no scan that night" — it alerts, it is not an expected outcome.
+  for the same runner. Since issue 2099 `notify-failure` fires on `cancelled`
+  too, with a distinct "DID NOT RUN" message, and the group is keyed on the
+  event so a manual dispatch and the nightly cannot cancel each other. **That
+  alert only fires when `notify-failure` itself gets dispatched and gets a
+  runner** (issue 2289): a run cancelled while still queued, or one that never
+  gets a runner, can end with no message from inside the run. So silence is
+  NOT evidence of a clean scan. The out-of-run check is
+  `.github/workflows/zap-freshness-check.yml` (`scripts/zap-freshness-check.mjs`):
+  once a day it alerts when no `zap-baseline` run on `main` concluded
+  `success` or `failure` in the last 26h. It shares the self-hosted runner, so
+  a DOWN runner silences both — that is `ci-runner-guard.sh` on the Mac. The check's own cancelled run alerts as UNKNOWN (it is keyed on the event so a dispatch cannot cancel the cron), and an unreadable API alerts as UNKNOWN, not as "no scan".
+  `cancelled` in `gh run list` still means "no scan that night".
   Since issue 2100 the 10063 IGNORE is backed by a deterministic gate:
   `tests/unit/csp-directive-floor.test.ts` pins `Permissions-Policy` on all
   three `next.config.js` files.

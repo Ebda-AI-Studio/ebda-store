@@ -29,9 +29,12 @@ permissions:
 # starved runner.
 #
 # Keyed on the event too (issue 2099), so a manual verification dispatch and
-# the nightly cron can never cancel each other. A run this group cancels is
-# NOT silent: notify-failure below fires on `cancelled` as well as `failure`,
-# and says the scan never ran — a cancelled DAST is a night with no scan.
+# the nightly cron can never cancel each other. notify-failure below fires on
+# `cancelled` as well as `failure` — but ONLY when that job is itself
+# dispatched and gets a runner (issue 2289). A run cancelled while still
+# queued, or one that never gets a runner, can end with no alert from inside
+# the run. That case is caught OUTSIDE it: zap-freshness-check.yml alerts once
+# a day when no zap-baseline run on main concluded success/failure in 26h.
 concurrency:
   group: zap-baseline-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
@@ -54,6 +57,18 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
+          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
+          # self-hosted workspace left core.sparseCheckout in .git/config, and
+          # the next plain actions/checkout reused it, so orders' deploy got a
+          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
+          # inherited sparse config BEFORE checkout, in every job.
+          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
+            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
+            git sparse-checkout disable 2>/dev/null || true
+            git config --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
           leftovers=(trufflehog-*)
           if [ ${#leftovers[@]} -eq 0 ]; then
             exit 0
@@ -155,13 +170,15 @@ jobs:
     runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs: [zap]
-    # failure() is FALSE for a cancelled run (issue 2099): with the
-    # concurrency group above cancelling a starved, still-queued nightly, the
-    # old `always() && failure()` turned the DAST's main failure mode into
-    # silence — no scan, no report, no alert, every night. Residual: when the
-    # self-hosted runner itself is starved or offline this job needs that same
-    # runner, so the alert of last resort is ci-runner-guard.sh on the Mac
-    # (runner-health-check.yml header), not this job.
+    # failure() is FALSE for a cancelled run (issue 2099): the old
+    # `always() && failure()` turned a cancelled scan into silence. With
+    # cancelled() this covers a zap job that was cancelled or timed out while
+    # this job can still be scheduled (the 20-minute timeouts in the run
+    # history show this job evaluated, not dropped). It does NOT cover a run
+    # cancelled before this job is dispatched, or a runner that never comes
+    # (issue 2289) — a job inside the run cannot report the run not
+    # happening. That is zap-freshness-check.yml's job (out-of-run, daily),
+    # and runner-down is ci-runner-guard.sh on the Mac.
     if: always() && (failure() || cancelled())
     steps:
       # The delivery channel that replaces the issue. Mirrors

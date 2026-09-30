@@ -66,7 +66,7 @@ describe('defence-mutation gate triggers on everything it measures', () => {
   });
 
   it("every spec entry's TEST is covered by a trigger path too (issues 2175/2188)", () => {
-    // --tier=all rests three verdicts on tests/integration/* files. A PR that
+    // --tier=all rests several verdicts on tests/integration/* files. A PR that
     // weakens the guarding test is as much a change to the defence as one
     // that edits its source — and used to match no glob at all.
     const spec = JSON.parse(

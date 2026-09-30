@@ -412,6 +412,36 @@
       "test": "tests/unit/order.test.ts"
     },
     {
+      "id": "money-admin-coupon-rules-enforced",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "an admin/manual order applies ANY coupon regardless of its rules — expired, over its usage limit, wrong customer group, first-order, minimum, product/category scope — as if every admin order were a recorded override; the admin twin of money-coupon-eligibility-guard (#1370, Ruling M-OVR-1, issues 2304/2317)",
+      "source": "apps/api/src/services/order.service.ts",
+      "find": "      if (couponViolations.length > 0 && !overrideCoupon) {",
+      "replace": "      if (couponViolations.length > 0 && false) {",
+      "test": "tests/integration/admin-order-coupon-rules.test.ts"
+    },
+    {
+      "id": "money-admin-coupon-override-role-gate",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "a staff member (or any role outside COUPON_OVERRIDE_ROLES) waives every coupon rule by ticking \"Override coupon rules\" — the 403 COUPON_OVERRIDE_FORBIDDEN is the only thing reserving the override for store_admin/super_admin (#1370, Ruling M-OVR-1, issues 2304/2317)",
+      "source": "apps/api/src/services/order.service.ts",
+      "find": "      if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role)) {",
+      "replace": "      if (false) {",
+      "test": "tests/integration/admin-order-coupon-rules.test.ts"
+    },
+    {
+      "id": "money-admin-coupon-atomic-reservation",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "two admin orders racing on a coupon's last use both pass the out-of-transaction rules pre-check; without the `usageCount < usageLimit` guard on the in-transaction reservation both commit and the coupon is redeemed past its limit (#1370 sibling fix, issues 2304/2317)",
+      "source": "apps/api/src/services/order.service.ts",
+      "find": "            ...(!overrideCoupon && appliedCoupon.usageLimit\n              ? { usageCount: { lt: appliedCoupon.usageLimit } }\n              : {}),",
+      "replace": "            ...({}),",
+      "test": "tests/integration/admin-order-coupon-rules.test.ts"
+    },
+    {
       "id": "money-agent-cod-compensating-rollback",
       "domain": "money / payment / refund",
       "tier": "unit",

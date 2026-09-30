@@ -12,9 +12,10 @@
  * Real Postgres, real `OrderService.createAdminOrder`; per-call unique
  * fixtures (retry-safe).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { withRlsBypass } from '@force/database';
 import { OrderService } from '@api/services/order.service';
+import { CouponService } from '@api/services/coupon.service';
 import { hasDb, seedBundleStore, DEFAULT_TEST_SHIPPING_ADDRESS } from '../helpers/bundle-fixtures';
 
 const uid = () => `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
@@ -149,6 +150,25 @@ describe.skipIf(!hasDb)('admin order coupon rules (#1370)', () => {
     expect(await usage(limited.couponId)).toBe(1); // admin orders now count
     await expect(order(limited)).rejects.toMatchObject({ code: 'COUPON_LIMIT_REACHED' });
     expect(await usage(limited.couponId)).toBe(1);
+  });
+
+  it('the atomic reservation refuses a use the rules pre-check let through (a concurrent redemption landed in between)', async () => {
+    // The pre-check reads usageCount OUTSIDE the order transaction, so two
+    // admin orders racing on a last-use coupon can both pass it. Only the
+    // `usageCount < usageLimit` guard on the in-tx reservation stops the second
+    // one. Simulate the losing side of that race deterministically: the limit
+    // is already reached, but the pre-check reports no violation.
+    const fx = await fixture({ usageLimit: 1 });
+    await withRlsBypass(tx =>
+      tx.coupon.update({ where: { id: fx.couponId }, data: { usageCount: 1 } })
+    );
+    const spy = vi.spyOn(CouponService, 'adminOrderCouponViolations').mockReturnValue([]);
+    try {
+      await expect(order(fx)).rejects.toMatchObject({ code: 'COUPON_LIMIT_REACHED' });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await usage(fx.couponId)).toBe(1);
   });
 
   it('store admin override: applies the coupon, records who and why (event + audit log)', async () => {

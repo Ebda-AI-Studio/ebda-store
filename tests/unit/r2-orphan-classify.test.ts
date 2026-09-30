@@ -1,13 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { classifyOrphans, rlsBypassRunner } from '../../scripts/r2-orphan-audit';
 import {
-  classifyOrphans,
-  rlsBypassRunner,
+  R2_REFERENCE_COLUMNS,
   assertStrictTablesVisible,
   STRICT_R2_TABLES,
-} from '../../scripts/r2-orphan-audit';
-import { R2_REFERENCE_COLUMNS } from '../../apps/api/src/lib/r2-references';
+} from '../../apps/api/src/lib/r2-references';
 
 const NOW = Date.UTC(2026, 7, 18, 12, 0, 0);
 const HOUR = 3600_000;
@@ -73,7 +72,7 @@ describe('classifyOrphans — the R2 delete guard', () => {
   });
 });
 
-// Issue 2251: the only delete-capable collector read the registry with a bare
+// Issue 2251: this bulk-delete collector (the sweep is the other) read the registry with a bare
 // client. Under force_app a contextless read of a STRICT table returns [] and
 // `--apply` would delete every file those rows reference.
 describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', () => {
@@ -126,23 +125,75 @@ describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', 
     expect([...STRICT_R2_TABLES].sort()).toEqual(expected);
   });
 
-  it('refuses --apply when a STRICT table is invisible to the collector but non-empty in the catalog', async () => {
-    const run = (async (fn: (db: unknown) => Promise<unknown>) =>
-      fn({ $queryRawUnsafe: async () => [{ n: 0 }] })) as never;
-    const catalog = { $queryRawUnsafe: async () => [{ n: 42 }] } as never;
-    await expect(assertStrictTablesVisible(run, catalog)).rejects.toThrow(/REFUSING --apply/);
+  // Collector (through the bypass runner) sees `seen` rows; the catalog reports
+  // `reltuples` / `live` after the guard's ANALYZE.
+  const collector = (seen: number) =>
+    (async (fn: (db: unknown) => Promise<unknown>) =>
+      fn({ $queryRawUnsafe: async () => [{ n: seen }] })) as never;
+  const catalog = (reltuples: number, live = 0, analyze: () => Promise<number> = async () => 0) => {
+    const calls: string[] = [];
+    return {
+      calls,
+      db: {
+        $executeRawUnsafe: async (sql: string) => {
+          calls.push(sql);
+          return analyze();
+        },
+        $queryRawUnsafe: async () => [{ reltuples, live }],
+      } as never,
+    };
+  };
+
+  it('refuses when a STRICT table is invisible to the collector but non-empty in the catalog', async () => {
+    await expect(assertStrictTablesVisible(collector(0), catalog(42).db)).rejects.toThrow(
+      /REFUSING: "blog_posts" shows 0 rows.*reltuples 42/
+    );
   });
 
-  it('allows --apply when the collector sees rows, or the table is genuinely empty', async () => {
-    const seeing = (async (fn: (db: unknown) => Promise<unknown>) =>
-      fn({ $queryRawUnsafe: async () => [{ n: 5 }] })) as never;
-    const empty = (async (fn: (db: unknown) => Promise<unknown>) =>
-      fn({ $queryRawUnsafe: async () => [{ n: 0 }] })) as never;
-    await expect(
-      assertStrictTablesVisible(seeing, { $queryRawUnsafe: async () => [{ n: 5 }] } as never)
-    ).resolves.toBeUndefined();
-    await expect(
-      assertStrictTablesVisible(empty, { $queryRawUnsafe: async () => [{ n: 0 }] } as never)
-    ).resolves.toBeUndefined();
+  it('refuses on the stats collector alone (reltuples 0 but n_live_tup > 0)', async () => {
+    await expect(assertStrictTablesVisible(collector(0), catalog(0, 7).db)).rejects.toThrow(
+      /n_live_tup 7/
+    );
+  });
+
+  it('issue 2288: refuses when the catalog estimate is UNKNOWN (-1, never analyzed) — it used to pass', async () => {
+    await expect(assertStrictTablesVisible(collector(0), catalog(-1).db)).rejects.toThrow(
+      /cannot say whether it is empty \(reltuples -1/
+    );
+  });
+
+  it('issue 2288: an ANALYZE that fails (not the owner) still refuses on an unknown estimate', async () => {
+    const c = catalog(-1, 0, async () => {
+      throw new Error('must be owner of table blog_posts');
+    });
+    await expect(assertStrictTablesVisible(collector(0), c.db)).rejects.toThrow(/REFUSING/);
+  });
+
+  it('ANALYZEs a table before trusting its estimate, and only when the collector saw nothing', async () => {
+    const empty = catalog(0);
+    await expect(assertStrictTablesVisible(collector(0), empty.db)).resolves.toBeUndefined();
+    expect(empty.calls).toEqual(STRICT_R2_TABLES.map(t => `ANALYZE "${t}"`));
+    const seeing = catalog(-1);
+    await expect(assertStrictTablesVisible(collector(5), seeing.db)).resolves.toBeUndefined();
+    expect(seeing.calls).toEqual([]);
+  });
+
+  it('the dry run validates the report too — the guard runs whenever anything would be called an orphan', () => {
+    const src = readFileSync(path.resolve(__dirname, '../../scripts/r2-orphan-audit.ts'), 'utf8');
+    const guard = src.indexOf('await assertStrictTablesVisible(run, prisma)');
+    expect(guard).toBeGreaterThan(0);
+    expect(src.slice(src.lastIndexOf('if (', guard), guard)).toMatch(/if \(orphans\.length > 0\)/);
+    expect(src.slice(src.lastIndexOf('if (', guard), guard)).not.toMatch(/apply/);
+  });
+
+  it('the Inngest sweep (the other bulk-delete collector) runs the same guard before deleting', () => {
+    const src = readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/lib/inngest/functions/r2-orphan-sweep.ts'),
+      'utf8'
+    );
+    const guard = src.indexOf('await assertStrictTablesVisible(');
+    expect(guard).toBeGreaterThan(0);
+    expect(guard).toBeLessThan(src.indexOf("step.run('delete-orphans'"));
+    expect(src).toMatch(/if \(visibilityError && applyDeletes\) \{\s*throw/);
   });
 });
