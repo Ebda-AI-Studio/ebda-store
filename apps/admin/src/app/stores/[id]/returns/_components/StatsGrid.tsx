@@ -24,15 +24,15 @@ export function StatsGrid({ stats }: StatsGridProps) {
       </div>
       <div className="bg-card rounded-xl border p-4 shadow-sm">
         <p className="text-sm text-muted-foreground">{t('pending')}</p>
-        <p className="text-2xl font-bold text-warning">{stats.pending}</p>
+        <p className="text-2xl font-bold text-warning-ink">{stats.pending}</p>
       </div>
       <div className="bg-card rounded-xl border p-4 shadow-sm">
         <p className="text-sm text-muted-foreground">{t('approved')}</p>
-        <p className="text-2xl font-bold text-info">{stats.approved}</p>
+        <p className="text-2xl font-bold text-info-ink">{stats.approved}</p>
       </div>
       <div className="bg-card rounded-xl border p-4 shadow-sm">
         <p className="text-sm text-muted-foreground">{t('completed')}</p>
-        <p className="text-2xl font-bold text-success">{stats.completed}</p>
+        <p className="text-2xl font-bold text-success-ink">{stats.completed}</p>
       </div>
     </div>
   );

@@ -308,22 +308,37 @@ export function pinDefaultDiscountBadge({
   topStartReserved = false,
   topEndReserved = false,
   newOrBrandBadgeReserved = false,
+  customBadgeCorner = null,
 }: {
   isRtl: boolean;
   orderable: boolean;
   topStartReserved?: boolean;
   topEndReserved?: boolean;
   newOrBrandBadgeReserved?: boolean;
+  /**
+   * Issue 2343 — the PHYSICAL top corner the merchant's custom chip will
+   * render in (after its own corner avoidance), or null when it renders no
+   * chip or sits on the bottom edge. A chip-deep occupant like the NEW pill:
+   * the pinned sale chip takes the other corner or the row below it, and
+   * never lands on it.
+   */
+  customBadgeCorner?: 'top-left' | 'top-right' | null;
 }): { corner: CustomBadgePosition; cls: string } {
+  const customAt: 'start' | 'end' | null =
+    customBadgeCorner === null
+      ? null
+      : (customBadgeCorner === 'top-left') !== isRtl
+        ? 'start'
+        : 'end';
   // Deepest occupant of each logical top corner.
   const startDepth: TopDepth = !orderable
     ? 3
     : topStartReserved
       ? 2
-      : newOrBrandBadgeReserved
+      : newOrBrandBadgeReserved || customAt === 'start'
         ? 1
         : 0;
-  const endDepth: TopDepth = topEndReserved ? 2 : 0;
+  const endDepth: TopDepth = topEndReserved ? 2 : customAt === 'end' ? 1 : 0;
 
   let side: 'start' | 'end';
   let depth: TopDepth;
@@ -517,27 +532,74 @@ export function resolveCardBadges({
   // Rule 2 — stock state outranks promotion.
   const customBadgeText = orderable ? label : null;
 
+  // Rules 3 and 4 compare RESOLVED corners, so an unset position and its
+  // explicit equivalent count as the same corner.
+  const resolvedCustom = customPosition ?? CUSTOM_BADGE_DEFAULT_POSITION;
+
+  // Issues #1609/#1611/#548 — corner-collision avoidance. Convert the two
+  // LOGICAL reserved sides (top-start / top-end, which mirror with reading
+  // direction — that's how every theme renders its heart/compare/remove
+  // button) into the PHYSICAL left/right corners this module renders in.
+  // Issue #1997 — `newOrBrandBadgeReserved` folds into whichever physical
+  // side is LOGICAL top-start (never top-end), the same conversion, so a
+  // badge avoiding a reserved heart corner also treats an occupied NEW/
+  // brand-pill corner as unavailable instead of landing on top of it.
+  const topLeftReserved = isRtl ? topEndReserved : topStartReserved || newOrBrandBadgeReserved;
+  const topRightReserved = isRtl ? topStartReserved || newOrBrandBadgeReserved : topEndReserved;
+  // The quick-add button / CTA band is itself LOGICAL (bottom-end on the
+  // carousel, or the full bottom-band on the 5 theme cards) — same
+  // start/end → left/right conversion.
+  const overlayLeftReserved = bottomOverlay === 'both' || (bottomOverlay === 'end' && isRtl);
+  const overlayRightReserved = bottomOverlay === 'both' || (bottomOverlay === 'end' && !isRtl);
+
+  /** Avoid a reserved top corner only — no stacking/lift yet. */
+  function avoidOnly(named: CustomBadgePosition): { v: CornerV; h: PhysicalH } {
+    const parsed = parsePhysicalCorner(named);
+    return avoidReservedCorner<PhysicalH>({
+      v: parsed.v,
+      h: parsed.h,
+      otherH: parsed.h === 'left' ? 'right' : 'left',
+      hReserved: parsed.h === 'left' ? topLeftReserved : topRightReserved,
+      otherHReserved: parsed.h === 'left' ? topRightReserved : topLeftReserved,
+    });
+  }
+
+  const avoidedCustom = avoidOnly(resolvedCustom);
+
   // Issue #1998 — unless the store keeps the legacy corner, an UNSET
   // discount corner is pinned to the image's top edge (reading-start side),
   // so it is resolved here, before rules 3/4, to the physical corner it will
   // actually occupy. Flag off → null → the original path below, unchanged.
-  const pinnedDiscount =
-    saleBadgeTopCorner && discountPosition === undefined
-      ? pinDefaultDiscountBadge({
-          isRtl,
-          orderable,
-          topStartReserved,
-          topEndReserved,
-          newOrBrandBadgeReserved,
-        })
-      : null;
+  const pinArgs = { isRtl, orderable, topStartReserved, topEndReserved, newOrBrandBadgeReserved };
+  let pinnedDiscount =
+    saleBadgeTopCorner && discountPosition === undefined ? pinDefaultDiscountBadge(pinArgs) : null;
 
-  // Rules 3 and 4 compare RESOLVED corners, so an unset position and its
-  // explicit equivalent count as the same corner.
-  const resolvedCustom = customPosition ?? CUSTOM_BADGE_DEFAULT_POSITION;
+  // Issue 2343 — the pin chooses from the platform's own occupants, so it
+  // could land on the corner the merchant gave the custom chip, and rule 3
+  // below ("same corner → the merchant's chip wins") then deleted the sale
+  // chip on every card of that store. Rule 3 is about two chips a merchant
+  // PLACED; a pinned chip was placed by the platform. So in exactly that case
+  // (and only then — every other input resolves as before) the pin is re-run
+  // with the custom chip as an occupant: it takes the free corner, or the row
+  // below the custom chip, and both render. A surface whose discount is
+  // inline text (`discountOccupiesCorner: false`) never collided: untouched.
+  let pinnedYieldsToCustom = false;
+  if (
+    pinnedDiscount &&
+    customBadgeText &&
+    discountOccupiesCorner &&
+    pinnedDiscount.corner === resolvedCustom
+  ) {
+    pinnedDiscount = pinDefaultDiscountBadge({
+      ...pinArgs,
+      customBadgeCorner: avoidedCustom.v === 'top' ? `top-${avoidedCustom.h}` : null,
+    });
+    pinnedYieldsToCustom = true;
+  }
+
   const resolvedDiscount =
     discountPosition ?? pinnedDiscount?.corner ?? DISCOUNT_BADGE_DEFAULT_POSITION;
-  const sameCorner = resolvedCustom === resolvedDiscount;
+  const sameCorner = !pinnedYieldsToCustom && resolvedCustom === resolvedDiscount;
 
   const discountBadgeAllowed = !(customBadgeText && discountOccupiesCorner && sameCorner);
 
@@ -570,35 +632,6 @@ export function resolveCardBadges({
   const bothRender =
     Boolean(customBadgeText) && discountVisible && discountBadgeAllowed && discountOccupiesCorner;
 
-  // Issues #1609/#1611/#548 — corner-collision avoidance. Convert the two
-  // LOGICAL reserved sides (top-start / top-end, which mirror with reading
-  // direction — that's how every theme renders its heart/compare/remove
-  // button) into the PHYSICAL left/right corners this module renders in.
-  // Issue #1997 — `newOrBrandBadgeReserved` folds into whichever physical
-  // side is LOGICAL top-start (never top-end), the same conversion, so a
-  // badge avoiding a reserved heart corner also treats an occupied NEW/
-  // brand-pill corner as unavailable instead of landing on top of it.
-  const topLeftReserved = isRtl ? topEndReserved : topStartReserved || newOrBrandBadgeReserved;
-  const topRightReserved = isRtl ? topStartReserved || newOrBrandBadgeReserved : topEndReserved;
-  // The quick-add button / CTA band is itself LOGICAL (bottom-end on the
-  // carousel, or the full bottom-band on the 5 theme cards) — same
-  // start/end → left/right conversion.
-  const overlayLeftReserved = bottomOverlay === 'both' || (bottomOverlay === 'end' && isRtl);
-  const overlayRightReserved = bottomOverlay === 'both' || (bottomOverlay === 'end' && !isRtl);
-
-  /** Avoid a reserved top corner only — no stacking/lift yet. */
-  function avoidOnly(named: CustomBadgePosition): { v: CornerV; h: PhysicalH } {
-    const parsed = parsePhysicalCorner(named);
-    return avoidReservedCorner<PhysicalH>({
-      v: parsed.v,
-      h: parsed.h,
-      otherH: parsed.h === 'left' ? 'right' : 'left',
-      hReserved: parsed.h === 'left' ? topLeftReserved : topRightReserved,
-      otherHReserved: parsed.h === 'left' ? topRightReserved : topLeftReserved,
-    });
-  }
-
-  const avoidedCustom = avoidOnly(resolvedCustom);
   const avoidedDiscount = avoidOnly(resolvedDiscount);
 
   // Rule 4, recomputed from the POST-avoidance edge rather than the merchant's
@@ -608,7 +641,14 @@ export function resolveCardBadges({
   // though their named corners never collided. Comparing the resolved edge
   // catches that case for free — no separate "did avoidance just create a
   // collision" branch needed.
-  const stacked = bothRender && avoidedCustom.v === avoidedDiscount.v;
+  // Issue 2343 — a pinned sale chip that took the custom chip's OWN corner
+  // already sits one row below it; lifting the custom chip too would put the
+  // two back on the same row.
+  const pinnedUnderCustom =
+    pinnedYieldsToCustom &&
+    pinnedDiscount !== null &&
+    pinnedDiscount.corner === `${avoidedCustom.v}-${avoidedCustom.h}`;
+  const stacked = bothRender && avoidedCustom.v === avoidedDiscount.v && !pinnedUnderCustom;
 
   function classFor(
     avoided: { v: CornerV; h: PhysicalH },

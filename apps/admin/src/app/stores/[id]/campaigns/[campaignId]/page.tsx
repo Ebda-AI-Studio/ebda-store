@@ -104,13 +104,13 @@ const CAMPAIGN_STATUS_COLORS = {
   sending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
   sent: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   cancelled: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  failed: { bg: 'bg-destructive/5', text: 'text-destructive', dot: 'bg-destructive' },
+  failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
 } as const;
 
 const RECIPIENT_STATUS_COLORS = {
   queued: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
   sent: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  failed: { bg: 'bg-destructive/5', text: 'text-destructive', dot: 'bg-destructive' },
+  failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
   bounced: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
   unsubscribed: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 } as const;
@@ -523,7 +523,7 @@ export default function CampaignDetailPage() {
                       className="w-full rounded-md border px-3 py-2 text-sm resize-y"
                     />
                   </label>
-                  {aiError && <p className="text-xs text-destructive">{aiError}</p>}
+                  {aiError && <p className="text-xs text-destructive-ink">{aiError}</p>}
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
@@ -711,7 +711,7 @@ export default function CampaignDetailPage() {
               <button
                 type="button"
                 onClick={() => setPendingAction('delete')}
-                className="ms-auto rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                className="ms-auto rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive-ink hover:bg-destructive/10"
               >
                 {t('deleteDraft')}
               </button>
@@ -780,7 +780,7 @@ export default function CampaignDetailPage() {
                 </p>
               )}
               {campaign.lastError && (
-                <p className="text-destructive">
+                <p className="text-destructive-ink">
                   <span className="font-medium">{tD('lastError')}: </span>
                   {campaign.lastError}
                 </p>
@@ -803,7 +803,7 @@ export default function CampaignDetailPage() {
                 <button
                   type="button"
                   onClick={() => setPendingAction('cancel')}
-                  className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                  className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive-ink hover:bg-destructive/10"
                 >
                   {tD('cancelCampaign')}
                 </button>
@@ -815,7 +815,7 @@ export default function CampaignDetailPage() {
                   <button
                     type="button"
                     onClick={() => setPendingAction('delete')}
-                    className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                    className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive-ink hover:bg-destructive/10"
                   >
                     {tc('delete')}
                   </button>
@@ -879,7 +879,7 @@ export default function CampaignDetailPage() {
                                 })
                               : formatDateTime(r.sentAt)}
                           </td>
-                          <td className="px-3 py-2 text-xs text-destructive">{r.error || '—'}</td>
+                          <td className="px-3 py-2 text-xs text-destructive-ink">{r.error || '—'}</td>
                         </tr>
                       ))}
                     </tbody>

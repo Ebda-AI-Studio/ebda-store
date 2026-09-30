@@ -295,7 +295,7 @@ export default function CheckoutDeliveryPage() {
                     <button
                       type="button"
                       onClick={() => removeWindow(w.id)}
-                      className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+                      className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-destructive-ink hover:bg-destructive/10"
                     >
                       {t('remove')}
                     </button>

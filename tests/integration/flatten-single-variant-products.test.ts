@@ -213,9 +213,34 @@ describe.skipIf(!hasDb)('flatten-single-variant-products script', () => {
     const plan = await inTx(true, tx => planProduct(tx, s.productId, opts));
     expect(plan).not.toBeNull();
     expect(plan!.blockers).toEqual([]);
-    const snap = await inTx(true, tx => snapshotProduct(tx, plan!));
-    const applied = await inTx(false, tx => applyProduct(tx, s.productId, opts));
+    // Issue 2350: a checkout lands AFTER the plan (the old out-of-transaction
+    // snapshot point) and BEFORE the apply. The apply unlinks it by predicate,
+    // so the restore snapshot must include it — it is taken inside the apply.
+    const stale = await inTx(true, tx => snapshotProduct(tx, plan!));
+    const late = await withRlsBypass(async tx =>
+      tx.orderItem.create({
+        data: {
+          orderId: (await tx.orderItem.findUniqueOrThrow({ where: { id: s.orderItemId } }))
+            .orderId,
+          productId: s.productId,
+          variantId: s.variantId,
+          productName: 'late line',
+          variantName: '380 Gram',
+          quantity: 1,
+          price: 4000,
+          total: 4000,
+        },
+      })
+    );
+    expect(stale.orderItemIds).not.toContain(late.id); // what the old flow would have saved
+    let persisted: unknown = null;
+    const applied = await inTx(false, tx =>
+      applyProduct(tx, s.productId, opts, b => (persisted = JSON.parse(JSON.stringify(b))))
+    );
     expect(applied.status).toBe('flattened');
+    const snap = (applied as { backup: typeof stale }).backup;
+    expect(snap.orderItemIds.sort()).toEqual([s.orderItemId, late.id].sort());
+    expect(persisted).toEqual(JSON.parse(JSON.stringify(snap))); // handed out before the writes
 
     const p = await readProduct(s.productId);
     expect(p.hasVariants).toBe(false);
@@ -290,6 +315,10 @@ describe.skipIf(!hasDb)('flatten-single-variant-products script', () => {
       tx.orderItem.findUniqueOrThrow({ where: { id: s.orderItemId } })
     );
     expect(oi2.variantId).toBe(s.variantId);
+    const late2 = await withRlsBypass(tx =>
+      tx.orderItem.findUniqueOrThrow({ where: { id: late.id } })
+    );
+    expect(late2.variantId).toBe(s.variantId); // issue 2350: the window's line is re-linked too
     const ws2 = await withRlsBypass(tx =>
       tx.warehouseStock.findMany({
         where: { productId: s.productId },

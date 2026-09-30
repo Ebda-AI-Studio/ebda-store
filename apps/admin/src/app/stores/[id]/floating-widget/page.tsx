@@ -676,7 +676,7 @@ export default function FloatingWidgetPage() {
                     <button
                       type="button"
                       onClick={() => removeButton(b.id)}
-                      className="rounded p-2 text-destructive hover:bg-destructive/10"
+                      className="rounded p-2 text-destructive-ink hover:bg-destructive/10"
                       aria-label={t('removeButtonAria')}
                     >
                       ✕

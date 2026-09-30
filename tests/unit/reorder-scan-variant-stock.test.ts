@@ -153,4 +153,29 @@ describe('runReorderScan — variant-aware on-hand (#1100)', () => {
     expect(result.suggested).toBe(0);
     expect(upserted).toEqual([]);
   });
+
+  // Issue 2344: supplier resolution is product-level — once per product, not
+  // once per variant unit.
+  it('looks up the last-PO supplier and its lead time once per product, not per variant', async () => {
+    tx.purchaseOrderItem.findFirst.mockClear();
+    tx.supplier.findUnique.mockClear();
+    tx.purchaseOrderItem.findFirst.mockResolvedValue({ po: { supplierId: 'sup-1' } } as never);
+    tx.supplier.findUnique.mockResolvedValue({ leadTimeDays: 10 } as never);
+    const variants = Array.from({ length: 30 }, (_, i) => ({
+      id: `v${i}`,
+      title: `V${i}`,
+      inventory: 0,
+    }));
+    findMany.mockResolvedValue([
+      { ...base, id: 'many-variants', inventory: 0, variants },
+      { ...base, id: 'other', inventory: 0, variants: [] },
+    ]);
+    await runReorderScan('store-1');
+    // 30 variant units over two chunks + 1 plain product = 2 products → 2 lookups.
+    expect(tx.purchaseOrderItem.findFirst).toHaveBeenCalledTimes(2);
+    expect(tx.supplier.findUnique).toHaveBeenCalledTimes(1); // one supplier
+    tx.purchaseOrderItem.findFirst.mockResolvedValue(null);
+    tx.supplier.findUnique.mockResolvedValue(null);
+  });
 });
+

@@ -318,7 +318,7 @@ export default function AiToolsPage() {
     {
       header: t('recentRuns.colFailed'),
       alignEnd: true,
-      cell: j => <span className="font-medium text-destructive">{j.failed}</span>,
+      cell: j => <span className="font-medium text-destructive-ink">{j.failed}</span>,
     },
     {
       header: '',
@@ -1014,7 +1014,7 @@ function ActiveJobCard({
         />
       </div>
 
-      {job.errorMessage && <p className="mt-3 text-sm text-destructive">{job.errorMessage}</p>}
+      {job.errorMessage && <p className="mt-3 text-sm text-destructive-ink">{job.errorMessage}</p>}
 
       {filledList.length > 0 && (
         <details className="mt-3">
@@ -1056,7 +1056,7 @@ function ActiveJobCard({
                   {e.entityKind} · {e.entityName}
                 </span>
                 {e.field && <span className="text-muted-foreground"> · {e.field}</span>}
-                <span className="ms-2 text-destructive">{e.error}</span>
+                <span className="ms-2 text-destructive-ink">{e.error}</span>
               </li>
             ))}
           </ul>
@@ -1192,7 +1192,7 @@ function Stat({
     tone === 'ok'
       ? 'text-emerald-700'
       : tone === 'bad'
-        ? 'text-destructive'
+        ? 'text-destructive-ink'
         : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-white px-3 py-2">

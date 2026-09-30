@@ -109,7 +109,7 @@ export function AICategorySuggestions({
     );
   }
   if (error) {
-    return <p className="mt-2 text-xs text-destructive">{error}</p>;
+    return <p className="mt-2 text-xs text-destructive-ink">{error}</p>;
   }
   if (suggestions.length === 0) return null;
 

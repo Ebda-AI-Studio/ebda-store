@@ -492,7 +492,7 @@ export function SimpleVariantsForm({
                     type="button"
                     onClick={() => removeRow(row.rowId)}
                     disabled={rows.length === 1 && !row.variantId}
-                    className="text-sm text-destructive hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground/50"
+                    className="text-sm text-destructive-ink hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground/50"
                     aria-label={t('removeRow')}
                   >
                     {t('removeRow')}
@@ -514,7 +514,7 @@ export function SimpleVariantsForm({
         )}
         <div className="flex items-center gap-3">
           {validationError && !saving && (
-            <p className="text-xs text-destructive">{validationError}</p>
+            <p className="text-xs text-destructive-ink">{validationError}</p>
           )}
           <Button onClick={handleSave} disabled={saving || !!validationError}>
             {saving ? t('saving') : t('save')}

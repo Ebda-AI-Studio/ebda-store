@@ -188,7 +188,7 @@ export function AITranslateMissingButton({
             <span>{t('summarySkippedEmpty', { count: summary.skippedReasons.empty })}</span>
           )}
           {summary.failed > 0 && (
-            <span className="text-destructive">
+            <span className="text-destructive-ink">
               {t('summaryFailed', { count: summary.failed })}
             </span>
           )}

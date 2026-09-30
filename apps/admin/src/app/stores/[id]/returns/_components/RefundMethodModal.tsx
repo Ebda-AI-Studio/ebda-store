@@ -166,7 +166,7 @@ export function RefundMethodModal({
               <p className="text-xs text-muted-foreground">{t('previewLoading')}</p>
             )}
             {previewState === 'error' && (
-              <p className="text-xs text-destructive">{t('previewError')}</p>
+              <p className="text-xs text-destructive-ink">{t('previewError')}</p>
             )}
             {alreadyPaid && (
               <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive-ink">
@@ -211,7 +211,7 @@ export function RefundMethodModal({
                         : t(`refundMethodOptions.${value}.description`)}
                     </span>
                     {value === 'original' && disabled && previewState === 'ready' && (
-                      <span className="mt-1 block text-xs text-destructive">
+                      <span className="mt-1 block text-xs text-destructive-ink">
                         {t(`gatewayUnavailable.${gatewayReasonKey}`)}
                       </span>
                     )}

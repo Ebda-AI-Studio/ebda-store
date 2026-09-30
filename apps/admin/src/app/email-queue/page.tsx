@@ -29,7 +29,11 @@ interface FailedEmail {
 export default function EmailQueuePage() {
   const t = useT('emailQueue');
   const [emails, setEmails] = useState<FailedEmail[]>([]);
-  const [stats, setStats] = useState<{ pending: number; failed: number } | null>(null);
+  const [stats, setStats] = useState<{ pending: number; failed: number; corrupt?: number } | null>(
+    null
+  );
+  const [corrupt, setCorrupt] = useState<Array<{ position: number; bytes: number }>>([]);
+  const [discarding, setDiscarding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -39,10 +43,12 @@ export default function EmailQueuePage() {
     try {
       const { data } = await apiGet<{
         emails: FailedEmail[];
-        stats: { pending: number; failed: number };
+        stats: { pending: number; failed: number; corrupt?: number };
+        corrupt?: Array<{ position: number; bytes: number }>;
       }>('/admin/email-queue/failed?limit=100');
       setEmails(data?.emails || []);
       setStats(data?.stats ?? null);
+      setCorrupt(data?.corrupt ?? []);
     } catch (err) {
       console.error('Failed to fetch failed emails:', err);
       setMessage(t('failedToLoad'));
@@ -78,6 +84,22 @@ export default function EmailQueuePage() {
     setRetrying(false);
   };
 
+  // Issue 2353: unreadable entries set aside by "Retry all" — they cannot be
+  // replayed, so the only actions are to see how many there are and discard.
+  const discardCorrupt = async () => {
+    if (!window.confirm(t('corrupt.confirmDiscard'))) return;
+    setDiscarding(true);
+    setMessage(null);
+    const res = await apiPost<{ discarded: number }>('/admin/email-queue/corrupt/discard', {});
+    if (res.error) {
+      setMessage(t('retryFailed', { message: res.error.message || 'error' }));
+    } else {
+      setMessage(t('corrupt.discarded', { count: res.data?.discarded ?? 0 }));
+      await fetchFailed();
+    }
+    setDiscarding(false);
+  };
+
   const columns: DataTableColumn<FailedEmail>[] = [
     {
       header: t('columns.created'),
@@ -105,7 +127,7 @@ export default function EmailQueuePage() {
     {
       header: t('columns.error'),
       cell: e => (
-        <span className="block max-w-[240px] truncate text-destructive" title={e.error || ''}>
+        <span className="block max-w-[240px] truncate text-destructive-ink" title={e.error || ''}>
           {e.error || '—'}
         </span>
       ),
@@ -137,6 +159,23 @@ export default function EmailQueuePage() {
         {message && (
           <div className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary-ink">
             {message}
+          </div>
+        )}
+
+        {(stats?.corrupt ?? 0) > 0 && (
+          <div className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-ink">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">{t('corrupt.title', { count: stats?.corrupt ?? 0 })}</p>
+              <Button variant="outline" size="sm" disabled={discarding} onClick={discardCorrupt}>
+                {discarding ? t('corrupt.discarding') : t('corrupt.discard')}
+              </Button>
+            </div>
+            <p className="mt-1 text-xs">{t('corrupt.body')}</p>
+            {corrupt.length > 0 && (
+              <p className="mt-1 text-xs">
+                {t('corrupt.sizes', { sizes: corrupt.map(c => c.bytes).join(', ') })}
+              </p>
+            )}
           </div>
         )}
 

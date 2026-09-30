@@ -542,12 +542,12 @@ export default function OrdersListPage() {
         )}
 
         {error && (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive-ink">
             <span className="min-w-0">{error}</span>
             <button
               type="button"
               onClick={() => fetchOrders()}
-              className="inline-flex h-11 min-w-[44px] shrink-0 items-center rounded-full border border-destructive/30 px-4 text-sm font-semibold text-destructive active:bg-destructive/10"
+              className="inline-flex h-11 min-w-[44px] shrink-0 items-center rounded-full border border-destructive/30 px-4 text-sm font-semibold text-destructive-ink active:bg-destructive/10"
             >
               {t.orders.retry}
             </button>

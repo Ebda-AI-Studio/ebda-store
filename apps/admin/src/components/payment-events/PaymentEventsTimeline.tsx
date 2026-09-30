@@ -261,7 +261,7 @@ function PayloadModal({ eventId, onClose }: PayloadModalProps) {
           {tCommon('loading')}
         </div>
       )}
-      {err && !loading && <p className="py-6 text-center text-sm text-destructive">{err}</p>}
+      {err && !loading && <p className="py-6 text-center text-sm text-destructive-ink">{err}</p>}
       {!loading && !err && (
         <pre className="mt-2 max-h-[60vh] overflow-auto rounded-lg bg-muted p-4 text-xs text-foreground font-mono whitespace-pre-wrap break-all">
           {JSON.stringify(payload, null, 2)}
@@ -471,7 +471,7 @@ export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTime
 
           {/* Error state — non-breaking; order detail still usable */}
           {err && !loading && (
-            <p className="py-2 text-xs text-destructive">{t('couldNotLoadEvents')}</p>
+            <p className="py-2 text-xs text-destructive-ink">{t('couldNotLoadEvents')}</p>
           )}
 
           {/* Empty state */}

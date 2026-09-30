@@ -194,11 +194,11 @@ export function clientFilterMatches(order: Order, filter: StatusFilter): boolean
 
 export const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-warning/15 text-warning-foreground border-warning/30',
-  confirmed: 'bg-info/15 text-info border-info/30',
-  processing: 'bg-info/15 text-info border-info/30',
-  shipped: 'bg-primary/15 text-primary border-primary/30',
-  delivered: 'bg-success/15 text-success border-success/30',
-  cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
+  confirmed: 'bg-info/15 text-info-ink border-info/30',
+  processing: 'bg-info/15 text-info-ink border-info/30',
+  shipped: 'bg-primary/15 text-primary-ink border-primary/30',
+  delivered: 'bg-success/15 text-success-ink border-success/30',
+  cancelled: 'bg-destructive/15 text-destructive-ink border-destructive/30',
   refunded: 'bg-muted text-muted-foreground border-border',
 };
 

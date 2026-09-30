@@ -128,3 +128,40 @@ describe('scoped-audit.sh three-dot diff (#1763)', () => {
     expect(stdout).toMatch(/changed source file/);
   });
 });
+
+/**
+ * Issues 2338 / 2352: the script itself kept three-dot semantics after #1763,
+ * but the WORKFLOW handed it `base..head`, and blast-radius.sh still split the
+ * range on `..` — so a PR behind main was audited against a two-dot diff that
+ * presented main's newer commits as the PR's own deletions.
+ */
+describe('audit inputs use the merge-base (three-dot) range (issues 2338, 2352)', () => {
+  const root = join(__dirname, '../..');
+
+  it('scoped-audit.yml passes base...head, never base..head', () => {
+    const yml = readFileSync(join(root, '.github/workflows/scoped-audit.yml'), 'utf8');
+    expect(yml).toMatch(/BASE_REF="\$\{BASE_SHA\}\.\.\.\$\{HEAD_SHA\}"/);
+    expect(yml).not.toMatch(/BASE_REF="\$\{BASE_SHA\}\.\.\$\{HEAD_SHA\}"/);
+  });
+
+  it('blast-radius.yml passes a three-dot range', () => {
+    const yml = readFileSync(join(root, '.github/workflows/blast-radius.yml'), 'utf8');
+    expect(yml).toMatch(/blast-radius\.sh force-website-builder "\$\{BASE_SHA:-HEAD~1\}\.\.\.\$\{HEAD_SHA:-HEAD\}"/);
+  });
+
+  it('blast-radius.sh keeps three-dot semantics (reports only the branch-side file)', () => {
+    const { dir, trunkSha, featureSha } = fixture();
+    // The script exits early without a graph; an empty one is enough to reach
+    // the changed-file listing. DRY_RUN keeps it off Telegram.
+    const graph = join(dir, 'graph.json');
+    writeFileSync(graph, JSON.stringify({ nodes: [], links: [] }));
+    const r = spawnSync(
+      'bash',
+      [join(root, 'scripts/blast-radius.sh'), 'test-repo', `${trunkSha}...${featureSha}`, dir],
+      { encoding: 'utf8', env: { ...cleanGitEnv(), GRAPH_ROOT: graph, DRY_RUN: '1' } }
+    );
+    const out = `${r.stdout}\n${r.stderr}`;
+    expect(out).toContain('g.txt');
+    expect(out, 'trunk-only h.txt leaked into the blast-radius changed-file list').not.toContain('h.txt');
+  });
+});

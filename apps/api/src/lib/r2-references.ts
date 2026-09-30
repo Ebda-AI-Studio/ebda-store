@@ -488,15 +488,32 @@ export interface R2CatalogDb extends R2ReferenceDb {
  * with GREATEST(), read "empty", and passed having proved nothing (issue 2288).
  * So: ANALYZE the table first (cheap for the small tables this is about, and
  * not filtered by RLS), then read reltuples AND the stats collector's
- * n_live_tup. Either one positive → non-empty. reltuples still -1 → UNKNOWN →
- * refuse. Only a table the catalog positively knows is empty passes with 0
- * visible rows.
+ * n_live_tup. Either one positive → non-empty → refuse.
+ *
+ * reltuples still -1 → UNKNOWN. That used to refuse unconditionally, which has
+ * no way out for the role it gates (issue 2354): after the force_app cutover the
+ * connection role is NOT the table owner, so ANALYZE is skipped with a WARNING,
+ * and a table that has never had a row is never auto-analyzed — reltuples stays
+ * -1 forever and the sweep would refuse (and page p1) every week. So the bypass
+ * is now proven POSITIVELY, inside the same runner the collection used:
+ * `current_setting('app.bypass_rls', true) = 'true'`. Every STRICT policy
+ * admits all rows under that GUC (pinned by tests/integration/rls-force-app
+ * .test.ts), so with the bypass proven a 0 is a real 0 and UNKNOWN passes; the
+ * catalog is then only POSITIVE evidence against it. Without the bypass proven,
+ * UNKNOWN still refuses.
  */
 export async function assertStrictTablesVisible(
   run: R2ReferenceRunner,
   catalog: R2CatalogDb,
   tables: readonly string[] = STRICT_R2_TABLES
 ): Promise<void> {
+  const [guc] = await run(db =>
+    db.$queryRawUnsafe<Array<{ bypass: string | null }>>(
+      `SELECT current_setting('app.bypass_rls', true) AS bypass`
+    )
+  );
+  const bypassProven = guc?.bypass === 'true';
+
   for (const table of tables) {
     const [seen] = await run(db =>
       db.$queryRawUnsafe<Array<{ n: number }>>(`SELECT count(*)::int AS n FROM ${q(table)}`)
@@ -526,12 +543,13 @@ export async function assertStrictTablesVisible(
           `role / app.bypass_rls.`
       );
     }
-    if (reltuples !== 0) {
+    if (reltuples !== 0 && !bypassProven) {
       throw new Error(
         `REFUSING: "${table}" shows 0 rows to the collector and the catalog cannot say whether ` +
           `it is empty (reltuples ${reltuples}: never analyzed, and ANALYZE did not update it — ` +
-          `the connection role may not own the table). Run ANALYZE "${table}" as the owner, ` +
-          `then retry.`
+          `the connection role may not own the table), and the runner did not prove ` +
+          `app.bypass_rls = 'true'. Run ANALYZE "${table}" as the owner, or run the collection ` +
+          `through withRlsBypass, then retry.`
       );
     }
   }

@@ -88,7 +88,7 @@ export function NotificationsLog({
             colorMap={NOTIFICATION_COLORS}
           />
           {log.error && (
-            <p className="text-xs text-destructive mt-1 truncate max-w-[200px]" title={log.error}>
+            <p className="text-xs text-destructive-ink mt-1 truncate max-w-[200px]" title={log.error}>
               {log.error}
             </p>
           )}

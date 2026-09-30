@@ -24,9 +24,13 @@ Rules, all in `email-templates/_layout.ts`:
 - **Layout**: a presentation table `width="600"`, `style="width:100%;max-width:600px"`
   (`EMAIL_MAX_WIDTH`). The shell emits no `<style>` block.
 - **Images**: always `emailImage()`, which sets a `width` attribute, the same width inline, and
-  `max-width:100%`, plus a fixed `height` (thumbnails, `EMAIL_THUMB_SIZE` = 64) or
-  `height:auto` (logo, `EMAIL_LOGO_WIDTH` = 160: its aspect ratio is unknown, and
-  a fixed height would stretch it).
+  `max-width:100%`, plus a fixed `height` (thumbnails, `EMAIL_THUMB_SIZE` = 64). The logo
+  (aspect ratio unknown) is scaled WHOLE into a 160×64 box instead (issue 2336): `width="160"`
+  for Outlook, and inline `width:auto;max-width:160px;height:auto;max-height:64px` — CSS keeps
+  the ratio when both bounds apply, so nothing is cropped or squashed. Measured in Chromium:
+  a 1600×420 wordmark renders 160×42, an 800×800 square 64×64 (it was 160×160, pushing the
+  order below the fold on merchant alerts), and a 120×30 mark stays 120×30 (no longer
+  upscaled). Outlook desktop ignores max-height and falls back to the 160 width.
 - **Colour**: solid hex only (`emailColor` converts theme HSL tokens, `emailTint`
   mixes the header tint). `<meta name="color-scheme" content="light only">` asks
   clients not to recolour; Gmail's forced dark mode may still invert.

@@ -215,11 +215,11 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             const rowErrors = parseResult.errors[row.rowNumber];
             const isError = Boolean(rowErrors?.length);
             return isError ? (
-              <span className="text-destructive font-medium" title={rowErrors?.join('; ')}>
+              <span className="text-destructive-ink font-medium" title={rowErrors?.join('; ')}>
                 {tNew('csvStatusError')}
               </span>
             ) : (
-              <span className="text-success">{tNew('csvStatusOk')}</span>
+              <span className="text-success-ink">{tNew('csvStatusOk')}</span>
             );
           },
         },
@@ -230,8 +230,8 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
     <div className="space-y-5">
       {/* Instructions card */}
       <div className="rounded-xl border bg-info/5 p-5">
-        <h3 className="font-semibold text-info text-sm">{tNew('csvHelpTitle')}</h3>
-        <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-info">
+        <h3 className="font-semibold text-info-ink text-sm">{tNew('csvHelpTitle')}</h3>
+        <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-info-ink">
           <li>{tNew('csvHelpStep1')}</li>
           <li>{tNew.rich('csvHelpStep2', { b: chunks => <strong>{chunks}</strong> })}</li>
           <li>{tNew.rich('csvHelpStep3', { b: chunks => <strong>{chunks}</strong> })}</li>
@@ -240,7 +240,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         <button
           type="button"
           onClick={downloadTemplate}
-          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 border border-info/40 rounded text-xs text-info hover:bg-info/10"
+          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 border border-info/40 rounded text-xs text-info-ink hover:bg-info/10"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -335,9 +335,9 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         {parseResult && (
           <p className="mt-1 text-xs text-muted-foreground">
             {tNew('csvParsedTotal', { count: parseResult.totalRows })}{' '}
-            <span className="text-success">{tNew('csvParsedValid', { count: validRowCount })}</span>
+            <span className="text-success-ink">{tNew('csvParsedValid', { count: validRowCount })}</span>
             {errorRowCount > 0 && (
-              <span className="text-destructive">
+              <span className="text-destructive-ink">
                 {tNew('csvParsedErrors', { count: errorRowCount })}
               </span>
             )}
@@ -364,10 +364,10 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           {/* Row-level errors */}
           {errorRowCount > 0 && (
             <div className="rounded-xl border border-border p-3 bg-destructive/5">
-              <p className="text-xs font-medium text-destructive mb-1">
+              <p className="text-xs font-medium text-destructive-ink mb-1">
                 {tNew('csvRowErrorsLabel')}
               </p>
-              <ul className="text-xs text-destructive space-y-0.5 max-h-36 overflow-y-auto">
+              <ul className="text-xs text-destructive-ink space-y-0.5 max-h-36 overflow-y-auto">
                 {Object.entries(parseResult.errors).map(([rn, msgs]) => (
                   <li key={rn}>
                     <span className="font-mono">{tNew('csvRowPrefix', { row: rn })}</span>{' '}
@@ -393,12 +393,12 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             </li>
             <li>
               {tNew('csvImported')}{' '}
-              <span className="text-success font-medium">{importResult.importedRows}</span>
+              <span className="text-success-ink font-medium">{importResult.importedRows}</span>
             </li>
             {importResult.skippedRows > 0 && (
               <li>
                 {tNew('csvSkipped')}{' '}
-                <span className="text-destructive font-medium">{importResult.skippedRows}</span>
+                <span className="text-destructive-ink font-medium">{importResult.skippedRows}</span>
               </li>
             )}
             <li>
@@ -409,7 +409,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             </li>
           </ul>
           {importResult.errors && Object.keys(importResult.errors).length > 0 && (
-            <details className="text-xs text-destructive">
+            <details className="text-xs text-destructive-ink">
               <summary className="cursor-pointer">{tNew('csvShowRowErrors')}</summary>
               <ul className="mt-1 space-y-0.5 pl-2">
                 {Object.entries(importResult.errors).map(([rn, msgs]) => (

@@ -251,7 +251,7 @@ export default function BackordersPage() {
         <button
           type="button"
           onClick={() => setCancelTarget(line.id)}
-          className="px-2 py-1 rounded border border-destructive/40 text-destructive text-xs hover:bg-destructive/10 max-sm:min-h-11 max-sm:px-4"
+          className="px-2 py-1 rounded border border-destructive/40 text-destructive-ink text-xs hover:bg-destructive/10 max-sm:min-h-11 max-sm:px-4"
         >
           {t('cancel')}
         </button>

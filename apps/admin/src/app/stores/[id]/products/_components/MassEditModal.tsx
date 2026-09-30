@@ -527,7 +527,7 @@ export function MassEditModal({
                 </p>
               )}
               {isCapped && (
-                <p className="text-xs text-warning">
+                <p className="text-xs text-warning-ink">
                   {t('massEdit.variantCap').replace('{cap}', String(VARIANT_LOAD_CAP))}
                 </p>
               )}

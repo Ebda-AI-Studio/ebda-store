@@ -212,7 +212,7 @@ function AnswerEngineProvidersPageInner() {
   if (error || !configs) {
     return (
       <div className="rounded-xl border bg-card p-8 text-center">
-        <p className="text-sm text-destructive">{t('loadFailedBody')}</p>
+        <p className="text-sm text-destructive-ink">{t('loadFailedBody')}</p>
         <button
           type="button"
           onClick={fetchConfigs}

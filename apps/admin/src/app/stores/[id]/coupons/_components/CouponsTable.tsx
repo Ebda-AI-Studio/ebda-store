@@ -143,8 +143,8 @@ export function CouponsTable({
             onClick={() => onToggleActive(coupon.id)}
             className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
               coupon.isActive
-                ? 'text-warning hover:bg-warning/10'
-                : 'text-success hover:bg-success/5'
+                ? 'text-warning-ink hover:bg-warning/10'
+                : 'text-success-ink hover:bg-success/5'
             }`}
             title={coupon.isActive ? tActions('deactivate') : tActions('activate')}
             aria-label={coupon.isActive ? tActions('deactivate') : tActions('activate')}

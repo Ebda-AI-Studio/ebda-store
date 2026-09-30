@@ -935,18 +935,26 @@ class AbandonedCartService {
   // ──────────────────────────────────────────
 
   /**
-   * The abandoned-cart report. Recovery figures are `null` — UNKNOWN, never 0
-   * (owner decision 2026-10-01, issue 2035): no flow attributes an order to
-   * a reminder (the recovery link was removed, and nothing calls
-   * `markRecovered`), so a "0% recovered" would be a claim, not a
-   * measurement. `totalAbandoned` and `byStatus` are real counts.
+   * The abandoned-cart report.
+   *
+   * "Recovered" is LAST-TOUCH, not reminder-attributed (issue 2356):
+   * `OrderService.createOrder` marks the store's open abandoned cart for the
+   * same cart or customer `recovered` (with `recoveredAt` + `recoveredOrderId`)
+   * inside the order transaction, whether or not a reminder was opened — the
+   * recovery LINK was removed (issue 2035), the attribution write was not. So
+   * these figures are a real measurement of "ordered after abandoning", and the
+   * admin labels say exactly that. `markRecovered` (above) still has no caller.
+   *
+   * `recoveredRevenue` counts only orders that count as revenue elsewhere
+   * (not cancelled/refunded, payment not failed — issue 2235; unpaid COD
+   * counts), summed in SQL so the row count never loads into memory.
    */
   async getStats(storeId: string): Promise<{
     byStatus: Record<string, number>;
     totalAbandoned: number;
-    totalRecovered: null;
-    recoveryRate: null;
-    recoveredRevenue: null;
+    totalRecovered: number;
+    recoveryRate: number;
+    recoveredRevenue: number;
   }> {
     const grouped = await prisma.abandonedCart.groupBy({
       by: ['status'],
@@ -960,14 +968,26 @@ class AbandonedCartService {
       byStatus[row.status] = row._count.id;
       totalAbandoned += row._count.id;
     }
+    const totalRecovered = byStatus.recovered ?? 0;
 
-    return {
-      byStatus,
-      totalAbandoned,
-      totalRecovered: null,
-      recoveryRate: null,
-      recoveredRevenue: null,
-    };
+    const revenueRows = await prisma.$queryRaw<Array<{ revenue: bigint | null }>>`
+      SELECT COALESCE(SUM(o.total), 0)::bigint AS revenue
+      FROM public.abandoned_carts ac
+      JOIN public.orders o ON o.id = ac.recovered_order_id
+      WHERE ac.store_id = ${storeId}
+        AND ac.status = 'recovered'
+        AND o.store_id = ${storeId}
+        AND o.deleted_at IS NULL
+        AND o.status NOT IN ('cancelled', 'refunded')
+        AND o.payment_status <> 'failed'
+    `;
+    const recoveredRevenue = Number(revenueRows[0]?.revenue ?? 0);
+
+    // Nothing abandoned = a genuine 0% (no denominator to be unknown about).
+    const recoveryRate =
+      totalAbandoned > 0 ? Math.round((totalRecovered / totalAbandoned) * 10000) / 100 : 0;
+
+    return { byStatus, totalAbandoned, totalRecovered, recoveryRate, recoveredRevenue };
   }
 
   // ──────────────────────────────────────────

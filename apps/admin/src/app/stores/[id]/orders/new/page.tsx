@@ -518,7 +518,7 @@ export default function NewOrderPage() {
                 </ul>
               )}
               {selectedCustomerId && (
-                <p className="mt-2 text-xs text-success">
+                <p className="mt-2 text-xs text-success-ink">
                   ✓{' '}
                   {t('customerSection.linkedToCustomer', {
                     id: selectedCustomerId.slice(0, 8),
@@ -631,7 +631,7 @@ export default function NewOrderPage() {
               ) : shippingPreview ? (
                 shippingPreview.matched ? (
                   shippingPreview.freeShipping ? (
-                    <p className="font-medium text-success">{t('shippingSection.freeDelivery')}</p>
+                    <p className="font-medium text-success-ink">{t('shippingSection.freeDelivery')}</p>
                   ) : (
                     <p className="font-semibold text-foreground">
                       {formatPrice(shippingPreview.shippingCost)}
@@ -646,7 +646,7 @@ export default function NewOrderPage() {
                     </p>
                   )
                 ) : (
-                  <p className="text-warning">{t('shippingSection.noRateConfigured')}</p>
+                  <p className="text-warning-ink">{t('shippingSection.noRateConfigured')}</p>
                 )
               ) : null}
             </div>
@@ -736,7 +736,7 @@ export default function NewOrderPage() {
                           {formatPrice(effectiveVariantPrice(v.price, pendingVariantProduct.price))}
                         </span>
                         {v.inventory <= 0 && (
-                          <span className="ms-1.5 text-destructive/70 text-[10px]">
+                          <span className="ms-1.5 text-destructive-ink text-[10px]">
                             {t('productsSection.outOfStock')}
                           </span>
                         )}
@@ -782,7 +782,7 @@ export default function NewOrderPage() {
                     type="button"
                     onClick={() => removeItem(it.productId, it.variantId)}
                     aria-label={t('productsSection.removeItemAria')}
-                    className="rounded p-1 text-destructive hover:bg-destructive/10"
+                    className="rounded p-1 text-destructive-ink hover:bg-destructive/10"
                   >
                     ✕
                   </button>

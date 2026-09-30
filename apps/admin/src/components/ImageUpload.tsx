@@ -252,7 +252,7 @@ export function ImageUpload({
         <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
       )}
 
-      {displayError && <p className="mt-1 text-xs text-destructive">{displayError}</p>}
+      {displayError && <p className="mt-1 text-xs text-destructive-ink">{displayError}</p>}
     </div>
   );
 }
@@ -363,7 +363,7 @@ export function MultiImageUpload({
       {recommendedSizeHint && (
         <p className="mt-2 text-xs text-muted-foreground">{recommendedSizeHint}</p>
       )}
-      {displayError && <p className="mt-1 text-xs text-destructive">{displayError}</p>}
+      {displayError && <p className="mt-1 text-xs text-destructive-ink">{displayError}</p>}
     </div>
   );
 }

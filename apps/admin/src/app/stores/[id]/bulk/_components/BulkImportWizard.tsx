@@ -113,8 +113,8 @@ export function BulkImportWizard({
     <div className="space-y-6">
       {/* Instructions */}
       <div className="rounded-xl border bg-info/5 p-6">
-        <h3 className="font-semibold text-info">{t('instructionsTitle')}</h3>
-        <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-info">
+        <h3 className="font-semibold text-info-ink">{t('instructionsTitle')}</h3>
+        <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-info-ink">
           <li>{t('step1')}</li>
           <li>{t('step2')}</li>
           <li>{t('step3')}</li>
@@ -171,14 +171,14 @@ export function BulkImportWizard({
               {selectedFileName ? t('fileLoaded', { name: selectedFileName }) : t('uploadPrompt')}
             </p>
             {fileKind === 'csv' && csvContent && (
-              <p className="mt-1 text-xs text-success">
+              <p className="mt-1 text-xs text-success-ink">
                 {t('csvReady', {
                   count: csvContent.split('\n').filter(l => l.trim()).length - 1,
                 })}
               </p>
             )}
             {fileKind === 'xlsx' && xlsxBase64 && (
-              <p className="mt-1 text-xs text-success">{t('xlsxReady')}</p>
+              <p className="mt-1 text-xs text-success-ink">{t('xlsxReady')}</p>
             )}
           </div>
 

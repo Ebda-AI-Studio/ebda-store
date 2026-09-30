@@ -305,7 +305,7 @@ export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerP
                 type="button"
                 onClick={() => removeLine(row)}
                 aria-label={t('removeLabel')}
-                className="rounded p-1 text-destructive hover:bg-destructive/10"
+                className="rounded p-1 text-destructive-ink hover:bg-destructive/10"
               >
                 ×
               </button>

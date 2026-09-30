@@ -274,7 +274,7 @@ function BarcodeInput({
         <p className="text-xs text-muted-foreground">{t('cameraNotSupported')}</p>
       )}
       {cameraError === 'camera-permission' && (
-        <p className="text-xs text-destructive">{t('cameraPermission')}</p>
+        <p className="text-xs text-destructive-ink">{t('cameraPermission')}</p>
       )}
     </div>
   );
@@ -408,7 +408,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
           >
             {submitting ? '…' : t('submitReceive')}
           </button>
-          {submitErr && <p className="text-xs text-destructive">{submitErr}</p>}
+          {submitErr && <p className="text-xs text-destructive-ink">{submitErr}</p>}
         </div>
       )}
 
@@ -524,7 +524,7 @@ function PickMode({ storeId }: { storeId: string }) {
               {orderLoading ? '…' : t('loadOrder')}
             </button>
           </div>
-          {orderErr && <p className="text-sm text-destructive">{orderErr}</p>}
+          {orderErr && <p className="text-sm text-destructive-ink">{orderErr}</p>}
         </div>
       )}
 
@@ -638,7 +638,7 @@ function PickMode({ storeId }: { storeId: string }) {
                   })}
                 </div>
               )}
-              {pickErr && <p className="text-sm text-destructive">{pickErr}</p>}
+              {pickErr && <p className="text-sm text-destructive-ink">{pickErr}</p>}
             </div>
           )}
         </div>
@@ -889,7 +889,7 @@ function CountMode({ storeId }: { storeId: string }) {
             />
           )}
 
-          {lineErr && <p className="text-sm text-destructive">{lineErr}</p>}
+          {lineErr && <p className="text-sm text-destructive-ink">{lineErr}</p>}
 
           {lookupResult && (
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -1003,7 +1003,7 @@ function CountMode({ storeId }: { storeId: string }) {
         </div>
       )}
 
-      {reconcileErr && <p className="text-sm text-destructive">{reconcileErr}</p>}
+      {reconcileErr && <p className="text-sm text-destructive-ink">{reconcileErr}</p>}
 
       {reconcileResult && (
         <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">

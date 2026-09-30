@@ -281,7 +281,7 @@ export default function WarehousesPage() {
                   {!w.isDefault && (
                     <button
                       onClick={() => handleDeactivate(w)}
-                      className="min-h-[44px] rounded-md px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
+                      className="min-h-[44px] rounded-md px-3 text-xs font-medium text-destructive-ink hover:bg-destructive/10"
                     >
                       {tc('deactivate')}
                     </button>

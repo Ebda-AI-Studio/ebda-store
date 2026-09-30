@@ -30,7 +30,7 @@ export function StoreDetailsStep({
       <div className="mt-6 space-y-4">
         <div>
           <label htmlFor="storeName" className="block text-sm font-medium text-foreground">
-            {t('storeNameLabel')} <span className="text-destructive">{t('required')}</span>
+            {t('storeNameLabel')} <span className="text-destructive-ink">{t('required')}</span>
           </label>
           <Input
             id="storeName"
@@ -40,13 +40,13 @@ export function StoreDetailsStep({
             className={`mt-1 ${validationErrors.storeName ? 'border-destructive' : ''}`}
           />
           {validationErrors.storeName && (
-            <p className="mt-1 text-sm text-destructive">{validationErrors.storeName}</p>
+            <p className="mt-1 text-sm text-destructive-ink">{validationErrors.storeName}</p>
           )}
         </div>
 
         <div>
           <label htmlFor="storeSlug" className="block text-sm font-medium text-foreground">
-            {t('storeSlugLabel')} <span className="text-destructive">{t('required')}</span>
+            {t('storeSlugLabel')} <span className="text-destructive-ink">{t('required')}</span>
           </label>
           <div
             className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-destructive' : ''}`}
@@ -64,7 +64,7 @@ export function StoreDetailsStep({
             />
           </div>
           {validationErrors.storeSlug && (
-            <p className="mt-1 text-sm text-destructive">{validationErrors.storeSlug}</p>
+            <p className="mt-1 text-sm text-destructive-ink">{validationErrors.storeSlug}</p>
           )}
         </div>
 

@@ -41,7 +41,7 @@ export function EraseCustomerModal({
     <Modal isOpen={isOpen} onClose={isErasing ? () => {} : onClose} title={t('eraseModalTitle')}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">{t('eraseModalBody')}</p>
-        <p className="text-sm font-medium text-destructive">{t('eraseModalWarning')}</p>
+        <p className="text-sm font-medium text-destructive-ink">{t('eraseModalWarning')}</p>
 
         <div>
           <label

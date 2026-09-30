@@ -4525,7 +4525,7 @@ function ManualProductPicker({
                 <button
                   type="button"
                   onClick={() => remove(id)}
-                  className="touch-target rounded text-destructive hover:bg-destructive/10"
+                  className="touch-target rounded text-destructive-ink hover:bg-destructive/10"
                   aria-label={t('manualPicker.remove')}
                 >
                   ×
@@ -5813,7 +5813,7 @@ function IconButton({
 }) {
   const styles =
     variant === 'danger'
-      ? 'border-destructive/40 text-destructive hover:bg-destructive/10'
+      ? 'border-destructive/40 text-destructive-ink hover:bg-destructive/10'
       : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground';
   return (
     <button

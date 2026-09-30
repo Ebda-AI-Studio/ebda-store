@@ -73,7 +73,7 @@ export function AwardPointsModal({
 
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-2">
-            {t('pointsLabel')} <span className="text-destructive">*</span>
+            {t('pointsLabel')} <span className="text-destructive-ink">*</span>
           </label>
           <input
             type="number"

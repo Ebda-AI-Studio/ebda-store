@@ -276,7 +276,7 @@ export function SmartPaletteModal({
             {logoLoading ? t('extracting') : t('suggestFromLogo')}
           </button>
           {logoError ? (
-            <span className="text-xs text-destructive">{logoError}</span>
+            <span className="text-xs text-destructive-ink">{logoError}</span>
           ) : (
             <span className="text-xs text-muted-foreground">{t('logoHint')}</span>
           )}

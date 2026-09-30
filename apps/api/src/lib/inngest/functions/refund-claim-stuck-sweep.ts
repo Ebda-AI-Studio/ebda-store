@@ -48,8 +48,10 @@ import {
  * almost entirely on resolved claims once refund volume passed ~500/week, and
  * a genuinely stuck claim newer than the 500th never surfaced. Paging
  * continues until CLAIM_SCAN_LIMIT unresolved claims are found, the window is
- * exhausted, or CLAIM_MAX_PAGES pages were read — and only the last two cases
- * can hide one, which is logged at warn, never silent.
+ * exhausted, CLAIM_MAX_PAGES pages were read, or the CLAIM_SCAN_BUDGET_MS
+ * wall-clock budget is spent (issue 2347) — the last three can defer one to a
+ * later tick, which is logged at warn, never silent. Each page's resolution
+ * read is cursor-paged too.
  */
 
 /** Old enough that the request that made the claim is certainly over. */
@@ -65,6 +67,16 @@ const CLAIM_SCAN_LIMIT = 500;
 const CLAIM_PAGE_SIZE = 500;
 /** Hard ceiling on pages per tick (CLAIM_PAGE_SIZE × this raw rows). */
 const CLAIM_MAX_PAGES = 20;
+/**
+ * Wall-clock budget for the claim scan (issue 2347). The whole scan is ONE
+ * `step.run`, i.e. one HTTP request from Inngest through Cloudflare, whose edge
+ * answers 524 at 100s — and a failed step here also fails the reversal sweep
+ * that shares the tick. Paging stops once this is spent, logged like the page
+ * ceiling; the rest is read on later ticks.
+ */
+export const CLAIM_SCAN_BUDGET_MS = 45_000;
+/** Resolution rows read per page (cursor-paged, never unbounded). */
+const RESOLUTION_PAGE_SIZE = 1000;
 /** Ages (minutes) at which one claim is alerted — once each. */
 const ESCALATION_STAGES_MINUTES = [STUCK_AFTER_MINUTES, 24 * 60, 72 * 60];
 /** Resolution events: the claim's outcome is known. */
@@ -91,7 +103,13 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
     const claims: StuckClaim[] = [];
     let cursorId: string | null = null;
     let windowExhausted = false;
+    let budgetSpent = false;
+    const startedAt = Date.now();
     for (let page = 0; page < CLAIM_MAX_PAGES && claims.length < CLAIM_SCAN_LIMIT; page++) {
+      if (page > 0 && Date.now() - startedAt > CLAIM_SCAN_BUDGET_MS) {
+        budgetSpent = true;
+        break;
+      }
       const claimRows = await withRlsBypass(tx =>
         tx.paymentEvent.findMany({
           where: {
@@ -116,17 +134,27 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
       if (claimRows.length === 0) break;
       cursorId = claimRows[claimRows.length - 1].id;
 
+      // This page's payments' resolutions, cursor-paged (issue 2347: the read
+      // had no `take`, the shape issue 2028 removed from the claim read).
       const paymentIds = [...new Set(claimRows.map(c => c.paymentId))];
-      const resolutionRows = await withRlsBypass(tx =>
-        tx.paymentEvent.findMany({
-          where: { eventType: { in: RESOLVING_EVENTS }, paymentId: { in: paymentIds } },
-          select: { details: true },
-        })
-      );
       const resolved = new Set<string>();
-      for (const e of resolutionRows) {
-        const claimId = ((e.details ?? {}) as Record<string, unknown>).claimId;
-        if (typeof claimId === 'string') resolved.add(claimId);
+      let resCursor: string | null = null;
+      for (;;) {
+        const resolutionRows = await withRlsBypass(tx =>
+          tx.paymentEvent.findMany({
+            where: { eventType: { in: RESOLVING_EVENTS }, paymentId: { in: paymentIds } },
+            select: { id: true, details: true },
+            orderBy: { id: 'asc' },
+            take: RESOLUTION_PAGE_SIZE,
+            ...(resCursor ? { cursor: { id: resCursor }, skip: 1 } : {}),
+          })
+        );
+        for (const e of resolutionRows) {
+          const claimId = ((e.details ?? {}) as Record<string, unknown>).claimId;
+          if (typeof claimId === 'string') resolved.add(claimId);
+        }
+        if (resolutionRows.length < RESOLUTION_PAGE_SIZE) break;
+        resCursor = resolutionRows[resolutionRows.length - 1].id;
       }
       for (const e of claimRows) {
         const details = (e.details ?? {}) as Record<string, unknown>;
@@ -146,7 +174,13 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
     }
     if (!windowExhausted) {
       logger.warn(
-        { unresolvedLimit: CLAIM_SCAN_LIMIT, maxPages: CLAIM_MAX_PAGES, found: claims.length },
+        {
+          unresolvedLimit: CLAIM_SCAN_LIMIT,
+          maxPages: CLAIM_MAX_PAGES,
+          budgetMs: CLAIM_SCAN_BUDGET_MS,
+          budgetSpent,
+          found: claims.length,
+        },
         '[refund-claim-stuck-sweep] claim scan stopped before the window ended — newer unresolved claims are read on later ticks'
       );
     }

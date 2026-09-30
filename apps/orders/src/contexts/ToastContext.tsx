@@ -37,9 +37,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             role="status"
             className={`pointer-events-auto w-full max-w-sm rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
               t.variant === 'success'
-                ? 'border-success/30 bg-success/10 text-success'
+                ? 'border-success/30 bg-success/10 text-success-ink'
                 : t.variant === 'error'
-                  ? 'border-destructive/30 bg-destructive/10 text-destructive'
+                  ? 'border-destructive/30 bg-destructive/10 text-destructive-ink'
                   : 'border-border bg-card text-foreground'
             }`}
           >

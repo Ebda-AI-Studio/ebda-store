@@ -156,12 +156,12 @@ export default function OrderDetailPage() {
         )}
 
         {error && !isLoading && (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive-ink">
             <p>{error}</p>
             <button
               type="button"
               onClick={fetchOrder}
-              className="mt-4 inline-flex h-11 min-w-[44px] items-center rounded-full border border-destructive/30 px-5 text-sm font-semibold text-destructive active:bg-destructive/10"
+              className="mt-4 inline-flex h-11 min-w-[44px] items-center rounded-full border border-destructive/30 px-5 text-sm font-semibold text-destructive-ink active:bg-destructive/10"
             >
               {t.orders.retry}
             </button>

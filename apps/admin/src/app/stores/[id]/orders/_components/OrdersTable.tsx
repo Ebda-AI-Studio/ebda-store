@@ -256,7 +256,7 @@ export function OrdersTable({
                   type="button"
                   onClick={() => onMarkPaid(order.id)}
                   disabled={isUpdating}
-                  className="inline-flex items-center gap-1 px-3 py-2 min-h-9 text-xs font-medium text-success border border-success/30 rounded-lg hover:bg-success/10 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1 px-3 py-2 min-h-9 text-xs font-medium text-success-ink border border-success/30 rounded-lg hover:bg-success/10 transition-colors disabled:opacity-50"
                   title={t('actions.markPaidTitle')}
                 >
                   {t('actions.markPaid')}

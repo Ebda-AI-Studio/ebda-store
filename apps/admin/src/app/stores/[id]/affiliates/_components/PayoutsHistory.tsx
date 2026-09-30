@@ -67,7 +67,7 @@ export function PayoutsHistory({
 
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-2">
-              {t('fields.amount')} <span className="text-destructive">*</span>
+              {t('fields.amount')} <span className="text-destructive-ink">*</span>
             </label>
             <input
               type="number"

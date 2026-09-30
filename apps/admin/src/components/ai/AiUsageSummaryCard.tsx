@@ -220,7 +220,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
       <div
         className={`rounded-xl border border-destructive/20 bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}
       >
-        <p className="text-xs text-destructive">{t('loadError')}</p>
+        <p className="text-xs text-destructive-ink">{t('loadError')}</p>
       </div>
     );
   }
@@ -292,7 +292,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">{t('remainingToday')}</span>
               <span
-                className={`font-bold tabular-nums ${remainingWarn ? 'text-destructive' : 'text-foreground'}`}
+                className={`font-bold tabular-nums ${remainingWarn ? 'text-destructive-ink' : 'text-foreground'}`}
               >
                 {remaining.toLocaleString()}
               </span>
@@ -377,7 +377,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
         <div className="rounded-lg bg-muted/40 px-3 py-2">
           <p className="text-xs text-muted-foreground">{t('statRemaining')}</p>
           <p
-            className={`text-lg font-bold tabular-nums ${remainingWarn ? 'text-destructive' : 'text-foreground'}`}
+            className={`text-lg font-bold tabular-nums ${remainingWarn ? 'text-destructive-ink' : 'text-foreground'}`}
           >
             {remaining.toLocaleString()}
           </p>

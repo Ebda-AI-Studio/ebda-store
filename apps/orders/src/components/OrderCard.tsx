@@ -55,7 +55,7 @@ export function OrderCard({ order, storeId }: { order: Order; storeId: string })
             {formatMoney(order.total, order.currency ?? 'KWD')}
           </p>
           {order.paymentStatus === 'paid' ? (
-            <p className="text-xs font-semibold text-success">{t.filters.paid}</p>
+            <p className="text-xs font-semibold text-success-ink">{t.filters.paid}</p>
           ) : null}
         </div>
       </div>

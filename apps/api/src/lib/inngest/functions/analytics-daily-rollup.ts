@@ -3,19 +3,27 @@
  *
  * Two Inngest functions:
  *
- *   analyticsDailyRollupCron  — nightly cron at 23:00 UTC (02:00 Kuwait, UTC+3)
- *                               runs cohort + funnel + RFM rollup for every
- *                               accountingEnabled store.
+ *   analyticsDailyRollupCron  — nightly cron at 23:00 UTC (02:00 Kuwait, UTC+3).
+ *                               Lists the accountingEnabled stores and FANS OUT
+ *                               one `insights/rollup-requested` event per store
+ *                               (issue 2348) — it does no rollup work itself.
  *
  *   analyticsRollupOnDemand   — event-driven, triggered by
- *                               `insights/rollup-requested` (super_admin via
+ *                               `insights/rollup-requested` (the cron's fan-out,
+ *                               or a super_admin via
  *                               POST /:storeId/insights/rollup/run-now).
  *
- * Both run the three rollups via `runStoreRollupSteps` — one step and one
- * tenant transaction per rollup per store — so Inngest retries only the
+ * The per-store run executes the three rollups via `runStoreRollupSteps` — one
+ * step and one tenant transaction per rollup — so Inngest retries only the
  * failing rollup without re-running healthy ones (issue 2293).
  *
- * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
+ * Step cost (issue 2348): the nightly total is 1 + ceil(N/500) steps on the
+ * cron + 3 per store (3N) in N separate runs. The old shape ran all 3N+1 steps
+ * inside ONE run, so the run's step count — and its wall-clock, serialised by
+ * `concurrency: 1` — grew without a ceiling as stores were added. Each run is
+ * now bounded (3 steps), and the per-store runs are capped at 3 at a time with
+ * one per store, so the DB sees at most 3 rollups at once. Recorded in
+ * docs/audits/_slices/06-cost-forecast.md.
  */
 
 import type { InngestFunction } from 'inngest';
@@ -63,6 +71,9 @@ export async function runStoreRollupSteps(
 // Nightly cron — 02:00 Kuwait (= 23:00 UTC)
 // ---------------------------------------------------------------------------
 
+/** Events per `step.sendEvent` call — keeps each request well under Inngest's payload limit. */
+export const FANOUT_BATCH = 500;
+
 export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunction(
   {
     id: 'analytics-daily-rollup',
@@ -73,29 +84,32 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
   },
   async ({ step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
-    // stores table does not filter to 0 rows (no tenant GUC is set).
+    // stores table does not filter to 0 rows (no tenant GUC is set). Ids only.
     const stores = await step.run('list-stores', () =>
       withRlsBypass(tx =>
         tx.store.findMany({
           where: { accountingEnabled: true, deletedAt: null },
           select: { id: true },
+          orderBy: { id: 'asc' },
         })
       )
     );
 
-    const totals = { cohortRows: 0, funnelDays: 0, rfmCustomers: 0 };
-
-    for (const store of stores) {
-      // The rollups use bare prisma internally; each step wraps its own
-      // runInTenantContext so FORCE RLS sees the store GUC (issue 2293).
-      const result = await runStoreRollupSteps(step, store.id, `rollup-${store.id}`);
-      totals.cohortRows += result.cohortRows;
-      totals.funnelDays += result.funnelDays;
-      totals.rfmCustomers += result.rfmCustomers;
+    // One event per store, sent in bounded batches: the per-store work runs in
+    // its own function run (analyticsRollupOnDemand), never inside this one.
+    for (let i = 0; i < stores.length; i += FANOUT_BATCH) {
+      const batch = stores.slice(i, i + FANOUT_BATCH);
+      await step.sendEvent(
+        `fan-out-${i / FANOUT_BATCH}`,
+        batch.map((s: { id: string }) => ({
+          name: 'insights/rollup-requested' as const,
+          data: { storeId: s.id, requestedBy: 'nightly-cron' },
+        }))
+      );
     }
 
-    logger.info({ stores: stores.length, ...totals }, 'analytics-daily-rollup: completed');
-    return { stores: stores.length, ...totals };
+    logger.info({ stores: stores.length }, 'analytics-daily-rollup: fanned out');
+    return { stores: stores.length };
   }
 );
 
@@ -106,8 +120,13 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
 export const analyticsRollupOnDemand: InngestFunction.Any = inngest.createFunction(
   {
     id: 'analytics-rollup-on-demand',
-    name: 'Insights — on-demand rollup',
-    retries: 1,
+    name: 'Insights — per-store rollup (nightly fan-out + on-demand)',
+    // 2, as the cron had when it ran the rollups inline — the nightly work now
+    // lands here.
+    retries: 2,
+    // At most 3 stores' rollups at once (DB pool), and never two for one store
+    // (a super_admin "run now" during the nightly fan-out queues behind it).
+    concurrency: [{ limit: 3 }, { key: 'event.data.storeId', limit: 1 }],
     triggers: [{ event: 'insights/rollup-requested' }],
   },
   async ({ event, step }) => {

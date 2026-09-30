@@ -885,7 +885,7 @@ export default function EditProductPage() {
                       <span className="ml-2 text-sm font-normal line-through text-muted-foreground">
                         {formatPrice(regularFils)}
                       </span>{' '}
-                      <span className="ml-1 text-sm font-medium text-success">
+                      <span className="ml-1 text-sm font-medium text-success-ink">
                         {tFields('discountOff').replace(
                           '{pct}',
                           pctOff.toFixed(1).replace(/\.0$/, '')
@@ -905,7 +905,7 @@ export default function EditProductPage() {
                 const marginPct = (margin / sellPrice) * 100;
                 const profitable = margin > 0;
                 return (
-                  <p className={`mt-3 text-sm ${profitable ? 'text-success' : 'text-destructive'}`}>
+                  <p className={`mt-3 text-sm ${profitable ? 'text-success-ink' : 'text-destructive-ink'}`}>
                     {tFields('profitLabel')}{' '}
                     <span className="font-semibold">
                       {margin.toFixed(3)} KWD ({marginPct.toFixed(1)}%)

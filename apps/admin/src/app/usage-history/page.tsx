@@ -110,7 +110,7 @@ function UsageHistoryInner() {
   if (error) {
     return (
       <div className="rounded-xl border bg-card p-6 text-center">
-        <p className="text-sm text-destructive">{t('loadError')}</p>
+        <p className="text-sm text-destructive-ink">{t('loadError')}</p>
         <button
           type="button"
           onClick={fetchData}

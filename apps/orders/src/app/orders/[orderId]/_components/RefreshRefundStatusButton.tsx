@@ -67,7 +67,7 @@ export function RefreshRefundStatusButton({
       type="button"
       onClick={handleRefresh}
       disabled={disabled || busy}
-      className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-warning bg-warning/5 px-3 text-center text-xs font-semibold leading-tight text-warning active:bg-warning/10 disabled:opacity-60"
+      className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-warning bg-warning/5 px-3 text-center text-xs font-semibold leading-tight text-warning-ink active:bg-warning/10 disabled:opacity-60"
     >
       <svg
         className={`h-4 w-4 shrink-0 ${busy ? 'animate-spin' : ''}`}

@@ -79,7 +79,12 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           AUDIT_INPUT: /tmp/scoped-audit-input.md
         run: |
-          BASE_REF="${BASE_SHA}..${HEAD_SHA}"
+          # Three-dot (issues 2338, 2352): `base..head` is a direct two-commit
+          # diff, so when main has moved since the branch point every main-only
+          # file showed up as a PR "deletion" (204 of 214 files on PR 2331).
+          # `base...head` diffs from the merge base: only the PR's own change.
+          # fetch-depth: 0 above guarantees the merge base is present.
+          BASE_REF="${BASE_SHA}...${HEAD_SHA}"
           bash scripts/scoped-audit.sh force-website-builder "$BASE_REF" .
 
       - name: Run Claude scoped audit (subscription OAuth)

@@ -40,7 +40,7 @@ All colors flow through `globals.css` CSS variables. Each tenant overrides `--pr
 
 - **Primary** (`--primary` / Force Orange `26 100% 50%` / `#ff6e00` default): CTAs, hero gradient, cart badge, focus rings, social hover, newsletter button.
 - **Primary Foreground** (`--primary-foreground` / `0 0% 100%`): Always paired with primary for contrast.
-- **Primary/5–30** (opacity utility): Used for ambient effects — `bg-primary/5` for icon halos in empty states, `shadow-primary/20` on hero CTA, `bg-primary/15 via-primary/8` for image fallback gradients.
+- **Primary/5–30** (opacity utility): Used for ambient effects — `bg-primary/5` for icon halos in empty states, `shadow-primary/20` on hero CTA, `from-primary/15 to-muted` for image fallback gradients (two-stop: the old `via-primary/8` emitted no CSS — issue 2342).
 
 ### Status Colors
 
@@ -313,7 +313,7 @@ Modern uses `@force/ui`'s `ProductBadge` with default styling — `rounded-full`
 
 - Hero `<Image>` uses `priority` and `sizes="(min-width: 1024px) 50vw, 100vw"`.
 - Product cards use `sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"` and `loading="lazy"`.
-- Hero falls back to a `bg-gradient-to-br from-primary/15 via-primary/8 to-muted` placeholder with a centered icon.
+- Hero falls back to a `bg-gradient-to-br from-primary/15 to-muted` placeholder with a centered icon.
 - Two-image swap on product cards is opt-in: when `product.images[1]?.url` exists, the second image fades in on hover via `cn('object-cover transition-opacity duration-500', isHovered ? 'opacity-100' : 'opacity-0')`. Single-image products skip the layer entirely.
 
 ### Motion Conventions

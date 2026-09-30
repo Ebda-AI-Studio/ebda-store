@@ -15,6 +15,7 @@
  * prove the chip NEVER lands on the bottom edge (so it can never be lifted into
  * mid-image again) unless the merchant explicitly chose a bottom corner.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
@@ -22,6 +23,9 @@ import {
   pinDefaultDiscountBadge,
   resolveCardBadges,
 } from '../../apps/web/src/templates/shared/custom-badge';
+
+/** sha256 of the legacy-corner resolver's output grid — see the freeze test at the end. */
+const LEGACY_GRID_SHA256 = '1f6758262013a208a0a3d4052558176c3af50d1fa88ec6b063285670f5e4fc10';
 
 const NO_LABEL = {};
 const base = {
@@ -189,4 +193,110 @@ describe('every corner-chip render path derives the placement from the per-store
       expect(src).not.toMatch(/slug\s*===\s*['"]pecannbee['"]/);
     });
   }
+});
+
+/**
+ * Issue 2343 — the pin chose its corner from the platform's own top-edge
+ * occupants only, then rule 3 ("same corner → the merchant's chip wins")
+ * compared it with a custom chip the merchant parked in the reading-start top
+ * corner, and deleted the sale chip on every card of that store. The pin now
+ * sees the custom chip, and a pinned (platform-placed) chip is never "the same
+ * corner" for rule 3.
+ */
+describe('pinned sale badge vs a merchant custom badge in a top corner (issue 2343)', () => {
+  const labelled = { ...base, product: { badgeLabel: 'Offer', badgeLabelAr: 'عرض' } };
+
+  it('LTR custom top-left: the sale chip still renders, in the free top-right corner', () => {
+    const r = resolveCardBadges({ ...labelled, isRtl: false, customPosition: 'top-left' });
+    expect(r.discountBadgeAllowed).toBe(true);
+    expect(r.discountBadgePositionCls).toBe('top-3 right-3');
+    // Same edge, different corners → rule 4 lifts the custom chip one row, as for any pair.
+    expect(r.customBadgePositionCls).toBe('top-12 left-3');
+  });
+
+  it('RTL mirrors it: custom top-right, sale chip top-left', () => {
+    const r = resolveCardBadges({ ...labelled, isRtl: true, customPosition: 'top-right' });
+    expect(r.discountBadgeAllowed).toBe(true);
+    expect(r.discountBadgePositionCls).toBe('top-3 left-3');
+  });
+
+  it('end corner held by a heart: the sale chip sits one row BELOW the custom chip, never on it', () => {
+    const r = resolveCardBadges({
+      ...labelled,
+      isRtl: false,
+      customPosition: 'top-left',
+      topEndReserved: true,
+    });
+    expect(r.discountBadgeAllowed).toBe(true);
+    expect(r.customBadgePositionCls).toBe('top-3 left-3');
+    expect(r.discountBadgePositionCls).toBe('top-12 left-3');
+  });
+
+  it('pinDefaultDiscountBadge treats the custom chip as a chip-deep occupant', () => {
+    expect(
+      pinDefaultDiscountBadge({ isRtl: false, orderable: true, customBadgeCorner: 'top-left' })
+    ).toEqual({ corner: 'top-right', cls: 'top-3 right-3' });
+    expect(
+      pinDefaultDiscountBadge({ isRtl: true, orderable: true, customBadgeCorner: 'top-left' })
+    ).toEqual({ corner: 'top-right', cls: 'top-3 right-3' }); // top-left is END in RTL
+  });
+
+  it('a merchant who CHOSE the same corner for both still gets rule 3 (custom wins)', () => {
+    const r = resolveCardBadges({
+      ...labelled,
+      isRtl: false,
+      customPosition: 'top-left',
+      discountPosition: 'top-left',
+    });
+    expect(r.discountBadgeAllowed).toBe(false);
+  });
+});
+
+/**
+ * Owner rule (2026-09-30): pecannbee — `saleBadgeLegacyCorner` — must not change
+ * visually. Every card path renders its chips from `resolveCardBadges` alone, so
+ * the legacy flag's output over EVERY input combination is frozen here. The
+ * hash was taken from the pre-issue-2343 resolver (and an exhaustive old-vs-new
+ * comparison over the same grid found 0 differences). If this fails, the change
+ * moves a chip on a legacy-corner store.
+ */
+describe('legacy-corner stores are byte-identical (issue 2343, owner rule)', () => {
+  function* grid() {
+    for (const isRtl of [false, true])
+      for (const orderable of [false, true])
+        for (const customPosition of [undefined, 'top-left', 'top-right', 'bottom-left', 'bottom-right'] as const)
+          for (const discountPosition of [undefined, 'bottom-left', 'top-left', 'top-right', 'bottom-right'] as const)
+            for (const discountVisible of [false, true])
+              for (const discountOccupiesCorner of [false, true])
+                for (const topStartReserved of [false, true])
+                  for (const topEndReserved of [false, true])
+                    for (const newOrBrandBadgeReserved of [false, true])
+                      for (const bottomOverlay of ['none', 'end', 'both'] as const)
+                        for (const label of [null, 'Offer'])
+                          yield {
+                            product: { badgeLabel: label, badgeLabelAr: label },
+                            isRtl,
+                            orderable,
+                            customPosition,
+                            discountPosition,
+                            discountVisible,
+                            discountOccupiesCorner,
+                            topStartReserved,
+                            topEndReserved,
+                            newOrBrandBadgeReserved,
+                            bottomOverlay,
+                            saleBadgeTopCorner: false,
+                          };
+  }
+
+  it('19,200 input combinations resolve exactly as before', () => {
+    const h = createHash('sha256');
+    let n = 0;
+    for (const input of grid()) {
+      h.update(JSON.stringify(resolveCardBadges(input)));
+      n++;
+    }
+    expect(n).toBe(19200);
+    expect(h.digest('hex')).toBe(LEGACY_GRID_SHA256);
+  });
 });

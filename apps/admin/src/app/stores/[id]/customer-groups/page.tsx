@@ -167,7 +167,7 @@ export default function CustomerGroupsPage() {
           <button
             type="button"
             onClick={() => void remove(group)}
-            className="ms-3 text-destructive hover:underline"
+            className="ms-3 text-destructive-ink hover:underline"
           >
             {t('delete')}
           </button>

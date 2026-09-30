@@ -21,7 +21,7 @@ export function OwnerStep({ formData, validationErrors, onFieldChange }: OwnerSt
       <div className="mt-6 space-y-4">
         <div>
           <label htmlFor="ownerName" className="block text-sm font-medium text-foreground">
-            {t('ownerNameLabel')} <span className="text-destructive">{t('required')}</span>
+            {t('ownerNameLabel')} <span className="text-destructive-ink">{t('required')}</span>
           </label>
           <Input
             id="ownerName"
@@ -31,13 +31,13 @@ export function OwnerStep({ formData, validationErrors, onFieldChange }: OwnerSt
             className={`mt-1 ${validationErrors.ownerName ? 'border-destructive' : ''}`}
           />
           {validationErrors.ownerName && (
-            <p className="mt-1 text-sm text-destructive">{validationErrors.ownerName}</p>
+            <p className="mt-1 text-sm text-destructive-ink">{validationErrors.ownerName}</p>
           )}
         </div>
 
         <div>
           <label htmlFor="ownerEmail" className="block text-sm font-medium text-foreground">
-            {t('emailLabel')} <span className="text-destructive">{t('required')}</span>
+            {t('emailLabel')} <span className="text-destructive-ink">{t('required')}</span>
           </label>
           <Input
             id="ownerEmail"
@@ -48,13 +48,13 @@ export function OwnerStep({ formData, validationErrors, onFieldChange }: OwnerSt
             className={`mt-1 ${validationErrors.ownerEmail ? 'border-destructive' : ''}`}
           />
           {validationErrors.ownerEmail && (
-            <p className="mt-1 text-sm text-destructive">{validationErrors.ownerEmail}</p>
+            <p className="mt-1 text-sm text-destructive-ink">{validationErrors.ownerEmail}</p>
           )}
         </div>
 
         <div>
           <label htmlFor="ownerPassword" className="block text-sm font-medium text-foreground">
-            {t('tempPasswordLabel')} <span className="text-destructive">{t('required')}</span>
+            {t('tempPasswordLabel')} <span className="text-destructive-ink">{t('required')}</span>
           </label>
           <Input
             id="ownerPassword"
@@ -65,7 +65,7 @@ export function OwnerStep({ formData, validationErrors, onFieldChange }: OwnerSt
             className={`mt-1 ${validationErrors.ownerPassword ? 'border-destructive' : ''}`}
           />
           {validationErrors.ownerPassword && (
-            <p className="mt-1 text-sm text-destructive">{validationErrors.ownerPassword}</p>
+            <p className="mt-1 text-sm text-destructive-ink">{validationErrors.ownerPassword}</p>
           )}
           <p className="mt-1 text-xs text-muted-foreground">{t('tempPasswordHint')}</p>
         </div>

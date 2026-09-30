@@ -9,6 +9,7 @@ import { EmailService, EmailOptions } from './email.service';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
+import { parkCorrupt, CORRUPT_CAP } from '../lib/dead-letter';
 
 export interface QueuedEmail {
   id: string;
@@ -233,23 +234,48 @@ class EmailQueueService {
   async getStats(): Promise<{
     pending: number;
     failed: number;
+    /** Unreadable set-aside entries (issue 2353). */
+    corrupt: number;
     processing: boolean;
   }> {
     if (!redis.isAvailable()) {
-      return { pending: 0, failed: 0, processing: this.processing };
+      return { pending: 0, failed: 0, corrupt: 0, processing: this.processing };
     }
 
     const client = redis.getClient();
-    const [pending, failed] = await Promise.all([
+    const [pending, failed, corrupt] = await Promise.all([
       client?.llen(QUEUE_KEY) || 0,
       client?.llen(FAILED_KEY) || 0,
+      client?.llen(FAILED_CORRUPT_KEY) || 0,
     ]);
 
     return {
       pending: pending || 0,
       failed: failed || 0,
+      corrupt: corrupt || 0,
       processing: this.processing,
     };
+  }
+
+  /**
+   * The unreadable set-aside entries (issue 2353), for the super-admin page.
+   * They cannot be parsed, so no recipient can be masked — only their size is
+   * returned, never the payload (the page's "body is never returned" rule).
+   */
+  async getCorruptEntries(limit: number = 50): Promise<Array<{ position: number; bytes: number }>> {
+    if (!redis.isAvailable()) return [];
+    const raw = (await redis.getClient()?.lrange(FAILED_CORRUPT_KEY, 0, limit - 1)) || [];
+    return raw.map((e, position) => ({ position, bytes: Buffer.byteLength(e, 'utf8') }));
+  }
+
+  /** Drop every set-aside entry. Returns how many were discarded. */
+  async discardCorrupt(): Promise<number> {
+    if (!redis.isAvailable()) return 0;
+    const client = redis.getClient();
+    if (!client) return 0;
+    const count = await client.llen(FAILED_CORRUPT_KEY);
+    await client.del(FAILED_CORRUPT_KEY);
+    return count;
   }
 
   /**
@@ -299,7 +325,7 @@ class EmailQueueService {
         email = JSON.parse(emailJson) as QueuedEmail;
         if (!email || typeof email !== 'object' || !email.options) throw new Error('bad shape');
       } catch {
-        await client.lpush(FAILED_CORRUPT_KEY, emailJson);
+        await parkCorrupt(client, FAILED_CORRUPT_KEY, emailJson);
         skipped++;
         logger.error(
           { bytes: emailJson.length },
@@ -324,7 +350,8 @@ class EmailQueueService {
         title: 'Unreadable dead-lettered emails set aside',
         body:
           `${skipped} dead-lettered email entr(ies) could not be parsed during "Retry all" and ` +
-          `were moved to Redis list \`${FAILED_CORRUPT_KEY}\` (not replayed). Inspect with ` +
+          `were moved to Redis list \`${FAILED_CORRUPT_KEY}\` (not replayed; newest ${CORRUPT_CAP}, ` +
+          'kept 30 days). Count + discard: super-admin Email queue page. Raw payload: ' +
           '`railway connect Redis` → `LRANGE email:failed:corrupt 0 -1`.',
         context: { skipped, list: FAILED_CORRUPT_KEY },
       }).catch(() => undefined);

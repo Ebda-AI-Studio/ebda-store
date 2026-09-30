@@ -46,7 +46,7 @@ export function SelectedProductCard({ product, onRemove }: SelectedProductCardPr
       <button
         type="button"
         onClick={onRemove}
-        className="touch-target flex-shrink-0 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        className="touch-target flex-shrink-0 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive-ink transition-colors"
         aria-label={t('removeAria', { name: displayName })}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

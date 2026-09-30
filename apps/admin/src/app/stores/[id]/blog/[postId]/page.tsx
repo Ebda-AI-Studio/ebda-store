@@ -174,7 +174,7 @@ export default function BlogPostEditorPage({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">
-                {t('titleEn')} <span className="text-destructive">*</span>
+                {t('titleEn')} <span className="text-destructive-ink">*</span>
               </label>
               <input
                 type="text"
@@ -202,7 +202,7 @@ export default function BlogPostEditorPage({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              {t('slug')} <span className="text-destructive">*</span>
+              {t('slug')} <span className="text-destructive-ink">*</span>
             </label>
             <input
               type="text"
@@ -264,7 +264,7 @@ export default function BlogPostEditorPage({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">
-                {t('contentEn')} <span className="text-destructive">*</span>
+                {t('contentEn')} <span className="text-destructive-ink">*</span>
               </label>
               <textarea
                 value={form.content}

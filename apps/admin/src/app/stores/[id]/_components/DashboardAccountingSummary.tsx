@@ -146,8 +146,8 @@ export function DashboardAccountingSummary({ storeId }: Props) {
 
   const toneClass = {
     primary: 'border-primary/30 hover:border-primary',
-    success: 'border-success/30 hover:border-success text-success',
-    danger: 'border-destructive/30 hover:border-destructive text-destructive',
+    success: 'border-success/30 hover:border-success text-success-ink',
+    danger: 'border-destructive/30 hover:border-destructive text-destructive-ink',
     info: 'border-info/30 hover:border-info',
     warning: 'border-warning/40 hover:border-warning text-warning-foreground',
     muted: 'border-border hover:border-muted-foreground text-muted-foreground',

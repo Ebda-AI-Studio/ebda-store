@@ -122,8 +122,14 @@ export default function PurchaseOrderDetailPage() {
       );
       if (apiError) {
         // Coded refusals have en/ar copy; anything else shows the API text.
+        // VARIANT_REQUIRED here is the receive-time refusal of an old-shape
+        // variant-less line (issue 2346) — its own copy, not the draft-time one.
         setReceiveError(
-          apiError.code === 'VARIANT_INACTIVE' ? t('errors.VARIANT_INACTIVE') : apiError.message
+          apiError.code === 'VARIANT_INACTIVE'
+            ? t('errors.VARIANT_INACTIVE')
+            : apiError.code === 'VARIANT_REQUIRED'
+              ? t('errors.VARIANT_REQUIRED_RECEIVE')
+              : apiError.message
         );
       } else {
         loadPO();

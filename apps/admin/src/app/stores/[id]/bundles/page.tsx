@@ -503,7 +503,7 @@ export default function BundlesPage() {
             <button
               type="button"
               onClick={() => void deactivate(bundle)}
-              className="ms-3 text-destructive hover:underline"
+              className="ms-3 text-destructive-ink hover:underline"
             >
               {t('deactivate')}
             </button>
@@ -748,7 +748,7 @@ export default function BundlesPage() {
                   </span>
                 </div>
                 {priceWarning && (
-                  <p className="pt-1 text-xs text-destructive">
+                  <p className="pt-1 text-xs text-destructive-ink">
                     {t(priceWarning, { sum: formatPrice(componentSum) })}
                   </p>
                 )}

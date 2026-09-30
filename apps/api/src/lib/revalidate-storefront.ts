@@ -29,7 +29,11 @@ import logger from './logger';
  * NEVER throws and NEVER awaits in the request path — a revalidation hiccup
  * must not affect the save that already committed.
  */
-export function revalidateStorefront(opts: {
+export function revalidateStorefront(opts: RevalidateOptions): void {
+  void revalidateStorefrontNow(opts);
+}
+
+export interface RevalidateOptions {
   slug?: string | null;
   domain?: string | null;
   /**
@@ -38,29 +42,38 @@ export function revalidateStorefront(opts: {
    * The storefront tags its data fetches with these.
    */
   tags?: string[];
-}): void {
+}
+
+export type RevalidateOutcome = 'ok' | 'not-configured' | 'nothing-to-purge' | 'rejected' | 'failed';
+
+/**
+ * The same purge, awaitable, with its outcome — for a one-off script that must
+ * know the purge landed before it exits (issue 2351). Never throws. The request
+ * path keeps using `revalidateStorefront`, which does not await this.
+ */
+export async function revalidateStorefrontNow(opts: RevalidateOptions): Promise<RevalidateOutcome> {
   const base = process.env.STOREFRONT_REVALIDATE_URL;
   const secret = process.env.REVALIDATE_SECRET;
-  if (!base || !secret) return; // not configured → no-op
+  if (!base || !secret) return 'not-configured';
 
   const tags: string[] = [...(opts.tags ?? [])];
   if (opts.domain) tags.push(`store-domain:${opts.domain.toLowerCase().replace(/^www\./, '')}`);
   if (opts.slug) tags.push(`store-slug:${opts.slug}`);
-  if (tags.length === 0) return;
+  if (tags.length === 0) return 'nothing-to-purge';
 
   const url = `${base.replace(/\/$/, '')}/api/revalidate`;
   // Bounded so a hung storefront can't pile up sockets on the API.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 4000);
 
-  fetch(url, {
+  return fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ secret, tags }),
     signal: ctrl.signal,
   })
-    .then(r => {
-      if (r.ok) return;
+    .then((r): RevalidateOutcome => {
+      if (r.ok) return 'ok';
       // 503 = the storefront has no REVALIDATE_SECRET, i.e. the purge pipeline
       // is DEAD, not flaky. 401 = the two sides hold different secrets. Both
       // are configuration faults that silently disable every invalidation, so
@@ -74,7 +87,11 @@ export function revalidateStorefront(opts: {
               'check REVALIDATE_SECRET matches on BOTH the API and the storefront Worker'
           : '[revalidate] storefront purge non-2xx'
       );
+      return 'rejected';
     })
-    .catch(err => logger.warn({ err: err?.message, tags }, '[revalidate] storefront purge failed'))
+    .catch((err): RevalidateOutcome => {
+      logger.warn({ err: err?.message, tags }, '[revalidate] storefront purge failed');
+      return 'failed';
+    })
     .finally(() => clearTimeout(timer));
 }

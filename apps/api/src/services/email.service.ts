@@ -18,6 +18,7 @@ import {
   EMAIL_FONT,
   EMAIL_FONT_AR,
   EMAIL_LOGO_WIDTH,
+  EMAIL_LOGO_MAX_HEIGHT,
   EMAIL_MAX_WIDTH,
   emailColor,
   emailImage,
@@ -99,7 +100,7 @@ export interface EmailStoreContext {
  * wholesale, so every class-sized element rendered at its natural size. The
  * layout is a 600px presentation table (`width="600"` for Outlook, fluid
  * `width:100%;max-width:600px` elsewhere), every colour is solid hex, the
- * logo is an `emailImage` with a fixed width, and the content is run through
+ * logo is an `emailImage` scaled whole into a 160×64 box, and the content is run through
  * `inlineEmailStyles` so templates' `.button`/`.order-table`/headings carry
  * inline styles. `dir` is set on the html, the wrapper table and the content
  * cell, with physical alignment, so Arabic reads right-to-left everywhere.
@@ -119,7 +120,13 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   // Logo OR name — never both. When a logo is set it's the brand mark;
   // rendering the name underneath duplicates the visual identity.
   const header = store.logo
-    ? emailImage({ src: store.logo, alt: store.name, width: EMAIL_LOGO_WIDTH, align: 'center' })
+    ? emailImage({
+        src: store.logo,
+        alt: store.name,
+        width: EMAIL_LOGO_WIDTH,
+        maxHeight: EMAIL_LOGO_MAX_HEIGHT,
+        align: 'center',
+      })
     : `<div class="store-name" style="font-size:22px;line-height:28px;font-weight:700;color:${c.ink};">${storeName}</div>`;
   const year = new Date().getFullYear();
   const footerLines: string[] = [];

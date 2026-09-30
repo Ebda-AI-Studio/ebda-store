@@ -20,7 +20,7 @@ export function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'suc
   }
   if (status === 'success') {
     return (
-      <span className="flex items-center gap-1.5 text-sm text-success">
+      <span className="flex items-center gap-1.5 text-sm text-success-ink">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
@@ -29,7 +29,7 @@ export function ConnectionStatus({ status }: { status: 'idle' | 'testing' | 'suc
     );
   }
   return (
-    <span className="flex items-center gap-1.5 text-sm text-destructive">
+    <span className="flex items-center gap-1.5 text-sm text-destructive-ink">
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"

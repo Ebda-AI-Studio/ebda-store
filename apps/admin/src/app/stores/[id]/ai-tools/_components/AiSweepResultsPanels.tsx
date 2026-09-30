@@ -810,7 +810,7 @@ function FillRateCard({
 }) {
   const percentage = pct(rate);
   const color =
-    rate >= 0.8 ? 'text-emerald-600' : rate >= 0.4 ? 'text-amber-600' : 'text-destructive';
+    rate >= 0.8 ? 'text-emerald-600' : rate >= 0.4 ? 'text-amber-600' : 'text-destructive-ink';
 
   return (
     <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-center">

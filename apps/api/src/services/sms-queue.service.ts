@@ -9,6 +9,8 @@ import { redis } from './redis.service';
 import { smsService, SmsConfig } from './sms.service';
 import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
+import { parkCorrupt, CORRUPT_CAP } from '../lib/dead-letter';
 
 export interface QueuedSms {
   id: string;
@@ -302,8 +304,12 @@ class SmsQueueService {
         sms = JSON.parse(smsJson) as QueuedSms;
         if (!sms || typeof sms !== 'object') throw new Error('bad shape');
       } catch {
-        await client.lpush(`${FAILED_KEY}:corrupt`, smsJson);
+        await parkCorrupt(client, `${FAILED_KEY}:corrupt`, smsJson);
         skipped++;
+        logger.error(
+          { bytes: smsJson.length },
+          '[SMS QUEUE] unreadable dead-lettered SMS moved to sms:failed:corrupt'
+        );
         continue;
       }
       sms.attempts = 0;
@@ -314,6 +320,19 @@ class SmsQueueService {
     }
 
     logger.info({ retried, skipped }, '[SMS QUEUE] Retrying failed SMS messages');
+    if (skipped > 0) {
+      // Same as the email twin (issue 2353): set aside is never silent.
+      await sendAlert({
+        level: 'p1',
+        source: 'sms.queue.corrupt_entries',
+        title: 'Unreadable dead-lettered SMS set aside',
+        body:
+          `${skipped} dead-lettered SMS entr(ies) could not be parsed during a retry and were ` +
+          `moved to Redis list \`${FAILED_KEY}:corrupt\` (not replayed; newest ${CORRUPT_CAP}, ` +
+          'kept 30 days). Inspect with `railway connect Redis` → `LRANGE sms:failed:corrupt 0 -1`.',
+        context: { skipped, list: `${FAILED_KEY}:corrupt` },
+      }).catch(() => undefined);
+    }
     return { retried, skipped };
   }
 }

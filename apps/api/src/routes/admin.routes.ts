@@ -2045,14 +2045,18 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 100) || 100));
-      const [emails, stats] = await Promise.all([
+      const [emails, stats, corrupt] = await Promise.all([
         emailQueue.getFailedEmails(limit),
         emailQueue.getStats(),
+        emailQueue.getCorruptEntries(50),
       ]);
       res.json({
         success: true,
         data: {
-          stats: { pending: stats.pending, failed: stats.failed },
+          stats: { pending: stats.pending, failed: stats.failed, corrupt: stats.corrupt },
+          // Issue 2353: the unreadable set-aside entries — size only (they
+          // cannot be parsed, so nothing can be masked; no payload returned).
+          corrupt,
           emails: emails.map(e => ({
             id: e.id,
             storeId: e.storeId,
@@ -2087,6 +2091,30 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
       res.json({ success: true, data: { retried, skipped } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Issue 2353: the only drain for `email:failed:corrupt` besides its 30-day
+// expiry. Those entries cannot be parsed, so they cannot be replayed.
+router.post(
+  '/email-queue/corrupt/discard',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const discarded = await emailQueue.discardCorrupt();
+      await auditLog({
+        action: 'email_queue.discard_corrupt',
+        userId: req.user!.userId,
+        resourceType: 'setting',
+        resourceId: 'email:failed:corrupt',
+        details: { discarded },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { discarded } });
     } catch (err) {
       next(err);
     }

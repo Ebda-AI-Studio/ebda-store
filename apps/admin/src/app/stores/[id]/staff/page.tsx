@@ -327,7 +327,7 @@ export default function StoreStaffPage() {
               <p className="mt-1 text-xs text-muted-foreground">{t('addModal.passwordHint')}</p>
             </div>
             {inviteError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-sm text-destructive-ink" role="alert">
                 {inviteError}
               </p>
             )}

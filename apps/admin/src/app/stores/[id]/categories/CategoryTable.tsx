@@ -199,7 +199,7 @@ function SortableCategoryRow({
               })
             }
             disabled={deletingId === cat.id}
-            className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-medium text-destructive-ink border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
           >
             {deletingId === cat.id ? t('deleting') : t('delete')}
           </button>

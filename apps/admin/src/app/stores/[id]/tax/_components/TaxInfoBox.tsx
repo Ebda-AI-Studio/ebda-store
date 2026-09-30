@@ -25,8 +25,8 @@ export function TaxInfoBox() {
           />
         </svg>
         <div>
-          <h3 className="text-sm font-medium text-info">{t('title')}</h3>
-          <p className="text-sm text-info mt-1">
+          <h3 className="text-sm font-medium text-info-ink">{t('title')}</h3>
+          <p className="text-sm text-info-ink mt-1">
             {t('priority')} <strong>{t('compoundLabel')}</strong> {t('compoundDescription')}{' '}
             <strong>{t('standardLabel')}</strong> {t('standardDescription')}
           </p>

@@ -145,7 +145,7 @@ export function CategoryForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              {t('nameEnglish')} <span className="text-destructive">{t('required')}</span>
+              {t('nameEnglish')} <span className="text-destructive-ink">{t('required')}</span>
             </label>
             <input
               type="text"
@@ -163,7 +163,7 @@ export function CategoryForm({
               placeholder={t('nameEnglishPlaceholder')}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-destructive' : 'border-border'}`}
             />
-            {formErrors.name && <p className="mt-1 text-xs text-destructive">{formErrors.name}</p>}
+            {formErrors.name && <p className="mt-1 text-xs text-destructive-ink">{formErrors.name}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
@@ -183,7 +183,7 @@ export function CategoryForm({
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
-            {t('urlSlug')} <span className="text-destructive">{t('required')}</span>
+            {t('urlSlug')} <span className="text-destructive-ink">{t('required')}</span>
           </label>
           <input
             type="text"
@@ -195,7 +195,7 @@ export function CategoryForm({
             placeholder={t('urlSlugPlaceholder')}
             className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.slug ? 'border-destructive' : 'border-border'}`}
           />
-          {formErrors.slug && <p className="mt-1 text-xs text-destructive">{formErrors.slug}</p>}
+          {formErrors.slug && <p className="mt-1 text-xs text-destructive-ink">{formErrors.slug}</p>}
           <p className="mt-1 text-xs text-muted-foreground">{t('urlSlugHint')}</p>
         </div>
 
@@ -388,7 +388,7 @@ export function CategoryForm({
         {saveMessage && (
           <p
             className={`text-sm ${
-              saveMessage.includes('success') ? 'text-success' : 'text-destructive'
+              saveMessage.includes('success') ? 'text-success-ink' : 'text-destructive-ink'
             }`}
           >
             {saveMessage}

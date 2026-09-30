@@ -90,3 +90,52 @@ describe('each rollup runs in its own step and tenant transaction (issue 2293)',
     expect(res).toEqual({ cohortRows: 1, funnelDays: 2, rfmCustomers: 3 });
   });
 });
+
+describe('the nightly cron fans out one run per store (issue 2348)', () => {
+  it('does no rollup work itself: one list step + batched events, never 3 steps per store', async () => {
+    const src = (await import('node:fs')).readFileSync(
+      (await import('node:path')).join(
+        __dirname,
+        '../../apps/api/src/lib/inngest/functions/analytics-daily-rollup.ts'
+      ),
+      'utf8'
+    );
+    const cron = src.slice(
+      src.indexOf('export const analyticsDailyRollupCron'),
+      src.indexOf('export const analyticsRollupOnDemand')
+    );
+    expect(cron).not.toMatch(/runStoreRollupSteps/);
+    expect(cron).toMatch(/step\.sendEvent\(/);
+    expect(cron).toMatch(/name: 'insights\/rollup-requested'/);
+    const onDemand = src.slice(src.indexOf('export const analyticsRollupOnDemand'));
+    expect(onDemand).toMatch(/concurrency: \[\{ limit: 3 \}, \{ key: 'event\.data\.storeId', limit: 1 \}\]/);
+  });
+
+  it('batches the fan-out: 1201 stores → 3 sendEvent calls', async () => {
+    // Fresh module registry: beforeEach's clearAllMocks wiped the createFunction
+    // calls recorded when the file first imported the module.
+    vi.resetModules();
+    const { inngest } = await import('@api/lib/inngest/client');
+    const { FANOUT_BATCH } = await import('@api/lib/inngest/functions/analytics-daily-rollup');
+    expect(FANOUT_BATCH).toBe(500);
+    const stores = Array.from({ length: 1201 }, (_, i) => ({ id: `s${i}` }));
+    const sent: Array<{ id: string; n: number }> = [];
+    const step = {
+      run: async (_id: string, _fn: () => unknown) => stores,
+      sendEvent: async (id: string, events: unknown[]) => {
+        sent.push({ id, n: events.length });
+      },
+    };
+    const call = vi
+      .mocked(inngest.createFunction)
+      .mock.calls.find(c => (c[0] as { id: string }).id === 'analytics-daily-rollup')!;
+    const handler = call[1] as unknown as (ctx: unknown) => Promise<unknown>;
+    const res = await handler({ step });
+    expect(res).toEqual({ stores: 1201 });
+    expect(sent).toEqual([
+      { id: 'fan-out-0', n: 500 },
+      { id: 'fan-out-1', n: 500 },
+      { id: 'fan-out-2', n: 201 },
+    ]);
+  });
+});

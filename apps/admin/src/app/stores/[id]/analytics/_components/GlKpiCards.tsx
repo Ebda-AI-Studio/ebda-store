@@ -58,7 +58,7 @@ export function GlKpiCards({ gl, periodLabel }: GlKpiCardsProps) {
             </div>
             <p
               className={`text-xl font-semibold tabular-nums ${
-                card.value !== null && card.value < 0 ? 'text-destructive' : 'text-foreground'
+                card.value !== null && card.value < 0 ? 'text-destructive-ink' : 'text-foreground'
               }`}
             >
               {card.value === null ? t('grossProfitUnknown') : formatCurrency(card.value)}

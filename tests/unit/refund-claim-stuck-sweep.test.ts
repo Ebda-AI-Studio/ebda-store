@@ -207,4 +207,59 @@ describe('handleStuckRefundClaimSweep', () => {
     expect(h.sendAlert).toHaveBeenCalledOnce();
     expect(h.sendAlert.mock.calls[0][0].context.claims[0].paymentId).toBe('pay-stuck');
   });
+
+  // issue 2347 — the scan is ONE step (one HTTP request, 524 at 100s): it
+  // stops paging once its wall-clock budget is spent, and each page's
+  // resolution read is paged instead of unbounded.
+  it('stops paging when the wall-clock budget is spent, and says so', async () => {
+    const events: Ev[] = [];
+    for (let i = 0; i < 1200; i++) {
+      const at = minutesAgo(2 * 24 * 60 - i);
+      events.push(event('refund_initiated', `ok-${i}`, at, `pay-${i}`));
+      events.push(event('refund_completed', `ok-${i}`, at, `pay-${i}`));
+    }
+    events.push(event('refund_initiated', 'stuck-late', minutesAgo(60), 'pay-stuck'));
+    h.events = events;
+    const { CLAIM_SCAN_BUDGET_MS } = await import(
+      '@api/lib/inngest/functions/refund-claim-stuck-sweep'
+    );
+    const real = Date.now();
+    let calls = 0;
+    const spy = vi.spyOn(Date, 'now').mockImplementation(() => {
+      calls += 1;
+      // After the first page's reads, time jumps past the budget.
+      return calls > 3 ? real + CLAIM_SCAN_BUDGET_MS + 1 : real;
+    });
+    try {
+      const res = await handleStuckRefundClaimSweep(stepStub);
+      expect(res.stuck).toBe(0); // the late claim is deferred to a later tick, not lost
+      const claimReads = h.findMany.mock.calls.filter(c => c[0].where.eventType === 'refund_initiated');
+      expect(claimReads).toHaveLength(1);
+      const logger = (await import('@api/lib/logger')).default;
+      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+        expect.objectContaining({ budgetSpent: true }),
+        expect.stringMatching(/stopped before the window ended/)
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('pages the resolution read (take + cursor), so a busy payment is fully checked', async () => {
+    const events: Ev[] = [];
+    // 1200 resolved claims on ONE payment: 1200 resolution rows for one page's payments.
+    for (let i = 0; i < 1200; i++) {
+      const at = minutesAgo(3 * 24 * 60 - i);
+      events.push(event('refund_initiated', `ok-${i}`, at, 'pay-busy'));
+    }
+    for (let i = 0; i < 1200; i++) {
+      events.push(event('refund_completed', `ok-${i}`, minutesAgo(2 * 24 * 60 - i), 'pay-busy'));
+    }
+    h.events = events;
+    const res = await handleStuckRefundClaimSweep(stepStub);
+    expect(res.stuck).toBe(0); // every claim's resolution was found, across pages
+    const resReads = h.findMany.mock.calls.filter(c => typeof c[0].where.eventType === 'object');
+    expect(resReads.every(c => typeof c[0].take === 'number')).toBe(true);
+    expect(resReads.length).toBeGreaterThan(1);
+  });
 });

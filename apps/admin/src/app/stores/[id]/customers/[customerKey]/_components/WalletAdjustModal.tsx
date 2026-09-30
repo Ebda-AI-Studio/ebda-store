@@ -157,7 +157,7 @@ export function WalletAdjustModal({
             htmlFor="wallet-adjust-amount"
             className="block text-sm font-medium text-muted-foreground mb-2"
           >
-            {t('amountLabel')} <span className="text-destructive">*</span>
+            {t('amountLabel')} <span className="text-destructive-ink">*</span>
           </label>
           <input
             id="wallet-adjust-amount"
@@ -172,7 +172,7 @@ export function WalletAdjustModal({
           />
           {preview !== null && fils !== null && fils > 0 && (
             <p
-              className={`mt-1 text-xs ${preview < 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+              className={`mt-1 text-xs ${preview < 0 ? 'text-destructive-ink' : 'text-muted-foreground'}`}
             >
               {t('newBalance', { amount: formatPrice(preview, { locale }) })}
             </p>
@@ -184,7 +184,7 @@ export function WalletAdjustModal({
             htmlFor="wallet-adjust-note"
             className="block text-sm font-medium text-muted-foreground mb-2"
           >
-            {t('noteLabel')} <span className="text-destructive">*</span>
+            {t('noteLabel')} <span className="text-destructive-ink">*</span>
           </label>
           <textarea
             id="wallet-adjust-note"
@@ -199,7 +199,7 @@ export function WalletAdjustModal({
         </div>
 
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-sm text-destructive-ink">
             {error}
           </p>
         )}

@@ -58,7 +58,7 @@ export function RedirectsTable({ rows, deletingId, onDelete, t, ariaLabel }: Red
           type="button"
           onClick={() => onDelete(row.id)}
           disabled={deletingId === row.id}
-          className="px-2 py-1 rounded border border-destructive/40 text-destructive text-xs hover:bg-destructive/10 disabled:opacity-50 max-sm:min-h-11 max-sm:px-4"
+          className="px-2 py-1 rounded border border-destructive/40 text-destructive-ink text-xs hover:bg-destructive/10 disabled:opacity-50 max-sm:min-h-11 max-sm:px-4"
         >
           {deletingId === row.id ? '…' : t('redirectsDelete')}
         </button>

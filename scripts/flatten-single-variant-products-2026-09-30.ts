@@ -76,14 +76,17 @@
  * Wishlists and reviews reference the PRODUCT only; InventoryHistory has no
  * variant column. Nothing else stores a variant id relationally.
  *
- * CACHES: after each committed product the script calls the app's own
- * `invalidateStoreProductCaches(storeId)` when --bust-caches is passed and
- * REDIS_URL is reachable. Production Redis is private-network only, so from a
- * laptop the script instead prints the exact Redis prefixes and storefront
- * tags; the public product caches are 120s TTL (feed 600s), and saving any
- * product in the admin runs the same invalidation for the whole store.
+ * CACHES (issue 2351): after a run that changed anything the script purges both
+ * layers by default (`--no-bust-caches` opts out). The storefront TAG purge is an
+ * outbound HTTPS call that needs no Redis (STOREFRONT_REVALIDATE_URL +
+ * REVALIDATE_SECRET) — it is always attempted and awaited, because tagged
+ * storefront fetches do not expire on their own. The Redis layer is cleared only
+ * with a REDIS_URL; production Redis is private-network only, so from a laptop
+ * those keys (120s TTL, feed 600s) are printed instead. Saving any product in the
+ * admin runs the same invalidation for the whole store.
  *
- * BACKUP / RESTORE: before the first write, every row the run will touch is
+ * BACKUP / RESTORE: every row a product's apply will touch is snapshotted inside
+ * that product's own write transaction, under its row locks (issue 2350), and
  * written to scripts/backups/flatten-single-variant-<store>-<stamp>.json
  * (gitignored, mode 0600). `--restore <file>` rebuilds each product's option
  * axis and variant with their ORIGINAL ids, moves the product's CURRENT stock
@@ -99,8 +102,8 @@
  * Usage (repo root; DATABASE_URL = the target DB, owner role):
  *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --store pecannbee
  *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --all-stores
- *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --store pecannbee --apply [--unlink-order-lines] [--keep-product-codes] [--only <productId,...>] [--bust-caches]
- *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --restore <backup.json> [--apply] [--bust-caches]
+ *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --store pecannbee --apply [--unlink-order-lines] [--keep-product-codes] [--only <productId,...>] [--no-bust-caches]
+ *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --restore <backup.json> [--apply] [--no-bust-caches]
  * Dry runs (the default, and --restore without --apply) run every read inside
  * a READ ONLY transaction, so they cannot write.
  */
@@ -628,18 +631,30 @@ export async function snapshotProduct(tx: Tx, plan: ProductPlan): Promise<Produc
 // ─── apply ───────────────────────────────────────────────────────────────────
 
 export type ApplyResult =
-  | { status: 'flattened'; imageId: string | null }
+  | { status: 'flattened'; imageId: string | null; backup: ProductBackup }
   | { status: 'skipped'; reason: string };
 
 /**
  * Flatten one product. MUST run inside a write transaction. Locks the product
  * and variant rows, re-plans against the locked state, and refuses on any
  * blocker — so a concurrent change or a second run cannot double-apply.
+ *
+ * The restore snapshot is taken HERE, under the same locks and in the same
+ * transaction as the writes (issue 2350). A snapshot taken earlier, in its own
+ * read-only transaction, missed any order/cart/warehouse row that pointed at
+ * the variant by the time the apply ran — the apply mutates by predicate
+ * (`variantId = vId`), so such a row was unlinked but could never be
+ * re-linked by `--restore`. Under the variant's FOR UPDATE lock no new row can
+ * reference it (an FK insert/update needs FOR KEY SHARE on the parent, which
+ * conflicts), so this snapshot is exactly the set the writes below touch.
+ * `onSnapshot` runs before the first write (persist it there); the snapshot is
+ * also returned on success.
  */
 export async function applyProduct(
   tx: Tx,
   productId: string,
-  opts: PlanOptions
+  opts: PlanOptions,
+  onSnapshot?: (backup: ProductBackup) => void
 ): Promise<ApplyResult> {
   await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
   await tx.$queryRaw`SELECT id FROM product_variants WHERE product_id = ${productId} FOR UPDATE`;
@@ -647,6 +662,8 @@ export async function applyProduct(
   if (!plan) return { status: 'skipped', reason: 'not a candidate (already flat, or changed)' };
   if (plan.blockers.length) return { status: 'skipped', reason: plan.blockers.join('; ') };
   const vId = plan.variantId;
+  const backup = await snapshotProduct(tx, plan);
+  onSnapshot?.(backup);
 
   // References first — the variant row goes last.
   if (opts.unlinkOrderLines) {
@@ -742,7 +759,7 @@ export async function applyProduct(
     },
   });
 
-  return { status: 'flattened', imageId };
+  return { status: 'flattened', imageId, backup };
 }
 
 // ─── restore ─────────────────────────────────────────────────────────────────
@@ -964,32 +981,90 @@ export function cachePurgeList(storeId: string): {
   };
 }
 
-async function bustCaches(storeId: string, requested: boolean): Promise<void> {
+export interface BustDeps {
+  /** Awaited storefront tag purge (needs no Redis). */
+  revalidate: (opts: { tags: string[] }) => Promise<string>;
+  /** Redis layer; only attempted when REDIS_URL is set. */
+  clearRedis: (storeId: string) => Promise<void>;
+  redisUrl: string | undefined;
+  log: (line: string) => void;
+}
+
+async function defaultBustDeps(): Promise<BustDeps> {
+  const { revalidateStorefrontNow } = await import('../apps/api/src/lib/revalidate-storefront');
+  return {
+    revalidate: revalidateStorefrontNow,
+    clearRedis: async storeId => {
+      const { clearProductsRedis } = await import('../apps/api/src/lib/public-cache');
+      await clearProductsRedis(storeId);
+    },
+    redisUrl: process.env.REDIS_URL,
+    log: line => console.log(line),
+  };
+}
+
+const within10s = <T>(p: Promise<T>): Promise<T> =>
+  Promise.race([
+    p,
+    new Promise<T>((_, rej) => setTimeout(() => rej(new Error('timeout after 10s')), 10_000)),
+  ]);
+
+/**
+ * Invalidate both cache layers after a flatten or restore (issue 2351).
+ *
+ * The two layers are independent, so they are gated independently:
+ *  - the storefront's Next.js TAG cache is an outbound HTTPS purge that needs
+ *    no Redis — always attempted, and awaited so the script knows it landed.
+ *    It does NOT expire on its own: a missed purge keeps the old one-option
+ *    picker rendering until something else revalidates the tag.
+ *  - the Redis layer is attempted only with a REDIS_URL. Production Redis is
+ *    private-network only, so from a laptop it is skipped; those keys expire
+ *    within 120s (feed 600s).
+ * On by default; `--no-bust-caches` opts out.
+ */
+export async function bustCaches(
+  storeId: string,
+  requested: boolean,
+  deps?: BustDeps
+): Promise<void> {
+  const d = deps ?? (await defaultBustDeps());
   const list = cachePurgeList(storeId);
-  if (requested && process.env.REDIS_URL) {
-    try {
-      const { invalidateStoreProductCaches } = await import('../apps/api/src/lib/public-cache');
-      await Promise.race([
-        invalidateStoreProductCaches(storeId),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout after 10s')), 10_000)),
-      ]);
-      console.log(`caches: invalidateStoreProductCaches(${storeId}) done`);
-      return;
-    } catch (err) {
-      console.log(
-        `caches: invalidateStoreProductCaches failed (${(err as Error).message}) — purge by hand:`
-      );
-    }
+  const manualRedis = () => {
+    d.log(`  Redis prefixes (SCAN+DEL): ${list.redisPrefixes.join('  ')}`);
+    d.log(`  Redis keys (DEL):          ${list.redisKeys.join('  ')}`);
+  };
+  if (!requested) {
+    d.log('caches: --no-bust-caches — nothing purged. Purge by hand:');
+    manualRedis();
+    d.log(`  storefront tags:           ${list.tags.join('  ')}`);
+    d.log('  (the tag layer does NOT expire on its own; saving any product of this store in');
+    d.log('   the admin runs the same invalidation for both layers.)');
+    return;
+  }
+
+  const outcome = await d.revalidate({ tags: list.tags }).catch(() => 'failed');
+  if (outcome === 'ok') {
+    d.log(`caches: storefront tags purged (${list.tags.join(', ')})`);
   } else {
-    console.log(
-      'caches: not busted from here (pass --bust-caches with a reachable REDIS_URL). Purge:'
+    d.log(
+      `caches: storefront tag purge ${outcome} — set STOREFRONT_REVALIDATE_URL + REVALIDATE_SECRET, ` +
+        `or save any product of this store in the admin. Tags: ${list.tags.join('  ')}`
     );
   }
-  console.log(`  Redis prefixes (SCAN+DEL): ${list.redisPrefixes.join('  ')}`);
-  console.log(`  Redis keys (DEL):          ${list.redisKeys.join('  ')}`);
-  console.log(`  storefront tags:           ${list.tags.join('  ')}`);
-  console.log('  or: save any product of this store in the admin (runs the same invalidation);');
-  console.log('      the public product caches expire on their own within 120s (feed 600s).');
+
+  if (d.redisUrl) {
+    try {
+      await within10s(d.clearRedis(storeId));
+      d.log('caches: Redis product keys cleared');
+      return;
+    } catch (err) {
+      d.log(`caches: Redis clear failed (${(err as Error).message}) — purge by hand:`);
+    }
+  } else {
+    d.log('caches: Redis not reachable from here (no REDIS_URL) — these expire within 120s');
+    d.log('  (feed 600s), or purge by hand:');
+  }
+  manualRedis();
 }
 
 // ─── output ──────────────────────────────────────────────────────────────────
@@ -1130,9 +1205,10 @@ async function runStore(
     return;
   }
 
-  // Backup of every row the run will touch, BEFORE the first write.
-  const backups: BackupFile['products'] = [];
-  for (const p of ready) backups.push(await inTx(true, tx => snapshotProduct(tx, p)));
+  // Backup: each product's snapshot is taken INSIDE its apply transaction,
+  // under the row locks, and written to the file before that transaction's
+  // first write (issue 2350). A product whose transaction then skips or rolls
+  // back is dropped from the file again.
   const dir = path.resolve(process.cwd(), 'scripts', 'backups');
   fs.mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1144,25 +1220,33 @@ async function runStore(
     createdAt: new Date().toISOString(),
     unlinkOrderLines,
     keepProductCodes,
-    products: backups,
+    products: [],
   };
   const write = () => fs.writeFileSync(file, JSON.stringify(backup, null, 2), { mode: 0o600 });
   write();
   console.log(`\nbackup: ${file}`);
 
   let done = 0;
-  for (const b of backup.products) {
+  for (const p of ready) {
+    const slot: { entry?: BackupFile['products'][number] } = {};
     try {
-      const res = await inTx(false, tx => applyProduct(tx, b.plan.productId, opts));
-      if (res.status === 'flattened') {
-        b.createdImageId = res.imageId;
+      const res = await inTx(false, tx =>
+        applyProduct(tx, p.productId, opts, snap => {
+          slot.entry = { ...snap, createdImageId: null };
+          backup.products.push(slot.entry);
+          write(); // on disk before the first write of this transaction
+        })
+      );
+      if (res.status === 'flattened' && slot.entry) {
+        slot.entry.createdImageId = res.imageId;
         done++;
-        console.log(`  flattened  ${b.plan.name}`);
+        console.log(`  flattened  ${p.name}`);
       } else {
-        console.log(`  skipped    ${b.plan.name}: ${res.reason}`);
+        console.log(`  skipped    ${p.name}: ${res.reason}`);
       }
     } catch (err) {
-      console.log(`  FAILED     ${b.plan.name}: ${(err as Error).message} (rolled back)`);
+      if (slot.entry) backup.products.splice(backup.products.indexOf(slot.entry), 1);
+      console.log(`  FAILED     ${p.name}: ${(err as Error).message} (rolled back)`);
     }
     write(); // keep createdImageId current for --restore
   }
@@ -1221,7 +1305,8 @@ async function runRestore(file: string, apply: boolean, bust: boolean): Promise<
 
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
-  const bust = process.argv.includes('--bust-caches');
+  // Default ON (issue 2351); `--bust-caches` is still accepted and is a no-op.
+  const bust = !process.argv.includes('--no-bust-caches');
   const restore = arg('--restore');
   const storeSlug = arg('--store');
   const onlyArg = arg('--only');

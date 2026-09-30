@@ -122,7 +122,11 @@ export default function ElegantHero({
           {/* Subtle decorative rings */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full border border-primary/5" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full border border-primary/8" />
+            {/* Issue 2342: this ring carried a primary border at opacity 8, an off-scale step
+                Tailwind 3 emits NO rule for, so it has always rendered with the
+                base border colour. The dead class is removed (pixel-identical);
+                a primary-tinted ring would be a visible storefront change. */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full border" />
           </div>
 
           <div className="relative z-10 container mx-auto px-4 py-28 md:py-36 lg:py-44">

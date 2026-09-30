@@ -83,14 +83,14 @@ export function PaymentLinkButton({
       {existingPaymentUrl ? (
         <div className="flex min-w-[10rem] flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-1.5 rounded-xl border-2 border-info bg-info/5 px-3 py-2">
-            <span className="flex-1 truncate font-mono text-xs text-info" dir="ltr">
+            <span className="flex-1 truncate font-mono text-xs text-info-ink" dir="ltr">
               {existingPaymentUrl}
             </span>
             <button
               type="button"
               onClick={() => copy(existingPaymentUrl)}
               disabled={disabled}
-              className="shrink-0 rounded-md p-1.5 text-info active:bg-info/10"
+              className="shrink-0 rounded-md p-1.5 text-info-ink active:bg-info/10"
               aria-label={ta.copyLink}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -106,7 +106,7 @@ export function PaymentLinkButton({
               href={existingPaymentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 rounded-md p-1.5 text-info active:bg-info/10"
+              className="shrink-0 rounded-md p-1.5 text-info-ink active:bg-info/10"
               aria-label={t.detail.paymentLink}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -133,7 +133,7 @@ export function PaymentLinkButton({
           type="button"
           onClick={() => setOpen(true)}
           disabled={disabled || isIssuing}
-          className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-3 text-center text-xs font-semibold leading-tight text-info active:bg-info/10 disabled:opacity-60"
+          className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-3 text-center text-xs font-semibold leading-tight text-info-ink active:bg-info/10 disabled:opacity-60"
         >
           <svg
             className="h-4 w-4 shrink-0"
@@ -227,7 +227,7 @@ export function PaymentLinkButton({
             ) : (
               <div className="space-y-4">
                 <div className="rounded-xl border border-success/20 bg-success/10 p-4">
-                  <p className="text-sm font-semibold text-success">
+                  <p className="text-sm font-semibold text-success-ink">
                     {result.notifyVia === 'email'
                       ? fmt(ta.emailSent, { email: result.customerEmail ?? '' })
                       : ta.linkGenerated}

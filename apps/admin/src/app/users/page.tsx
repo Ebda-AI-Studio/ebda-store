@@ -463,7 +463,7 @@ export default function UsersPage() {
               </select>
             </div>
             {inviteError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-sm text-destructive-ink" role="alert">
                 {inviteError}
               </p>
             )}

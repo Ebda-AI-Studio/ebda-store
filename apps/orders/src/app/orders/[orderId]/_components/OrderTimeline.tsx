@@ -62,15 +62,15 @@ function getIconType(kind: string): IconType {
 function TimelineDot({ type }: { type: IconType }) {
   const cls =
     type === 'success'
-      ? 'bg-success/10 text-success'
+      ? 'bg-success/10 text-success-ink'
       : type === 'cancel'
-        ? 'bg-destructive/10 text-destructive'
+        ? 'bg-destructive/10 text-destructive-ink'
         : type === 'ship'
-          ? 'bg-info/10 text-info'
+          ? 'bg-info/10 text-info-ink'
           : type === 'location'
-            ? 'bg-warning/10 text-warning'
+            ? 'bg-warning/10 text-warning-ink'
             : type === 'admin'
-              ? 'bg-primary/10 text-primary'
+              ? 'bg-primary/10 text-primary-ink'
               : 'bg-muted text-muted-foreground';
   return (
     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${cls}`}>

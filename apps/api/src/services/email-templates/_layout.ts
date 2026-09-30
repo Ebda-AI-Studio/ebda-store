@@ -17,8 +17,15 @@
 
 /** The canonical email body width. Fluid below it (`width:100%;max-width`). */
 export const EMAIL_MAX_WIDTH = 600;
-/** Store logo: fixed width, proportional height, never wider than the column. */
+/**
+ * Store logo box: at most this wide AND at most EMAIL_LOGO_MAX_HEIGHT tall,
+ * scaled proportionally into it (issue 2336). A wide wordmark hits the width
+ * (1600×420 → 160×42); a square mark hits the height (800×800 → 64×64) instead
+ * of rendering 160×160 — which pushed the order below the fold on merchant
+ * alerts, the reason the old shell capped the logo at 56px.
+ */
 export const EMAIL_LOGO_WIDTH = 160;
+export const EMAIL_LOGO_MAX_HEIGHT = 64;
 /** Product thumbnails in item tables. */
 export const EMAIL_THUMB_SIZE = 64;
 
@@ -74,21 +81,35 @@ export function emailImage(opts: {
   width: number;
   /** Fixed box height. Omit for proportional (logo) images. */
   height?: number;
+  /**
+   * Proportional images only: also cap the height. The image then scales
+   * WHOLE into a `width` × `maxHeight` box (`width:auto` + both max bounds —
+   * CSS keeps the aspect ratio when both apply), never cropped or squashed.
+   * Outlook desktop reads only the `width` attribute and ignores max-height,
+   * so there it falls back to the width bound.
+   */
+  maxHeight?: number;
   radius?: number;
   align?: 'center';
 }): string {
-  const { src, alt, width, height, radius = 0 } = opts;
+  const { src, alt, width, height, maxHeight, radius = 0 } = opts;
   const heightAttr = height ? ` height="${height}"` : '';
   // Only a FIXED box (thumbnail) may crop to fill it. A proportional image —
   // the logo — must never carry object-fit or a fixed height: either one can
-  // crop a wide wordmark instead of scaling it down whole.
+  // crop a wide wordmark instead of scaling it down whole. A bounded box
+  // (`maxHeight`) sizes it with max-width + max-height and `width:auto`, so
+  // neither bound can distort it.
+  const widthStyle =
+    !height && maxHeight ? `width:auto;max-width:${width}px;` : `width:${width}px;max-width:100%;`;
   const heightStyle = height
     ? `height:${height}px;max-height:${height}px;object-fit:cover;`
-    : 'height:auto;';
+    : maxHeight
+      ? `height:auto;max-height:${maxHeight}px;`
+      : 'height:auto;';
   const margin = opts.align === 'center' ? 'margin:0 auto;' : '';
   return (
     `<img src="${attr(src)}" alt="${attr(alt)}" width="${width}"${heightAttr} border="0" ` +
-    `style="display:block;${margin}width:${width}px;max-width:100%;${heightStyle}` +
+    `style="display:block;${margin}${widthStyle}${heightStyle}` +
     `border:0;outline:none;text-decoration:none;${radius ? `border-radius:${radius}px;` : ''}">`
   );
 }

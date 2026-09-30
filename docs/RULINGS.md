@@ -4254,9 +4254,16 @@ with "unrelated histories" (17:30 at 0e59048b, 19:10 at 925b9f76). The fetch now
 script (`--fetch`); `fetchArgs` adds `--depth=1` only when `CI=true` and `GITHUB_ACTIONS=true`, and
 `migration-order-gate.test.ts` proves a local run leaves a full clone full (with a positive control
 that the Actions env does go shallow) and forbids a bare shallow `git fetch` in any workflow, script
-or hook. Residual: a PR that passed and then sat while
-main gained a newer migration is only re-checked on its next push or re-run. Cost if wrong: one PR a
-month renames a folder it did not need to.
+or hook. **Post-merge arm (issue 2355):** on a push to `main` the same step runs with
+`--base ${{ github.event.before }}` (the pre-push tip, fetched by sha), so the just-merged folders
+are the added set; the PR-time arm alone printed "clean" on every push because `origin/main` was the
+pushed commit. Which arm catches what: the PR arm stops a back-dated or same-stamp folder before
+merge; the push arm catches the two-open-PRs race (both passed against the same old main) after the
+second merge, as a red `main`. It DETECTS, it does not prevent: `railway-deploy.yml` runs on the
+same push and `migrate deploy` is the Railway pre-deploy command, so the folder is usually applied in
+production by the time the red check lands — the remedy is then to confirm the two migrations are
+order-independent and record the pair (a rename is no longer possible), not to rename. Residual:
+prevention needs "require branches to be up to date" in branch protection, a repo setting, not code. Cost if wrong: one PR a month renames a folder it did not need to.
 
 **Ruling ZAP-F-1 — "no scan ran" is detected OUTSIDE the scan's run; the in-run `cancelled()`
 branch stays but is no longer described as covering a queued cancel (issue 2289).**
@@ -4290,9 +4297,25 @@ collectors run it: `scripts/r2-orphan-audit.ts` before the report is printed (dr
 TRUSTWORTHY" (P1) on failure. The per-URL check in `r2-cleanup.service.ts` runs one indexed probe
 per deleted file under `withRlsBypass` (pinned by defence `r2-cleanup-isstillreferenced-rls-bypass`);
 adding four `count(*)` + possible `ANALYZE`s to every single-file delete is disproportionate, and a
-wrong bypass there is already a mutation-gated defect. Not verified: the guard end-to-end under a
-role actually subject to RLS (the scratch DB connects as a superuser). Cost if wrong: one
-still-referenced file deleted by a per-URL cleanup if the bypass itself is ever broken.
+wrong bypass there is already a mutation-gated defect. ~~Not verified: the guard end-to-end under a
+role actually subject to RLS~~ — now verified by `tests/integration/r2-strict-visibility-guard.test.ts`
+(issue 2354, see R2-VIS-2). Cost if wrong: one still-referenced file deleted by a per-URL cleanup if
+the bypass itself is ever broken.
+
+**Ruling R2-VIS-2 — an UNKNOWN catalog estimate passes only when the bypass is proven positively
+(issue 2354; amends R2-VIS-1).** The UNKNOWN (`reltuples` -1) refusal had no way out for the role it
+gates: post-cutover `force_app` does not own the STRICT tables, so the guard's ANALYZE is skipped
+with a WARNING, and a table that has never had a row is never auto-analyzed — a standing weekly p1
+and a sweep that never cleans. The guard now reads `current_setting('app.bypass_rls', true)` inside
+the SAME runner the collection used; every STRICT policy admits all rows under it (pinned by
+`rls-force-app.test.ts`), so with the bypass proven a 0 is a real 0 and UNKNOWN passes. Positive
+catalog evidence (`reltuples > 0` or `n_live_tup > 0`) still refuses, bypass or not; without the
+bypass proven, UNKNOWN still refuses. `scripts/r2-orphan-audit.ts --force-report` prints a refused
+dry-run list under a NOT-TRUSTWORTHY banner and is ignored with `--apply`. Verified against a real
+Postgres with a non-superuser owner and a non-owner role (the non-owner's ANALYZE really leaves
+`reltuples` at -1). No ownership grant or SECURITY DEFINER helper was added: the positive proof
+makes it unnecessary. Cost if wrong: a STRICT table whose policy lost its bypass clause reads 0
+under a set GUC and its references are treated as orphans — the policy test is the guard for that.
 
 **Issue ownership after #2309 merged mid-batch.** Issue 2010 (masked payment key is a ciphertext
 fragment) is fixed by open PR #2311 (`Fixes #2010`), which must first rename its
@@ -4361,6 +4384,21 @@ Proved by before/after screenshots (en/ar × desktop/mobile, two products): page
 the only pixels that change are the option row and the button. Cost if wrong: a sold-out single
 variant still shows "Select Options"/disabled, exactly as today.
 
+**Ruling SVF-4 — the restore snapshot is taken inside each product's apply transaction, and both
+cache layers are purged by default (issues 2350, 2351).** The first version snapshotted every
+product in its own read-only transaction before any apply, but the apply unlinks by predicate
+(`variant_id = vId`), so an order/cart line written in between was unlinked and missing from the
+backup — `--restore` could never re-link it. `applyProduct` now snapshots after taking the
+product and variant `FOR UPDATE` locks (no new row can reference the locked variant: an FK write
+needs `FOR KEY SHARE` on it), hands the snapshot to the caller, which writes it to the backup file
+before the transaction's first write; a skipped or rolled-back product is dropped from the file.
+The cache purge splits into its two independent layers: the storefront tag purge (HTTPS, no Redis)
+is always attempted and awaited, the Redis layer only with a `REDIS_URL`; `--no-bust-caches` opts
+out. Residual: the pecannbee run of 2026-09-30 used the OLD flow — its backups
+(`~/.claude/fwb-lane/flatten-single-variant-pecannbee-*.json`) can miss a line that landed in its
+window. Cost if wrong: one order line from that window stays detached from a restored variant; its
+snapshot fields are intact.
+
 **Ruling SVF-4 — product cards, the carousel quick-add and "Frequently Bought Together" are NOT
 changed.** A variant product's card CTA is the "View"/"عرض" button and quick-add is hidden for it;
 turning either into Add to Cart changes the card's copy and layout, which the owner's no-visual-change
@@ -4389,7 +4427,28 @@ text-primary-ink`. The gate does not measure two shapes:
 Converting those changes the resting look of most admin screens, not just the pills. Issue 2332
 tracks them. The storefront has the same shapes and is excluded, because storefront visual changes
 need owner sign-off. Cost if wrong: warning-coloured admin text stays at 1.8:1 until issue 2332
-lands.
+lands. **Superseded by YWA-TXT-1 (issue 2332 landed).**
+
+**Ruling YWA-TXT-1 — role-coloured text is `-ink` everywhere in admin and orders; the storefront gets
+only the dropped-class ban; bare `text-primary` links stay (issues 2332, 2341, 2342, 2349).**
+Owner approval 2026-10-01: admin colour changes are approved, including the orders app. Done: 232
+bare `text-{success,warning,info,destructive}` class strings in admin and 29 in orders (plus 4
+`bg-primary/N text-primary` pills in orders) now read `text-<role>-ink`; orders gained the five
+`-ink` tokens (light + dark, the admin values) and the tailwind `ink` keys. The gate runs over both
+apps from each app's own globals.css, per theme and per state — rest, and `hover:` tint (the
+state YWA-1 left out) — at 4.5:1 for text and 3:1 for an icon (a fixed `h-*`+`w-*` box; 21
+admin icons keep the role colour because they clear 3:1). Its dropped-class half (double and
+off-scale opacity modifiers) also runs over `apps/web` and `packages/ui`: the two storefront
+offenders (`elegant/Hero.tsx` ring, `modern/CategoryCard.tsx` via-stop at opacity 8) were REMOVED,
+not re-stepped — a compiled probe against apps/web's own Tailwind 3.4.19 config emits no rule for
+either, so removing them is pixel-identical on every store, pecannbee included, while stepping them
+to `/10` would be a visible change. NOT done, and why: (1) bare `text-primary` on the plain surface
+and under `hover:bg-primary/N` — it is the brand orange on every admin link (2.5–2.9:1 on white);
+re-colouring it changes the whole admin's link colour, an owner call. (2) The storefront's tint and
+bare-text shapes (issue 2349's apps/web half: cart/checkout/auth banners, 59 strings) — those pages
+render on pecannbee, whose look must not change; it needs either an owner OK or a default-off theme
+flag with pecannbee pinned by data. Cost if wrong: admin links stay below AA; a shopper on the
+storefront reads checkout errors at 2–3.3:1 until the storefront decision is made.
 
 **Ruling YWA-2: amends EWO-A1. A 404 from `/auth/me` carrying the API's own
 `{ error: { code: 'NOT_FOUND' } }` body is `signed-out` (issue 2283).**
@@ -4467,6 +4526,23 @@ so it can run before the code that reads it ships. Proven: every surface with th
 pixel-identical to origin/main (screenshot diff = 0). Cost if wrong: if the script is not run (or its
 edge-cache check not waited for) before deploy, pecannbee shows the top-corner badge until the flag
 lands — the run order in the PR body is the control.
+
+**Ruling OD-9e — a PINNED sale chip never loses the corner to a custom chip; it moves (issue 2343).**
+The pin picked its corner from the platform's own top-edge occupants, so on a store whose merchant
+parked the custom label in the reading-start top corner it landed on that corner, and rule 3 ("same
+corner → the merchant's chip wins") deleted the -25% chip on every card. Rule 3 exists for two chips
+a merchant PLACED; the pinned one was placed by the platform. In exactly that case (a custom chip
+renders, the discount is a corner chip, and the pin lands on the custom chip's named corner) the pin
+is re-run with the custom chip as a chip-deep occupant: it takes the free top corner, or the row
+below the custom chip when the other corner holds a heart, and both render. Nothing else changes:
+over the resolver's full input grid (19,200 combinations per flag value) the legacy-corner output is
+identical to origin/main (0 differences; frozen by a sha256 in `sale-badge-top-pin.test.ts`), and
+with the top pin the ONLY 96 changed combinations are ones where the old code deleted the sale chip
+and the new one renders it. Rendered cards (6 paths × en/ar × 6 cases, legacy and default): all 72
+legacy-corner screenshots are byte-identical PNGs to origin/main; the 10 that differ are default-
+corner cards whose sale chip was missing. Cost if wrong: on a default-corner store with a top-corner
+custom label, the custom chip moves down one row when the sale chip takes the other top corner
+(rule 4's same-edge stacking), as it already did for any two top-edge chips.
 
 ## Backlog batch x-api (2026-10-01, branch `fix/backlog-x-api`)
 
@@ -4548,10 +4624,20 @@ but nobody pressed "mark paid" is told "not charged"; the merchant's records say
 
 **Ruling ACR-1 — the abandoned-cart recovery link is removed; the report stays (issue 2035).**
 Reminders link to the store's plain `/cart`; the unused public `…/cart/recover/:id` endpoint is
-deleted. The report keeps its counts; recovered / recovery rate / recovered revenue are `null`
-("Not tracked", EN + AR), not 0, because nothing attributes an order to a reminder
-(`markRecovered` has no caller). Cost if wrong: a shopper opening a reminder on a new device sees an
-empty cart and must re-add items.
+deleted. The report keeps its counts. **Amended by ACR-1a below:** the recovery figures were first
+set to `null` on the premise that nothing attributes an order — that premise was false. Cost if
+wrong: a shopper opening a reminder on a new device sees an empty cart and must re-add items.
+
+**Ruling ACR-1a — the recovery figures are measured, labelled as last-touch "ordered later"
+(issue 2356; amends ACR-1).** `OrderService.createOrder` marks the store's open abandoned cart for
+the same cart or customer `recovered` (`recoveredAt`, `recoveredOrderId`) inside the order
+transaction, so the three figures are live data, and nulling them left `recovered` rows badged on
+the list under a "Not tracked" headline. `getStats` computes them again: count of `recovered`
+rows, rate over all abandoned rows, and revenue as the SQL sum of the linked orders that count as
+revenue everywhere else (not cancelled/refunded, payment not failed; unpaid COD counts). The labels
+say what the number is — "Ordered later" / «طلبوا لاحقًا», not "Recovered" — because the order is
+not attributed to a reminder. Cost if wrong: a merchant reads a customer who would have bought
+anyway as a later order, which is what the label says.
 
 **Ruling W-7a — the merchant sees an erasure write-off as ONE line on the customer's wallet history
 (issue 2126; amends W-7).** The admin ledger flags the entry `forfeitOnErasure` writes
@@ -4560,3 +4646,51 @@ their account" (EN + AR) instead of the internal note. The audit log stays super
 Residual: an erased customer who never placed an order has no customer detail page (the lookup
 excludes `deletedAt`), so their line is not reachable. Cost if wrong: that population's write-off
 is visible only as the store's wallet total dropping.
+
+## Backlog batch final (2026-10-01, branch `fix/backlog-final`)
+
+Amendments made in this batch sit next to the rulings they amend: MIG-ORD-1 (issue 2355), ACR-1a
+(issue 2356), R2-VIS-2 (issue 2354), SVF-4 (issues 2350/2351), YWA-TXT-1 (issues 2332, 2341, 2342,
+2349), OD-9e (issue 2343).
+
+**Ruling BF-1 — audit and blast-radius inputs diff from the merge base (issues 2338, 2352).**
+`scoped-audit.yml` handed `scripts/scoped-audit.sh` a two-dot `base..head`, so a PR behind main was
+audited against a direct two-commit diff: 204 of 214 files on PR 2331 were main's own later
+commits, presented as the PR deleting them. The workflow now passes `base...head` (the script
+already kept that intact, #1763). The same class was live in `blast-radius.sh`, which split any
+range on `..` into two positional refs — it now passes the range through as one argument, and
+`blast-radius.yml` passes three dots. `ci.yml`'s two `git diff --name-only "$BASE_SHA" HEAD`
+filters were left: on a PR the checkout is the merge commit, so that diff IS the PR's change, and
+an over-inclusive list only runs more jobs. Cost if wrong: a three-dot diff omits main's own
+commits — reviewed on their own PRs — so a semantic conflict between a stale branch and newer main
+is caught by CI on the merge commit, not by this audit.
+
+**Ruling BF-2 — the unreadable dead-letter lists get a bound, an owner and a drain; SMS gets the
+alert but no page (issue 2353).** `email:failed:corrupt` / `sms:failed:corrupt` are LPUSH + LTRIM
+200 + EXPIRE 30 days on every write (`lib/dead-letter.ts`). The email list's size shows on the
+super-admin `/email-queue` page (size only — an unparseable entry cannot be masked, and that page
+never returns a body) with an audited Discard. The SMS twin now raises the same P1 as email, but
+has no page: there is no SMS queue UI at all and SMS is parked until a provider exists (#206).
+Cost if wrong: a parked SMS entry is visible only through the alert and `railway connect Redis`
+for its 30 days.
+
+**Ruling BF-3 — the nightly analytics rollup fans out one run per store (issue 2348).** The cron
+now lists stores and sends one `insights/rollup-requested` per store in batches of 500; the
+per-store function (the same one the super-admin "run now" uses) does the three rollup steps, with
+`concurrency: [{ limit: 3 }, { key: storeId, limit: 1 }]` and `retries: 2`. Total steps are the
+same 3 per store (recorded in the cost forecast); what changed is that no single run grows with
+the store count. Cost if wrong: a store's nightly rollup and a "run now" for it queue behind each
+other instead of running together.
+
+**Owner questions left open in this batch (not guessed):**
+- Issues 2345 / 2346 — what an old-shape variant-less PO line on a variant product means for a
+  merchant. `sent` lines cannot be received (VARIANT_REQUIRED) and count as on order for no
+  variant, so the reorder scan can over-suggest; `partial` lines already put units on the parent
+  column, which no stock surface counts, and cancelling re-orders the full quantity. Landed here:
+  the refusal in en/ar, `scripts/list-variantless-po-lines.ts` (count per store and PO status) and
+  a warn log per scan when any exist. Not decided: whether such lines count toward a variant's
+  on-order (all of it, apportioned, or none until re-targeted), and how stranded `partial` units
+  (and their AP/journal) are settled.
+- Issue 2349's storefront half — `apps/web` cart/checkout/auth banners pair a role tint with the
+  bare role colour (1.98–3.30:1). Those pages render on pecannbee, whose look must not change, so
+  re-colouring needs an owner OK or a default-off theme flag with pecannbee pinned by data.

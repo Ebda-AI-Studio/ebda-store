@@ -319,7 +319,7 @@ export default function NewsletterPage() {
                   })}
                 </p>
                 {broadcastResult.errors && broadcastResult.errors.length > 0 && (
-                  <p className="mt-2 text-xs text-destructive">
+                  <p className="mt-2 text-xs text-destructive-ink">
                     {broadcastResult.errors.length} chunk(s) failed — check server logs
                   </p>
                 )}

@@ -155,7 +155,7 @@ export function ProductsTable({
             <div className="min-w-0">
               <p className="font-medium text-foreground truncate">{displayName}</p>
               {product.hasVariants && (
-                <span className="text-xs text-info">{t('table.hasVariants')}</span>
+                <span className="text-xs text-info-ink">{t('table.hasVariants')}</span>
               )}
             </div>
           </div>
@@ -197,7 +197,7 @@ export function ProductsTable({
         const margin = product.price - product.costPrice;
         const profitable = margin > 0;
         return (
-          <span className={`font-medium ${profitable ? 'text-success' : 'text-destructive'}`}>
+          <span className={`font-medium ${profitable ? 'text-success-ink' : 'text-destructive-ink'}`}>
             {formatPrice(margin)}
           </span>
         );
@@ -216,10 +216,10 @@ export function ProductsTable({
           <span
             className={`text-sm font-medium ${
               resolvedInventory === 0
-                ? 'text-destructive'
+                ? 'text-destructive-ink'
                 : resolvedInventory < 10
-                  ? 'text-warning'
-                  : 'text-success'
+                  ? 'text-warning-ink'
+                  : 'text-success-ink'
             }`}
           >
             {resolvedInventory}

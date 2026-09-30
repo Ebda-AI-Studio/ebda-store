@@ -789,7 +789,7 @@ export function AreaRateEditor({ storeId }: Props) {
 
             {preview.errors.length > 0 && (
               <div className="space-y-1">
-                <p className="text-sm font-medium text-destructive">
+                <p className="text-sm font-medium text-destructive-ink">
                   {t('previewErrors', { count: preview.errors.length })}
                 </p>
                 <ul className="max-h-40 overflow-y-auto text-xs text-muted-foreground space-y-0.5 border border-border rounded-lg p-2">
@@ -1060,7 +1060,7 @@ export function AreaRateEditor({ storeId }: Props) {
                               type="button"
                               onClick={() => removeCustomRow(idx)}
                               aria-label={`${t('remove')} ${row.area}`}
-                              className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                              className="p-1.5 text-muted-foreground hover:text-destructive-ink hover:bg-destructive/10 rounded-md transition-colors"
                             >
                               <TrashIcon />
                             </button>
@@ -1269,7 +1269,7 @@ export function AreaRateEditor({ storeId }: Props) {
                                 type="button"
                                 onClick={() => removeCustomRow(idx)}
                                 aria-label={`${t('remove')} ${row.area}`}
-                                className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                className="p-1.5 text-muted-foreground hover:text-destructive-ink hover:bg-destructive/10 rounded-md transition-colors"
                               >
                                 <TrashIcon />
                               </button>

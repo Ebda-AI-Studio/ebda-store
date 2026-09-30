@@ -486,7 +486,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
 
       {/* ── Danger Zone ──────────────────────────────────────────────────────── */}
       <div className="mt-8">
-        <h2 className="mb-4 font-semibold text-destructive">{t('dangerZone.heading')}</h2>
+        <h2 className="mb-4 font-semibold text-destructive-ink">{t('dangerZone.heading')}</h2>
         <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
           {/* Suspend / Reactivate */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

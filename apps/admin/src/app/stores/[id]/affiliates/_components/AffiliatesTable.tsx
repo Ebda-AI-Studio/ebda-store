@@ -80,7 +80,7 @@ export function AffiliatesTable({
       header: t('columns.totalEarned'),
       alignEnd: true,
       cell: affiliate => (
-        <span className="text-success font-medium">
+        <span className="text-success-ink font-medium">
           {formatFils(Number(affiliate.totalEarned))}
         </span>
       ),
@@ -113,7 +113,7 @@ export function AffiliatesTable({
                 type="button"
                 onClick={() => onStatusAction(affiliate, 'approve')}
                 disabled={saving}
-                className="min-h-11 inline-flex items-center px-3 py-2 text-success hover:text-success text-sm font-medium disabled:opacity-50"
+                className="min-h-11 inline-flex items-center px-3 py-2 text-success-ink hover:text-success-ink text-sm font-medium disabled:opacity-50"
               >
                 {t('actions.approve')}
               </button>
@@ -121,7 +121,7 @@ export function AffiliatesTable({
                 type="button"
                 onClick={() => onStatusAction(affiliate, 'reject')}
                 disabled={saving}
-                className="min-h-11 inline-flex items-center px-3 py-2 text-destructive hover:text-destructive text-sm font-medium disabled:opacity-50"
+                className="min-h-11 inline-flex items-center px-3 py-2 text-destructive-ink hover:text-destructive-ink text-sm font-medium disabled:opacity-50"
               >
                 {t('actions.reject')}
               </button>

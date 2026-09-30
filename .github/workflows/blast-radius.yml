@@ -74,7 +74,9 @@ jobs:
           set -o pipefail
           # ref-based mode (no gh needed); path = repo root. Degrades gracefully
           # if graphify-out/graph.json is absent.
-          bash scripts/blast-radius.sh force-website-builder "${BASE_SHA:-HEAD~1}..${HEAD_SHA:-HEAD}" . \
+          # Three-dot (issue 2338): diff from the merge base, so a PR that is
+          # merely behind main reports only its own files, not main's newer ones.
+          bash scripts/blast-radius.sh force-website-builder "${BASE_SHA:-HEAD~1}...${HEAD_SHA:-HEAD}" . \
             | tee blast-radius.txt || true
           {
             echo '## 🌐 Blast radius (transitive dependents of the changed files)'

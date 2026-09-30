@@ -4,22 +4,26 @@
  *
  * - A reminder links to the store's plain `/cart` — no `?recover=&sig=`.
  * - `GET /stores/public/:storeId/cart/recover/:id` is no longer routed.
- * - The report's recovery figures are `null` (not tracked), never a
- *   fabricated 0, because nothing attributes an order to a reminder.
+ * - The report's recovery figures are MEASURED (issue 2356): order creation
+ *   marks the open abandoned cart `recovered`, so they are last-touch
+ *   "ordered later" figures, not `null`.
  *
  * Mutation-proof: restoring the signed URL reddens the first case; restoring
- * the route the second; returning 0 for the recovery figures the third.
+ * the route the second; nulling the recovery figures the third.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const h = vi.hoisted(() => ({
   dispatch: vi.fn(async () => undefined),
   update: vi.fn(async () => ({})),
   groupBy: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock('@force/database', () => ({
-  prisma: { abandonedCart: { update: h.update, groupBy: h.groupBy } },
+  prisma: { abandonedCart: { update: h.update, groupBy: h.groupBy }, $queryRaw: h.queryRaw },
   withRlsBypass: vi.fn(),
 }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({
@@ -84,18 +88,37 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
     expect(paths.some(p => /recover/.test(p as string))).toBe(false);
   });
 
-  it('the report returns recovery figures as unknown (null), never 0', async () => {
+  it('the report measures last-touch recovery (issue 2356), revenue from revenue-countable orders only', async () => {
     h.groupBy.mockResolvedValue([
       { status: 'step1_sent', _count: { id: 3 } },
-      { status: 'expired', _count: { id: 2 } },
+      { status: 'expired', _count: { id: 4 } },
+      { status: 'recovered', _count: { id: 1 } },
     ]);
+    h.queryRaw.mockResolvedValue([{ revenue: 12_500n }]);
     const stats = await abandonedCartService.getStats('store-1');
     expect(stats).toEqual({
-      byStatus: { step1_sent: 3, expired: 2 },
-      totalAbandoned: 5,
-      totalRecovered: null,
-      recoveryRate: null,
-      recoveredRevenue: null,
+      byStatus: { step1_sent: 3, expired: 4, recovered: 1 },
+      totalAbandoned: 8,
+      totalRecovered: 1,
+      recoveryRate: 12.5,
+      recoveredRevenue: 12_500,
     });
+    const sql = (h.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
+    expect(sql).toMatch(/JOIN public\.orders o ON o\.id = ac\.recovered_order_id/);
+    expect(sql).toMatch(/o\.status NOT IN \('cancelled', 'refunded'\)/);
+    expect(sql).toMatch(/o\.payment_status <> 'failed'/);
+    expect(h.queryRaw.mock.calls[0].slice(1)).toEqual(['store-1', 'store-1']);
+  });
+
+  it('an empty store reads 0 (a real zero), not unknown', async () => {
+    h.groupBy.mockResolvedValue([]);
+    h.queryRaw.mockResolvedValue([{ revenue: 0n }]);
+    const stats = await abandonedCartService.getStats('store-1');
+    expect(stats).toMatchObject({ totalRecovered: 0, recoveryRate: 0, recoveredRevenue: 0 });
+  });
+
+  it('order creation is the attribution writer the report reads', () => {
+    const src = readFileSync(join(__dirname, '../../apps/api/src/services/order.service.ts'), 'utf8');
+    expect(src).toMatch(/status: 'recovered',\s+recoveredAt: new Date\(\),\s+recoveredOrderId: newOrder\.id/);
   });
 });

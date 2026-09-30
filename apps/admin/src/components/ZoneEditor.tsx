@@ -137,7 +137,7 @@ export function ZoneEditor({
             <button
               type="button"
               onClick={onReset}
-              className="text-[11px] text-destructive hover:underline shrink-0"
+              className="text-[11px] text-destructive-ink hover:underline shrink-0"
             >
               {t('resetToDefault')}
             </button>
@@ -150,7 +150,7 @@ export function ZoneEditor({
           <button
             type="button"
             onClick={onReset}
-            className="text-[11px] text-destructive hover:underline shrink-0"
+            className="text-[11px] text-destructive-ink hover:underline shrink-0"
           >
             {t('resetToDefault')}
           </button>

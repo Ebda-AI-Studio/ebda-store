@@ -154,7 +154,7 @@ export function ScopePicker({
                 type="button"
                 onClick={() => remove(id)}
                 aria-label={removeLabel}
-                className="text-muted-foreground hover:text-destructive"
+                className="text-muted-foreground hover:text-destructive-ink"
               >
                 ×
               </button>

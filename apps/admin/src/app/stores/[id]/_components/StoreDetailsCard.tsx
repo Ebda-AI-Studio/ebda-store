@@ -74,7 +74,7 @@ export function StoreDetailsCard({
                 }`}
               />
               {formErrors.name && (
-                <p className="mt-1 text-sm text-destructive">{formErrors.name}</p>
+                <p className="mt-1 text-sm text-destructive-ink">{formErrors.name}</p>
               )}
             </div>
             <div>
@@ -95,7 +95,7 @@ export function StoreDetailsCard({
                 placeholder={t('slugPlaceholder')}
               />
               {formErrors.slug && (
-                <p className="mt-1 text-sm text-destructive">{formErrors.slug}</p>
+                <p className="mt-1 text-sm text-destructive-ink">{formErrors.slug}</p>
               )}
               <p className="mt-1 text-xs text-muted-foreground">
                 {t('slugHint', {

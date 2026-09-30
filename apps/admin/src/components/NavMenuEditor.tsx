@@ -227,7 +227,7 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
                 <button
                   type="button"
                   onClick={() => removeItem(index)}
-                  className="rounded p-1 text-destructive hover:bg-destructive/10"
+                  className="rounded p-1 text-destructive-ink hover:bg-destructive/10"
                   aria-label={t('removeItem')}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

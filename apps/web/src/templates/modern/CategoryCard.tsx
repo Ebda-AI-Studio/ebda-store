@@ -63,7 +63,9 @@ export default function ModernCategoryCard({
             loading="lazy"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-primary/8 to-muted" />
+          // Two-stop on purpose (issue 2342): the old primary via-stop at opacity 8 was an
+          // off-scale step that emitted nothing, so this is what always rendered.
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/15 to-muted" />
         )}
 
         {isOverlay && showLabel !== false && (

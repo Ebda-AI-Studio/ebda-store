@@ -233,11 +233,11 @@ export default function AffiliateEventsPage() {
 
         {error && !loading && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-destructive-ink">{error}</p>
             <button
               type="button"
               onClick={fetchEvents}
-              className="mt-3 rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+              className="mt-3 rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive/10"
             >
               Retry / إعادة المحاولة
             </button>
@@ -298,7 +298,7 @@ export default function AffiliateEventsPage() {
                       {event.details.commissionAmount !== undefined && (
                         <p>
                           Commission:{' '}
-                          <span className="font-medium text-success">
+                          <span className="font-medium text-success-ink">
                             +{formatPrice(event.details.commissionAmount)}
                           </span>
                         </p>

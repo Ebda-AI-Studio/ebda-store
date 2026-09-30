@@ -26,6 +26,7 @@ module.exports = {
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
+          ink: 'hsl(var(--primary-ink))',
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
@@ -34,18 +35,22 @@ module.exports = {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
+          ink: 'hsl(var(--destructive-ink))',
         },
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
+          ink: 'hsl(var(--success-ink))',
         },
         warning: {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
+          ink: 'hsl(var(--warning-ink))',
         },
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
+          ink: 'hsl(var(--info-ink))',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',

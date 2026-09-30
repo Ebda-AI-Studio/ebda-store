@@ -257,6 +257,29 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
     `;
     const expired = Number(expiredResult) + Number(unitGoneResult);
 
+    // Issue 2345: open old-shape PO lines (no variant, on a variant product)
+    // match NO scan unit, so their open quantity counts as on order for no
+    // variant and the scan can over-suggest. How to count them is an owner
+    // decision; until then the transition is made observable, never silent.
+    // `scripts/list-variantless-po-lines.ts` lists them.
+    const [variantless] = await tx.$queryRaw<Array<{ n: bigint | null }>>`
+      SELECT COUNT(*)::bigint AS n
+      FROM public.purchase_order_items i
+      JOIN public.purchase_orders p ON p.id = i.po_id
+      WHERE p.store_id = ${storeId}
+        AND p.status IN ('sent', 'partial')
+        AND i.variant_id IS NULL
+        AND i.qty > i.qty_received
+        AND EXISTS (SELECT 1 FROM public.product_variants pv WHERE pv.product_id = i.product_id)
+    `;
+    const variantlessOpen = Number(variantless?.n ?? 0);
+    if (variantlessOpen > 0) {
+      logger.warn(
+        { storeId, variantlessOpenPoLines: variantlessOpen },
+        'reorder-scan: open PO lines with no variant on variant products — their quantity is on order for no variant (issue 2345)'
+      );
+    }
+
     // -------------------------------------------------------------------------
     // Step 2: List active trackInventory products
     // -------------------------------------------------------------------------
@@ -364,6 +387,28 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   // -------------------------------------------------------------------------
   const candidates: ReorderCandidate[] = [];
   const SCAN_CHUNK_SIZE = 25;
+
+  // Product-level lookups run ONCE per product per scan (issue 2344). The loop
+  // iterates units — one per active variant — but the last-PO supplier and
+  // that supplier's lead time belong to the product, so a 20-variant product
+  // used to scan its whole PO-item history 20 times for one answer. Memoised
+  // across chunks: the answer does not depend on which chunk's tx asked.
+  const lastSupplierByProduct = new Map<string, string | null>();
+  const leadTimeBySupplier = new Map<string, number | null>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastSupplierFor = async (productId: string, tx: any): Promise<string | null> => {
+    if (!lastSupplierByProduct.has(productId)) {
+      lastSupplierByProduct.set(productId, await pickLastSupplierForProduct(productId, tx));
+    }
+    return lastSupplierByProduct.get(productId) ?? null;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const leadTimeFor = async (supplierId: string, tx: any): Promise<number | null> => {
+    if (!leadTimeBySupplier.has(supplierId)) {
+      leadTimeBySupplier.set(supplierId, await getSupplierLeadTime(supplierId, tx));
+    }
+    return leadTimeBySupplier.get(supplierId) ?? null;
+  };
   for (let chunkStart = 0; chunkStart < units.length; chunkStart += SCAN_CHUNK_SIZE) {
     const unitSlice = units.slice(chunkStart, chunkStart + SCAN_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -399,13 +444,11 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
           leadTimeDays = rule.leadTimeDays;
           // Supplier for the suggestion: prefer rule's explicit preferred supplier.
           resolvedSupplierId =
-            rule.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id, tx));
+            rule.preferredSupplierId ?? (await lastSupplierFor(product.id, tx));
         } else {
           // No rule: resolve the supplier first (last PO), then use its leadTimeDays.
-          resolvedSupplierId = await pickLastSupplierForProduct(product.id, tx);
-          const supplierLt = resolvedSupplierId
-            ? await getSupplierLeadTime(resolvedSupplierId, tx)
-            : null;
+          resolvedSupplierId = await lastSupplierFor(product.id, tx);
+          const supplierLt = resolvedSupplierId ? await leadTimeFor(resolvedSupplierId, tx) : null;
           leadTimeDays = supplierLt ?? 7;
         }
 

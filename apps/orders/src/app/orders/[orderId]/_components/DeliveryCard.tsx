@@ -50,7 +50,7 @@ export function DeliveryCard({ order }: DeliveryCardProps) {
       </h2>
 
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
           <svg
             className="h-5 w-5"
             fill="none"
@@ -169,7 +169,7 @@ export function DeliveryCard({ order }: DeliveryCardProps) {
 
           {deliveryNotes && (
             <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-warning">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-warning-ink">
                 {t.detail.customerNotes}
               </div>
               <div className="whitespace-pre-wrap break-words text-sm text-foreground">

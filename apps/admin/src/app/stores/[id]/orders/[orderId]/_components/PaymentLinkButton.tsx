@@ -131,14 +131,14 @@ export function PaymentLinkButton({
                 d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-2.828 2.828a4 4 0 01-5.656 0L11 18.828m-1.828-7.656a4 4 0 00-5.656 0L1.69 12.586a4 4 0 000 5.656l2.828 2.828a4 4 0 005.656 0L11.828 19.5"
               />
             </svg>
-            <span className="text-xs font-mono text-info truncate flex-1" dir="ltr">
+            <span className="text-xs font-mono text-info-ink truncate flex-1" dir="ltr">
               {existingPaymentUrl}
             </span>
             <button
               type="button"
               onClick={copyExistingLink}
               disabled={disabled}
-              className="text-info hover:bg-info/10 rounded-md p-1.5 flex-shrink-0 cursor-pointer"
+              className="text-info-ink hover:bg-info/10 rounded-md p-1.5 flex-shrink-0 cursor-pointer"
               aria-label={t('copyAria')}
               title={t('copyAria')}
             >
@@ -166,7 +166,7 @@ export function PaymentLinkButton({
               href={existingPaymentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-info hover:bg-info/10 rounded-md p-1.5 flex-shrink-0"
+              className="text-info-ink hover:bg-info/10 rounded-md p-1.5 flex-shrink-0"
               aria-label={t('openAria')}
               title={t('openAria')}
             >
@@ -331,7 +331,7 @@ export function PaymentLinkButton({
             ) : (
               <div className="space-y-4">
                 <div className="rounded-xl bg-success/10 border border-success/20 p-4">
-                  <p className="text-sm font-semibold text-success">
+                  <p className="text-sm font-semibold text-success-ink">
                     {result.notifyVia === 'email'
                       ? t('successEmailSent', { email: result.customerEmail ?? '' })
                       : t('successGenerated')}

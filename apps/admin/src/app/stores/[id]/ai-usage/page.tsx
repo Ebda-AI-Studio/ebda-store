@@ -202,7 +202,7 @@ export default function AiUsagePage() {
         ) : logError || !log || log.rows.length === 0 ? (
           <div className="px-6 py-8 text-center">
             {logError ? (
-              <p className="text-sm text-destructive">{t('table.loadError')}</p>
+              <p className="text-sm text-destructive-ink">{t('table.loadError')}</p>
             ) : (
               <p className="text-sm text-muted-foreground">{t('table.empty')}</p>
             )}

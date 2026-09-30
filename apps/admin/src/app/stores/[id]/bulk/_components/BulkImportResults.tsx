@@ -30,28 +30,28 @@ export function BulkImportResults({ result, onViewProducts }: BulkImportResultsP
           <p className="text-xs text-muted-foreground">{t('created')}</p>
         </div>
         <div className="text-center p-4 bg-info/5 rounded-lg">
-          <p className="text-2xl font-bold text-info">{result.updated}</p>
+          <p className="text-2xl font-bold text-info-ink">{result.updated}</p>
           <p className="text-xs text-muted-foreground">{t('updated')}</p>
         </div>
         <div className="text-center p-4 bg-destructive/10 rounded-lg">
-          <p className="text-2xl font-bold text-destructive">{result.failed}</p>
+          <p className="text-2xl font-bold text-destructive-ink">{result.failed}</p>
           <p className="text-xs text-muted-foreground">{t('failed')}</p>
         </div>
       </div>
 
       {result.errors.length > 0 && (
         <div className="mt-4">
-          <h4 className="text-sm font-medium text-destructive mb-2">{t('errorsHeading')}</h4>
+          <h4 className="text-sm font-medium text-destructive-ink mb-2">{t('errorsHeading')}</h4>
           <div className="max-h-48 overflow-y-auto rounded-lg border border-destructive/20 bg-destructive/10">
             {result.errors.map((error, i) => (
               <div
                 key={i}
                 className="px-4 py-2 border-b border-destructive/20 last:border-0 text-sm"
               >
-                <span className="font-medium text-destructive">
+                <span className="font-medium text-destructive-ink">
                   {t('rowLabel', { row: error.row })}
                 </span>{' '}
-                <span className="text-destructive">{error.error}</span>
+                <span className="text-destructive-ink">{error.error}</span>
               </div>
             ))}
           </div>

@@ -209,7 +209,7 @@ export function ActionFooter({
             type="button"
             onClick={() => onStatusChange('cancelled')}
             disabled={isUpdating}
-            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center rounded-xl border-2 border-destructive bg-card px-3 py-2.5 text-center text-sm font-semibold leading-tight text-destructive hover:bg-destructive/5 disabled:opacity-60 transition-colors cursor-pointer"
+            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center rounded-xl border-2 border-destructive bg-card px-3 py-2.5 text-center text-sm font-semibold leading-tight text-destructive-ink hover:bg-destructive/5 disabled:opacity-60 transition-colors cursor-pointer"
           >
             <span className="min-w-0">{t('cancel')}</span>
           </button>

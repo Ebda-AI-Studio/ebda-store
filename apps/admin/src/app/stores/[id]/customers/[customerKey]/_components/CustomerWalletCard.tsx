@@ -126,7 +126,7 @@ export function CustomerWalletCard({
       {loading ? (
         <div className="h-24 animate-pulse bg-muted/30" />
       ) : error ? (
-        <div className="p-4 text-sm text-destructive">
+        <div className="p-4 text-sm text-destructive-ink">
           {error}
           <button type="button" className="ms-3 font-medium underline" onClick={load}>
             {tDetail('retry')}
@@ -194,7 +194,7 @@ export function CustomerWalletCard({
                   </td>
                   <td
                     className={`px-4 py-2 text-end font-medium whitespace-nowrap ${
-                      row.amount > 0 ? 'text-success' : 'text-destructive'
+                      row.amount > 0 ? 'text-success-ink' : 'text-destructive-ink'
                     }`}
                     dir="ltr"
                   >

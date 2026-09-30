@@ -282,7 +282,13 @@ export default function NewPurchaseOrderPage() {
       if (apiError) {
         // Coded refusals have en/ar copy; anything else shows the API text.
         setError(
-          apiError.code === 'VARIANT_INACTIVE' ? t('errors.VARIANT_INACTIVE') : apiError.message
+          apiError.code === 'VARIANT_INACTIVE'
+            ? t('errors.VARIANT_INACTIVE')
+            : apiError.code === 'VARIANT_REQUIRED'
+              ? t('errors.VARIANT_REQUIRED')
+              : apiError.code === 'VARIANT_PRODUCT_MISMATCH'
+                ? t('errors.VARIANT_PRODUCT_MISMATCH')
+                : apiError.message
         );
         return;
       }

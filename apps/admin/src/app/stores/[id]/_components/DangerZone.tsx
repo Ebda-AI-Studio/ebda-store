@@ -15,7 +15,7 @@ export function DangerZone({ isDeleting, onRequestDelete }: DangerZoneProps) {
 
   return (
     <div className="mt-8">
-      <h2 className="mb-4 font-semibold text-destructive">{t('title')}</h2>
+      <h2 className="mb-4 font-semibold text-destructive-ink">{t('title')}</h2>
       <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1">

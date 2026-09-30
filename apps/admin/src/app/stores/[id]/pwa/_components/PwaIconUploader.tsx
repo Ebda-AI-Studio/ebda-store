@@ -187,7 +187,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
           </UploadDropzone>
         </div>
         <p className="text-xs text-muted-foreground mt-2">{t('uploaderSizeHint')}</p>
-        {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+        {error && <p className="mt-1 text-xs text-destructive-ink">{error}</p>}
 
         {(settings.icon192 || settings.iconAppleTouch || settings.favicon32) && (
           <div className="mt-4">

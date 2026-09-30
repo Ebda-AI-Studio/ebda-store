@@ -133,9 +133,9 @@ Consequences worth stating explicitly:
   (409 `VARIANT_INACTIVE`) — its units would otherwise book AP and cost for
   stock every surface reads as 0. The merchant re-enables the variant first.
   A reorder suggestion for a variant drafts its PO at the variant's cost.
-  Known gap, owner decision pending: reorder suggestions are product-level
-  (`variantId: null`), so a PO drafted from one for a VARIANT product has no
-  variant to receive into and its receive writes the parent column.
+  (Formerly a known gap — product-level suggestions for a VARIANT product
+  drafted POs with no variant to receive into. Resolved 2026-10-01: the scan
+  now suggests per variant; see the purchase-order bullet below.)
 - **Reading cost** uses the same rule everywhere: `variant.costPrice ??
 product.costPrice`. Order lines snapshot it at sale time
   (`lib/order-line-cost.ts` — checkout, bundle components, admin manual
@@ -154,7 +154,9 @@ product.costPrice`. Order lines snapshot it at sale time
   (store, product, variant); drafting from one carries the variant and its
   cost. Legacy product-level suggestions for variant products, and open ones
   for since-disabled variants, are expired by the scan's own next run
-  (`reorder-scan.service.ts`, step 1b).
+  (`reorder-scan.service.ts`, step 1b). The per-unit metrics (sales, on
+  order, backlog) are per variant; the last-PO supplier and its lead time are
+  product-level and looked up once per product per scan (issue 2344).
 - **A product-scoped write aimed at a variant product must fail loud.**
   `InventoryService.adjustInventory` / `bulkAdjustInventory` return a 400
   (`VARIANT_PRODUCT`) rather than writing a column that moves no stock. The

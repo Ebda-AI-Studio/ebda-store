@@ -57,6 +57,8 @@ interface AuditResult {
   /** Keys we deliberately skipped because they were too fresh — likely
    *  in-flight uploads whose DB row hasn't landed yet. */
   skippedRecent: number;
+  /** The visibility guard's refusal, when --force-report printed the list anyway. */
+  untrusted: string | null;
 }
 
 function requireEnv(name: string): string {
@@ -167,6 +169,25 @@ export function rlsBypassRunner(prisma: Pick<PrismaClient, '$transaction'>): R2R
     );
 }
 
+/**
+ * Run the RLS-visibility guard for the audit. A refusal always blocks
+ * `--apply`; with `--force-report` (and no `--apply`) it is returned instead of
+ * thrown, so an operator can still read a dry-run list that deletes nothing —
+ * under a banner saying it is not trustworthy (issue 2354).
+ */
+export async function guardForAudit(
+  guard: () => Promise<void>,
+  opts: { apply: boolean; forceReport: boolean }
+): Promise<string | null> {
+  try {
+    await guard();
+    return null;
+  } catch (err) {
+    if (opts.apply || !opts.forceReport) throw err;
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
 // The visibility guard lives in the shared registry so the Inngest sweep
 // (the other bulk-delete collector) runs the same check (issue 2288).
 export { STRICT_R2_TABLES, assertStrictTablesVisible };
@@ -180,10 +201,14 @@ export { STRICT_R2_TABLES, assertStrictTablesVisible };
  */
 function parseArgs() {
   const apply = process.argv.includes('--apply');
+  // Issue 2354: print the list even when the visibility guard refuses — with a
+  // NOT-TRUSTWORTHY banner. Never honoured together with --apply.
+  const forceReport = process.argv.includes('--force-report');
   const minAgeArg = process.argv.find(a => a.startsWith('--min-age-hours='));
   const minAgeHours = minAgeArg ? Number(minAgeArg.split('=')[1]) : 1;
   return {
     apply,
+    forceReport,
     minAgeMs: Math.max(0, minAgeHours) * 60 * 60 * 1000,
     minAgeHours: Math.max(0, minAgeHours),
   };
@@ -256,7 +281,7 @@ async function audit(): Promise<AuditResult> {
   const secretKey = requireEnv('STORAGE_SECRET_KEY');
   const bucket = process.env.STORAGE_BUCKET || 'uploads';
   const publicBase = process.env.STORAGE_PUBLIC_URL || '';
-  const { apply, minAgeMs, minAgeHours } = parseArgs();
+  const { apply, forceReport, minAgeMs, minAgeHours } = parseArgs();
 
   const client = new S3Client({
     endpoint,
@@ -290,8 +315,12 @@ async function audit(): Promise<AuditResult> {
     // dry run too (issue 2288): an operator reviews the dry-run list and then
     // runs --apply, so a list built from an RLS-filtered read is already the
     // harm. Only needed when something would be called an orphan.
+    let untrusted: string | null = null;
     if (orphans.length > 0) {
-      await assertStrictTablesVisible(run, prisma);
+      untrusted = await guardForAudit(() => assertStrictTablesVisible(run, prisma), {
+        apply,
+        forceReport,
+      });
     }
 
     if (apply && orphans.length > 0) {
@@ -307,6 +336,7 @@ async function audit(): Promise<AuditResult> {
       orphanKeys: orphans,
       orphanBytes,
       skippedRecent,
+      untrusted,
     };
   } finally {
     await prisma.$disconnect();
@@ -352,11 +382,18 @@ if (isDirectRun) {
       console.log(`Skipped (fresh):  ${result.skippedRecent}`);
       console.log(`Orphan list:      ${outPath}`);
       console.log('');
+      if (result.untrusted) {
+        console.log(`⚠️ REPORT NOT TRUSTWORTHY — do not act on it: ${result.untrusted}`);
+        console.log('');
+      }
       if (apply) {
         console.log('Applied: orphan objects above were deleted from R2.');
       } else {
         console.log('Dry run. Pass --apply to delete the orphans listed above.');
         console.log('Pass --min-age-hours=N (default 1) to widen the safety window.');
+        console.log(
+          'Pass --force-report to print the list even when the visibility guard refuses (never deletes).'
+        );
       }
     })
     .catch(err => {

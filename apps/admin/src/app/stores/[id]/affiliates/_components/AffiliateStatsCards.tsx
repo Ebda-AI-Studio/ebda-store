@@ -22,11 +22,11 @@ export function AffiliateStatsCards({ stats }: AffiliateStatsCardsProps) {
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('activeReferrals')}</p>
-        <p className="text-2xl font-bold text-success">{stats.totalReferrals}</p>
+        <p className="text-2xl font-bold text-success-ink">{stats.totalReferrals}</p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('conversionRate')}</p>
-        <p className="text-2xl font-bold text-info">{stats.conversionRate}%</p>
+        <p className="text-2xl font-bold text-info-ink">{stats.conversionRate}%</p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('totalPaid')}</p>
@@ -34,7 +34,7 @@ export function AffiliateStatsCards({ stats }: AffiliateStatsCardsProps) {
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('conversions')}</p>
-        <p className="text-2xl font-bold text-info">{stats.conversions}</p>
+        <p className="text-2xl font-bold text-info-ink">{stats.conversions}</p>
       </div>
     </div>
   );

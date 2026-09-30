@@ -188,11 +188,11 @@ export default function OrderDetailPage() {
 
         {error && !isLoading && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-destructive-ink">{error}</p>
             <button
               type="button"
               onClick={fetchOrder}
-              className="mt-3 inline-flex items-center justify-center rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 cursor-pointer"
+              className="mt-3 inline-flex items-center justify-center rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive/10 cursor-pointer"
             >
               {tList('errors.retry')}
             </button>

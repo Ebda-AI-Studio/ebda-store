@@ -373,7 +373,7 @@ export default function CustomerDetailPage() {
               )}
             </div>
             {refundedPayment && (
-              <p className="mt-1 text-xs text-destructive">
+              <p className="mt-1 text-xs text-destructive-ink">
                 <span className="font-semibold">{t('refunded')}</span>
                 {' · '}-{formatKwd(refundedPayment.refundedAmount ?? order.total)} {t('via')}{' '}
                 {refundedPayment.provider}
@@ -535,7 +535,7 @@ export default function CustomerDetailPage() {
                       </div>
                     )}
                     {groupError && (
-                      <p className="text-end text-xs text-destructive">{groupError}</p>
+                      <p className="text-end text-xs text-destructive-ink">{groupError}</p>
                     )}
                   </dl>
                 </div>
@@ -625,7 +625,7 @@ export default function CustomerDetailPage() {
                     className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive-ink"
                   >
                     {t('statusRefunded')} · {customer.refundedCount}
-                    <span className="text-[10px] text-destructive/70">
+                    <span className="text-[10px] text-destructive-ink">
                       ({formatKwd(customer.totalRefunded)})
                     </span>
                   </span>
@@ -670,8 +670,8 @@ export default function CustomerDetailPage() {
               {!customer.isGuest && canManagePrivacy && (
                 <div className="rounded-xl border border-destructive/30 bg-card shadow-sm">
                   <div className="border-b border-destructive/30 bg-destructive/10 p-4">
-                    <h2 className="font-semibold text-destructive">{tPrivacy('sectionTitle')}</h2>
-                    <p className="text-sm text-destructive">{tPrivacy('sectionSubtitle')}</p>
+                    <h2 className="font-semibold text-destructive-ink">{tPrivacy('sectionTitle')}</h2>
+                    <p className="text-sm text-destructive-ink">{tPrivacy('sectionSubtitle')}</p>
                   </div>
                   <div className="p-6 space-y-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -696,7 +696,7 @@ export default function CustomerDetailPage() {
                           {tPrivacy('eraseDescription')}
                         </p>
                         {walletEnabled && walletBalance > 0 && (
-                          <p className="mt-1 text-sm font-medium text-destructive">
+                          <p className="mt-1 text-sm font-medium text-destructive-ink">
                             {tWallet('forfeitWarning', { amount: formatKwd(walletBalance) })}
                           </p>
                         )}

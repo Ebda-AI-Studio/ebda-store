@@ -72,7 +72,7 @@ function TypeBadge({ type, label }: { type: string; label: string }) {
 function PointsCell({ points }: { points: number }) {
   if (points > 0)
     return <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{points}</span>;
-  if (points < 0) return <span className="font-semibold text-destructive">{points}</span>;
+  if (points < 0) return <span className="font-semibold text-destructive-ink">{points}</span>;
   return <span className="text-muted-foreground">0</span>;
 }
 

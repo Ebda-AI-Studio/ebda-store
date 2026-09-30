@@ -301,7 +301,7 @@ export default function PromotionsPage() {
           <button
             type="button"
             onClick={() => void remove(promo)}
-            className="ms-3 text-destructive hover:underline"
+            className="ms-3 text-destructive-ink hover:underline"
           >
             {t('delete')}
           </button>

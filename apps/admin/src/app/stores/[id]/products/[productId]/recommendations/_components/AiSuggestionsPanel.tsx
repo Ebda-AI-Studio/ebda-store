@@ -224,7 +224,7 @@ export function AiSuggestionsPanel({
       </p>
 
       {loading && <div className="text-sm text-muted-foreground">{t('loading')}</div>}
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      {error && <div className="text-sm text-destructive-ink">{error}</div>}
       {!loading && !error && recs.length === 0 && (
         <div className="rounded-md bg-background border border-border p-3 text-sm text-muted-foreground">
           {t.rich('emptyState', {

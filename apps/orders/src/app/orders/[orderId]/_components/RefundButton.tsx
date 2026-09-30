@@ -83,7 +83,7 @@ export function RefundButton({
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled || busy}
-        className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-3 text-center text-xs font-semibold leading-tight text-destructive active:bg-destructive/10 disabled:opacity-60"
+        className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-3 text-center text-xs font-semibold leading-tight text-destructive-ink active:bg-destructive/10 disabled:opacity-60"
       >
         <svg
           className="h-4 w-4 shrink-0"

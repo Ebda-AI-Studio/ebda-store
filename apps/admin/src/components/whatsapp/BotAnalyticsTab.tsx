@@ -79,7 +79,7 @@ function FunnelBar({ step, maxCount }: { step: FunnelStep; maxCount: number }) {
 
   return (
     <div className="flex flex-col gap-1">
-      {dropOffDisplay && <div className="text-xs text-destructive/80 ps-1">{dropOffDisplay}</div>}
+      {dropOffDisplay && <div className="text-xs text-destructive-ink ps-1">{dropOffDisplay}</div>}
       <div className="flex items-center gap-3">
         <div
           className="rounded-lg bg-primary/15 flex items-center px-3 py-2 min-w-0"

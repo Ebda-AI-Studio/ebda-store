@@ -42,6 +42,9 @@ describe('Email Queue Service', () => {
       rpop: vi.fn().mockResolvedValue(null),
       llen: vi.fn().mockResolvedValue(0),
       lrange: vi.fn().mockResolvedValue([]),
+      ltrim: vi.fn().mockResolvedValue('OK'),
+      expire: vi.fn().mockResolvedValue(1),
+      del: vi.fn().mockResolvedValue(1),
     };
 
     vi.mocked(redis.isAvailable).mockReturnValue(true);
@@ -283,6 +286,32 @@ describe('Email Queue Service', () => {
           context: { skipped: 1, list: 'email:failed:corrupt' },
         })
       );
+    });
+
+    // Issue 2353: the set-aside list is bounded and has a reader + a drain.
+    it('bounds the set-aside list (newest 200, 30-day expiry) on every write', async () => {
+      mockRedisClient.llen.mockResolvedValueOnce(1);
+      mockRedisClient.rpop.mockResolvedValueOnce('not json');
+      await emailQueue.retryFailed();
+      expect(mockRedisClient.ltrim).toHaveBeenCalledWith('email:failed:corrupt', 0, 199);
+      expect(mockRedisClient.expire).toHaveBeenCalledWith('email:failed:corrupt', 30 * 24 * 60 * 60);
+    });
+
+    it('exposes the set-aside entries by size only, and counts them in getStats', async () => {
+      mockRedisClient.lrange.mockResolvedValueOnce(['{"a":', 'xyz']);
+      expect(await emailQueue.getCorruptEntries(50)).toEqual([
+        { position: 0, bytes: 5 },
+        { position: 1, bytes: 3 },
+      ]);
+      expect(mockRedisClient.lrange).toHaveBeenCalledWith('email:failed:corrupt', 0, 49);
+      mockRedisClient.llen.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(4);
+      expect((await emailQueue.getStats()).corrupt).toBe(4);
+    });
+
+    it('discardCorrupt drops the list and reports how many it held', async () => {
+      mockRedisClient.llen.mockResolvedValueOnce(3);
+      expect(await emailQueue.discardCorrupt()).toBe(3);
+      expect(mockRedisClient.del).toHaveBeenCalledWith('email:failed:corrupt');
     });
 
     it('raises no set-aside alert when every entry was readable', async () => {

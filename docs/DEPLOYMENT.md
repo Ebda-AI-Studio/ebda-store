@@ -275,7 +275,12 @@ npx prisma migrate deploy
 sort strictly after the newest migration on `main`, and must not be shared with any other folder.
 CI's `Lint` job runs `node scripts/check-migration-order.mjs --fetch --base origin/main` and fails the PR
 otherwise; run it locally before pushing (`--fetch` never makes a local repo shallow — `--depth` is used only inside GitHub Actions). If `main` gained a newer migration while your PR was open,
-rename your folder to a later timestamp (it has not been applied anywhere yet). The two collisions
+rename your folder to a later timestamp (it has not been applied anywhere yet). The gate has two
+arms (issue 2355): on a PR it compares against current `origin/main`; on a push to `main` it compares
+against the pre-push tip (`github.event.before`, fetched by sha), which catches two PRs that each
+passed against the same old main and then both merged — main goes red on the second merge. That arm
+detects after the fact (the Railway deploy on the same push has usually applied the folder already);
+prevention is branch protection's "require branches to be up to date". The two collisions
 already applied in production (`20260615000000_*`, `20260925160000_*`) are allow-listed in the script
 and cannot be renamed.
 

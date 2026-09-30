@@ -178,9 +178,62 @@ describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', 
     expect(seeing.calls).toEqual([]);
   });
 
+  // Issue 2354: after the force_app cutover the role cannot ANALYZE (not the
+  // owner) and a never-populated table stays reltuples -1 forever. A bypass
+  // proven through the SAME runner makes a 0 a real 0.
+  const bypassCollector = (seen: number, bypass: string | null) =>
+    (async (fn: (db: unknown) => Promise<unknown>) =>
+      fn({
+        $queryRawUnsafe: async (sql: string) =>
+          /current_setting\('app\.bypass_rls'/.test(sql) ? [{ bypass }] : [{ n: seen }],
+      })) as never;
+
+  it('issue 2354: UNKNOWN (-1) passes when the runner proves app.bypass_rls = true', async () => {
+    const notOwner = catalog(-1, 0, async () => 0); // ANALYZE skipped (WARNING), stays -1
+    await expect(
+      assertStrictTablesVisible(bypassCollector(0, 'true'), notOwner.db)
+    ).resolves.toBeUndefined();
+  });
+
+  it('issue 2354: UNKNOWN still refuses when the bypass is NOT proven', async () => {
+    for (const bypass of [null, '', 'false']) {
+      await expect(
+        assertStrictTablesVisible(bypassCollector(0, bypass), catalog(-1).db)
+      ).rejects.toThrow(/did not prove app\.bypass_rls/);
+    }
+  });
+
+  it('issue 2354: positive catalog evidence still refuses even with the bypass proven', async () => {
+    await expect(
+      assertStrictTablesVisible(bypassCollector(0, 'true'), catalog(42).db)
+    ).rejects.toThrow(/reltuples 42/);
+    await expect(
+      assertStrictTablesVisible(bypassCollector(0, 'true'), catalog(0, 3).db)
+    ).rejects.toThrow(/n_live_tup 3/);
+  });
+
+  it('issue 2354: --force-report prints a refused dry run, never a refused --apply', async () => {
+    const { guardForAudit } = await import('../../scripts/r2-orphan-audit');
+    const refuse = async () => {
+      throw new Error('REFUSING: x');
+    };
+    await expect(guardForAudit(refuse, { apply: false, forceReport: true })).resolves.toBe(
+      'REFUSING: x'
+    );
+    await expect(guardForAudit(refuse, { apply: true, forceReport: true })).rejects.toThrow(
+      /REFUSING/
+    );
+    await expect(guardForAudit(refuse, { apply: false, forceReport: false })).rejects.toThrow(
+      /REFUSING/
+    );
+    await expect(
+      guardForAudit(async () => undefined, { apply: true, forceReport: false })
+    ).resolves.toBeNull();
+  });
+
   it('the dry run validates the report too — the guard runs whenever anything would be called an orphan', () => {
     const src = readFileSync(path.resolve(__dirname, '../../scripts/r2-orphan-audit.ts'), 'utf8');
-    const guard = src.indexOf('await assertStrictTablesVisible(run, prisma)');
+    const guard = src.indexOf('assertStrictTablesVisible(run, prisma)');
     expect(guard).toBeGreaterThan(0);
     expect(src.slice(src.lastIndexOf('if (', guard), guard)).toMatch(/if \(orphans\.length > 0\)/);
     expect(src.slice(src.lastIndexOf('if (', guard), guard)).not.toMatch(/apply/);

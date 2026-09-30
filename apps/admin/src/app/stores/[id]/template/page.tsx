@@ -292,8 +292,8 @@ export default function StoreTemplatePage() {
               />
             </svg>
             <div>
-              <p className="text-info font-medium">{t('aboutTitle')}</p>
-              <p className="text-info text-sm mt-1">
+              <p className="text-info-ink font-medium">{t('aboutTitle')}</p>
+              <p className="text-info-ink text-sm mt-1">
                 {t('aboutBody')}
                 <Link href={`/stores/${storeId}/branding`} className="underline ms-1">
                   {t('brandingSettings')}

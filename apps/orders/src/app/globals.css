@@ -24,6 +24,14 @@
     --info-foreground: 0 0% 100%;
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
+    /* Text on a role tint or a plain surface (issues 2341, 2349): the role
+       colours themselves fail WCAG AA there (warning 1.7:1). Same values as
+       apps/admin; measured per theme by tests/unit/admin-tint-ink-contrast. */
+    --primary-ink: 26 100% 33%;
+    --success-ink: 158 64% 24%;
+    --warning-ink: 43 96% 24%;
+    --info-ink: 210 100% 35%;
+    --destructive-ink: 0 72% 40%;
     --border: 30 15% 90%;
     --input: 30 15% 90%;
     --ring: 26 100% 50%;
@@ -51,6 +59,11 @@
     --info-foreground: 0 0% 100%;
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
+    --primary-ink: 26 100% 62%;
+    --success-ink: 158 64% 65%;
+    --warning-ink: 43 96% 62%;
+    --info-ink: 210 100% 72%;
+    --destructive-ink: 0 72% 70%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 26 100% 55%;

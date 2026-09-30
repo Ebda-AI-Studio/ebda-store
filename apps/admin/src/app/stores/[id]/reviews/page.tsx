@@ -56,7 +56,7 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < rating ? 'text-warning fill-yellow-400' : 'text-muted-foreground/60'}`}
+          className={`h-4 w-4 ${i < rating ? 'text-warning-ink fill-yellow-400' : 'text-muted-foreground/60'}`}
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -361,7 +361,7 @@ export default function ReviewsPage() {
                           {review.status === 'published' ? t('approved') : review.status}
                         </Badge>
                         {review.verifiedPurchase && (
-                          <Badge variant="outline" className="text-success border-success/40">
+                          <Badge variant="outline" className="text-success-ink border-success/40">
                             {t('verifiedPurchase')}
                           </Badge>
                         )}
@@ -397,13 +397,13 @@ export default function ReviewsPage() {
 
                       {/* Spam reasons */}
                       {review.spamReasons && review.spamReasons.length > 0 && (
-                        <p className="text-xs text-destructive mb-2">
+                        <p className="text-xs text-destructive-ink mb-2">
                           {t('spamReasons')}: {review.spamReasons.join(', ')}
                         </p>
                       )}
 
                       {review.rejectionReason && (
-                        <p className="text-destructive text-xs mb-2">
+                        <p className="text-destructive-ink text-xs mb-2">
                           {t('rejectionReason')}: {review.rejectionReason}
                         </p>
                       )}
@@ -472,7 +472,7 @@ export default function ReviewsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-destructive hover:bg-destructive/5"
+                        className="text-destructive-ink hover:bg-destructive/5"
                         onClick={() => setDeleteTarget(review.id)}
                       >
                         {t('delete')}

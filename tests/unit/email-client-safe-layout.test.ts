@@ -19,6 +19,7 @@
  *  - logo gets `object-fit:cover`                     → "logo scales down whole" (5 red)
  *  - logo gets a fixed `height:56px`                  → "logo scales down whole" + "every <img>" (36 red)
  *  - header cell `height="72"` + `overflow:hidden`   → "logo scales down whole" (5 red)
+ *  - logo loses `maxHeight` (issue 2336)              → "every <img>" + "logo scales down whole"
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
@@ -235,11 +236,15 @@ describe('transactional emails are safe in clients that strip <style>', () => {
       expect(width, img).not.toBeNull();
       expect(Number(width![1]), img).toBeLessThanOrEqual(EMAIL_MAX_WIDTH);
       const style = /\sstyle="([^"]*)"/.exec(img)?.[1] ?? '';
-      expect(style, img).toMatch(/(^|;)width:\d+px;/);
-      expect(style, img).toMatch(/max-width:100%;/);
-      // A fixed box (height attr) or proportional height — never unbounded.
+      // Either a fixed width that can shrink with the column, or (a bounded
+      // logo box) width:auto under a pixel max-width no wider than the column.
+      const fixed = /(^|;)width:\d+px;max-width:100%;/.test(style);
+      const boxed = /(^|;)width:auto;max-width:(\d+)px;/.exec(style);
+      expect(fixed || (boxed !== null && Number(boxed[2]) <= EMAIL_MAX_WIDTH), img).toBe(true);
+      // A fixed box (height attr) or a proportional height that is ALSO capped
+      // (issue 2336: a square logo with only a width bound rendered 160px tall).
       const hasHeightAttr = /\sheight="\d+"/.test(img);
-      expect(hasHeightAttr || /height:auto;/.test(style), img).toBe(true);
+      expect(hasHeightAttr || /height:auto;max-height:\d+px;/.test(style), img).toBe(true);
     }
   });
 
@@ -341,16 +346,17 @@ describe('logo scales down whole — never cropped', () => {
       Object.entries(logos).map(([shape, src]) => [`${shape} (${locale})`, locale, src] as const)
     )
   )(
-    '%s: width 160 + height:auto, no object-fit / fixed height / overflow clip',
+    '%s: scaled whole into a 160×64 box, no object-fit / fixed height / overflow clip',
     (_n, locale, src) => {
       const html = renderBrandedShell('<p>hi</p>', { ...STORE(locale), logo: src });
       const img = logoTag(html, src);
       expect(img).toBeDefined();
-      expect(img).toContain('width="160"');
+      expect(img).toContain('width="160"'); // Outlook desktop's only bound
       expect(img).not.toMatch(/\sheight="/);
       const style = /\sstyle="([^"]*)"/.exec(img!)![1];
-      expect(style).toMatch(/(^|;)width:160px;max-width:100%;height:auto;/);
-      expect(style).not.toMatch(/object-fit|object-position|max-height|(^|;)height:\d/);
+      // Issue 2336: both bounds, width:auto so neither one squashes the other.
+      expect(style).toMatch(/(^|;)width:auto;max-width:160px;height:auto;max-height:64px;/);
+      expect(style).not.toMatch(/object-fit|object-position|(^|;)height:\d|(^|;)width:\d/);
       // The cell holding the logo must not be a clipping box.
       const cell = /<td\b[^>]*class="header"[^>]*>/.exec(html)![0];
       expect(cell).not.toMatch(/\sheight="|[;"]height:\d|max-height|overflow/);
@@ -361,7 +367,8 @@ describe('logo scales down whole — never cropped', () => {
   it('every rendered email: the logo carries no cropping style', () => {
     for (const r of RENDERED) {
       const img = logoTag(r.html, 'https://pub.r2.dev/logo-1600x420.png')!;
-      expect(img, `${r.name} ${r.locale}`).not.toMatch(/object-fit|max-height|\sheight="/);
+      expect(img, `${r.name} ${r.locale}`).not.toMatch(/object-fit|\sheight="|[;"]height:\d/);
+      expect(img, `${r.name} ${r.locale}`).toMatch(/max-height:64px;/);
       expect(r.html, `${r.name} ${r.locale}`).not.toMatch(/overflow:\s*hidden/);
     }
   });

@@ -24,7 +24,7 @@ interface UserDetail {
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   inactive: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  suspended: { bg: 'bg-destructive/5', text: 'text-destructive', dot: 'bg-destructive' },
+  suspended: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
 };
 
 export default function UserDetailPage() {
@@ -181,7 +181,7 @@ export default function UserDetailPage() {
     return (
       <AdminLayout title={t('notFoundTitle')} subtitle={t('notFoundSubtitle')}>
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
-          <p className="text-destructive">{error || t('notFoundMessage')}</p>
+          <p className="text-destructive-ink">{error || t('notFoundMessage')}</p>
           <Link href="/users" className="mt-4 inline-block text-primary hover:underline">
             {t('backToUsers')}
           </Link>
@@ -365,7 +365,7 @@ export default function UserDetailPage() {
                   />
                 </div>
                 {editPassword && editPassword !== confirmPassword && (
-                  <p className="text-xs text-destructive">{t('passwordMismatch')}</p>
+                  <p className="text-xs text-destructive-ink">{t('passwordMismatch')}</p>
                 )}
               </div>
 
@@ -454,7 +454,7 @@ export default function UserDetailPage() {
               <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium text-destructive">{t('dangerZoneTitle')}</p>
+                    <p className="font-medium text-destructive-ink">{t('dangerZoneTitle')}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {t('dangerZoneDescription')}
                     </p>
@@ -462,7 +462,7 @@ export default function UserDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="rounded-lg border border-destructive bg-card px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    className="rounded-lg border border-destructive bg-card px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive hover:text-destructive-foreground"
                   >
                     {t('deleteUserButton')}
                   </button>

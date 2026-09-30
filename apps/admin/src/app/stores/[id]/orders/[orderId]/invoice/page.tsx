@@ -173,7 +173,7 @@ export default function OrderInvoicePage() {
 
         {error && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-destructive-ink">{error}</p>
           </div>
         )}
 

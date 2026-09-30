@@ -285,7 +285,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           {/* Inline delete confirm */}
           {confirmDeleteId === loc.id ? (
             <>
-              <span className="text-xs text-destructive font-medium">{t('deleteConfirm')}</span>
+              <span className="text-xs text-destructive-ink font-medium">{t('deleteConfirm')}</span>
               <button
                 type="button"
                 disabled={deletingId === loc.id}
@@ -428,7 +428,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             {/* Name EN */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-foreground">
-                {t('fieldName')} <span className="text-destructive">*</span>
+                {t('fieldName')} <span className="text-destructive-ink">*</span>
               </label>
               <input
                 type="text"
@@ -455,7 +455,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             {/* Country EN */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-foreground">
-                {t('fieldCountry')} <span className="text-destructive">*</span>
+                {t('fieldCountry')} <span className="text-destructive-ink">*</span>
               </label>
               <input
                 type="text"
@@ -482,7 +482,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             {/* Address EN */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-foreground">
-                {t('fieldAddress')} <span className="text-destructive">*</span>
+                {t('fieldAddress')} <span className="text-destructive-ink">*</span>
               </label>
               <input
                 type="text"

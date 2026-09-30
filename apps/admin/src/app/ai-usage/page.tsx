@@ -106,7 +106,7 @@ function PctBar({ pct, warn }: { pct: number; warn?: boolean }) {
         />
       </div>
       <span
-        className={`text-xs tabular-nums ${pct >= 90 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+        className={`text-xs tabular-nums ${pct >= 90 ? 'text-destructive-ink font-medium' : 'text-muted-foreground'}`}
       >
         {pct}%
       </span>
@@ -191,7 +191,7 @@ function PlatformAiUsagePageInner() {
   if (error || !data) {
     return (
       <div className="rounded-xl border bg-card p-8 text-center">
-        <p className="text-sm text-destructive">{t('loadError')}</p>
+        <p className="text-sm text-destructive-ink">{t('loadError')}</p>
         <button
           type="button"
           onClick={fetchData}

@@ -157,7 +157,7 @@ export function ActionFooter({
             type="button"
             onClick={onMarkPaid}
             disabled={isUpdating}
-            className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 text-center text-xs font-semibold leading-tight text-primary active:bg-primary/10 disabled:opacity-60"
+            className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 text-center text-xs font-semibold leading-tight text-primary-ink active:bg-primary/10 disabled:opacity-60"
           >
             <svg
               className="h-4 w-4 shrink-0"
@@ -182,7 +182,7 @@ export function ActionFooter({
             type="button"
             onClick={() => onStatusChange('cancelled')}
             disabled={isUpdating}
-            className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center rounded-xl border-2 border-destructive bg-card px-3 text-center text-xs font-semibold leading-tight text-destructive active:bg-destructive/5 disabled:opacity-60"
+            className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center rounded-xl border-2 border-destructive bg-card px-3 text-center text-xs font-semibold leading-tight text-destructive-ink active:bg-destructive/5 disabled:opacity-60"
           >
             <span className="min-w-0">{ta.cancel}</span>
           </button>

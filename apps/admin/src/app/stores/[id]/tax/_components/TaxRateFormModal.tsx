@@ -82,7 +82,7 @@ export function TaxRateFormModal({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-2">
-              {t('name.label')} <span className="text-destructive">*</span>
+              {t('name.label')} <span className="text-destructive-ink">*</span>
             </label>
             <input
               type="text"
@@ -111,7 +111,7 @@ export function TaxRateFormModal({
 
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-2">
-            {t('rate.label')} <span className="text-destructive">*</span>
+            {t('rate.label')} <span className="text-destructive-ink">*</span>
           </label>
           <div className="flex items-center gap-3">
             <input

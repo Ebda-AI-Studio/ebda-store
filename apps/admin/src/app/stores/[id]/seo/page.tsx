@@ -160,7 +160,7 @@ function CharCount({ value, max }: { value: string; max: number }) {
     <span
       className={`text-xs ${
         isOver
-          ? 'text-destructive font-medium'
+          ? 'text-destructive-ink font-medium'
           : isClose
             ? 'text-amber-500'
             : 'text-muted-foreground'
@@ -550,7 +550,7 @@ export default function StoreSeoPage() {
           <h2 className="mb-4 text-sm font-medium text-foreground">{t('searchPreview')}</h2>
           <div className="rounded-lg border border-border p-4 max-w-xl">
             <p className="text-xs text-muted-foreground mb-1">{t('previewDomain')}</p>
-            <p className="text-lg font-medium text-info leading-tight line-clamp-1">
+            <p className="text-lg font-medium text-info-ink leading-tight line-clamp-1">
               {settings.metaTitle}
             </p>
             {settings.metaDescription && (
@@ -567,7 +567,7 @@ export default function StoreSeoPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-info/10">
-              <span className="text-xs font-bold text-info">{t('enBadge')}</span>
+              <span className="text-xs font-bold text-info-ink">{t('enBadge')}</span>
             </div>
             <h2 className="font-semibold text-foreground">{t('englishSeo')}</h2>
           </div>
@@ -619,7 +619,7 @@ export default function StoreSeoPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded bg-success/10">
-              <span className="text-xs font-bold text-success">{t('arBadge')}</span>
+              <span className="text-xs font-bold text-success-ink">{t('arBadge')}</span>
             </div>
             <h2 className="font-semibold text-foreground">{t('arabicSeo')}</h2>
           </div>
@@ -1431,7 +1431,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                         stepsAr: (d.stepsAr ?? []).filter((_, idx) => idx !== i),
                       }))
                     }
-                    className="text-destructive hover:text-destructive/80 text-xs"
+                    className="text-destructive-ink hover:text-destructive-ink/80 text-xs"
                   >
                     ✕
                   </button>

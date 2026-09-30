@@ -3865,9 +3865,9 @@
     },
     "stats": {
       "totalAbandoned": "Total Abandoned",
-      "recovered": "Recovered",
-      "recoveryRate": "Recovery Rate",
-      "recoveredRevenue": "Revenue Recovered",
+      "recovered": "Ordered later",
+      "recoveryRate": "Ordered-later rate",
+      "recoveredRevenue": "Revenue from later orders",
       "kwdValue": "{amount} KWD",
       "recoveryNotTracked": "Not tracked"
     },
@@ -3876,7 +3876,7 @@
       "step1_sent": "Step 1 Sent",
       "step2_sent": "Step 2 Sent",
       "step3_sent": "Step 3 Sent",
-      "recovered": "Recovered",
+      "recovered": "Ordered later",
       "expired": "Expired"
     },
     "campaign": {
@@ -6453,7 +6453,10 @@
       },
       "searchPlaceholder": "Search POs…",
       "errors": {
-        "VARIANT_INACTIVE": "A variant on this purchase order is disabled. Re-enable it on the product page before ordering or receiving stock for it."
+        "VARIANT_INACTIVE": "A variant on this purchase order is disabled. Re-enable it on the product page before ordering or receiving stock for it.",
+        "VARIANT_REQUIRED": "This product has variants — choose the variant for each purchase order line.",
+        "VARIANT_PRODUCT_MISMATCH": "A purchase order line names a variant that does not belong to its product.",
+        "VARIANT_REQUIRED_RECEIVE": "This line names no variant, but its product has variants, so it cannot be received. Cancel this purchase order and draft it again per variant."
       },
       "emptyState": "No purchase orders yet. Create one with the button above."
     },
@@ -6711,6 +6714,15 @@
       "to": "To",
       "attempts": "Attempts",
       "error": "Last error"
+    },
+    "corrupt": {
+      "title": "{count} unreadable entr(ies) set aside",
+      "body": "These dead-lettered emails could not be read during \"Retry all\", so they cannot be re-sent. The newest 200 are kept for 30 days in the Redis list email:failed:corrupt for inspection; discard them once reviewed.",
+      "sizes": "Sizes (bytes, newest first): {sizes}",
+      "discard": "Discard",
+      "discarding": "Discarding…",
+      "confirmDiscard": "Discard every unreadable entry? They cannot be recovered afterwards.",
+      "discarded": "Discarded {count} unreadable entr(ies)"
     }
   },
   "webhookEvents": {

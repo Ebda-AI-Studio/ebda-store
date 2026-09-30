@@ -1,6 +1,6 @@
 # Abandoned Cart Recovery Implementation Plan
 
-> **Superseded in part (2026-10-01, issue 2035, owner decision):** the signed recovery link (`/cart?recover=&sig=`) and the public `…/cart/recover/:id` endpoint were removed — nothing on the storefront consumed them. Reminders link to the store's plain `/cart`; the abandoned-cart report keeps its counts but shows recovery figures as _not tracked_ (`null`), since nothing attributes an order to a reminder.
+> **Superseded in part (2026-10-01, issue 2035, owner decision):** the signed recovery link (`/cart?recover=&sig=`) and the public `…/cart/recover/:id` endpoint were removed — nothing on the storefront consumed them. Reminders link to the store's plain `/cart`; the abandoned-cart report keeps its counts. **Corrected 2026-10-01 (issue 2356):** its recovery figures are real — `OrderService.createOrder` marks the open abandoned cart for the same cart or customer `recovered` inside the order transaction — but they are last-touch ("ordered later"), not reminder-attributed, and are labelled that way.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

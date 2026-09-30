@@ -56,7 +56,7 @@ const CAMPAIGN_STATUS_COLORS = {
   sending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
   sent: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   cancelled: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
-  failed: { bg: 'bg-destructive/5', text: 'text-destructive', dot: 'bg-destructive' },
+  failed: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
 } as const;
 
 // Known lastError codes the send job can leave behind (campaign-send.ts) —
@@ -237,7 +237,7 @@ export default function CampaignsListPage() {
                         {c.name}
                       </button>
                       {lastErrorText(c.lastError) && (
-                        <p className="mt-0.5 text-xs text-destructive">
+                        <p className="mt-0.5 text-xs text-destructive-ink">
                           {lastErrorText(c.lastError)}
                         </p>
                       )}

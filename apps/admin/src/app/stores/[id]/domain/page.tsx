@@ -287,7 +287,7 @@ export default function StoreDomainPage() {
                     placeholder={t('domainPlaceholder')}
                     className={`mt-1 ${domainError ? 'border-destructive' : ''}`}
                   />
-                  {domainError && <p className="mt-1 text-sm text-destructive">{domainError}</p>}
+                  {domainError && <p className="mt-1 text-sm text-destructive-ink">{domainError}</p>}
                   <p className="mt-1 text-xs text-muted-foreground">{t('domainRemoveHint')}</p>
                 </div>
                 <div className="flex gap-2">
@@ -445,7 +445,7 @@ export default function StoreDomainPage() {
                     )}
 
                     {isFullyLive && (
-                      <p className="text-sm text-success">{t('verifiedMessage', { domain })}</p>
+                      <p className="text-sm text-success-ink">{t('verifiedMessage', { domain })}</p>
                     )}
 
                     {/* www auto-attach feedback — the platform's
@@ -504,7 +504,7 @@ export default function StoreDomainPage() {
               </Badge>
             </div>
 
-            {emailSenderError && <p className="text-sm text-destructive">{emailSenderError}</p>}
+            {emailSenderError && <p className="text-sm text-destructive-ink">{emailSenderError}</p>}
 
             {!domainStatus?.emailSender?.domainId && domain && (
               <Button onClick={handleProvisionEmailSender} disabled={isProvisioningEmail}>

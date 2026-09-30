@@ -202,7 +202,7 @@ export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
 
           {deliveryNotes && (
             <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-warning mb-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-warning-ink mb-1">
                 {t('customerNotes')}
               </div>
               <div className="text-sm text-foreground whitespace-pre-wrap break-words">

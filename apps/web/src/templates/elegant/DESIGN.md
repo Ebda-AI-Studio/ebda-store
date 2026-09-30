@@ -30,7 +30,7 @@ Elegant relies on a near-monochromatic palette dominated by `--foreground` and i
 - **Page** (`--background` / white default): The dominant surface — hero, header, product grid, cart, form, empty state all sit on `--background`.
 - **Footer / Newsletter** (`bg-muted`): A soft tint that distinguishes the footer block. Inside the newsletter row, individual fields go back to `bg-background`.
 - **Product Image Background** (`bg-gray-50` hardcoded in ProductCard, `bg-muted/30` on cart thumbs): A near-white surface that lets shot-on-white product photography blend seamlessly. Elegant uses Tailwind's `bg-gray-50` here intentionally (not `bg-muted`) to keep image bg colors consistent across tenant theme overrides.
-- **Subtle decorative rings** (no-image hero): Concentric `border border-primary/5` and `border border-primary/8` rings at 700px / 450px diameter, centered.
+- **Subtle decorative rings** (no-image hero): Concentric `border border-primary/5` and plain `border` rings (the inner ring's old `border-primary/8` emitted no CSS — issue 2342) at 700px / 450px diameter, centered.
 
 ### Text & Content
 

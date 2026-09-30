@@ -149,10 +149,10 @@ export function ProductInfoSections({
             <p
               className={`mt-1 text-lg font-semibold ${
                 onHand <= 0
-                  ? 'text-destructive'
+                  ? 'text-destructive-ink'
                   : onHand <= product.lowStockThreshold
-                    ? 'text-warning'
-                    : 'text-success'
+                    ? 'text-warning-ink'
+                    : 'text-success-ink'
               }`}
             >
               {tFields('stockInStock', { count: onHand })}

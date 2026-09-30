@@ -118,15 +118,12 @@ else
   # fetch-depth:0). Accepts "base..head", "base...head", or a single ref.
   PR_LABEL="$REPO_SLUG@$PR_REF"
   _diff_root="${REPO_ROOT_OVERRIDE:-.}"
-  if [[ "$PR_REF" == *..* ]]; then
-    _base_ref="${PR_REF%%..*}"
-    _head_ref="${PR_REF##*..}"
-    _read_lines_into_array CHANGED_FILES \
-      git -C "$_diff_root" diff --name-only "$_base_ref" "$_head_ref"
-  else
-    _read_lines_into_array CHANGED_FILES \
-      git -C "$_diff_root" diff --name-only "$PR_REF"
-  fi
+  # PR_REF goes to git as ONE argument (issue 2338, same class as #1763 in
+  # scoped-audit.sh): splitting "base...head" on `..` into two positional refs
+  # collapsed three-dot (merge-base) semantics to a direct two-commit diff, so
+  # a PR merely BEHIND main reported every main-only file as its own change.
+  _read_lines_into_array CHANGED_FILES \
+    git -C "$_diff_root" diff --name-only "$PR_REF"
 fi
 
 # bash 3.2 (macOS) errors on "${arr[@]}" when arr is empty under `set -u`.

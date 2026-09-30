@@ -147,6 +147,8 @@ At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastru
 
 **Step volume:** Order created → 5 steps fanout. At 10k MAU: 100 merchants × 20 orders/day × 5 = 10K steps/day = **300K/mo** → 6× free cap. At 10 active merchants × 20 orders × 5 = 30K/mo (near free cap).
 
+**Nightly analytics rollup (issue 2348, 2026-10-01):** 3 steps per accounting-enabled store (cohort, funnel, RFM each in its own step since issue 2293 — 3× the old single step) plus 1 + ceil(N/500) on the fan-out cron. At 200 stores: ~601 steps/night ≈ **18K/mo** — about a third of the free cap on its own. Each store runs in its own function run (≤3 at a time), so no single run grows with the store count.
+
 **Bulk AI sweeps wildcard:** 100 merchants × 200 products = 20K steps in one sweep. At 10k MAU during active-adoption period → 2M steps/mo → Pro required.
 
 | Scenario                                     | Inngest cost                |

@@ -29,6 +29,12 @@
  *   node scripts/check-migration-order.mjs --base <git-ref>
  *   node scripts/check-migration-order.mjs --fetch             # refresh origin/main first
  *     (shallow --depth=1 only when CI=true AND GITHUB_ACTIONS=true — see fetchArgs)
+ *   node scripts/check-migration-order.mjs --fetch --base <40-hex sha>
+ *     post-merge arm (issue 2355): on a push to main, CI passes the PRE-push tip
+ *     (`github.event.before`), fetched by sha, so the just-merged folders are the
+ *     "added" set and one that sorts at/before the previous newest fails ON MAIN.
+ *     The PR-time arm alone cannot see two PRs that each passed against the same
+ *     old main and then both merged.
  *   node scripts/check-migration-order.mjs --migrations-dir <path>
  *
  * Exit 0 = clean, 1 = a violation, 2 = could not read the base (fail closed).
@@ -141,16 +147,21 @@ export function checkMigrationOrder({
  * both times with the grafted commit equal to origin/main's tip at the moment,
  * i.e. the CI step's own `git fetch --depth=1 origin main` run outside CI.
  */
-export function fetchArgs(env = process.env) {
+export function fetchArgs(env = process.env, baseRef = 'origin/main') {
   const inActions = env.CI === 'true' && env.GITHUB_ACTIONS === 'true';
   return [
     'fetch',
     '--no-tags',
     ...(inActions ? ['--depth=1'] : []),
     'origin',
-    '+refs/heads/main:refs/remotes/origin/main',
+    // A commit sha (the post-merge arm's pre-push tip) is fetched by id — no
+    // refspec, so no local ref is written or moved. Anything else refreshes main.
+    SHA_RE.test(baseRef) ? baseRef : '+refs/heads/main:refs/remotes/origin/main',
   ];
 }
+
+const SHA_RE = /^[0-9a-f]{40}$/;
+const ZERO_SHA = /^0{40}$/;
 
 function listHead(dir) {
   return readdirSync(dir).filter(n => statSync(path.join(dir, n)).isDirectory());
@@ -176,10 +187,16 @@ function main(argv) {
   const baseRef = val('base') ?? 'origin/main';
   const dir = val('migrations-dir') ?? DEFAULT_MIGRATIONS_DIR;
 
+  if (ZERO_SHA.test(baseRef)) {
+    // A push event whose `before` is all zeros has no previous tip to compare
+    // against — fail CLOSED rather than compare nothing and print "clean".
+    console.error(`migration-order: base ${baseRef} is the null sha — nothing to compare against`);
+    return 2;
+  }
   if (argv.includes('--fetch')) {
-    const f = spawnSync('git', fetchArgs(), { encoding: 'utf8' });
+    const f = spawnSync('git', fetchArgs(process.env, baseRef), { encoding: 'utf8' });
     if (f.status !== 0) {
-      console.error(`migration-order: cannot fetch origin/main — ${(f.stderr || '').trim()}`);
+      console.error(`migration-order: cannot fetch ${baseRef} — ${(f.stderr || '').trim()}`);
       return 2;
     }
   }

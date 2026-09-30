@@ -174,6 +174,97 @@ describe('ci.yml runs the gate on every PR', () => {
     // `git fetch --depth` a person or agent can copy into the shared repo.
     expect(run).not.toMatch(/git fetch/);
   });
+
+  it('issue 2355: on a push to main it compares against the PRE-push tip, not origin/main', () => {
+    const ci = yaml.load(readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8')) as {
+      jobs: Record<string, { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> }>;
+    };
+    const step = ci.jobs.lint.steps.find(s => s.name === 'Migration ordering gate')!;
+    expect(step.env?.BEFORE_SHA).toBe('${{ github.event.before }}');
+    expect(step.run).toMatch(
+      /if \[ "\$EVENT_NAME" = "push" \]; then\s+node scripts\/check-migration-order\.mjs --fetch --base "\$BEFORE_SHA"/
+    );
+  });
+});
+
+describe('post-merge arm (issue 2355): two PRs that each passed against the same old main', () => {
+  const dirs: string[] = [];
+  afterAll(() => dirs.forEach(d => rmSync(d, { recursive: true, force: true })));
+
+  /**
+   * origin: main has MAIN. PR A adds 20261002090000_a_new, PR B adds
+   * 20261002080000_b_new; both sort after main's newest, so each passes its
+   * PR-time check. A merges, then B. On B's push the pre-push tip (A's merge)
+   * already holds A's later folder, so B's must fail.
+   */
+  function pushed(second: string) {
+    const env = cleanEnv();
+    delete env.CI;
+    delete env.GITHUB_ACTIONS;
+    const root = mkdtempSync(path.join(tmpdir(), 'mig-post-'));
+    dirs.push(root);
+    const sh = (cwd: string, ...a: string[]) => {
+      const r = spawnSync('git', a, { cwd, env, encoding: 'utf8' });
+      if (r.status !== 0) throw new Error(`git ${a.join(' ')}: ${r.stderr}`);
+      return r.stdout.trim();
+    };
+    const add = (dir: string, name: string) => {
+      mkdirSync(path.join(dir, MIG, name), { recursive: true });
+      writeFileSync(path.join(dir, MIG, name, 'migration.sql'), 'SELECT 1;\n');
+    };
+    const src = path.join(root, 'src');
+    mkdirSync(src);
+    sh(src, 'init', '-q', '-b', 'main');
+    sh(src, 'config', 'user.email', 't@t.com');
+    sh(src, 'config', 'user.name', 't');
+    MAIN.forEach(n => add(src, n));
+    sh(src, 'add', '.');
+    sh(src, 'commit', '-q', '-m', 'base');
+    add(src, '20261002090000_a_new');
+    sh(src, 'add', '.');
+    sh(src, 'commit', '-q', '-m', 'merge A');
+    const before = sh(src, 'rev-parse', 'HEAD');
+    add(src, second);
+    sh(src, 'add', '.');
+    sh(src, 'commit', '-q', '-m', 'merge B');
+    const work = path.join(root, 'work');
+    sh(root, 'clone', '-q', `file://${src}`, work);
+    const gate = (base: string) =>
+      spawnSync('node', [SCRIPT, '--fetch', '--base', base], { cwd: work, env, encoding: 'utf8' });
+    return { gate, before };
+  }
+
+  it('fails on main when the second merge sorts before the first', () => {
+    const { gate, before } = pushed('20261002080000_b_new');
+    const r = gate(before);
+    expect(r.status, r.stdout).toBe(1);
+    expect(r.stderr).toMatch(/20261002080000_b_new: timestamp .* does not sort after .*20261002090000_a_new/);
+  });
+
+  it('control: the PR-time arm (origin/main = the pushed commit) compares nothing and passes', () => {
+    const { gate } = pushed('20261002080000_b_new');
+    const r = gate('origin/main');
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/0 new vs origin\/main/);
+  });
+
+  it('passes on main when the second merge sorts after the first', () => {
+    const { gate, before } = pushed('20261002100000_b_new');
+    const r = gate(before);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/1 new vs [0-9a-f]{40} \(20261002100000_b_new\)/);
+  });
+
+  it('fails CLOSED on the null sha', () => {
+    const { gate } = pushed('20261002100000_b_new');
+    expect(gate('0'.repeat(40)).status).toBe(2);
+  });
+
+  it('fetchArgs fetches a sha by id (no refspec) and keeps depth Actions-only', () => {
+    const sha = 'a'.repeat(40);
+    expect(fetchArgs({}, sha)).toEqual(['fetch', '--no-tags', 'origin', sha]);
+    expect(fetchArgs({ CI: 'true', GITHUB_ACTIONS: 'true' }, sha)).toContain('--depth=1');
+  });
 });
 
 describe('the gate never makes a developer/agent repo shallow (2026-09-30, twice)', () => {

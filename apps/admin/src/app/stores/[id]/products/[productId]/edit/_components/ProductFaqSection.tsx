@@ -303,7 +303,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
           <>
             <p className="mb-4 text-xs text-muted-foreground">{t('description')}</p>
 
-            {loadError && <p className="mb-4 text-sm text-destructive">{t('loadError')}</p>}
+            {loadError && <p className="mb-4 text-sm text-destructive-ink">{t('loadError')}</p>}
 
             {/* AI draft rows */}
             {aiDrafts.length > 0 && (

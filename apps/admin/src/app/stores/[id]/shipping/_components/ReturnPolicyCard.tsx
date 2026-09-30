@@ -123,8 +123,8 @@ export function ReturnPolicyCard({ storeId }: { storeId: string }) {
         >
           {saving ? t('saving') : t('save')}
         </button>
-        {saved && <span className="text-xs text-success">{t('saved')}</span>}
-        {error && <span className="text-xs text-destructive">{error}</span>}
+        {saved && <span className="text-xs text-success-ink">{t('saved')}</span>}
+        {error && <span className="text-xs text-destructive-ink">{error}</span>}
       </div>
     </div>
   );

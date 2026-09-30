@@ -636,7 +636,7 @@ export default function StoreSettingsPage() {
 
           {/* Danger Zone */}
           <div>
-            <h2 className="mb-3 font-semibold text-destructive">
+            <h2 className="mb-3 font-semibold text-destructive-ink">
               {t('superAdmin.dangerZoneTitle')}
             </h2>
             <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">

@@ -184,7 +184,7 @@ export async function invalidateStoreCategoriesCaches(storeId: string): Promise<
  * order path ({@link invalidateStoreProductCachesAfterOrder}) — both funnel
  * through here so the bundle-list bust below can't be forgotten by either.
  */
-async function clearProductsRedis(storeId: string): Promise<void> {
+export async function clearProductsRedis(storeId: string): Promise<void> {
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   await invalidateCachedPrefix(`public:product:${storeId}:`);
   await invalidateCachedPrefix(`public:suggest:${storeId}:`);
