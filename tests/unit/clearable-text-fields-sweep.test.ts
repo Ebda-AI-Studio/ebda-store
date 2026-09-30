@@ -27,6 +27,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     coupon: { findFirst: vi.fn(), update: vi.fn() },
     taxRate: { findFirst: vi.fn(), update: vi.fn() },
+    supplier: { findFirst: vi.fn(), update: vi.fn() },
   },
 }));
 
@@ -298,6 +299,101 @@ describe('PUT /stores/:storeId/tax/rates/:id — an emptied tax-rate field clear
 
     expect(res.status).toBe(200);
     expect(mockPrisma.taxRate.update.mock.calls[0][0].data.country).toBeUndefined();
+  });
+});
+
+// ─── Suppliers — apps/api/src/routes/suppliers.routes.ts ─────────────────────
+//
+// The half-fixed surface: the admin form was moved onto `textFieldValue(x,
+// 'update')` (so an emptied field sends a clearing `null`) while the route kept
+// `createSchema.partial()`, whose fields are `.optional()` but NOT
+// `.nullable()`. Zod rejects null there, so the PATCH 422'd — and because most
+// suppliers legitimately have no Arabic name or notes, that broke EVERY
+// supplier edit, not just the clear. A caller-side gate
+// (check-update-payload-clear.mjs) cannot see this; only the receiving schema
+// can be asked whether it accepts what the form now sends.
+
+describe('PATCH /stores/:storeId/suppliers/:id — an emptied supplier field clears', () => {
+  let app: Express;
+
+  beforeAll(async () => {
+    const { default: supplierRouter } = await import('@api/routes/suppliers.routes');
+    const { errorHandler } = await import('@api/middleware/error-handler');
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/stores', supplierRouter);
+    app.use(errorHandler);
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.supplier.findFirst.mockResolvedValue({ id: 'supplier-1' });
+    mockPrisma.supplier.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'supplier-1', ...data })
+    );
+  });
+
+  const NULLABLE_FIELDS = ['nameAr', 'contactName', 'phone', 'email', 'notes', 'notesAr'] as const;
+
+  for (const field of NULLABLE_FIELDS) {
+    it(`accepts null for ${field} and writes null`, async () => {
+      const res = await request(app)
+        .patch(`/api/v1/stores/${STORE_ID}/suppliers/supplier-1`)
+        .send({ [field]: null });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.supplier.update.mock.calls[0][0].data[field]).toBeNull();
+    });
+  }
+
+  it("accepts the edit form's full clear-on-empty payload (the 422 that broke every edit)", async () => {
+    // Verbatim shape of the page's payload for an existing supplier whose
+    // optional fields are blank — the common case, and the one that 422'd.
+    const res = await request(app).patch(`/api/v1/stores/${STORE_ID}/suppliers/supplier-1`).send({
+      name: 'Al-Mutlaq Trading',
+      nameAr: null,
+      contactName: null,
+      phone: null,
+      email: null,
+      paymentTerms: 'net30',
+      leadTimeDays: 14,
+      notes: null,
+      notesAr: null,
+    });
+
+    expect(res.status).toBe(200);
+    const written = mockPrisma.supplier.update.mock.calls[0][0].data;
+    expect(written.leadTimeDays).toBe(14);
+    for (const field of NULLABLE_FIELDS) expect(written[field]).toBeNull();
+  });
+
+  it('leaves the stored value alone when the key is omitted', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/stores/${STORE_ID}/suppliers/supplier-1`)
+      .send({ isActive: false });
+
+    expect(res.status).toBe(200);
+    const written = mockPrisma.supplier.update.mock.calls[0][0].data;
+    for (const field of NULLABLE_FIELDS) expect(written[field]).toBeUndefined();
+  });
+
+  it('still rejects null for the required name, and still validates a real email', async () => {
+    // Nullability was widened field-by-field, not by dropping validation.
+    const nulledName = await request(app)
+      .patch(`/api/v1/stores/${STORE_ID}/suppliers/supplier-1`)
+      .send({ name: null });
+    expect(nulledName.status).toBe(422);
+
+    const badEmail = await request(app)
+      .patch(`/api/v1/stores/${STORE_ID}/suppliers/supplier-1`)
+      .send({ email: 'not-an-email' });
+    expect(badEmail.status).toBe(422);
+
+    const goodEmail = await request(app)
+      .patch(`/api/v1/stores/${STORE_ID}/suppliers/supplier-1`)
+      .send({ email: 'sales@almutlaq.com.kw' });
+    expect(goodEmail.status).toBe(200);
+    expect(mockPrisma.supplier.update.mock.calls[0][0].data.email).toBe('sales@almutlaq.com.kw');
   });
 });
 

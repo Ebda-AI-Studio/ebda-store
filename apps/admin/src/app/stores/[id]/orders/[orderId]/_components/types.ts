@@ -115,6 +115,10 @@ export interface OrderDetail {
    * the merchant can see how much a customer saved by buying the bundle.
    */
   bundleDiscount?: number;
+  /** Loyalty-redemption portion of `discount`, and how many points funded it
+   *  (null/0 when no redemption applied). #197. */
+  loyaltyDiscount?: number;
+  loyaltyPointsRedeemed?: number | null;
   notes: string | null;
   customerNotes: string | null;
   shippingAddress: AddressJson | null;

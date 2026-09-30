@@ -78,9 +78,15 @@ const UNREVIEWED_PREDATING_THIS_REGISTRY: Record<string, number> = {
   'inventory.routes.ts': 6,
   // The accounting / finance / insights surfaces (alert-webhooks, backorders,
   // expenses, finance, insights, purchase-orders, smart-layer,
-  // stock-adjustments, suppliers) and payment-links.routes.ts were migrated
-  // onto the standard `{ success: false, error: { code, message, details? } }`
-  // envelope in #1829 and removed from this list.
+  // stock-adjustments, suppliers) and payment-links.routes.ts shared a
+  // DIFFERENT convention — a flat lower-case discriminant
+  // (`{ error: 'not_found' }`, `{ error: 'validation_failed', details }`) —
+  // and were migrated onto the standard
+  // `{ success: false, error: { code, message, details? } }` envelope in
+  // #1829, so they are removed from this list rather than merely reasoned
+  // about. See docs/RULINGS.md Ruling P2-B8-1's correction for why the
+  // "their own pages read it as a string" deferral did not hold for most of
+  // this group in the first place.
 };
 
 function routeFiles(dir: string, rel = ''): string[] {

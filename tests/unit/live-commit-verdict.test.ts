@@ -155,4 +155,23 @@ describe('the workflow captures the parser status instead of dying on it', () =>
       expect(a, `unguarded substitution under bash -e: ${a.trim().slice(0, 60)}`).toMatch(/\|\|/);
     }
   });
+
+  it('#1519: body and code come from ONE request, not two independent curls', () => {
+    const step = workflow.slice(
+      workflow.indexOf('Verify the deployed build is THIS commit'),
+      workflow.indexOf('Verify guest checkout is still admitted')
+    );
+    const curlCalls = step.match(/curl\s/g) ?? [];
+    expect(
+      curlCalls.length,
+      'more than one curl call per poll reintroduces the two-request race ' +
+        '(a body fetched at one instant, a status code fetched moments ' +
+        'later) that let a perfectly healthy poll read as UNREADABLE'
+    ).toBe(1);
+    // The single curl must emit BOTH the body and the status code, and code/
+    // body must both be derived from that same captured response.
+    expect(step).toMatch(/curl\s+-s[^\n]*-w\s+'\\n%\{http_code\}'/);
+    expect(step).toMatch(/code="\$\(printf '%s' "\$resp"/);
+    expect(step).toMatch(/body="\$\(printf '%s' "\$resp"/);
+  });
 });

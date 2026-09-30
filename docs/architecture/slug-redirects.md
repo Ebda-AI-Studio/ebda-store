@@ -123,6 +123,29 @@ soft-404, invisible to monitoring and useless to users). That is removed:
 `type: 'product'` and `type: 'blog'` now call `notFound()` when there is no
 redirect hit, producing a real 404.
 
+## Admin surface — list + delete (#903)
+
+Added 2026-09-25: the data model had no admin UI at all, so a merchant could
+not see or remove a spuriously-captured bulk-import alias, or a stale
+redirect blocking an old slug being re-purposed for something new.
+
+- **API** — `apps/api/src/routes/slug-redirects.routes.ts`:
+  `GET /stores/:storeId/slug-redirects?q=` (list, newest first, 200 per
+  request — hard ceiling 500 — returned as `{ rows, total, limit }` so the UI
+  can say "showing 200 of N"; `q` filters by a case-insensitive fragment of
+  either slug, so a row past the cap is still findable)
+  and `DELETE /stores/:storeId/slug-redirects/:id` (delete scoped to BOTH
+  `id` and `storeId`, so a merchant cannot delete another tenant's row).
+  `authenticate → authorize('store_admin','super_admin') → requireStoreAccess`,
+  same order as every other admin route. Backed by `listSlugRedirects` /
+  `deleteSlugRedirect` in `slug-redirect.service.ts`.
+- **Admin UI** — `/stores/[id]/seo/redirects`, linked from the main SEO
+  settings page. Search box, a "showing the newest N of M" notice whenever
+  rows were withheld, and errors as a banner above the table (a failed
+  delete never unmounts it; a failed load offers a retry). **Read + delete only** — there is deliberately no
+  create/edit form, since rows are written exclusively by
+  `recordSlugRedirect` alongside the entity rename that produced them.
+
 ## What's excluded
 
 - **`SlugEntityType.PAGE`** — CMS `StorePage` rows are looked up by slug via

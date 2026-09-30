@@ -65,22 +65,19 @@ function baseOrder(
   };
 }
 
-// DataTable renders BOTH the desktop `<table>` and the mobile card layout
-// into the DOM at once (a CSS media query hides one — jsdom doesn't apply
-// CSS), so the status `<select>` for a given order exists twice. Assert
-// every instance agrees, then return the shared option list.
+// DataTable renders exactly ONE tree (issues 1929/1931: `useSyncExternalStore`
+// over `matchMedia`). jsdom has no `matchMedia`, so it resolves to the MOBILE
+// card layout only and a single-order table has exactly one status
+// `<select>`. The count is asserted so a regression that re-mounts both trees
+// goes red rather than being absorbed; the desktop `<table>` path is not
+// exercised by this file.
 function statusOptionValues(): string[] {
   const selects = screen.getAllByLabelText('actions.updateStatusLabel') as HTMLSelectElement[];
-  const lists = selects.map(select =>
-    within(select)
-      .getAllByRole('option')
-      .map(o => (o as HTMLOptionElement).value)
-      .filter(v => v !== '')
-  );
-  for (const list of lists) {
-    expect(list).toEqual(lists[0]);
-  }
-  return lists[0];
+  expect(selects).toHaveLength(1);
+  return within(selects[0])
+    .getAllByRole('option')
+    .map(o => (o as HTMLOptionElement).value)
+    .filter(v => v !== '');
 }
 
 function renderTable(orders: Order[]) {

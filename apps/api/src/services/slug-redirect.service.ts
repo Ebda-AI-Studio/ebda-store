@@ -1,4 +1,5 @@
-import { DbClient, SlugEntityType, prisma } from '@force/database';
+import { DbClient, Prisma, SlugEntityType, prisma } from '@force/database';
+import { AppError } from '../middleware/error-handler';
 import { BoundedMap } from '../lib/bounded-map';
 
 /**
@@ -62,6 +63,63 @@ export async function resolveSlugRedirect(
   return current;
 }
 
+/** Rows returned per list request, and the most a caller may ask for. */
+export const SLUG_REDIRECT_LIST_LIMIT = 200;
+export const SLUG_REDIRECT_LIST_MAX = 500;
+
+/**
+ * List a store's redirects, newest first, capped — this table has no admin
+ * UI other than this list (#903), so it is read-only apart from the delete
+ * below; there is no create/edit path because rows are written exclusively
+ * by `recordSlugRedirect` alongside the entity rename that produced them.
+ *
+ * Returns the TOTAL alongside the capped page (scoped audit, PR 1978): a bulk
+ * import writes hundreds of rows at once, and a silently-capped list reads as
+ * "that redirect does not exist" to a merchant hunting an older one. `q`
+ * narrows by a case-insensitive substring of either slug so a row past the
+ * cap is still findable.
+ */
+export async function listSlugRedirects(
+  storeId: string,
+  opts: { q?: string; limit?: number } = {}
+) {
+  const limit = Math.min(opts.limit ?? SLUG_REDIRECT_LIST_LIMIT, SLUG_REDIRECT_LIST_MAX);
+  const q = opts.q?.trim();
+  const where: Prisma.SlugRedirectWhereInput = {
+    storeId,
+    ...(q
+      ? {
+          OR: [
+            { fromSlug: { contains: q, mode: 'insensitive' } },
+            { toSlug: { contains: q, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+  };
+  // Sequential, not Promise.all: inside the request's tenant transaction both
+  // run on one connection anyway.
+  const rows = await prisma.slugRedirect.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+  const total = await prisma.slugRedirect.count({ where });
+  return { rows, total, limit };
+}
+
+/**
+ * Delete one redirect row, scoped to the caller's store so a merchant can
+ * never delete another tenant's row by guessing an id (#903). Used for a
+ * spuriously-captured bulk-import alias, or when an old slug is being
+ * re-purposed for something new and the stale redirect would otherwise win.
+ */
+export async function deleteSlugRedirect(storeId: string, id: string): Promise<void> {
+  const { count } = await prisma.slugRedirect.deleteMany({ where: { id, storeId } });
+  if (count === 0) {
+    throw new AppError(404, 'NOT_FOUND', 'Slug redirect not found');
+  }
+}
+
 /**
  * Short in-process cache in front of `resolveSlugRedirect` for the public
  * `GET /public/redirects/resolve` endpoint (#904).
@@ -73,8 +131,10 @@ export async function resolveSlugRedirect(
  *
  * Staleness class: BOUNDED. A redirect recorded by a rename becomes visible
  * within REDIRECT_CACHE_TTL_MS; until then the old slug keeps its 404 (the
- * pre-redirect behaviour). A slug that is live again never reaches this path
- * — the storefront only asks after its own product lookup missed. In-memory
+ * pre-redirect behaviour). Symmetrically, a row removed by `deleteSlugRedirect`
+ * keeps resolving for up to the same window on each instance (a per-instance
+ * map cannot be invalidated across instances). A slug that is live again never
+ * reaches this path — the storefront only asks after its own product lookup missed. In-memory
  * (bounded-map), per API instance, because the Redis TTL floor is 120s.
  */
 export const REDIRECT_CACHE_TTL_MS = 60_000;

@@ -33,7 +33,7 @@ const createCategorySchema = z.object({
   showOnHomeStrip: z.boolean().optional(),
 });
 
-const updateCategorySchema = z.object({
+export const updateCategorySchema = z.object({
   name: z.string().min(1).max(255).optional(),
   nameAr: z.string().max(255).optional().nullable(),
   slug: z

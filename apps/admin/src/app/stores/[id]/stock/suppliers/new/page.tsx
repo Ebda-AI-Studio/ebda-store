@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { HelpTip } from '@/components/HelpTip';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPatch } from '@/lib/api';
+import { textFieldValue } from '@/lib/form-text';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,18 +92,25 @@ export default function NewSupplierPage() {
     setSubmitting(true);
     setError(null);
 
+    // textFieldValue sends `null` on update (clears the stored value) and
+    // `undefined` on create (nothing to clear yet) — this page shares one
+    // payload between apiPost (create) and apiPatch (edit) below, so a plain
+    // `X || undefined` made clearing any of these fields on an existing
+    // supplier impossible (#1576, the same class as the shipped
+    // order-invoice-email bug).
+    const intent = isEdit ? 'update' : 'create';
     const payload = {
       name: name.trim(),
-      nameAr: nameAr.trim() || undefined,
-      contactName: contactName.trim() || undefined,
-      phone: phone.trim() || undefined,
-      email: email.trim() || undefined,
+      nameAr: textFieldValue(nameAr.trim(), intent),
+      contactName: textFieldValue(contactName.trim(), intent),
+      phone: textFieldValue(phone.trim(), intent),
+      email: textFieldValue(email.trim(), intent),
       paymentTerms,
       customTermsDays:
         paymentTerms === 'custom' && customTermsDays ? parseInt(customTermsDays) : undefined,
       leadTimeDays: leadTimeDays ? parseInt(leadTimeDays) : 7,
-      notes: notes.trim() || undefined,
-      notesAr: notesAr.trim() || undefined,
+      notes: textFieldValue(notes.trim(), intent),
+      notesAr: textFieldValue(notesAr.trim(), intent),
     };
 
     try {

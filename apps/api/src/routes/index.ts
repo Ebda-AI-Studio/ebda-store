@@ -62,6 +62,7 @@ import stockAdjustmentsRoutes from './stock-adjustments.routes';
 import warehouseRoutes from './warehouse.routes';
 import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
+import slugRedirectsRoutes from './slug-redirects.routes';
 import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
@@ -397,6 +398,11 @@ router.use('/stores', tenantContext, expensesRoutes);
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service
 // already self-manages tenant context per-query (see financeRoutes note).
 router.use('/stores', tenantContext, backordersRoutes);
+
+// Slug redirect list + delete (#903): read/delete admin surface for
+// SlugRedirect rows (recordSlugRedirect is the sole writer — see
+// docs/architecture/slug-redirects.md).
+router.use('/stores', tenantContext, slugRedirectsRoutes);
 
 // Phase 5 bot intelligence: proxy bot analytics from WBS to admin frontend.
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the handler

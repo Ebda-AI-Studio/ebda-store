@@ -1,15 +1,17 @@
-// READ-ONLY (spec §5 gate): wadyaljuz's resolved layout must be byte-identical
-// before/after Phase 2. palora is logged but NOT gated (adopts minimal baseline).
+// READ-ONLY (spec §5 gate): wady-aljuz's and pecannbee's resolved layouts must
+// be byte-identical before/after Phase 2 (#648: pecannbee added to the gate,
+// not just the query — see GATED_STORE_IDS below). palora is logged but NOT
+// gated (adopts minimal baseline).
 //   run:  node packages/database/scripts/verify-baseline-nodrift.mjs
 import { PrismaClient } from '@prisma/client';
 import { resolveLayoutSettings } from '@force/shared';
-
-const prisma = new PrismaClient();
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Recursively sort object keys so the comparison is INSENSITIVE to key order
 // (the merge spreads keys in a different order before vs after, but key order
 // is irrelevant to rendering — components read by name — and to caching).
-function canonical(v) {
+export function canonical(v) {
   if (Array.isArray(v)) return v.map(canonical);
   if (v && typeof v === 'object') {
     const out = {};
@@ -19,57 +21,84 @@ function canonical(v) {
   return v;
 }
 
-function deepEqual(a, b) {
+export function deepEqual(a, b) {
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
 
-const stores = await prisma.store.findMany({
-  // wady-aljuz + pecannbee (id-pinned; slug may change at domain cutover) are
-  // LIVE CLIENT STORES — their resolved layout must never drift (2026-07-12).
-  where: {
-    OR: [
-      { slug: { in: ['wady-aljuz', 'palora'] } },
-      { id: '359afc1f-ea5b-4f8d-b372-c038c6c057f7' },
-    ],
-  },
-  select: { id: true, slug: true, template: true, layoutSettings: true },
-});
+// GATED_STORE_IDS pins pecannbee by id (its slug may change at the domain
+// cutover — see the query comment); GATED_STORE_SLUGS pins wady-aljuz, whose
+// slug is stable. Both LIVE CLIENT STORES' resolved layout must never drift
+// (2026-07-12). One predicate drives BOTH the query and the gating decision
+// below (#648) so the two can no longer diverge the way they did when
+// pecannbee was added to the query but not to the gate: it fell into the
+// `else` (not-gated) branch, so `failed` was never set no matter how far its
+// layout drifted, and the log mislabelled it "palora" — a resolved-layout
+// regression on a live client store would have passed CI silently.
+const GATED_STORE_IDS = new Set(['359afc1f-ea5b-4f8d-b372-c038c6c057f7']); // pecannbee
+const GATED_STORE_SLUGS = new Set(['wady-aljuz']);
+export function isGated(s) {
+  return GATED_STORE_SLUGS.has(s.slug) || GATED_STORE_IDS.has(s.id);
+}
 
-let failed = false;
-for (const s of stores) {
-  const saved = s.layoutSettings ?? {};
-  const before = resolveLayoutSettings(saved); // legacy (no templateId)
-  const after = resolveLayoutSettings(saved, s.template); // phase 2
-  const same = deepEqual(before, after);
-  if (s.slug === 'wady-aljuz') {
-    console.log(`wady-aljuz [${s.template}] no-drift: ${same ? 'PASS' : 'FAIL'}`);
-    if (!same) {
-      failed = true;
-      for (const k of Object.keys(after)) {
-        if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) {
-          console.error(`  DRIFT at "${k}"`);
-          console.error(`    before: ${JSON.stringify(before[k])}`);
-          console.error(`    after:  ${JSON.stringify(after[k])}`);
+// DB access lives behind this guard (not at module load) so the pure
+// functions above (canonical/deepEqual/isGated) can be imported and unit
+// tested without a live database connection.
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+async function main() {
+  const prisma = new PrismaClient();
+  const stores = await prisma.store.findMany({
+    where: {
+      OR: [
+        { slug: { in: [...GATED_STORE_SLUGS, 'palora'] } },
+        { id: { in: [...GATED_STORE_IDS] } },
+      ],
+    },
+    select: { id: true, slug: true, template: true, layoutSettings: true },
+  });
+
+  let failed = false;
+  const failedStores = [];
+  for (const s of stores) {
+    const saved = s.layoutSettings ?? {};
+    const before = resolveLayoutSettings(saved); // legacy (no templateId)
+    const after = resolveLayoutSettings(saved, s.template); // phase 2
+    const same = deepEqual(before, after);
+    if (isGated(s)) {
+      console.log(`${s.slug} [${s.template}] no-drift: ${same ? 'PASS' : 'FAIL'}`);
+      if (!same) {
+        failed = true;
+        failedStores.push(s.slug);
+        for (const k of Object.keys(after)) {
+          if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) {
+            console.error(`  DRIFT at "${k}"`);
+            console.error(`    before: ${JSON.stringify(before[k])}`);
+            console.error(`    after:  ${JSON.stringify(after[k])}`);
+          }
+        }
+        // keys present in one but not the other
+        for (const k of Object.keys(before)) {
+          if (!(k in after)) console.error(`  DROPPED key "${k}"`);
+        }
+        for (const k of Object.keys(after)) {
+          if (!(k in before)) console.error(`  ADDED key "${k}"`);
         }
       }
-      // keys present in one but not the other
-      for (const k of Object.keys(before)) {
-        if (!(k in after)) console.error(`  DROPPED key "${k}"`);
-      }
-      for (const k of Object.keys(after)) {
-        if (!(k in before)) console.error(`  ADDED key "${k}"`);
-      }
+    } else {
+      console.log(
+        `${s.slug} [${s.template}] adopts baseline (not gated): changed=${!same} (expected: true)`
+      );
     }
-  } else {
-    console.log(
-      `palora [${s.template}] adopts baseline (not gated): changed=${!same} (expected: true)`
-    );
   }
+
+  await prisma.$disconnect();
+  if (failed) {
+    console.error(`\nFAIL: ${failedStores.join(', ')} layout drifted — do not ship.`);
+    process.exit(1);
+  }
+  console.log('\nPASS: gated stores unchanged.');
 }
 
-await prisma.$disconnect();
-if (failed) {
-  console.error('\nFAIL: wadyaljuz layout drifted — do not ship.');
-  process.exit(1);
+if (isMain) {
+  await main();
 }
-console.log('\nPASS: wadyaljuz unchanged.');

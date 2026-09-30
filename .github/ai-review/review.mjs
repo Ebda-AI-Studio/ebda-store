@@ -117,9 +117,21 @@ try {
     comments,
   });
   if (!rv.ok) {
-    await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, {
+    const fallback = await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, {
       body: summary + (list ? `\n\n_(inline anchoring failed; findings below)_\n\n${list}` : ''),
     });
+    // Same class as audit.mjs's upsertMarkerComment (#1453): gh() only
+    // console.error()s a non-ok response, it never throws. If this fallback
+    // ALSO fails (rate limit, missing `pull-requests: write`), the review
+    // findings — including any critical ones about to block or auto-fix this
+    // PR — are silently unreported anywhere a human would see them.
+    if (!fallback.ok) {
+      console.error(
+        `::error::ai-review could not post its findings to the PR (review HTTP ${rv.status}, ` +
+          `fallback comment HTTP ${fallback.status}). ${critical.length} critical finding(s) ` +
+          `are unreported; only this job's log carries them.`
+      );
+    }
   }
 } catch (e) {
   console.error('GitHub API call failed (non-fatal, fail-open):', e.message);

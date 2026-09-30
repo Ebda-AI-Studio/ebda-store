@@ -110,6 +110,25 @@ jobs:
       admin: ${{ steps.f.outputs.admin }}
       orders: ${{ steps.f.outputs.orders }}
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Full history: the diff base is the last SUCCESSFUL deploy, which can
@@ -197,6 +216,25 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -221,8 +259,10 @@ jobs:
           # docs/migration/cf-opennext-hardening-plan.md.
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
         run: bash scripts/cf-setup-local.sh web
-      - name: Assert the generated worker config still carries the cache bindings
+      - name: Assert the generated worker config matches OPENNEXT_CACHE
         working-directory: apps/web
+        env:
+          OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
         # cf-setup-local.sh REWRITES open-next.config.ts and wrangler.jsonc from
         # scratch on every deploy, and its no-cache branch silently drops the tag
         # cache, the R2 incremental cache and their bindings. When that happens
@@ -231,14 +271,38 @@ jobs:
         # out the fetch TTL after each save while the pipeline stays green. That
         # is precisely how a D1 tag cache was committed, documented as REQUIRED
         # and never deployed. Fail loudly instead of deploying a silent no-op.
+        #
+        # Mode-aware (#1300), not an unconditional assert: cf-setup-local.sh's
+        # own else-branch writes `defineCloudflareConfig({})` and a
+        # wrangler.jsonc with no r2_buckets/durable_objects when OPENNEXT_CACHE
+        # is unset/false — its own comment calls that "DEFAULT = empty config =
+        # current behaviour, ZERO risk". An unconditional assert on the three
+        # cache tokens made that documented, intended fallback fail the ENTIRE
+        # web deploy job the moment the variable was unset, misspelled, or
+        # deliberately flipped off — turning the one escape hatch for a bad
+        # cache rollout into a way to lose the ability to deploy the storefront
+        # at all. Each branch below still catches a generator that silently
+        # drops or wrongly adds bindings for the mode that's actually active.
         run: |
-          grep -q 'NEXT_TAG_CACHE' wrangler.jsonc \
-            || { echo "::error::generated wrangler.jsonc has NO tag-cache binding — revalidateTag would be a silent no-op. Check OPENNEXT_CACHE and scripts/cf-setup-local.sh"; exit 1; }
-          grep -q 'NEXT_INC_CACHE_R2_BUCKET' wrangler.jsonc \
-            || { echo "::error::generated wrangler.jsonc has NO incremental-cache binding — ISR/SSG pages would revalidate from origin on every isolate"; exit 1; }
-          grep -q 'tagCache' open-next.config.ts \
-            || { echo "::error::generated open-next.config.ts declares no tagCache override — revalidateTag resolves to the dummy no-op"; exit 1; }
-          echo "cache bindings present in the config that will actually deploy"
+          if [ "$OPENNEXT_CACHE" = "true" ]; then
+            grep -q 'NEXT_TAG_CACHE' wrangler.jsonc \
+              || { echo "::error::OPENNEXT_CACHE=true but generated wrangler.jsonc has NO tag-cache binding — revalidateTag would be a silent no-op. Check scripts/cf-setup-local.sh"; exit 1; }
+            grep -q 'NEXT_INC_CACHE_R2_BUCKET' wrangler.jsonc \
+              || { echo "::error::OPENNEXT_CACHE=true but generated wrangler.jsonc has NO incremental-cache binding — ISR/SSG pages would revalidate from origin on every isolate"; exit 1; }
+            grep -q 'tagCache' open-next.config.ts \
+              || { echo "::error::OPENNEXT_CACHE=true but generated open-next.config.ts declares no tagCache override — revalidateTag resolves to the dummy no-op"; exit 1; }
+            echo "cache bindings present in the config that will actually deploy"
+          else
+            if grep -qE 'r2_buckets|durable_objects' wrangler.jsonc; then
+              echo "::error::OPENNEXT_CACHE is not 'true' but generated wrangler.jsonc still carries cache bindings — the generator did not produce the documented empty-cache fallback. Check scripts/cf-setup-local.sh"
+              exit 1
+            fi
+            if grep -q 'tagCache' open-next.config.ts; then
+              echo "::error::OPENNEXT_CACHE is not 'true' but generated open-next.config.ts still declares a tagCache override — the generator did not produce the documented empty-cache fallback."
+              exit 1
+            fi
+            echo "empty-cache fallback config present, as documented for OPENNEXT_CACHE unset/false"
+          fi
       - name: Write storefront public env (.env.production.local)
         # NEXT_PUBLIC_* are BUILD-TIME inlined; public values → repo variables,
         # with prod defaults so a missing var still builds.
@@ -319,6 +383,25 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -386,6 +469,25 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -463,6 +565,25 @@ jobs:
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 10
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

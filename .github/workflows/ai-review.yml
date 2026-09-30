@@ -21,6 +21,25 @@ jobs:
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
@@ -202,6 +221,12 @@ jobs:
           # workspace. Tracked modifications are what the fix actually made;
           # genuinely new files are added by name, and listed in the log so
           # the commit's contents are reviewable from the job output.
+          #
+          # No path restriction (#1758): the auto-fix's own allowedTools
+          # (Read/Grep/Glob/Edit/Write) are not scoped to apps/packages/tests/
+          # docs/scripts/.zap — a new file it created anywhere else
+          # (.github/ai-review/*.mjs, .husky/**, a new root config) was
+          # silently neither staged nor mentioned in the log.
           git add -u
           # Exclusion-based, not a hardcoded root list (#1758): the old
           # pathspec named exactly six roots (apps packages tests docs
@@ -232,16 +257,23 @@ jobs:
           fi
 
           cat /tmp/push-err
-          # Only ONE rejection is recoverable here: the workflows permission.
-          # Anything else (protected branch, auth failure, non-fast-forward) is
-          # a real failure and must stay red rather than be retried into a
-          # partial push that hides it.
-          if ! grep -q "without \`workflows\` permission" /tmp/push-err; then
+          # Only ONE rejection is recoverable here: missing the workflows
+          # scope on the token. Anything else (protected branch, auth failure,
+          # non-fast-forward) is a real failure and must stay red rather than
+          # be retried into a partial push that hides it.
+          #
+          # GitHub words this rejection differently depending on the token
+          # type (#1769): a GitHub App / fine-grained PAT is refused "without
+          # `workflows` permission" (plural), a classic PAT/OAuth App is
+          # refused "without `workflow` scope" (singular) — matching only the
+          # first left a classic-PAT AI_FIX_PAT treated as an unrecoverable
+          # failure instead of the same recoverable case.
+          if ! grep -qE "without \`workflows?\` (permission|scope)" /tmp/push-err; then
             echo "::error::Auto-fix push rejected for a reason other than the workflows permission — see above."
             exit 1
           fi
 
-          echo "::warning::AI_FIX_PAT cannot push .github/workflows/** (missing the 'workflows' permission)."
+          echo "::warning::AI_FIX_PAT cannot push .github/workflows/** (missing the 'workflows' permission/scope)."
           echo "::warning::Retrying WITHOUT the workflow changes so the rest of the fix is not lost."
           if [ -z "$WF_CHANGED" ]; then
             echo "::error::Push was refused for workflow permissions but no workflow file changed — nothing to drop."

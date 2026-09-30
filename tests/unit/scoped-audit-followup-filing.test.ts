@@ -150,6 +150,48 @@ describe('a single run cannot flood the tracker', () => {
     expect(r.toFile).toHaveLength(1);
     expect(r.overCap).toHaveLength(0);
   });
+
+  it('#1752: also caps the toComment (already-tracked-location) path', () => {
+    // Every entry below resolves to an already-open issue at the SAME
+    // location, so with no cap of its own every one would land in
+    // `toComment` — one paginated read plus one write each, unbounded.
+    const sameLocation = Array.from({ length: 5 }, (_, i) => ({
+      severity: 'P2',
+      title: `worded differently ${i}`,
+      dimension: 'security',
+      file: 'apps/api/src/services/order.service.ts',
+    }));
+    const fp = 'security|apps/api/src/services/order.service.ts';
+    const r = selectFollowupsToFile({
+      followups: sameLocation,
+      openTitles: new Set(),
+      openFingerprints: new Map([[fp, 4242]]),
+      cap: 10,
+      commentCap: 2,
+    });
+    expect(r.toComment).toHaveLength(2);
+    expect(r.overCap).toHaveLength(3);
+    expect(r.toFile).toHaveLength(0);
+    expect(r.toComment.length + r.overCap.length).toBe(sameLocation.length);
+  });
+
+  it('#1752: defaults commentCap to cap for an older caller that only passes cap', () => {
+    const sameLocation = Array.from({ length: 4 }, (_, i) => ({
+      severity: 'P2',
+      title: `worded differently ${i}`,
+      dimension: 'security',
+      file: 'apps/api/src/services/order.service.ts',
+    }));
+    const fp = 'security|apps/api/src/services/order.service.ts';
+    const r = selectFollowupsToFile({
+      followups: sameLocation,
+      openTitles: new Set(),
+      openFingerprints: new Map([[fp, 4242]]),
+      cap: 2,
+    });
+    expect(r.toComment).toHaveLength(2);
+    expect(r.overCap).toHaveLength(2);
+  });
 });
 
 describe('fetchAllPages — the shared rule both call sites now use', () => {
@@ -340,6 +382,36 @@ describe('a gate that did not run must not report success', () => {
   });
 });
 
+describe('#1453: a failed marker-comment write is reported, not swallowed', () => {
+  // gh() logs a non-ok response but never throws, so the `catch` around
+  // upsertMarkerComment only ever fired on a thrown network error — never on
+  // an HTTP rejection (a comment over GitHub's 65536-char limit, a token
+  // missing `pull-requests: write`, a secondary rate limit). This comment is
+  // the ONLY place P3 and over-cap findings are ever reported, so a silent
+  // HTTP failure here loses them with no trace anywhere. Both the audit gate
+  // and its sibling ai-review gate share the same gh() shape (CLAUDE.md: "fix
+  // the class, not the instance").
+  const auditSource = readFileSync(
+    new URL('../../.github/scoped-audit/audit.mjs', import.meta.url),
+    'utf8'
+  );
+  const reviewSource = readFileSync(
+    new URL('../../.github/ai-review/review.mjs', import.meta.url),
+    'utf8'
+  );
+
+  it('upsertMarkerComment checks resp.ok before returning', () => {
+    const fn = auditSource.match(/async function upsertMarkerComment\([\s\S]*?\n}\n/)?.[0];
+    expect(fn, 'upsertMarkerComment not found').toBeTruthy();
+    expect(fn).toMatch(/resp\.ok/);
+    expect(fn).toMatch(/::error::/);
+  });
+
+  it('review.mjs checks the fallback comment response too', () => {
+    expect(reviewSource).toMatch(/fallback\.ok/);
+  });
+});
+
 describe('every path that admits it did not audit must exit non-zero', () => {
   // Three of these were fixed and a FOURTH was missed, which the gate itself
   // caught on the next run. Then THREE MORE were found — the pre-flight guards
@@ -348,8 +420,7 @@ describe('every path that admits it did not audit must exit non-zero', () => {
   // invariant it cannot observe is worse than no test.
   //
   // So it no longer looks for a function name. It looks at every zero-exit in
-  // the file and asserts that only ONE exists: the terminal success. Any new
-  // early return has to justify itself here.
+  // the file. Any new early return has to justify itself here.
   const source = readFileSync(
     new URL('../../.github/scoped-audit/audit.mjs', import.meta.url),
     'utf8'
@@ -360,18 +431,47 @@ describe('every path that admits it did not audit must exit non-zero', () => {
     .map((line, i) => ({ line, n: i + 1 }))
     .filter(({ line }) => /process\.exit\(\s*0\s*\)/.test(line));
 
-  it('has exactly one exit-zero, and it is the terminal success', () => {
+  // #1521: workflow_dispatch has no PR to audit by construction (the trigger
+  // is explicitly supported — the recovery text in alertAuditDidNotRun below
+  // even tells an operator to use it) — that is an expected no-op, not a
+  // failure, and is the ONE early exit(0) allowed to exist alongside the
+  // terminal success. It must be conditioned on the trigger not being
+  // `pull_request`, so it cannot mask a genuinely PR-triggered run with no
+  // PR_NUMBER — that case still falls through to nonRunExitCode().
+  const EXPECTED_EARLY_ZERO_EXITS = 1;
+
+  it(`has exactly ${EXPECTED_EARLY_ZERO_EXITS} justified early exit(0), and a terminal exit that reads the verdict`, () => {
+    // The terminal exit used to be a literal `process.exit(0)`. It now goes
+    // through gate-policy's auditExitCode(), so a PARTIAL (truncated) audit
+    // with nothing blocking cannot exit green (scoped audit, PR 1978).
     expect(
       zeroExits.length,
-      `exit(0) at lines ${zeroExits.map(z => z.n).join(', ')} — every early exit must use nonRunExitCode()`
-    ).toBe(1);
-    // The terminal one is the last statement in the file, not an early return.
-    const remaining = lines.slice(zeroExits[0].n).filter(l => l.trim().length > 0);
-    expect(remaining, 'the one exit(0) is not the final statement').toHaveLength(0);
+      `exit(0) at lines ${zeroExits.map(z => z.n).join(', ')} — every early exit must use ` +
+        `nonRunExitCode() unless justified here`
+    ).toBe(EXPECTED_EARLY_ZERO_EXITS);
+    const nonEmpty = lines.map((l, i) => ({ l, n: i + 1 })).filter(({ l }) => l.trim().length > 0);
+    expect(nonEmpty[nonEmpty.length - 1].l.trim()).toBe(
+      'process.exit(auditExitCode({ blockingFindings: 0, partial }));'
+    );
+  });
+
+  it('the early exit(0) is gated on a non-pull_request trigger', () => {
+    const early = zeroExits;
+    expect(early).toHaveLength(EXPECTED_EARLY_ZERO_EXITS);
+    for (const z of early) {
+      const before = lines.slice(Math.max(0, z.n - 12), z.n - 1).join('\n');
+      expect(
+        /GITHUB_EVENT_NAME/.test(before),
+        `line ${z.n} exits 0 early without checking GITHUB_EVENT_NAME — an unconditional or ` +
+          `differently-guarded early exit(0) needs its own justification here`
+      ).toBe(true);
+    }
   });
 
   it('no exit sits under a line admitting it skipped', () => {
-    // Catches the shape regardless of how the skip is worded or reported.
+    // Catches the shape regardless of how the skip is worded or reported. The
+    // #1521 no-op deliberately says "expected"/"not a failure" rather than any
+    // of these words, precisely so this stays a true admission-of-failure check.
     const admits = /skipping|fail-open|did NOT run|not set|missing|malformed/i;
     for (const z of zeroExits) {
       const before = lines.slice(Math.max(0, z.n - 6), z.n - 1).join('\n');
@@ -421,11 +521,22 @@ describe('location fingerprint dedup (#116)', () => {
     expect(a).toBe(b);
   });
 
-  it('separates two different files, and two different lines in one file', () => {
+  it('separates two different files', () => {
     expect(followupFingerprint(finding())).not.toBe(
       followupFingerprint(finding({ file: 'apps/api/src/services/cart.service.ts' }))
     );
-    expect(followupFingerprint(finding())).not.toBe(followupFingerprint(finding({ line: 900 })));
+  });
+
+  it('#1738: does NOT separate two different lines in one file', () => {
+    // `line` used to be part of the key. prompt.md explicitly permits the
+    // model to cite an "approx line N" guess, and the reviewed file keeps
+    // changing between pushes (that is why there was a push) — so a line
+    // number, exact or estimated, was the least stable part of a finding's
+    // identity and drifted the fingerprint on every push it did not close.
+    // Dropping it means the same file/dimension always fingerprints the same,
+    // regardless of which line the model cited this run.
+    expect(followupFingerprint(finding())).toBe(followupFingerprint(finding({ line: 900 })));
+    expect(followupFingerprint(finding({ line: undefined }))).toBe(followupFingerprint(finding()));
   });
 
   it('round-trips through the hidden marker', () => {
@@ -437,6 +548,54 @@ describe('location fingerprint dedup (#116)', () => {
   it('returns null for a body with no marker — the 929 already-open issues', () => {
     expect(extractFingerprint('an issue filed before the marker existed')).toBeNull();
     expect(extractFingerprint(undefined as unknown as string)).toBeNull();
+  });
+
+  it('#1744: reads the LAST marker, not the first', () => {
+    // Body composition (audit.mjs) interpolates model-authored detail/fix/
+    // blastRadius text BEFORE the real trailing marker it appends last. This
+    // gate audits itself, so a finding ABOUT the fingerprint scheme can quote
+    // a marker literal inside its own detail — the shape below is that case.
+    const body =
+      `**Detail:** quotes a literal <!-- audit-fp:security|a.ts|1 --> in its own text\n\n` +
+      `<!-- audit-fp:contract-drift|followup-filing.mjs|125 -->`;
+    // Legacy three-part marker, normalised to the current two-part key.
+    expect(extractFingerprint(body)).toBe('contract-drift|followup-filing.mjs');
+  });
+
+  it('a LEGACY dimension|file|line marker still matches the current dimension|file key', () => {
+    // Scoped audit, PR 1978: #1738 dropped `|line` from the key, and 195 of
+    // the 200 open audit-followup issues carried the old three-part marker.
+    // Read back verbatim, none matched, and each would have been filed again.
+    const f = finding({ line: 7 });
+    const legacyBody = `**Detail:** x\n\n<!-- audit-fp:security|${f.file}|412 -->`;
+    expect(extractFingerprint(legacyBody)).toBe(followupFingerprint(f));
+  });
+
+  it('a legacy-marked open issue dedups a new finding end to end (fetch → select)', async () => {
+    const f = finding({ title: 'reworded since it was filed', line: 30 });
+    const gh = async () => ({
+      ok: true,
+      json: async () => [
+        {
+          number: 777,
+          title: '[audit-followup][P2] the original wording',
+          body: `old issue\n<!-- audit-fp:security|${f.file}|412 -->`,
+        },
+      ],
+    });
+    const { titles, fingerprints } = await fetchOpenFollowupTitles({
+      gh: gh as any,
+      owner: 'o',
+      repo: 'r',
+    });
+    const res = selectFollowupsToFile({
+      followups: [f],
+      openTitles: titles,
+      openFingerprints: fingerprints,
+      cap: 10,
+    });
+    expect(res.toFile).toHaveLength(0);
+    expect(res.toComment).toEqual([{ finding: f, issueNumber: 777 }]);
   });
 
   it('COMMENTS a reworded finding onto the open issue instead of filing again', () => {
@@ -646,8 +805,9 @@ describe('location fingerprint dedup (#116)', () => {
     const { titles, fingerprints } = await fetchOpenFollowupTitles({ gh, owner: 'o', repo: 'r' });
     expect(titles.has('a')).toBe(true);
     expect(titles.has('pr')).toBe(false); // pull requests are not issues
-    // First writer wins — comments go to the older issue.
-    expect(fingerprints.get('security|a.ts|1')).toBe(11);
-    expect(fingerprints.has('x|y|1')).toBe(false); // the PR's marker is ignored
+    // First writer wins — comments go to the older issue. The legacy
+    // three-part markers are read back under the current two-part key.
+    expect(fingerprints.get('security|a.ts')).toBe(11);
+    expect(fingerprints.has('x|y')).toBe(false); // the PR's marker is ignored
   });
 });

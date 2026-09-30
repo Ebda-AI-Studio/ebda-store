@@ -19,6 +19,25 @@ jobs:
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Semgrep scan (block on ERROR severity)
         # Install semgrep into a venv off the runner's SYSTEM python3 — works on

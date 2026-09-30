@@ -269,7 +269,13 @@ for (const [domain, rows] of [...byDomain].sort()) {
   lines.push('| Defence | Source | Mutation | Verdict |');
   lines.push('| --- | --- | --- | --- |');
   for (const r of rows) {
-    const mut = `\`${r.find.replace(/\|/g, '\\|').slice(0, 70)}\` → \`${r.replace.replace(/\|/g, '\\|').slice(0, 40) || '(removed)'}\``;
+    // Escape both `|` (breaks a markdown table cell) and newlines (a
+    // multi-line `find`/`replace` — several entries in defence-mutations.json
+    // have one — put a literal newline INSIDE a table cell otherwise, which
+    // ends the row early and pushes everything after it, including the
+    // verdict, outside the table entirely (#1232).
+    const cellEscape = s => s.replace(/\|/g, '\\|').replace(/\r?\n/g, '\\n');
+    const mut = `\`${cellEscape(r.find).slice(0, 70)}\` → \`${cellEscape(r.replace).slice(0, 40) || '(removed)'}\``;
     const note = r.verdict === 'KILLED' ? '' : `<br>${r.detail}`;
     lines.push(`| ${r.id}<br>${r.why} | \`${r.source}\` | ${mut} | **${r.verdict}**${note} |`);
   }

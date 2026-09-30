@@ -33,12 +33,14 @@ import {
   groupCommentsByIssue,
 } from './followup-filing.mjs';
 import { fetchAllPages } from './gh-paginate.mjs';
-import { nonRunExitCode, NON_RUN_REASONS } from './gate-policy.mjs';
+import { nonRunExitCode, auditExitCode, auditVerdict, NON_RUN_REASONS } from './gate-policy.mjs';
 import { resolveMarkerComment } from './marker-comment.mjs';
+import { recoverTruncatedFindings } from './partial-json.mjs';
 
 const {
   GITHUB_TOKEN,
   GITHUB_REPOSITORY,
+  GITHUB_EVENT_NAME,
   PR_NUMBER,
   HEAD_SHA,
   CLAUDE_OUTPUT = '/tmp/scoped-audit-out.json',
@@ -91,6 +93,22 @@ if (repoParts.length !== 2) {
   process.exit(nonRunExitCode());
 }
 if (!PR_NUMBER) {
+  // scoped-audit.yml declares workflow_dispatch as a supported trigger, and a
+  // manual dispatch has no `github.event.pull_request` by construction — there
+  // is no PR — so PR_NUMBER is empty there on purpose, not by mistake. Before
+  // this guard existed that path exited 0 silently; after it, every dispatch
+  // hit reportPreflightFailure + nonRunExitCode() and reported red forever,
+  // which is how a real red tick on a supported path stops being read (#1521).
+  // This is an expected no-op, not a masked failure, so it says so plainly and
+  // exits 0 — the pull_request-triggered path below still fails loud when
+  // PR_NUMBER really is missing on the trigger that requires it.
+  if (GITHUB_EVENT_NAME && GITHUB_EVENT_NAME !== 'pull_request') {
+    console.log(
+      `scoped-audit: '${GITHUB_EVENT_NAME}' trigger has no pull request to audit — nothing to ` +
+        `do. This is expected for a non-pull_request trigger, not a failure.`
+    );
+    process.exit(0);
+  }
   reportPreflightFailure(NON_RUN_REASONS.NO_PR_NUMBER);
   process.exit(nonRunExitCode());
 }
@@ -122,10 +140,22 @@ async function gh(method, path, body) {
 const SEV_ICON = { P0: '🔴', P1: '🔴', P2: '🟡', P3: '🔵' };
 
 /**
- * Most a single audit run may file. The PR comment carries every finding in
- * full regardless, so this bounds the tracker, not the review.
+ * Most NEW issues a single audit run may file. The PR comment carries every
+ * finding in full regardless, so this bounds the tracker, not the review.
+ * Governs `toFile` only — see MAX_COMMENTS_PER_RUN for the separate bound on
+ * the `toComment` (already-tracked-location) write path.
  */
 const MAX_ISSUES_PER_RUN = 10;
+
+/**
+ * Most location-comment upserts a single run may perform (#1752). Each entry
+ * costs a paginated read of the target issue's comments plus a write, and this
+ * path is reached once per already-tracked location the run re-reports, which
+ * a heavily-audited file can exceed independently of MAX_ISSUES_PER_RUN.
+ * Overflow is reported the same way an over-cap new issue is: nothing lost,
+ * still in the PR comment.
+ */
+const MAX_COMMENTS_PER_RUN = 10;
 
 const PR_URL = `https://github.com/${owner}/${repo}/pull/${PR_NUMBER}`;
 const MARKER = '<!-- scoped-audit-bot -->';
@@ -139,8 +169,9 @@ async function upsertMarkerComment(body) {
       path: `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`,
     });
     const { prior, uncertain } = resolveMarkerComment({ items, complete, marker: MARKER });
+    let resp;
     if (prior) {
-      await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body });
+      resp = await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body });
     } else {
       // A partial read cannot vouch that no marker exists, but this comment is
       // the ONLY place P3 and over-cap findings are reported — a duplicate is
@@ -151,7 +182,20 @@ async function upsertMarkerComment(body) {
             `audit comment. If an earlier audit comment already exists, this run duplicates it.`
         );
       }
-      await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
+      resp = await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
+    }
+    // gh() only console.error()s a non-ok response, it never throws — so an
+    // HTTP rejection (comment body over GitHub's 65536-char limit, a token
+    // missing `pull-requests: write`, a secondary rate limit) fell through
+    // the catch below untouched and this function returned having silently
+    // failed to record the ONLY place P3 and over-cap findings are reported.
+    // Check the response explicitly (#1453).
+    if (!resp.ok) {
+      console.error(
+        `::error::scoped-audit's PR comment write failed (HTTP ${resp.status}). This commit's ` +
+          `P3 and over-cap P2 findings exist ONLY in this job's log and step summary — the PR ` +
+          `comment does not carry them.`
+      );
     }
   } catch (e) {
     // NOT non-fatal in any useful sense: the gate below may block this PR, and
@@ -257,14 +301,43 @@ function extractJson(s) {
 }
 
 let result;
+// True when the model's response was cut off and only the findings before the
+// cutoff were recovered. Threaded to the verdict and the exit code: a partial
+// audit with nothing blocking is PARTIAL + a non-run exit, never PASSED + 0.
+let partial = false;
 try {
   result = JSON.parse(extractJson(modelText));
 } catch (e) {
-  console.error('Model did not return valid JSON:\n', modelText);
-  await alertAuditDidNotRun(
-    `AUDIT_RAN was not 'false' but model output did not parse as JSON: ${e.message}`
-  );
-  process.exit(nonRunExitCode());
+  // A large diff (scripts/scoped-audit.sh caps it at ~150KB, roughly the
+  // ~12k-line diffs where this was first observed) can make the model's OWN
+  // response long enough to be cut off mid-generation — an incomplete
+  // `findings` array that fails JSON.parse outright. Reporting that as "DID
+  // NOT RUN" drops every finding the model DID manage to write down, on
+  // exactly the largest, riskiest PRs. Recover what parses as complete and
+  // degrade to a partial, explicitly-labelled audit instead of silence.
+  const recovered = recoverTruncatedFindings(extractJson(modelText));
+  if (recovered) {
+    console.error(
+      `::warning::scoped-audit's model output did not parse as complete JSON — likely truncated ` +
+        `on a large diff. Recovered ${recovered.findings.length} complete finding(s) before the ` +
+        `cutoff; this audit is PARTIAL.`
+    );
+    partial = true;
+    result = {
+      summary:
+        `⚠️ This audit is PARTIAL — the diff was large and the model's response was truncated ` +
+        `before it finished. ${recovered.findings.length} finding(s) below were recovered from ` +
+        `before the cutoff; anything past that point was not reviewed. Re-run once the diff is ` +
+        `smaller, or review the tail of this PR manually.`,
+      findings: recovered.findings,
+    };
+  } else {
+    console.error('Model did not return valid JSON:\n', modelText);
+    await alertAuditDidNotRun(
+      `AUDIT_RAN was not 'false' but model output did not parse as JSON: ${e.message}`
+    );
+    process.exit(nonRunExitCode());
+  }
 }
 
 const findings = Array.isArray(result.findings) ? result.findings : [];
@@ -294,7 +367,7 @@ function findingRow(f) {
 
 const headerLines = [
   MARKER,
-  `### Scoped Audit — ${blocking.length > 0 ? 'BLOCKED' : 'PASSED'}`,
+  `### Scoped Audit — ${auditVerdict({ blockingFindings: blocking.length, partial })}`,
   '',
   result.summary || '',
   '',
@@ -315,7 +388,12 @@ const blockingSection =
         ...blocking.map(findingRow),
         '',
       ]
-    : ['_No P0/P1 findings — merge is unblocked by this gate._', ''];
+    : partial
+      ? [
+          '_No P0/P1 findings in the part of the diff the model reached — the rest was NOT reviewed. This is not a pass; review the tail of this PR manually or re-run on a smaller diff._',
+          '',
+        ]
+      : ['_No P0/P1 findings — merge is unblocked by this gate._', ''];
 
 const followupSection =
   p2.length + p3.length > 0
@@ -378,6 +456,7 @@ async function fileFollowupIssues(followups) {
       openTitles,
       openFingerprints,
       cap: MAX_ISSUES_PER_RUN,
+      commentCap: MAX_COMMENTS_PER_RUN,
       dedupComplete,
     });
 
@@ -392,7 +471,8 @@ async function fileFollowupIssues(followups) {
       `scoped-audit: ${followups.length} followups — filing ${toFile.length}, ` +
         `${alreadyTracked.length} already tracked, ${toComment.length} commented onto an ` +
         `existing issue at the same location, ${untracked.length} recorded on the PR ` +
-        `only, ${overCap.length} over the per-run cap of ${MAX_ISSUES_PER_RUN} ` +
+        `only, ${overCap.length} over the per-run cap (new issues capped at ` +
+        `${MAX_ISSUES_PER_RUN}, location comments capped at ${MAX_COMMENTS_PER_RUN}) ` +
         `(all of them are in the PR comment)`
     );
   }
@@ -507,7 +587,9 @@ async function fileFollowupIssues(followups) {
         console.log(`scoped-audit: updated its existing location comment on #${group.issueNumber}`);
       } else {
         await gh('POST', `/repos/${owner}/${repo}/issues/${group.issueNumber}/comments`, { body });
-        console.log(`scoped-audit: commented on #${group.issueNumber} instead of filing a duplicate`);
+        console.log(
+          `scoped-audit: commented on #${group.issueNumber} instead of filing a duplicate`
+        );
       }
     } catch (e) {
       console.error(`Comment on #${group.issueNumber} failed (non-fatal):`, e.message);
@@ -536,8 +618,15 @@ if (blocking.length > 0) {
   console.error(
     `scoped-audit: BLOCKED — ${blocking.length} P0/P1 finding(s) confirmed. Resolve before merging.`
   );
-  process.exit(1);
+  process.exit(auditExitCode({ blockingFindings: blocking.length, partial }));
 }
 
-console.log('scoped-audit: PASSED — no P0/P1 findings.');
-process.exit(0);
+if (partial) {
+  console.error(
+    'scoped-audit: PARTIAL — no P0/P1 in the part of the diff the model reached; the rest was ' +
+      'not reviewed. Exiting red (informational, not a required check), not PASSED.'
+  );
+} else {
+  console.log('scoped-audit: PASSED — no P0/P1 findings.');
+}
+process.exit(auditExitCode({ blockingFindings: 0, partial }));

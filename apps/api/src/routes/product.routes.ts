@@ -137,7 +137,7 @@ function refineFixedDiscount(
 }
 
 const createProductSchemaChecked = createProductSchema.superRefine(refineFixedDiscount);
-const updateProductSchema = createProductSchema.partial().superRefine(refineFixedDiscount);
+export const updateProductSchema = createProductSchema.partial().superRefine(refineFixedDiscount);
 
 /**
  * @swagger

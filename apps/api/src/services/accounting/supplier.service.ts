@@ -37,7 +37,24 @@ export async function createSupplier(input: CreateSupplierInput): Promise<Suppli
   });
 }
 
-export type UpdateSupplierInput = Partial<Omit<CreateSupplierInput, 'storeId'>> & {
+/**
+ * The nullable text columns accept an explicit `null` to CLEAR the stored
+ * value; `undefined` (key omitted) leaves it untouched. `{ ...patch }` below
+ * hands both straight to Prisma, which reads them the same way. Create has
+ * nothing to clear, so `CreateSupplierInput` stays `string | undefined`.
+ */
+export type UpdateSupplierInput = Partial<
+  Omit<
+    CreateSupplierInput,
+    'storeId' | 'nameAr' | 'contactName' | 'phone' | 'email' | 'notes' | 'notesAr'
+  >
+> & {
+  nameAr?: string | null;
+  contactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  notesAr?: string | null;
   isActive?: boolean;
 };
 

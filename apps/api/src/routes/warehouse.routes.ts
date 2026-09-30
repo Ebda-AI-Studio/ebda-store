@@ -46,7 +46,7 @@ const createWarehouseSchema = z.object({
   address: z.string().max(500).optional(),
 });
 
-const updateWarehouseSchema = z.object({
+export const updateWarehouseSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   nameAr: z.string().max(200).nullable().optional(),
   code: z

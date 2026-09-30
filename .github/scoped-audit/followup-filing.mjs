@@ -23,16 +23,22 @@
  *     as #116 on the day the gate shipped and left open ever since; by
  *     2026-09-11 there were 929 open followups across 315 files.
  *
- *     Fixed by fingerprinting the LOCATION — dimension, file, line — into a
- *     hidden marker in the issue body, and matching on that. A reworded finding
- *     now resolves to the issue that already tracks it.
+ *     Fixed by fingerprinting the LOCATION — dimension + file — into a hidden
+ *     marker in the issue body, and matching on that. A reworded finding now
+ *     resolves to the issue that already tracks it. `line` is deliberately NOT
+ *     part of the key: prompt.md explicitly allows the model to cite an
+ *     "approx line N" when unsure, and the file under review keeps changing
+ *     between pushes (that is why there was a push), so a line number — exact
+ *     or estimated — is the least stable part of a finding's identity. Filed
+ *     as #1738 after `dimension|file|line` was observed drifting the key on
+ *     every push to a file it did not close.
  *
- *     The failure mode of a location key is the opposite one: two genuinely
- *     different defects at the same file:line would collapse into one issue and
- *     the second would vanish. So a fingerprint match does NOT silently drop
- *     the finding — it returns it as `toComment`, and the caller posts it on
- *     the existing issue. Nothing is lost either way, which is the property
- *     worth more than either key being perfect.
+ *     The failure mode of a coarser key is the opposite one: two genuinely
+ *     different defects in the same file would collapse into one issue and the
+ *     second would vanish. So a fingerprint match does NOT silently drop the
+ *     finding — it returns it as `toComment`, and the caller posts it on the
+ *     existing issue. Nothing is lost either way, which is the property worth
+ *     more than either key being perfect.
  *
  *  4. That `toComment` path was itself unbounded. It is reached precisely when a
  *     defect persists and the model rewords it, and the gate runs on EVERY push
@@ -46,12 +52,24 @@
  *     rewords) and not on the commit (which changes on every push, i.e. exactly
  *     the key that would reproduce the bug). The caller UPSERTS against it: one
  *     comment per location per PR, edited in place as the wording changes,
- *     the same shape as the gate's own PR marker comment.
+ *     the same shape as the gate's own PR marker comment. `selectFollowupsToFile`
+ *     also caps how many `toComment` entries one run may produce (`commentCap`,
+ *     same default as the issue-filing cap) — filed as #1752 after a run with
+ *     many already-tracked locations issued one paginated read plus one write
+ *     per location with no bound at all. Overflow goes to `overCap`, same as an
+ *     over-cap new issue — nothing is lost, the PR comment still carries it.
  *
  * All four are fixed here, as pure functions so the behaviour is testable
  * without a network. Nothing is silently dropped: the PR comment already renders every
  * P2/P3 in full (detail, fix, blast radius), so a finding that is capped out of
  * the issue tracker is still in front of the reviewer on the pull request.
+ *
+ * Caveat (#1745): the location fingerprint only dedupes issues filed AFTER it
+ * shipped. Every `audit-followup` issue filed before this marker existed has no
+ * `<!-- audit-fp:... -->` in its body, so `extractFingerprint` returns null for
+ * all of them and they fall through to title-only dedup — the backlog does not
+ * retroactively benefit. No backfill has been run; see
+ * `docs/runbooks/scoped-audit-followups.md`.
  */
 
 import { fetchAllPages } from './gh-paginate.mjs';
@@ -90,13 +108,16 @@ export async function fetchOpenFollowupTitles({ gh, owner, repo, maxPages = 30 }
 export const FINGERPRINT_PREFIX = 'audit-fp:';
 
 /**
- * A stable identity for a finding: what kind of problem, in which file, at
- * which line. Deliberately NOT the title — that is the free text a model
- * rewords between runs, which is the whole defect this exists to close.
- *
- * `line` is included because two findings in one large file are usually
- * genuinely different; omitting it would collapse every finding in
- * `order.service.ts` into one issue.
+ * A stable identity for a finding: what kind of problem, in which file.
+ * Deliberately NOT the title — that is the free text a model rewords between
+ * runs, which is the whole defect this exists to close — and deliberately NOT
+ * the line: prompt.md permits an "approx line N" guess, and a persistent
+ * finding is reported on a file that keeps moving between pushes (that is why
+ * there was a push), so a line number is the least stable part of a finding's
+ * identity (#1738). Two genuinely different findings in one file now share a
+ * fingerprint and travel together in `toComment` instead of missing dedup
+ * and each opening its own issue — `groupCommentsByIssue` keeps both visible
+ * in one comment, so nothing is lost by the coarser key.
  */
 export function followupFingerprint(finding) {
   // No file means no location, and a location key over "unknown" would make
@@ -109,8 +130,7 @@ export function followupFingerprint(finding) {
   const dimension = String(finding?.dimension || 'audit')
     .trim()
     .toLowerCase();
-  const line = finding?.line ? String(finding.line).trim() : '0';
-  return `${dimension}|${file}|${line}`;
+  return `${dimension}|${file}`;
 }
 
 /** The marker line to embed in an issue body. */
@@ -119,11 +139,34 @@ export function fingerprintMarker(finding) {
   return fp ? `<!-- ${FINGERPRINT_PREFIX}${fp} -->` : '';
 }
 
-/** Read a fingerprint back out of an issue body, or null if it has none. */
+/**
+ * Read a fingerprint back out of an issue body, or null if it has none.
+ *
+ * Matches the LAST marker, not the first (#1744). The issue body interpolates
+ * three blocks of model-authored free text (detail/fix/blastRadius) BEFORE the
+ * real marker this module appends last — if a finding's own detail quotes a
+ * marker literal (this gate audits itself, so a finding ABOUT the fingerprint
+ * scheme naturally does), the first match in the body is that quoted text, not
+ * the trailing marker that is actually load-bearing.
+ */
 export function extractFingerprint(body) {
   if (typeof body !== 'string') return null;
-  const m = body.match(/<!--\s*audit-fp:([^>]*?)\s*-->/);
-  return m ? m[1].trim() : null;
+  const matches = [...body.matchAll(/<!--\s*audit-fp:([^>]*?)\s*-->/g)];
+  if (!matches.length) return null;
+  return normalizeFingerprint(matches[matches.length - 1][1].trim());
+}
+
+/**
+ * Issues filed while the key was `dimension|file|line` (before #1738 dropped
+ * the line) still carry that three-part marker — 195 of the 200 open
+ * `audit-followup` issues when the key changed. Read back verbatim, none of
+ * them would match the two-part key `followupFingerprint` now computes, and
+ * every one would be filed again. Keeping the first two segments makes a
+ * legacy marker mean what the current key means.
+ */
+export function normalizeFingerprint(fp) {
+  const parts = fp.split('|');
+  return parts.length > 2 ? parts.slice(0, 2).join('|') : fp;
 }
 
 /** Hidden marker identifying a location COMMENT (distinct from an issue body). */
@@ -228,6 +271,14 @@ export function selectFollowupsToFile({
   // rather than erroring.
   openFingerprints = new Map(),
   cap,
+  // Bounds the `toComment` path (#1752): each entry costs a paginated read of
+  // the target issue's comments plus a write, and unlike `toFile` this path
+  // has no natural volume limit — it is reached once per already-tracked
+  // location this run re-reports, which can outnumber `cap` on a heavily
+  // audited file. Overflow goes to `overCap`, same as an over-cap new issue:
+  // nothing is lost, the PR comment still carries it in full. Defaults to
+  // `cap` so an older caller that only passes `cap` still gets a bound.
+  commentCap = cap,
   dedupComplete = true,
   trackedSeverities = TRACKED_SEVERITIES,
 }) {
@@ -276,6 +327,10 @@ export function selectFollowupsToFile({
     // are different defects at one line, a human sees both in one place.
     const existing = fp === null ? undefined : openFingerprints.get(fp);
     if (existing !== undefined) {
+      if (toComment.length >= commentCap) {
+        overCap.push(f);
+        continue;
+      }
       toComment.push({ finding: f, issueNumber: existing });
       continue;
     }
@@ -284,6 +339,10 @@ export function selectFollowupsToFile({
     // the rest comment onto it after it exists, so they are held here and
     // resolved by the caller once the issue number is known.
     if (fp !== null && seenFpThisRun.has(fp)) {
+      if (toComment.length >= commentCap) {
+        overCap.push(f);
+        continue;
+      }
       toComment.push({ finding: f, issueNumber: null, sameRunFingerprint: fp });
       continue;
     }

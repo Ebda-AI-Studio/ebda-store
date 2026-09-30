@@ -160,8 +160,26 @@ jobs:
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 15
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
@@ -205,7 +223,12 @@ jobs:
   defence-mutations:
     name: Defence mutation record
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 20
+    # 20 -> 30 (#1439): budgeted when the retry-0 unit-tier step below was a
+    # ~20s, 159-file stryker run; it now mirrors ci.yml's own comparable unit
+    # job, whose sibling jobs in that file use 20-35. Kept at 30 (not reverted
+    # to 20) even after the postgres service + --tier=all integration-tier
+    # defence below were added, since those only add work, not headroom.
+    timeout-minutes: 30
     # Postgres only, no Redis: the one integration-tier defence
     # (password-reset-bumps-token-version, tests/integration/refresh-token-rotation.test.ts)
     # drives AuthService directly against Prisma — no HTTP layer, and it
@@ -228,8 +251,26 @@ jobs:
           --health-retries 10
           --health-start-period 30s
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
@@ -286,9 +327,20 @@ jobs:
         # defaults to it (#1248).
         #
         # Keep this list in step with ci.yml's "Run unit tests with coverage".
+        # --maxWorkers=2 + NODE_OPTIONS match ci.yml's identical-scope unit job
+        # (#1439): vitest.config.ts defaults to maxWorkers: 1, so this ran the
+        # full 182-file scope single-worker — roughly double ci.yml's wall
+        # clock — inside a job whose timeout was budgeted when this step was a
+        # ~20s, 159-file stryker run, plus npm ci + db:generate + two package
+        # builds + the defence-mutation runner (14 defences, ~2 fresh vitest
+        # boots each). A timeout-cancelled job surfaces as a red gate with no
+        # diagnostic — the same false-signal class ci.yml's orphan-tests job
+        # comment documents fixing.
         run: |
-          ./node_modules/.bin/vitest run --config vitest.config.ts --retry=0 \
+          ./node_modules/.bin/vitest run --config vitest.config.ts --retry=0 --maxWorkers=2 \
             tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders
+        env:
+          NODE_OPTIONS: --max-old-space-size=2048
 
       # --write both measures and refreshes the markdown, and exits non-zero if
       # any defence SURVIVED. One run, not two — the measurement is the artifact.

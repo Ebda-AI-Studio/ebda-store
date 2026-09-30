@@ -137,3 +137,9 @@ Respond with ONLY a strict JSON object, no prose, no code fences:
 If the PR is clean for all active dimensions, return `"findings": []` with a
 brief positive summary. Never fabricate file:line references. If unsure of the
 exact line, cite the nearest changed line and say "approx line N."
+
+**Order `findings` by severity, P0 first.** On a very large diff your own
+response can run long enough to be cut off before you finish writing every
+finding down. The gate recovers whatever complete finding objects you managed
+to emit before the cutoff — ordering by severity means a truncated response
+still loses the least important findings, not the blocking ones.

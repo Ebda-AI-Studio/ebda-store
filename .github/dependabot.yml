@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # The 2026-09 pin sweep (PR #1515) hand-normalized every `uses:` ref in
+  # .github/workflows/*.yml to a 40-hex commit SHA. Dependabot understands SHA
+  # pins natively — it bumps both the SHA and the trailing `# vX` comment —
+  # which is the missing refresh path: without this, this repo would never
+  # receive an action's security or Node-runtime fixes (see #1516).
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'

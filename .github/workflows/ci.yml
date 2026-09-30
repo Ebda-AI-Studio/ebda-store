@@ -61,6 +61,25 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       cf: ${{ steps.cf-filter.outputs.cf }}
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
@@ -131,8 +150,26 @@ jobs:
     # ~4.5m cold and much faster warm. Budget for the cold case.
     timeout-minutes: 20
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -184,12 +221,35 @@ jobs:
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 3
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Scan client for secret leakage
         run: bash scripts/scan-bundle-secrets.sh
+      # #1517: nothing verified that every `uses:` ref stays pinned to a
+      # 40-hex SHA (the 2026-09 pin sweep, PR #1515) — the next workflow edit
+      # could reintroduce a mutable tag with no reviewer able to tell from a
+      # `@v4` line alone, in exactly the workflows holding
+      # CLOUDFLARE_API_TOKEN/RAILWAY_TOKEN/AI_FIX_PAT. Pure bash, no install —
+      # fits this job's fast, every-PR budget.
       - name: Verify every GitHub Action is pinned to a commit SHA
-        # A tag ref (@v4) is mutable and these workflows hold deploy/PAT
-        # secrets (#1517). Pure bash, same no-node job as the scan above.
         run: bash scripts/check-action-pins.sh
 
   typecheck:
@@ -197,8 +257,26 @@ jobs:
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 30
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -257,8 +335,26 @@ jobs:
     timeout-minutes: 35
     needs: [lint, typecheck, changes]
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -302,8 +398,26 @@ jobs:
       matrix:
         app: [web, admin, orders]
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -336,8 +450,26 @@ jobs:
     timeout-minutes: 30
     needs: [build]
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -431,8 +563,26 @@ jobs:
     timeout-minutes: 20
     needs: [build, changes]
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -474,6 +624,23 @@ jobs:
             const fs = require('fs');
             const all = new Set(JSON.parse(fs.readFileSync('/tmp/all-tests.json', 'utf8')).map(t => t.file));
             const covered = new Set(JSON.parse(fs.readFileSync('/tmp/covered-tests.json', 'utf8')).map(t => t.file));
+
+            // The FIRST collection (the whole-repo \`all\` set) can itself come
+            // back (near-)empty — the same broken-collector failure mode as the
+            // second one below, just on the other list. Without this floor, an
+            // empty/near-empty \`all\` makes the covered-vs-all comparison below
+            // false (0 < 0, or a tiny number under a tiny number) and every
+            // check below falls through to \"No orphan test files\" — a green
+            // pass having discovered almost nothing, on a repo with hundreds of
+            // test files. The repo has ~395 vitest-discovered files today; 50
+            // is a floor far below any plausible legitimate shrinkage and far
+            // above a broken collector's near-zero.
+            if (all.size < 50) {
+              console.error('::error::the FIRST vitest list discovered only ' + all.size +
+                ' file(s) repo-wide. That collector failed, so this is a BROKEN RUN, not an' +
+                ' empty repo. Re-run; if it persists, check the runner node_modules and disk state.');
+              process.exit(1);
+            }
 
             // A collection that came back (near-)empty is a BROKEN RUN, not a
             // repo full of orphans. Without this the job reports every file in
@@ -539,8 +706,26 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -728,8 +913,26 @@ jobs:
           --health-retries 10
           --health-start-period 30s
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -834,8 +1037,26 @@ jobs:
           --health-retries 10
           --health-start-period 30s
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -915,8 +1136,26 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -972,14 +1211,37 @@ jobs:
   security:
     name: Security Audit
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    # 7 (was 5), bumped 2026-07-05 alongside removing the flaky npm-cache
-    # restore + pinning trufflehog off '@main' — small safety margin so a
-    # cold npm ci + double audit + secret scan on a busy self-hosted runner
-    # still fits comfortably now that the two known hangs are gone.
-    timeout-minutes: 10 # 3 bounded audit attempts (~3.5 min worst case) + install headroom
+    # 18 (was 10, was 7, was 5). The budget is the SUM of the worst cases, not
+    # the audit alone: 3 bounded audit attempts (3 x 110s + 2 x 10s backoff =
+    # ~5.8 min, #1520) + a COLD `npm ci` (268s recorded on the umbra guest —
+    # see the Lint job's timeout note) + checkout/setup/jq/trufflehog (3-22s
+    # measured across 30 recent runs). 10 left 10.5 min of need against 10 min
+    # on a cold install, so the job would be CANCELLED (neither pass nor fail,
+    # blocks the merge with no finding) exactly when the registry is slow
+    # (scoped audit, PR 1978). tests/unit/audit-report-verdict.test.ts asserts
+    # this sum, not the attempt arithmetic alone.
+    timeout-minutes: 18
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -1065,6 +1327,17 @@ jobs:
       # Clean it the way it was created — a root container bind-mounting the
       # workspace — since sudo is unavailable. `if: always()` because the
       # interrupted-scan case is exactly the one that strands the directory.
+      #
+      # `always()` covers step failure and job cancellation — it does NOT
+      # cover the runner process being OOM-killed or the guest restarting,
+      # because then no further step in the job runs at all, this one
+      # included (#1883). The fast path here is kept for the ordinary case
+      # (fails loud if a genuine cleanup failure would strand the NEXT job),
+      # but every job on the self-hosted runner now ALSO runs
+      # an inline pre-checkout cleanup step before checkout, which is
+      # the path that survives a hard kill — that pre-checkout guard is the
+      # actual safety net now, so a docker hiccup here degrades to a warning
+      # instead of failing a security scan that itself found nothing.
       - name: Remove root-owned trufflehog scratch (survives an interrupted scan)
         if: always()
         shell: bash
@@ -1077,11 +1350,12 @@ jobs:
           fi
           echo "removing root-owned scratch: ${leftovers[*]}"
           docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*'
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' \
+            || echo "::warning::trufflehog scratch cleanup's docker run failed — the pre-checkout guard on the next job will retry it"
           remaining=(trufflehog-*)
           if [ ${#remaining[@]} -ne 0 ]; then
-            echo "::error::trufflehog scratch survived cleanup (${remaining[*]}) — the next checkout on this runner will fail with EACCES"
-            exit 1
+            echo "::warning::trufflehog scratch survived cleanup (${remaining[*]}) — the pre-checkout guard on the next job on this runner will retry it before checkout"
+            exit 0
           fi
           echo "workspace is clean"
 

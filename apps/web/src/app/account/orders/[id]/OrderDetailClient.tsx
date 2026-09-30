@@ -33,6 +33,10 @@ interface OrderDetail {
   promotionDiscount?: number;
   /** The promotion that discounted this order, when `promotionDiscount` > 0. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
+  /** Loyalty-redemption portion of `discount`, and how many points funded it
+   *  (null/0 when no redemption applied). #197. */
+  loyaltyDiscount?: number;
+  loyaltyPointsRedeemed?: number | null;
   /** Part of `total` paid from the customer wallet (D1), in fils. */
   walletAmount?: number;
   notes?: string;
@@ -599,14 +603,22 @@ export default function OrderDetailClient() {
             )}
             {(() => {
               // Break the total discount into its levers \u2014 coupon, automatic
-              // promotion, and everything else (loyalty redemption etc.) \u2014
+              // promotion, loyalty-points redemption, and any remainder \u2014
               // instead of an aggregate "Discount" line alongside a
               // coupon-only sub-line, which used to double-count the coupon
               // portion visually. couponDiscount + promotionDiscount +
-              // "other" always reconciles to `discount` (order.service.ts).
+              // loyaltyDiscount + "other" always reconciles to `discount`
+              // (order.service.ts). Loyalty split out (#197) to match the
+              // same "Loyalty points" label checkout's OrderSummary.tsx uses
+              // \u2014 UAT step 11 requires the order detail to show it distinctly,
+              // not folded into a generic "Discount" line.
               const couponPortion = order.couponDiscount ?? 0;
               const promotionPortion = order.promotionDiscount ?? 0;
-              const otherDiscount = Math.max(0, order.discount - couponPortion - promotionPortion);
+              const loyaltyPortion = order.loyaltyDiscount ?? 0;
+              const otherDiscount = Math.max(
+                0,
+                order.discount - couponPortion - promotionPortion - loyaltyPortion
+              );
               const promotionName = order.appliedPromotion
                 ? language === 'ar' && order.appliedPromotion.nameAr
                   ? order.appliedPromotion.nameAr
@@ -633,6 +645,22 @@ export default function OrderDetailClient() {
                       </span>
                       <span className="text-[hsl(var(--success))]">
                         -{formatPrice(promotionPortion)}
+                      </span>
+                    </div>
+                  )}
+                  {loyaltyPortion > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {t(
+                          'Loyalty points',
+                          '\u0646\u0642\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621'
+                        )}
+                        {order.loyaltyPointsRedeemed
+                          ? ` (${order.loyaltyPointsRedeemed.toLocaleString(language === 'ar' ? 'ar' : 'en')})`
+                          : ''}
+                      </span>
+                      <span className="text-[hsl(var(--success))]">
+                        -{formatPrice(loyaltyPortion)}
                       </span>
                     </div>
                   )}

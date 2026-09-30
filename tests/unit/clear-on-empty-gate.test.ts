@@ -59,6 +59,55 @@ describe('clear-on-empty gate — FAILS on a reintroduced violation', () => {
     const src = `apiPut(url, { a: { b: { c: { d: v || undefined } } } });`;
     expect(findClearGateViolations(src, 'a.tsx')).toHaveLength(1);
   });
+
+  it('#1576: flags a payload built one statement earlier and passed by identifier', () => {
+    // `apiPut(url, body)` — the object literal has no children for
+    // scanArgument to recurse into, since the call site holds only an
+    // identifier. Every surface this class of fix actually shipped on used
+    // exactly this shape.
+    const src = `
+      const body = { x: v || undefined };
+      apiPut(url, body);
+    `;
+    const found = findClearGateViolations(src, 'a.tsx');
+    expect(found).toHaveLength(1);
+    expect(found[0].snippet).toContain('|| undefined');
+  });
+
+  it('#1576: resolves the identifier for apiPatch too, and across multiple keys', () => {
+    const src = `
+      const payload = {
+        name: name.trim(),
+        nameAr: nameAr.trim() || undefined,
+        notes: notes.trim() || undefined,
+      };
+      apiPatch(url, payload);
+    `;
+    expect(findClearGateViolations(src, 'a.tsx')).toHaveLength(2);
+  });
+
+  it('#1576: does not guess when the identifier is ambiguous (two same-named locals in one scope)', () => {
+    // Deliberately conservative: block-scoped `const body` in each branch of
+    // one function is two declarations within the SAME enclosing function
+    // scope this gate searches. It must never guess which one `apiPut`
+    // actually received and produce a false positive on the wrong one.
+    const src = `
+      function handleSubmit() {
+        if (cond) {
+          const body = { x: 1 };
+          apiPut(url, body);
+        } else {
+          const body = { y: v || undefined };
+        }
+      }
+    `;
+    expect(findClearGateViolations(src, 'a.tsx')).toHaveLength(0);
+  });
+
+  it('#1576: does not resolve an identifier with no matching declaration in scope', () => {
+    const src = `apiPut(url, someImportedConstant);`;
+    expect(findClearGateViolations(src, 'a.tsx')).toHaveLength(0);
+  });
 });
 
 describe('clear-on-empty gate — PASSES on the legitimate uses', () => {

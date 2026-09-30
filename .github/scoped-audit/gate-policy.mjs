@@ -45,7 +45,24 @@ export function nonRunExitCode({ isRequiredCheck = false } = {}) {
   return isRequiredCheck ? 0 : 1;
 }
 
-/** Exit code for a completed audit, given whether it found anything blocking. */
-export function auditExitCode({ blockingFindings }) {
-  return blockingFindings > 0 ? 1 : 0;
+/**
+ * Exit code for an audit that produced findings to gate on.
+ *
+ * `partial` is a response the model did not finish (truncated on a large
+ * diff; see partial-json.mjs). Its findings are real, so recovered P0/P1s
+ * still block — but "no blocking finding" only covers the part of the diff
+ * the model reached. Exiting 0 there renders the same green tick as a full
+ * clean audit, on exactly the largest, riskiest PRs, which is the inversion
+ * this module's header exists to prevent. So a partial audit with nothing
+ * blocking takes the honest non-run exit: red, informational, not required.
+ */
+export function auditExitCode({ blockingFindings, partial = false }) {
+  if (blockingFindings > 0) return 1;
+  return partial ? nonRunExitCode() : 0;
+}
+
+/** The comment header word. Never PASSED for an audit that did not finish. */
+export function auditVerdict({ blockingFindings, partial = false }) {
+  if (blockingFindings > 0) return 'BLOCKED';
+  return partial ? 'PARTIAL' : 'PASSED';
 }

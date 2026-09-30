@@ -29,7 +29,21 @@ const createSchema = z.object({
   notesAr: z.string().optional(),
 });
 
-const updateSchema = createSchema.partial().extend({ isActive: z.boolean().optional() });
+// A PATCH clears a nullable column by sending an explicit `null` (an omitted
+// key leaves the stored value — Prisma's convention, which the admin edit form
+// follows via `textFieldValue(x, 'update')`). `createSchema.partial()` alone
+// leaves these as `z.string().optional()`, which REJECTS null, so every edit of
+// a supplier with a blank Arabic name/contact/notes 422'd. Each field nullable
+// in the Prisma model is nullable here too.
+export const updateSchema = createSchema.partial().extend({
+  nameAr: z.string().max(200).nullable().optional(),
+  contactName: z.string().max(200).nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  notesAr: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
 
 router.get(
   '/:storeId/suppliers',

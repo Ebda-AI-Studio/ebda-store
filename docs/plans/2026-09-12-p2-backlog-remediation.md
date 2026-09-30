@@ -16,17 +16,22 @@
 
 **THE HARD RULE — no order or payment path may break.** Every batch that touches the money path proves it, in this order, before the PR opens:
 
-1. `npx vitest run $(ls tests/integration/*.test.ts | grep -iE "order|cart|payment|inventory|bundle")` — must match the `origin/main` control **exactly**, run in the same worktree with the same build.
+1. `npx vitest run $(cat /tmp/p2-control-files.txt)` — every FILE frozen in the Step 4
+   control must still pass (#1779). A new test a batch adds under the same
+   `order|cart|payment|inventory|bundle` grep (Batches 3, 5, 6 all create one) legitimately
+   grows the file/test count — that is not a regression. Only a pass→fail transition in a
+   frozen control file is.
 2. A live production read after merge: `orders`/`payments` counts unchanged-or-increased, **zero** rows in `payments` with `status IN ('failed','cancelled')` created after the deploy.
 3. A guest cart round-trip against production (`POST /stores/:id/cart/items` → 201).
 
-If (1) differs from the control by even one test, the PR does not open.
+If any control file in (1) fails, the PR does not open.
 
 - **Money path files** (the rule's scope): `apps/api/src/services/order.service.ts`, `routes/order.routes.ts`, `services/cart.service.ts`, `routes/cart.routes.ts`, `services/payment-providers/**`, `routes/payment.routes.ts`, `services/inventory.service.ts`, `lib/effective-inventory.ts`, `apps/web/src/app/checkout/**`, `apps/api/src/mcp/tools/{cart,order}.tools.ts`, `lib/inngest/functions/order-*.ts`.
 - **Integration tests must be RETRY-SAFE** (CLAUDE.md's RETRY-SAFE section): take cart sessions from `cartSessionId()` (`tests/helpers/bundle-fixtures.ts`), and give every other per-test fixture a per-CALL unique id, never one derived from a per-file suffix. Batch 3 is exactly a cart-focused integration-test batch, so this applies to it directly — a fixture keyed on a per-file id is reused across the integration job's `--retry=1` attempts and turns a real attempt-1 failure into a misleading attempt-2 artefact.
 - **Never widen a money-path query.** Narrowing filters (`deletedAt: null`, `storeId`) are safe and already proven. Widening one, or changing an amount/rounding/currency expression, requires its own PR with nothing else in it.
 - **Audit findings are claims, not facts.** Verify each against current code before fixing. Roughly 1 in 4 does not reproduce.
 - **Mutation-prove every fix**: break it, name the reddening test, restore byte-identical.
+- **New integration tests must be RETRY-SAFE (#1780).** `vitest.config.ts` sets `retry: 1`, and a retry re-runs the test body against the SAME database — a fixture keyed on a per-FILE id (a `sessionId`, slug or email built from one `suffix`) is reused across attempts, so it either accumulates the failed attempt's rows or trips a unique index, and the reported error is an artefact of attempt 2 while the real attempt-1 failure is invisible (this is how a cart 500 was mis-read as a pricing bug for a day). Any new integration test — Batch 3's `cart-nested-transaction.test.ts` included — takes its cart session from `cartSessionId()` (`tests/helpers/bundle-fixtures.ts`) and gives every other per-test fixture a per-CALL unique id. See CLAUDE.md's "Integration tests must be RETRY-SAFE" section for the full rule.
 - **Register security fixes** in `docs/security/defence-mutations.json`, and add the source file to `.github/workflows/mutation-testing.yml` `paths` or the gate never runs on it.
 - **A worktree needs its own `npm ci`** + `prisma generate` + `npm run build -w packages/{shared,database}`. A symlinked `node_modules` breaks `@force/*` resolution and fabricates failures — it produced 115 phantom ones on 2026-09-11.
 - **Integration tests:** set `TEST_DATABASE_URL` (not `DATABASE_URL` — `db-guard` refuses production Neon) to a **localhost-published** port, or every suite silently SKIPS. Read the zero-skipped number, never the passing tail.
@@ -108,11 +113,13 @@ npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
 ```bash
 cd ~/Desktop/projects/force-website-builder   # main checkout, on main
 npm run build -w packages/shared && npm run build -w packages/database
-npx vitest run $(ls tests/integration/*.test.ts | grep -iE "order|cart|payment|inventory|bundle") \
-  2>&1 | grep -E "Test Files|^ *Tests " | tee /tmp/p2-control.txt
+ls tests/integration/*.test.ts | grep -iE "order|cart|payment|inventory|bundle" \
+  | tee /tmp/p2-control-files.txt
+npx vitest run $(cat /tmp/p2-control-files.txt) \
+  2>&1 | tee /tmp/p2-control.txt | grep -E "Test Files|^ *Tests "
 ```
 
-Expected today: `Test Files 13 passed (13)` / `Tests 71 passed (71)`. Write the actual numbers into the PR body.
+Expected today: `Test Files 13 passed (13)` / `Tests 71 passed (71)`. Write the actual numbers into the PR body. **Freeze `/tmp/p2-control-files.txt` too** (#1779): a later batch (3, 5, 6) creates a new integration test whose filename matches this same `order|cart|payment|inventory|bundle` grep, so the post-change file count and test count legitimately GROW — Step 6 compares against this frozen list plus each control file's own pass/fail, never against the raw count.
 
 - [ ] **Step 5: Fix, test, mutation-prove**
 
@@ -121,11 +128,15 @@ Per finding that reproduces: write the failing test first, fix, confirm it passe
 - [ ] **Step 6: Re-run the money-path suite and compare to the control**
 
 ```bash
-npx vitest run $(ls tests/integration/*.test.ts | grep -iE "order|cart|payment|inventory|bundle") \
-  2>&1 | grep -E "Test Files|^ *Tests "
+npx vitest run $(cat /tmp/p2-control-files.txt) $(ls tests/integration/*.test.ts \
+  | grep -iE "order|cart|payment|inventory|bundle" | grep -vFxf /tmp/p2-control-files.txt) \
+  2>&1 | grep -E "Test Files|^ *Tests |✓|×"
 ```
 
-Must match `/tmp/p2-control.txt` exactly. If it does not, stop: the change broke something.
+**Every file listed in `/tmp/p2-control-files.txt` must still pass** (#1779). A test count
+INCREASE caused by a batch's own new test (Batch 3's `cart-nested-transaction.test.ts`,
+Batch 5, Batch 6) is expected and is NOT a gate failure — only a pass→fail transition in a
+frozen control file is. If a control file fails, stop: the change broke something.
 
 - [ ] **Step 7: Commit, PR, and close the non-reproducing findings**
 
@@ -145,44 +156,41 @@ curl -s -o /dev/null -w '%{http_code}' -X POST "https://api.force-ai.co/api/v1/s
 ## Batch 1: `auth.service.ts` — the refresh-token rotation race
 
 **Findings:** #1671, #1683, #1684, #1687, #1688, #1691
-**Files:** Modify `apps/api/src/services/auth.service.ts`; Test `tests/unit/refresh-token-rotation-race.test.ts` (create)
+**Files:** Modify `apps/api/src/services/auth.service.ts`; Test `tests/unit/refresh-token-rotation-race.test.ts` (**already exists** — extend, do not create)
 **Exposure:** every login. NOT a money-path file, so the hard rule's step 6 is a regression check rather than a gate.
+
+**Status (#1785, corrected 2026-09-25): four of six are ALREADY FIXED, on `main`.**
+Commit `2333d8c0` ("fix(auth): bound the rotation-race grace path's consequence,
+not just its window", PR #1774) closed #1684, #1687, #1683 and #1688 before this
+plan's Step 1 was ever run against them — an executor opening this batch as
+originally written would re-derive the window-only fix over code that already
+has the stronger one, and the prescribed commit subject below is the exact
+framing that fixed commit explicitly rejects ("The window bounded the
+OPPORTUNITY to replay a rotated token. It bounded nothing about what replaying
+one paid out."). **Only #1671 (token-family lineage) and the absolute-lifetime
+half of #1691 remain**, both deliberately deferred — see Rulings P2-B1-1 and
+P2-B1-2 in `docs/RULINGS.md` for what was decided and why (P2-B1-2: closing
+#1671 needs a `familyId` column, a migration and a backfill).
 
 **Interfaces:**
 
 - Consumes: `ROTATION_RACE_GRACE_MS`, `successorChainIsLive()`, `ROTATION_RACE_MAX_CHAIN_HOPS` — all already in `auth.service.ts`.
 - Produces: nothing other tasks depend on.
 
-These six are ONE mechanism, not six bugs: the grace window that forgives a rotation race. Fix them together or they will contradict each other.
+Scope is now the remainder only. Do not re-touch the four already-fixed findings or their mechanism.
 
-- [ ] **Step 1: Verify all six reproduce**
-
-Read `auth.service.ts` around the claim lines. In particular confirm #1687 (`replacedById` last-writer-wins) before touching #1683 — if the chain walk is already atomic the other five change shape.
-
-- [ ] **Step 2: Write the failing tests**
-
-One test per finding, each naming the scenario in its title, e.g.:
-
-```ts
-it('a forgiven race does NOT mint a full 365-day session', async () => {
-  // #1691: the grace path exists to let a racing client finish ONE request,
-  // not to issue a fresh year-long session.
-  const { refreshToken, expiresAt } = await AuthService.refresh(racingToken);
-  expect(expiresAt.getTime() - Date.now()).toBeLessThan(60_000);
-});
-```
-
+- [ ] **Step 1: Verify #1671 and the absolute-lifetime half of #1691 still reproduce**, and re-read Rulings P2-B1-1/P2-B1-2 for what a fix needs (the `familyId` column + migration + backfill).
+- [ ] **Step 2: Write the failing test(s)** for whichever half of this Ahmad approves fixing — Rulings P2-B1-1/P2-B1-2 recorded these as deferred, not rejected, so confirm scope before writing the migration.
 - [ ] **Step 3: Run them — expect FAIL**
-- [ ] **Step 4: Fix the mechanism as one change**
+- [ ] **Step 4: Fix**
 - [ ] **Step 5: Run — expect PASS**
-- [ ] **Step 6: Mutation-prove** — remove the grace-window bound, confirm the #1691 test reddens; restore byte-identical.
-- [ ] **Step 7: Register** `auth-rotation-grace-bounded` in `docs/security/defence-mutations.json` (`auth.service.ts` is already in the mutation workflow's `paths`).
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Mutation-prove** — restore byte-identical.
+- [ ] **Step 7: Register** the new defence(s) in `docs/security/defence-mutations.json` alongside the four already there (`session-rotation-grace-budget`, `session-rotation-backlink-cas`, `session-revocation-midflight`, `session-rotation-grace-no-clock-renew` — NOT `auth-rotation-grace-bounded`, which does not exist in the spec).
+- [ ] **Step 8: Commit** — do not reuse "fix(auth): bound the rotation-race grace window" as the subject; that framing is what the merged fix corrected.
 
 ```bash
 git add apps/api/src/services/auth.service.ts tests/unit/refresh-token-rotation-race.test.ts \
   docs/security/defence-mutations.json docs/security/defence-mutation-record.md
-git commit -m "fix(auth): bound the rotation-race grace window"
 ```
 
 ---
@@ -283,6 +291,6 @@ These are known, recorded, and deliberately outside the batch sequence.
 ## Definition of done
 
 - 0 open `audit-followup` issues, each either fixed-with-a-test or closed-with-evidence.
-- The money-path integration suite matches its control on `origin/main` at every merge.
+- Every file frozen in the money-path control still passes at every merge (new tests a batch adds are additive, not a mismatch — see Step 6).
 - Every security fix registered in `defence-mutations.json` with its source file reachable from the mutation workflow's `paths`.
 - Production verified after each money-path merge: `/health` commit equals `origin/main`, zero failed payments since the deploy, guest cart round-trip 201.

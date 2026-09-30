@@ -58,10 +58,20 @@ const { execFileSync } = await import('node:child_process');
  * as neither pass nor fail and blocks the merge with no finding to act on.
  * A retry that can exceed its own deadline has just moved the failure.
  *
- * ATTEMPTS × (ATTEMPT_TIMEOUT_MS + backoff) must stay under the job's
- * timeout-minutes. At 3 × (60s + ≤10s) that is ~3.5 minutes against 10.
+ * ATTEMPTS × ATTEMPT_TIMEOUT_MS + backoff, PLUS a cold `npm ci` and the
+ * secret scan, must stay under the job's timeout-minutes. At 3 × 110s + 2 × 10s
+ * that is ~5.8 minutes of audit + ~4.5 minutes of cold install against 18.
+ *
+ * 60s was itself below an already-observed normal-slow duration (#1520): the
+ * PR that introduced the retry recorded ~155s for a single attempt against a
+ * slow registry, so under that same condition all three 60s-bounded attempts
+ * were killed before returning anything, and this REQUIRED, fail-closed check
+ * blocked every merge for the duration of the registry incident with no way
+ * to tell a slow registry from a real advisory in the log. 110s is the
+ * largest bound that still leaves the job's checkout+install its own room
+ * (see the retry-budget test below).
  */
-const ATTEMPT_TIMEOUT_MS = 60_000;
+const ATTEMPT_TIMEOUT_MS = 110_000;
 
 function runAudit() {
   try {
@@ -108,7 +118,15 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
   }
 }
 if (!raw) {
-  console.error('audit-gate: npm audit produced no output after ' + ATTEMPTS + ' attempts');
+  // Distinct, greppable wording (#1520): every attempt returning empty is the
+  // timeout/registry-outage shape, not a parse failure or a real advisory —
+  // an operator reading the log should be able to tell those apart without
+  // opening the run.
+  console.error(
+    `audit-gate: could not reach the advisory endpoint after ${ATTEMPTS} bounded attempts ` +
+      `(${ATTEMPT_TIMEOUT_MS / 1000}s each) — npm audit produced no output. This looks like a ` +
+      `slow/unreachable registry, not a vulnerability finding.`
+  );
   process.exit(1);
 }
 

@@ -1934,12 +1934,32 @@ repo cannot deploy alongside. That is recorded as deliberate.
 Nine more — `alert-webhooks`, `backorders`, `expenses`, `finance`, `insights`,
 `purchase-orders`, `smart-layer`, `stock-adjustments`, `suppliers` — share a
 DIFFERENT convention: a flat lower-case discriminant (`{ error: 'not_found' }`,
-`{ error: 'validation_failed', details }`) that their own admin pages read as a
-string rather than through `data.error.code`. That is self-consistent, so it is
-not the defect this batch is about. It IS a second error envelope on one
-platform, and nobody has decided whether the two should converge — so it goes
-on the unreviewed list rather than being swept. Changing a shape a page already
-reads correctly would be the mirror failure: a gate breaking working code.
+`{ error: 'validation_failed', details }`). It IS a second error envelope on
+one platform, and nobody has decided whether the two should converge — so it
+goes on the unreviewed list rather than being swept. Changing a shape a page
+already reads correctly would be the mirror failure: a gate breaking working
+code.
+
+**CORRECTION (#1800) — "their own admin pages read as a string rather than
+through `data.error.code`" was checked for one page and asserted for the
+group.** It holds for the one raw-`apiFetch` import page
+(`finance/bank-reconciliation/import/page.tsx:93`, `json?.message ?? json?.error`).
+Every other checked finance page consumes through `apiGet`/`apiPost`
+(`apps/admin/src/lib/api.ts`), which reads `data.error?.code` /
+`data.error?.message` off the response body — on a string `error` field those
+are both `undefined`, so `apiRequest` (api.ts:378-379) collapses the response
+to `{ code: 'SERVER_ERROR', message: 'Request failed with status 422' }`
+regardless of what the route actually said, and drops `details` entirely.
+`fx-rates/page.tsx:106-112` and `bank-reconciliation/page.tsx:57-61` both hit
+this: a merchant sees a generic "request failed" with no field-level reason.
+So "self-consistent" does not hold for the group — most of these pages DO lose
+code/message/details, they just fail quietly (a generic message) rather than
+loudly (`[object Object]`), which is why nobody had reported it. The deferral
+itself stands: converging the two envelope shapes is still a product decision
+nobody has made, not something to guess at here. What was wrong is the reason
+given for deferring, which is corrected above; the test comment at
+`tests/unit/api-error-envelope-registry.test.ts` mirrors this text and must
+change with it.
 
 The gate's first version made exactly that mistake twice. It reported
 `bundle.routes.ts`, whose only match is inside a COMMENT documenting its
@@ -2478,6 +2498,47 @@ naming the product and refetching the cart so /cart shows the mark. A line whose
 separate product decision. Cost if wrong: a cart whose every loose line is deleted shows checkout's
 "Your cart is empty" screen rather than the refusal copy, because the summary no longer lists
 unorderable lines.
+
+## 2026-09-28 — PR 1978 scoped-audit remediation (branch `fix/p2-other-o1`)
+
+**Ruling O1-1 — the drift check alerts on a stall at 90 minutes or 10 waiting deploy-path
+commits, measured from the oldest undeployed FIRST-PARENT commit on the deploy job's own
+trigger paths.** The deploy job's timeout is 30 min, so 90 leaves a full retry window; the
+path filter mirrors `railway-deploy.yml` (test-enforced) because a web-only commit never
+triggers a deploy and would otherwise read as permanently undeployed; first-parent because a
+merged branch's commits carry their authoring dates, not their merge time. Verified against
+the real `main` and live `/health` on 2026-09-28: up to date, exit 0. Cost if wrong: a
+Railway auto-deploy (pre-cutover) that routinely takes over 90 min raises a false stall alert
+every 30 min until the bound is raised.
+
+**Ruling O1-2 — the drift check now runs unconditionally and only flags a truthy-looking
+`RAILWAY_ACTIONS_DEPLOY` (`True`/`TRUE`/`1`/`yes`/`on`) as misconfigured; unset and `false`
+are treated as deliberate.** `/health` reports the live commit today (`51e7372f`, Railway's own
+auto-deploy stamps `RAILWAY_GIT_COMMIT_SHA`), so the comparison is meaningful pre-cutover too.
+Cost if wrong: a post-cutover variable DELETED outright is not flagged by rule 1 — it is
+caught only by the stall rule, up to 90 minutes after the first undeployed API merge.
+
+**Ruling O1-3 — accepted residual: legacy `audit-cmt:` location comments keyed on the old
+`dimension|file|line` fingerprint are not normalised.** `extractFingerprint` now normalises
+legacy ISSUE markers (195 of 200 open followups carried one), which was the duplicate-issue
+defect. A location comment's marker is matched exactly, so the first run per (issue, PR) after
+the change posts one new comment instead of editing the old one, and edits the new one after
+that. Cost if wrong: at most one extra comment per (issue, PR) pair, once.
+
+**Ruling O1-4 — the Security Audit job budget test allows 120s for checkout + setup + jq +
+trufflehog.** Measured 3–22s across 30 recent runs; one earlier main run showed trufflehog at
+589s, which no budget short of a larger one covers and which is outside the audit-retry
+change. Cost if wrong: a slow trufflehog download on a cold-install, slow-registry run can
+still cancel the 18-minute job.
+
+**Ruling O1-5 — `docs/security/defence-mutation-record.md` is not regenerated.** The only
+recorded defence in a touched file is `tenant-product-faq-ownership` (product.routes.ts, where
+this change only added `export` to `updateProductSchema`); its mutation is text-anchored and
+re-ran KILLED with `--tier=all --only=tenant-product-faq-ownership`. The record is derived from
+spec + verdicts, so a regeneration would be byte-identical. Cost if wrong: none beyond a stale
+line count the next full `--write` corrects. (2026-09-30: the 2026-09-30 merge of `origin/main`
+into this branch conflicted on the record, so it WAS regenerated there — `--tier=all --write`
+against a scratch local DB, not hand-merged.)
 
 ## 2026-09-30 — P2 batch OTHER-O3: merge of main (#2073, #2088)
 

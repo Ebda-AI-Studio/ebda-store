@@ -104,6 +104,27 @@ jobs:
     # healthy release.
     timeout-minutes: 30
     steps:
+      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
+      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
+      # cannot cover, because nothing after the kill runs, checkout included.
+      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
+        # Inline, not a local composite action: a `uses: ./.github/actions/...`
+        # step cannot resolve before actions/checkout has put the repo on disk.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          leftovers=(trufflehog-*)
+          if [ ${#leftovers[@]} -eq 0 ]; then
+            exit 0
+          fi
+          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
+          docker run --rm -v "$PWD":/workspace -w /workspace \
+            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
+            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
+            exit 0
+          }
+        if: vars.USE_SELF_HOSTED == 'true'
+
       - name: Require RAILWAY_TOKEN (deploy is switched on)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
@@ -155,10 +176,18 @@ jobs:
           # thereby right in the job, so the runbook requires one dispatch run
           # while Railway's own auto-deploy is still enabled, before anyone
           # disables it.
+          #
+          # Non-fatal (#1494): this stamps VERIFICATION metadata, not the
+          # deploy itself. Any drift in this subcommand's surface (the CLI is
+          # pinned above precisely because that surface is unverified from
+          # here) used to fail here and exit BEFORE `railway up` ever ran,
+          # turning a metadata step into a total production deploy outage.
+          # Shipping the code matters more than stamping which commit it was.
           railway variable set "GIT_COMMIT_SHA=${{ github.sha }}" \
             --service "${{ vars.RAILWAY_SERVICE || 'api' }}" \
             --environment "${{ vars.RAILWAY_ENVIRONMENT || 'production' }}" \
-            --skip-deploys
+            --skip-deploys \
+            || echo "::warning::could not set GIT_COMMIT_SHA — /health will report commit: null for this deploy. The deploy itself still proceeds."
 
       - name: Deploy (railway up)
         env:
@@ -189,8 +218,18 @@ jobs:
         run: |
           observations=()
           for i in $(seq 1 30); do
-            body=$(curl -s -m 10 "$HEALTH_URL" || echo '')
-            code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$HEALTH_URL" || echo 000)
+            # ONE request, not two (#1519): body and code used to come from
+            # two independent curls up to ~10s apart during a rolling deploy.
+            # If the body request hit a blip while the status request a
+            # moment later returned 200, `unreadable` was computed from
+            # observations that never described the same instant — a
+            # perfectly healthy poll could read as UNREADABLE, which latches
+            # and fails the whole window (see live-commit-verdict.mjs). The
+            # trailing %{http_code} write-out keeps both fields sourced from
+            # the exact same response.
+            resp=$(curl -s -m 10 -w '\n%{http_code}' "$HEALTH_URL" || printf '\n000')
+            code="$(printf '%s' "$resp" | tail -n1)"
+            body="$(printf '%s' "$resp" | sed '$d')"
             # Parsed with the node setup-node already guarantees, not python3:
             # this runner is conditionally self-hosted, and `2>/dev/null || echo ''`
             # made a missing interpreter, a non-JSON body and a genuine null
@@ -261,26 +300,59 @@ jobs:
       - name: Verify guest checkout is still admitted
         env:
           API_BASE: ${{ vars.RAILWAY_API_BASE || 'https://api.force-ai.co' }}
+        # Bounded retry (#1535), matching the shape of "Verify the deployed
+        # build is THIS commit" above: that step already reasons that the
+        # verdict must come from the whole polling window, never a single
+        # poll — this probe fired exactly one curl and treated any non-404 as
+        # fatal. paymentLimiter (apps/api/src/middleware/security.ts) is
+        # keyed by IP with a shared self-hosted runner IP behind it, so a 429
+        # RATE_LIMITED is reachable on a healthy deploy; a transient 502/504
+        # during the post-deploy replica swap is too. Both are retry-worthy.
+        # CSRF_* stays an immediate hard fail: a CSRF lockout is deterministic
+        # and does not benefit from retrying.
         run: |
           set -euo pipefail
-          body=$(mktemp) || body="${RUNNER_TEMP:-/tmp}/admission-probe.json"
-          probe_args=(-s -m 20 -o "$body" -w '%{http_code}' -X POST "$API_BASE/api/v1/payments/create" -H 'Content-Type: application/json' -H 'X-Session-ID: deploy-admission-probe' -d '{"orderId":"00000000-0000-0000-0000-000000000000","provider":"tap"}')
-          code=$(curl "${probe_args[@]}") || code=000
-          err=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s)?.error?.code ?? ""))}catch{process.exit(3)}})' < "$body" 2>/dev/null) || err='__UNPARSEABLE__'
-          echo "status=$code error_code=${err:-<none>}"
-          case "$err" in
-            CSRF_*)
-              echo "::error::Guest checkout is locked out again: POST /payments/create returned $code $err for a cookieless request. This is the 2026-09-03 regression. Do not leave this deploy serving."
-              exit 1 ;;
-            __UNPARSEABLE__)
-              echo "::error::$API_BASE/api/v1/payments/create returned $code with a body this probe could not parse, so admission could not be verified. A broken check is not a healthy deploy."
-              exit 1 ;;
-          esac
-          if [ "$code" != "404" ]; then
-            echo "::error::Expected 404 NOT_FOUND for a non-existent order (proving the request cleared CSRF and reached business logic), got $code. Admission is unverified."
+          probe_args=(-s -m 20 -X POST "$API_BASE/api/v1/payments/create" -H 'Content-Type: application/json' -H 'X-Session-ID: deploy-admission-probe' -d '{"orderId":"00000000-0000-0000-0000-000000000000","provider":"tap"}')
+
+          for i in $(seq 1 5); do
+            body=$(mktemp) || body="${RUNNER_TEMP:-/tmp}/admission-probe.json"
+            code=$(curl "${probe_args[@]}" -o "$body" -w '%{http_code}') || code=000
+            err=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s)?.error?.code ?? ""))}catch{process.exit(3)}})' < "$body" 2>/dev/null) || err='__UNPARSEABLE__'
+            echo "attempt $i: status=$code error_code=${err:-<none>}"
+
+            if [ "$code" = "404" ]; then
+              echo "Guest checkout admitted: cleared CSRF and reached business logic."
+              exit 0
+            fi
+
+            # Status-code retry check BEFORE the error-code switch below: an
+            # infra-level 000/429/5xx is exactly the case whose body is NOT
+            # our app's JSON error shape (a load balancer error page, or no
+            # body at all on a connection failure), so it reads as
+            # __UNPARSEABLE__ — checking that case first would treat the most
+            # realistic transient failures as fatal, defeating the retry.
+            case "$code" in
+              000 | 429 | 5??)
+                echo "retry-worthy: status=$code error_code=${err:-<none>} — waiting 5s"
+                sleep 5
+                continue ;;
+            esac
+
+            case "$err" in
+              CSRF_*)
+                echo "::error::Guest checkout is locked out again: POST /payments/create returned $code $err for a cookieless request. This is the 2026-09-03 regression. Do not leave this deploy serving."
+                exit 1 ;;
+              __UNPARSEABLE__)
+                echo "::error::$API_BASE/api/v1/payments/create returned $code with a body this probe could not parse, so admission could not be verified. A broken check is not a healthy deploy."
+                exit 1 ;;
+            esac
+
+            echo "::error::Expected 404 NOT_FOUND for a non-existent order (proving the request cleared CSRF and reached business logic), got $code ${err:-<none>}. Admission is unverified."
             exit 1
-          fi
-          echo "Guest checkout admitted: cleared CSRF and reached business logic."
+          done
+
+          echo "::error::Guest checkout admission never reached a verifiable state after 5 attempts (last: status=$code error_code=${err:-<none>}) — likely still rate-limited or a persistent 5xx. Admission is unverified."
+          exit 1
 
   # Same probe as the deploy job's "Verify guest checkout is still admitted"
   # step, but INDEPENDENT of the RAILWAY_ACTIONS_DEPLOY gate and of any push

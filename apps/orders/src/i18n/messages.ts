@@ -88,6 +88,8 @@ export interface Messages {
     discount: string;
     coupon: string;
     promotion: string;
+    /** Loyalty-points redemption portion of the discount (issue 197). */
+    loyaltyPoints: string;
     total: string;
     /** Customer wallet (D1) — store credit applied to this order. */
     paidFromWallet: string;
@@ -306,6 +308,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       discount: 'Discount',
       coupon: 'Coupon',
       promotion: 'Promotion',
+      loyaltyPoints: 'Loyalty points',
       total: 'Total',
       paidFromWallet: 'Paid from wallet',
       amountDue: 'Amount due',
@@ -525,6 +528,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       discount: 'الخصم',
       coupon: 'كوبون',
       promotion: 'عرض ترويجي',
+      loyaltyPoints: 'نقاط الولاء',
       total: 'الإجمالي',
       paidFromWallet: 'مدفوع من المحفظة',
       amountDue: 'المبلغ المستحق',

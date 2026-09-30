@@ -35,6 +35,33 @@ Once the variable IS `true`, a missing `RAILWAY_TOKEN` **fails** the job rather 
 skipping it. After cutover an absent token is a misconfiguration, and the one thing it
 must not do is quietly go back to deploying nothing.
 
+**Post-cutover hazard (#1490):** the job-level gate that makes a _pre-cutover_ run safe
+(grey skip, not a lying green tick) reopens the identical risk one door over if
+`RAILWAY_ACTIONS_DEPLOY` is ever lost, mistyped (`True`/`TRUE`/`1`) or unset **after**
+cutover — the job silently skips again, and `notify-failure` (`needs: deploy`,
+`if: failure()`) skips right along with it, because a skipped dependency never satisfies
+`failure()`. Every push to `main` would then deploy nothing and alert nobody, with only a
+grey square on a workflow nobody is watching. `railway-deploy-drift-check.yml` is the
+independent safety net for exactly this. Every 30 minutes — **not** gated on
+`RAILWAY_ACTIONS_DEPLOY`, since a monitor that skips with the variable it watches is blind
+to that variable's loss — it alerts on Telegram and fails when:
+
+1. `RAILWAY_ACTIONS_DEPLOY` is set to a truthy-looking value that is not exactly `true`
+   (`True`, `TRUE`, `1`, `yes`, `on`) — a pure config check, no network call;
+2. the commit `/health` reports is **not an ancestor** of `main` (rollback, branch deploy,
+   force-push); or
+3. the live commit **is** an ancestor of `main`, but `main` carries commits on the deploy
+   job's own trigger paths (`DEPLOY_PATHS`, kept equal to `railway-deploy.yml`'s
+   `on.push.paths` by a unit test) that have not gone live, and the oldest of them landed
+   more than **90 minutes** ago or more than **10** of them are waiting. This is the
+   stalled-pipeline case: a pipeline that stopped deploying leaves the live commit
+   permanently an ancestor of `main`, which the check used to accept forever.
+
+Commits outside the deploy paths never trigger a deploy, so they are never "undeployed".
+`/health` reports the live commit whichever pipeline deployed it (Railway's own
+auto-deploy stamps `RAILWAY_GIT_COMMIT_SHA` pre-cutover), so the comparison is meaningful
+before and after the cutover. It never touches the deploy job's own gate.
+
 ## Before the cutover — prove the deploy path once
 
 **Do this while Railway's own auto-deploy is still enabled**, so the API keeps a working
@@ -137,6 +164,16 @@ Re-enable "Deploy on push" in Railway and the GitHub App resumes deploying; the 
 workflow goes back to a skipped job once `RAILWAY_ACTIONS_DEPLOY` is unset or set to
 anything other than `true`. Fully reversible, and the rollback is a variable rather than a
 secret so it needs no token handling.
+
+**Also delete the `GIT_COMMIT_SHA` service variable** (#1495). The "Stamp the commit"
+step writes it as a _persistent_ Railway service variable, overwritten only by the next
+Actions-triggered deploy. Once the GitHub App resumes deploying (or anyone runs
+`railway up` from a developer machine), the image is rebuilt by a path that never touches
+this variable, so it keeps baking the LAST Actions-set commit into the build and
+`/health` reports a frozen, increasingly-wrong `commit` forever — a confident lie, not
+the `null` a rolled-back cutover should read as. Delete it from the service
+(`railway variable delete GIT_COMMIT_SHA --service <service> --environment <environment>`,
+or via the dashboard) as part of the rollback.
 
 ## Concurrency: the hourly probe has its own group (2026-09-30)
 

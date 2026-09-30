@@ -15,13 +15,20 @@ export function SummaryCard({ order }: SummaryCardProps) {
   const discountPct = order.subtotal > 0 ? Math.round((order.discount / order.subtotal) * 100) : 0;
 
   // Break the total discount into its levers — coupon, automatic promotion,
-  // and everything else (loyalty redemption etc.) — instead of showing the
+  // loyalty-points redemption, and any remainder — instead of showing the
   // aggregate `discount` line alongside a coupon-only sub-line, which used to
   // double-count the coupon portion visually. couponDiscount + promotionDiscount
-  // + "other" always reconciles to `discount` (see order.service.ts's create()).
+  // + loyaltyDiscount + "other" always reconciles to `discount` (see
+  // order.service.ts's create()). Loyalty split out (#197): docs/uat/
+  // loyalty-redemption.md step 11 requires the order detail to show it
+  // distinctly, not folded into a generic "Discount" line.
   const couponPortion = order.couponDiscount ?? 0;
   const promotionPortion = order.promotionDiscount ?? 0;
-  const otherDiscount = Math.max(0, order.discount - couponPortion - promotionPortion);
+  const loyaltyPortion = order.loyaltyDiscount ?? 0;
+  const otherDiscount = Math.max(
+    0,
+    order.discount - couponPortion - promotionPortion - loyaltyPortion
+  );
   // I5 (final review): reporting-only, NOT a component of `discount` — the
   // saving already lives in a lower `subtotal` (a bundle is priced at
   // bundlePrice, never componentSum), so it is shown as its own informational
@@ -49,6 +56,14 @@ export function SummaryCard({ order }: SummaryCardProps) {
           {
             label: `${t('promotion')}${promotionName ? ` (${promotionName})` : ''}`,
             value: formatMoney(promotionPortion, order.currency),
+          },
+        ]
+      : []),
+    ...(loyaltyPortion > 0
+      ? [
+          {
+            label: `${t('loyaltyPoints')}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed.toLocaleString(locale)})` : ''}`,
+            value: formatMoney(loyaltyPortion, order.currency),
           },
         ]
       : []),

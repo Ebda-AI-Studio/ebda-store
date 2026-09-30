@@ -145,6 +145,20 @@ describe('defence-mutation gate triggers on everything it measures', () => {
       'the point of this gate is retry: 1 not masking order-dependent failures'
     ).toBe(true);
 
+    // #1439: this step used to omit ci.yml's --maxWorkers=2 (vitest.config.ts
+    // defaults to maxWorkers: 1), so it ran the full ~182-file scope single-
+    // worker — roughly double ci.yml's own wall clock for the identical
+    // scope — inside a job whose timeout was budgeted when this step was a
+    // ~20s, 159-file stryker run. A worker-count drift here is invisible in
+    // a diff review the same way the scope drift this test already guards
+    // was, so it is asserted the same way.
+    const ciWorkers = ciRun?.match(/--maxWorkers=\d+/)?.[0];
+    expect(ciWorkers, "ci.yml's unit job dropped --maxWorkers — re-point this test").toBeTruthy();
+    expect(
+      runCmd.includes(ciWorkers as string),
+      `ci.yml runs the identical unit scope with ${ciWorkers}, but the retry-0 gate does not — it can run single-worker and time out the job instead of surfacing a real result`
+    ).toBe(true);
+
     // And pin the premise, so a future widening of the stryker include does not
     // silently make the reasoning above stale without anyone noticing.
     const stryker = readFileSync(path.join(ROOT, 'vitest.stryker.config.ts'), 'utf8');

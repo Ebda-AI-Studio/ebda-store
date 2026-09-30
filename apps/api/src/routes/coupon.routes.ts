@@ -71,7 +71,7 @@ const createCouponSchema = z.object({
   scopeCategoryIds: z.array(z.string().uuid()).max(200).optional(),
 });
 
-const updateCouponSchema = createCouponSchema.partial();
+export const updateCouponSchema = createCouponSchema.partial();
 
 // Same cart-item shape as promotion.routes.ts's preview endpoint — kept
 // local (not imported) since each router already owns its own validation

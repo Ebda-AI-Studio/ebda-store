@@ -36,7 +36,7 @@ const createTaxRateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-const updateTaxRateSchema = createTaxRateSchema.partial();
+export const updateTaxRateSchema = createTaxRateSchema.partial();
 
 // GET /stores/:storeId/tax/settings - Get tax settings
 router.get(

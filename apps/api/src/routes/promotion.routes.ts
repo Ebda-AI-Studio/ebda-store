@@ -48,7 +48,7 @@ export const createSchema = z.object({
   scopeCategoryIds: z.array(z.string().uuid()).max(200).optional(),
 });
 
-const updateSchema = createSchema.partial();
+export const updateSchema = createSchema.partial();
 
 // The storefront cart only carries product ids + quantities (no category
 // ids — those live server-side on Product.categories), so the public

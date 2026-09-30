@@ -470,11 +470,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       0,
       productResults.length - Math.floor(staticBudget / STORE_STATIC_PAGES.length)
     );
+    // `storesFullyDropped` only goes non-zero once even the cheap 11-URL
+    // static pass overflows (~4,500 stores). Catalog coverage — the pages
+    // that actually convert — can be gone far earlier: MAX_STORES_WITH_PRODUCTS
+    // x PRODUCT_PAGES_PER_STORE x 100 can reach 60,000 catalog URLs against a
+    // budget that's already spent 11 x N on static pages first, so a
+    // product-bearing store past roughly the 160th can lose 100% of its
+    // catalog while its 11 static pages still get in — `storesFullyDropped`
+    // reads 0 and hides it (#1821). Walk the catalog pass in the same order
+    // it was built (oldest/anchor stores first) to find every store whose
+    // entire catalog contribution landed past the surviving budget.
+    const catalogBudget = Math.max(0, SITEMAP_URL_LIMIT - staticPages.length);
+    let storesWithNoCatalogUrls = 0;
+    let catalogConsumed = 0;
+    for (const { products, bundles } of productResults) {
+      const storeCatalogCount = products.length + (bundles.length > 0 ? 1 : 0) + bundles.length;
+      if (storeCatalogCount === 0) continue; // nothing to lose for this store
+      const survivingForThisStore = Math.max(
+        0,
+        Math.min(storeCatalogCount, catalogBudget - catalogConsumed)
+      );
+      if (survivingForThisStore === 0) storesWithNoCatalogUrls++;
+      catalogConsumed += storeCatalogCount;
+    }
     console.error('sitemap: master sitemap exceeds the 50k-URL protocol limit — truncating', {
       total: entries.length,
       emitted: SITEMAP_URL_LIMIT,
       stores: stores.length,
       storesFullyDropped,
+      storesWithNoCatalogUrls,
       // Stores the API reported but fetchStores() never received — see its
       // own error log for why. Absent from `stores` above entirely.
       storesNeverFetched,

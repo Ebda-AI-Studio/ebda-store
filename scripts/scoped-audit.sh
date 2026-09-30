@@ -81,16 +81,18 @@ if _is_pr_number "$PR_REF"; then
   _read_lines_into_array CHANGED_FILES \
     gh pr diff --repo "$GH_USER/$REPO_SLUG" "$PR_REF" --name-only
 else
-  # ref range: "base..head" or "base...head"
-  if [[ "$PR_REF" == *..* ]]; then
-    _base_ref="${PR_REF%%..*}"
-    _head_ref="${PR_REF##*..}"
-    _read_lines_into_array CHANGED_FILES \
-      git -C "$REPO_ROOT" diff --name-only "$_base_ref" "$_head_ref"
-  else
-    _read_lines_into_array CHANGED_FILES \
-      git -C "$REPO_ROOT" diff --name-only "$PR_REF"
-  fi
+  # ref range: "base..head" or "base...head" — pass PR_REF straight through
+  # to git as ONE argument (#1763). Splitting it on `..` into two separate
+  # positional refs and handing them to `git diff A B` always computes a
+  # direct two-commit diff, collapsing three-dot (merge-base) semantics to
+  # two-dot ones: a branch that is merely BEHIND main then presents as having
+  # REVERTED everything main gained since the branch point, inviting P0/P1
+  # findings on code the branch never touched. git's own range parser already
+  # handles both "A..B" and "A...B" correctly when given as a single string —
+  # a bare ref with no ".." at all (no PR range, just one SHA) is unaffected
+  # either way, so no branch is needed here.
+  _read_lines_into_array CHANGED_FILES \
+    git -C "$REPO_ROOT" diff --name-only "$PR_REF"
 fi
 
 # bash 3.2 unbound-variable guard: guard before any ${arr[@]} expansion
@@ -377,9 +379,11 @@ echo ""
 echo "scoped-audit: building diff..."
 DIFF_CONTENT=""
 if [[ "$PR_REF" == *..* ]]; then
-  _base_ref="${PR_REF%%..*}"
-  _head_ref="${PR_REF##*..}"
-  DIFF_CONTENT=$(git -C "$REPO_ROOT" diff "$_base_ref" "$_head_ref" -- . \
+  # Same fix as the changed-file list above (#1763): PR_REF passed through as
+  # ONE argument, not split into two positional refs, so three-dot
+  # (merge-base) semantics survive instead of silently degrading to a direct
+  # two-commit diff.
+  DIFF_CONTENT=$(git -C "$REPO_ROOT" diff "$PR_REF" -- . \
     ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' \
     ':(exclude)**/dist/**' ':(exclude)**/.next/**' ':(exclude)**/*.snap' \
     | python3 -c "

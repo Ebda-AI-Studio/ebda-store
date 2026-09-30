@@ -22,6 +22,13 @@
  * the gate. Use `textFieldValue` / `numericFieldValue` / `dateFieldValue`
  * from `apps/admin/src/lib/form-text.ts` instead.
  *
+ * This gate reads only the CALLER. Converting a form makes it send `null`,
+ * and a receiving Zod update schema without `.nullable()` then 422s every
+ * edit (the supplier form, PR 1978). The server half is
+ * tests/unit/update-payload-server-null-parity.test.ts: every file that calls
+ * a clear-on-empty helper must be registered there against its update
+ * schema, and that schema must accept `null` for each helper-built field.
+ *
  * DELIBERATELY NARROW so it stays enabled:
  *   - only `apiPut` / `apiPatch` (update). `apiPost` create paths are correct
  *     with `undefined` — there is nothing to clear on a create.
@@ -89,6 +96,59 @@ function isObjectPropertyValue(node) {
 }
 
 /**
+ * The nearest enclosing function (or the source file itself) — the scope
+ * `resolveIdentifierInitializer` below searches for a matching declaration.
+ */
+function findEnclosingScope(node) {
+  let current = node.parent;
+  while (current) {
+    if (
+      ts.isFunctionDeclaration(current) ||
+      ts.isFunctionExpression(current) ||
+      ts.isArrowFunction(current) ||
+      ts.isMethodDeclaration(current) ||
+      ts.isSourceFile(current)
+    ) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return null;
+}
+
+/**
+ * `apiPut(url, body)` — an identifier argument has no children for
+ * `scanArgument` to recurse into, so `const body = { x: v || undefined }`
+ * built one statement earlier was invisible to this gate (#1576). Resolves
+ * `identifierNode` to the initializer of its single matching
+ * `VariableDeclaration` in the nearest enclosing function/file scope.
+ *
+ * Deliberately conservative: zero or more-than-one candidate declaration
+ * returns null rather than guessing, so this only ever ADDS coverage for the
+ * unambiguous case — it never risks scanning the wrong object and producing
+ * a false positive on an unrelated same-named variable.
+ */
+function resolveIdentifierInitializer(identifierNode) {
+  const scope = findEnclosingScope(identifierNode);
+  if (!scope) return null;
+  const name = identifierNode.text;
+  const matches = [];
+  const search = node => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer
+    ) {
+      matches.push(node.initializer);
+    }
+    ts.forEachChild(node, search);
+  };
+  ts.forEachChild(scope, search);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+/**
  * A waiver is the marker on the offending line itself, or anywhere in the
  * contiguous comment block directly above it — so a multi-line explanation
  * counts, and a comment attached to some unrelated earlier statement does not.
@@ -145,7 +205,15 @@ export function findClearGateViolations(text, fileName = 'input.tsx') {
     if (ts.isCallExpression(node)) {
       const name = calleeName(node);
       if (name && UPDATE_CALLS.has(name)) {
-        for (const arg of node.arguments) scanArgument(arg, name);
+        for (const arg of node.arguments) {
+          scanArgument(arg, name);
+          // #1576: `apiPut(url, body)` — resolve the identifier to the
+          // object literal it was built from one statement earlier.
+          if (ts.isIdentifier(arg)) {
+            const initializer = resolveIdentifierInitializer(arg);
+            if (initializer) scanArgument(initializer, name);
+          }
+        }
       }
     }
     ts.forEachChild(node, visit);

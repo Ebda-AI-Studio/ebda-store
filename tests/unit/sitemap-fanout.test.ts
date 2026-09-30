@@ -193,7 +193,7 @@ describe('sitemap fan-out', () => {
    */
   it('keeps every store’s static pages when product-bearing stores fill the budget', async () => {
     hostRef.host = 'store.test';
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     // 200 stores get the product fan-out (MAX_STORES_WITH_PRODUCTS), each with
@@ -220,6 +220,32 @@ describe('sitemap fan-out', () => {
       missing.map(st => st.slug).slice(0, 5),
       `${missing.length} of ${stores.length} stores vanished from the master sitemap entirely`
     ).toEqual([]);
+
+    // #1821/#1828: static pages surviving is NOT the same claim as catalog
+    // pages surviving. This exact N-large + catalogs-present quadrant is the
+    // one where product URLs are cut zero-or-partial for the later
+    // product-bearing (still oldest-first, still anchor) stores while every
+    // store's 11 static pages get in — the previously-only metric
+    // (`storesFullyDropped`) reads 0 here and hides it.
+    const productUrls = [...urls].filter(u => u.includes('/products/'));
+    expect(
+      productUrls.length,
+      'no product URL survived at all in a scenario with 200 full 300-product catalogs — the fixture stopped covering this quadrant'
+    ).toBeGreaterThan(0);
+    expect(
+      productUrls.length,
+      'every product URL survived — the clamp is no longer being exercised by this fixture'
+    ).toBeLessThan(200 * 300);
+
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('50k-URL protocol limit'),
+      expect.objectContaining({ storesWithNoCatalogUrls: expect.any(Number) })
+    );
+    const payload = error.mock.calls.at(-1)?.[1] as { storesWithNoCatalogUrls: number };
+    expect(
+      payload.storesWithNoCatalogUrls,
+      'some product-bearing store must have lost its entire catalog contribution in this scenario'
+    ).toBeGreaterThan(0);
   });
 
   it('reports how many stores were fully dropped, not just a total', async () => {

@@ -500,6 +500,11 @@ export default function StoreSeoPage() {
               {t('backToSettings')}
             </Button>
           </Link>
+          <Link href={`/stores/${storeId}/seo/redirects`}>
+            <Button type="button" variant="outline">
+              {t('manageRedirects')}
+            </Button>
+          </Link>
           <button
             type="button"
             onClick={() => handleGenerate('fill-empty')}

@@ -54,7 +54,9 @@ No changes to the sitemap/robots.txt/structured-data guidance above are needed f
 > - **The master sitemap hard-clamps at 50,000 URLs** (sitemaps.org protocol
 >   limit — Google rejects/truncates anything larger). Hitting the clamp logs
 >   `sitemap: master sitemap exceeds the 50k-URL protocol limit`, with
->   `storesFullyDropped` and `catalogUrlsDropped` in the payload.
+>   `storesFullyDropped`, `storesWithNoCatalogUrls`, `storesNeverFetched` and
+>   `catalogUrlsDropped` in the payload (2026-09-25, #1821: `storesWithNoCatalogUrls`
+>   is new — see why below; #1815: `storesNeverFetched` — see the next bullet).
 > - **The store list itself can come back short, and now says so (2026-09-25,
 >   #1815).** `fetchStores()` stops at 50 pages (5,000 stores) and logs
 >   `sitemap: store list page ceiling hit`; a non-2xx page mid-pagination logs
@@ -67,37 +69,39 @@ No changes to the sitemap/robots.txt/structured-data guidance above are needed f
 >   `store.force-ai.co/` 307s to `force-ai.co`; GSC would report it as "Page
 >   with redirect". Per-store roots (`/<slug>`) are listed as before.
 > - **What the clamp drops, and in what order.** Every store's 11 static pages
->   are emitted FIRST, in one bounded pass; product and bundle URLs are
->   appended after. This degrades catalog DEPTH, but "degrades" understates
->   it: **product-URL coverage reaches ZERO well before any static page is
->   dropped**, not after. With 11 static pages emitted for every store ahead
->   of any product URL, emitted product URLs = `max(0, 50,000 - apex - 11 x
-storeCount)` — at 1,000 stores that is ~39,000 of up to 60,000 catalog
->   URLs (the 200 product-fan-out anchor tenants); at 3,000 stores it is
->   ~17,000, so only ~56 of those 200 anchor tenants have ANY catalog URL
->   left in the master sitemap; **at ~4,545 stores it is exactly zero** —
->   every product page on the platform is crowded out of the master sitemap
->   by boilerplate `/privacy` and `/terms` pages, before a single store loses
->   a static page. No store loses ITS static pages until even the
->   11-per-store pass overflows, which is a separate, later threshold, also
->   ~4,500 stores — the two thresholds coincide only because both are driven
->   by the same 11-static-pages-first ordering, not because one implies the
->   other. A tiered leading pass (home/products/categories for every store,
->   THEN catalog, THEN the other 8 static pages) would push the
->   zero-product-coverage point much higher at the cost of the low-value
->   static pages degrading sooner instead — tracked as a follow-up, not done
->   here (issue #1828).
+>   are emitted FIRST, in one bounded pass, for EVERY store — including the
+>   eight low-value ones (`/privacy`, `/terms`, `/faq`, `/shipping`,
+>   `/returns`, `/about`, `/contact`, `/how-to-guides`); product and bundle
+>   URLs are appended after, for ALL stores, only once every store's static
+>   pages are in. So product-URL coverage is `max(0, 50,000 -
+11 × storeCount)` (no apex term since #1543 dropped the platform root) — at ~4,545 stores that reaches **zero before any store
+>   loses even its static pages**, which is the metric `storesFullyDropped`
+>   reports. **Catalog coverage degrades far earlier than that** (#1821/#1828,
+>   corrected 2026-09-25): `MAX_STORES_WITH_PRODUCTS=200` x
+>   `PRODUCT_PAGES_PER_STORE=3` (up to 300 product URLs/store) can produce up
+>   to 60,000 catalog URLs from the 200 anchor tenants alone, so once catalog
+>   depth is in play a product-bearing store can lose its ENTIRE catalog
+>   contribution — zero product/bundle URLs, still-present static pages —
+>   at roughly the 160th product-bearing store, some 28x below the
+>   ~4,500-store threshold that used to be the only trigger named here.
+>   `storesFullyDropped` stays 0 through all of this, because it only counts a
+>   store whose static pages are gone too; watch `storesWithNoCatalogUrls` (and
+>   `catalogUrlsDropped`) for the earlier, catalog-only failure.
 >
->   This was NOT true before 2026-09-13. The list was built store-by-store and
->   the clamp cut the tail, so ~161 full-catalog stores (11 + 300 URLs each)
->   consumed the entire budget and every store after them was emitted with
->   ZERO URLs — vanishing from the master sitemap outright rather than
->   degrading to static-page-only coverage. Measured on the pre-fix code:
->   400 stores with full catalogs, **239 of them emitted nothing**. If you are
->   reading a Worker log from before that date, `total` alone did not tell you
->   any store had been dropped.
+>   Static-pages-first was NOT true before 2026-09-13. The list was built
+>   store-by-store and the clamp cut the tail, so ~161 full-catalog stores
+>   (11 + 300 URLs each) consumed the entire budget and every store after them
+>   was emitted with ZERO URLs — vanishing from the master sitemap outright
+>   rather than degrading to static-page-only coverage. Measured on the
+>   pre-fix code: 400 stores with full catalogs, **239 of them emitted
+>   nothing**. If you are reading a Worker log from before that date, `total`
+>   alone did not tell you any store had been dropped.
 >
-> - Past ~4,500 stores the fix is sharding — but NOT via Next's
+> - Two thresholds, not one: **catalog coverage degrades from roughly 160
+>   full-catalog stores** (watch `catalogUrlsDropped` /
+>   `storesWithNoCatalogUrls`); **static-page coverage only degrades past
+>   ~4,500 stores** (watch `storesFullyDropped`). Sharding is the fix for
+>   the first threshold, not just the second — but NOT via Next's
 >   `generateSitemaps()`, which remaps the route to `/sitemap/[id].xml`
 >   and 404s the bare `/sitemap.xml` every merchant has already submitted.
 > - Merchant custom-domain sitemaps are unaffected by the store cap and the

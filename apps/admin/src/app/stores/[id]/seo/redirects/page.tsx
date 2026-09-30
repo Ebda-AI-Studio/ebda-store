@@ -1,0 +1,159 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { AdminLayout } from '@/components/AdminLayout';
+import { useT } from '@/i18n/useT';
+import { apiGet, apiDelete } from '@/lib/api';
+import { RedirectsTable, type SlugRedirectRow } from './RedirectsTable';
+
+// #903: SlugRedirect had no admin UI surface at all — a merchant could not
+// see or remove a spuriously-captured bulk-import alias, or a stale
+// redirect blocking an old slug being re-purposed for something new. This
+// is READ + DELETE only: rows are written exclusively by
+// recordSlugRedirect alongside the entity rename that produced them (see
+// docs/architecture/slug-redirects.md), so there is no create/edit form.
+//
+// The list/delete logic lives in RedirectsTable — a pure function of props —
+// so it is testable without AdminLayout's context tree; this file owns only
+// fetching, the confirm dialog and the layout chrome.
+
+interface SlugRedirectList {
+  rows: SlugRedirectRow[];
+  total: number;
+  limit: number;
+}
+
+export default function SlugRedirectsPage() {
+  const params = useParams();
+  const storeId = params?.id as string;
+  const t = useT('seo.page');
+
+  const [list, setList] = useState<SlugRedirectList | null>(null);
+  // A failed LOAD has nothing to show; a failed DELETE must not take the
+  // table the merchant is working through away with it (scoped audit P3,
+  // PR 1978). So the error renders as a banner above the table, never as an
+  // early return that unmounts it, and the load error carries a retry.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
+
+  const load = useCallback(() => {
+    if (!storeId) return;
+    setLoadError(null);
+    const qs = appliedQuery ? `?q=${encodeURIComponent(appliedQuery)}` : '';
+    apiGet<SlugRedirectList>(`/api/v1/stores/${storeId}/slug-redirects${qs}`)
+      .then(({ data, error: apiError }) => {
+        if (apiError) {
+          setLoadError(apiError.message || t('redirectsLoadError'));
+        } else {
+          setList(data ?? { rows: [], total: 0, limit: 0 });
+        }
+      })
+      .catch(() => setLoadError(t('redirectsLoadError')));
+  }, [storeId, appliedQuery, t]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function handleDelete(id: string) {
+    if (!window.confirm(t('redirectsDeleteConfirm'))) return;
+    setDeletingId(id);
+    setActionError(null);
+    const { error: apiError } = await apiDelete(`/api/v1/stores/${storeId}/slug-redirects/${id}`);
+    setDeletingId(null);
+    if (apiError) {
+      setActionError(t('redirectsDeleteError'));
+      return;
+    }
+    setList(prev =>
+      prev ? { ...prev, rows: prev.rows.filter(row => row.id !== id), total: prev.total - 1 } : prev
+    );
+  }
+
+  const header = {
+    title: t('redirectsTitle'),
+    subtitle: t('redirectsSubtitle'),
+    actions: (
+      <Link
+        href={`/stores/${storeId}/seo`}
+        className="text-sm text-primary hover:underline px-3 py-2"
+      >
+        {t('backToSettings')}
+      </Link>
+    ),
+  };
+
+  return (
+    <AdminLayout {...header}>
+      <div className="max-w-5xl space-y-4">
+        <form
+          role="search"
+          className="flex gap-2"
+          onSubmit={e => {
+            e.preventDefault();
+            setAppliedQuery(query.trim());
+          }}
+        >
+          <input
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={t('redirectsSearchPlaceholder')}
+            aria-label={t('redirectsSearchPlaceholder')}
+            maxLength={255}
+            className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+          <button
+            type="submit"
+            className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+          >
+            {t('redirectsSearch')}
+          </button>
+        </form>
+
+        {(loadError || actionError) && (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          >
+            <span>{loadError ?? actionError}</span>
+            {loadError ? (
+              <button type="button" onClick={load} className="underline">
+                {t('redirectsRetry')}
+              </button>
+            ) : (
+              <button type="button" onClick={() => setActionError(null)} className="underline">
+                {t('redirectsDismiss')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {!list && !loadError && (
+          <div className="text-muted-foreground text-sm">{t('redirectsLoading')}</div>
+        )}
+
+        {list && (
+          <>
+            {list.total > list.rows.length && (
+              <p className="text-xs text-muted-foreground">
+                {t('redirectsShowingOf', { shown: list.rows.length, total: list.total })}
+              </p>
+            )}
+            <RedirectsTable
+              rows={list.rows}
+              deletingId={deletingId}
+              onDelete={handleDelete}
+              t={t}
+            />
+          </>
+        )}
+      </div>
+    </AdminLayout>
+  );
+}

@@ -18,13 +18,19 @@ export function SummaryCard({ order }: SummaryCardProps) {
   const discountPct = order.subtotal > 0 ? Math.round((order.discount / order.subtotal) * 100) : 0;
 
   // Break the total discount into its levers — coupon, automatic promotion,
-  // and everything else (loyalty redemption etc.) — instead of one aggregate
+  // loyalty-points redemption, and any remainder — instead of one aggregate
   // line, so the fulfillment operator can see WHAT discounted the order.
-  // couponDiscount + promotionDiscount + "other" always reconciles to
-  // `discount` (see order.service.ts's create()).
+  // couponDiscount + promotionDiscount + loyaltyDiscount + "other" always
+  // reconciles to `discount` (see order.service.ts's create()). Loyalty split
+  // out in step with the admin SummaryCard and the storefront order detail
+  // (issue 197): all three surfaces must name the same levers for one order.
   const couponPortion = order.couponDiscount ?? 0;
   const promotionPortion = order.promotionDiscount ?? 0;
-  const otherDiscount = Math.max(0, order.discount - couponPortion - promotionPortion);
+  const loyaltyPortion = order.loyaltyDiscount ?? 0;
+  const otherDiscount = Math.max(
+    0,
+    order.discount - couponPortion - promotionPortion - loyaltyPortion
+  );
   const walletAmount = order.walletAmount ?? 0;
   const promotionName = order.appliedPromotion
     ? locale === 'ar' && order.appliedPromotion.nameAr
@@ -47,6 +53,14 @@ export function SummaryCard({ order }: SummaryCardProps) {
           {
             label: `${t.detail.promotion}${promotionName ? ` (${promotionName})` : ''}`,
             value: formatMoney(promotionPortion, order.currency),
+          },
+        ]
+      : []),
+    ...(loyaltyPortion > 0
+      ? [
+          {
+            label: `${t.detail.loyaltyPoints}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed.toLocaleString(locale)})` : ''}`,
+            value: formatMoney(loyaltyPortion, order.currency),
           },
         ]
       : []),

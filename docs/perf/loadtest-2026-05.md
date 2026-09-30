@@ -48,13 +48,13 @@ STORE_ID=<uuid> ./run.sh api-bursts
 `lens-n-medium-traffic` (ramp to 300 VUs across ~80 stores, ~7 min,
 **staging/dedicated load env only — see `loadtests/README.md`, "Lens N" section**):
 
-| Metric                                                     | Target  | Notes                                                                                                   |
-| ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------- |
-| http_req_duration p95 (overall)                            | < 500ms | Code-quality non-negotiable ceiling for the edge-cached public read path.                               |
-| ms_product_list / ms_category_list / ms_product_detail p95 | < 800ms | Same cross-tenant RLS-contention ceiling `multi-store-storm` already established, scaled to ~80 stores. |
-| ms_store_layout p95                                        | < 500ms | Edge-cached (`s-maxage=120`).                                                                           |
-| ms_health p95                                              | < 200ms | Single `SELECT 1`.                                                                                      |
-| http_req_failed rate                                       | < 1%    |                                                                                                         |
+| Metric                                                     | Target  | Notes                                                                                                                                                                                                               |
+| ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| http_req_duration p95 (overall)                            | < 800ms | #605: was 500ms, contradicting the 800ms per-endpoint rows below (the highest-volume request in this scenario runs every iteration and is itself allowed 800ms). Matches `multi-store-storm`'s own overall ceiling. |
+| ms_product_list / ms_category_list / ms_product_detail p95 | < 800ms | Same cross-tenant RLS-contention ceiling `multi-store-storm` already established, scaled to ~80 stores.                                                                                                             |
+| ms_store_layout p95                                        | < 500ms | Edge-cached (`s-maxage=120`).                                                                                                                                                                                       |
+| ms_health p95                                              | < 200ms | Single `SELECT 1`.                                                                                                                                                                                                  |
+| http_req_failed rate                                       | < 1%    |                                                                                                                                                                                                                     |
 
 This closes the "Lens N" gap — the ~30-80-store medium-traffic headroom
 was previously reasoned from the single-store and 20-store baselines
