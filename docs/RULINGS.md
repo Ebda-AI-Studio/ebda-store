@@ -2628,6 +2628,50 @@ ledger shape for a single cancelled line (a pro-rata adjustment via
 wrong: the first merchant to cancel a backorder line on a paid order gets the
 whole sale reversed in the ledger.
 
+**RESOLVED 2026-09-30 (branch `fix/backorder-line-cancel-ledger`) — owner decision
+(Ahmad): cancelling ONE backorder line reverses only THAT line's amount.**
+`cancelBackorder` now fires the item-level event (`partial`, refundKey
+`backorder:<lineId>`, units = `qty − qtyFulfilled`), so the GL posts through the
+partial-return path: that line's revenue net of its discount share, its VAT
+share, its COGS — with the partial-return allocation, not a new one. Whole-order
+cancel/refund is unchanged and backs these adjustments out. Idempotency follows
+returns: the cancel is claimed by a conditional update in the same `withMoneyTx`
+that writes a `backorder_line_cancelled` orderEvent (the backorder twin of a
+completed Return row); the GL keys on `${orderId}:partial:backorder:<lineId>`, and
+the event is sent after commit (`deferAfterTenantCommit`). Proven in
+`tests/integration/accounting/backorder-line-cancel-ledger.test.ts` (7 tests, 5
+mutations each turned a test red).
+
+**Ruling AP-5a — the backorder cancel marker counts as a PRIOR reversal
+everywhere the partial allocation runs.** `loadPriorReversedQty` sums completed
+Return rows AND `backorder_line_cancelled` markers for the GL posting,
+`ReturnService.allocateThisReturn` and `computeStoreCreditAmount`, and
+`ReturnService.create` counts the cancelled units as not returnable. Without it
+the cumulative discount/tax allocation stops telescoping (measured: cancelling
+all three lines of a 1000-discount / 777-tax order one by one left fils on
+revenue, tax and cash) and a later return could re-claim units that never
+shipped. `allocateThisReturn`'s `allLinesNowReturned` therefore also treats a cancelled
+backorder unit as gone: a return that takes back the rest of such an order is sent to the
+provider as NOT item-level, and if it exhausts the payment the whole-order reversal runs —
+which backs the line adjustments out, so the GL still nets to zero. Backorder lines cancelled by the refund FANOUT get no marker — their
+units are already the Return row's, or the sale was reversed whole. Cost if
+wrong: none known; the marker is written only by `cancelBackorder`.
+
+**Ruling AP-5b — accepted residuals of the line cancel.** (1) Shipping income is
+never reversed by line cancels, as with partial returns: cancelling every line
+one by one leaves exactly the shipping charge booked against cash (pinned by a
+test); a whole-order cancel is the path that reverses it. (2) The adjustment
+credits the sale's cash account, as a partial return does, but `cancelBackorder`
+does not itself refund the provider — the merchant refunds the line off-platform
+(or via the order's refund action). (3) The fanout's "Refund issued" notification
+now fires only when `paymentStatus === 'paid'`, and states the line's allocated
+amount instead of the order total. (4) As with returns, two cancels whose events
+are processed out of order can each count the other as prior; the rounding
+remainder can then land 1 fil off. Cost if wrong: a merchant with shipping on a
+fully-cancelled backorder order sees shipping income remain until they cancel
+the order; a line cancelled but never refunded at the provider shows cash lower
+than the gateway balance.
+
 **Ruling AP-6 — margin_drop is not evaluated unless BOTH windows booked COGS.**
 With no cost of goods the margin is 100% by construction; the week cost prices
 first appear it would "drop" and page. Cost if wrong: a store whose COGS stops

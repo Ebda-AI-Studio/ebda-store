@@ -49,6 +49,8 @@ vi.mock('@force/database', () => ({
     },
     order: { findFirst: (...a: unknown[]) => orderFindFirst(...a) },
     orderItem: { findMany: (...a: unknown[]) => orderItemFindMany(...a) },
+    // Backorder single-line cancel markers — none in this file.
+    orderEvent: { findMany: async () => [] },
     payment: { findFirst: (...a: unknown[]) => paymentFindFirst(...a) },
     // The order-level returns lock (pg_advisory_xact_lock).
     $executeRaw: (...a: unknown[]) => executeRaw(...a),

@@ -34,6 +34,8 @@ const {
   prismaMock: {
     order: { findFirst: vi.fn() },
     return: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+    // create() counts units a backorder single-line cancel already took back.
+    orderEvent: { findMany: vi.fn().mockResolvedValue([]) },
     // create() takes the order's returns lock (pg_advisory_xact_lock).
     $executeRaw: vi.fn().mockResolvedValue(1),
   },
@@ -101,6 +103,7 @@ function seedHappyPath(): void {
     store: { name: 'Probe Store' },
   });
   prismaMock.return.findMany.mockResolvedValue([]);
+  prismaMock.orderEvent.findMany.mockResolvedValue([]);
   prismaMock.return.create.mockResolvedValue({ id: 'ret-1', items: [] });
 }
 

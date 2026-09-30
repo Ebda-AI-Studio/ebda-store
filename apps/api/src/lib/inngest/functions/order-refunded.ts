@@ -26,6 +26,12 @@ export interface PartialRefund {
   items: Array<{ orderItemId: string; quantity: number }>;
   refundKey: string;
   refundAmount?: number;
+  /**
+   * Present on a backorder single-line cancel: that one line is already
+   * cancelled by `cancelBackorder`, and the item's other open backorder lines
+   * stay open (they are still owed to the customer).
+   */
+  backorderLineId?: string;
 }
 
 // orderEvent.toStatus marker for a completed partial-return restore. Owned
@@ -110,8 +116,8 @@ export async function handleOrderRefunded(
   // partial-return mode (item-restore only, no whole-order reversals).
   partial?: PartialRefund,
   // Whether a whole-order event may put the order's customer-wallet spend back
-  // (D1). Absent/true for every cancel/refund; false only from the backorder
-  // single-line cancel, which borrows this whole-order event for one line.
+  // (D1). Absent/true for every cancel/refund. The backorder single-line cancel
+  // sends false too, but it is a partial event, which never reverses the wallet.
   reverseWallet: boolean = true
 ): Promise<{ skipped?: string } | void> {
   if (!orderId || !storeId) {
@@ -296,8 +302,8 @@ export async function handleOrderRefunded(
 
   // Reverse the coupon usage count consumed at checkout. Guarded by its OWN
   // `coupon_reversed` orderEvent marker (NOT the inventory `return_stock`
-  // marker — restoreInventory:false calls, e.g. backorder-line cancels, or
-  // orders with no tracked inventory, must still decrement the coupon exactly
+  // marker — restoreInventory:false calls, or orders with no tracked
+  // inventory, must still decrement the coupon exactly
   // once). Marker written IN THE SAME withMoneyTx as the decrement so a
   // retried/redelivered event never double-decrements. Order-level lock
   // matches restore-inventory above — same reasoning.
@@ -403,20 +409,24 @@ export async function handleOrderRefunded(
   // purchase-order demand planning stays accurate. Idempotent via the
   // fulfilledAt/cancelledAt null guards.
   await step.run('cancel-backorders', () =>
-    runInTenantContext(storeId, () =>
-      prisma.backorderLine.updateMany({
-        // Partial return: only the returned lines' open backorder demand is
-        // released — the rest of the order may still be fulfilled.
-        where: {
-          orderItem: isPartial
-            ? { orderId, id: { in: partial!.items.map(i => i.orderItemId) } }
-            : { orderId },
-          fulfilledAt: null,
-          cancelledAt: null,
-        },
-        data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
-      })
-    )
+    // Backorder single-line cancel: its line is already cancelled; releasing
+    // the item's OTHER open lines would cancel demand still owed.
+    partial?.backorderLineId
+      ? Promise.resolve({ count: 0 })
+      : runInTenantContext(storeId, () =>
+          prisma.backorderLine.updateMany({
+            // Partial return: only the returned lines' open backorder demand is
+            // released — the rest of the order may still be fulfilled.
+            where: {
+              orderItem: isPartial
+                ? { orderId, id: { in: partial!.items.map(i => i.orderItemId) } }
+                : { orderId },
+              fulfilledAt: null,
+              cancelledAt: null,
+            },
+            data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
+          })
+        )
   );
 
   // Refund amount: prefer the latest payment's refundedAmount (set by
@@ -648,8 +658,8 @@ export async function handleOrderRefunded(
   // guarantee — it is best-effort by design and runs immediately before this
   // stamp specifically so a reconcile failure can never prevent it.
   //
-  // Stamped regardless of whether any stock actually MOVED: a backorder-line
-  // cancel (restoreInventory:false) and an order whose products are all
+  // Stamped regardless of whether any stock actually MOVED: a whole-order
+  // event with restoreInventory:false and an order whose products are all
   // track_inventory=false both legitimately restore nothing and write no
   // InventoryHistory row. That is exactly why the sweep keys on this claim
   // rather than on marker-absence, which cannot tell those apart from "never ran".

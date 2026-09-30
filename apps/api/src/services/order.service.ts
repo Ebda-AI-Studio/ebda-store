@@ -1881,10 +1881,9 @@ export class OrderService {
       /**
        * Whether the whole-order fanout may put the order's customer-wallet
        * spend back (D1, `reverse-wallet-payment` step). Defaults true — every
-       * whole-order cancel/refund returns it. The backorder single-LINE cancel
-       * passes false: it fires this whole-order event for one line, and must
-       * never hand back the entire wallet payment for it. Partial events never
-       * reverse the wallet regardless.
+       * whole-order cancel/refund returns it. Partial events (a partial
+       * return, a backorder single-LINE cancel — which also passes false,
+       * belt and braces) never reverse the wallet.
        */
       reverseWallet?: boolean;
       /**
@@ -1907,6 +1906,13 @@ export class OrderService {
         items: Array<{ orderItemId: string; quantity: number }>;
         refundKey: string;
         refundAmount?: number;
+        /**
+         * Set by the backorder single-line cancel (`refundKey`
+         * `backorder:<id>`): that line is already cancelled, so the fanout's
+         * `cancel-backorders` step must not cancel the item's OTHER open
+         * backorder lines.
+         */
+        backorderLineId?: string;
       };
     } = {}
   ): Promise<void> {

@@ -119,6 +119,30 @@ product.costPrice`. Order lines snapshot it at sale time
 - **A non-variant product may legitimately go negative** — that is real
   backorder debt. Only variant rows are floored at 0.
 
+## Cancelling one backorder line
+
+`cancelBackorder` (`POST …/backorders/:id/cancel`) takes back only that
+line's unfulfilled units (`qty − qtyFulfilled`) — owner decision 2026-09-30,
+ruling AP-5 in `docs/RULINGS.md`. In one `withMoneyTx` it claims the line
+(conditional on `cancelledAt: null`, so a second cancel is a 404) and writes a
+`backorder_line_cancelled` orderEvent recording those units. After commit it
+fires the ITEM-LEVEL `order/refunded` event (`partial`, refundKey
+`backorder:<lineId>`, `restoreInventory: false`):
+
+- the GL posts a pro-rata adjustment for that line through the partial-return
+  path (`postPartialReturnJournal`): revenue net of its discount share, its
+  VAT share, its COGS. The sale entry itself stays posted. Shipping is not
+  reversed; a whole-order cancel still reverses the whole sale and backs these
+  adjustments out first.
+- no stock moves (none was reserved for a backordered unit), and coupon,
+  affiliate, loyalty and wallet stay as they are — the order is still live.
+  The item's other open backorder lines stay open.
+
+Every later item-level allocation — the GL, a return's provider refund, its
+store credit — counts those units as already taken back
+(`loadPriorReversedQty`, `accounting/posting/prior-reversed-qty.ts`), and
+`ReturnService.create` does not let them be returned.
+
 ## Cache
 
 Variant stock is serialized into the storefront product list, detail and

@@ -9,6 +9,10 @@ import { PaymentService, findOutstandingRefundClaims } from './payment-providers
 import { refundMayHaveExecuted } from './payment-providers/refund-outcome';
 import logger from '../lib/logger';
 import { allocatePartialReturn } from './accounting/posting/partial-return-allocation';
+import {
+  loadBackorderCancelledQty,
+  loadPriorReversedQty,
+} from './accounting/posting/prior-reversed-qty';
 import { featureService } from './feature.service';
 import { WalletService } from './wallet.service';
 
@@ -331,7 +335,10 @@ export class ReturnService {
       },
       select: { items: { select: { orderItemId: true, quantity: true } } },
     });
-    const claimedQty = new Map<string, number>();
+    // Units a single-line backorder cancel already took back never shipped —
+    // they are not returnable either.
+    const claimedQty = (await loadBackorderCancelledQty(prisma, { storeId, orderId: data.orderId }))
+      .qty;
     for (const prior of priorReturns) {
       for (const it of prior.items) {
         claimedQty.set(it.orderItemId, (claimedQty.get(it.orderItemId) ?? 0) + it.quantity);
@@ -1066,22 +1073,13 @@ export class ReturnService {
     orderLines: Array<{ id: string; quantity: number; price: number }>,
     items: Array<{ orderItemId: string; quantity: number }>
   ): Promise<PartialAllocation> {
-    const priorReturns = await prisma.return.findMany({
-      where: {
-        storeId,
-        orderId,
-        status: 'completed',
-        type: { in: ['return', 'refund'] },
-        id: { not: returnId },
-      },
-      select: { items: { select: { orderItemId: true, quantity: true } } },
+    // Prior completed returns AND single-line backorder cancellations — the
+    // same reader the GL posting uses, so the two cannot disagree.
+    const { prevQty } = await loadPriorReversedQty(prisma, {
+      storeId,
+      orderId,
+      excludeKey: returnId,
     });
-    const prevQty = new Map<string, number>();
-    for (const ret of priorReturns) {
-      for (const it of ret.items) {
-        prevQty.set(it.orderItemId, (prevQty.get(it.orderItemId) ?? 0) + it.quantity);
-      }
-    }
     const order = await prisma.order.findFirst({
       where: { id: orderId, storeId },
       select: { subtotal: true, discount: true, tax: true, taxIncludedInPrice: true },
@@ -1317,17 +1315,8 @@ export class ReturnService {
     items: Array<{ orderItemId: string; quantity: number }>,
     isFullReturn: boolean
   ): Promise<number> {
-    const [priorReturns, order] = await Promise.all([
-      prisma.return.findMany({
-        where: {
-          storeId,
-          orderId,
-          status: 'completed',
-          type: { in: ['return', 'refund'] },
-          id: { not: returnId },
-        },
-        select: { items: { select: { orderItemId: true, quantity: true } } },
-      }),
+    const [{ prevQty }, order] = await Promise.all([
+      loadPriorReversedQty(prisma, { storeId, orderId, excludeKey: returnId }),
       prisma.order.findFirst({
         where: { id: orderId, storeId },
         select: {
@@ -1340,12 +1329,6 @@ export class ReturnService {
         },
       }),
     ]);
-    const prevQty = new Map<string, number>();
-    for (const ret of priorReturns) {
-      for (const it of ret.items) {
-        prevQty.set(it.orderItemId, (prevQty.get(it.orderItemId) ?? 0) + it.quantity);
-      }
-    }
     const alloc = allocatePartialReturn({
       subtotal: order?.subtotal ?? 0,
       discount: order?.discount ?? 0,

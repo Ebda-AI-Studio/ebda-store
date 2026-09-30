@@ -14,10 +14,11 @@ import { featureService } from '../../../services/feature.service';
  *     reversedById (postRefundJournal — also backs out any prior partial
  *     adjustment entries so the ledger nets to zero, the GL equivalent of
  *     the fanout's already-restored-quantity subtraction).
- *   - PARTIAL return (item-level `partial` payload): a pro-rata adjustment
- *     reversing only the returned lines' revenue/tax/COGS
- *     (postPartialReturnJournal), keyed on `partial.refundKey` (the Return
- *     id) so an at-least-once redelivery never posts twice.
+ *   - PARTIAL return or backorder single-line cancel (item-level `partial`
+ *     payload): a pro-rata adjustment reversing only those lines'
+ *     revenue/tax/COGS (postPartialReturnJournal), keyed on
+ *     `partial.refundKey` (the Return id, or `backorder:<lineId>`) so an
+ *     at-least-once redelivery never posts twice.
  *
  * Idempotent — postRefundJournal skips already-reversed entries;
  * postPartialReturnJournal posts one entry set per refundKey.

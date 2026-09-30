@@ -5,14 +5,16 @@ import { postEntry, type JournalLineInput } from '../journal.service';
 import { PROVIDER_TO_CASH_CODE } from './order-posting';
 import logger from '../../../lib/logger';
 import { allocatePartialReturn } from './partial-return-allocation';
+import { loadPriorReversedQty } from './prior-reversed-qty';
 
 export interface PartialReturnJournalArgs {
   orderId: string;
   /**
-   * Idempotency key for this partial return — the Return id (every partial
-   * `order/refunded` producer sets it from ReturnService.complete). One
-   * adjustment entry set per refundKey; a redelivered event no-ops. The
-   * Return row it names also supplies the memo's merchant-entered reason.
+   * Idempotency key for this item-level reversal — the Return id (set by
+   * ReturnService.complete) or `backorder:<lineId>` (set by cancelBackorder,
+   * ruling AP-5). One adjustment entry set per refundKey; a redelivered event
+   * no-ops. The Return row / backorder cancel marker it names also supplies
+   * the memo's merchant-entered reason.
    */
   refundKey: string;
   items: Array<{ orderItemId: string; quantity: number }>;
@@ -171,30 +173,23 @@ export async function postPartialReturnJournal(
     select: { id: true, status: true },
   });
 
-  // Quantities already returned by PRIOR returns, read from the return
-  // domain's own COMPLETED rows (see the docblock — deliberately NOT the
-  // inventory fanout's marker). ReturnService.complete flips the row to
+  // Quantities already taken back by PRIOR item-level reversals, read from
+  // the return domain's own COMPLETED rows (see the docblock — deliberately
+  // NOT the inventory fanout's marker) plus single-line backorder
+  // cancellations (their `backorder_line_cancelled` marker, committed with the
+  // cancel before the event fires). ReturnService.complete flips the row to
   // 'completed' before firing order/refunded, so prior returns are always
-  // visible here; THIS return (id === refundKey) is excluded — it is
-  // already 'completed' too by the time its event arrives. The same query
-  // also supplies this return's merchant-entered reason for the memo
-  // (issue 1191 — the event payload carries no reason field).
-  const completedReturns = await tx.return.findMany({
-    where: { storeId, orderId, status: 'completed', type: { in: ['return', 'refund'] } },
-    select: {
-      id: true,
-      reason: true,
-      items: { select: { orderItemId: true, quantity: true } },
-    },
+  // visible here; THIS reversal (refundKey) is excluded — it is already
+  // committed too by the time its event arrives. The same read supplies this
+  // reversal's merchant-entered reason for the memo (issue 1191 — the event
+  // payload carries no reason field).
+  const { prevQty, reasons } = await loadPriorReversedQty(tx, {
+    storeId,
+    orderId,
+    excludeKey: refundKey,
   });
-  const returnReason = completedReturns.find(r => r.id === refundKey)?.reason;
-  const prevQty = new Map<string, number>();
-  for (const ret of completedReturns) {
-    if (ret.id === refundKey) continue;
-    for (const it of ret.items) {
-      prevQty.set(it.orderItemId, (prevQty.get(it.orderItemId) ?? 0) + it.quantity);
-    }
-  }
+  const returnReason = reasons.get(refundKey) ?? undefined;
+  const isBackorderCancel = refundKey.startsWith('backorder:');
 
   // Prior gross across the whole order, this return's lines clamped to each
   // line's un-returned remainder, and the cumulative discount/tax allocation.
@@ -273,10 +268,10 @@ export async function postPartialReturnJournal(
       storeId,
       source: 'order',
       sourceId: baseSourceId,
-      memo: returnReason
-        ? `Partial return — Order ${order.orderNumber} (${returnReason})`
-        : `Partial return — Order ${order.orderNumber}`,
-      memoAr: `مرتجع جزئي — طلب ${order.orderNumber}`,
+      memo: `${isBackorderCancel ? 'Backorder line cancelled' : 'Partial return'} — Order ${order.orderNumber}${returnReason ? ` (${returnReason})` : ''}`,
+      memoAr: isBackorderCancel
+        ? `إلغاء بند طلب مسبق — طلب ${order.orderNumber}`
+        : `مرتجع جزئي — طلب ${order.orderNumber}`,
       lines,
       tx,
     });
