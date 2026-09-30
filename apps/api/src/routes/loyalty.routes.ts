@@ -6,6 +6,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { LoyaltyService } from '../services/loyalty.service';
 import { LoyaltyTransactionType, prisma } from '@force/database';
 import { tenantContext } from '../middleware/tenant-context';
+import { rangeOrLegacyDays } from '../lib/report-range';
 
 // TWO routers, deliberately. The admin half is mounted ONLY at the bare
 // '/stores' prefix; the customer half is the only thing mounted at '/public'
@@ -216,7 +217,18 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { page, limit, type, customerId, from, to } = req.query;
+      const { page, limit, type, customerId } = req.query;
+      // Shared report-range contract (viewer-local days); legacy date-only
+      // `from`/`to` still accepted as UTC days. The old parse mixed a UTC
+      // start with a server-local end.
+      const range = rangeOrLegacyDays(req.query as Record<string, unknown>);
+      if (!range.ok) {
+        res.status(422).json({
+          success: false,
+          error: { code: 'validation_failed', message: 'Invalid date range.' },
+        });
+        return;
+      }
 
       const pageNum = Math.max(1, parseInt((page as string) || '1') || 1);
       const limitNum = Math.min(100, Math.max(1, parseInt((limit as string) || '50') || 50));
@@ -229,17 +241,10 @@ router.get(
       if (customerId && typeof customerId === 'string') {
         where.customerId = customerId;
       }
-      if (from || to) {
+      if (range.from || range.to) {
         where.createdAt = {};
-        if (from && typeof from === 'string') {
-          where.createdAt.gte = new Date(from);
-        }
-        if (to && typeof to === 'string') {
-          // Include the full 'to' day
-          const toDate = new Date(to);
-          toDate.setHours(23, 59, 59, 999);
-          where.createdAt.lte = toDate;
-        }
+        if (range.from) where.createdAt.gte = range.from;
+        if (range.to) where.createdAt.lte = range.to;
       }
 
       const [transactions, total] = await Promise.all([

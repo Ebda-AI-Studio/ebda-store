@@ -1,11 +1,26 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
-import { neutralizeRowObject } from '../lib/exports/xlsx';
+import {
+  neutralizeRowObject,
+  addFiltersSheet,
+  describeRange,
+  summarizeExportFilters,
+} from '../lib/exports/xlsx';
 import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { OrderService, assertValidTransition } from '../services/order.service';
+import {
+  OrderService,
+  assertValidTransition,
+  type OrderListWhere,
+} from '../services/order.service';
+import {
+  parseOrderListFilters as parseSharedOrderFilters,
+  exportFilename,
+  dayInOffset,
+  parseTzOffset,
+} from '@force/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
 import { requirePermission } from '../middleware/rbac';
@@ -30,6 +45,7 @@ import {
   REFUND_EVENT_IDS_KEY,
   REFUND_STATUS_BY_ID_KEY,
 } from '../services/payment-providers/refund-settlement';
+import { rangeOrLegacyDays } from '../lib/report-range';
 
 const router = Router({ mergeParams: true });
 
@@ -44,6 +60,48 @@ const router = Router({ mergeParams: true });
  * the overwhelming majority of stores.
  */
 const MAX_ORDERS_SCANNED = 20_000;
+
+/**
+ * Parses the order list's filters — the list AND its XLSX export read them
+ * through here, so the export is what the list shows.
+ *
+ * Date range: the shared report-range contract (`startDate`/`endDate`, ISO
+ * instants resolved in the viewer's timezone). The legacy date-only
+ * `from`/`to` pair stays accepted for older callers; it is read as a whole
+ * UTC day, which is why the admin no longer sends it (a Kuwait
+ * merchant's "today" started 3 hours late). Returns null after a 422.
+ */
+function parseOrderListFilters(
+  req: Request,
+  res: Response
+): Pick<OrderListWhere, 'status' | 'paymentStatus' | 'from' | 'to' | 'search'> | null {
+  const parsed = parseSharedOrderFilters(req.query);
+  if (!parsed.ok) {
+    res.status(422).json({
+      success: false,
+      error: {
+        code: 'validation_failed',
+        message: 'Invalid order filters.',
+        details: parsed.error.flatten(),
+      },
+    });
+    return null;
+  }
+  const { status, paymentStatus, search } = parsed.filters;
+  // Contract range first, legacy date-only pair second. `parseSharedOrderFilters`
+  // already rejected a malformed contract range, so this cannot fail here.
+  const { from, to } = rangeOrLegacyDays(req.query as Record<string, unknown>) as {
+    from?: Date;
+    to?: Date;
+  };
+  return {
+    status,
+    paymentStatus,
+    from,
+    to,
+    search,
+  };
+}
 
 /** Admin-only middleware chain for store-scoped read endpoints. */
 const adminMiddleware = [
@@ -98,10 +156,14 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
+      // Same filters as the list on screen (status, date range, search).
+      const filters = parseOrderListFilters(req, res);
+      if (!filters) return;
+
       // Fetch up to cap+1 to detect truncation. Include items + first payment
       // for the Line Items sheet and the payment provider/method columns.
       const fetched = await prisma.order.findMany({
-        where: { storeId, deletedAt: null },
+        where: OrderService.listWhere(storeId, filters),
         select: {
           id: true,
           orderNumber: true,
@@ -319,8 +381,23 @@ router.get(
       }
       itemsSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
+      // Name the applied filters in the file itself and in its filename, in
+      // the viewer's days (`tzOffset`, as the admin sends it).
+      const dayOf = dayInOffset(parseTzOffset(req.query.tzOffset));
+      const range =
+        filters.from && filters.to ? { startDate: filters.from, endDate: filters.to } : undefined;
+      addFiltersSheet(
+        workbook,
+        summarizeExportFilters([
+          ['Date range', describeRange(range, dayOf)],
+          ['Status', filters.status],
+          ['Payment status', filters.paymentStatus],
+          ['Search', filters.search],
+        ])
+      );
+
       const filenameSafe = (store.slug || store.name || 'orders').replace(/[^a-z0-9-]/gi, '-');
-      const filename = `${filenameSafe}-orders-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = exportFilename(`${filenameSafe}-orders`, range, 'xlsx', dayOf);
 
       // Build the workbook into an in-memory buffer BEFORE touching the
       // response.  This bounds all DB work to the fast fetch+build window and
@@ -427,7 +504,7 @@ const getSessionId = (req: Request): string => {
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const { page, limit, status, from, to, confirmedOnly } = req.query;
+    const { page, limit, confirmedOnly } = req.query;
     const role = req.user?.role;
     const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
 
@@ -441,13 +518,14 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       }
     }
 
+    const filters = parseOrderListFilters(req, res);
+    if (!filters) return;
+
     const result = await OrderService.list(storeId, {
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
-      status: status as string,
+      ...filters,
       customerId: isStoreViewer ? undefined : req.user?.userId,
-      from: from ? new Date(String(from) + 'T00:00:00') : undefined,
-      to: to ? new Date(String(to) + 'T23:59:59') : undefined,
       // Orders PWA passes confirmedOnly=1 to show only confirmed/COD orders.
       // Only honoured for store viewers (staff / admins); customer queries
       // are already scoped to their own orders and never need this filter.

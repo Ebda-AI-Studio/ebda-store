@@ -10,6 +10,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
+import { reportRangeQueryString } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,19 +40,12 @@ export default function StockAdjustmentsPage() {
   // Debounced search term — client-side filter over adjustment number and type.
   const [search, setSearch] = useState('');
 
-  function toDateStr(d: Date): string {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
   useEffect(() => {
     if (!storeId) return;
-    const resolved = resolveDateRange(period, customRange);
-    const from = toDateStr(resolved.startDate);
-    const to = toDateStr(resolved.endDate);
-    apiGet<AdjustmentRow[]>(`/api/v1/stores/${storeId}/stock-adjustments?from=${from}&to=${to}`)
+    // Shared report-range contract: the picked days in the viewer's timezone
+    // (the date-only from/to were read as UTC days).
+    const rangeQs = reportRangeQueryString(resolveDateRange(period, customRange));
+    apiGet<AdjustmentRow[]>(`/api/v1/stores/${storeId}/stock-adjustments?${rangeQs}`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);

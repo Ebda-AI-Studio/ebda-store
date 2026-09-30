@@ -14,6 +14,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { rangeOrLegacyDays } from '../lib/report-range';
 import { prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -71,7 +72,7 @@ function maskEmail(email: string | null | undefined): string | null | undefined 
 router.get('/', ...adminMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const { page, limit, from, to } = listQuerySchema.parse(req.query);
+    const { page, limit } = listQuerySchema.parse(req.query);
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {
@@ -83,11 +84,22 @@ router.get('/', ...adminMiddleware, async (req: Request, res: Response, next: Ne
       // recovered or cancelled after abandon).
     };
 
-    if (from || to) {
-      const range: Record<string, Date> = {};
-      if (from) range['gte'] = new Date(`${from}T00:00:00`);
-      if (to) range['lte'] = new Date(`${to}T23:59:59`);
-      where['paymentGatewayAbandonedAt'] = range;
+    // Shared report-range contract (viewer-local days as instants); the
+    // legacy date-only `from`/`to` were read as server-local days, so a Kuwait
+    // merchant's "today" started 3 hours late.
+    const range = rangeOrLegacyDays(req.query as Record<string, unknown>);
+    if (!range.ok) {
+      res.status(422).json({
+        success: false,
+        error: { code: 'validation_failed', message: 'Invalid date range.' },
+      });
+      return;
+    }
+    if (range.from || range.to) {
+      const bounds: Record<string, Date> = {};
+      if (range.from) bounds['gte'] = range.from;
+      if (range.to) bounds['lte'] = range.to;
+      where['paymentGatewayAbandonedAt'] = bounds;
     }
 
     const [rows, total] = await runInTenantContext(storeId, () =>

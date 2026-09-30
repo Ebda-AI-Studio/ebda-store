@@ -1,6 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
-import { neutralizeRowObject, neutralizeRowArray } from '../lib/exports/xlsx';
+import {
+  neutralizeRowObject,
+  neutralizeRowArray,
+  addFiltersSheet,
+  summarizeExportFilters,
+} from '../lib/exports/xlsx';
 import { prisma, type RfmSegment } from '@force/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -50,9 +55,54 @@ const adminMiddleware = [
 ];
 
 /**
+ * The list's search + segment filters, applied the SAME way by the list and
+ * by the export (owner report 2026-09-30: the export button ignored the
+ * filters on screen and always downloaded every customer). Segment filtering
+ * is admin-only — staff get a 403, matching `rfm-batch`.
+ */
+async function applyCustomerListFilters(
+  req: Request,
+  storeId: string,
+  customers: Awaited<ReturnType<typeof aggregateCustomers>>['customers']
+) {
+  const search = (req.query.search as string | undefined)?.trim().toLowerCase() ?? '';
+  const segment = parseSegmentFilter(req.query.segment);
+
+  // RFM segments are analytics that `rfm-batch` serves to store_admin /
+  // super_admin only. Filtering by one here would let `staff` (who can
+  // read this list) enumerate segment membership, so keep the same line.
+  if (segment && segment !== 'guest' && req.user?.role === 'staff') {
+    throw new AppError(403, 'FORBIDDEN', 'Segment filtering requires a store admin');
+  }
+
+  // Segment filter runs server-side, over the whole aggregated set, so the
+  // total + pagination reflect the segment rather than one page of it.
+  // It reads only that segment's members (issue 2243).
+  const bySegment =
+    segment === 'guest'
+      ? customers.filter(c => c.isGuest)
+      : segment
+        ? await filterCustomersBySegment(storeId, customers, segment)
+        : customers;
+
+  // Server-side so search is consistent across pages (the old client-only
+  // search only matched the fetched page).
+  return search
+    ? bySegment.filter(
+        c =>
+          c.firstName.toLowerCase().includes(search) ||
+          c.lastName.toLowerCase().includes(search) ||
+          c.email.toLowerCase().includes(search) ||
+          c.phone.toLowerCase().includes(search)
+      )
+    : bySegment;
+}
+
+/**
  * GET /stores/:storeId/customers/export.xlsx
- * Streams an .xlsx workbook of all customers aggregated from order history.
- * Used by the admin customers page's "Export" button.
+ * Streams an .xlsx workbook of the customers aggregated from order history,
+ * narrowed by the same `search` / `segment` query the list takes — the admin
+ * customers page's "Export" button sends whatever filters are on screen.
  */
 router.get(
   '/customers/export.xlsx',
@@ -68,8 +118,17 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
-      const { customers, ordersTruncated, zeroOrderTruncated, ordersScanned, orders } =
-        await aggregateCustomers(storeId);
+      const aggregated = await aggregateCustomers(storeId);
+      const { ordersTruncated, zeroOrderTruncated, ordersScanned } = aggregated;
+      const customers = await applyCustomerListFilters(req, storeId, aggregated.customers);
+      // The Purchases / Summary sheets follow the same filter: only the orders
+      // of the customers exported. A row's id IS its `customerKeyOf` key
+      // (customer-aggregate.service), so the same key selects its orders.
+      const exportedIds = new Set(customers.map(c => c.id));
+      const orders =
+        customers.length === aggregated.customers.length
+          ? aggregated.orders
+          : aggregated.orders.filter(o => exportedIds.has(customerKeyOf(o) ?? `guest:${o.id}`));
 
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Force Website Builder';
@@ -408,8 +467,20 @@ router.get(
         noticeRow.getCell(1).font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
 
+      const appliedSearch = (req.query.search as string | undefined)?.trim() || undefined;
+      const appliedSegment = parseSegmentFilter(req.query.segment) ?? undefined;
+      addFiltersSheet(
+        workbook,
+        summarizeExportFilters([
+          ['Segment', appliedSegment],
+          ['Search', appliedSearch],
+        ])
+      );
+
       const filenameSafe = (store.slug || store.name || 'customers').replace(/[^a-z0-9-]/gi, '-');
-      const filename = `${filenameSafe}-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${filenameSafe}-customers${appliedSegment ? `-${appliedSegment}` : ''}${
+        appliedSearch ? '-search' : ''
+      }-${new Date().toISOString().slice(0, 10)}.xlsx`;
 
       // Build the workbook into an in-memory buffer BEFORE touching the
       // response.  This bounds all DB work to the fast fetch+build window and
@@ -463,46 +534,15 @@ router.get(
       const page = Math.max(1, Number(req.query.page ?? 1) || 1);
       // Hard-cap perPage so a caller can't request an unbounded page.
       const perPage = Math.min(100, Math.max(1, Number(req.query.perPage ?? 20) || 20));
-      const search = (req.query.search as string | undefined)?.trim().toLowerCase() ?? '';
-      const segment = parseSegmentFilter(req.query.segment);
-
-      // RFM segments are analytics that `rfm-batch` serves to store_admin /
-      // super_admin only. Filtering by one here would let `staff` (who can
-      // read this list) enumerate segment membership, so keep the same line.
-      if (segment && segment !== 'guest' && req.user?.role === 'staff') {
-        throw new AppError(403, 'FORBIDDEN', 'Segment filtering requires a store admin');
-      }
-
       const { customers, truncated, summary } = await aggregateCustomers(storeId);
 
       // A guest's snapshot is keyed by the HASH of the same key this list
       // groups by (`lib/customer-key.ts`), so guests resolve too — before,
       // RFM keyed guests by hash(email:phone) and this filter could only
       // ever match registered shoppers (analytics audit §4). Staff never
-      // receive segments, matching the 403 above.
+      // receive segments (applyCustomerListFilters 403s them).
       const canSeeSegments = req.user?.role !== 'staff';
-
-      // Segment filter runs server-side, over the whole aggregated set, so the
-      // total + pagination reflect the segment rather than one page of it.
-      // It reads only that segment's members (issue 2243).
-      const bySegment =
-        segment === 'guest'
-          ? customers.filter(c => c.isGuest)
-          : segment
-            ? await filterCustomersBySegment(storeId, customers, segment)
-            : customers;
-
-      // Optional server-side filter so search is consistent across pages
-      // (the old client-only search only matched the fetched page).
-      const filtered = search
-        ? bySegment.filter(
-            c =>
-              c.firstName.toLowerCase().includes(search) ||
-              c.lastName.toLowerCase().includes(search) ||
-              c.email.toLowerCase().includes(search) ||
-              c.phone.toLowerCase().includes(search)
-          )
-        : bySegment;
+      const filtered = await applyCustomerListFilters(req, storeId, customers);
 
       const total = filtered.length;
       const totalPages = Math.max(1, Math.ceil(total / perPage));

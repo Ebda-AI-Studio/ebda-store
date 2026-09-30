@@ -336,7 +336,9 @@ app.use(
       callback(corsRejection(origin));
     },
     credentials: true,
-    exposedHeaders: ['X-Request-Id', 'X-CSRF-Token'],
+    // Content-Disposition: the admin names a downloaded export after the
+    // server's filename (it carries the applied date range).
+    exposedHeaders: ['X-Request-Id', 'X-CSRF-Token', 'Content-Disposition'],
   })
 );
 

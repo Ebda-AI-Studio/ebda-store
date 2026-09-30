@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../../lib/api';
 import { textFieldValue, numericFieldValue, dateFieldValue } from '../../../../../lib/form-text';
 import type { Coupon, CouponFormData, CouponStatusFilter } from '../_components/types';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 
 interface UseCouponsResult {
   coupons: Coupon[];
@@ -71,7 +72,9 @@ export function useCoupons(storeId: string): UseCouponsResult {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<CouponStatusFilter>('all');
 
+  const beginRequest = useLatestRequest();
   const fetchCoupons = useCallback(async () => {
+    const isLatest = beginRequest();
     try {
       const query = new URLSearchParams();
       if (searchTerm) query.append('search', searchTerm);
@@ -82,21 +85,26 @@ export function useCoupons(storeId: string): UseCouponsResult {
       const { data } = await apiGet<{ coupons: Coupon[] }>(
         `/api/v1/stores/${storeId}/coupons?${query}`
       );
+      if (!isLatest()) return;
       if (data) {
         setCoupons(data.coupons);
       }
     } catch (error) {
       console.error('Failed to fetch coupons:', error);
     } finally {
-      setIsLoading(false);
+      if (isLatest()) setIsLoading(false);
     }
-  }, [storeId, searchTerm, filterActive]);
+  }, [storeId, searchTerm, filterActive, beginRequest]);
 
+  // Refetch when the store or the status filter changes. The status filter
+  // used to refetch from the page via `setTimeout(fetchCoupons)` — a closure
+  // from the render BEFORE the change, so every request carried the PREVIOUS
+  // status and the list lagged one selection behind. Search stays
+  // submit-on-Enter (`fetchCoupons` from the current render).
   useEffect(() => {
     void fetchCoupons();
-    // Only refetch when storeId changes — filters/search trigger refetch manually.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId]);
+  }, [storeId, filterActive]);
 
   const saveCoupon = useCallback(
     async (formData: CouponFormData, editingId: string | null): Promise<boolean> => {

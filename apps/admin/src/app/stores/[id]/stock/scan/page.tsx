@@ -451,16 +451,21 @@ function PickMode({ storeId }: { storeId: string }) {
     setOrderErr(null);
     setOrder(null);
     setPickResult(null);
-    // Look up by order number — we need to search first
-    const { data, error } = await apiGet<{ orders: { id: string }[]; meta: { total: number } }>(
-      `/api/v1/stores/${storeId}/orders?search=${encodeURIComponent(orderInput.trim())}&limit=1`
-    );
-    if (error || !data?.orders?.length) {
+    // Look up by order number. The list's `search` is a contains-match (it
+    // was ignored by the API outright, so this used to open the store's
+    // NEWEST order whatever was typed) — take the exact order-number match.
+    const wanted = orderInput.trim();
+    const { data, error } = await apiGet<{
+      orders: { id: string; orderNumber: string }[];
+      meta: { total: number };
+    }>(`/api/v1/stores/${storeId}/orders?search=${encodeURIComponent(wanted)}&limit=20`);
+    const match = data?.orders?.find(o => o.orderNumber.toLowerCase() === wanted.toLowerCase());
+    if (error || !match) {
       setOrderErr(t('orderNotFound'));
       setOrderLoading(false);
       return;
     }
-    const orderId = data.orders[0].id;
+    const orderId = match.id;
     const { data: progress, error: progErr } = await apiGet<OrderPickProgress>(
       `/api/v1/stores/${storeId}/inventory/orders/${orderId}/pick-progress`
     );

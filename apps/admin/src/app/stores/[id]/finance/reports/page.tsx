@@ -7,6 +7,7 @@ import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiFetch } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,19 +136,33 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
+  // Latest-request-wins: a slower response for the PREVIOUS dates must not
+  // land after the current one and repaint the old period under the new dates.
+  const beginRequest = useLatestRequest();
   const fetch = useCallback(() => {
+    const isLatest = beginRequest();
     setLoading(true);
     setError(null);
     apiGet<TrialBalanceRow[]>(
       `/api/v1/stores/${storeId}/finance/reports/trial-balance?asOf=${asOf}`
     )
       .then(({ data, error: apiError }) => {
-        if (apiError) setError(apiError.message);
-        else setRows(data ?? []);
+        if (!isLatest()) return;
+        if (apiError) {
+          // Never leave the previous period's figures on screen under an error.
+          setRows(null);
+          setError(apiError.message);
+        } else setRows(data ?? []);
       })
-      .catch(() => setError('Failed to load trial balance'))
-      .finally(() => setLoading(false));
-  }, [storeId, asOf]);
+      .catch(() => {
+        if (!isLatest()) return;
+        setRows(null);
+        setError('Failed to load trial balance');
+      })
+      .finally(() => {
+        if (isLatest()) setLoading(false);
+      });
+  }, [storeId, asOf, beginRequest]);
 
   useEffect(() => {
     fetch();
@@ -177,7 +192,11 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
       kwd(r.credit),
       kwd(r.balance),
     ]);
-    downloadCsv(`trial-balance-${asOf}.csv`, [header, ...dataRows]);
+    downloadCsv(`trial-balance-as-of-${asOf}.csv`, [
+      [`Filters: As of = ${asOf}`],
+      header,
+      ...dataRows,
+    ]);
   }
 
   return (
@@ -196,20 +215,20 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
           <button
             type="button"
             onClick={exportCsv}
-            disabled={!rows || rows.length === 0}
+            disabled={loading || !rows || rows.length === 0}
             className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
           >
             {t('exportCsv')}
           </button>
           <button
             type="button"
-            disabled={!rows || rows.length === 0 || exportingXlsx}
+            disabled={loading || !rows || rows.length === 0 || exportingXlsx}
             onClick={async () => {
               setExportingXlsx(true);
               try {
                 await downloadXlsx(
                   `/api/v1/stores/${storeId}/finance/reports/trial-balance.xlsx?asOf=${asOf}`,
-                  `trial-balance-${asOf}.xlsx`
+                  `trial-balance-as-of-${asOf}.xlsx`
                 );
               } finally {
                 setExportingXlsx(false);
@@ -301,17 +320,31 @@ function PnlTab({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
+  // Latest-request-wins: a slower response for the PREVIOUS dates must not
+  // land after the current one and repaint the old period under the new dates.
+  const beginRequest = useLatestRequest();
   const fetch = useCallback(() => {
+    const isLatest = beginRequest();
     setLoading(true);
     setError(null);
     apiGet<PnlData>(`/api/v1/stores/${storeId}/finance/reports/pnl?from=${from}&to=${to}`)
       .then(({ data: d, error: apiError }) => {
-        if (apiError) setError(apiError.message);
-        else setData(d ?? null);
+        if (!isLatest()) return;
+        if (apiError) {
+          // Never leave the previous period's figures on screen under an error.
+          setData(null);
+          setError(apiError.message);
+        } else setData(d ?? null);
       })
-      .catch(() => setError('Failed to load P&L'))
-      .finally(() => setLoading(false));
-  }, [storeId, from, to]);
+      .catch(() => {
+        if (!isLatest()) return;
+        setData(null);
+        setError('Failed to load P&L');
+      })
+      .finally(() => {
+        if (isLatest()) setLoading(false);
+      });
+  }, [storeId, from, to, beginRequest]);
 
   useEffect(() => {
     fetch();
@@ -329,7 +362,7 @@ function PnlTab({ storeId }: { storeId: string }) {
     rows.push([tp('totalExpenses'), '', kwd(data.expenses.total)]);
     rows.push([]);
     rows.push([tp('netIncome'), '', kwd(data.netIncome)]);
-    downloadCsv(`pnl-${from}-to-${to}.csv`, rows);
+    downloadCsv(`pnl-${from}_to_${to}.csv`, [[`Filters: Date range = ${from} to ${to}`], ...rows]);
   }
 
   return (
@@ -357,20 +390,20 @@ function PnlTab({ storeId }: { storeId: string }) {
           <button
             type="button"
             onClick={exportCsv}
-            disabled={!data}
+            disabled={loading || !data}
             className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
           >
             {t('exportCsv')}
           </button>
           <button
             type="button"
-            disabled={!data || exportingXlsx}
+            disabled={loading || !data || exportingXlsx}
             onClick={async () => {
               setExportingXlsx(true);
               try {
                 await downloadXlsx(
                   `/api/v1/stores/${storeId}/finance/reports/pnl.xlsx?from=${from}&to=${to}`,
-                  `pnl-${from}-to-${to}.xlsx`
+                  `pnl-${from}_to_${to}.xlsx`
                 );
               } finally {
                 setExportingXlsx(false);
@@ -476,17 +509,31 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
+  // Latest-request-wins: a slower response for the PREVIOUS dates must not
+  // land after the current one and repaint the old period under the new dates.
+  const beginRequest = useLatestRequest();
   const fetch = useCallback(() => {
+    const isLatest = beginRequest();
     setLoading(true);
     setError(null);
     apiGet<BalanceSheetData>(`/api/v1/stores/${storeId}/finance/reports/balance-sheet?asOf=${asOf}`)
       .then(({ data: d, error: apiError }) => {
-        if (apiError) setError(apiError.message);
-        else setData(d ?? null);
+        if (!isLatest()) return;
+        if (apiError) {
+          // Never leave the previous period's figures on screen under an error.
+          setData(null);
+          setError(apiError.message);
+        } else setData(d ?? null);
       })
-      .catch(() => setError('Failed to load balance sheet'))
-      .finally(() => setLoading(false));
-  }, [storeId, asOf]);
+      .catch(() => {
+        if (!isLatest()) return;
+        setData(null);
+        setError('Failed to load balance sheet');
+      })
+      .finally(() => {
+        if (isLatest()) setLoading(false);
+      });
+  }, [storeId, asOf, beginRequest]);
 
   useEffect(() => {
     fetch();
@@ -509,7 +556,7 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
     rows.push([tbs('equity'), '', '']);
     data.equity.accounts.forEach(a => rows.push([a.code, accountLabel(a), kwd(a.balance)]));
     rows.push([tbs('totalEquity'), '', kwd(data.equity.total)]);
-    downloadCsv(`balance-sheet-${asOf}.csv`, rows);
+    downloadCsv(`balance-sheet-as-of-${asOf}.csv`, [[`Filters: As of = ${asOf}`], ...rows]);
   }
 
   // The earnings row is computed (the ledger has no closing entries), so it
@@ -576,20 +623,20 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
           <button
             type="button"
             onClick={exportCsv}
-            disabled={!data}
+            disabled={loading || !data}
             className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
           >
             {t('exportCsv')}
           </button>
           <button
             type="button"
-            disabled={!data || exportingXlsx}
+            disabled={loading || !data || exportingXlsx}
             onClick={async () => {
               setExportingXlsx(true);
               try {
                 await downloadXlsx(
                   `/api/v1/stores/${storeId}/finance/reports/balance-sheet.xlsx?asOf=${asOf}`,
-                  `balance-sheet-${asOf}.xlsx`
+                  `balance-sheet-as-of-${asOf}.xlsx`
                 );
               } finally {
                 setExportingXlsx(false);
@@ -634,19 +681,33 @@ function TaxReportTab({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
+  // Latest-request-wins: a slower response for the PREVIOUS dates must not
+  // land after the current one and repaint the old period under the new dates.
+  const beginRequest = useLatestRequest();
   const fetchReport = useCallback(() => {
+    const isLatest = beginRequest();
     setLoading(true);
     setError(null);
     apiGet<TaxReportData>(
       `/api/v1/stores/${storeId}/finance/reports/tax-report?from=${from}&to=${to}`
     )
       .then(({ data: d, error: apiError }) => {
-        if (apiError) setError(apiError.message);
-        else setData(d ?? null);
+        if (!isLatest()) return;
+        if (apiError) {
+          // Never leave the previous period's figures on screen under an error.
+          setData(null);
+          setError(apiError.message);
+        } else setData(d ?? null);
       })
-      .catch(() => setError('Failed to load tax report'))
-      .finally(() => setLoading(false));
-  }, [storeId, from, to]);
+      .catch(() => {
+        if (!isLatest()) return;
+        setData(null);
+        setError('Failed to load tax report');
+      })
+      .finally(() => {
+        if (isLatest()) setLoading(false);
+      });
+  }, [storeId, from, to, beginRequest]);
 
   useEffect(() => {
     fetchReport();
@@ -674,7 +735,11 @@ function TaxReportTab({ storeId }: { storeId: string }) {
       kwd(r.taxCollected),
       r.total === null ? '' : kwd(r.total),
     ]);
-    downloadCsv(`tax-report-${from}-to-${to}.csv`, [header, ...rows]);
+    downloadCsv(`tax-report-${from}_to_${to}.csv`, [
+      [`Filters: Date range = ${from} to ${to}`],
+      header,
+      ...rows,
+    ]);
   }
 
   return (
@@ -703,20 +768,20 @@ function TaxReportTab({ storeId }: { storeId: string }) {
           <button
             type="button"
             onClick={exportCsv}
-            disabled={!data || data.rows.length === 0}
+            disabled={loading || !data || data.rows.length === 0}
             className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
           >
             {t('exportCsv')}
           </button>
           <button
             type="button"
-            disabled={!data || data.rows.length === 0 || exportingXlsx}
+            disabled={loading || !data || data.rows.length === 0 || exportingXlsx}
             onClick={async () => {
               setExportingXlsx(true);
               try {
                 await downloadXlsx(
                   `/api/v1/stores/${storeId}/finance/reports/tax-report.xlsx?from=${from}&to=${to}`,
-                  `tax-report-${from}-to-${to}.xlsx`
+                  `tax-report-${from}_to_${to}.xlsx`
                 );
               } finally {
                 setExportingXlsx(false);

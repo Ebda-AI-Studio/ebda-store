@@ -9,6 +9,8 @@ import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { exportFilename, orderListFilterParams } from '@force/shared';
 import { OrdersFilters } from './_components/OrdersFilters';
 import { OrdersBulkBar } from './_components/OrdersBulkBar';
 import { OrdersTable } from './_components/OrdersTable';
@@ -71,12 +73,30 @@ export default function StoreOrdersPage() {
   const { success: toastSuccess, error: showError } = useToast();
   const [isExporting, setIsExporting] = useState(false);
 
-  function toDateStr(d: Date): string {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
+  // Search runs server-side (it used to filter only the fetched page), so it
+  // is debounced rather than sent per keystroke.
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+
+  /**
+   * The list's filters as query params — the list AND the export send exactly
+   * these, so the export is what is on screen. The range goes through the
+   * shared report-range contract (viewer-local day boundaries as instants);
+   * the old date-only `from`/`to` were read as UTC days by the API.
+   */
+  const filterParams = useCallback(
+    (): URLSearchParams =>
+      orderListFilterParams({
+        range: resolveDateRange(period, customRange),
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: debouncedSearch,
+      }),
+    [period, customRange, statusFilter, debouncedSearch]
+  );
+
+  // A new search starts from the first page.
+  useEffect(() => {
+    setPagination(prev => (prev.page === 1 ? prev : { ...prev, page: 1 }));
+  }, [debouncedSearch]);
 
   // Overlapping list requests (a filter or period change mid-flight) resolve
   // in either order; only the newest may write (#2234 class).
@@ -87,14 +107,9 @@ export default function StoreOrdersPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const resolved = resolveDateRange(period, customRange);
-      const qs = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        from: toDateStr(resolved.startDate),
-        to: toDateStr(resolved.endDate),
-      });
-      if (statusFilter !== 'all') qs.set('status', statusFilter);
+      const qs = filterParams();
+      qs.set('page', pagination.page.toString());
+      qs.set('limit', pagination.limit.toString());
 
       // The API (OrderService.list) returns pagination under `meta`, not
       // `pagination`. Reading the wrong key left `total`/`totalPages` at 0 —
@@ -122,16 +137,7 @@ export default function StoreOrdersPage() {
     } finally {
       if (isLatest()) setIsLoading(false);
     }
-  }, [
-    storeId,
-    pagination.page,
-    pagination.limit,
-    statusFilter,
-    period,
-    customRange,
-    t,
-    beginRequest,
-  ]);
+  }, [storeId, pagination.page, pagination.limit, filterParams, t, beginRequest]);
 
   useEffect(() => {
     fetchOrders();
@@ -147,7 +153,11 @@ export default function StoreOrdersPage() {
     if (!storeId || isExporting) return;
     setIsExporting(true);
     try {
-      const res = await apiFetch(`/api/v1/stores/${storeId}/orders/export.xlsx`);
+      // Same filters as the list on screen; tzOffset lets the file name the
+      // range in the viewer's days.
+      const qs = filterParams();
+      qs.set('tzOffset', String(-new Date().getTimezoneOffset()));
+      const res = await apiFetch(`/api/v1/stores/${storeId}/orders/export.xlsx?${qs}`);
       if (!res.ok) {
         showError(t('export.failed'));
         return;
@@ -156,7 +166,9 @@ export default function StoreOrdersPage() {
       const filename = (() => {
         const cd = res.headers.get('content-disposition') ?? '';
         const match = cd.match(/filename="?([^"]+)"?/i);
-        return match?.[1] ?? `orders-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        return (
+          match?.[1] ?? exportFilename('orders', resolveDateRange(period, customRange), 'xlsx')
+        );
       })();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -171,7 +183,7 @@ export default function StoreOrdersPage() {
     } finally {
       setIsExporting(false);
     }
-  }, [storeId, isExporting, t, showError]);
+  }, [storeId, isExporting, filterParams, period, customRange, t, showError]);
 
   // Choosing "Refunded" in the status dropdown only RECORDS a refund: it
   // reverses stock/coupon/loyalty and sends the customer a "Refund issued"
@@ -374,18 +386,8 @@ export default function StoreOrdersPage() {
     });
   };
 
-  // Client-side search on already-fetched page
-  const filteredOrders = orders.filter(order => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      (order.orderNumber ?? '').toLowerCase().includes(s) ||
-      order.id.toLowerCase().includes(s) ||
-      order.customer?.firstName?.toLowerCase().includes(s) ||
-      order.customer?.lastName?.toLowerCase().includes(s) ||
-      order.customer?.email?.toLowerCase().includes(s)
-    );
-  });
+  // The server already applied every filter (search included).
+  const filteredOrders = orders;
 
   const hasActiveFilters = Boolean(search) || statusFilter !== 'all';
 

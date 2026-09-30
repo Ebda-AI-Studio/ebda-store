@@ -2071,7 +2071,7 @@
       "soldCount": "{count} sold"
     },
     "recentOrders": {
-      "title": "Recent Orders",
+      "title": "Latest 5 orders (all time)",
       "empty": "No orders yet",
       "guest": "Guest"
     },
@@ -2085,7 +2085,7 @@
       "refunded": "Refunded"
     },
     "lowStock": {
-      "title": "Low Stock Alerts",
+      "title": "Low stock alerts (current stock)",
       "allStocked": "All products are well stocked",
       "unitsLeft": "{count} left",
       "openBackorders": "Open backorders: {count}",
@@ -2104,7 +2104,7 @@
       "window": "General-ledger figures for: {period}"
     },
     "inventorySnapshot": {
-      "title": "Inventory snapshot",
+      "title": "Inventory snapshot (right now)",
       "stockValue": "Stock value",
       "openBackorders": "Open backorders",
       "backorderedDemandValue": "Backordered demand value",
@@ -5839,8 +5839,8 @@
       "liabilities": "Liabilities",
       "equity": "Equity",
       "negativeBalanceTooltip": "Negative balance — check opening balance + stock adjustments",
-      "recentAnomalies": "Recent anomalies",
-      "pendingOcrDrafts": "Pending OCR drafts",
+      "recentAnomalies": "Open anomalies (any date)",
+      "pendingOcrDrafts": "Pending receipt drafts (any date)",
       "viewAll": "View all",
       "salesOrdersTitle": "Sales (from Orders)",
       "salesOrdersSource": "Orders",
@@ -5886,6 +5886,7 @@
       "tax": "Tax (KWD)",
       "total": "Total (KWD)",
       "status": "Status",
+      "allStatuses": "All statuses",
       "emptyState": "No expenses yet.",
       "statuses": {
         "draft": "Draft",
@@ -7217,10 +7218,10 @@
       "enterprise": "Payment abandonment capture is an Enterprise feature.",
       "empty": "No gateway abandoners found in this period.",
       "emptyHint": "The sweep runs every 30 minutes and marks orders whose gateway link was generated but never paid.",
-      "statsTotal": "Total abandoners",
+      "statsTotal": "Total abandoners (all time)",
       "statsLast7": "Last 7 days",
       "statsLast30": "Last 30 days",
-      "statsValue": "Total abandoned value",
+      "statsValue": "Total abandoned value (all time)",
       "colOrderNumber": "Order #",
       "colCustomer": "Customer",
       "colPhone": "Phone",

@@ -4933,4 +4933,42 @@ their surface is inherited, so a static gate cannot tell a light-tint parent fro
 not gated, not rewritten here. Cost if wrong: some of those read below AA in the dark theme until
 migrated.
 
+## 2026-10-01 — Report filters apply (`fix/report-filters-apply`)
+
+Context: owner report 2026-09-30 "for the sales reports, why does the selected filter not apply?",
+then an orders export that held the whole store history (138 orders, every status, every date)
+while the list was filtered. Every admin report/list surface with a filter was traced UI → params →
+route → service → query; the shared contract is `@force/shared` `report-range` + `list-filters`.
+
+**Ruling RF-1 — finance GL reports (P&L, trial balance, balance sheet, tax report) keep whole-UTC-day
+boundaries; they are NOT moved to viewer-local days in this PR.** Their filter is applied correctly
+end to end (verified, and pinned by `tests/integration/report-filters-finance.test.ts`); the only
+difference is which 24h a "day" is. Moving an accounting period boundary changes reported P&L and
+tax totals for every merchant, which is an owner decision, not a bug fix. The finance DASHBOARD
+already uses viewer-local instants (BUG-F-DASH-02), so the dashboard and the Reports tab can differ
+for postings between 00:00 and 03:00 Kuwait time. Cost if wrong: a Kuwait merchant's monthly P&L /
+tax report counts up to 3h of postings in the wrong month until the owner rules on it.
+
+**Ruling RF-2 — the expenses date filter stays whole UTC days (now with an explicit `Z`).**
+`expenseDate` is a calendar date (the form posts `YYYY-MM-DD`, stored as that day's UTC midnight),
+so a viewer-local instant range would drop the first day for any viewer west of UTC. The old parse
+depended on the server's TZ; the explicit `Z` removes that. Cost if wrong: an OCR draft whose
+fallback `expenseDate` is `now()` after 21:00 UTC lists under the next Kuwait day's neighbour.
+
+**Ruling RF-3 — Analytics "Latest 5 orders", "Low stock alerts" and "Inventory snapshot" stay NOT
+period-based and are labelled so (en + ar).** They answer "what is happening now", not "what
+happened in the period"; the titles now say "(all time)" / "(current stock)" / "(right now)". Same
+for the payment-abandonment "Total … (all time)" cards (their neighbours are already named "Last 7
+/ 30 days") and the finance dashboard's open-anomalies / pending-receipt-drafts cards ("any date").
+Cost if wrong: a merchant who wanted those cards period-filtered still has to open the list.
+
+**Ruling RF-4 — the bulk product export gets no "Filters" sheet.** Its filters (status, search,
+include-deleted) were verified applied on both CSV and XLSX; the file is the re-import template
+shape, and an extra sheet risks the import wizard reading the wrong one. Cost if wrong: a product
+export file does not say which filter produced it.
+
+**Ruling RF-5 — the orders-list `search` matches order number and a REGISTERED customer's name,
+email, phone; a guest's contact (in `shippingAddress` JSON) is not searched server-side.** The old
+client-side search matched the same fields, but only on the 25 fetched rows. Cost if wrong: a
+guest order is found by its number but not by the guest's name.
 **Ruling BC-1 — storefront status-message text is readable `-ink` by default; pecannbee keeps the old colours through per-store DATA (`StoreTheme.legacyBannerContrast = true`), set by SQL before deploy (issue 2349 storefront half, owner option A 2026-09-30).** Done: 203 changed lines of role-text classes across 46 files in `apps/web/src` (cart, checkout + the 5 templates' `OrderSummary`/`CartTable`, auth, account, returns, search, compare, wishlist, reviews, bundles) now read `text-<role>-ink` (`success`/`warning`/`info`/`destructive`); arbitrary spellings (`bg-[hsl(var(--success))]/20`) became the token form, which a compiled probe against apps/web's Tailwind 3.4.19 shows emits the identical rule. The three `@force/ui` field errors already read `text-destructive-ink` (ADM-GREY-2), which the storefront aliased to the bare `--destructive`; that alias now points at the per-store `--destructive-ink`, so they are readable by default and identical under the flag — this supersedes ADM-GREY-2's storefront alias. The ink is NOT a fixed token: stores recolour `--success`/`--warning`/`--destructive`, so `statusInkVars` derives each store's ink from its own palette (nearest lightness at >= 4.6:1 derivation target on card and page, bare and under every tint to 30%) in the shared `themeToCssVars` and the `StoreContext` mirror, and `pageSurfaceStyle` re-derives it on a merchant page colour (a dark checkout page gets LIGHTER inks). With the flag, every ink is `var(--<role>)` and the page wrapper sets none, so each `text-<role>-ink` computes to the colour its `text-<role>` did; the SSR sanitizer admits exactly that value on `-ink` keys and nothing else. The code reads the flag and never a slug. Proven: pecannbee with the flag is pixel-identical to origin/main (screenshot diff in the PR). NOT done, and why: bare `text-primary` (brand colour, YWA-TXT-1); rating stars, the wishlist heart and the modern/elegant footers' newsletter error (graphics, or a merchant-coloured footer the root ink is not measured on — exempt by name in the gate, which fails if an exemption goes stale); raw neutral and raw chromatic palette utilities on the storefront (gates 4 and 5 are admin/orders only; not message text). Cost if wrong: if the SQL is not run (or the 120s Redis + 120s/600s-SWR edge store cache has not turned over) before the storefront deploys, pecannbee shows the darker message colours until the flag reaches it — the run order in the PR body is the control.

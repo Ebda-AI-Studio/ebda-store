@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
@@ -13,7 +14,12 @@ import { resolveDateRange } from '../../analytics/_components/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ExpenseStatus = 'draft' | 'pending' | 'approved' | 'posted' | 'rejected';
+const EXPENSE_STATUSES = ['draft', 'pending', 'approved', 'posted', 'rejected'] as const;
+type ExpenseStatus = (typeof EXPENSE_STATUSES)[number];
+
+function isExpenseStatus(v: string | null): v is ExpenseStatus {
+  return (EXPENSE_STATUSES as readonly string[]).includes(v ?? '');
+}
 
 interface ExpenseRow {
   id: string;
@@ -49,6 +55,14 @@ export default function ExpensesPage() {
   const t = useT('finance.expenses');
   const tc = useT('common');
 
+  // `?status=draft` deep links (finance dashboard → "Pending OCR drafts" →
+  // View all) land filtered; the page used to ignore the query string.
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams?.get('status') ?? null;
+  const [statusFilter, setStatusFilter] = useState<ExpenseStatus | 'all'>(
+    isExpenseStatus(initialStatus) ? initialStatus : 'all'
+  );
+
   const [period, setPeriod] = useState<Period>('this_month');
   const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
 
@@ -63,21 +77,37 @@ export default function ExpensesPage() {
     return `${yyyy}-${mm}-${dd}`;
   }
 
+  // Latest-request-wins: a slower response for the previous filter must not
+  // repaint its rows under the new one.
+  const beginRequest = useLatestRequest();
   const fetchExpenses = useCallback(() => {
     if (!storeId) return;
+    const isLatest = beginRequest();
     const resolved = resolveDateRange(period, customRange);
-    const from = toDateStr(resolved.startDate);
-    const to = toDateStr(resolved.endDate);
-    apiGet<ExpenseRow[]>(`/api/v1/stores/${storeId}/expenses?perPage=50&from=${from}&to=${to}`)
+    // Calendar days: `expenseDate` is a date, not an instant (see the route).
+    const qs = new URLSearchParams({
+      perPage: '50',
+      from: toDateStr(resolved.startDate),
+      to: toDateStr(resolved.endDate),
+    });
+    if (statusFilter !== 'all') qs.set('status', statusFilter);
+    setError(null);
+    apiGet<ExpenseRow[]>(`/api/v1/stores/${storeId}/expenses?${qs}`)
       .then(({ data, error: apiError }) => {
+        if (!isLatest()) return;
         if (apiError) {
+          setExpenses(null);
           setError(apiError.message);
         } else {
           setExpenses(data ?? []);
         }
       })
-      .catch(() => setError('Failed to load expenses'));
-  }, [storeId, period, customRange]);
+      .catch(() => {
+        if (!isLatest()) return;
+        setExpenses(null);
+        setError('Failed to load expenses');
+      });
+  }, [storeId, period, customRange, statusFilter, beginRequest]);
 
   useEffect(() => {
     fetchExpenses();
@@ -217,6 +247,22 @@ export default function ExpensesPage() {
           if (c) setCustomRange(c);
         }}
       />
+
+      <label className="mb-4 flex w-fit items-center gap-2 text-sm">
+        <span className="text-muted-foreground">{t('status')}</span>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value as ExpenseStatus | 'all')}
+          className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+        >
+          <option value="all">{t('allStatuses')}</option>
+          {EXPENSE_STATUSES.map(s => (
+            <option key={s} value={s}>
+              {t(`statuses.${s}`)}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {error && (
         <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">

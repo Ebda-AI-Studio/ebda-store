@@ -8,6 +8,7 @@ import { apiGet } from '../../../../../lib/api';
 import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { localDayRange, reportRangeParams } from '@force/shared';
 
 interface LoyaltyTransaction {
   id: string;
@@ -100,8 +101,9 @@ export default function LoyaltyTransactionsPage() {
       qs.set('limit', '50');
       if (typeFilter !== 'all') qs.set('type', typeFilter);
       if (customerFilter.trim()) qs.set('customerId', customerFilter.trim());
-      if (dateFrom) qs.set('from', dateFrom);
-      if (dateTo) qs.set('to', dateTo);
+      // The picked days in the viewer's timezone (shared report-range contract).
+      const range = localDayRange(dateFrom, dateTo);
+      if (range) for (const [k, v] of Object.entries(reportRangeParams(range))) qs.set(k, v);
 
       const { data } = await apiGet<{ transactions: LoyaltyTransaction[]; meta: Meta }>(
         `/api/v1/stores/${storeId}/loyalty/transactions?${qs}`

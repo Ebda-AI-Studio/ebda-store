@@ -20,6 +20,7 @@ import { OrderCard } from '@/components/OrderCard';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { EnableNotifications } from '@/components/EnableNotifications';
 import { NewOrderWatcher } from '@/components/NewOrderWatcher';
+import { reportRangeParams } from '@force/shared';
 
 const POLL_MS = 30_000;
 const PER_PAGE_OPTIONS = [10, 25, 50] as const;
@@ -117,6 +118,16 @@ export default function OrdersListPage() {
 
   // ── Search state ──────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
+  // Search runs server-side over every order (it used to filter only the
+  // fetched page), so it is debounced rather than sent per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search]);
+  // Latest-request-wins: a filter change, a page change and the background
+  // poll overlap; only the newest response may paint the list.
+  const requestSeq = useRef(0);
 
   // ── Bulk selection state ──────────────────────────────────────────────────
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -129,15 +140,24 @@ export default function OrdersListPage() {
   const fetchOrders = useCallback(
     async (opts?: { silent?: boolean }) => {
       if (!selectedStoreId) return;
+      const mine = ++requestSeq.current;
+      const isLatest = () => mine === requestSeq.current;
       if (!opts?.silent) setIsLoading(true);
       setError(null);
       try {
         const resolved = resolvePreset(datePreset, customRange);
+        // The shared report-range contract: the picked days as instants in
+        // the viewer's timezone. The date-only `from`/`to` this sent were
+        // read by the API as UTC days (a Kuwait "today" started 3h late).
+        const [fy, fm, fd] = resolved.from.split('-').map(Number);
+        const [ty, tm, td] = resolved.to.split('-').map(Number);
         const qs = new URLSearchParams({
           page: String(pageRef.current),
           limit: String(pagination.limit),
-          from: resolved.from,
-          to: resolved.to,
+          ...reportRangeParams({
+            startDate: new Date(fy, fm - 1, fd, 0, 0, 0, 0),
+            endDate: new Date(ty, tm - 1, td, 23, 59, 59, 999),
+          }),
           // Orders PWA is a fulfillment tool — staff should only see orders
           // that are actionable: COD orders (any status) and confirmed/paid
           // online orders. Unconfirmed online orders (pending + unpaid, customer
@@ -147,12 +167,17 @@ export default function OrdersListPage() {
         });
         const apiStatus = filterToApiStatus(filter);
         if (apiStatus) qs.set('status', apiStatus);
+        // `paid` is a payment-status filter; applied server-side so it spans
+        // every page (it used to refine only the fetched page).
+        if (filter === 'paid') qs.set('paymentStatus', 'paid');
+        if (debouncedSearch) qs.set('search', debouncedSearch);
 
         const { data, error: apiError } = await apiGet<{
           orders: Order[];
           meta?: Pagination;
           pagination?: Pagination;
         }>(`/api/v1/stores/${selectedStoreId}/orders?${qs}`);
+        if (!isLatest()) return;
 
         if (apiError) {
           setError(apiError.message || t.orders.error);
@@ -162,20 +187,28 @@ export default function OrdersListPage() {
           if (meta) setPagination(prev => ({ ...prev, ...meta }));
         }
       } catch {
-        setError(t.orders.error);
+        if (isLatest()) setError(t.orders.error);
       } finally {
-        setIsLoading(false);
+        if (isLatest()) setIsLoading(false);
       }
     },
-    [selectedStoreId, pagination.limit, filter, datePreset, customRange, t.orders.error]
+    [
+      selectedStoreId,
+      pagination.limit,
+      filter,
+      datePreset,
+      customRange,
+      debouncedSearch,
+      t.orders.error,
+    ]
   );
 
-  // Reset to page 1 when store, filter, or date range changes.
+  // Reset to page 1 when store, filter, date range or search changes.
   useEffect(() => {
     pageRef.current = 1;
     setPagination(prev => ({ ...prev, page: 1 }));
     setSelectedOrders(new Set());
-  }, [selectedStoreId, filter, datePreset, customRange]);
+  }, [selectedStoreId, filter, datePreset, customRange, debouncedSearch]);
 
   useEffect(() => {
     fetchOrders();
@@ -192,20 +225,12 @@ export default function OrdersListPage() {
 
   // ── Derived filtered + searched list ──────────────────────────────────────
   const visibleOrders = useMemo(() => {
-    let list = orders.filter(o => clientFilterMatches(o, filter));
-    if (search.trim()) {
-      const s = search.trim().toLowerCase();
-      list = list.filter(
-        o =>
-          (o.orderNumber ?? '').toLowerCase().includes(s) ||
-          o.id.toLowerCase().includes(s) ||
-          (o.customer?.firstName ?? '').toLowerCase().includes(s) ||
-          (o.customer?.lastName ?? '').toLowerCase().includes(s) ||
-          `${o.customer?.firstName ?? ''} ${o.customer?.lastName ?? ''}`.toLowerCase().includes(s)
-      );
-    }
+    // Status, payment status and search are all applied by the API now; a
+    // second client-side search here would drop the email/phone matches the
+    // server returned.
+    const list = orders.filter(o => clientFilterMatches(o, filter));
     return list;
-  }, [orders, filter, search]);
+  }, [orders, filter]);
 
   // Newest order id drives the in-app new-order alert (NewOrderWatcher).
   //

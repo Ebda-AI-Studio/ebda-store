@@ -108,13 +108,10 @@ export default function CouponsPage() {
     }
   }
 
-  // Refetch whenever the status filter changes. Search is submitted on Enter.
+  // useCoupons refetches when the status filter changes. Search is submitted
+  // on Enter.
   function handleFilterActiveChange(value: typeof filterActive) {
     setFilterActive(value);
-    // Allow state to settle before refetching so the new value is included.
-    setTimeout(() => {
-      void fetchCoupons();
-    }, 0);
   }
 
   // Gate first, then render the loading state INSIDE <AdminLayout>. An early

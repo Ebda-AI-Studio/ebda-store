@@ -285,6 +285,12 @@ export interface ListExpensesOptions {
   perPage?: number;
   from?: Date;
   to?: Date;
+  /**
+   * Only expenses that came from a receipt (the upload → OCR path). Keyed on
+   * the receipt, not `ocrProcessedAt`: an upload whose OCR was skipped or
+   * failed still creates a draft that needs the same review.
+   */
+  hasOcr?: boolean;
 }
 
 /**
@@ -301,6 +307,7 @@ export async function listExpenses(
   const where: any = {
     storeId,
     ...(opts.status ? { status: opts.status as any } : {}),
+    ...(opts.hasOcr ? { receiptImageUrl: { not: null } } : {}),
   };
 
   if (opts.from || opts.to) {

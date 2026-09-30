@@ -12,7 +12,7 @@
  */
 import ExcelJS from 'exceljs';
 import type { Response } from 'express';
-import { neutralizeFormula } from '@force/shared';
+import { neutralizeFormula, describeListFilters, type ReportRange } from '@force/shared';
 
 /**
  * Formula-injection guard, cell/row level — for routes that build an ExcelJS
@@ -51,6 +51,55 @@ export interface StreamXlsxOpts {
   sheetName?: string; // default 'Sheet1'
   columns: XlsxColumn[];
   rows: Record<string, unknown>[];
+  /** The filters the export applied — written to a "Filters" sheet. */
+  filters?: ExportFilterSummary;
+}
+
+/** What an export was filtered by, for the file's own "Filters" sheet. */
+export interface ExportFilterSummary {
+  /** One line, e.g. `Filters: Date = 2026-09-01 to 2026-09-30; Status = pending`. */
+  line: string;
+  /** Label/value pairs, one row each (value '' = not applied). */
+  details: Array<[string, string]>;
+}
+
+/** Builds the summary from label/value pairs (`undefined`/'' = not applied). */
+export function summarizeExportFilters(
+  details: Array<[string, string | undefined]>
+): ExportFilterSummary {
+  return {
+    line: describeListFilters(details),
+    details: details.map(([k, v]) => [k, v ?? '']),
+  };
+}
+
+/** `2026-09-01 to 2026-09-30` in the viewer's days, or undefined for no range. */
+export function describeRange(
+  range: ReportRange | undefined,
+  dayOf: (d: Date) => string
+): string | undefined {
+  return range ? `${dayOf(range.startDate)} to ${dayOf(range.endDate)}` : undefined;
+}
+
+/**
+ * Adds a "Filters" sheet naming exactly what the export was filtered by, so a
+ * downloaded file says which slice of the data it holds (owner report
+ * 2026-09-30: an "orders" file held the whole store history and nothing in it
+ * said so).
+ */
+export function addFiltersSheet(wb: ExcelJS.Workbook, filters: ExportFilterSummary): void {
+  const ws = wb.addWorksheet('Filters');
+  ws.columns = [
+    { header: 'Filter', key: 'filter', width: 22 },
+    { header: 'Value', key: 'value', width: 60 },
+  ];
+  ws.getRow(1).font = { bold: true };
+  for (const [filter, value] of filters.details) {
+    ws.addRow(neutralizeRowObject({ filter, value: value || 'all' }));
+  }
+  ws.addRow([]);
+  ws.addRow(neutralizeRowArray([filters.line]));
+  ws.addRow(neutralizeRowArray([`Generated: ${new Date().toISOString()}`]));
 }
 
 /**
@@ -87,6 +136,8 @@ export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): P
     fgColor: { argb: 'FFF2F2F2' },
   };
   headerRow.commit();
+
+  if (opts.filters) addFiltersSheet(wb, opts.filters);
 
   res.setHeader(
     'Content-Type',

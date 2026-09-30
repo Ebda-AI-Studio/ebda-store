@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { reportRangeQueryString } from '@force/shared';
 import { apiGet } from '../../../../../lib/api';
+import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import type {
   CashflowPoint,
   DashboardStats,
@@ -36,6 +38,8 @@ interface DashboardResponseData {
  * state. Dashboard returns gl + stock alongside operational stats. Every
  * range-aware endpoint (dashboard incl. GL, sales, top products, cashflow)
  * gets the same `startDate`/`endDate` pair from the period picker.
+ * Recent orders and low stock are deliberately NOT period-based (latest 5
+ * orders; stock right now) — their cards say so in the title.
  *
  * `error` carries the first failed call's message. Before it existed a failed
  * call left its widget at the initial empty state, which read as "no sales
@@ -53,9 +57,14 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Latest-request-wins: switching period while a slower earlier request is
+  // still in flight must not let that stale response overwrite the new one
+  // (the page would show the OLD range under the NEW pill).
+  const beginRequest = useLatestRequest();
 
   const fetchAnalytics = useCallback(async () => {
     if (!storeId) return;
+    const isLatest = beginRequest();
     setIsLoading(true);
     setError(null);
 
@@ -65,7 +74,8 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
       // backend gets explicit timestamps. Custom range overrides via
       // ResolvedDateRange passed from the picker.
       const range = period === 'custom' && customRange ? customRange : resolveDateRange(period);
-      const rangeQs = `startDate=${range.startDate.toISOString()}&endDate=${range.endDate.toISOString()}`;
+      // The shared contract names the params, so admin and API cannot drift.
+      const rangeQs = reportRangeQueryString(range);
       // Viewer's UTC offset (east-positive minutes) so the sales buckets are
       // the same calendar days the preset was resolved in.
       const tzOffset = -new Date().getTimezoneOffset();
@@ -87,6 +97,7 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
         apiGet<{ products: LowStockProduct[] }>(`${basePath}/low-stock?threshold=10`),
         apiGet<{ trend: Array<{ day: string; net: number }> }>(`${basePath}/cashflow?${rangeQs}`),
       ]);
+      if (!isLatest()) return;
 
       if (dashboardResult.data) {
         setStats(dashboardResult.data.stats);
@@ -125,12 +136,19 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
       // `''` renders the page's own translated "did not load" fallback.
       else if (dashboardResult.data?.failed?.length) setError('');
     } catch (err) {
+      if (!isLatest()) return;
       console.error('Failed to fetch analytics:', err);
       setError(err instanceof Error ? err.message : '');
     } finally {
-      setIsLoading(false);
+      if (isLatest()) setIsLoading(false);
     }
-  }, [storeId, period, customRange?.startDate.getTime(), customRange?.endDate.getTime()]);
+  }, [
+    storeId,
+    period,
+    customRange?.startDate.getTime(),
+    customRange?.endDate.getTime(),
+    beginRequest,
+  ]);
 
   useEffect(() => {
     fetchAnalytics();

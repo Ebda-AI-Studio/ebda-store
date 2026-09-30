@@ -9,6 +9,7 @@ import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
+import { reportRangeQueryString } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,8 @@ export default function FinanceDashboardPage() {
 
   useEffect(() => {
     if (!storeId) return;
+    // A response for a previous period must not land after the current one.
+    let stale = false;
 
     setData(null);
     setDashboardErr(null);
@@ -113,13 +116,16 @@ export default function FinanceDashboardPage() {
     // Main dashboard — pass the resolved date window
     apiGet<DashboardData>(`/api/v1/stores/${storeId}/finance/dashboard?from=${from}&to=${to}`)
       .then(({ data: d, error: apiError }) => {
+        if (stale) return;
         if (apiError) {
           setDashboardErr(apiError.message);
         } else if (d) {
           setData(d);
         }
       })
-      .catch(() => setDashboardErr('Failed to load finance dashboard'));
+      .catch(() => {
+        if (!stale) setDashboardErr('Failed to load finance dashboard');
+      });
 
     // Sales stats from the canonical analytics endpoint. This is the same
     // source used by the Analytics hub — paid order totals from the orders
@@ -127,10 +133,12 @@ export default function FinanceDashboardPage() {
     // journal entries will see $0 in the P&L section above but real numbers
     // here. Both numbers are intentionally surfaced so the merchant can
     // reconcile them. Failure is best-effort — the panel simply disappears.
+    setSalesStats(null);
     apiGet<{ stats?: { totalRevenue?: number; totalOrders?: number } }>(
-      `/api/v1/stores/${storeId}/analytics/dashboard?startDate=${resolved.startDate.toISOString()}&endDate=${resolved.endDate.toISOString()}`
+      `/api/v1/stores/${storeId}/analytics/dashboard?${reportRangeQueryString(resolved)}`
     )
       .then(({ data: ad }) => {
+        if (stale) return;
         const s = ad?.stats;
         if (s && typeof s.totalRevenue === 'number') {
           setSalesStats({ totalRevenue: s.totalRevenue, totalOrders: s.totalOrders ?? 0 });
@@ -146,15 +154,18 @@ export default function FinanceDashboardPage() {
     apiGet<{ data?: ProfitAnomaly[]; meta?: { total: number } }>(
       `/api/v1/stores/${storeId}/finance/anomalies?acknowledged=false&perPage=3&page=1`
     ).then(({ data: ad }) => {
-      if (ad?.data && Array.isArray(ad.data)) setRecentAnomalies(ad.data);
+      if (!stale && ad?.data && Array.isArray(ad.data)) setRecentAnomalies(ad.data);
     });
 
     // Pending OCR drafts count — defensive against missing `meta` field.
     apiGet<{ meta?: { total: number } }>(
       `/api/v1/stores/${storeId}/expenses?status=draft&hasOcr=true&perPage=1&page=1`
     ).then(({ data: ed }) => {
-      if (ed?.meta?.total !== undefined) setPendingOcrCount(ed.meta.total);
+      if (!stale && ed?.meta?.total !== undefined) setPendingOcrCount(ed.meta.total);
     });
+    return () => {
+      stale = true;
+    };
   }, [storeId, period, customRange]);
 
   // Defensive destructure — API can return partial shape for stores with

@@ -25,7 +25,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { ALLOWED_CURRENCIES, convertToKwd, requiresFxRate } from '@force/shared';
+import { ALLOWED_CURRENCIES, convertToKwd, requiresFxRate, localIsoDay } from '@force/shared';
 import {
   listAccountsTree,
   createChildAccount,
@@ -35,7 +35,7 @@ import {
 import { postEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
 import { generateTaxReport } from '../services/accounting/tax-report.service';
-import { streamXlsxResponse } from '../lib/exports/xlsx';
+import { streamXlsxResponse, summarizeExportFilters } from '../lib/exports/xlsx';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
 import {
@@ -664,10 +664,11 @@ router.get(
       const rows = await runInTenantContext(req.params.storeId, () =>
         trialBalance(req.params.storeId, asOf)
       );
-      const date = (asOf ?? new Date()).toISOString().slice(0, 10);
+      const date = localIsoDay(asOf ?? new Date());
       await streamXlsxResponse(res, {
-        filename: `trial-balance-${date}.xlsx`,
+        filename: `trial-balance-as-of-${date}.xlsx`,
         sheetName: 'Trial Balance',
+        filters: summarizeExportFilters([['As of', asOf ? date : 'now (all postings)']]),
         columns: [
           { header: 'Account Code', key: 'code', width: 16 },
           { header: 'Account Name (EN)', key: 'nameEn', width: 34 },
@@ -736,11 +737,15 @@ router.get(
         { type: 'Net', code: '', name: 'Net Income', amount: raw.netIncome / 1000 },
       ];
 
-      const fromStr = from.toISOString().slice(0, 10);
-      const toStr = to.toISOString().slice(0, 10);
+      // parseFinanceDate reads a date-only value as a SERVER-LOCAL day, so
+      // name it in the same timezone (toISOString shifted it a day on any
+      // server east of UTC).
+      const fromStr = localIsoDay(from);
+      const toStr = localIsoDay(to);
       await streamXlsxResponse(res, {
-        filename: `pnl-${fromStr}-to-${toStr}.xlsx`,
+        filename: `pnl-${fromStr}_to_${toStr}.xlsx`,
         sheetName: 'P&L',
+        filters: summarizeExportFilters([['Date range', `${fromStr} to ${toStr}`]]),
         columns: [
           { header: 'Type', key: 'type', width: 12 },
           { header: 'Account Code', key: 'code', width: 16 },
@@ -799,10 +804,11 @@ router.get(
         ...buildSection('Equity', 'Total Equity', raw.equity, -1),
       ];
 
-      const date = asOf.toISOString().slice(0, 10);
+      const date = localIsoDay(asOf);
       await streamXlsxResponse(res, {
-        filename: `balance-sheet-${date}.xlsx`,
+        filename: `balance-sheet-as-of-${date}.xlsx`,
         sheetName: 'Balance Sheet',
+        filters: summarizeExportFilters([['As of', date]]),
         columns: [
           { header: 'Section', key: 'section', width: 14 },
           { header: 'Account Code', key: 'code', width: 16 },
@@ -992,8 +998,9 @@ router.get(
       const fromStr = from.toISOString().slice(0, 10);
       const toStr = to.toISOString().slice(0, 10);
       await streamXlsxResponse(res, {
-        filename: `tax-report-${fromStr}-to-${toStr}.xlsx`,
+        filename: `tax-report-${fromStr}_to_${toStr}.xlsx`,
         sheetName: 'Tax Report',
+        filters: summarizeExportFilters([['Date range', `${fromStr} to ${toStr}`]]),
         columns: [
           { header: 'Type', key: 'rowType', width: 14 },
           { header: 'Date', key: 'date', width: 14 },

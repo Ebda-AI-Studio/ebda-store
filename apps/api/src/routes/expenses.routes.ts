@@ -98,10 +98,22 @@ router.get(
       const status = typeof req.query.status === 'string' ? req.query.status : undefined;
       const page = Number(req.query.page ?? 1);
       const perPage = Number(req.query.perPage ?? 50);
-      const from = req.query.from ? new Date(String(req.query.from) + 'T00:00:00') : undefined;
-      const to = req.query.to ? new Date(String(req.query.to) + 'T23:59:59') : undefined;
+      // `expenseDate` is a CALENDAR date (the form posts `YYYY-MM-DD`, stored
+      // as that day's UTC midnight), so the filter is whole UTC days — with an
+      // explicit `Z`, so the result no longer depends on the server's TZ.
+      const day = (v: unknown, time: string) => {
+        if (!v) return undefined;
+        const d = new Date(`${String(v).slice(0, 10)}T${time}Z`);
+        return Number.isNaN(d.getTime()) ? undefined : d;
+      };
+      const from = day(req.query.from, '00:00:00.000');
+      const to = day(req.query.to, '23:59:59.999');
+      // `hasOcr=true` — only receipt-upload drafts (the finance
+      // dashboard's "Pending OCR drafts" card). It was sent but never read, so
+      // that card counted every draft.
+      const hasOcr = req.query.hasOcr === 'true' ? true : undefined;
       const result = await runInTenantContext(req.params.storeId, () =>
-        listExpenses(req.params.storeId, { status, page, perPage, from, to })
+        listExpenses(req.params.storeId, { status, page, perPage, from, to, hasOcr })
       );
       res.json({
         data: result.items,

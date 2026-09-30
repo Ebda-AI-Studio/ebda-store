@@ -10,6 +10,8 @@ export * from './notifications';
 export * from './schemas/location';
 export * from './schemas/campaign';
 export * from './schemas/analytics';
+export * from './schemas/report-range';
+export * from './schemas/list-filters';
 export * from './data/kuwait-areas';
 export * from './bundle-pricing';
 export * from './order-lines';

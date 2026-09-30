@@ -6,20 +6,30 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
 import logger from '../lib/logger';
 import { z } from 'zod';
-import { analyticsPeriodSchema } from '@force/shared';
+import { analyticsPeriodSchema, parseReportRange, type ReportRange } from '@force/shared';
 
 const router = Router({ mergeParams: true });
 
-// Helper to parse date range from query
-function parseDateRange(req: Request) {
-  const { startDate, endDate } = req.query;
-  if (startDate && endDate) {
-    return {
-      startDate: new Date(startDate as string),
-      endDate: new Date(endDate as string),
-    };
+/**
+ * Parses the shared report-range contract (`@force/shared` report-range).
+ * Half a range, an unparseable date or start > end is a 422 — before this, a
+ * route that got only one bound silently used month-to-date, and an invalid
+ * date reached Prisma as `Invalid Date` (500). Returns `null` after answering.
+ */
+function parseDateRange(req: Request, res: Response): { range: ReportRange | undefined } | null {
+  const parsed = parseReportRange(req.query);
+  if (!parsed.ok) {
+    res.status(422).json({
+      success: false,
+      error: {
+        code: 'validation_failed',
+        message: 'Invalid date range.',
+        details: parsed.error.flatten(),
+      },
+    });
+    return null;
   }
-  return undefined;
+  return { range: parsed.range };
 }
 
 // GET /stores/:storeId/analytics/dashboard - Get dashboard stats
@@ -31,7 +41,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const dateRange = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       // GL cards follow the period picker like every other widget on the
       // page. Month-to-date only when the caller sends no range.
@@ -93,8 +105,6 @@ router.get(
 // (east-positive) so buckets are the viewer's calendar days.
 const salesQuerySchema = z.object({
   period: analyticsPeriodSchema.optional(),
-  startDate: z.coerce.date().optional(),
-  endDate: z.coerce.date().optional(),
   tzOffset: z.coerce.number().int().min(-840).max(840).default(0),
 });
 
@@ -118,8 +128,10 @@ router.get(
         });
         return;
       }
-      const { period, startDate, endDate, tzOffset } = parsed.data;
-      const dateRange = startDate && endDate ? { startDate, endDate } : undefined;
+      const { period, tzOffset } = parsed.data;
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       const { sales, granularity } = await AnalyticsService.getSalesChart(
         storeId,
@@ -148,7 +160,9 @@ router.get(
     try {
       const { storeId } = req.params;
       const { limit } = req.query;
-      const dateRange = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       const products = await AnalyticsService.getTopProducts(
         storeId,
@@ -176,7 +190,9 @@ router.get(
     try {
       const { storeId } = req.params;
       const { limit } = req.query;
-      const dateRange = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       const categories = await AnalyticsService.getTopCategories(
         storeId,
@@ -203,7 +219,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const dateRange = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       const orderStats = await AnalyticsService.getOrdersByStatus(storeId, dateRange);
 
@@ -226,7 +244,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const dateRange = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       const customerStats = await AnalyticsService.getCustomerStats(storeId, dateRange);
 
@@ -348,7 +368,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const dateRange = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       const paymentStats = await AnalyticsService.getRevenueByPaymentStatus(storeId, dateRange);
 
@@ -371,7 +393,9 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const dateRange = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const dateRange = parsedRange.range;
 
       // GL gross profit follows an explicit range when one is sent;
       // month-to-date otherwise.
@@ -413,7 +437,9 @@ router.get(
       // the admin always sent those, but this route read only `from`/`to`, so
       // the chart ignored the period picker and was always the last 30 days.
       // `from`/`to` stay accepted as aliases for any older caller.
-      const range = parseDateRange(req);
+      const parsedRange = parseDateRange(req, res);
+      if (!parsedRange) return;
+      const range = parsedRange.range;
       const from =
         range?.startDate ?? (req.query.from ? new Date(req.query.from as string) : defaultFrom);
       const to = range?.endDate ?? (req.query.to ? new Date(req.query.to as string) : now);

@@ -65,6 +65,7 @@ interface CustomersListResponse {
 }
 
 import { formatDate, formatPrice } from '@/lib/format';
+import { customerListFilterParams } from '@force/shared';
 
 export default function StoreCustomersPage() {
   const params = useParams();
@@ -141,12 +142,12 @@ export default function StoreCustomersPage() {
     setError(null);
 
     try {
-      const qs = new URLSearchParams({
-        page: String(page),
-        perPage: String(CUSTOMERS_PAGE_SIZE),
+      const qs = customerListFilterParams({
+        search,
+        segment: segment === 'all' ? undefined : segment,
       });
-      if (search) qs.set('search', search);
-      if (segment !== 'all') qs.set('segment', segment);
+      qs.set('page', String(page));
+      qs.set('perPage', String(CUSTOMERS_PAGE_SIZE));
 
       const { data, error: fetchError } = await apiGet<CustomersListResponse>(
         `/api/v1/stores/${storeId}/customers?${qs.toString()}`
@@ -195,7 +196,13 @@ export default function StoreCustomersPage() {
     if (!storeId || isExporting) return;
     setIsExporting(true);
     try {
-      const res = await apiFetch(`/api/v1/stores/${storeId}/customers/export.xlsx`);
+      // Export what is on screen: the same search + segment the list sends.
+      const qs = customerListFilterParams({
+        search,
+        segment: segment === 'all' ? undefined : segment,
+      });
+      const suffix = qs.toString() ? `?${qs}` : '';
+      const res = await apiFetch(`/api/v1/stores/${storeId}/customers/export.xlsx${suffix}`);
       if (!res.ok) {
         toastError(t('exportFailed'));
         return;
@@ -219,7 +226,7 @@ export default function StoreCustomersPage() {
     } finally {
       setIsExporting(false);
     }
-  }, [storeId, isExporting, t, toastError]);
+  }, [storeId, isExporting, search, segment, t, toastError]);
 
   const pageDir = locale === 'ar' ? 'rtl' : 'ltr';
   /** The route param accepts either a User.id UUID or a guest synthetic key

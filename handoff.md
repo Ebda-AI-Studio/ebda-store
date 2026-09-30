@@ -1,31 +1,40 @@
-# Handoff — backlog batch final (the last 22 open FWB issues)
+# Handoff — report filters apply (owner report 2026-09-30)
 
-_Updated 2026-10-01. Branch `fix/backlog-final`, worktree
-`_worktrees/force-website-builder__fix-backlog-final`, off `origin/main` @ 0e17786c._
+_Updated 2026-10-01. Branch `fix/report-filters-apply`, worktree
+`_worktrees/force-website-builder__fix-report-filters-apply`, off `origin/main` @ 2aefa901._
 
 ## Goal
 
-Triage and close the 22 `audit-followup` issues in `~/.claude/fwb-lane/batches-1003/final.tsv`,
-one PR, under the owner rules: nothing on pecannbee changes visually; admin + orders colour
-changes approved; email logo capped; audit tooling diffs from the merge base.
+"For the sales reports, why does the selected filter not apply?" — treated as a defect class: every
+admin report/list surface with a filter, traced UI → params → route → service → query, fixed at the
+root with ONE shared contract (`@force/shared` `report-range` + `list-filters`). Follow-up from the
+owner: the orders export held the whole history — every export must be exactly the filtered list,
+name the range in its filename, and carry a "Filters" sheet.
 
 ## Current state
 
-All code, tests and docs written; unit (5324), app (1220), typecheck and lint green locally.
-One PR `fix(p2): backlog batch final`. Not deployed.
+Code, tests, docs and rulings written; typecheck, lint (0 errors), format, unit + colocated
+(6867/6868, the 1 = a supertest HTTP parse flake in an unrelated coupon-validate test, green alone),
+the two new integration files + 8 related ones on the scratch DB, and RLS payload parity (198
+comparisons, PASS) all green locally. 12/12 mutants killed. One PR. Not deployed.
 
 ## Done
 
-- Fixed (16): 2356 (last-touch recovery stats, relabelled), 2355 (post-merge migration-order arm),
-  2354 (R2 guard proves the bypass; `--force-report`; real-Postgres test), 2353 (bounded
-  dead-letter lists, /email-queue section, SMS alert), 2352 + 2338 (three-dot audit/blast-radius
-  diffs), 2351 + 2350 (flatten script: split cache purge, in-transaction snapshot), 2348 (rollup
-  fan-out), 2347 (sweep wall-clock budget + paged resolutions), 2344 (per-product supplier memo),
-  2343 (pinned sale chip vs top custom chip; legacy corner frozen), 2342 (dead `/8` classes removed
-  pixel-identically; dropped-class gate on web + ui), 2341 + 2332 (`-ink` everywhere in admin +
-  orders, gate per app/theme/state), 2336 (email logo 160×64 box).
-- Closed as already fixed on main (3): 2340, 2339, 2287.
-- Rulings: MIG-ORD-1 amended, ACR-1a, R2-VIS-2, SVF-4, YWA-TXT-1, OD-9e, BF-1..3 (docs/RULINGS.md).
+- Shared contract: `reportRangeParams` / `parseReportRange` (both-or-neither, 422 on half/garbage),
+  `orderListFilterParams` / `parseOrderListFilters`, `customerListFilterParams`, `localDayRange`,
+  `exportFilename`, `describeListFilters`; API `lib/report-range.ts` (`rangeOrLegacyDays`),
+  `lib/exports/xlsx.ts` (`addFiltersSheet`).
+- Orders: list search server-side (was page-only), range in viewer-local days, unknown status 422,
+  export = `OrderService.listWhere` (same filters) + range filename + Filters sheet; CORS exposes
+  Content-Disposition; stock-scan order lookup takes the exact order-number match.
+- Customers export: same search/segment as the list (Customers + Purchases + Summary sheets).
+- Finance: XLSX filenames `_to_` / `as-of`, Filters sheet, day named in the server-local TZ it was
+  parsed in; CSV gets a Filters row; exports disabled while a new range loads; latest-request-wins.
+- Expenses: `hasOcr` read (dashboard card), `?status=` deep link + status select, explicit-UTC days.
+- Analytics: all routes on the shared parser, latest-request-wins, non-period cards labelled en+ar.
+- Payment abandonments, loyalty, stock adjustments, Orders PWA: shared range; coupons status filter
+  (stale closure) fixed; finance dashboard stale guard + labels.
+- Rulings RF-1..RF-5 in `docs/RULINGS.md`; merchant doc `docs/merchant/orders.md`.
 
 ## In progress
 
@@ -33,10 +42,6 @@ Nothing.
 
 ## Left to do
 
-- Owner questions (issues left open with a comment): 2345 / 2346 (old-shape variant-less PO lines:
-  how they count on order, how stranded `partial` units + AP are settled) and 2349's storefront
-  half (re-colour cart/checkout/auth banners on apps/web — touches pecannbee).
-- Branch protection "require branches to be up to date" on main (prevention for the migration
-  race; the new CI arm only detects) — a repo setting, owner's call.
-- After merge + deploy: verify `/email-queue` renders the corrupt section only when non-empty, and
-  one real email's logo in Gmail.
+- Owner decision (Ruling RF-1): move finance GL reports to Kuwait-local day boundaries?
+- After merge + deploy: verify `/health` commit, then export orders for a narrow range on prod and
+  check the file's Filters sheet + row count (read-only).

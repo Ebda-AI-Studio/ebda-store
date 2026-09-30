@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet } from '../../../../../lib/api';
+import { localDayRange, reportRangeParams } from '@force/shared';
+import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 
 export interface AbandonmentItem {
   id: string;
@@ -84,20 +86,24 @@ export function usePaymentAbandonments({ storeId, enabled }: UsePaymentAbandonme
     if (data) setStats(data);
   }, [storeId, noteError]);
 
+  const beginRequest = useLatestRequest();
   const fetchList = useCallback(async () => {
+    const isLatest = beginRequest();
     const qs = new URLSearchParams({ page: String(page), limit: '25' });
-    if (dateFrom) qs.set('from', dateFrom);
-    if (dateTo) qs.set('to', dateTo);
+    // The picked days as instants in the viewer's timezone (shared contract).
+    const range = localDayRange(dateFrom, dateTo);
+    if (range) for (const [k, v] of Object.entries(reportRangeParams(range))) qs.set(k, v);
     const { data, error: apiError } = await apiGet<{
       abandoners: AbandonmentRecord[];
       meta: ListMeta;
     }>(`/api/v1/stores/${storeId}/payment-abandonments?${qs}`);
+    if (!isLatest()) return;
     noteError(apiError);
     if (data) {
       setRecords(data.abandoners ?? []);
       setMeta(data.meta ?? { total: 0, page: 1, limit: 25, totalPages: 1 });
     }
-  }, [storeId, page, dateFrom, dateTo, noteError]);
+  }, [storeId, page, dateFrom, dateTo, noteError, beginRequest]);
 
   // Initial load when feature is enabled
   const [reloadKey, setReloadKey] = useState(0);

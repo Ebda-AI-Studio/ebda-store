@@ -13,6 +13,7 @@ import {
   findAdjustmentByImportKey,
 } from '../services/accounting/stock-adjustment.service';
 import { parseStockAdjustCsv, STOCK_ADJUST_ROW_LIMIT } from '@force/shared';
+import { rangeOrLegacyDays } from '../lib/report-range';
 
 const router = Router();
 
@@ -46,8 +47,17 @@ router.get(
   requireFeature('inventory.bulk_adjustments'),
   async (req, res, next) => {
     try {
-      const from = req.query.from ? new Date(String(req.query.from) + 'T00:00:00') : undefined;
-      const to = req.query.to ? new Date(String(req.query.to) + 'T23:59:59') : undefined;
+      // Shared report-range contract (viewer-local days); legacy date-only
+      // `from`/`to` still accepted as UTC days.
+      const range = rangeOrLegacyDays(req.query as Record<string, unknown>);
+      if (!range.ok) {
+        res.status(422).json({
+          success: false,
+          error: { code: 'validation_failed', message: 'Invalid date range.' },
+        });
+        return;
+      }
+      const { from, to } = range;
       const data = await runInTenantContext(req.params.storeId, () =>
         listAdjustments(req.params.storeId, { from, to })
       );

@@ -16,14 +16,16 @@ Manage orders from **Admin → Sales → Orders**, or from the dedicated **Order
 
 The list supports:
 
-- **Search** — find an order by number, customer, or phone.
-- **Date filter** — narrow the list to any time period.
+- **Search** — find an order by number, or by a registered customer's name, email or phone. It searches **all** your orders, not just the page on screen.
+- **Date filter** — narrow the list to any time period. Days are your own calendar days (a Kuwait order at 01:00 belongs to that day, not the previous one).
+- **Export** — downloads **exactly the filtered list**: the same dates, status and search. The file name carries the date range (e.g. `orders-2026-09-01_to_2026-09-30.xlsx`) and a **Filters** sheet says what was applied.
 - **Bulk "mark paid"** — select multiple orders and mark them paid in one action (useful for cash-on-delivery batches).
 
 تدعم القائمة:
 
-- **البحث** — عن طلب برقمه أو باسم العميل أو رقمه.
-- **تصفية بالتاريخ** — حصر القائمة بأي فترة زمنية.
+- **البحث** — عن طلب برقمه، أو باسم العميل المسجَّل أو بريده أو هاتفه. يبحث في **كل** طلباتك وليس في الصفحة المعروضة فقط.
+- **تصفية بالتاريخ** — حصر القائمة بأي فترة زمنية، بأيامك أنت (طلب في الكويت الساعة 1 صباحًا يُحسب لذلك اليوم لا لليوم السابق).
+- **التصدير** — يُنزّل **القائمة المصفّاة نفسها بالضبط**: نفس التواريخ والحالة والبحث. اسم الملف يحمل الفترة (مثل `orders-2026-09-01_to_2026-09-30.xlsx`) وورقة **Filters** توضح ما طُبّق.
 - **"تعليم كمدفوع" بالجملة** — تحديد عدة طلبات وتعليمها كمدفوعة دفعة واحدة (مفيد لطلبات الدفع عند الاستلام).
 
 ---

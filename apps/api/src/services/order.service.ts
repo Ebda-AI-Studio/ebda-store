@@ -155,7 +155,74 @@ interface CreateOrderData {
   source?: string;
 }
 
+/**
+ * The admin order list's filters, shared by `OrderService.list` and the
+ * orders XLSX export so the export is exactly what the list shows (owner
+ * report 2026-09-30: the export ignored every filter on screen).
+ */
+export interface OrderListWhere {
+  status?: string;
+  paymentStatus?: string;
+  customerId?: string;
+  from?: Date;
+  to?: Date;
+  /**
+   * Free-text search over order number and the customer's name / email /
+   * phone (registered customers).
+   * Server-side, so it matches across ALL pages — the admin used to filter
+   * only the 25 rows it had fetched.
+   */
+  search?: string;
+  confirmedOnly?: boolean;
+}
+
 export class OrderService {
+  /** WHERE clause for the order list and its export. */
+  static listWhere(storeId: string, filters: OrderListWhere): Prisma.OrderWhereInput {
+    const { status, paymentStatus, customerId, from, to, confirmedOnly } = filters;
+    // Defensive deletedAt filter. The schema marks Order as soft-deletable
+    // but no code path currently sets `deletedAt`, so this is a no-op
+    // today — kept here so a future "archive order" feature doesn't
+    // accidentally surface archived rows in the admin list (which would
+    // also pollute analytics aggregates that count off this query).
+    const where: Prisma.OrderWhereInput = { storeId, deletedAt: null };
+    if (status) where.status = status as OrderStatus;
+    if (paymentStatus)
+      where.paymentStatus = paymentStatus as Prisma.OrderWhereInput['paymentStatus'];
+
+    // Orders-PWA confirmed-only filter: exclude unconfirmed online-payment
+    // orders (pending + unpaid with an online Payment row). COD orders that
+    // are pending are real orders — always included.
+    if (confirmedOnly && !status) {
+      where.NOT = {
+        AND: [
+          { status: 'pending' },
+          { paymentStatus: 'unpaid' },
+          // Has at least one online-payment Payment (not COD/cash).
+          { payments: { some: { provider: { notIn: ['cod', 'cash', 'cash_on_delivery'] } } } },
+        ],
+      };
+    }
+    if (customerId) where.customerId = customerId;
+    if (from || to) {
+      where.createdAt = {};
+      if (from) (where.createdAt as any).gte = from;
+      if (to) (where.createdAt as any).lte = to;
+    }
+    const search = filters.search?.trim();
+    if (search) {
+      const contains = { contains: search, mode: 'insensitive' as const };
+      where.OR = [
+        { orderNumber: contains },
+        { customer: { is: { firstName: contains } } },
+        { customer: { is: { lastName: contains } } },
+        { customer: { is: { email: contains } } },
+        { customer: { is: { phone: contains } } },
+      ];
+    }
+    return where;
+  }
+
   static async list(
     storeId: string,
     options: {
@@ -165,6 +232,9 @@ export class OrderService {
       customerId?: string;
       from?: Date;
       to?: Date;
+      /** See `OrderListWhere.search`. */
+      search?: string;
+      paymentStatus?: string;
       /**
        * When true, exclude orders that are status=pending AND paymentStatus=unpaid
        * (i.e. an online-payment order that has not been paid yet and is not COD).
@@ -188,38 +258,12 @@ export class OrderService {
       cursor?: string;
     } = {}
   ) {
-    const { status, customerId, from, to, confirmedOnly, cursor } = options;
+    const { cursor } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
-    // Defensive deletedAt filter. The schema marks Order as soft-deletable
-    // but no code path currently sets `deletedAt`, so this is a no-op
-    // today — kept here so a future "archive order" feature doesn't
-    // accidentally surface archived rows in the admin list (which would
-    // also pollute analytics aggregates that count off this query).
-    const where: Prisma.OrderWhereInput = { storeId, deletedAt: null };
-    if (status) where.status = status as OrderStatus;
-
-    // Orders-PWA confirmed-only filter: exclude unconfirmed online-payment
-    // orders (pending + unpaid with an online Payment row). COD orders that
-    // are pending are real orders — always included.
-    if (confirmedOnly && !status) {
-      where.NOT = {
-        AND: [
-          { status: 'pending' },
-          { paymentStatus: 'unpaid' },
-          // Has at least one online-payment Payment (not COD/cash).
-          { payments: { some: { provider: { notIn: ['cod', 'cash', 'cash_on_delivery'] } } } },
-        ],
-      };
-    }
-    if (customerId) where.customerId = customerId;
-    if (from || to) {
-      where.createdAt = {};
-      if (from) (where.createdAt as any).gte = from;
-      if (to) (where.createdAt as any).lte = to;
-    }
+    const where = OrderService.listWhere(storeId, options);
 
     const baseFindManyArgs = {
       where,
