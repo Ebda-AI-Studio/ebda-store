@@ -52,6 +52,7 @@ vi.mock('@api/services/r2-cleanup.service', () => ({
 // vi.mock factories are hoisted above top-level const declarations, so any
 // value a factory closes over must itself be declared via vi.hoisted.
 const { sendMock, mockPrisma } = vi.hoisted(() => {
+  const bypassGuc: { v: string | null } = { v: null };
   const sendMock = vi.fn();
   const mockPrisma = {
     user: {
@@ -93,9 +94,15 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     $transaction: vi.fn(),
     // `SET LOCAL app.bypass_rls` brackets the addresses delete — see the
     // rls-bypass test below for why removing it silently under-erases.
-    $executeRaw: vi.fn().mockResolvedValue(0),
-    // withScopedRlsBypass reads the prior GUC before switching it on.
-    $queryRaw: vi.fn().mockResolvedValue([{ v: null }]),
+    // Transaction-shaped: a `SET LOCAL app.bypass_rls` persists, and
+    // withScopedRlsBypass reads it back (prior value, then the issue 2123
+    // "did it stick" check), so the fake echoes the last value set.
+    $executeRaw: vi.fn(async (tpl: unknown) => {
+      const sql = Array.isArray(tpl) ? (tpl as string[]).join('') : String(tpl);
+      if (/app\.bypass_rls/.test(sql)) bypassGuc.v = /'true'/.test(sql) ? 'true' : 'false';
+      return 0;
+    }),
+    $queryRaw: vi.fn(async () => [{ v: bypassGuc.v }]),
     auditLog: { create: vi.fn().mockResolvedValue({}) },
   };
   return { sendMock, mockPrisma };

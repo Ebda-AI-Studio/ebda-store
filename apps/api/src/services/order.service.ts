@@ -1695,6 +1695,10 @@ export class OrderService {
       // it (an accepted-but-undelivered event, #619).
       statusFanoutRequestedAt: new Date(),
       statusFanoutClaimedAt: null,
+      // WHICH transition (issue 2070): the stuck sweep re-sends this, not
+      // whatever status a later direct writer left the row at.
+      statusFanoutRequestedStatus: status,
+      statusFanoutCompletedAt: null,
     };
     if (status === 'delivered' && order.status !== 'delivered') {
       statusData.deliveredAt = new Date();

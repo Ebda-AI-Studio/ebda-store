@@ -341,6 +341,38 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
       expect(after.status).toBe('completed');
     }, 60_000);
 
+    // issue 2002 — an indeterminate gateway refund left a claim with no
+    // terminal state a human could reach, so the stuck-claim sweep alerted it
+    // for a week. Completing the return "record only" now settles it.
+    it('a record-only completion after an indeterminate refund settles the open claim', async () => {
+      const { orderId, paymentId } = await paidOrder();
+      const ret = await receivedReturn(orderId);
+      vi.spyOn(TapPaymentProvider.prototype, 'refund').mockRejectedValue(
+        new Error('The operation was aborted due to timeout')
+      );
+
+      await expect(
+        inRequest(() => ReturnService.complete(storeId, ret.id, 'admin', 'original'))
+      ).rejects.toMatchObject({ code: 'PROVIDER_REFUND_INDETERMINATE' });
+      const refunded = (await readPayment(paymentId)).refundedAmount;
+      expect(await eventTypes(paymentId)).toEqual(['refund_initiated', 'refund_indeterminate']);
+
+      await inRequest(() => ReturnService.complete(storeId, ret.id, 'admin', 'manual'));
+
+      const events = await withRlsBypass(tx =>
+        tx.paymentEvent.findMany({ where: { paymentId }, orderBy: { occurredAt: 'asc' } })
+      );
+      const claim = events.find(e => e.eventType === 'refund_initiated')!;
+      const settled = events.find(e => e.eventType === 'refund_reconciled');
+      expect(settled, 'the claim must get a terminal state').toBeDefined();
+      expect((settled!.details as Record<string, unknown>).claimId).toBe(
+        (claim.details as Record<string, unknown>).claimId
+      );
+      expect((settled!.details as Record<string, unknown>).reason).toBe('reconciled_by_merchant');
+      // Records only — the balance the claim counted is unchanged.
+      expect((await readPayment(paymentId)).refundedAmount).toBe(refunded);
+    });
+
     it('a retry after the request rolled back is refused, and a manual method records it', async () => {
       // Two lines (3000 + 2000 of a 5000 payment), so returning one is partial.
       const { orderId, paymentId } = await paidOrder();

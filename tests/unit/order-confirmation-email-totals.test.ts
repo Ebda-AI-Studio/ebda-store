@@ -54,7 +54,9 @@ describe('order confirmation email totals', () => {
     const en = text(orderConfirmationTemplate.en(d, 'S'));
     expect(en).toBe('Subtotal 5.000 KWD Shipping 0.500 KWD Total 5.500 KWD Incl. VAT 0.238 KWD');
     const ar = text(orderConfirmationTemplate.ar(d, 'S'));
-    expect(ar.indexOf('شامل ضريبة القيمة المضافة 0.238 د.ك')).toBeGreaterThan(ar.indexOf('الإجمالي'));
+    expect(ar.indexOf('شامل ضريبة القيمة المضافة 0.238 د.ك')).toBeGreaterThan(
+      ar.indexOf('الإجمالي')
+    );
     expect(ar).not.toContain('الضريبة 0.238 د.ك الشحن');
   });
 

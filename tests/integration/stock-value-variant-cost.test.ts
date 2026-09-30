@@ -14,6 +14,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@force/database';
 import { AnalyticsService } from '../../apps/api/src/services/analytics.service';
 import { InventoryService } from '../../apps/api/src/services/inventory.service';
+import {
+  DISABLED_VARIANT_STOCK_VALUE_SQL,
+  STOCK_VALUE_SQL,
+} from '../../apps/api/src/lib/effective-inventory-sql';
 
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
@@ -94,5 +98,22 @@ describe.skipIf(!hasDb)('stock value is variant-cost aware', () => {
     const byName = new Map(list.products.map(p => [p.name, p.stockValue]));
     expect(byName.get('Variant product')).toBe(14500);
     expect(byName.get('Simple product')).toBe(2000);
+  });
+});
+
+/**
+ * issue 2146 — the disabled variant's value is excluded from stock (M5-6) but
+ * must not vanish: the finance dashboard reports it on its own line, from the
+ * exact inverse predicate. The two figures partition every variant's value.
+ */
+describe.skipIf(!hasDb)('value held on disabled variants (issue 2146)', () => {
+  it('is 100 × 50 for the disabled variant, and disjoint from stock value', async () => {
+    const [row] = await prisma.$queryRaw<Array<{ stock: bigint; disabled: bigint }>>`
+      SELECT COALESCE(SUM(${STOCK_VALUE_SQL}), 0) AS stock,
+             COALESCE(SUM(${DISABLED_VARIANT_STOCK_VALUE_SQL}), 0) AS disabled
+      FROM public.products p
+      WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL`;
+    expect(Number(row.stock)).toBe(EXPECTED);
+    expect(Number(row.disabled)).toBe(100 * 50);
   });
 });

@@ -116,3 +116,25 @@ describe('runCitationScan', () => {
     );
   });
 });
+
+/**
+ * issue 2076 — the resume only works if each check row commits as it is
+ * written. Both entrypoints must scope the scan per query (runInStoreScope),
+ * never wrap the whole scan in one interactive transaction. The committed-vs-
+ * rolled-back behaviour itself is proven against Postgres in
+ * tests/integration/answer-engine/citation-scan.test.ts.
+ */
+describe('citation scan entrypoints never hold one transaction across the scan (issue 2076)', () => {
+  it('answer-engine-citation-scan.ts calls runCitationScan only inside runInStoreScope', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(
+      join(__dirname, '../../apps/api/src/lib/inngest/functions/answer-engine-citation-scan.ts'),
+      'utf8'
+    );
+    const calls = src.match(/runIn\w+\(storeId, \(\) => runCitationScan\(/g) ?? [];
+    expect(calls.length).toBe(2);
+    expect(calls.every(c => c.startsWith('runInStoreScope('))).toBe(true);
+    expect(src).not.toMatch(/runInTenantContext\(storeId, \(\) => runCitationScan/);
+  });
+});

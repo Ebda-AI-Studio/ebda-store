@@ -1,6 +1,5 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
-import { featureService } from './feature.service';
 
 interface CreateTaxRateData {
   name: string;
@@ -182,86 +181,6 @@ export class TaxService {
     return {
       ...updated,
       rate: Number(updated.rate),
-    };
-  }
-
-  /**
-   * Calculate tax for an order
-   */
-  static async calculateTax(
-    storeId: string,
-    subtotal: number,
-    country?: string,
-    state?: string
-  ): Promise<{
-    taxAmount: number;
-    taxRate: number;
-    taxBreakdown: Array<{ name: string; rate: number; amount: number }>;
-  }> {
-    const [settings, taxEnabled] = await Promise.all([
-      this.getSettings(storeId),
-      featureService.isFeatureEnabled(storeId, 'tax'),
-    ]);
-
-    if (!taxEnabled) {
-      return { taxAmount: 0, taxRate: 0, taxBreakdown: [] };
-    }
-
-    // Get applicable tax rates
-    const rates = await prisma.taxRate.findMany({
-      where: {
-        storeId,
-        isActive: true,
-        OR: [
-          { country: null, state: null }, // Universal rates
-          { country, state: null }, // Country-specific
-          { country, state }, // Country + state specific
-        ],
-      },
-      orderBy: { priority: 'desc' },
-    });
-
-    if (rates.length === 0) {
-      // Use default tax rate if no specific rates found
-      if (settings.defaultTaxRate) {
-        const taxAmount = Math.round((subtotal * settings.defaultTaxRate) / 100);
-        return {
-          taxAmount,
-          taxRate: settings.defaultTaxRate,
-          taxBreakdown: [{ name: 'Tax', rate: settings.defaultTaxRate, amount: taxAmount }],
-        };
-      }
-      return { taxAmount: 0, taxRate: 0, taxBreakdown: [] };
-    }
-
-    // Calculate tax with compound support
-    let taxableAmount = subtotal;
-    let totalTax = 0;
-    const breakdown: Array<{ name: string; rate: number; amount: number }> = [];
-
-    for (const rate of rates) {
-      const rateValue = Number(rate.rate);
-      const taxAmount = Math.round((taxableAmount * rateValue) / 100);
-
-      totalTax += taxAmount;
-      breakdown.push({
-        name: rate.name,
-        rate: rateValue,
-        amount: taxAmount,
-      });
-
-      // For compound taxes, add to the taxable amount
-      if (rate.isCompound) {
-        taxableAmount += taxAmount;
-      }
-    }
-
-    const effectiveRate = rates.reduce((sum, r) => sum + Number(r.rate), 0);
-
-    return {
-      taxAmount: totalTax,
-      taxRate: effectiveRate,
-      taxBreakdown: breakdown,
     };
   }
 }

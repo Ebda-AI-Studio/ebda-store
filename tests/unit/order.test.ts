@@ -1269,6 +1269,9 @@ describe('OrderService', () => {
               status: 'processing',
               statusFanoutRequestedAt: expect.any(Date),
               statusFanoutClaimedAt: null,
+              // issue 2070: WHICH transition, for the stuck sweep.
+              statusFanoutRequestedStatus: 'processing',
+              statusFanoutCompletedAt: null,
             }),
           })
         );

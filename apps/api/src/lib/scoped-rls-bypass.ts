@@ -31,6 +31,14 @@ type RawClient = Pick<Prisma.TransactionClient, '$executeRaw' | '$queryRaw'>;
  * the restore itself cannot run; that restore error is swallowed so the
  * original error surfaces — an aborted transaction can only roll back, which
  * discards the SET LOCAL anyway.
+ *
+ * PRECONDITION, ASSERTED (issue 2123): `client` must be a TRANSACTION. The
+ * plain non-transactional `prisma` client satisfies the `RawClient` type, but
+ * outside a transaction every statement is its own implicit transaction, so
+ * `SET LOCAL` is discarded (Postgres only WARNs) before `fn` runs — the caller
+ * would be told its bypassed work succeeded while RLS silently filtered it
+ * (e.g. an erasure that under-erases every other store). So the GUC is read
+ * back with a SECOND statement and a value that did not stick throws.
  */
 export async function withScopedRlsBypass<T>(client: RawClient, fn: () => Promise<T>): Promise<T> {
   const rows = await client.$queryRaw<Array<{ v: string | null }>>`
@@ -38,6 +46,13 @@ export async function withScopedRlsBypass<T>(client: RawClient, fn: () => Promis
   const priorWasOn = rows?.[0]?.v === 'true';
 
   await client.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+  const check = await client.$queryRaw<Array<{ v: string | null }>>`
+    SELECT current_setting('app.bypass_rls', true) AS v`;
+  if (check?.[0]?.v !== 'true') {
+    throw new Error(
+      'withScopedRlsBypass: SET LOCAL app.bypass_rls did not persist — the client is not inside a transaction'
+    );
+  }
   let fnFailed = false;
   try {
     return await fn();

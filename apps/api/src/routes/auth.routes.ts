@@ -15,6 +15,7 @@ import {
   refreshIpLimiter,
   resetEmailLimiter,
   verifyEmailLimiter,
+  authEmailAddressLimiter,
   auditLog,
   generateCsrfToken,
   verifyRefreshJwt,
@@ -893,6 +894,9 @@ router.post(
   authLimiter,
   // S5-3: a dedicated, tighter, email-scoped budget stacked in front of
   // authLimiter — see resetEmailLimiter's docstring in middleware/security.ts.
+  // issue 2228: plus an address-wide ceiling, so spraying store ids cannot
+  // multiply the mails one inbox receives.
+  authEmailAddressLimiter,
   resetEmailLimiter,
   async (req: Request, res: Response, _next: NextFunction) => {
     try {
@@ -1039,6 +1043,9 @@ router.post(
 router.post(
   '/resend-verification',
   authLimiter,
+  // issue 2228: the same per-inbox ceiling as /forgot-password — this route
+  // also takes a caller-supplied storeId and sends one mail per account.
+  authEmailAddressLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, storeId } = req.body ?? {};

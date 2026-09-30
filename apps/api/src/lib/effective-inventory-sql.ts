@@ -46,3 +46,17 @@ export const STOCK_VALUE_SQL = Prisma.sql`CASE
   )
   ELSE p.inventory * COALESCE(p.cost_price, 0)
 END`;
+
+/**
+ * Stock VALUE (fils) held on DISABLED variants of one product row aliased `p`
+ * — the exact inverse predicate of `STOCK_VALUE_SQL`'s variant branch
+ * (issue 2146). Those units are excluded from every stock figure, so the
+ * finance dashboard shows them on their own line instead of letting the
+ * value silently disappear when a merchant disables a variant.
+ */
+export const DISABLED_VARIANT_STOCK_VALUE_SQL = Prisma.sql`COALESCE(
+  (SELECT SUM(pv.inventory * COALESCE(pv.cost_price, p.cost_price, 0))
+    FROM public.product_variants pv
+    WHERE pv.product_id = p.id AND NOT pv.is_active AND pv.inventory > 0),
+  0
+)`;

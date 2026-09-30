@@ -204,6 +204,25 @@ class IntendedRollback extends Error {
   }
 }
 
+/**
+ * The client disconnected (`close` without `finish`) before the handler
+ * answered (issue 1604). Node does NOT stop the handler on disconnect: it
+ * keeps running and keeps querying, but once this gate settles the
+ * transaction is closing, so every later statement fails with "Transaction
+ * already closed". Resolving here — the original middleware's behaviour,
+ * which a test once asserted as intended — COMMITTED whatever half of the
+ * handler had run. Rejecting with this sentinel rolls the whole request back
+ * instead: all-or-nothing, and consistent with what the client saw (no
+ * response at all, so nothing it can rely on having happened). Deferred
+ * post-commit work is dropped with it, exactly as on any rollback.
+ */
+class AbandonedRequest extends Error {
+  constructor() {
+    super('Client disconnected before the handler answered');
+    this.name = 'AbandonedRequest';
+  }
+}
+
 /** Which lane this response is in. `flushing` = the gate is done, bytes may go. */
 type Lane = 'buffered' | 'streaming' | 'flushing';
 
@@ -440,12 +459,12 @@ export function runRequestInTransaction(
           if (res.statusCode >= 500) reject(new IntendedRollback(res.statusCode));
           else resolve();
         });
-        // Premature close (client disconnect) — don't roll back, let the tx
-        // commit. Unchanged from the original middleware.
+        // Premature close (client disconnect) — ROLL BACK (issue 1604). See
+        // AbandonedRequest: resolving here committed a half-executed handler.
         res.on('close', () => {
           if (settled) return;
           settled = true;
-          resolve();
+          reject(new AbandonedRequest());
         });
 
         // Advance into the handler. Passing a function to next() would be a
@@ -498,6 +517,15 @@ export function runRequestInTransaction(
         flushCaptured();
         return;
       }
+      if (err instanceof AbandonedRequest) {
+        // Nobody is listening: the socket is gone, so there is no response to
+        // send and no error to hand to Express. The rollback is the outcome.
+        logger.warn(
+          { ...logContext },
+          'Client disconnected before the handler answered — request transaction rolled back'
+        );
+        return;
+      }
 
       // A genuine transaction failure: COMMIT rejected, statement error,
       // transaction timeout, connection loss.
@@ -539,3 +567,5 @@ export function runRequestInTransaction(
 
 /** Test-only export so the rollback sentinel can be asserted by name. */
 export const __INTENDED_ROLLBACK_NAME = 'IntendedRollback';
+/** Test-only export: the disconnect sentinel (issue 1604). */
+export const __ABANDONED_REQUEST_NAME = 'AbandonedRequest';

@@ -223,9 +223,12 @@ export function bundlesCacheKey(storeId: string): string {
  * Invalidate a store's public bundle-list cache (both layers) plus the
  * storefront's Next.js data cache tag `bundles:<storeId>` — the tag the
  * storefront's /bundles list and bundle PDP fetches carry (pinned by
- * tests/unit/storefront-purge-on-write.test.ts). Call from every bundle write —
- * create, update, deactivate — the same way product writes call
- * `invalidateStoreProductCaches`.
+ * tests/unit/storefront-purge-on-write.test.ts). Self-sufficient for a write
+ * that touches ONLY bundles. A write that already calls
+ * `invalidateStoreProductCaches` must NOT also call this: that function clears
+ * the same Redis key and purges `bundles:<storeId>` in its one request, so a
+ * second call is a second outbound purge POST for nothing (issue 2202 — the
+ * three bundle write handlers did exactly that).
  */
 export async function invalidateStoreBundlesCache(storeId: string): Promise<void> {
   await invalidateCached(bundlesCacheKey(storeId));

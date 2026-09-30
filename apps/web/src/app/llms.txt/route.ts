@@ -95,7 +95,11 @@ async function fetchAllStores(): Promise<PublicStore[]> {
 async function fetchStore(slug: string): Promise<PublicStore | null> {
   try {
     const res = await fetch(`${API_URL}/public/stores/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 600 }, // per-store store detail refreshes every 10 min
+      // Per-store detail refreshes every 10 min, AND carries the same
+      // `store-slug:<slug>` tag the store resolver uses, so the API's
+      // bustStoreCaches purge (bulk AEO/GEO/SEO sweeps, settings saves)
+      // reaches llms.txt too instead of waiting out the 600s (issue 2199).
+      next: { revalidate: 600, tags: [`store-slug:${slug}`] },
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;

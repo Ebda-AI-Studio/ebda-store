@@ -29,6 +29,8 @@ interface DashboardData {
   };
   cash: CashAccountRow[];
   stockValue: number;
+  /** Value held on DISABLED variants — excluded from stockValue (issue 2146). */
+  disabledVariantStockValue?: number;
   balanceSheet: {
     totalAssets: number;
     totalLiabilities: number;
@@ -162,6 +164,9 @@ export default function FinanceDashboardPage() {
   const thisMonth = data?.thisMonth ?? { revenue: 0, expenses: 0, net: 0 };
   const cash = Array.isArray(data?.cash) ? data.cash : [];
   const stockValue = typeof data?.stockValue === 'number' ? data.stockValue : 0;
+  // Unknown (older API) renders as nothing, never as a false 0 line.
+  const disabledVariantStockValue =
+    typeof data?.disabledVariantStockValue === 'number' ? data.disabledVariantStockValue : null;
   const balanceSheet = data?.balanceSheet ?? {
     totalAssets: 0,
     totalLiabilities: 0,
@@ -376,6 +381,15 @@ export default function FinanceDashboardPage() {
                   ) : (
                     <p className="text-sm text-muted-foreground">KWD</p>
                   )}
+                  {!dashboardErr &&
+                    disabledVariantStockValue !== null &&
+                    disabledVariantStockValue > 0 && (
+                      <p className="text-xs text-muted-foreground pt-1">
+                        {t('disabledVariantStockValue', {
+                          amount: kwd(disabledVariantStockValue),
+                        })}
+                      </p>
+                    )}
                 </div>
               </div>
             </section>

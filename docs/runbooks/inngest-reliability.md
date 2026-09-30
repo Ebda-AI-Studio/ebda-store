@@ -236,6 +236,20 @@ exemption — they persist + enqueue the inbound event before their signature
 is actually verified, so skipping the counter there would let an
 unauthenticated flood cost real DB/queue work before rejection.
 
+**Hardened 2026-10-01 (issue 2063, issue 2064):** the exemption now also
+requires `NODE_ENV=production` AND a non-empty `INNGEST_SIGNING_KEY`
+(`inngestSignatureIsEnforced`) — the only state in which the SDK verifies
+signatures (it is in dev mode, verifying nothing, whenever `NODE_ENV` is not
+`production`). Boot logs an error and pages P1 if the key is missing in
+production. Header presence is not a secret, so the path has its own bucket,
+`inngestLimiter` (`middleware/security.ts`), mounted before the body parser:
+300 per 15 minutes per IP, counting ONLY requests answered ≥400
+(`skipSuccessfulRequests`) — signed step callbacks never spend it, forged
+ones are capped. `tests/unit/inngest-serve-rejects-unsigned.test.ts` drives the
+REAL `inngest/express` handler in cloud mode and asserts a forged or missing
+signature is a 401 with no function run, so an SDK upgrade cannot quietly
+change the assumption.
+
 If Inngest step callbacks start 429ing again, check first whether the
 signature header changed name/casing on Inngest's side (it would silently
 stop matching and fall back to the counted path) before assuming the cap

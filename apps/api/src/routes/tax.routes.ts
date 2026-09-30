@@ -226,33 +226,14 @@ router.patch(
   }
 );
 
-// Public endpoint: Calculate tax for an order
-// POST /public/:storeId/tax/calculate
-router.post(
-  '/public/:storeId/tax/calculate',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
-      const { subtotal, country, state } = req.body;
-
-      if (subtotal === undefined || subtotal === null) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'MISSING_SUBTOTAL', message: 'Subtotal is required' },
-        });
-        return;
-      }
-
-      const result = await TaxService.calculateTax(storeId, subtotal, country, state);
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+// REMOVED (issue 2211 / issue 2167): `POST /public/:storeId/tax/calculate`
+// and `TaxService.calculateTax` behind it. Nothing in apps/web, apps/admin or
+// apps/orders called it, and it was a SECOND, differently-gated tax resolver
+// reachable unauthenticated: it ignored `Store.taxEnabled`, taxed the raw
+// subtotal (not subtotal − discount), never extracted an inclusive price, and
+// summed multi-rate/compound/country rates plus `defaultTaxRate` — none of
+// which the charge does. `resolveActiveTaxRate` (lib/order-tax.ts) is the one
+// resolver for both the charge and the storefront display; a surface that
+// needs a tax quote calls it (and `computeOrderTax`), never a parallel model.
 
 export default router;

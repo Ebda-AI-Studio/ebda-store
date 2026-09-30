@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
+import { withRlsBypass, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { OrderService } from '../../../services/order.service';
@@ -8,6 +8,7 @@ import { confirmPaymentFromProviderStatus } from '../../../services/payment-conf
 import type { PaymentProvider } from '../../../services/payment-providers/types';
 import { sendAlert } from '../../../services/alerts.service';
 import { AppError } from '../../../middleware/error-handler';
+import { recordPaymentEvent } from '../../../services/payment-event.service';
 
 /**
  * Auto-cancel stale unpaid orders — daily cron (03:00 UTC).
@@ -88,7 +89,14 @@ type ReconcileOutcome =
   /** No gateway payment to check, or provider says not paid. Cancel it. */
   | { action: 'cancel' }
   /** Couldn't get a trustworthy answer. Leave it pending; retry tomorrow. */
-  | { action: 'skip'; reason: string };
+  | { action: 'skip'; reason: string }
+  /**
+   * The provider says PAID but the order already left `pending` (cancelled /
+   * refunded by staff) — captured money that is NOT recorded on the order
+   * (issue 2134 / issue 2136 / issue 2143). Never folded into `skip`: it is
+   * the opposite of "provider unreachable" and needs a human, loudly.
+   */
+  | { action: 'stale_confirmed'; code: string };
 
 /** What the sweep should do with one stale unpaid order. */
 export type AutoCancelDecision = 'reconcile_paid' | 'cancel' | 'skip';
@@ -177,13 +185,22 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
 
     if (stale.length === 0) {
       logger.info('order-auto-cancel-unpaid: nothing to cancel');
-      return { scanned: 0, cancelled: 0, failed: 0, rescued: 0, skipped: 0 };
+      return { scanned: 0, cancelled: 0, failed: 0, rescued: 0, skipped: 0, staleConfirmed: 0 };
     }
 
     let cancelled = 0;
     let failed = 0;
     let rescued = 0;
     let skipped = 0;
+    let staleConfirmed = 0;
+    const capturedOnTerminal: Array<{
+      orderId: string;
+      orderNumber: string;
+      storeId: string;
+      paymentId: string | undefined;
+      provider: string | undefined;
+      transactionId: string | null | undefined;
+    }> = [];
 
     for (const order of stale) {
       const outcome: ReconcileOutcome = await step.run(`reconcile-${order.id}`, async () => {
@@ -258,27 +275,55 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
           ).then(
             () => null,
             (err: unknown) => {
-              // A 4xx AppError is a TERMINAL answer, not a transient one: the
-              // order left `pending` between this run's query and this step (a
-              // merchant cancelled it, or another path confirmed it and moved
-              // it on), so the confirm is a stale backwards transition (#763).
-              // Retrying cannot change that, and rethrowing failed the whole
-              // sweep: every order after this one went unprocessed and a
-              // non-actionable P1 fired. payment-webhook-process treats the
-              // same error the same way. The order is no longer pending, so
-              // tomorrow's run does not pick it up again.
-              if (err instanceof AppError && err.statusCode >= 400 && err.statusCode < 500) {
-                return err.code;
+              // ONLY the stale backwards transition is terminal (issue 2137):
+              // the order left `pending` between this run's query and this
+              // step (a merchant cancelled it, or another path confirmed it
+              // and moved it on), so confirming it is INVALID_STATUS_TRANSITION
+              // (#763). Retrying cannot change that, and rethrowing failed the
+              // whole sweep. ANY OTHER error — including some other 4xx — is
+              // rethrown: it would leave the order `pending`, so skipping it
+              // would re-skip it every night while a paid order sat
+              // unconfirmed. Returned as an object so the branch never hangs
+              // on the truthiness of a code string.
+              if (err instanceof AppError && err.code === 'INVALID_STATUS_TRANSITION') {
+                return { code: err.code };
               }
               throw err;
             }
           );
           if (staleConfirm) {
-            logger.warn(
-              { orderId: order.id, storeId: order.storeId, code: staleConfirm },
-              'order-auto-cancel-unpaid: provider reports paid but the order moved on — not confirming'
+            logger.error(
+              {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                storeId: order.storeId,
+                paymentId: payment.id,
+                provider: payment.provider,
+                code: staleConfirm.code,
+              },
+              'order-auto-cancel-unpaid: provider reports PAID but the order is no longer pending — captured money is unrecorded'
             );
-            return { action: 'skip', reason: `stale_confirm:${staleConfirm}` } as ReconcileOutcome;
+            // Durable, UI-visible trace on the order page's payment timeline
+            // (issue 2143) — the money exists at the provider even though the
+            // order and payment rows say it does not.
+            await runInTenantContext(order.storeId, () =>
+              recordPaymentEvent({
+                paymentId: payment.id,
+                storeId: order.storeId,
+                orderId: order.id,
+                eventType: 'reconciliation',
+                provider: payment.provider,
+                details: {
+                  reason: 'provider_paid_on_terminal_order',
+                  source: 'auto_cancel_sweep',
+                  providerStatus: providerStatus.status,
+                  transactionId: payment.transactionId,
+                  amount: payment.amount,
+                  note: 'Provider reports this payment captured, but the order had already left pending. Check the provider and refund the customer if the order stays cancelled.',
+                },
+              })
+            );
+            return { action: 'stale_confirmed', code: staleConfirm.code } as ReconcileOutcome;
           }
 
           logger.warn(
@@ -300,6 +345,17 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
 
       if (outcome.action === 'rescued') {
         rescued += 1;
+      } else if (outcome.action === 'stale_confirmed') {
+        staleConfirmed += 1;
+        const p = order.payments[0];
+        capturedOnTerminal.push({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          storeId: order.storeId,
+          paymentId: p?.id,
+          provider: p?.provider,
+          transactionId: p?.transactionId,
+        });
       } else if (outcome.action === 'skip') {
         skipped += 1;
       } else {
@@ -325,11 +381,32 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
       }
     }
 
+    // Captured money on an order that is no longer pending (issue 2134 /
+    // issue 2136 / issue 2143): its OWN P1, naming every order, because no
+    // merchant surface can act on it (a cancelled + unpaid order shows no
+    // refund or status action) and the pre-#763 behaviour (a failed run) was
+    // the only thing that used to make a human look.
+    if (staleConfirmed > 0) {
+      void sendAlert({
+        level: 'p1',
+        scope: 'platform',
+        source: 'order.auto_cancel.captured_on_terminal_order',
+        title: 'Provider reports PAID on an order that is no longer pending',
+        body:
+          `${staleConfirmed} order(s): the payment provider reports the payment CAPTURED, but the ` +
+          `order had already left pending (cancelled or refunded), so the capture is recorded ` +
+          `nowhere on the order. Check each in the provider dashboard and refund the customer ` +
+          `if the order stays cancelled. A 'reconciliation' event is on each order's payment timeline.`,
+        context: { orders: capturedOnTerminal.slice(0, 20) },
+      }).catch(() => undefined);
+    }
+
     // A rescue means real money was captured with every push path missed — the
     // merchant needs to know their fulfilment queue just gained an order, and
     // repeated rescues point at a broken webhook config rather than bad luck.
     // A skip means we could not reach a provider at all; one is noise, a
-    // persistent count is an outage holding real orders in limbo.
+    // persistent count is an outage holding real orders in limbo. (Stale
+    // confirms are NOT skips — see the alert above.)
     if (rescued > 0 || skipped > 0) {
       void sendAlert({
         level: rescued > 0 ? 'p1' : 'info',
@@ -351,10 +428,11 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
         failed,
         rescued,
         skipped,
+        staleConfirmed,
         thresholdDays: AUTO_CANCEL_UNPAID_DAYS,
       },
       'order-auto-cancel-unpaid completed'
     );
-    return { scanned: stale.length, cancelled, failed, rescued, skipped };
+    return { scanned: stale.length, cancelled, failed, rescued, skipped, staleConfirmed };
   }
 );

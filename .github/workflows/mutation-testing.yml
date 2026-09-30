@@ -119,6 +119,10 @@ on:
       - 'apps/web/middleware.ts'
       # #2037: the exception-safe scoped RLS bypass used by erasure.
       - 'apps/api/src/lib/scoped-rls-bypass.ts'
+      - 'apps/api/src/lib/ai-quota.ts'
+      - 'apps/api/src/lib/store-scoped-read.ts'
+      - 'apps/api/src/index.ts'
+      - 'apps/api/src/lib/customer-key.ts'
       - 'tests/unit/**'
       # --tier=all runs the integration-tier defences too (issues 2175/2188):
       # their verdicts rest on tests/integration/*.test.ts files, so a PR that

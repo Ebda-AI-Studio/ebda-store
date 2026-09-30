@@ -14,6 +14,15 @@ const MCP_ADMIN_PATH = /^\/api\/v1\/mcp\/admin\/[^/]+$/;
  * closure no suite could reach, and the limiter itself is disabled under
  * vitest — so every branch of it was unobservable.
  */
+/**
+ * True only when the Inngest SDK verifies `x-inngest-signature`: cloud mode
+ * (`isDev: config.nodeEnv !== 'production'` in lib/inngest/client.ts) AND a
+ * non-empty signing key. Read from the environment each call, like Bypass 0.
+ */
+export function inngestSignatureIsEnforced(): boolean {
+  return process.env.NODE_ENV === 'production' && Boolean(process.env.INNGEST_SIGNING_KEY);
+}
+
 export function skipGlobalRateLimit(req: Request): boolean {
   // Bypass 0: test environment. Integration test suites issue many
   // POST/PUT/DELETE mutations in a short window; the global mutation cap
@@ -88,7 +97,9 @@ export function skipGlobalRateLimit(req: Request): boolean {
   //     — before touching `this.fns` or executing any step — when it did
   //     not succeed.
   // So an attacker without the real signing key gains nothing but a
-  // rejected 401, same posture as the load-test bypass above. Dev-mode
+  // rejected 401 (NOT the load-test bypass's posture — that one compares
+  // against a secret; this one keys on a header NAME, which is why the
+  // dedicated `inngestLimiter` below bounds it). Dev-mode
   // (INNGEST_DEV) traffic from the local dev server does not carry a real
   // signature and so does NOT match this header-presence check — it stays
   // subject to the limiter (moot in practice: dev/test already exits via
@@ -96,10 +107,26 @@ export function skipGlobalRateLimit(req: Request): boolean {
   //
   // Matched exactly, like the /auth/refresh bypass: a lookalike path
   // (`/api/v1/inngest-x`, a `..`-traversal path) must NOT fall through.
+  //
+  // issue 2064: the load-bearing assumption ("inngestServe 401s first") holds
+  // only in cloud mode WITH a signing key. `isDev` is `nodeEnv !==
+  // 'production'` and an empty INNGEST_SIGNING_KEY is silently allowed, so a
+  // deployed service with NODE_ENV≠production (a staging/preview Railway
+  // variable) or no key would run functions for ANY caller — the bypass is
+  // therefore conditioned on exactly that state, and a misconfigured deploy
+  // keeps the counter. Pinned against the installed SDK by
+  // tests/unit/inngest-serve-rejects-unsigned.test.ts.
+  //
+  // issue 2063: header presence is not a secret, so this path is no longer
+  // UNBOUNDED — `inngestLimiter` (middleware/security.ts, mounted on
+  // /api/v1/inngest in index.ts before body parsing) counts every request
+  // that is answered ≥400 (an unsigned/forged call is a 401), 300 per 15
+  // minutes per IP, while successful signed step calls never consume it.
   if (
     method === 'POST' &&
     req.path === '/api/v1/inngest' &&
-    Boolean(req.header('x-inngest-signature'))
+    Boolean(req.header('x-inngest-signature')) &&
+    inngestSignatureIsEnforced()
   ) {
     return true;
   }

@@ -29,6 +29,8 @@ const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoist
     prismaMock: {
       // isStillReferenced's single registry-built probe (lib/r2-references.ts).
       $queryRawUnsafe: vi.fn().mockResolvedValue([{ referenced: false }]),
+      // r2-cleanup bounds its orphan scan with set_config('statement_timeout').
+      $executeRaw: vi.fn().mockResolvedValue(0),
       affiliateEvent: { create: vi.fn().mockResolvedValue({ id: 'evt-1' }) },
     },
     runInTenantContextMock: vi.fn(
@@ -174,7 +176,9 @@ describe('cleanupRemovedImages — bounded fan-out (issue 2042)', () => {
 
     await cleanupRemovedImages(removed, []);
 
-    expect(prismaMock.$queryRawUnsafe).toHaveBeenCalledTimes(20);
+    // Two statements per URL: the exact-URL probe, then (on a miss) the
+    // substring scan (issue 2249).
+    expect(prismaMock.$queryRawUnsafe).toHaveBeenCalledTimes(40);
     expect(storageMock.delete).toHaveBeenCalledTimes(20);
     expect(peak).toBe(1);
   });

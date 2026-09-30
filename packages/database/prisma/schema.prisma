@@ -991,6 +991,7 @@ model InventoryHistory {
   @@index([productId])
   @@index([storeId])
   @@index([createdAt])
+  @@index([storeId, reference])
   @@map("inventory_history")
 }
 
@@ -1403,6 +1404,14 @@ model Order {
   /// stuck-sweep re-sends a transition whose fanout never claimed it.
   statusFanoutRequestedAt DateTime? @map("status_fanout_requested_at")
   statusFanoutClaimedAt   DateTime? @map("status_fanout_claimed_at")
+  /// WHICH transition was requested (issue 2070 / issue 2133). The sweep
+  /// re-sends this status, never the order's current one, and only while the
+  /// order is still at it.
+  statusFanoutRequestedStatus String? @map("status_fanout_requested_status")
+  /// Stamped by the fanout after every side effect succeeded (issue 2071).
+  /// Claimed-but-not-completed past the window = a fanout that failed after
+  /// its claim, which the sweep reports.
+  statusFanoutCompletedAt DateTime? @map("status_fanout_completed_at")
 
   // Enterprise: payment-gateway abandonment capture. Set by the Inngest
   // payment-abandonment-sweep cron when the order has a Payment row with a
@@ -1635,6 +1644,7 @@ model PaymentEvent {
   @@index([storeId, occurredAt(sort: Desc)])
   @@index([orderId, occurredAt])
   @@index([eventType])
+  @@index([eventType, occurredAt])
   @@index([provider, occurredAt])
   @@index([triggeredByUserId])
   @@map("payment_events")

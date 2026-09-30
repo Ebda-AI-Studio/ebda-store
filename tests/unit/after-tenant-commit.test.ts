@@ -45,6 +45,7 @@ import {
   withDeferredWork,
   awaitDeferredWork,
   DEFERRED_TX_GLOBAL_LIMIT,
+  deferredConnectionsInUse,
 } from '@api/lib/after-tenant-commit';
 
 const STORE_ID = '11111111-1111-1111-1111-111111111111';
@@ -215,6 +216,40 @@ describe('withDeferredWork — inside a request transaction', () => {
     expect(ran).toBe(REQUESTS * TASKS_EACH);
     expect(maxInFlight).toBeGreaterThan(1);
     expect(maxInFlight).toBeLessThanOrEqual(DEFERRED_TX_GLOBAL_LIMIT);
+  });
+
+  // issue 2250: r2-cleanup nests withRlsBypass inside its tenant transaction,
+  // so each task holds TWO connections. Counted per task, five of them held
+  // 10 of 15. Mutation-proof: acquiring 1 slot regardless of `connections`
+  // lets maxConnections reach 2 × DEFERRED_TX_GLOBAL_LIMIT and reddens this.
+  it('counts CONNECTIONS, so two-connection tasks never exceed the pool share', async () => {
+    const releases: Array<() => void> = [];
+    runInTenantContextMock.mockImplementation(
+      async (_storeId: string | undefined, fn: () => Promise<unknown>) => {
+        await new Promise<void>(resolve => releases.push(resolve));
+        return fn();
+      }
+    );
+    const TASKS = 12;
+    const drain = withDeferredWork({ storeId: STORE_ID }, async () => {
+      for (let i = 0; i < TASKS; i++) {
+        void deferAfterTenantCommit(`nested-${i}`, async () => undefined, { connections: 2 });
+      }
+    });
+    let maxConnections = 0;
+    let ran = 0;
+    for (let round = 0; round < 100 && ran < TASKS; round++) {
+      // eslint-disable-next-line no-await-in-loop
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      maxConnections = Math.max(maxConnections, releases.length * 2);
+      const pending = releases.splice(0, releases.length);
+      ran += pending.length;
+      pending.forEach(r => r());
+    }
+    await drain;
+    expect(ran).toBe(TASKS);
+    expect(maxConnections).toBeLessThanOrEqual(DEFERRED_TX_GLOBAL_LIMIT);
+    expect(deferredConnectionsInUse()).toBe(0);
   });
 
   it('drops deferred work when the request transaction rolled back', async () => {
@@ -422,5 +457,29 @@ describe('installClosedTenantTxAlerting', () => {
     expect(loggerMock.error).not.toHaveBeenCalled();
     expect(sendAlertMock).not.toHaveBeenCalled();
     expect(loggerMock.debug).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Merge of issue 2250 (connection-weighted cap) with PR 2279 (runOnRollback):
+// a task can declare both, and a rolled-back request still runs it, under the
+// same weighted cap, releasing every slot it took.
+describe('connections + runOnRollback together', () => {
+  it('a rolled-back request still runs a runOnRollback task declaring 2 connections, and frees its slots', async () => {
+    console.log('SLOTS-BEFORE', deferredConnectionsInUse());
+    // An earlier test deliberately leaves a hung task holding a slot, so
+    // measure the delta rather than an absolute count.
+    const before = deferredConnectionsInUse();
+    const ran = vi.fn(async () => undefined);
+    await expect(
+      withDeferredWork({ storeId: STORE_ID }, async () => {
+        void deferAfterTenantCommit('both', ran, { connections: 2, runOnRollback: true });
+        void deferAfterTenantCommit('dropped', async () => undefined, { connections: 2 });
+        throw new Error('Handler returned 500');
+      })
+    ).rejects.toThrow('Handler returned 500');
+    for (let i = 0; i < 50 && ran.mock.calls.length === 0; i++) await Promise.resolve();
+    await new Promise(r => setTimeout(r, 10));
+    expect(ran).toHaveBeenCalledTimes(1);
+    expect(deferredConnectionsInUse()).toBe(before);
   });
 });

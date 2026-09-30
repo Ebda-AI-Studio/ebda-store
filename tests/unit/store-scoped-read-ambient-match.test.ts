@@ -1,0 +1,56 @@
+/**
+ * issue 2041 — readInStoreContext must reuse the ambient tenant transaction
+ * ONLY when it is scoped to the requested store. A transaction with no store
+ * GUC (`userContext` on /addresses, a header-less /wishlist) or another
+ * store's GUC reads a STRICT table as [] under force_app. The real-RLS proof
+ * is in tests/integration/rls-force-app.test.ts (run under a force_app login);
+ * this unit pin is what the defence-mutation record runs.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const h = vi.hoisted(() => ({
+  gucs: undefined as { storeId?: string; userId?: string } | undefined,
+  runInTenantContext: vi.fn(),
+}));
+
+vi.mock('@force/database', () => ({
+  currentTenantGucs: () => h.gucs,
+  runInTenantContext: h.runInTenantContext,
+}));
+
+import { readInStoreContext } from '../../apps/api/src/lib/store-scoped-read';
+
+const STORE_A = '11111111-1111-4111-8111-111111111111';
+const STORE_B = '22222222-2222-4222-8222-222222222222';
+
+describe('readInStoreContext — ambient store must match (issue 2041)', () => {
+  beforeEach(() => {
+    h.runInTenantContext
+      .mockReset()
+      .mockImplementation(async (_s: string, fn: () => unknown) => fn());
+  });
+
+  it('opens a scoped transaction when the ambient one has NO store (user-scoped router)', async () => {
+    h.gucs = { userId: 'u1' };
+    await readInStoreContext(STORE_B, async () => 1);
+    expect(h.runInTenantContext).toHaveBeenCalledWith(STORE_B, expect.any(Function));
+  });
+
+  it('opens a scoped transaction when the ambient one is ANOTHER store', async () => {
+    h.gucs = { storeId: STORE_A };
+    await readInStoreContext(STORE_B, async () => 1);
+    expect(h.runInTenantContext).toHaveBeenCalledWith(STORE_B, expect.any(Function));
+  });
+
+  it('reuses the ambient transaction when it is the SAME store', async () => {
+    h.gucs = { storeId: STORE_B };
+    await expect(readInStoreContext(STORE_B, async () => 7)).resolves.toBe(7);
+    expect(h.runInTenantContext).not.toHaveBeenCalled();
+  });
+
+  it('opens a scoped transaction with no context at all', async () => {
+    h.gucs = undefined;
+    await readInStoreContext(STORE_B, async () => 1);
+    expect(h.runInTenantContext).toHaveBeenCalledWith(STORE_B, expect.any(Function));
+  });
+});

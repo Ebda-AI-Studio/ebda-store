@@ -45,7 +45,7 @@
  *      next store.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
+import { prisma, withRlsBypass, runInTenantContext, runInStoreScope } from '@force/database';
 import { generatePrompts } from '../../../apps/api/src/services/answer-engine/prompts';
 import { runCitationScan } from '../../../apps/api/src/services/answer-engine/citation-scan.service';
 import { isPaidEngineOverBudget } from '../../../apps/api/src/services/answer-engine/budget';
@@ -525,4 +525,61 @@ describe('scanStoreCitations — cron per-store isolation (whole-branch fix wave
       }
     }
   );
+});
+
+/**
+ * issue 2076 — the #910 resume looks for rows an EARLIER attempt of the same
+ * run wrote. Wrapped in one `runInTenantContext`, a crash (or the 30s
+ * interactive-transaction timeout, which a multi-engine scan of grounded LLM
+ * calls blows through) rolled every one of those rows back, so the resume
+ * always found nothing and every retry re-bought every paid call. The scan now
+ * runs in `runInStoreScope`: each row commits as it is written.
+ */
+describe('citation scan resume survives a crashed attempt (issue 2076)', () => {
+  const P1 = { text: `resume prompt one ${Date.now()}`, locale: 'en' as const };
+  const P2 = { text: `resume prompt two ${Date.now()}`, locale: 'en' as const };
+  const answer = async () => ({ text: 'Answer', citedUrls: [], grounded: false });
+  const dbNow = async () =>
+    new Date((await prisma.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`)[0].now);
+
+  it('a row written before the crash is kept, and the retry does not re-query it', async () => {
+    const runStartedAt = await dbNow();
+    const first = mockProvider('gemini', answer);
+    await expect(
+      runInStoreScope(storeId, async () => {
+        await runCitationScan(storeId, { providers: [first], prompts: [P1], runStartedAt });
+        throw new Error('step crashed after writing');
+      })
+    ).rejects.toThrow('step crashed after writing');
+
+    const retry = mockProvider('gemini', answer);
+    const results = await runInStoreScope(storeId, () =>
+      runCitationScan(storeId, { providers: [retry], prompts: [P1, P2], runStartedAt })
+    );
+
+    expect(retry.queryMock).toHaveBeenCalledTimes(1); // P2 only
+    expect(retry.queryMock.mock.calls[0][1]).toBe(P2.text);
+    expect(results[0].checks).toBe(2);
+    const rows = await prisma.answerEngineCheck.findMany({
+      where: { storeId, promptText: { in: [P1.text, P2.text] } },
+    });
+    expect(rows).toHaveLength(2); // no duplicate row for P1
+  });
+
+  it('control: inside ONE runInTenantContext the same crash rolls the row back', async () => {
+    const P3 = { text: `resume prompt three ${Date.now()}`, locale: 'en' as const };
+    await expect(
+      runInTenantContext(storeId, async () => {
+        await runCitationScan(storeId, {
+          providers: [mockProvider('gemini', answer)],
+          prompts: [P3],
+          runStartedAt: await dbNow(),
+        });
+        throw new Error('step crashed after writing');
+      })
+    ).rejects.toThrow();
+    expect(await prisma.answerEngineCheck.count({ where: { storeId, promptText: P3.text } })).toBe(
+      0
+    );
+  });
 });

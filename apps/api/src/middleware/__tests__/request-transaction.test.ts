@@ -378,7 +378,11 @@ describe('streaming lane: escalated, not truncated, still commit-after-flush', (
 // ---------------------------------------------------------------------------
 
 describe('client disconnect', () => {
-  it('a client that aborts mid-handler commits, it does not roll back', async () => {
+  // issue 1604 — inverted. Committing on disconnect persisted whatever half of
+  // the handler had run (its later statements fail on the closing tx).
+  // Mutation-proof: resolving instead of rejecting in the `close` listener
+  // reddens this.
+  it('a client that aborts mid-handler ROLLS BACK, it does not commit', async () => {
     let released!: () => void;
     const gate = new Promise<void>(r => {
       released = r;
@@ -398,8 +402,8 @@ describe('client disconnect', () => {
       released();
       await new Promise(r => setTimeout(r, 50));
     });
-    expect(events).toContain('commit');
-    expect(events).not.toContain('rollback');
+    expect(events).toContain('rollback');
+    expect(events).not.toContain('commit');
   });
 });
 

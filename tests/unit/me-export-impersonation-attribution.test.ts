@@ -46,6 +46,7 @@ vi.mock('@api/middleware/security', () => ({
   refreshLimiter: (_req: any, _res: any, next: any) => next(),
   refreshIpLimiter: (_req: any, _res: any, next: any) => next(),
   resetEmailLimiter: (_req: any, _res: any, next: any) => next(),
+  authEmailAddressLimiter: (_req: any, _res: any, next: any) => next(),
   writeLimiter: (_req: any, _res: any, next: any) => next(),
   // #1863: /verify-email got its own limiter instead of sharing authLimiter's
   // <ip>-unknown bucket with /reset-password.

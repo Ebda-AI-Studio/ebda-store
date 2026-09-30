@@ -5,7 +5,11 @@ import { EmailService } from './email.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { socketService } from './socket.service';
 import { OrderService } from './order.service';
-import { PaymentService, findOutstandingRefundClaims } from './payment-providers/payment.factory';
+import {
+  PaymentService,
+  findOutstandingRefundClaims,
+  reconcileOutstandingRefundClaims,
+} from './payment-providers/payment.factory';
 import { refundMayHaveExecuted } from './payment-providers/refund-outcome';
 import logger from '../lib/logger';
 import { allocatePartialReturn } from './accounting/posting/partial-return-allocation';
@@ -838,6 +842,28 @@ export class ReturnService {
             502,
             'PROVIDER_REFUND_FAILED',
             'Payment provider refund failed. Please retry or switch refund method.'
+          );
+        }
+      }
+
+      // A NON-gateway completion of a return whose earlier gateway refund may
+      // have gone out (PROVIDER_REFUND_INDETERMINATE / REFUND_ALREADY_ISSUED
+      // both tell the merchant to "complete with Already refunded — record
+      // only") is the merchant settling that claim. Record it, so the claim
+      // has a terminal state and the stuck-claim sweep stops alerting on it
+      // (issue 2002). Same transaction as the completion below.
+      if (!isGatewayRefund && returnRequest.orderId) {
+        const settled = await reconcileOutstandingRefundClaims({
+          storeId,
+          orderId: returnRequest.orderId,
+          refundKey: `return:${returnId}`,
+          refundMethod,
+          userId: _userId,
+        });
+        if (settled.length > 0) {
+          logger.info(
+            { storeId, returnId, claims: settled, refundMethod },
+            '[ReturnService] merchant settled outstanding refund claim(s) on completion'
           );
         }
       }

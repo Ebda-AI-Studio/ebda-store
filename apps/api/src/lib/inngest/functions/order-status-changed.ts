@@ -274,6 +274,26 @@ export async function handleOrderStatusChanged(
     );
   }
 
+  // Completion marker (issue 2071). The claim above is a DEDUP lock taken
+  // before the side effects; this stamp says they all SUCCEEDED. A claimed
+  // transition that never gets it — every retry of some step failed — is what
+  // order-status-fanout-stuck-sweep now reports, instead of it being invisible
+  // behind its own claim. Scoped to the transition this run claimed.
+  await step.run('complete-status-fanout', () =>
+    runInTenantContext(storeId, () =>
+      prisma.order.updateMany({
+        where: {
+          id: orderId,
+          storeId,
+          status: status as OrderStatus,
+          statusFanoutClaimedAt: { not: null },
+          statusFanoutCompletedAt: null,
+        },
+        data: { statusFanoutCompletedAt: new Date() },
+      })
+    )
+  );
+
   return { ran };
 }
 

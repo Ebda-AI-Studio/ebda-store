@@ -213,3 +213,31 @@ describe('order-status-changed fanout — per-transition claim', () => {
     expect(h.orderFindUnique).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * issue 2071 — the claim is a dedup lock taken before the side effects; the
+ * completion stamp is what says they all succeeded. Mutation-proof: stamping
+ * before `Promise.allSettled` (or unconditionally) reddens the failure case.
+ */
+describe('order-status-changed fanout — completion stamp (issue 2071)', () => {
+  const stampCalls = () =>
+    h.orderUpdateMany.mock.calls.filter(
+      c => (c[0] as { data: Record<string, unknown> }).data.statusFanoutCompletedAt !== undefined
+    );
+
+  it('stamps statusFanoutCompletedAt after every side effect succeeded', async () => {
+    await handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub);
+    expect(stampCalls()).toHaveLength(1);
+    expect(stampCalls()[0][0]).toMatchObject({
+      where: { id: 'o1', storeId: 's1', status: 'shipped', statusFanoutCompletedAt: null },
+    });
+  });
+
+  it('does NOT stamp when a side effect failed — the sweep must be able to see it', async () => {
+    h.sendOrderShipped.mockRejectedValueOnce(new Error('resend down'));
+    await expect(
+      handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub)
+    ).rejects.toThrow();
+    expect(stampCalls()).toHaveLength(0);
+  });
+});

@@ -408,7 +408,10 @@ describe.skipIf(!hasDb)('deferred work vs. commit-before-respond', () => {
   // Client disconnect
   // -------------------------------------------------------------------------
 
-  it('a client that disconnects still commits and still drains its deferred work', async () => {
+  // issue 1604: a disconnect ROLLS BACK (it used to commit whatever half of the
+  // handler had run), so the deferred work — which would react to writes that
+  // no longer exist — is dropped with it, exactly like any rollback.
+  it('a client that disconnects rolls back and drops its deferred work', async () => {
     await new Promise<void>((resolve, reject) => {
       const req = http.get({ host: '127.0.0.1', port, path: `/abort/${storeId}` }, res => {
         res.resume();
@@ -422,13 +425,11 @@ describe.skipIf(!hasDb)('deferred work vs. commit-before-respond', () => {
       }, 5000);
     });
 
-    // Release the handler well after the socket is gone: `res.on('close')`
-    // resolves the gate, the transaction COMMITS (it does not roll back), and
-    // the deferred work — which reacts to writes that DID land — must still run.
     await waitFor(() => abortGateRelease !== undefined);
     abortGateRelease!();
 
-    await waitFor(() => probe.outcome !== undefined);
-    expect(probe.outcome).toBe('ok');
+    // Give a (wrongly) queued task ample time to run before asserting it didn't.
+    await new Promise(r => setTimeout(r, 500));
+    expect(probe.outcome).toBeUndefined();
   });
 });

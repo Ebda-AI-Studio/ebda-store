@@ -21,7 +21,7 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass, runInTenantContext } from '@force/database';
+import { withRlsBypass, runInStoreScope } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
@@ -46,6 +46,17 @@ export interface ScanStoreResult {
   checks: number;
   /** Checks written from an ungrounded fallback — see issue 2119. */
   ungroundedChecks: number;
+}
+
+/**
+ * The run's start instant from the DATABASE clock (issue 2076). The resume
+ * filter compares it with `answer_engine_checks.run_at`, which is Postgres
+ * `now()`; a Node timestamp would let clock skew between the API host and the
+ * database make the filter miss rows an earlier attempt wrote.
+ */
+async function dbNowIso(): Promise<string> {
+  const rows = await withRlsBypass(tx => tx.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`);
+  return new Date(rows[0]?.now ?? Date.now()).toISOString();
 }
 
 /**
@@ -89,10 +100,16 @@ export async function scanStoreCitations(
       return { storeId, skipped: true, checks: 0, ungroundedChecks: 0 };
     }
 
-    // runCitationScan uses bare prisma internally. Wrap in
-    // runInTenantContext so FORCE RLS policies see the correct store GUC
-    // for the AnswerEngineCheck writes.
-    const engineResults = await runInTenantContext(storeId, () => runCitationScan(storeId, opts));
+    // runCitationScan uses bare prisma internally. `runInStoreScope`, NOT
+    // `runInTenantContext` (issue 2076): the scan makes up to 24 grounded-LLM
+    // calls, seconds each, and one interactive transaction around all of them
+    // hit its 30s timeout and ROLLED BACK every AnswerEngineCheck row it had
+    // written — so the #910 resume (which looks for rows an earlier attempt
+    // wrote) always found none and every retry re-bought every paid call.
+    // In a store scope each query is its own short scoped transaction: the
+    // provider calls run outside any transaction and each check row commits
+    // as it is written, which is what makes the resume real.
+    const engineResults = await runInStoreScope(storeId, () => runCitationScan(storeId, opts));
     const checks = engineResults.reduce((sum, r) => sum + r.checks, 0);
     const ungroundedChecks = engineResults.reduce((sum, r) => sum + (r.ungrounded ?? 0), 0);
     return { storeId, skipped: false, checks, ungroundedChecks };
@@ -153,7 +170,7 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
 
     // Memoized, so a retried per-store step below sees the SAME instant and
     // resumes past the rows its crashed attempt already wrote (#910).
-    const runStartedAt = new Date(await step.run('run-started-at', () => new Date().toISOString()));
+    const runStartedAt = new Date(await step.run('run-started-at', () => dbNowIso()));
 
     const batches = chunk(stores, BULK_AI_BATCH_SIZE);
 
@@ -285,9 +302,9 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
     // On-demand also runs without HTTP tenant context — wrap so FORCE RLS
     // sees the correct GUC.
     // See the cron: memoized so a retried `scan` step resumes (#910).
-    const runStartedAt = new Date(await step.run('run-started-at', () => new Date().toISOString()));
+    const runStartedAt = new Date(await step.run('run-started-at', () => dbNowIso()));
     const engineResults = await step.run('scan', () =>
-      runInTenantContext(storeId, () => runCitationScan(storeId, { runStartedAt }))
+      runInStoreScope(storeId, () => runCitationScan(storeId, { runStartedAt }))
     );
 
     logger.info({ storeId, engineResults }, 'answer-engine-scan-on-demand completed');

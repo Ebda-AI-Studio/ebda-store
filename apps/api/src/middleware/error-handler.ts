@@ -50,6 +50,48 @@ export function clientErrorStatus(err: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * Mark a Prisma error that a call site KNOWS is a client condition (e.g. a
+ * merchant typing a duplicate SKU), so Sentry skips it. See
+ * `isExpectedClientError`. Returns the same error for `throw markExpected(e)`.
+ */
+export function markExpected<E extends Error>(err: E): E {
+  (err as E & { expected?: boolean }).expected = true;
+  return err;
+}
+
+/**
+ * Should Sentry treat this as an EXPECTED client error (skip capture)?
+ *
+ * Narrower than `clientErrorStatus` on purpose (issue 2005). A ZodError, a
+ * body-parser SyntaxError and an AppError 4xx are client mistakes by
+ * construction. A Prisma P2002/P2025/P2003 is raised by OUR query and is just
+ * as often a server defect — FORCE-API-28 was a P2003 from a nested
+ * transaction that could not see the uncommitted cart, and a P2002 on a
+ * ledger row is a double-post attempt. Those keep their 4xx RESPONSE (the
+ * parity with `errorHandler` is unchanged) but are still captured, unless the
+ * throw site opted out with `markExpected`.
+ */
+export function isExpectedClientError(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if ((err as { expected?: unknown }).expected === true) return true;
+    // Ruling BS-5: a P2002 on a MERCHANT-TYPED unique field (a duplicate SKU
+    // or slug) is a genuine client error. Any other P2002 — a ledger/journal
+    // row, an idempotency key — is our own double write and is captured
+    // (issue 2005).
+    if (err.code === 'P2002') {
+      const target = (err.meta as { target?: unknown } | undefined)?.target;
+      const fields = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+      return fields.some(f => MERCHANT_TYPED_UNIQUE_FIELDS.has(f) || /_(sku|slug)_key$/.test(f));
+    }
+    return false;
+  }
+  return clientErrorStatus(err) !== undefined;
+}
+
+/** Unique columns a merchant types into a form (Ruling BS-5 / CL-5). */
+const MERCHANT_TYPED_UNIQUE_FIELDS = new Set(['sku', 'slug']);
+
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): void {
   // A response has already gone out (a genuine real send — request-
   // transaction.ts's buffered lane flips its lane to 'flushing' the moment

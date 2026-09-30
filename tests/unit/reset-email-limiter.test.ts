@@ -24,7 +24,11 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import type { Request } from 'express';
-import { resetEmailLimiterKey, verifyEmailLimiterKey } from '@api/middleware/security';
+import {
+  authEmailAddressLimiterKey,
+  resetEmailLimiterKey,
+  verifyEmailLimiterKey,
+} from '@api/middleware/security';
 
 function req(body: unknown): Request {
   return { body } as unknown as Request;
@@ -97,6 +101,20 @@ describe('S5-3 / S5-4: the limiters are actually wired onto their routes', () =>
     expect(middlewareBlock).toContain('resetEmailLimiter');
   });
 
+  // issue 2228 — mutation-proof: removing authEmailAddressLimiter from either
+  // route reddens the matching case.
+  it.each(['/forgot-password', '/resend-verification'])(
+    'POST %s is behind the address-wide authEmailAddressLimiter',
+    route => {
+      const re = new RegExp(
+        `router\\.post\\(\\s*'${route.replace('/', '\\/')}',([\\s\\S]*?)async \\(req`
+      );
+      const match = routesSrc.match(re);
+      expect(match, `could not find the ${route} route handler`).not.toBeNull();
+      expect(match![1]).toContain('authEmailAddressLimiter');
+    }
+  );
+
   it('POST /verify-email is behind verifyEmailLimiter, not the shared authLimiter bucket', () => {
     // #1863: authLimiter's key is `<ip>-<email || 'unknown'>` and this route
     // posts no email, so riding authLimiter pooled every verification click
@@ -136,5 +154,23 @@ describe('verifyEmailLimiterKey (#1863)', () => {
       body: { token: 'bbb' },
     } as unknown as Request);
     expect(a).toBe(b);
+  });
+});
+
+describe('authEmailAddressLimiterKey (issue 2228)', () => {
+  it("ignores storeId — spraying store ids cannot multiply one inbox's budget", () => {
+    const a = authEmailAddressLimiterKey(req({ email: 'a@example.com', storeId: 'store-1' }));
+    const b = authEmailAddressLimiterKey(req({ email: 'a@example.com', storeId: 'store-2' }));
+    const c = authEmailAddressLimiterKey(req({ email: 'a@example.com' }));
+    expect(a).toBe(b);
+    expect(a).toBe(c);
+  });
+
+  it('normalises case/whitespace and has no IP component', () => {
+    expect(
+      authEmailAddressLimiterKey({ ip: '1.1.1.1', body: { email: ' A@Example.com ' } } as never)
+    ).toBe(
+      authEmailAddressLimiterKey({ ip: '2.2.2.2', body: { email: 'a@example.com' } } as never)
+    );
   });
 });

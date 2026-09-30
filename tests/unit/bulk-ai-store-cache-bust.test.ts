@@ -76,3 +76,19 @@ describe('bulk-ai-geo.ts store-record sweeps bust the STORE cache, not the produ
     expect(body).toContain('invalidateStoreProductCaches(storeId)');
   });
 });
+
+/**
+ * issue 2199 — the sweeps above write llmsTxt/aboutJson/FAQs, which
+ * `/llms.txt` serves. Its per-store fetch had `revalidate: 600` and NO tag, so
+ * the purge `bustStoreCaches` sends (`store-slug:<slug>`) could never reach it.
+ * Mutation-proof: removing the tag reddens this.
+ */
+describe('/llms.txt subscribes to the store purge tag (issue 2199)', () => {
+  it('fetchStore tags its fetch store-slug:<slug>', () => {
+    const src = readFileSync(join(__dirname, '../../apps/web/src/app/llms.txt/route.ts'), 'utf8');
+    const start = src.indexOf('async function fetchStore(');
+    expect(start).toBeGreaterThan(-1);
+    const body = src.slice(start, src.indexOf('\n}\n', start));
+    expect(body).toContain('tags: [`store-slug:${slug}`]');
+  });
+});

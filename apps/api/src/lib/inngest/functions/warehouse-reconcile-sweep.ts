@@ -1,8 +1,9 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { runInStoreScope, withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
+import { sendAlert } from '../../../services/alerts.service';
 
 interface FanoutStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
@@ -55,23 +56,22 @@ export interface WarehouseSweepResult {
  * aggregate) and already isolates per-SKU failures internally — this sweep
  * only adds the per-STORE isolation layer on top.
  *
- * NOT wrapped in `runInTenantContext` (fix wave 2, #936): a store's SKU count
- * is unbounded, and `runInTenantContext` opens ONE Prisma interactive
- * transaction with a 30s `timeout` for whatever runs inside it —
- * `warehouse.routes.ts`'s `POST /warehouses/reconcile-all` hit exactly this
- * ceiling synchronously in the request path (2026-07-23) and was moved here,
- * onto an Inngest step, which only relocated the same 30s ceiling rather than
- * removing it: a large Enterprise multi-warehouse catalog can still exceed it
- * mid-backfill, aborting the whole store's sweep with a P2028 that then
- * cascades into every remaining SKU failing on a dead transaction. Every read
- * and write inside `backfillReconcileAll` / `reconcileWarehouseStockToAggregate`
- * already filters explicitly by `storeId` (and `warehouses` /
- * `warehouse_stock`'s RLS policies permit an unset `app.current_store_id`
- * GUC, so this is not a coverage gap — see the migration's policy `USING
- * (current_store_id() IS NULL OR …)`), and `reconcileWarehouseStockToAggregate`
- * already opens its OWN short `withMoneyTx` per SKU, so calling
- * `backfillReconcileAll` unwrapped removes only the redundant whole-store
- * ceiling, not any tenant isolation.
+ * Wrapped in `runInStoreScope`, NOT `runInTenantContext` (issue 2081; fix
+ * wave 2, #936): a store's SKU count is unbounded, and `runInTenantContext`
+ * opens ONE Prisma interactive transaction with a 30s `timeout` for whatever
+ * runs inside it — `POST /warehouses/reconcile-all` hit exactly that ceiling
+ * (2026-07-23). #936 removed the wrapper entirely, which worked only because
+ * all four touched tables (`warehouses`, `warehouse_stock`, `products`,
+ * `product_variants`) allow an unset `app.current_store_id` today — nothing
+ * tied the code to that. `runInStoreScope` gives every query its own short
+ * `runInTenantContext` and makes each per-SKU `withMoneyTx` start with the
+ * store's `SET LOCAL`, so there is no whole-store ceiling AND the sweep keeps
+ * working if one of those policies is ever made strict. The SUMs in
+ * `reconcileWarehouseStockToAggregate` also filter `store_id` explicitly now,
+ * rather than relying on RLS for it.
+ *
+ * Failures are alerted, not only logged: a store that throws is a P1, and a
+ * night with failed SKUs sends an info alert with the counts.
  *
  * INNGEST_DEPLOY_ID note: like every other cron in this registry, this new
  * function is invisible to the Inngest platform until a deploy bumps
@@ -100,7 +100,7 @@ export async function sweepAllWarehouseStores(step: FanoutStep): Promise<Warehou
   for (const { storeId } of stores) {
     try {
       const result = await step.run(`sweep-${storeId}`, () =>
-        WarehouseService.backfillReconcileAll(storeId)
+        runInStoreScope(storeId, () => WarehouseService.backfillReconcileAll(storeId))
       );
       storesSwept++;
       totalSkusReconciled += result.skusReconciled;
@@ -124,6 +124,20 @@ export async function sweepAllWarehouseStores(step: FanoutStep): Promise<Warehou
     totalSkusFailed,
   };
   logger.info(result, '[warehouse-reconcile-sweep] daily completeness sweep complete');
+  if (storesFailed > 0 || totalSkusFailed > 0) {
+    await step.run('alert-reconcile-failures', () =>
+      sendAlert({
+        // A whole store failing means its drift was not repaired tonight; a
+        // failed SKU is usually a soft-deleted product (see backfillReconcileAll).
+        level: storesFailed > 0 ? 'p1' : 'info',
+        scope: 'platform',
+        source: 'warehouse.reconcile_sweep',
+        title: 'Warehouse reconcile sweep had failures',
+        body: `${storesFailed} of ${stores.length} store(s) failed; ${totalSkusFailed} SKU(s) could not be reconciled. Inventory drift for those is NOT repaired until a later run succeeds.`,
+        context: { ...result },
+      }).then(() => undefined)
+    );
+  }
   return result;
 }
 
@@ -153,7 +167,7 @@ export async function reconcileOneStoreOnDemand(
   logger.info({ storeId, requestedBy }, '[warehouse-reconcile-on-demand] starting');
 
   const result = await step.run(`sweep-${storeId}`, () =>
-    WarehouseService.backfillReconcileAll(storeId)
+    runInStoreScope(storeId, () => WarehouseService.backfillReconcileAll(storeId))
   );
 
   logger.info({ storeId, requestedBy, ...result }, '[warehouse-reconcile-on-demand] complete');

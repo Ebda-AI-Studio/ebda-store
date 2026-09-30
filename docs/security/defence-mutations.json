@@ -607,8 +607,8 @@
       "tier": "unit",
       "why": "one noisy store (reachable by an unauthenticated caller at publicLimiter's 300/min/IP) could fill a single GLOBAL take cap with its own rows, making every other store's denials in the window invisible to the classifier — a starved store reads identically to a quiet one",
       "source": "apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts",
-      "find": "                where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },",
-      "replace": "                where: { action: 'agent.write.denied', createdAt: { gte: since } },",
+      "find": "            where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },",
+      "replace": "            where: { action: 'agent.write.denied', createdAt: { gte: since } },",
       "test": "tests/unit/agent-write-denied-watch.test.ts"
     },
     {
@@ -947,8 +947,8 @@
       "tier": "unit",
       "why": "the Inngest step-callback bypass stops checking for x-inngest-signature, so ANY unauthenticated POST to /api/v1/inngest skips the global 200/15min per-IP mutation counter, not just Inngest Cloud's signed traffic",
       "source": "apps/api/src/middleware/global-rate-limit-skip.ts",
-      "find": "    req.path === '/api/v1/inngest' &&\n    Boolean(req.header('x-inngest-signature'))\n  ) {",
-      "replace": "    req.path === '/api/v1/inngest'\n  ) {",
+      "find": "    req.path === '/api/v1/inngest' &&\n    Boolean(req.header('x-inngest-signature')) &&\n    inngestSignatureIsEnforced()\n  ) {",
+      "replace": "    req.path === '/api/v1/inngest' &&\n    inngestSignatureIsEnforced()\n  ) {",
       "test": "tests/unit/global-rate-limit-skip.test.ts"
     },
     {
@@ -1127,8 +1127,8 @@
       "tier": "unit",
       "why": "every limiter is built at module load, before redis.connect(); a store that reads the client once at construction gets null and silently counts per process in production — per-replica budgets that reset on every deploy (#1862)",
       "source": "apps/api/src/middleware/security.ts",
-      "find": "    const client = this.resolveClient();\n    if (!client) return this.memory;",
-      "replace": "    return this.memory;",
+      "find": "    const client = this.resolveClient();\n    if (!client) {",
+      "replace": "    const client = null as RedisCaller | null;\n    void this.resolveClient;\n    if (!client) {",
       "test": "tests/unit/rate-limit-redis-at-boot.test.ts"
     },
     {
@@ -1137,8 +1137,8 @@
       "tier": "unit",
       "why": "a limiter that uses a client which exists but is not connected queues on ioredis's offline queue and holds the request for seconds at boot or during an outage (#1862)",
       "source": "apps/api/src/middleware/security.ts",
-      "find": "  redis.isAvailable() ? redis.getClient() : null;",
-      "replace": "  redis.getClient();",
+      "find": "  rateLimitSharedEnabled() && redis.isAvailable() ? redis.getClient() : null;",
+      "replace": "  rateLimitSharedEnabled() ? redis.getClient() : null;",
       "test": "tests/unit/rate-limit-redis-at-boot.test.ts"
     },
     {
@@ -1530,6 +1530,86 @@
       "find": "CREATE UNIQUE INDEX IF NOT EXISTS \"loyalty_transactions_reversal_tag_unique\"",
       "replace": "CREATE INDEX IF NOT EXISTS \"loyalty_transactions_reversal_tag_unique\"",
       "test": "tests/integration/partial-unique-indexes.test.ts"
+    },
+    {
+      "id": "rls-scoped-bypass-asserts-transaction",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "withScopedRlsBypass stops checking that SET LOCAL app.bypass_rls persisted, so a caller that passes the plain non-transactional client runs its 'bypassed' statements with RLS still on and is told they succeeded — an erasure that silently under-erases every other store (issue 2123)",
+      "source": "apps/api/src/lib/scoped-rls-bypass.ts",
+      "find": "  if (check?.[0]?.v !== 'true') {",
+      "replace": "  if (false as boolean) {",
+      "test": "tests/unit/scoped-rls-bypass.test.ts"
+    },
+    {
+      "id": "ai-quota-global-caps-count-cross-tenant",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "assertAiQuota's platform-wide daily/monthly counts run on the ambient client, so inside runInStoreScope or tenantContext the STRICT ai_usage policy filters them to one store under force_app and the global Gemini cap becomes a per-store cap (issue 2040, issue 2043)",
+      "source": "apps/api/src/lib/ai-quota.ts",
+      "find": "import { prisma, withRlsBypass } from '@force/database';",
+      "replace": "import { prisma } from '@force/database';\n// eslint-disable-next-line @typescript-eslint/no-explicit-any\nconst withRlsBypass = <T>(fn: (tx: any) => T): T => fn(prisma);",
+      "test": "tests/unit/ai-quota-global-counts-bypass.test.ts"
+    },
+    {
+      "id": "store-scoped-read-requires-same-store-context",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "readInStoreContext reuses ANY ambient tenant transaction — including one opened with no store (userContext on /addresses, header-less /wishlist) or for another store — so a strict-table read returns [] under force_app, the exact 2026-09-25 cutover failure (issue 2041)",
+      "source": "apps/api/src/lib/store-scoped-read.ts",
+      "find": "  if (currentTenantGucs()?.storeId === storeId) return fn();",
+      "replace": "  if (currentTenantGucs() !== undefined) return fn();",
+      "test": "tests/unit/store-scoped-read-ambient-match.test.ts"
+    },
+    {
+      "id": "ratelimit-memory-fallback-is-announced",
+      "domain": "availability",
+      "tier": "unit",
+      "why": "a limiter that falls back to per-process memory (Redis down, or an error latch) does so silently, so every budget is per replica and resets on deploy with no signal — the #1862 state, now reachable at runtime (issue 1963)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "      recordMemoryFallback(\n        this.prefix,\n        rateLimitSharedEnabled() ? 'redis-unavailable' : 'disabled'\n      );",
+      "replace": "      void 0;",
+      "test": "tests/unit/rate-limit-redis-at-boot.test.ts"
+    },
+    {
+      "id": "auth-email-address-wide-ceiling",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "with only the per-tenant reset bucket, spraying public store ids multiplies the reset/verification mails one inbox receives by the number of accounts that address holds (mailbox flooding, Resend cost, merchant-domain reputation) — issue 2228",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "  '/resend-verification',\n  authLimiter,\n  // issue 2228: the same per-inbox ceiling as /forgot-password — this route\n  // also takes a caller-supplied storeId and sends one mail per account.\n  authEmailAddressLimiter,",
+      "replace": "  '/resend-verification',\n  authLimiter,",
+      "test": "tests/unit/reset-email-limiter.test.ts"
+    },
+    {
+      "id": "inngest-bypass-requires-enforced-signature",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the Inngest bypass applies even when the SDK does not verify signatures (NODE_ENV not production = SDK dev mode, or no INNGEST_SIGNING_KEY), so any caller with a made-up x-inngest-signature header runs functions AND skips the global cap (issue 2064)",
+      "source": "apps/api/src/middleware/global-rate-limit-skip.ts",
+      "find": "    Boolean(req.header('x-inngest-signature')) &&\n    inngestSignatureIsEnforced()\n  ) {",
+      "replace": "    Boolean(req.header('x-inngest-signature'))\n  ) {",
+      "test": "tests/unit/global-rate-limit-skip.test.ts"
+    },
+    {
+      "id": "inngest-path-has-own-bucket",
+      "domain": "availability",
+      "tier": "unit",
+      "why": "with the global-cap bypass keyed on a header NAME, removing the dedicated /api/v1/inngest bucket leaves forged-signature POSTs unbounded — each a 10 MB JSON parse plus an HMAC on the shared event loop before the 401 (issue 2063)",
+      "source": "apps/api/src/index.ts",
+      "find": "app.use('/api/v1/inngest', inngestLimiter);",
+      "replace": "void inngestLimiter;",
+      "test": "tests/unit/global-rate-limit-skip.test.ts"
+    },
+    {
+      "id": "customer-ref-keyed-not-plain-hash",
+      "domain": "secret exposure",
+      "tier": "unit",
+      "why": "the guest RFM key doubles as the MCP customerRef returned next to a masked email/phone; as an unkeyed sha256 of an 8-digit Kuwait mobile it is reversible in seconds, so the masking contract fails for anyone holding a tool transcript (issue 2242)",
+      "source": "apps/api/src/lib/customer-key.ts",
+      "find": "import { createHmac } from 'node:crypto';",
+      "replace": "import { createHash } from 'node:crypto';\nconst createHmac = (_alg: string, _key: unknown) => createHash('sha256');",
+      "test": "tests/unit/customer-key-pii-mask.test.ts"
     }
   ]
 }

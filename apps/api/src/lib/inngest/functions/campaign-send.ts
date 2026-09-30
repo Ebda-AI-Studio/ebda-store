@@ -130,7 +130,30 @@ interface BatchResult {
   failed: number;
   skipped: number;
   cancelled: boolean;
+  /**
+   * The step stopped early to stay inside its wall-clock budget (issue 2115);
+   * its unsent recipients are still `queued` and are picked up by the
+   * leftover passes after the main loop.
+   */
+  deferred?: boolean;
 }
+
+/**
+ * Wall-clock budget for ONE batch step (issue 2115). Each `step.run` is an
+ * HTTP request from Inngest Cloud through Cloudflare, whose edge answers 524
+ * at 100s. With K stores sending at once the shared 1/s pacer gives each
+ * store ~1 send per K seconds, so a 20-recipient batch could run ~20·K s and
+ * be killed mid-step; after the retries ran out `onFailure` marked every
+ * still-queued recipient failed although they were never mailed. A step now
+ * stops at this budget and the rest resume in later steps.
+ */
+function campaignBatchWallBudgetMs(): number {
+  const n = parseInt(process.env.CAMPAIGN_BATCH_WALL_BUDGET_MS ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 60_000;
+}
+
+/** Upper bound on leftover passes after the main batches (each is ≥1 step). */
+const CAMPAIGN_LEFTOVER_MAX_PASSES = 200;
 
 const campaignSendFn = inngest.createFunction(
   {
@@ -294,120 +317,175 @@ const campaignSendFn = inngest.createFunction(
 
     const batches = chunk(ids, CAMPAIGN_SEND_BATCH_SIZE);
     const throttleMs = campaignThrottleMs();
-    for (let i = 0; i < batches.length; i++) {
-      const result: BatchResult = await step.run(`batch-${i}`, async () => {
-        const { campaign, store } = await loadSendContext(storeId, campaignId);
-        if (!campaign || !store || campaign.status !== 'sending') {
-          await failQueuedRecipients(storeId, campaignId, 'CANCELLED');
-          return { sent: 0, failed: 0, skipped: 0, cancelled: true };
+    const wallBudgetMs = campaignBatchWallBudgetMs();
+
+    /** Send to `recipientIds` (a batch), inside ONE step's wall-clock budget. */
+    const sendBatch = async (recipientIds: string[]): Promise<BatchResult> => {
+      const { campaign, store } = await loadSendContext(storeId, campaignId);
+      if (!campaign || !store || campaign.status !== 'sending') {
+        await failQueuedRecipients(storeId, campaignId, 'CANCELLED');
+        return { sent: 0, failed: 0, skipped: 0, cancelled: true };
+      }
+      const base = storefrontBaseUrl(store);
+      let sent = 0;
+      let failed = 0;
+      let skipped = 0;
+
+      const startedAt = Date.now();
+      let deferred = false;
+      for (const recipientId of recipientIds) {
+        // Stop inside the wall-clock budget (issue 2115); the rest stay
+        // `queued` and resume in a later step.
+        if (wallBudgetMs - (Date.now() - startedAt) <= 0) {
+          deferred = true;
+          break;
         }
-        const base = storefrontBaseUrl(store);
-        let sent = 0;
-        let failed = 0;
-        let skipped = 0;
-
-        for (const recipientId of batches[i]) {
-          const r = await runInTenantContext(storeId, () =>
-            prisma.campaignRecipient.findFirst({
-              where: { id: recipientId, campaignId, storeId },
-              select: {
-                id: true,
-                email: true,
-                locale: true,
-                status: true,
-                subscriber: { select: { isActive: true, unsubscribedAt: true } },
-              },
-            })
-          );
-          // Idempotency guard: anything already sent, failed or unsubscribed
-          // (or erased since) is never mailed again.
-          if (!r || r.status !== 'queued') {
-            skipped++;
-            continue;
-          }
-          // Consent is re-checked at send time, not only at materialize: a
-          // subscriber who unsubscribed (via another campaign's link) or was
-          // erased while this campaign was queued is skipped, never mailed.
-          if (!r.subscriber || !r.subscriber.isActive || r.subscriber.unsubscribedAt) {
-            await runInTenantContext(storeId, () =>
-              prisma.campaignRecipient.updateMany({
-                where: { id: r.id, status: 'queued' },
-                data: { status: 'unsubscribed', error: 'CONSENT_WITHDRAWN_BEFORE_SEND' },
-              })
-            );
-            skipped++;
-            continue;
-          }
-
-          const content = pickCampaignContent(campaign, r.locale === 'ar' ? 'ar' : 'en');
-          const token = signUnsubscribeToken(storeId, r.id);
-          const { subject, html } = renderCampaignEmail({
-            store,
-            locale: content.locale,
-            subject: content.subject,
-            bodyHtml: content.bodyHtml,
-            unsubscribeUrl: `${base}/unsubscribe?token=${encodeURIComponent(token)}`,
-          });
-
-          // Platform-wide rate bound across every store's running campaign.
-          await awaitCampaignSendSlot();
-          let messageId: string;
-          try {
-            ({ id: messageId } = await ResendService.sendMarketingEmail(store, {
-              to: r.email,
-              subject,
-              html,
-              headers: listUnsubscribeHeaders(config.apiUrl, token),
-              idempotencyKey: `campaign-recipient/${r.id}`,
-            }));
-          } catch (err) {
-            // A throttle is transient: rethrow so the step retries with
-            // backoff. Everything already sent in this batch is `sent` and is
-            // skipped on the retry.
-            if (err instanceof ResendSendError && err.code === 'rate_limit_exceeded') throw err;
-            const message = (err instanceof Error ? err.message : 'send failed').slice(
-              0,
-              ERROR_MAX
-            );
-            await runInTenantContext(storeId, () =>
-              prisma.campaignRecipient.updateMany({
-                where: { id: r.id, status: 'queued' },
-                data: { status: 'failed', error: message },
-              })
-            );
-            failed++;
-            logger.warn(
-              {
-                campaignId,
-                storeId,
-                recipientId: r.id,
-                code: err instanceof ResendSendError ? err.code : 'unknown',
-              },
-              '[CAMPAIGN] recipient send failed'
-            );
-            continue;
-          }
-
-          // Not inside the try: if this write fails the step retries, the row
-          // is still `queued`, and the idempotency key makes the resend a no-op.
+        const r = await runInTenantContext(storeId, () =>
+          prisma.campaignRecipient.findFirst({
+            where: { id: recipientId, campaignId, storeId },
+            select: {
+              id: true,
+              email: true,
+              locale: true,
+              status: true,
+              subscriber: { select: { isActive: true, unsubscribedAt: true } },
+            },
+          })
+        );
+        // Idempotency guard: anything already sent, failed or unsubscribed
+        // (or erased since) is never mailed again.
+        if (!r || r.status !== 'queued') {
+          skipped++;
+          continue;
+        }
+        // Consent is re-checked at send time, not only at materialize: a
+        // subscriber who unsubscribed (via another campaign's link) or was
+        // erased while this campaign was queued is skipped, never mailed.
+        if (!r.subscriber || !r.subscriber.isActive || r.subscriber.unsubscribedAt) {
           await runInTenantContext(storeId, () =>
             prisma.campaignRecipient.updateMany({
               where: { id: r.id, status: 'queued' },
-              data: {
-                status: 'sent',
-                providerMessageId: messageId,
-                sentAt: new Date(),
-                error: null,
-              },
+              data: { status: 'unsubscribed', error: 'CONSENT_WITHDRAWN_BEFORE_SEND' },
             })
           );
-          sent++;
-          if (throttleMs > 0) await sleep(throttleMs);
+          skipped++;
+          continue;
         }
-        return { sent, failed, skipped, cancelled: false };
-      });
+
+        const content = pickCampaignContent(campaign, r.locale === 'ar' ? 'ar' : 'en');
+        const token = signUnsubscribeToken(storeId, r.id);
+        const { subject, html } = renderCampaignEmail({
+          store,
+          locale: content.locale,
+          subject: content.subject,
+          bodyHtml: content.bodyHtml,
+          unsubscribeUrl: `${base}/unsubscribe?token=${encodeURIComponent(token)}`,
+        });
+
+        // Platform-wide rate bound across every store's running campaign —
+        // but never a wait past this step's remaining budget (issue 2115).
+        if (!(await awaitCampaignSendSlot(wallBudgetMs - (Date.now() - startedAt)))) {
+          deferred = true;
+          break;
+        }
+        let messageId: string;
+        try {
+          ({ id: messageId } = await ResendService.sendMarketingEmail(store, {
+            to: r.email,
+            subject,
+            html,
+            headers: listUnsubscribeHeaders(config.apiUrl, token),
+            idempotencyKey: `campaign-recipient/${r.id}`,
+          }));
+        } catch (err) {
+          // A throttle is transient: rethrow so the step retries with
+          // backoff. Everything already sent in this batch is `sent` and is
+          // skipped on the retry.
+          if (err instanceof ResendSendError && err.code === 'rate_limit_exceeded') throw err;
+          const message = (err instanceof Error ? err.message : 'send failed').slice(0, ERROR_MAX);
+          await runInTenantContext(storeId, () =>
+            prisma.campaignRecipient.updateMany({
+              where: { id: r.id, status: 'queued' },
+              data: { status: 'failed', error: message },
+            })
+          );
+          failed++;
+          logger.warn(
+            {
+              campaignId,
+              storeId,
+              recipientId: r.id,
+              code: err instanceof ResendSendError ? err.code : 'unknown',
+            },
+            '[CAMPAIGN] recipient send failed'
+          );
+          continue;
+        }
+
+        // Not inside the try: if this write fails the step retries, the row
+        // is still `queued`, and the idempotency key makes the resend a no-op.
+        await runInTenantContext(storeId, () =>
+          prisma.campaignRecipient.updateMany({
+            where: { id: r.id, status: 'queued' },
+            data: {
+              status: 'sent',
+              providerMessageId: messageId,
+              sentAt: new Date(),
+              error: null,
+            },
+          })
+        );
+        sent++;
+        if (throttleMs > 0) await sleep(throttleMs);
+      }
+      return { sent, failed, skipped, cancelled: false, deferred };
+    };
+
+    let cancelled = false;
+    let anyDeferred = false;
+    for (let i = 0; i < batches.length; i++) {
+      const result: BatchResult = await step.run(`batch-${i}`, () => sendBatch(batches[i]));
       logger.info({ campaignId, storeId, batch: i, ...result }, '[CAMPAIGN] batch done');
-      if (result.cancelled) break;
+      if (result.deferred) anyDeferred = true;
+      if (result.cancelled) {
+        cancelled = true;
+        break;
+      }
+    }
+
+    // Leftovers (issue 2115): recipients a budget-limited step did not reach
+    // are still `queued`. Re-list and send them in further steps until none
+    // remain. Only runs when a step actually deferred, so a normal campaign
+    // takes no extra steps.
+    for (let pass = 0; anyDeferred && !cancelled && pass < CAMPAIGN_LEFTOVER_MAX_PASSES; pass++) {
+      const left: string[] = await step.run(`leftover-list-${pass}`, () =>
+        runInTenantContext(storeId, async () =>
+          (
+            await prisma.campaignRecipient.findMany({
+              where: { campaignId, storeId, status: 'queued' },
+              select: { id: true },
+              orderBy: { createdAt: 'asc' },
+            })
+          ).map(r => r.id)
+        )
+      );
+      if (left.length === 0) break;
+      anyDeferred = false;
+      const leftBatches = chunk(left, CAMPAIGN_SEND_BATCH_SIZE);
+      for (let j = 0; j < leftBatches.length; j++) {
+        const result: BatchResult = await step.run(`leftover-${pass}-batch-${j}`, () =>
+          sendBatch(leftBatches[j])
+        );
+        logger.info(
+          { campaignId, storeId, pass, batch: j, ...result },
+          '[CAMPAIGN] leftover batch done'
+        );
+        if (result.deferred) anyDeferred = true;
+        if (result.cancelled) {
+          cancelled = true;
+          break;
+        }
+      }
     }
 
     // 6. Finalize counts + status.

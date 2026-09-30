@@ -1,0 +1,25 @@
+-- Migration: order_status_fanout_requested_status
+--
+-- Two gaps in the order/status-changed fanout's arming columns
+-- (20260927111000_order_status_fanout_claim):
+--
+--   issue 2070 / issue 2133 — the columns recorded WHEN a transition was
+--   requested but not WHICH. Four writers move orders.status without
+--   updateStatus (gateway refund paths, refresh-refund-status, payment
+--   confirm), so a stale unclaimed request was re-sent by the stuck sweep for
+--   the order's CURRENT status — firing the refunded side effects for a
+--   request that was about 'confirmed' and dropping the confirmed email.
+--   status_fanout_requested_status records the requested status; the sweep
+--   re-sends only that, and only while the order is still at it.
+--
+--   issue 2071 — the claim is taken BEFORE the side effects, so a claimed
+--   fanout whose steps all failed was invisible to the sweep (it only looks
+--   at unclaimed rows). status_fanout_completed_at is stamped after every
+--   side effect succeeded; claimed-but-not-completed past the window is
+--   reported.
+--
+-- Additive, nullable, no default, no backfill. Existing rows stay NULL and are
+-- never reported (the sweep requires a non-null requested_status for the
+-- completion check). Old code never writes them.
+ALTER TABLE "orders" ADD COLUMN "status_fanout_requested_status" TEXT;
+ALTER TABLE "orders" ADD COLUMN "status_fanout_completed_at" TIMESTAMP(3);

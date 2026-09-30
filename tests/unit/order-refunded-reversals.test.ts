@@ -31,6 +31,8 @@ const h = vi.hoisted(() => ({
   orderEventCreate: vi.fn(),
   // #1935: a failed customer refund email releases the refund_notified claim.
   orderEventDeleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+  // issue 2138: the release now hands back ONE channel on the claim row.
+  orderEventUpdate: vi.fn().mockResolvedValue({}),
   couponUpdateMany: vi.fn(),
   backorderLineUpdateMany: vi.fn(),
   reverseCommission: vi.fn(),
@@ -63,6 +65,7 @@ const txClient = {
     findMany: h.orderEventFindMany,
     create: h.orderEventCreate,
     deleteMany: h.orderEventDeleteMany,
+    update: h.orderEventUpdate,
   },
   coupon: { updateMany: h.couponUpdateMany },
   $queryRaw: h.queryRaw,
@@ -552,6 +555,15 @@ describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
   // could ever tell the customer their refund was issued.
   it('the customer email failing — the rest still runs, then the claim is released and the run FAILS', async () => {
     h.sendOrderRefunded.mockRejectedValue(new Error('enqueue failed'));
+    // First read (the claim): no row yet. Later read (the release): the row.
+    let claimReads = 0;
+    h.orderEventFindFirst.mockImplementation((args: { where: { toStatus?: string } }) =>
+      Promise.resolve(
+        args?.where?.toStatus === 'refund_notified' && claimReads++ > 0
+          ? { id: 'claim-1', metadata: {} }
+          : null
+      )
+    );
     const order: string[] = [];
     const recordingStep = {
       run: async <T>(id: string, fn: () => Promise<T>): Promise<T> => {
@@ -568,14 +580,52 @@ describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.notifyAdminsOfRefund).toHaveBeenCalledTimes(1);
     expect(h.orderUpdateMany).toHaveBeenCalledTimes(1); // claim-reversed stamp
-    // … and the claim was released only after the completion stamp, so a
-    // replay of the event can notify the customer.
-    expect(h.orderEventDeleteMany).toHaveBeenCalledWith({
-      where: { storeId: 's1', orderId: 'o1', toStatus: 'refund_notified' },
+    // … and ONLY the email channel was released (issue 2138 / issue 2135),
+    // after the completion stamp, so a replay notifies the customer and
+    // nothing else. The claim row is never deleted.
+    expect(h.orderEventDeleteMany).not.toHaveBeenCalled();
+    expect(h.orderEventUpdate).toHaveBeenCalledWith({
+      where: { id: 'claim-1' },
+      data: { metadata: { released: ['email'] } },
     });
     expect(order.indexOf('release-refund-notification-claim')).toBeGreaterThan(
       order.indexOf('claim-reversed')
     );
+  });
+
+  it('a replay after an email-only release sends the email and NOT the dispatch or push again', async () => {
+    h.orderEventFindFirst.mockImplementation((args: { where: { toStatus?: string } }) =>
+      Promise.resolve(
+        args?.where?.toStatus === 'refund_notified'
+          ? { id: 'claim-1', metadata: { released: ['email'] } }
+          : null
+      )
+    );
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.sendOrderRefunded).toHaveBeenCalledTimes(1);
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
+    // …and the released channel is re-claimed.
+    expect(h.orderEventUpdate).toHaveBeenCalledWith({
+      where: { id: 'claim-1' },
+      data: { metadata: { released: [] } },
+    });
+  });
+
+  it('a claim row with no released list (every row written before issue 2138) sends nothing', async () => {
+    h.orderEventFindFirst.mockImplementation((args: { where: { toStatus?: string } }) =>
+      Promise.resolve(
+        args?.where?.toStatus === 'refund_notified' ? { id: 'claim-1', metadata: {} } : null
+      )
+    );
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
   });
 
   it('a partial return whose email fails is not claimed, so nothing is released, but the run still fails', async () => {

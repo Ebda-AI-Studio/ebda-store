@@ -130,3 +130,23 @@ describe('campaign send pacer (#1955)', () => {
     }
   });
 });
+
+describe('campaign send pacer — bounded wait (issue 2115)', () => {
+  it('returns false WITHOUT waiting when the reserved slot is past maxWaitMs', async () => {
+    const evalFn = vi.fn(async () => 5_000);
+    redisState.client = { eval: evalFn };
+    redisState.available = true;
+    const start = Date.now();
+    await expect(awaitCampaignSendSlot(1_000)).resolves.toBe(false);
+    expect(Date.now() - start).toBe(0);
+  });
+
+  it('waits and returns true when the slot fits the budget', async () => {
+    const evalFn = vi.fn(async () => 250);
+    redisState.client = { eval: evalFn };
+    redisState.available = true;
+    const p = awaitCampaignSendSlot(1_000);
+    await vi.advanceTimersByTimeAsync(250);
+    await expect(p).resolves.toBe(true);
+  });
+});

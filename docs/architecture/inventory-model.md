@@ -24,6 +24,15 @@ Checkout can never sell a disabled variant, so counting one only produced a
 product that read "in stock" on units nobody could buy — and, before this rule,
 two different totals for the same product depending on which screen you asked.
 
+Disabling a variant that holds units therefore changes stock and stock value
+with no quantity moving. So that the drop is never silent (issue 2146): the
+flip writes a zero-quantity `adjustment` row in `inventory_history`
+(`reference = variant:<id>`, reason "Variant disabled — N unit(s) no longer
+count as stock", and the mirror row on re-enable), and the finance dashboard
+shows the value held on disabled variants on its own line under Stock Value
+(`DISABLED_VARIANT_STOCK_VALUE_SQL`, the exact inverse predicate of
+`STOCK_VALUE_SQL`). No journal entry is posted — see Ruling CL-14.
+
 ## Reading stock
 
 Never dereference `product.inventory` to answer "is this available" or "how

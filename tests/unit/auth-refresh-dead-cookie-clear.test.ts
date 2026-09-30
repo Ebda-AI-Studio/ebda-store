@@ -29,6 +29,7 @@ vi.mock('@api/middleware/security', () => ({
   refreshLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   refreshIpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   resetEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authEmailAddressLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   auditLog: vi.fn(),
   generateCsrfToken: vi.fn(() => 'csrf'),
   // #1801: `/auth/refresh` verifies the presented token's signature before

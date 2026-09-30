@@ -3377,6 +3377,238 @@ the debt). The guard's docstring now states exactly which shapes are enforced an
 (template literals, text between two interpolations, lower-case ternary literals, files outside the
 list). Cost if wrong: the 66 strings keep rendering in English on an Arabic admin until someone
 translates them and deletes their debt entries.
+
+---
+
+## 2026-10-01 — backlog batch c-api-lib (branch `fix/backlog-c-api-lib`)
+
+Context: 53 `audit-followup` P2 issues filed against `apps/api/src/lib`,
+`apps/api/src/middleware` and `apps/api/src/index.ts`.
+
+**Ruling CL-1 — a CORS lookup failure serves the last resolved answer for up to
+15 minutes (issue 2109, issue 2169).** The first failed custom-domain lookup no
+longer poisons the hostname: the next request re-queries, and only the second
+consecutive failure short-circuits to 503 for 5s. A domain resolved within
+`CORS_STALE_SERVE_MAX_MS` keeps its last answer through the outage (stale-allow
+or stale-reject). Cost if wrong: a domain the merchant DEACTIVATED (store status
+change, not a domain edit) during an outage on another replica keeps passing
+CORS on this replica for up to 15 minutes — bounded, and harmless on its own
+because CSRF tokens and `restrictPlatformOnlyOrigins` are the real boundary; a
+domain removal on this replica busts the entry and is never served stale.
+
+**Ruling CL-2 — cross-store aggregates reached from inside a store scope run
+under `withRlsBypass`, and are gated in the force_app suite (issue 2040,
+issue 2043).** `assertAiQuota`'s daily/monthly counts protect ONE Google project
+ceiling; the per-store slice stays ambient. The mirror of RLS-S1: the strict
+list names readers that NEED a context, and `rls-force-app.test.ts` now carries
+a "must NOT be scoped" block for readers that must not have one. Proven red on
+the pre-fix code under a real non-BYPASSRLS login (a role that is a member of
+`force_app`). Cost if wrong: none on isolation — the two counts only read
+`count(*)`, never row contents.
+
+**Ruling CL-3 — RLS helpers assert their precondition instead of documenting it
+(issue 2123, issue 2041).** `withScopedRlsBypass` reads `app.bypass_rls` back
+after its `SET LOCAL` and throws if it did not persist (a non-transactional
+client), so the Ruling W-7 wallet/erasure statements can no longer "succeed"
+with RLS still on. `readInStoreContext` reuses an ambient tenant transaction
+only when `currentTenantGucs().storeId` matches the requested store; a
+store-less (`userContext`) or other-store transaction gets a fresh short
+`runInTenantContext` — correct for a read, which is all the helper does.
+Both are registered defence mutations (unit tier) and the second is also
+proven under a real non-BYPASSRLS login in `rls-force-app.test.ts`. Cost if
+wrong: one extra short read transaction when a same-store caller arrives
+without its GUC recorded — none found.
+
+**Ruling CL-4 — the R2 orphan check keeps scanning every registered JSON/HTML
+column; its cost is bounded rather than removed (issue 2249, issue 2250).**
+Measured on Postgres 16 with 200k synthetic `abandoned_carts` rows (3 image
+URLs each): the combined statement took ~475 ms for a key that is NOT
+referenced (the common case — it is what triggers the delete); the exact-URL
+half alone took ~20 ms. Changes: the exact half runs first and short-circuits
+a still-referenced (cloned) image; the substring half runs under
+`SET LOCAL statement_timeout = 5000` and a timeout KEEPS the object; the
+deferred task declares `connections: 2` so the global deferred cap counts the
+nested `withRlsBypass` connection (at most 2 concurrent checks per process at
+the default pool of 15). NOT done: dropping `abandoned_carts` from the scan
+(its snapshot images appear in recovery emails already sitting in inboxes, so
+deleting them breaks sent mail — a product call, and the table is bounded by
+the 30-day `abandoned-cart-purge`), and a `pg_trgm` expression index (write
+amplification on every cart-step update, unjustified at today's volume). Cost
+if wrong: an image delete costs ~0.5 s of one pooled connection per 200k
+abandoned carts; past ~2M rows the 5 s timeout starts keeping orphaned files
+(a storage leak the weekly sweep already reports), which is the signal to add
+the trigram index.
+
+**Ruling CL-5 — Prisma P2002/P2025/P2003 are captured by Sentry again; the
+response mapping is unchanged (issue 2005).** `clientErrorStatus` still decides
+the 4xx the client gets; the Sentry gate now uses the narrower
+`isExpectedClientError` (ZodError, body-parser SyntaxError, AppError 4xx, or a
+Prisma error the throw site passed through `markExpected`). This restores the
+safety net Ruling SN-2 relies on: a FORCE-API-28 recurrence (P2003) reaches
+Sentry instead of answering a silent 400, and a P2002 on a ledger row is no
+longer an invisible 409. Cost if wrong: FORCE-API-2A-style events (a merchant
+saving a duplicate SKU) come back as Sentry events — noise, not an outage; the
+fix for any such site that turns out to be loud is `markExpected` at that
+throw site, never widening the global gate again.
+
+**Ruling CL-5a — merge with Ruling BS-5 (issue 1988, main).** Both batches
+reopened Prisma errors to Sentry. The merged gate: P2002/P2003/P2025 with no
+status of their own are captured at WARNING level; skipped are Zod/body-parser
+errors, AppError 4xx, a Prisma error passed through `markExpected`, and — BS-5's
+case — a P2002 whose unique target is a merchant-typed field (`sku`/`slug`).
+Any other P2002 (a journal/ledger row, an idempotency key) is captured, which is
+issue 2005's double-post case. Cost if wrong: a merchant-facing unique field not
+named `sku`/`slug` produces warning-level Sentry noise until it is added to
+`MERCHANT_TYPED_UNIQUE_FIELDS` or its throw site uses `markExpected`.
+
+**Ruling CL-6 — the shared rate-limit budgets are measured and switchable, not
+re-sized (issue 2216, issue 2230, issue 2171, issue 1963, issue 2228).**
+Every limiter counts its 429s per prefix and logs a per-minute summary; a
+prefix over `RATE_LIMIT_429_ALERT_PER_MIN` pages P1; a fall back to
+per-process counting after a Redis-backed period is logged and alerted once;
+`RATE_LIMIT_SHARED=0` restores per-process counting without a deploy of code;
+and the Redis `isConnected` latch is re-armed on `ready` (an `error` only
+clears it when the client is really not ready). The per-IP maxes were NOT
+raised: the only replica evidence in the repo is `railway.json`, which sets no
+`numReplicas` (Railway's default is one instance) and docs/SCALING.md, which
+describes replicas as not yet enabled — if that holds, #1862 tightened nothing
+and only made budgets survive a deploy. Amends Ruling S1-4: the live replica
+count is still NOT verified against the Railway dashboard from this session;
+the first post-deploy 429 summary lines settle it. The checkout limiters stay
+IP-keyed: an IP+session key would let a caller mint a fresh bucket per
+request by rotating `X-Session-ID`. Amends Ruling S1-8: a new address-wide
+`authEmailAddressLimiter` (6/hour, no IP, no store component) sits in front of
+`/forgot-password` and `/resend-verification`, so spraying public store ids no
+longer multiplies the mails one inbox receives; the cost is that a flood can
+now spend that ceiling for every store at once (the flooded mails still carry
+working links). Cost if wrong: if production does run several replicas, CGNAT
+shoppers may already be seeing 429s — now visible within a minute and
+reversible with one variable.
+
+**Ruling CL-7 — the Inngest global-limiter bypass is conditioned on the SDK
+actually verifying, and the path gets its own failure-counted bucket (issue
+2063, issue 2064).** Amends Ruling RL-1: its "costs nothing" held only in
+cloud mode with a key; the bypass now also requires `NODE_ENV=production` and a
+non-empty `INNGEST_SIGNING_KEY`, boot pages P1 when the key is missing, and the
+SDK behaviour is pinned by driving the real `inngest/express` handler (a
+dev-mode positive control answers 200 and runs the function, so the test has
+teeth). `inngestLimiter` (300/15min/IP, `skipSuccessfulRequests`) sits before
+the body parser. NOT changed: the 10 MB JSON limit on this path — Inngest's
+step-state payload ceiling was not measured, and a too-small parser limit
+would break real jobs; the failure-counted bucket bounds a forged-body flood
+to 300 parses per IP per 15 minutes instead. Cost if wrong: a caller rotating
+IPs can still force 300 × 10 MB parses per IP per window — the same exposure
+every JSON route has under the global cap.
+
+**Ruling CL-8 — a provider-PAID answer on an order that already left `pending`
+is its own outcome with its own P1, not a skip (issue 2134, issue 2136,
+issue 2137, issue 2143).** Only `INVALID_STATUS_TRANSITION` is terminal in the
+auto-cancel reconcile; every other error, 4xx included, rethrows (a skipped
+4xx would leave the order `pending` and re-skip it nightly). The stale confirm
+is counted as `staleConfirmed`, pages `order.auto_cancel.captured_on_terminal_order`
+naming order/payment/transaction ids, and writes a `reconciliation` payment
+event so the order page shows it. NOT done: automatically refunding or
+re-opening the order — whether captured money on a staff-cancelled order is
+refunded or the order revived is a merchant decision (Ruling R2-5 already
+defers the adjacent #1948 question). `payment-webhook-process` keeps its
+4xx-class terminal rule: there a 4xx means the inbound bytes are bad, and it
+already persists a `rejected` webhook row with a replay UI. Cost if wrong:
+none silent — the worst case is a P1 per affected order per nightly run until
+a human acts; the order is no longer `pending`, so it is reported once.
+
+**Ruling CL-9 — the once-per-order refund notice claim is released per channel
+(issue 2138, issue 2135); #1948 stays with the owner.** Amends Ruling R2-8: an
+email-only failure now records `metadata.released: ['email']` on the single
+`refund_notified` claim row instead of deleting it, so a replay sends the
+email alone — not a second billed WhatsApp/SMS template and a second admin
+push — and a later independent `order/refunded` for the order still finds the
+claim. A claim row with no `released` list (every row written before this
+change) means all channels were sent. Runs that started before the change
+replay the claim step's memoized boolean, which is mapped to "all channels" /
+"none". Issue 1948 (the notice is claimed at CANCEL, before money moves) is
+NOT changed here: Ruling R2-5 already records it as an owner question about
+what a customer is told at the cancel of a paid order. Cost if wrong: none new
+— a replay after a release sends exactly the channel that failed.
+
+**Ruling CL-10 — a stuck status fanout is re-sent only for the transition it
+was about; a failed-after-claim fanout is reported, not re-sent (issue 2070,
+issue 2071, issue 2133).** New additive columns `status_fanout_requested_status`
+and `status_fanout_completed_at`. The sweep re-sends the requested status while
+the order is still at it; a request a direct writer superseded is reported P1
+and disarmed. The four direct `Order.status` writers were deliberately NOT
+changed to clear the arming: that would hide the lost transition the sweep now
+reports. A claimed fanout that never completes is reported once (Redis
+sentinel) and NOT re-sent: re-running it would repeat the steps that did
+succeed — customer emails and WhatsApp — the double-send #558 exists to stop.
+Cost if wrong: the operator replays or hand-applies the missing effect for each
+reported order; nothing is silently lost any more.
+
+**Ruling CL-11 — the second tax resolver is deleted; multi-rate and the plan
+gate stay with the owner (issue 2167, issue 2211; open: issue 2114, issue
+2166).** `POST /stores/public/:storeId/tax/calculate` and
+`TaxService.calculateTax` had no caller in any app and disagreed with the
+charge on every axis (no `taxEnabled` gate, pre-discount base, no inclusive
+extraction, summed/compound/country rates, `defaultTaxRate` fallback), so they
+are removed and `order-tax-resolver-gating.test.ts` now sweeps all of
+`apps/api/src` for another resolver. The admin "Default tax rate" help text
+now says what is true — it is not applied at checkout — in EN and AR. Amends
+Ruling M3-9's wording ("the same two gates TaxService.calculateTax applies"),
+which was never true. NOT decided here: whether a store with several active
+rates should be charged their sum (issue 2114 — changes the amount charged),
+and whether the billing-plan `tax` feature may switch off statutory VAT
+collection for a lapsed `free` store (issue 2166). Production has 0 `tax_rates`
+rows and `taxEnabled: false` on all 3 live stores (M3-9), so neither is live
+today. Cost if wrong: an integrator calling the removed endpoint gets a 404 —
+none exists in the repo.
+
+**Ruling CL-12 — a client disconnect rolls the request back (issue 1604);
+#1603 stays closed by Ruling M2-3.** The `close`-before-`finish` branch now
+rejects with `AbandonedRequest`, so a half-executed handler is never committed
+and its deferred work is dropped. Both request-transaction tests that asserted
+commit-on-abort as intended are inverted. Order creation is unaffected either
+way (both order writers commit in their own `withMoneyTx`, M2-3). Cost if
+wrong: a merchant who closes the tab while a slow admin save is still running
+loses that save and has to redo it — instead of silently keeping part of it.
+
+**Ruling CL-13 — campaign batch steps are wall-clock bounded; the per-store
+concurrency stays (issue 2115).** Each `batch-i` step stops inside
+`CAMPAIGN_BATCH_WALL_BUDGET_MS` (60s) and asks the pacer only for a slot it can
+afford (`awaitCampaignSendSlot(maxWaitMs)` returns false instead of sleeping
+past the budget), and leftover passes send what a step deferred. Amends Ruling
+R3-1's cost-if-wrong: it named only the Redis-down replica case, not step
+duration. NOT changed: `concurrency: { limit: 1, key: storeId }` — returning to
+platform-wide one-at-a-time would undo #1955. Cost if wrong: a skipped pacer
+slot is a one-interval gap in the platform cadence, never a burst, and a very
+large campaign takes more (short) steps.
+
+**Ruling CL-14 — disabling a stocked variant is recorded and its value shown,
+but no journal entry is posted (issue 2146).** The flip writes a zero-quantity
+`inventory_history` marker and the finance dashboard shows "held on disabled
+variants" beside Stock Value (EN + AR, hidden when zero or unknown), so the
+dashboard figure no longer drops with no trace. NOT done: an inventory
+write-off/reclass journal entry. A disabled variant's units still physically
+exist and can be re-enabled; posting and reversing ledger entries on a
+visibility toggle is an accounting-policy call for the owner, and until it is
+made the ledger's Inventory account and the computed stock value differ by
+exactly the new "held on disabled variants" figure. Cost if wrong: the
+merchant's balance-sheet Inventory and the dashboard's Stock Value disagree by
+that visible amount.
+
+**Ruling CL-15 — the guest RFM key / MCP `customerRef` is an HMAC under a
+secret derived from `ENCRYPTION_KEY`, not a new env var (issue 2242).** A plain
+sha256 of a guest's contact was reversible (8-digit mobile, masked forms leak
+most of it), so the "contact details are masked" contract (MCP-R2) did not hold.
+`rfmKeyFor` now uses HMAC-SHA256 keyed by `HMAC(ENCRYPTION_KEY, "fwb:customer-
+rfm-key:v1")`. A derived key was chosen over a new `CUSTOMER_REF_SECRET` because
+production already refuses to boot without `ENCRYPTION_KEY`, so there is no
+deploy-ordering step and no silent unkeyed fallback. Re-keying repeats Ruling
+RFM-K1's residual once: until the first nightly `runRfmRollup` after deploy
+rewrites the snapshots (its stale-row sweep deletes the old keys), guest
+segment drill-downs and MCP refs from before the deploy match nothing. Cost if
+wrong: rotating `ENCRYPTION_KEY` re-keys every guest snapshot the same way
+(one night of empty guest drill-downs) — a rotation already has to re-encrypt
+every stored provider secret, so it is never silent.
+
 ## 2026-10-01 — backlog batch b-services (branch `fix/backlog-b-services`)
 
 **Ruling BS-1 — issues 2247 / 2269: the all-time customer count keeps its full scan, but on its
@@ -3476,7 +3708,6 @@ transaction: account-lockout (`/auth`), abandoned-cart and SMS queue (process ti
 (Inngest, no context), `payment.factory` `releaseClaim` (its own deliberate transaction),
 wbs-integration (context-less router). Cost if wrong: a site the scan's pattern missed (a write
 wrapped in a helper, or a `.catch(() => …)` chain) still poisons its request.
-
 
 ## 2026-10-01 — backlog batch a-money-services (branch `fix/backlog-a-money-services`)
 

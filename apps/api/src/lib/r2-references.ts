@@ -511,40 +511,66 @@ export async function collectReferencedR2Keys(opts: {
 }
 
 /**
- * ONE statement answering "does any registered column still reference this
+ * A statement answering "does any registered column still reference this
  * object?". `url` columns match the exact URL (an index probe, as before);
  * `json`/`text` columns match the R2 KEY as a substring of the value's text,
  * which also catches the other URL form (public vs endpoint) and URLs
  * embedded in HTML. A substring false positive only keeps a file alive.
+ *
+ * `part` (issue 2249): the substring branches are unindexable by construction
+ * — a full scan with a per-row jsonb→text cast over `abandoned_carts`,
+ * `campaigns`, `blog_posts`, `store_pages`, 13 JSON columns on `stores` —
+ * measured at ~480 ms against 200k abandoned carts on Postgres 16. So
+ * `isR2UrlReferenced` runs the cheap `'exact'` half first and only falls back
+ * to `'substring'` when no exact reference exists. `'all'` is the combined
+ * statement (kept for tests and ad-hoc audits).
  */
 export function buildIsReferencedSql(
-  columns: readonly R2ReferenceColumn[] = R2_REFERENCE_COLUMNS
+  columns: readonly R2ReferenceColumn[] = R2_REFERENCE_COLUMNS,
+  part: 'all' | 'exact' | 'substring' = 'all'
 ): string {
   const clauses: string[] = [];
-  for (const [table, cols] of columnsByTable(columns)) {
+  for (const [table, all] of columnsByTable(columns)) {
+    const cols = all.filter(c =>
+      part === 'all' ? true : part === 'exact' ? c.kind === 'url' : c.kind !== 'url'
+    );
+    if (cols.length === 0) continue;
+    // Placeholders: 'all' binds ($1 = url, $2 = key); each half binds only
+    // the one value it uses, as $1 — Postgres rejects an unused parameter.
+    const keyParam = part === 'substring' ? '$1' : '$2';
     const where = cols
       .map(c =>
         c.kind === 'url'
           ? `${q(c.column)} = $1::text`
-          : `position($2::text in ${q(c.column)}::text) > 0`
+          : `position(${keyParam}::text in ${q(c.column)}::text) > 0`
       )
       .join(' OR ');
     clauses.push(`EXISTS (SELECT 1 FROM ${q(table)} WHERE ${where})`);
   }
+  if (clauses.length === 0) return `SELECT false AS "referenced"`;
   return `SELECT (${clauses.join(' OR ')}) AS "referenced"`;
 }
 
-const IS_REFERENCED_SQL = buildIsReferencedSql();
+const IS_REFERENCED_EXACT_SQL = buildIsReferencedSql(R2_REFERENCE_COLUMNS, 'exact');
+const IS_REFERENCED_SUBSTRING_SQL = buildIsReferencedSql(R2_REFERENCE_COLUMNS, 'substring');
 
-/** True when any registered column still references `url` (whose R2 key is `key`). */
+/**
+ * True when any registered column still references `url` (whose R2 key is
+ * `key`). Exact-URL probes first; the expensive substring scan only when they
+ * miss.
+ */
 export async function isR2UrlReferenced(
   db: R2ReferenceDb,
   url: string,
   key: string
 ): Promise<boolean> {
+  const exact = await db.$queryRawUnsafe<Array<{ referenced: boolean | null }>>(
+    IS_REFERENCED_EXACT_SQL,
+    url
+  );
+  if (exact[0]?.referenced) return true;
   const rows = await db.$queryRawUnsafe<Array<{ referenced: boolean | null }>>(
-    IS_REFERENCED_SQL,
-    url,
+    IS_REFERENCED_SUBSTRING_SQL,
     key
   );
   return Boolean(rows[0]?.referenced);

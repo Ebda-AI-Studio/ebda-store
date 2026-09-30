@@ -535,6 +535,33 @@ export class VariantService {
       },
     });
 
+    // Disabling (or re-enabling) a variant that HOLDS stock moves those units
+    // out of (or back into) every stock and stock-value figure (a disabled
+    // variant is not stock — inventory-model.md, Ruling M5-6), without any
+    // quantity changing. Record it in the stock history so the drop is
+    // traceable (issue 2146): quantity 0, previous = new = the variant's
+    // units, so no reader that sums movements is affected.
+    if (
+      input.isActive !== undefined &&
+      input.isActive !== variant.isActive &&
+      variant.inventory !== 0
+    ) {
+      await prisma.inventoryHistory.create({
+        data: {
+          productId,
+          storeId,
+          type: 'adjustment',
+          quantity: 0,
+          previousStock: variant.inventory,
+          newStock: variant.inventory,
+          reason: input.isActive
+            ? `Variant re-enabled — ${variant.inventory} unit(s) count as stock again`
+            : `Variant disabled — ${variant.inventory} unit(s) no longer count as stock`,
+          reference: `variant:${variantId}`,
+        },
+      });
+    }
+
     // If the variant's image URL changed, queue the old object for R2
     // cleanup. Skip when input.imageUrl is undefined (caller didn't
     // touch the field) — only the explicit-set or explicit-null cases

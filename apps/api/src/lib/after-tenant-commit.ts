@@ -77,11 +77,20 @@ interface DeferredTask {
   /** Stable, greppable identifier — appears in logs and alert headers. */
   name: string;
   run: () => Promise<unknown>;
+  /**
+   * Pooled connections the task holds at once (issue 2250). Every task holds
+   * ONE for its own `runInTenantContext`; a task that opens a second
+   * transaction while that one is open (`withRlsBypass`, `withMoneyTx`) holds
+   * TWO and must say so, or DEFERRED_TX_GLOBAL_LIMIT under-counts.
+   */
+  connections: number;
   /** See DeferOptions.runOnRollback. */
   runOnRollback?: boolean;
 }
 
 export interface DeferOptions {
+  /** See `DeferredTask.connections`. Default 1. */
+  connections?: number;
   /**
    * Run this task even when the request transaction rolls back. ONLY for
    * work that records something that already happened OUTSIDE the database
@@ -136,6 +145,7 @@ export function deferAfterTenantCommit<T>(
   run: () => Promise<T>,
   options: DeferOptions = {}
 ): Promise<T | null> {
+  const connections = Math.max(1, Math.floor(options.connections ?? 1));
   const scope = deferralStorage.getStore();
   if (!scope) {
     return run();
@@ -170,9 +180,9 @@ export function deferAfterTenantCommit<T>(
     // transaction — never inline, which would reach the ambient `prisma`
     // proxy on the now-committed request transaction and die with the same
     // P2028 this module exists to avoid.
-    return runOneDeferredTask({ name, run }, ctx).then(() => null);
+    return runOneDeferredTask({ name, run, connections }, ctx).then(() => null);
   }
-  scope.tasks.push({ name, run, runOnRollback: options.runOnRollback });
+  scope.tasks.push({ name, run, connections, runOnRollback: options.runOnRollback });
   return Promise.resolve(null);
 }
 
@@ -301,7 +311,7 @@ export async function awaitDeferredWork(timeoutMs: number): Promise<void> {
 const DRAIN_CONCURRENCY = 5;
 
 /**
- * PROCESS-WIDE cap on deferred interactive transactions in flight at once.
+ * PROCESS-WIDE cap on pooled connections held by deferred work at once.
  *
  * DRAIN_CONCURRENCY bounds one request's drain, but each deferred task holds
  * a pooled connection for its whole `runInTenantContext` transaction, and
@@ -309,8 +319,13 @@ const DRAIN_CONCURRENCY = 5;
  * entire default pool (`connection_limit`, DB_CONNECTION_LIMIT, default 15 —
  * packages/database/src/index.ts) — starving foreground requests into P2024 /
  * P2028. So every deferred task, on the drain AND on the late-arrival path,
- * also takes a slot here. Derived from the pool size: a third of it, so
+ * also takes slots here. Derived from the pool size: a third of it, so
  * deferred work can never hold more than that share of the connections.
+ *
+ * The unit is CONNECTIONS, not tasks (issue 2250): `r2-cleanup.deleteOrphan`
+ * nests a `withRlsBypass` transaction inside its tenant transaction, so it
+ * holds two connections and takes two slots — counted per task, five such
+ * tasks held 10 of 15 connections, two thirds rather than one.
  */
 export const DEFERRED_TX_GLOBAL_LIMIT = Math.max(
   1,
@@ -318,22 +333,39 @@ export const DEFERRED_TX_GLOBAL_LIMIT = Math.max(
 );
 
 let deferredTxActive = 0;
-const deferredTxWaiters: Array<() => void> = [];
+const deferredTxWaiters: Array<{ n: number; resolve: () => void }> = [];
 
-async function acquireDeferredTxSlot(): Promise<void> {
-  if (deferredTxActive < DEFERRED_TX_GLOBAL_LIMIT) {
-    deferredTxActive++;
-    return;
-  }
-  // The releasing task hands its slot straight to us (see release below), so
-  // the active count does not change.
-  await new Promise<void>(resolve => deferredTxWaiters.push(resolve));
+/** Test/observability hook: connections currently held by deferred work. */
+export function deferredConnectionsInUse(): number {
+  return deferredTxActive;
 }
 
-function releaseDeferredTxSlot(): void {
-  const next = deferredTxWaiters.shift();
-  if (next) next();
-  else deferredTxActive--;
+/**
+ * Take `n` slots (clamped to the limit, so an oversized task can still run —
+ * alone). Strict FIFO: a waiter is never overtaken by a later, smaller one,
+ * so a two-slot task cannot be starved by a stream of one-slot tasks.
+ */
+async function acquireDeferredTxSlot(n: number): Promise<number> {
+  const want = Math.min(n, DEFERRED_TX_GLOBAL_LIMIT);
+  if (deferredTxWaiters.length === 0 && deferredTxActive + want <= DEFERRED_TX_GLOBAL_LIMIT) {
+    deferredTxActive += want;
+    return want;
+  }
+  await new Promise<void>(resolve => deferredTxWaiters.push({ n: want, resolve }));
+  return want;
+}
+
+function releaseDeferredTxSlot(n: number): void {
+  deferredTxActive -= n;
+  // Admit waiters in order while the head fits; the grant is counted here, so
+  // a woken waiter already owns its slots.
+  while (deferredTxWaiters.length > 0) {
+    const head = deferredTxWaiters[0];
+    if (deferredTxActive + head.n > DEFERRED_TX_GLOBAL_LIMIT) break;
+    deferredTxWaiters.shift();
+    deferredTxActive += head.n;
+    head.resolve();
+  }
 }
 
 async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<void> {
@@ -351,11 +383,12 @@ async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<v
 }
 
 /**
- * Run one deferred task in a fresh tenant transaction, holding a global
- * DEFERRED_TX_GLOBAL_LIMIT slot for its duration; never rejects.
+ * Run one deferred task in a fresh tenant transaction, holding
+ * `task.connections` DEFERRED_TX_GLOBAL_LIMIT slots for its duration; never
+ * rejects.
  */
 async function runOneDeferredTask(task: DeferredTask, ctx: TenantCommitContext): Promise<void> {
-  await acquireDeferredTxSlot();
+  const held = await acquireDeferredTxSlot(task.connections);
   try {
     await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
   } catch (err) {
@@ -365,7 +398,7 @@ async function runOneDeferredTask(task: DeferredTask, ctx: TenantCommitContext):
       // A broken logger/alerter must not strand the rest of the queue.
     }
   } finally {
-    releaseDeferredTxSlot();
+    releaseDeferredTxSlot(held);
   }
 }
 
@@ -399,9 +432,10 @@ function reportDeferredFailure(name: string, err: unknown, ctx: TenantCommitCont
  * downgraded to `logger.debug` with no alert. That request already errored
  * and every write it made — committed or not — is undone; a P2028 reaching
  * here on that path is routine noise on the error path, not the silent loss
- * of committed work this alert exists to catch (a client disconnect does NOT
- * land here: `request-transaction.ts` deliberately lets that tx commit, so it
- * reports 'committed' like any other successful request).
+ * of committed work this alert exists to catch. A client disconnect lands
+ * here too since issue 1604: `request-transaction.ts` now ROLLS BACK a request
+ * whose client went away mid-handler, so the handler's remaining queries are
+ * accesses on an 'aborted' tx — expected, and debug-level.
  */
 export function installClosedTenantTxAlerting(): void {
   onClosedTenantTxAccess(({ property, stack, reason }) => {

@@ -30,6 +30,11 @@ const state = vi.hoisted(() => ({
   client: null as null | { call: (...args: string[]) => Promise<unknown>; calls: Call[] },
 }));
 
+const alerts = vi.hoisted(() => ({ sendAlert: vi.fn().mockResolvedValue('sent') }));
+vi.mock('@api/services/alerts.service', () => alerts);
+const log = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }));
+vi.mock('@api/lib/logger', () => ({ default: log }));
+
 vi.mock('@api/services/redis.service', () => ({
   redis: {
     isAvailable: () => state.available,
@@ -39,6 +44,7 @@ vi.mock('@api/services/redis.service', () => ({
 
 import * as security from '@api/middleware/security';
 import { makeRateLimitStore, rateLimitRedisClient } from '@api/middleware/security';
+import { recordRateLimited, resetRateLimitTelemetry } from '@api/lib/rate-limit-telemetry';
 
 /** A working Redis double that speaks just enough of rate-limit-redis's protocol. */
 function workingRedis() {
@@ -192,5 +198,79 @@ describe('#1862 source gate — every limiter in apps/api/src resolves Redis laz
       );
     }
     expect(total).toBeGreaterThanOrEqual(19);
+  });
+});
+
+/**
+ * issue 1963 / issue 2216 / issue 2230 — the limiters are observable and have
+ * a kill switch. Mutation-proof: dropping `recordMemoryFallback` from
+ * RedisOrMemoryStore.current() reddens "announces a fallback"; dropping the
+ * `recordRateLimited` call from increment() reddens "counts 429s per limiter";
+ * dropping `rateLimitSharedEnabled()` from rateLimitRedisClient reddens the
+ * kill-switch case.
+ */
+describe('rate limiter observability + kill switch', () => {
+  function appWith(max: number, name: string) {
+    const app = express();
+    app.use(
+      rateLimit({
+        windowMs: 60_000,
+        max,
+        standardHeaders: true,
+        legacyHeaders: false,
+        passOnStoreError: true,
+        store: makeRateLimitStore(rateLimitRedisClient, name),
+      })
+    );
+    app.get('/ping', (_req, res) => {
+      res.json({ ok: true });
+    });
+    return app;
+  }
+
+  beforeEach(() => {
+    resetRateLimitTelemetry(Date.now());
+    alerts.sendAlert.mockClear();
+    log.warn.mockClear();
+    delete process.env.RATE_LIMIT_SHARED;
+  });
+
+  it('announces a fallback to per-process counting after a Redis-backed period (once)', async () => {
+    const app = appWith(100, `obs-fallback-${Math.random()}`);
+    state.client = workingRedis();
+    state.available = true;
+    expect((await request(app).get('/ping')).status).toBe(200);
+    state.available = false; // Redis drops
+    await request(app).get('/ping');
+    await request(app).get('/ping');
+    const fallbackAlerts = alerts.sendAlert.mock.calls.filter(
+      c => (c[0] as { source: string }).source === 'rate-limit.memory-fallback'
+    );
+    expect(fallbackAlerts).toHaveLength(1);
+  });
+
+  it('counts 429s per limiter prefix and summarises them once the window turns over', async () => {
+    const name = `obs-429-${Math.random()}`;
+    const app = appWith(1, name);
+    expect((await request(app).get('/ping')).status).toBe(200);
+    expect((await request(app).get('/ping')).status).toBe(429);
+    expect((await request(app).get('/ping')).status).toBe(429);
+    // Next event after the 60s window flushes the summary.
+    recordRateLimited('rl:other:', Date.now() + 61_000);
+    const summary = log.warn.mock.calls.find(
+      c => c[1] === '[rate-limit] 429s by limiter in the last window'
+    );
+    expect(summary?.[0]).toMatchObject({ rateLimited: { [`rl:${name}:`]: 2 } });
+  });
+
+  it('RATE_LIMIT_SHARED=0 keeps Redis connected but counts per process', async () => {
+    process.env.RATE_LIMIT_SHARED = '0';
+    const fake = workingRedis();
+    state.client = fake;
+    state.available = true;
+    const app = appWith(5, `obs-kill-${Math.random()}`);
+    expect((await request(app).get('/ping')).status).toBe(200);
+    expect(fake.calls.filter(c => c[0] === 'EVALSHA')).toHaveLength(0);
+    delete process.env.RATE_LIMIT_SHARED;
   });
 });

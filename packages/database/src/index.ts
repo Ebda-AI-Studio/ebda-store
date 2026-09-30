@@ -393,6 +393,19 @@ export function hasTenantContext(): boolean {
 }
 
 /**
+ * The RLS settings of the ambient tenant TRANSACTION, if one is open —
+ * `undefined` outside one (including inside `runInStoreScope`, which holds no
+ * transaction). Lets a caller check WHICH store the open transaction is scoped
+ * to, not merely that one exists: `runInTenantContext(undefined, fn, userId)`
+ * (the user-scoped routers) opens a transaction with NO store GUC, and a
+ * strict-table read on it returns `[]` (issue 2041).
+ */
+export function currentTenantGucs(): TenantGucs | undefined {
+  const tx = tenantStorage.getStore();
+  return tx ? txGucs.get(tx as object) : undefined;
+}
+
+/**
  * Proxy-wrapped Prisma client.
  *
  * When called inside `runInTenantContext`, model accessors and raw query

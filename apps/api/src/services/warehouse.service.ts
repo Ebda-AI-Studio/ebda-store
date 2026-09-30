@@ -13,7 +13,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { prisma, Prisma, withRlsBypass, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
@@ -912,12 +912,14 @@ export class WarehouseService {
           const sumRows = variantId
             ? await tx.$queryRaw<Array<{ sum: number }>>`
                 SELECT COALESCE(SUM("quantity"), 0)::int AS sum FROM "warehouse_stock"
-                WHERE "product_id" = ${productId} AND "variant_id" = ${variantId}
+                WHERE "store_id" = ${storeId} AND "product_id" = ${productId} AND "variant_id" = ${variantId}
               `
             : await tx.$queryRaw<Array<{ sum: number }>>`
                 SELECT COALESCE(SUM("quantity"), 0)::int AS sum FROM "warehouse_stock"
-                WHERE "product_id" = ${productId} AND "variant_id" IS NULL
+                WHERE "store_id" = ${storeId} AND "product_id" = ${productId} AND "variant_id" IS NULL
               `;
+          // issue 2081: `store_id` is explicit — the SUM used to rely on RLS
+          // (or on product_id FKing a single store) for its tenant scope.
           const currentSum = sumRows[0]?.sum ?? 0;
           const diff = authoritative - currentSum;
 

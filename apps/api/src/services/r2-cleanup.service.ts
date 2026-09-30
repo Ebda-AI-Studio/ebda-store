@@ -66,8 +66,19 @@ export function urlToR2Key(url: string | null | undefined): string | null {
  * image read as orphaned and was deleted from R2.
  */
 async function isStillReferenced(url: string, key: string): Promise<boolean> {
-  return withRlsBypass(tx => isR2UrlReferenced(tx, url, key));
+  return withRlsBypass(async tx => {
+    // issue 2249: the substring half of the check is a full scan of the
+    // JSON/HTML columns. Bound how long it may hold its connection; a timeout
+    // (57014) throws, and the caller's catch then KEEPS the object — the safe
+    // direction (a leaked file, never a deleted live one).
+    // set_config(…, true) is SET LOCAL with a bound parameter.
+    await tx.$executeRaw`SELECT set_config('statement_timeout', ${String(ORPHAN_CHECK_STATEMENT_TIMEOUT_MS)}, true)`;
+    return isR2UrlReferenced(tx, url, key);
+  });
 }
+
+/** Per-statement ceiling for the orphan check (ms). See isStillReferenced. */
+export const ORPHAN_CHECK_STATEMENT_TIMEOUT_MS = 5000;
 
 /**
  * Delete the R2 object backing `url` if it's safe to do so.
@@ -90,7 +101,12 @@ export async function deleteR2ObjectIfOrphan(url: string | null | undefined): Pr
   // service was written to prevent. Deferring runs the same work in a fresh
   // tenant transaction once the request's has committed; outside a request
   // (Inngest, crons, scripts) it still executes inline, unchanged.
-  await deferAfterTenantCommit('r2-cleanup.deleteOrphan', () => deleteR2ObjectIfOrphanNow(url));
+  // `connections: 2` — the orphan check opens a `withRlsBypass` transaction
+  // while the task's own tenant transaction is still held (issue 2250), so the
+  // global deferred-work cap must count it twice.
+  await deferAfterTenantCommit('r2-cleanup.deleteOrphan', () => deleteR2ObjectIfOrphanNow(url), {
+    connections: 2,
+  });
 }
 
 async function deleteR2ObjectIfOrphanNow(url: string | null | undefined): Promise<void> {
@@ -152,11 +168,18 @@ export function cleanupRemovedImages(
   // registered before the handler returns (a later `deferAfterTenantCommit`
   // from a still-running loop would arrive after the scope closed), and the
   // drain then runs the whole list in one fresh tenant transaction.
-  return deferAfterTenantCommit('r2-cleanup.deleteRemoved', async () => {
-    for (const url of removed) {
-      await deleteR2ObjectIfOrphanNow(url);
-    }
-  }).then(() => undefined);
+  // `connections: 2`: each check nests a `withRlsBypass` transaction inside
+  // the task's own tenant transaction (issue 2250) — sequential, so never
+  // more than two at once.
+  return deferAfterTenantCommit(
+    'r2-cleanup.deleteRemoved',
+    async () => {
+      for (const url of removed) {
+        await deleteR2ObjectIfOrphanNow(url);
+      }
+    },
+    { connections: 2 }
+  ).then(() => undefined);
 }
 
 /**

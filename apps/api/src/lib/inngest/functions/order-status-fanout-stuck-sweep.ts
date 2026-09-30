@@ -3,6 +3,7 @@ import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
+import { redis } from '../../../services/redis.service';
 
 /**
  * Stuck status-change fanout sweep — scheduled safety net (#619).
@@ -27,6 +28,21 @@ import { sendAlert } from '../../../services/alerts.service';
  *
  * Only statuses whose fanout does something are swept. `pending` / `processing`
  * have no side effects, so an unclaimed one is not "stuck".
+ *
+ * issue 2070 / issue 2133: the re-send carries the REQUESTED status
+ * (`statusFanoutRequestedStatus`), and only while the order is still at it.
+ * A direct `Order.status` writer (gateway refund, refresh-refund-status,
+ * payment confirm) can move the row on without re-arming, and re-sending the
+ * CURRENT status then ran the wrong transition's side effects (a second
+ * refund bookkeeping mail) while the lost one was never reported. A request
+ * that was superseded that way is now reported and disarmed, never re-sent.
+ *
+ * issue 2071: the claim is a dedup lock taken BEFORE the side effects, so a
+ * fanout whose steps failed on every retry kept its claim and was invisible
+ * here. The fanout now stamps `statusFanoutCompletedAt` after every side
+ * effect succeeded; a claimed, never-completed transition past the window is
+ * reported (once per transition) as a P1 naming the orders. It is NOT re-sent:
+ * the steps that did succeed (customer emails) would send twice.
  */
 interface StuckTransition {
   id: string;
@@ -34,6 +50,7 @@ interface StuckTransition {
   status: string;
   paymentStatus: string;
   statusFanoutRequestedAt: Date | null;
+  statusFanoutRequestedStatus: string | null;
 }
 
 const FANOUT_STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
@@ -76,6 +93,7 @@ export async function handleOrderStatusFanoutStuckSweep(
           status: true,
           paymentStatus: true,
           statusFanoutRequestedAt: true,
+          statusFanoutRequestedStatus: true,
         },
         orderBy: { statusFanoutRequestedAt: 'asc' },
         take: SWEEP_TAKE,
@@ -83,18 +101,79 @@ export async function handleOrderStatusFanoutStuckSweep(
     )
   );
 
-  if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };
+  const failedAfterClaim = await reportFailedAfterClaim(step, cutoff, floorCutoff);
+
+  // Rows armed before issue 2070 carry no requested status: their CURRENT
+  // status is the only answer available (the old behaviour).
+  const superseded = stuck.filter(
+    o => o.statusFanoutRequestedStatus != null && o.statusFanoutRequestedStatus !== o.status
+  );
+  const resendable = stuck.filter(o => !superseded.includes(o));
+  if (superseded.length > 0) {
+    await step.run('report-superseded-transitions', async () => {
+      logger.error(
+        {
+          orders: superseded.slice(0, 20).map(o => ({
+            id: o.id,
+            requested: o.statusFanoutRequestedStatus,
+            now: o.status,
+          })),
+        },
+        '[order-status-fanout-stuck-sweep] a requested transition was never delivered and the order has since moved on — its side effects were lost'
+      );
+      await sendAlert({
+        level: 'p1',
+        scope: 'platform',
+        source: 'order.status_fanout.superseded',
+        title: 'Order status fanout lost to a later status change',
+        body:
+          `${superseded.length} order(s) had a status change whose fanout (customer email / ` +
+          `WhatsApp, affiliate commission, loyalty award) never ran, and the order has since ` +
+          `been moved to another status directly. Not re-sent — it would run the wrong ` +
+          `transition. Check each order's notifications and loyalty/affiliate state.`,
+        context: {
+          orders: superseded.slice(0, 20).map(o => ({
+            id: o.id,
+            storeId: o.storeId,
+            requested: o.statusFanoutRequestedStatus,
+            now: o.status,
+          })),
+        },
+      }).catch(() => undefined);
+      // Disarm, so the same lost transition is reported once, not every tick.
+      await withRlsBypass(tx =>
+        Promise.all(
+          superseded.map(o =>
+            tx.order.updateMany({
+              where: {
+                id: o.id,
+                statusFanoutClaimedAt: null,
+                statusFanoutRequestedAt: o.statusFanoutRequestedAt,
+              },
+              data: { statusFanoutRequestedAt: null },
+            })
+          )
+        )
+      );
+    });
+  }
+
+  if (resendable.length === 0) {
+    return { swept: stuck.length, resent: 0, alerted: failedAfterClaim };
+  }
 
   let resent = 0;
   await step.run('resend-order-status-changed', async () => {
-    for (const o of stuck) {
+    for (const o of resendable) {
       try {
         await inngest.send({
           name: 'order/status-changed',
           data: {
             orderId: o.id,
             storeId: o.storeId,
-            status: o.status,
+            // The REQUESTED transition (issue 2070); equal to the current
+            // status here by construction (superseded rows were split out).
+            status: o.statusFanoutRequestedStatus ?? o.status,
             // Only gates the admin refund bookkeeping email. updateStatus reads
             // it off the pre-transition order; from the persisted row, money
             // was captured when the payment status says paid or refunded.
@@ -110,13 +189,13 @@ export async function handleOrderStatusFanoutStuckSweep(
     }
   });
   logger.warn(
-    { count: stuck.length, resent },
+    { count: resendable.length, resent },
     '[order-status-fanout-stuck-sweep] re-sent order/status-changed for unclaimed transitions'
   );
 
   // Still unclaimed past 3× the window: the re-send itself is not landing.
   const veryStaleCutoff = Date.now() - 3 * ORDER_STATUS_FANOUT_STUCK_MINUTES * 60_000;
-  const veryStale = stuck.filter(
+  const veryStale = resendable.filter(
     o => (o.statusFanoutRequestedAt?.getTime() ?? Date.now()) < veryStaleCutoff
   );
   if (veryStale.length > 0) {
@@ -143,7 +222,79 @@ export async function handleOrderStatusFanoutStuckSweep(
     );
   }
 
-  return { swept: stuck.length, resent, alerted: veryStale.length };
+  return { swept: stuck.length, resent, alerted: veryStale.length + failedAfterClaim };
+}
+
+/**
+ * issue 2071 — claimed, never completed, past the window: the fanout failed
+ * after taking its claim. Reported once per transition (Redis sentinel keyed
+ * on the order and its requested-at); returns how many were newly reported.
+ * Only rows armed with a requested status are considered, so rows from before
+ * the completion stamp existed are never reported.
+ */
+async function reportFailedAfterClaim(
+  step: SweepStep,
+  cutoff: Date,
+  floorCutoff: Date
+): Promise<number> {
+  const failed = await step.run('find-failed-after-claim', () =>
+    withRlsBypass(tx =>
+      tx.order.findMany({
+        where: {
+          statusFanoutClaimedAt: { lt: cutoff, gt: floorCutoff },
+          statusFanoutCompletedAt: null,
+          statusFanoutRequestedStatus: { not: null },
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          storeId: true,
+          status: true,
+          statusFanoutRequestedStatus: true,
+          statusFanoutRequestedAt: true,
+        },
+        orderBy: { statusFanoutClaimedAt: 'asc' },
+        take: SWEEP_TAKE,
+      })
+    )
+  );
+  if (failed.length === 0) return 0;
+  return step.run('alert-failed-after-claim', async () => {
+    const fresh: typeof failed = [];
+    for (const o of failed) {
+      const key = `status-fanout-failed:${o.id}:${new Date(o.statusFanoutRequestedAt ?? 0).getTime()}`;
+      const first = await redis
+        .acquireLock(key, (ORDER_STATUS_FANOUT_MAX_AGE_MINUTES + 60) * 60)
+        .catch(() => true);
+      if (first) fresh.push(o);
+    }
+    if (fresh.length === 0) return 0;
+    logger.error(
+      { orders: fresh.slice(0, 20).map(o => o.id) },
+      '[order-status-fanout-stuck-sweep] fanout claimed but never completed — side effects failed'
+    );
+    await sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'order.status_fanout.failed_after_claim',
+      title: 'Order status fanout failed after it started',
+      body:
+        `${fresh.length} order status change(s) started their fanout but never finished it ` +
+        `(a step failed on every retry): the customer email/WhatsApp, affiliate commission or ` +
+        `loyalty award for that transition may not have run. Not re-sent automatically — ` +
+        `steps that DID succeed would repeat. Check the failed run in Inngest and replay it, ` +
+        `or apply the missing effect by hand.`,
+      context: {
+        orders: fresh.slice(0, 20).map(o => ({
+          id: o.id,
+          storeId: o.storeId,
+          transition: o.statusFanoutRequestedStatus,
+          now: o.status,
+        })),
+      },
+    }).catch(() => undefined);
+    return fresh.length;
+  });
 }
 
 export const orderStatusFanoutStuckSweep: InngestFunction.Any = inngest.createFunction(

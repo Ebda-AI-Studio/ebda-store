@@ -44,12 +44,7 @@ import {
   compareBundleComponents,
   type ResolvedBundle,
 } from '../services/bundle.service';
-import {
-  invalidateStoreProductCaches,
-  invalidateStoreBundlesCache,
-  bundlesCacheKey,
-  getCached,
-} from '../lib/public-cache';
+import { invalidateStoreProductCaches, bundlesCacheKey, getCached } from '../lib/public-cache';
 
 /** Most bundles the public storefront list serves (newest first). */
 export const PUBLIC_BUNDLE_LIST_CAP = 200;
@@ -532,8 +527,10 @@ router.post(
       // the same `public:products:${storeId}:` prefix product writes bust)
       // — a new bundle must invalidate it the same way a new product does,
       // or it silently won't appear in the feed for up to the cache TTL.
+      // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
+      // in the SAME outbound request — a separate invalidateStoreBundlesCache
+      // here was a second purge POST per write (issue 2202).
       await invalidateStoreProductCaches(storeId);
-      await invalidateStoreBundlesCache(storeId);
       res.status(201).json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);
@@ -646,8 +643,10 @@ router.put(
 
       const bundle = await resolveBundle(prisma, storeId, id);
       // See the POST handler above — the same feed-cache invalidation gap.
+      // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
+      // in the SAME outbound request — a separate invalidateStoreBundlesCache
+      // here was a second purge POST per write (issue 2202).
       await invalidateStoreProductCaches(storeId);
-      await invalidateStoreBundlesCache(storeId);
       res.json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);
@@ -686,8 +685,10 @@ router.delete(
       // See the POST handler above — the same feed-cache invalidation gap;
       // a deactivated bundle must stop being purchasable there too, not just
       // in `resolveBundle`'s live-read callers.
+      // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
+      // in the SAME outbound request — a separate invalidateStoreBundlesCache
+      // here was a second purge POST per write (issue 2202).
       await invalidateStoreProductCaches(storeId);
-      await invalidateStoreBundlesCache(storeId);
 
       res.json({
         success: true,
@@ -724,8 +725,8 @@ router.get(
       // candidate, on every request. Cached under its own
       // `bundlesCacheKey`, which `invalidateStoreProductCaches` also clears
       // (so every product/stock write busts it — a bundle's price and
-      // availability derive from its components) and which every bundle
-      // write busts via `invalidateStoreBundlesCache`. Same 120s TTL and
+      // availability derive from its components) — including every bundle
+      // write, which calls it too (issue 2202). Same 120s TTL and
       // staleness class as the public product list this mirrors.
       const bundles = await getCached(bundlesCacheKey(storeId), 120, async () => {
         const candidates = await prisma.bundle.findMany({

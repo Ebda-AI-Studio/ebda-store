@@ -85,3 +85,10 @@ export const REFUND_CLAIM_EVENT = 'refund_initiated';
 export const REFUND_EXECUTED_EVENT = 'refund_completed';
 export const REFUND_RELEASED_EVENT = 'refund_failed';
 export const REFUND_INDETERMINATE_EVENT = 'refund_indeterminate';
+/**
+ * A claim whose outcome the MERCHANT settled: they checked the provider and
+ * completed the return with a non-gateway method ("Already refunded — record
+ * only"). Resolves the claim for the stuck-claim sweep (issue 2002). It moves
+ * no money and does not touch `refundedAmount` — the claim already counted it.
+ */
+export const REFUND_RECONCILED_EVENT = 'refund_reconciled';

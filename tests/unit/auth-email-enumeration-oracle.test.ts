@@ -53,6 +53,7 @@ vi.mock('@api/middleware/security', () => ({
   refreshIpLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   // S5-3, 2026-09-22 security audit: auth.routes.ts now imports this too.
   resetEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authEmailAddressLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   // #1863: /verify-email got its own limiter instead of sharing authLimiter's
   // <ip>-unknown bucket with /reset-password.
   verifyEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),

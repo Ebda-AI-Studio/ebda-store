@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 
 export const AI_QUOTA_DAILY_CODE = 'AI_QUOTA_DAILY_EXCEEDED';
@@ -99,13 +99,27 @@ export async function assertAiQuota(
   startOfMonth.setUTCDate(1);
   startOfMonth.setUTCHours(0, 0, 0, 0);
 
-  const [today, thisMonth, storeToday] = await Promise.all([
-    prisma.aiUsage.count({
-      where: { createdAt: { gte: startOfDay }, cachedHit: false },
-    }),
-    prisma.aiUsage.count({
-      where: { createdAt: { gte: startOfMonth }, cachedHit: false },
-    }),
+  // The two PLATFORM counts are cross-tenant questions, so they run under
+  // withRlsBypass (issue 2040 / issue 2043). `ai_usage` has a STRICT policy:
+  // called from inside `runInStoreScope` (every bulk-AI sweep) or a
+  // `tenantContext` request (the interactive /stores/:storeId/ai routes), a
+  // plain `prisma.aiUsage.count()` is RLS-filtered to the ONE store under
+  // force_app — the global daily/monthly caps would then never trip and the
+  // interactive reserve would never apply, so N sweeping merchants each got
+  // the full platform budget. Same precedent as admin.routes.ts ("aiUsage has
+  // RLS — must bypass to aggregate cross-tenant") and answer-engine/budget.ts.
+  // The per-store slice stays on the ambient path — it IS store-filtered.
+  const [[today, thisMonth], storeToday] = await Promise.all([
+    withRlsBypass(tx =>
+      Promise.all([
+        tx.aiUsage.count({
+          where: { createdAt: { gte: startOfDay }, cachedHit: false },
+        }),
+        tx.aiUsage.count({
+          where: { createdAt: { gte: startOfMonth }, cachedHit: false },
+        }),
+      ])
+    ),
     opts.storeId
       ? prisma.aiUsage.count({
           where: { storeId: opts.storeId, createdAt: { gte: startOfDay }, cachedHit: false },

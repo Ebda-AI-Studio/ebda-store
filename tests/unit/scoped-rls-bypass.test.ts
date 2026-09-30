@@ -5,16 +5,27 @@
 import { describe, it, expect, vi } from 'vitest';
 import { withScopedRlsBypass } from '@api/lib/scoped-rls-bypass';
 
-function fakeClient(prior: string | null, opts: { restoreThrows?: boolean } = {}) {
+/**
+ * A transaction-shaped fake: `SET LOCAL` persists and the read-back echoes it.
+ * `outsideTx: true` models the plain non-transactional client, where each
+ * statement is its own implicit transaction and SET LOCAL is discarded.
+ */
+function fakeClient(
+  prior: string | null,
+  opts: { restoreThrows?: boolean; outsideTx?: boolean } = {}
+) {
   const log: string[] = [];
   let sets = 0;
+  let current = prior;
   const client = {
-    $queryRaw: vi.fn(async () => [{ v: prior }]),
+    $queryRaw: vi.fn(async () => [{ v: current }]),
     $executeRaw: vi.fn(async (tpl: TemplateStringsArray) => {
       const sql = tpl.join('');
       sets++;
       if (opts.restoreThrows && sets > 1) throw new Error('25P02 current transaction is aborted');
-      log.push(/'true'/.test(sql) ? 'on' : /'false'/.test(sql) ? 'off' : sql);
+      const v = /'true'/.test(sql) ? 'true' : /'false'/.test(sql) ? 'false' : null;
+      if (!opts.outsideTx) current = v;
+      log.push(v === 'true' ? 'on' : v === 'false' ? 'off' : sql);
       return 0;
     }),
   };
@@ -60,5 +71,14 @@ describe('withScopedRlsBypass', () => {
   it('a failed restore after a SUCCESSFUL fn is not swallowed', async () => {
     const { client } = fakeClient(null, { restoreThrows: true });
     await expect(withScopedRlsBypass(client, async () => 'ok')).rejects.toThrow('25P02');
+  });
+
+  // issue 2123 — mutation-proof: deleting the read-back assertion makes this
+  // case resolve (fn runs with RLS still on) and reddens it.
+  it('throws instead of running fn when the client is NOT a transaction (SET LOCAL discarded)', async () => {
+    const { client } = fakeClient(null, { outsideTx: true });
+    const fn = vi.fn(async () => 'bypassed work');
+    await expect(withScopedRlsBypass(client, fn)).rejects.toThrow('not inside a transaction');
+    expect(fn).not.toHaveBeenCalled();
   });
 });

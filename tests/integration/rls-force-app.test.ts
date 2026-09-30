@@ -52,6 +52,8 @@ import {
   type Prisma,
 } from '@force/database';
 import { WalletService } from '../../apps/api/src/services/wallet.service';
+import { assertAiQuota } from '../../apps/api/src/lib/ai-quota';
+import { readInStoreContext } from '../../apps/api/src/lib/store-scoped-read';
 
 const TEST_PREFIX = 'fatest-';
 
@@ -123,6 +125,9 @@ async function cleanup(): Promise<void> {
     );
     await tx.$executeRawUnsafe(
       `DELETE FROM public.customer_wallets WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%')`
+    );
+    await tx.$executeRawUnsafe(
+      `DELETE FROM public.ai_usage WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%')`
     );
     await tx.$executeRawUnsafe(`DELETE FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%'`);
     await tx.$executeRawUnsafe(`DELETE FROM public.users WHERE email LIKE '${TEST_PREFIX}%'`);
@@ -651,6 +656,87 @@ describe('force_app real-login: runInStoreScope (long jobs, no long transaction)
 
   it('rejects a non-UUID store id', () => {
     expect(() => runInStoreScope('not-a-uuid', async () => 1)).toThrow('Invalid store ID format');
+  });
+});
+
+/**
+ * issue 2041 — readInStoreContext used to trust ANY open tenant transaction.
+ * `userContext` opens `runInTenantContext(undefined, fn, userId)` (addresses,
+ * header-less wishlist): a transaction with NO store GUC, on which a strict
+ * read returns [] under force_app. The helper now reuses the ambient
+ * transaction only when it is scoped to the SAME store.
+ */
+describe('force_app real-login: readInStoreContext only reuses a same-store transaction', () => {
+  it('inside a store-less user context it still sees store B strict rows', async () => {
+    const n = await runInTenantContext(
+      undefined,
+      () => readInStoreContext(storeB, () => prisma.storeFaq.count({ where: { id: faqB } })),
+      userA
+    );
+    expect(n).toBe(1);
+  });
+
+  it('inside a DIFFERENT store context it reads the requested store, not the ambient one', async () => {
+    const n = await runInTenantContext(storeA, () =>
+      readInStoreContext(storeB, () => prisma.storeFaq.count({ where: { id: faqB } }))
+    );
+    expect(n).toBe(1);
+  });
+
+  it('inside the SAME store context it runs on the ambient transaction (control)', async () => {
+    const n = await runInTenantContext(storeB, () =>
+      readInStoreContext(storeB, () => prisma.storeFaq.count({ where: { id: faqB } }))
+    );
+    expect(n).toBe(1);
+  });
+});
+
+/**
+ * The mirror image of the STRICT list: readers that must NOT be scoped
+ * (issue 2040 / issue 2043). `assertAiQuota`'s daily/monthly caps protect the
+ * ONE Google project ceiling shared by every store, so they are cross-tenant
+ * questions even when asked from inside a store scope (every bulk-AI sweep)
+ * or a tenantContext request. Under force_app a scoped count of the STRICT
+ * `ai_usage` table sees one store, and the platform cap silently becomes a
+ * per-store cap. The parity gate drives public storefront endpoints only
+ * (RLS-S5), so it cannot see this — this block is the gate.
+ */
+describe('force_app real-login: cross-store aggregates that must NOT be scoped', () => {
+  it('the global AI daily cap inside runInStoreScope(store B) still counts store A usage', async () => {
+    const env = { ...process.env };
+    try {
+      await withRlsBypass(tx =>
+        tx.aiUsage.createMany({
+          data: Array.from({ length: 2 }, () => ({
+            storeId: storeA,
+            feature: 'translate',
+            inputTokens: 1,
+            outputTokens: 1,
+            cachedHit: false,
+          })),
+        })
+      );
+      const platformToday = await withRlsBypass(tx =>
+        tx.aiUsage.count({
+          where: { createdAt: { gte: new Date(Date.now() - 60_000) }, cachedHit: false },
+        })
+      );
+      // Cap at the platform total: a store-B-scoped count (0) would pass,
+      // the real cross-tenant count must trip it.
+      process.env.AI_DAILY_REQUEST_CAP = String(platformToday);
+      process.env.AI_MONTHLY_REQUEST_CAP = '100000000';
+      process.env.AI_STORE_DAILY_REQUEST_CAP = '100000000';
+      await expect(
+        runInStoreScope(storeB, () => assertAiQuota({ storeId: storeB }))
+      ).rejects.toMatchObject({ code: 'AI_QUOTA_DAILY_EXCEEDED' });
+      // control: the scoped path really is blind to store A under force_app
+      const scoped = await runInStoreScope(storeB, () =>
+        prisma.aiUsage.count({ where: { storeId: storeA } })
+      );
+      expect(scoped).toBe(0);
+    } finally {
+      process.env = env;
+    }
   });
 });
 

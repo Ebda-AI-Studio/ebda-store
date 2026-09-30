@@ -2,7 +2,8 @@
  * warehouse-reconcile-sweep — daily completeness sweep (Task 4, item 5
  * data-integrity). Verifies: (1) stores are enumerated via withRlsBypass
  * (FORCE RLS, no tenant GUC in a cron), (2) each store's reconcile is NOT
- * wrapped in a whole-store `runInTenantContext` (fix wave 2, #936 — that
+ * wrapped in a whole-store `runInTenantContext` but IS wrapped in
+ * `runInStoreScope` (issue 2081 — per-query scoping; fix wave 2, #936 — that
  * wrapper opened ONE 30s Prisma transaction across an unbounded SKU count,
  * relocating rather than removing the same ceiling `warehouse.routes.ts`
  * already hit once in the request path; `backfillReconcileAll` and
@@ -18,6 +19,9 @@ const h = vi.hoisted(() => ({
   warehouseFindMany: vi.fn(),
   backfillReconcileAll: vi.fn(),
   runInTenant: vi.fn((_s: string, fn: () => unknown) => fn()),
+  scopes: [] as string[],
+  runInStoreScope: vi.fn(),
+  sendAlert: vi.fn().mockResolvedValue('sent'),
   withRlsBypass: vi.fn((fn: (tx: unknown) => unknown) =>
     fn({ warehouse: { findMany: h.warehouseFindMany } })
   ),
@@ -25,8 +29,10 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@force/database', () => ({
   runInTenantContext: h.runInTenant,
+  runInStoreScope: h.runInStoreScope,
   withRlsBypass: h.withRlsBypass,
 }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 vi.mock('@api/services/warehouse.service', () => ({
   WarehouseService: { backfillReconcileAll: h.backfillReconcileAll },
 }));
@@ -42,6 +48,11 @@ const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.scopes.length = 0;
+  h.runInStoreScope.mockImplementation((storeId: string, fn: () => unknown) => {
+    h.scopes.push(storeId);
+    return fn();
+  });
   h.withRlsBypass.mockImplementation((fn: (tx: unknown) => unknown) =>
     fn({ warehouse: { findMany: h.warehouseFindMany } })
   );
@@ -63,6 +74,9 @@ describe('sweepAllWarehouseStores', () => {
     // (and reconcileWarehouseStockToAggregate underneath it) scope RLS
     // per-query/per-SKU themselves.
     expect(h.runInTenant).not.toHaveBeenCalled();
+    // issue 2081: …but every store's work IS tenant-scoped, per query, via
+    // runInStoreScope — not left to allow-contextless RLS policies.
+    expect(h.scopes).toEqual(['s1', 's2']);
 
     expect(result).toEqual({
       storesTotal: 2,
@@ -106,6 +120,32 @@ describe('sweepAllWarehouseStores', () => {
   });
 });
 
+describe('reconcile failures are alerted (issue 2081)', () => {
+  it('pages P1 when a whole store fails', async () => {
+    h.warehouseFindMany.mockResolvedValue([{ storeId: 'bad' }, { storeId: 'good' }]);
+    h.backfillReconcileAll.mockImplementation((storeId: string) =>
+      storeId === 'bad'
+        ? Promise.reject(new Error('down'))
+        : Promise.resolve({ skusReconciled: 1, skusFailed: 0 })
+    );
+    await sweepAllWarehouseStores(stepStub);
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'warehouse.reconcile_sweep' })
+    );
+  });
+
+  it('sends an info alert when only SKUs failed, and nothing on a clean night', async () => {
+    h.warehouseFindMany.mockResolvedValue([{ storeId: 's1' }]);
+    h.backfillReconcileAll.mockResolvedValue({ skusReconciled: 1, skusFailed: 2 });
+    await sweepAllWarehouseStores(stepStub);
+    expect(h.sendAlert).toHaveBeenCalledWith(expect.objectContaining({ level: 'info' }));
+    h.sendAlert.mockClear();
+    h.backfillReconcileAll.mockResolvedValue({ skusReconciled: 1, skusFailed: 0 });
+    await sweepAllWarehouseStores(stepStub);
+    expect(h.sendAlert).not.toHaveBeenCalled();
+  });
+});
+
 describe('reconcileOneStoreOnDemand', () => {
   it('reconciles the single requested store WITHOUT a whole-store runInTenantContext wrapper', async () => {
     h.backfillReconcileAll.mockResolvedValue({ skusReconciled: 5, skusFailed: 1 });
@@ -113,6 +153,7 @@ describe('reconcileOneStoreOnDemand', () => {
     const result = await reconcileOneStoreOnDemand('s1', 'admin-1', stepStub);
 
     expect(h.runInTenant).not.toHaveBeenCalled();
+    expect(h.scopes).toEqual(['s1']); // issue 2081
     expect(h.backfillReconcileAll).toHaveBeenCalledWith('s1');
     expect(result).toEqual({ skusReconciled: 5, skusFailed: 1 });
   });

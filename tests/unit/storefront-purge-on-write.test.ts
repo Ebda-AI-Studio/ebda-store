@@ -225,3 +225,19 @@ describe('every InventoryService stock writer busts the product caches', () => {
     );
   });
 });
+
+describe('bundle writes fire ONE storefront purge (issue 2202)', () => {
+  // invalidateStoreProductCaches already clears the bundle-list key and sends
+  // `bundles:<storeId>` in the same request, so pairing it with
+  // invalidateStoreBundlesCache was a second outbound POST per write.
+  it('bundle.routes.ts busts via invalidateStoreProductCaches only', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/routes/bundle.routes.ts'),
+      'utf8'
+    );
+    expect(src.match(/await invalidateStoreProductCaches\(storeId\)/g)?.length).toBe(3);
+    expect(src).not.toContain('invalidateStoreBundlesCache(');
+  });
+});

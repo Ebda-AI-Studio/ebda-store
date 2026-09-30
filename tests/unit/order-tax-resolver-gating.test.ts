@@ -3,9 +3,7 @@
  * CHARGE must use the SAME gate as the DISPLAY. `resolveActiveTaxRate` is
  * now the ONE resolver both `order.service.ts` (the charge) and
  * `public.routes.ts` (the public storefront payload) call — gated on BOTH
- * `Store.taxEnabled` and the `tax` feature, the same two gates
- * `TaxService.calculateTax` already applies
- * (apps/api/src/services/tax.service.ts:201-207). A single function means
+ * `Store.taxEnabled` and the `tax` feature. A single function means
  * the charge and the display cannot drift apart again — there is only one
  * place left for either to read the wrong thing.
  *
@@ -14,7 +12,7 @@
  * charged today.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const storeFindUnique = vi.fn();
@@ -119,6 +117,28 @@ describe('resolveActiveTaxRate is the ONLY resolver — both call sites use it',
   it('there is no second, ungated resolver left in order-tax.ts', () => {
     expect(orderTaxLib).not.toMatch(/resolveDisplayTaxRatePercent/);
     expect(orderTaxLib).toMatch(/export async function resolveActiveTaxRate/);
+  });
+
+  // issue 2167 / issue 2211 — the old assertion only grepped order-tax.ts, so
+  // TaxService.calculateTax (a public, differently-gated resolver) survived
+  // next to it. Sweep the WHOLE API for anything else that reads tax_rates to
+  // compute a rate: only order-tax.ts may, plus the admin CRUD in
+  // tax.service.ts (list/get/create/update/delete/toggle — no computation).
+  it('no other module in apps/api computes an order tax rate', () => {
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) return e.name === '__tests__' ? [] : walk(p);
+        return /\.ts$/.test(e.name) && !/\.test\.ts$/.test(e.name) ? [p] : [];
+      });
+    const offenders = walk(join(R, 'apps/api/src')).filter(f => {
+      if (f.endsWith('lib/order-tax.ts')) return false;
+      const src = readFileSync(f, 'utf8');
+      return /calculateTax\s*\(/.test(src) || /taxRate\.findMany\([^)]*isActive:\s*true/s.test(src)
+        ? !f.endsWith('services/tax.service.ts') || /calculateTax\s*\(/.test(src)
+        : false;
+    });
+    expect(offenders.map(f => f.slice(R.length + 1))).toEqual([]);
   });
 
   it('order.service.ts (the charge) calls resolveActiveTaxRate at both call sites', () => {

@@ -45,6 +45,7 @@ import {
   REFUND_EXECUTED_EVENT,
   REFUND_RELEASED_EVENT,
   REFUND_INDETERMINATE_EVENT,
+  REFUND_RECONCILED_EVENT,
 } from './refund-outcome';
 
 // ==========================================
@@ -585,6 +586,78 @@ export async function findOutstandingRefundClaims(
     (row.eventType === REFUND_CLAIM_EVENT ? claimed : released).add(id);
   }
   return [...claimed].filter(id => !released.has(id));
+}
+
+/**
+ * Mark every still-open claim for `refundKey` on this order as settled by the
+ * merchant (issue 2002). Called when a return is completed with a NON-gateway
+ * method — the product's own recovery for an indeterminate refund ("Already
+ * refunded — record only"). Without it the claim had no terminal state a human
+ * could reach, and the stuck-claim sweep re-alerted it for a week.
+ *
+ * "Open" = claimed, and not yet executed, released or reconciled. Written on
+ * the caller's (request) transaction, so it commits or rolls back with the
+ * completion it records. Moves no money. Returns the claim ids it settled.
+ */
+export async function reconcileOutstandingRefundClaims(input: {
+  storeId: string;
+  orderId: string;
+  refundKey: string;
+  refundMethod: string;
+  userId?: string | null;
+}): Promise<string[]> {
+  const rows = await prisma.paymentEvent.findMany({
+    where: {
+      orderId: input.orderId,
+      storeId: input.storeId,
+      eventType: {
+        in: [
+          REFUND_CLAIM_EVENT,
+          REFUND_EXECUTED_EVENT,
+          REFUND_RELEASED_EVENT,
+          REFUND_RECONCILED_EVENT,
+        ],
+      },
+      details: { path: ['refundKey'], equals: input.refundKey },
+    },
+    select: { eventType: true, details: true, paymentId: true, provider: true },
+  });
+  const claims = new Map<string, { paymentId: string; provider: string | null; amount: unknown }>();
+  const closed = new Set<string>();
+  for (const row of rows) {
+    const d = (row.details as Record<string, unknown> | null) ?? {};
+    const id = d.claimId;
+    if (typeof id !== 'string') continue;
+    if (row.eventType === REFUND_CLAIM_EVENT) {
+      claims.set(id, { paymentId: row.paymentId, provider: row.provider, amount: d.amount });
+    } else {
+      closed.add(id);
+    }
+  }
+  const open = [...claims].filter(([id]) => !closed.has(id));
+  for (const [claimId, claim] of open) {
+    await prisma.paymentEvent.create({
+      data: {
+        paymentId: claim.paymentId,
+        storeId: input.storeId,
+        orderId: input.orderId,
+        eventType: REFUND_RECONCILED_EVENT,
+        provider: claim.provider,
+        // The actor rides in `details`, not the `triggeredByUserId` FK: a
+        // bad FK here would abort the completion transaction this row is
+        // recording (25P02) and take the return down with it.
+        details: {
+          reason: 'reconciled_by_merchant',
+          claimId,
+          amount: typeof claim.amount === 'number' ? claim.amount : null,
+          refundKey: input.refundKey,
+          refundMethod: input.refundMethod,
+          reconciledBy: input.userId ?? null,
+        } as Prisma.InputJsonValue,
+      },
+    });
+  }
+  return open.map(([id]) => id);
 }
 
 // ==========================================

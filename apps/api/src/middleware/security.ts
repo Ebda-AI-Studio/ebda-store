@@ -14,6 +14,11 @@ import { BoundedMap } from '../lib/bounded-map';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
 import logger from '../lib/logger';
+import {
+  recordMemoryFallback,
+  recordRateLimited,
+  recordSharedCounting,
+} from '../lib/rate-limit-telemetry';
 import { withSavepoint } from '../lib/savepoint';
 
 // ==========================================
@@ -667,7 +672,17 @@ type RedisCaller = { call: (...args: any[]) => unknown };
  * seconds before failing. A limiter must never make a request wait on Redis.
  */
 export const rateLimitRedisClient = (): RedisCaller | null =>
-  redis.isAvailable() ? redis.getClient() : null;
+  rateLimitSharedEnabled() && redis.isAvailable() ? redis.getClient() : null;
+
+/**
+ * Kill switch for SHARED counting (issue 2230 / issue 2171). `RATE_LIMIT_SHARED=0`
+ * puts every limiter back on per-process counting without a code change —
+ * the escape hatch if the shared (tighter, by the replica count) budgets turn
+ * out too small for real traffic. Read per request. Default: shared.
+ */
+export function rateLimitSharedEnabled(): boolean {
+  return process.env.RATE_LIMIT_SHARED !== '0';
+}
 
 /**
  * A rate-limit store that picks its backend PER REQUEST (#1862).
@@ -709,7 +724,15 @@ class RedisOrMemoryStore implements Store {
 
   private current(): Store {
     const client = this.resolveClient();
-    if (!client) return this.memory;
+    if (!client) {
+      // issue 1963: never silent — counted, summarised, alerted once.
+      recordMemoryFallback(
+        this.prefix,
+        rateLimitSharedEnabled() ? 'redis-unavailable' : 'disabled'
+      );
+      return this.memory;
+    }
+    recordSharedCounting();
     if (!this.redisStore || this.redisStoreClient !== client) {
       const store = new RedisStore({
         sendCommand: (...args: string[]) => client.call(...args) as Promise<number | string>,
@@ -731,8 +754,13 @@ class RedisOrMemoryStore implements Store {
     return this.current().get?.(key);
   }
 
-  increment(key: string) {
-    return this.current().increment(key);
+  async increment(key: string) {
+    const result = await this.current().increment(key);
+    // A hit past the limit is a 429 (issue 2216): count it per limiter so the
+    // shared-budget tightening is measured, not inferred.
+    const limit = this.options?.limit;
+    if (typeof limit === 'number' && result.totalHits > limit) recordRateLimited(this.prefix);
+    return result;
   }
 
   decrement(key: string) {
@@ -885,6 +913,75 @@ export const resetEmailLimiter = rateLimit({
   passOnStoreError: true,
   skip: skipForLoadTestOrTests,
   keyGenerator: resetEmailLimiterKey,
+});
+
+/**
+ * Dedicated bucket for `POST /api/v1/inngest` (issue 2063).
+ *
+ * Signed Inngest step callbacks skip the global 200/15min mutation cap
+ * (Bypass 4 in global-rate-limit-skip.ts) because Inngest Cloud's small IP
+ * pool legitimately exceeds it. But the bypass keys on a header NAME, so
+ * without this an unsigned caller sending `x-inngest-signature: x` was
+ * unbounded — each request a full 10 MB JSON parse plus an HMAC before the
+ * SDK's 401. `skipSuccessfulRequests` means only requests answered ≥400 are
+ * counted: real signed traffic never spends this budget, forged traffic is
+ * capped at 300 per 15 minutes per IP. Mounted in index.ts BEFORE the body
+ * parser, so a capped caller is refused before its body is read.
+ */
+export const inngestLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'inngest'),
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  skipSuccessfulRequests: true,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => `inngest-${ipKeyGenerator(req.ip ?? '')}`,
+});
+
+/**
+ * Address-wide ceiling on account emails to ONE inbox (issue 2228), stacked in
+ * front of the per-tenant `resetEmailLimiter` on `/forgot-password` and on
+ * `/resend-verification` (which had only the IP-rotatable `authLimiter`).
+ *
+ * The per-tenant key (#1861) is right for fairness, but an address holds one
+ * account PER STORE, and store ids are public — so spraying every known store
+ * id multiplied the per-inbox budget by the number of accounts that address
+ * holds: 3/hour × N reset mails to the same mailbox, plus Resend cost and
+ * sender-reputation damage on merchant domains. This bucket has no IP and no
+ * store component, so neither rotating IPs nor rotating store ids widens it.
+ *
+ * Tradeoff (Ruling S1-8, amended by CL-6): a flood can now spend the owner's
+ * address-wide budget across every store; each flooded request still mailed
+ * a working 15-minute link, so recovery is "use the link already in your
+ * inbox", not removed.
+ */
+export function authEmailAddressLimiterKey(req: Request): string {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  return `auth-email-any-${email.slice(0, 320) || 'unknown'}`;
+}
+
+export const authEmailAddressLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'auth-email-any'),
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 6,
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMITED',
+      message: 'Too many emails requested for this address, please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: authEmailAddressLimiterKey,
 });
 
 /**

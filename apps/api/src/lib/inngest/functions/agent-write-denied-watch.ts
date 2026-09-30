@@ -65,6 +65,21 @@ import {
  */
 const MAX_ROWS_PER_STORE = 1000;
 
+/**
+ * Bound on the per-store fan-out (issue 2055 / issue 2060). The store set comes
+ * straight from a groupBy over every store with a denial in the window, and a
+ * cross-store credential sweep — the incident this watcher exists to page on —
+ * makes EVERY store active. Uncapped, N per-store reads shared one 30s
+ * `withRlsBypass` transaction (one connection, so wall-clock is the SUM), and
+ * with `retries: 0` a tick that overran produced no alert at all. Now: only
+ * the noisiest MAX_STORES_PER_TICK stores are read (the drop is logged and
+ * marks the tick `truncated`), in batches of STORE_READ_BATCH, each batch in
+ * its own short transaction. 100 stores is far past the 3-store threshold
+ * that makes a sweep a platform alert.
+ */
+const MAX_STORES_PER_TICK = 100;
+const STORE_READ_BATCH = 10;
+
 function bodyFor(finding: AgentDenialFinding, truncated: boolean): string {
   const countPhrase = truncated ? `at least ${finding.count}` : `${finding.count}`;
   const tools = finding.tools.length > 0 ? finding.tools.join(', ') : 'unknown';
@@ -165,38 +180,61 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
     tx.auditLog.groupBy({
       by: ['storeId'],
       where: { action: 'agent.write.denied', createdAt: { gte: since } },
+      _count: { _all: true },
     })
   );
-  const storeIds = activeStores
-    .map(g => g.storeId)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+  const ranked = activeStores
+    .filter(
+      (g): g is typeof g & { storeId: string } =>
+        typeof g.storeId === 'string' && g.storeId.length > 0
+    )
+    .sort((a, b) => (b._count?._all ?? 0) - (a._count?._all ?? 0));
+  const storeIds = ranked.slice(0, MAX_STORES_PER_TICK).map(g => g.storeId);
+  const droppedStores = ranked.length - storeIds.length;
+  if (droppedStores > 0) {
+    logger.warn(
+      { activeStores: ranked.length, read: storeIds.length, droppedStores },
+      'agent-write-denied-watch: store fan-out capped — quietest stores not read this tick'
+    );
+  }
 
-  const rowsByStore =
-    storeIds.length > 0
-      ? await withRlsBypass(tx =>
-          Promise.all(
-            storeIds.map(storeId =>
-              tx.auditLog.findMany({
-                where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
-                select: {
-                  storeId: true,
-                  ipAddress: true,
-                  details: true,
-                  store: { select: { name: true, slug: true } },
-                },
-                orderBy: { createdAt: 'desc' },
-                take: MAX_ROWS_PER_STORE,
-              })
-            )
-          )
+  const rowsByStore: Array<
+    Array<{
+      storeId: string | null;
+      ipAddress: string | null;
+      details: unknown;
+      store: { name: string; slug: string } | null;
+    }>
+  > = [];
+  for (let i = 0; i < storeIds.length; i += STORE_READ_BATCH) {
+    const batch = storeIds.slice(i, i + STORE_READ_BATCH);
+    const slices = await withRlsBypass(tx =>
+      Promise.all(
+        batch.map(storeId =>
+          tx.auditLog.findMany({
+            where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
+            select: {
+              storeId: true,
+              ipAddress: true,
+              details: true,
+              store: { select: { name: true, slug: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: MAX_ROWS_PER_STORE,
+          })
         )
-      : [];
+      )
+    );
+    rowsByStore.push(...slices);
+  }
 
   const rows = rowsByStore.flat();
   // Coarse on purpose (matches the prior single-flag behaviour downstream):
-  // true when ANY one store's own slice hit its cap, so a caller sees "at
-  // least N" rather than a false exact count.
-  const truncated = rowsByStore.some(storeRows => storeRows.length >= MAX_ROWS_PER_STORE);
+  // true when ANY one store's own slice hit its cap, or when whole stores were
+  // dropped by the fan-out cap, so a caller sees "at least N" rather than a
+  // false exact count.
+  const truncated =
+    droppedStores > 0 || rowsByStore.some(storeRows => storeRows.length >= MAX_ROWS_PER_STORE);
 
   const denials: AgentDenialRow[] = rows
     .filter((r): r is typeof r & { storeId: string } => typeof r.storeId === 'string')
@@ -273,6 +311,7 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
         storesAffected: finding.storesAffected,
         windowMinutes: DENIAL_WINDOW_MINUTES,
         truncated,
+        droppedStores,
       },
     });
   }

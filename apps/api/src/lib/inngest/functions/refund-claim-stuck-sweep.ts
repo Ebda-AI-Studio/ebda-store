@@ -1,10 +1,12 @@
 import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { sendAlert } from '../../../services/alerts.service';
+import { redis } from '../../../services/redis.service';
 import {
   REFUND_CLAIM_EVENT,
   REFUND_EXECUTED_EVENT,
   REFUND_RELEASED_EVENT,
+  REFUND_RECONCILED_EVENT,
 } from '../../../services/payment-providers/refund-outcome';
 
 /**
@@ -27,6 +29,19 @@ import {
  * ask the provider about — so this raises it for a human, who checks the
  * provider dashboard. The claim and its outcome show on the order page's
  * payment-events timeline.
+ *
+ * A human CAN resolve it (issue 2002): completing the return with a
+ * non-gateway method ("Already refunded — record only") writes
+ * `refund_reconciled` for the claim, which this sweep treats as an outcome.
+ *
+ * Alerted once per ESCALATION stage, not every tick (issue 2027): at
+ * STUCK_AFTER_MINUTES, again at 24h and at 72h, tracked per claim by a Redis
+ * sentinel. The every-15-minutes cadence used to page a P1 ~670 times per
+ * claim over its week, which is how a real P0 gets scrolled past.
+ *
+ * Bounded read (issue 2028): up to CLAIM_SCAN_LIMIT claims oldest-first, then
+ * the resolutions for only those payments — never an unbounded cross-tenant
+ * fetch of every refund event in the window.
  */
 
 /** Old enough that the request that made the claim is certainly over. */
@@ -36,6 +51,12 @@ const STUCK_AFTER_MINUTES = Number(process.env.REFUND_CLAIM_STUCK_MINUTES) || 15
  * is either reconciled by hand or not going to be because of this alert.
  */
 const MAX_AGE_MINUTES = Number(process.env.REFUND_CLAIM_MAX_AGE_MINUTES) || 7 * 24 * 60;
+/** Claims read per tick, oldest first. A truncated read is logged, never silent. */
+const CLAIM_SCAN_LIMIT = 500;
+/** Ages (minutes) at which one claim is alerted — once each. */
+const ESCALATION_STAGES_MINUTES = [STUCK_AFTER_MINUTES, 24 * 60, 72 * 60];
+/** Resolution events: the claim's outcome is known. */
+const RESOLVING_EVENTS = [REFUND_EXECUTED_EVENT, REFUND_RELEASED_EVENT, REFUND_RECONCILED_EVENT];
 
 interface SweepStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
@@ -55,70 +76,100 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
   const floor = new Date(Date.now() - MAX_AGE_MINUTES * 60_000);
 
   const stuck: StuckClaim[] = await step.run('find-stuck-refund-claims', async () => {
-    const events = await withRlsBypass(tx =>
+    const claimRows = await withRlsBypass(tx =>
       tx.paymentEvent.findMany({
         where: {
-          eventType: { in: [REFUND_CLAIM_EVENT, REFUND_EXECUTED_EVENT, REFUND_RELEASED_EVENT] },
-          occurredAt: { gt: floor },
+          eventType: REFUND_CLAIM_EVENT,
+          occurredAt: { gt: floor, lt: new Date(cutoff) },
         },
-        select: {
-          eventType: true,
-          paymentId: true,
-          storeId: true,
-          orderId: true,
-          details: true,
-          occurredAt: true,
-        },
+        select: { paymentId: true, storeId: true, orderId: true, details: true, occurredAt: true },
+        orderBy: { occurredAt: 'asc' },
+        take: CLAIM_SCAN_LIMIT,
+      })
+    );
+    if (claimRows.length === CLAIM_SCAN_LIMIT) {
+      logger.warn(
+        { limit: CLAIM_SCAN_LIMIT },
+        '[refund-claim-stuck-sweep] claim scan hit its limit — newer claims are read on later ticks'
+      );
+    }
+    if (claimRows.length === 0) return [];
+    const paymentIds = [...new Set(claimRows.map(c => c.paymentId))];
+    const resolutionRows = await withRlsBypass(tx =>
+      tx.paymentEvent.findMany({
+        where: { eventType: { in: RESOLVING_EVENTS }, paymentId: { in: paymentIds } },
+        select: { details: true },
       })
     );
     const resolved = new Set<string>();
-    const claims = new Map<string, StuckClaim>();
-    for (const e of events) {
+    for (const e of resolutionRows) {
+      const claimId = ((e.details ?? {}) as Record<string, unknown>).claimId;
+      if (typeof claimId === 'string') resolved.add(claimId);
+    }
+    const claims: StuckClaim[] = [];
+    for (const e of claimRows) {
       const details = (e.details ?? {}) as Record<string, unknown>;
       const claimId = typeof details.claimId === 'string' ? details.claimId : null;
-      if (!claimId) continue;
-      if (e.eventType === REFUND_CLAIM_EVENT) {
-        claims.set(claimId, {
-          claimId,
-          paymentId: e.paymentId,
-          storeId: e.storeId,
-          orderId: e.orderId,
-          amount: typeof details.amount === 'number' ? details.amount : null,
-          claimedAt: e.occurredAt.toISOString(),
-        });
-      } else if (e.eventType === REFUND_EXECUTED_EVENT || e.eventType === REFUND_RELEASED_EVENT) {
-        resolved.add(claimId);
-      }
+      if (!claimId || resolved.has(claimId)) continue;
+      claims.push({
+        claimId,
+        paymentId: e.paymentId,
+        storeId: e.storeId,
+        orderId: e.orderId,
+        amount: typeof details.amount === 'number' ? details.amount : null,
+        claimedAt: e.occurredAt.toISOString(),
+      });
     }
-    return [...claims.values()].filter(
-      c => !resolved.has(c.claimId) && new Date(c.claimedAt).getTime() < cutoff
-    );
+    return claims;
   });
 
   if (stuck.length === 0) return { stuck: 0 };
 
+  // Which claims enter a NEW escalation stage on this tick? One Redis sentinel
+  // per (claim, stage); fails open (alerts) when Redis is down.
+  const toAlert = await step.run('pick-claims-to-alert', async () => {
+    const now = Date.now();
+    const picked: Array<StuckClaim & { stageMinutes: number }> = [];
+    for (const c of stuck) {
+      const ageMin = (now - new Date(c.claimedAt).getTime()) / 60_000;
+      const stage = [...ESCALATION_STAGES_MINUTES].reverse().find(m => ageMin >= m);
+      if (stage === undefined) continue;
+      const fresh = await redis
+        .acquireLock(`refund-claim-alerted:${c.claimId}:${stage}`, (MAX_AGE_MINUTES + 60) * 60)
+        .catch(() => true);
+      if (fresh) picked.push({ ...c, stageMinutes: stage });
+    }
+    return picked;
+  });
+
   logger.error(
-    { count: stuck.length, claims: stuck.slice(0, 20) },
+    { count: stuck.length, newlyEscalated: toAlert.length, claims: stuck.slice(0, 20) },
     '[refund-claim-stuck-sweep] refund claims with no outcome — balances may count money that never left'
   );
+  if (toAlert.length === 0) return { stuck: stuck.length };
+
   await step.run('alert-stuck-refund-claims', async () => {
     await sendAlert({
       level: 'p1',
       scope: 'platform',
       source: 'payment.refund.claim_stuck',
-      title: `${stuck.length} refund(s) with no known outcome`,
+      // Stable title: the alerts throttle keys on it.
+      title: 'Refund(s) with no known outcome',
       body:
-        `${stuck.length} refund(s) were claimed on a payment more than ${STUCK_AFTER_MINUTES}m ago ` +
-        `and never confirmed as sent or released. Each payment's refunded total already ` +
-        `counts the amount. Check each one in the provider dashboard; the claim is on the ` +
+        `${toAlert.length} refund claim(s) reached a new age (15m / 24h / 72h) with no outcome ` +
+        `(${stuck.length} open in total). Each payment's refunded total already counts the ` +
+        `amount. Check each one in the provider dashboard; if the money went out, complete the ` +
+        `return with "Already refunded — record only" to settle the claim. The claim is on the ` +
         `order page's payment timeline.`,
       context: {
-        claims: stuck.slice(0, 20).map(c => ({
+        totalOpen: stuck.length,
+        claims: toAlert.slice(0, 20).map(c => ({
           orderId: c.orderId,
           paymentId: c.paymentId,
           storeId: c.storeId,
           amount: c.amount,
           claimedAt: c.claimedAt,
+          stageMinutes: c.stageMinutes,
         })),
       },
     }).catch(() => undefined);

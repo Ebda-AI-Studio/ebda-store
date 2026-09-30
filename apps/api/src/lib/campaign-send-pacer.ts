@@ -83,12 +83,28 @@ async function reserveSlot(intervalMs: number): Promise<number> {
 /**
  * Wait until this process may make its next campaign send. Call it
  * immediately before each `sendMarketingEmail`.
+ *
+ * `maxWaitMs` (issue 2115): the wait grows with the number of stores sending
+ * at once (one shared slot per interval), and the caller is inside ONE
+ * Inngest step = one HTTP request behind Cloudflare's 100s edge timeout. When
+ * the reserved slot is further away than the caller can afford, this returns
+ * `false` WITHOUT waiting (the slot is simply skipped — a gap in the cadence,
+ * never a burst) so the caller can end its step and resume in the next one.
+ * Returns `true` when the caller may send now.
  */
-export async function awaitCampaignSendSlot(): Promise<void> {
+export async function awaitCampaignSendSlot(maxWaitMs = Infinity): Promise<boolean> {
   const intervalMs = campaignPlatformSendIntervalMs();
-  if (intervalMs <= 0) return;
+  if (intervalMs <= 0) return true;
   const wait = await reserveSlot(intervalMs);
+  if (wait > maxWaitMs) {
+    logger.info(
+      { waitMs: wait, maxWaitMs },
+      "[CAMPAIGN] send pacer: next slot is past this step's budget — resuming in the next step"
+    );
+    return false;
+  }
   if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+  return true;
 }
 
 /** Test-only: forget the in-process slot. */

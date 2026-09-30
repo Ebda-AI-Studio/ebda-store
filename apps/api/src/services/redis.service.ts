@@ -38,9 +38,19 @@ class RedisService {
         );
       });
 
+      // issue 1963: `isConnected` used to be latched false by ANY `error`
+      // event with only `connect` to re-arm it, so an error that did not tear
+      // the socket down left every `isAvailable()` caller (rate limiters,
+      // CSRF, sessions, caches) on its fallback indefinitely. `ready` re-arms
+      // it after every (re)connect, and an error only clears it when the
+      // client really is not ready.
+      this.client.on('ready', () => {
+        this.isConnected = true;
+      });
+
       this.client.on('error', (err: Error) => {
         logger.error({ err: err.message }, '[REDIS] Connection error');
-        this.isConnected = false;
+        this.isConnected = this.client?.status === 'ready';
       });
 
       this.client.on('close', () => {

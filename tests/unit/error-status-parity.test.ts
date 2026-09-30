@@ -33,6 +33,7 @@ import {
   AppError,
   clientErrorStatus,
   errorHandler,
+  markExpected,
 } from '../../apps/api/src/middleware/error-handler';
 import { SentryService } from '../../apps/api/src/services/sentry.service';
 
@@ -102,7 +103,7 @@ describe('clientErrorStatus ↔ errorHandler parity', () => {
   });
 });
 
-describe('SentryService.errorHandler — client errors are not captured', () => {
+describe('SentryService.errorHandler — expected client errors are not captured', () => {
   beforeEach(() => {
     captureException.mockClear();
     (SentryService as unknown as { isInitialized: boolean }).isInitialized = true;
@@ -139,6 +140,25 @@ describe('SentryService.errorHandler — client errors are not captured', () => 
     gate(prismaError(code));
     expect(captureException).toHaveBeenCalledTimes(1);
     expect(captureException.mock.calls[0][1]).toMatchObject({ level: 'warning' });
+  });
+
+  // issue 2005 (Ruling CL-5): a P2002 that is NOT on a merchant-typed field
+  // (a ledger/journal row, an idempotency key) is our own double write and
+  // is captured; any Prisma error its throw site marked expected is not.
+  it('captures a P2002 on a non-merchant field (a double-posted ledger row) at warning level', () => {
+    const err = new Prisma.PrismaClientKnownRequestError('prisma P2002', {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['journal_entry_id', 'line_no'] },
+    });
+    gate(err);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException.mock.calls[0][1]).toMatchObject({ level: 'warning' });
+  });
+
+  it('a Prisma error the throw site marked expected is NOT captured (per-site opt-out)', () => {
+    gate(markExpected(prismaError('P2003')));
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('keeps a duplicate-key P2002 (a merchant typing an existing SKU) out of Sentry', () => {

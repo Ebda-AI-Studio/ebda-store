@@ -3094,7 +3094,7 @@
       },
       "defaultRate": {
         "label": "Default Tax Rate (%)",
-        "description": "Used when no specific tax rate rules apply",
+        "description": "Not applied at checkout — checkout charges the highest-priority active tax rate below. Add a rate to charge VAT.",
         "placeholder": "e.g., 5.00"
       }
     },
@@ -5699,6 +5699,7 @@
         "refund_completed": "Refund completed",
         "refund_failed": "Refund failed",
         "refund_indeterminate": "Refund unconfirmed — check the provider",
+        "refund_reconciled": "Refund settled by merchant",
         "retry": "Retry attempt",
         "expired": "Payment expired",
         "cancelled": "Payment cancelled",
@@ -5825,6 +5826,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} KWD — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",

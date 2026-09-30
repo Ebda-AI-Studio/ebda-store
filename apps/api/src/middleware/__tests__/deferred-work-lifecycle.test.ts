@@ -367,7 +367,10 @@ describe('streaming lane keeps commit-after-flush and still drains deferred work
 // ---------------------------------------------------------------------------
 
 describe('client disconnect', () => {
-  it('an aborted request still commits and still drains its deferred work', async () => {
+  // issue 1604: a disconnect now ROLLS BACK (it used to commit whatever half
+  // of the handler had run). The writes the deferred work would react to do
+  // not exist, so it is dropped — the same decision as any rolled-back request.
+  it('an aborted request rolls back and drops its deferred work', async () => {
     let released!: () => void;
     const gate = new Promise<void>(r => {
       released = r;
@@ -390,14 +393,12 @@ describe('client disconnect', () => {
       await p;
       await sleep(50);
       released();
-      await waitFor(() => events.includes('deferred:ran'));
+      await waitFor(() => events.includes('rollback'));
+      await sleep(50);
     });
 
-    // A disconnect commits (unchanged behaviour), so the writes exist and the
-    // deferred work that reacts to them must still run — dropping it here
-    // would silently lose an email for every customer who closed the tab.
-    expect(events).toContain('commit');
-    expect(events).not.toContain('rollback');
-    expect(events).toContain('deferred:ran');
+    expect(events).toContain('rollback');
+    expect(events).not.toContain('commit');
+    expect(events).not.toContain('deferred:ran');
   });
 });

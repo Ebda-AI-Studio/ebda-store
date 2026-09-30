@@ -14,20 +14,24 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { queryRaw, bypassTx, prismaQueryRaw, prismaDecoy, withRlsBypassMock } = vi.hoisted(() => {
-  const queryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
-  const bypassTx = { $queryRawUnsafe: queryRaw };
+const { queryRaw, executeRaw, bypassTx, prismaQueryRaw, prismaDecoy, withRlsBypassMock } =
+  vi.hoisted(() => {
+    const queryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
+    const executeRaw = vi.fn().mockResolvedValue(0);
+    const bypassTx = { $queryRawUnsafe: queryRaw, $executeRaw: executeRaw };
 
-  // A DISTINCT client from `bypassTx` — if the source under test ever queries
-  // straight through `prisma` instead of `tx`, this decoy would be the one
-  // invoked, and the assertions below would catch it.
-  const prismaQueryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
-  const prismaDecoy = { $queryRawUnsafe: prismaQueryRaw };
+    // A DISTINCT client from `bypassTx` — if the source under test ever queries
+    // straight through `prisma` instead of `tx`, this decoy would be the one
+    // invoked, and the assertions below would catch it.
+    const prismaQueryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
+    const prismaDecoy = { $queryRawUnsafe: prismaQueryRaw };
 
-  const withRlsBypassMock = vi.fn((fn: (tx: typeof bypassTx) => Promise<unknown>) => fn(bypassTx));
+    const withRlsBypassMock = vi.fn((fn: (tx: typeof bypassTx) => Promise<unknown>) =>
+      fn(bypassTx)
+    );
 
-  return { queryRaw, bypassTx, prismaQueryRaw, prismaDecoy, withRlsBypassMock };
-});
+    return { queryRaw, executeRaw, bypassTx, prismaQueryRaw, prismaDecoy, withRlsBypassMock };
+  });
 
 vi.mock('@force/database', () => ({
   prisma: prismaDecoy,
@@ -63,14 +67,21 @@ describe('r2-cleanup isStillReferenced runs on an RLS-bypass client (#1599)', ()
     await deleteR2ObjectIfOrphan('https://cdn.example.com/products/some-key.jpg');
 
     expect(withRlsBypassMock).toHaveBeenCalledTimes(1);
-    // The single registry-built probe landed on the bypass client, with the
-    // URL (exact-match columns) and the R2 key (JSON/HTML columns)...
-    expect(queryRaw).toHaveBeenCalledTimes(1);
-    const [sql, url, key] = queryRaw.mock.calls[0]!;
+    // The registry-built probes landed on the bypass client: the exact-URL
+    // half first (with the URL), then — because it missed — the substring
+    // half over the JSON/HTML columns (with the R2 key). issue 2249.
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+    const [exactSql, url] = queryRaw.mock.calls[0]!;
     expect(url).toBe('https://cdn.example.com/products/some-key.jpg');
+    expect(exactSql).toContain('"product_images"');
+    expect(exactSql).not.toContain('position(');
+    const [substringSql, key] = queryRaw.mock.calls[1]!;
     expect(key).toBe('products/some-key.jpg');
-    expect(sql).toContain('"pwa_settings"');
-    expect(sql).toContain('"product_images"');
+    expect(substringSql).toContain('"pwa_settings"');
+    // The scan is time-bounded on the same transaction (issue 2249).
+    expect((executeRaw.mock.calls[0][0] as TemplateStringsArray).join('?')).toContain(
+      "set_config('statement_timeout'"
+    );
     // ...and NOTHING landed on the un-scoped decoy.
     expect(prismaQueryRaw).not.toHaveBeenCalled();
     expect(bypassTx.$queryRawUnsafe).toBe(queryRaw);
@@ -82,6 +93,25 @@ describe('r2-cleanup isStillReferenced runs on an RLS-bypass client (#1599)', ()
 
     await deleteR2ObjectIfOrphan('https://cdn.example.com/products/still-used.jpg');
 
+    expect(StorageService.delete).not.toHaveBeenCalled();
+  });
+
+  it('skips the substring scan when an exact-URL reference exists (issue 2249)', async () => {
+    queryRaw.mockResolvedValueOnce([{ referenced: true }]);
+    const { StorageService } = await import('../../apps/api/src/services/storage.service');
+    await deleteR2ObjectIfOrphan('https://cdn.example.com/products/cloned.jpg');
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(StorageService.delete).not.toHaveBeenCalled();
+  });
+
+  it('KEEPS the object when the bounded scan times out (57014) — never deletes on doubt', async () => {
+    queryRaw
+      .mockResolvedValueOnce([{ referenced: false }])
+      .mockRejectedValueOnce(
+        Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' })
+      );
+    const { StorageService } = await import('../../apps/api/src/services/storage.service');
+    await deleteR2ObjectIfOrphan('https://cdn.example.com/products/slow.jpg');
     expect(StorageService.delete).not.toHaveBeenCalled();
   });
 

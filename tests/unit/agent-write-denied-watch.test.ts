@@ -63,15 +63,21 @@ function deniedRow(credential: string, ip: string) {
 /**
  * Configure BOTH reads the watcher now makes: the groupBy that discovers
  * which stores are active in the window, and the per-store `findMany` slice.
- * `findMany` ignores its arguments in this stub (it always returns the full
- * set passed here), which is exactly right for every existing single-store
- * test — the per-store `where: { storeId }` filter is real in production,
- * not in this mock.
+ * `findMany` returns only the rows of the store it is asked for (see below).
  */
 function setDenials(rows: ReturnType<typeof deniedRow>[]) {
-  mockAuditFindMany.mockResolvedValue(rows);
-  const storeIds = [...new Set(rows.map(r => r.storeId).filter(Boolean))];
-  mockAuditGroupBy.mockResolvedValue(storeIds.map(storeId => ({ storeId })));
+  // Honour the per-store `where.storeId` the watcher sends (issue 2055: the
+  // old stub returned EVERY row for every store, so no test could observe the
+  // fan-out). A query with no storeId still gets everything, so the
+  // per-store-scoping mutation stays observable.
+  mockAuditFindMany.mockImplementation(async (args?: { where?: { storeId?: string } }) =>
+    args?.where?.storeId ? rows.filter(r => r.storeId === args.where!.storeId) : rows
+  );
+  const counts = new Map<string, number>();
+  for (const r of rows) if (r.storeId) counts.set(r.storeId, (counts.get(r.storeId) ?? 0) + 1);
+  mockAuditGroupBy.mockResolvedValue(
+    [...counts].map(([storeId, n]) => ({ storeId, _count: { _all: n } }))
+  );
 }
 
 beforeEach(() => {
@@ -284,5 +290,42 @@ describe('agent-write-denied-watch — reads the coalesced count (#1644 / #1649)
     const result = await handleAgentWriteDeniedWatch();
     expect(result.findings).toBe(0);
     expect(mockSendAlert).not.toHaveBeenCalled();
+  });
+});
+
+describe('agent-write-denied-watch — bounded fan-out (issue 2055, issue 2060)', () => {
+  function storeRows(n: number, perStore: (i: number) => number) {
+    const rows: ReturnType<typeof deniedRow>[] = [];
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < perStore(i); k++) {
+        rows.push({ ...deniedRow('invalid', `10.0.${i % 250}.1`), storeId: `store-${i}` });
+      }
+    }
+    return rows;
+  }
+
+  it('reads at most 100 stores, the noisiest first, in batches of short transactions', async () => {
+    // 150 active stores; store-149 is the noisiest and must be read.
+    setDenials(storeRows(150, i => (i === 149 ? 5 : 1)));
+    await handleAgentWriteDeniedWatch();
+
+    const perStoreReads = mockAuditFindMany.mock.calls.map(
+      c => (c[0] as { where: { storeId: string } }).where.storeId
+    );
+    expect(perStoreReads).toHaveLength(100);
+    expect(perStoreReads).toContain('store-149');
+    // 1 groupBy + 10 batches of 10 + 1 prior-agent-order read — never one
+    // transaction spanning the whole fan-out.
+    expect(mockRlsBypass).toHaveBeenCalledTimes(12);
+  });
+
+  it('marks the tick truncated when whole stores were dropped', async () => {
+    setDenials(storeRows(150, () => 4));
+    await handleAgentWriteDeniedWatch();
+    const contexts = mockSendAlert.mock.calls.map(
+      c => (c[0] as { context: { truncated: boolean; droppedStores: number } }).context
+    );
+    expect(contexts.length).toBeGreaterThan(0);
+    expect(contexts.every(c => c.truncated === true && c.droppedStores === 50)).toBe(true);
   });
 });

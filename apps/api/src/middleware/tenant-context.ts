@@ -42,6 +42,9 @@ import { runRequestInTransaction } from './request-transaction';
  *    `COMMIT → response → deferred work`, so post-response side effects never
  *    sit on the request's latency path and never inherit a closed transaction.
  *    A rolled-back request drops its deferred work entirely.
+ * 7. A client that disconnects before the handler answers ROLLS BACK the
+ *    request (issue 1604) — it used to commit whatever half of the handler
+ *    had run. See `AbandonedRequest` in `./request-transaction.ts`.
  *
  * Safety guarantees:
  * - Routes WITHOUT a storeId skip this middleware (no RLS filtering)

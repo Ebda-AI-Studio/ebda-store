@@ -18,6 +18,8 @@ const h = vi.hoisted(() => ({
   getPaymentStatus: vi.fn(),
   updateStatus: vi.fn(),
   confirm: vi.fn(),
+  sendAlert: vi.fn(),
+  recordPaymentEvent: vi.fn(),
 }));
 
 vi.mock('@force/database', () => ({
@@ -42,8 +44,9 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
 vi.mock('@api/services/payment-confirm.service', () => ({
   confirmPaymentFromProviderStatus: h.confirm,
 }));
-vi.mock('@api/services/alerts.service', () => ({
-  sendAlert: vi.fn().mockResolvedValue(undefined),
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
+vi.mock('@api/services/payment-event.service', () => ({
+  recordPaymentEvent: h.recordPaymentEvent,
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -78,6 +81,8 @@ beforeEach(() => {
   h.findMany.mockResolvedValue([gatewayOrder('o1'), gatewayOrder('o2')]);
   h.getPaymentStatus.mockResolvedValue({ status: 'completed' });
   h.updateStatus.mockResolvedValue(undefined);
+  h.sendAlert.mockResolvedValue(undefined);
+  h.recordPaymentEvent.mockResolvedValue(undefined);
 });
 
 describe('order-auto-cancel-unpaid — stale confirm on a paid order (#763)', () => {
@@ -95,8 +100,68 @@ describe('order-auto-cancel-unpaid — stale confirm on a paid order (#763)', ()
     const r = await h.handler!({ step });
 
     expect(h.confirm).toHaveBeenCalledTimes(2); // o2 was still processed
-    expect(r).toMatchObject({ scanned: 2, rescued: 1, skipped: 1, cancelled: 0 });
+    // issue 2134: a stale confirm is its OWN outcome, never a "provider
+    // unreachable" skip.
+    expect(r).toMatchObject({
+      scanned: 2,
+      rescued: 1,
+      skipped: 0,
+      staleConfirmed: 1,
+      cancelled: 0,
+    });
     expect(h.updateStatus).not.toHaveBeenCalled(); // a paid order is never auto-cancelled
+  });
+
+  // issue 2136 / issue 2143 — captured money on a terminal order pages P1 by
+  // name and leaves a durable trace on the order's payment timeline.
+  it('pages a dedicated P1 naming the order and records a reconciliation event', async () => {
+    h.findMany.mockResolvedValue([gatewayOrder('o1')]);
+    h.confirm.mockRejectedValueOnce(
+      new AppError(
+        400,
+        'INVALID_STATUS_TRANSITION',
+        'Cannot transition from cancelled to confirmed'
+      )
+    );
+
+    await h.handler!({ step });
+
+    const alert = h.sendAlert.mock.calls
+      .map(
+        c =>
+          c[0] as {
+            level: string;
+            source: string;
+            context: {
+              orders: Array<{ orderId: string; paymentId: string; transactionId: string }>;
+            };
+          }
+      )
+      .find(a => a.source === 'order.auto_cancel.captured_on_terminal_order');
+    expect(alert?.level).toBe('p1');
+    expect(alert?.context.orders).toEqual([
+      expect.objectContaining({ orderId: 'o1', paymentId: 'p-o1', transactionId: 'tx-o1' }),
+    ]);
+    // The "provider could not be reached" alert must not claim this order.
+    expect(
+      h.sendAlert.mock.calls.some(
+        c => (c[0] as { source: string }).source === 'order.auto_cancel.reconciliation'
+      )
+    ).toBe(false);
+    expect(h.recordPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentId: 'p-o1',
+        eventType: 'reconciliation',
+        details: expect.objectContaining({ reason: 'provider_paid_on_terminal_order' }),
+      })
+    );
+  });
+
+  // issue 2137 — only INVALID_STATUS_TRANSITION is terminal. Any other 4xx
+  // would leave the order pending and be re-skipped every night.
+  it('rethrows a 4xx AppError that is NOT the stale transition (control)', async () => {
+    h.confirm.mockRejectedValueOnce(new AppError(409, 'SOMETHING_ELSE', 'other client error'));
+    await expect(h.handler!({ step })).rejects.toThrow('other client error');
   });
 
   it('still throws a non-terminal error so Inngest retries it (control)', async () => {

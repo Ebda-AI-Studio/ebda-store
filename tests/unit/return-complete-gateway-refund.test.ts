@@ -39,6 +39,8 @@ const applyRefundEffects = vi.fn();
 const getById = vi.fn();
 const executeRaw = vi.fn();
 const findOutstandingRefundClaims = vi.fn();
+// issue 2002: a non-gateway completion settles any open claim for its key.
+const reconcileOutstandingRefundClaims = vi.fn().mockResolvedValue([]);
 
 vi.mock('@force/database', () => ({
   prisma: {
@@ -63,6 +65,7 @@ vi.mock('@force/database', () => ({
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: { refund: (...a: unknown[]) => providerRefund(...a) },
   findOutstandingRefundClaims: (...a: unknown[]) => findOutstandingRefundClaims(...a),
+  reconcileOutstandingRefundClaims: (...a: unknown[]) => reconcileOutstandingRefundClaims(...a),
 }));
 vi.mock('@api/services/order.service', () => ({
   OrderService: { applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a) },
@@ -167,6 +170,7 @@ function setup({
   applyRefundEffects.mockResolvedValue(undefined);
   executeRaw.mockResolvedValue(1);
   findOutstandingRefundClaims.mockResolvedValue([]);
+  reconcileOutstandingRefundClaims.mockResolvedValue([]);
 }
 
 /** The amount handed to the payment provider on the single refund call. */
@@ -1162,5 +1166,36 @@ describe('ReturnService.refundPreview — what the admin confirms is what comple
 
     expect(preview.storeCreditToWallet).toBe(1978);
     expect(preview.storeCreditToWallet).toBe(preview.recordedAmount);
+  });
+});
+
+/**
+ * issue 2002 — a NON-gateway completion settles the return's open refund
+ * claims (so the stuck-claim sweep stops alerting); a gateway completion never
+ * does (its own refund resolves its claim). Mutation-proof: dropping the
+ * reconcile call (or running it for gateway methods) reddens this.
+ */
+describe('ReturnService.complete — record-only settles open refund claims (issue 2002)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+    setup({ returnedItems: [{ orderItemId: 'oi-a', quantity: 1 }] });
+  });
+
+  it('settles claims for a manual completion, keyed on this return', async () => {
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'admin-1', 'manual');
+    expect(reconcileOutstandingRefundClaims).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storeId: STORE_ID,
+        refundKey: `return:${RETURN_ID}`,
+        refundMethod: 'manual',
+        userId: 'admin-1',
+      })
+    );
+  });
+
+  it('never settles claims on a gateway completion', async () => {
+    await ReturnService.complete(STORE_ID, RETURN_ID, 'admin-1', 'original');
+    expect(reconcileOutstandingRefundClaims).not.toHaveBeenCalled();
   });
 });

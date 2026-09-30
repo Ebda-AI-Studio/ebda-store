@@ -15,7 +15,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
+import { DISABLED_VARIANT_STOCK_VALUE_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { z } from 'zod';
 import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
@@ -600,7 +600,7 @@ router.get(
       const to = parseFinanceDate(req.query.to, now, 'end');
 
       const data = await runInTenantContext(req.params.storeId, async () => {
-        const [pnl, bs, stockValueRows] = await Promise.all([
+        const [pnl, bs, stockValueRows, disabledValueRows] = await Promise.all([
           profitAndLoss(req.params.storeId, from, to),
           balanceSheet(req.params.storeId, to),
           // Variant-aware quantity AND cost: `products.inventory` is not
@@ -612,9 +612,17 @@ router.get(
             FROM public.products p
             WHERE p.store_id = ${req.params.storeId} AND p.deleted_at IS NULL
           `,
+          // issue 2146: value on DISABLED variants — not stock, so not in
+          // stockValue, but shown beside it rather than vanishing.
+          prisma.$queryRaw<{ total: bigint }[]>`
+            SELECT COALESCE(SUM(${DISABLED_VARIANT_STOCK_VALUE_SQL}), 0) AS total
+            FROM public.products p
+            WHERE p.store_id = ${req.params.storeId} AND p.deleted_at IS NULL
+          `,
         ]);
 
         const stockValue = Number(stockValueRows[0]?.total ?? 0);
+        const disabledVariantStockValue = Number(disabledValueRows[0]?.total ?? 0);
 
         return {
           thisMonth: {
@@ -624,6 +632,7 @@ router.get(
           },
           cash: bs.assets.filter(a => a.code.startsWith('10')),
           stockValue,
+          disabledVariantStockValue,
           balanceSheet: {
             totalAssets: bs.totalAssets,
             totalLiabilities: bs.totalLiabilities,

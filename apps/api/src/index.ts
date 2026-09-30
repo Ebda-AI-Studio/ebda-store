@@ -19,6 +19,7 @@ import {
   restrictPlatformOnlyOrigins,
   makeRateLimitStore,
   rateLimitRedisClient,
+  inngestLimiter,
 } from './middleware/security';
 import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
@@ -188,9 +189,10 @@ app.use(
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
 import {
   corsDomainCache,
-  CORS_CACHE_TTL_MS,
-  CORS_LOOKUP_FAILURE_TTL_MS,
   corsCustomDomainWhere,
+  corsEntryAfterFailure,
+  corsEntryAfterLookup,
+  decideAfterFailedLookup,
   decideCorsCache,
   isPlatformOrigin,
 } from './lib/cors-cache';
@@ -283,7 +285,7 @@ app.use(
           .findFirst({ where: corsCustomDomainWhere(hostname), select: { id: true } })
           .then(store => {
             const allowed = store !== null;
-            corsDomainCache.set(hostname, { allowed, expiresAt: Date.now() + CORS_CACHE_TTL_MS });
+            corsDomainCache.set(hostname, corsEntryAfterLookup(allowed, Date.now()));
             return allowed ? callback(null, true) : callback(corsRejection(origin));
           })
           // A FAILED LOOKUP IS NOT A REJECTED ORIGIN. If Neon is down or the
@@ -301,19 +303,29 @@ app.use(
             // AppError has no `cause` slot to thread it through. Deleting this
             // line as redundant would throw away the only record of WHY the
             // lookup failed, which is the entire diagnostic value of a 503.
-            logger.error({ err, origin }, 'CORS custom-domain lookup failed');
+            // It also records WHICH answer the request got (`served`), so a
+            // stale-allow window is observable rather than silent.
             // #1074: a failed lookup used to populate NOTHING, so every
             // request for this hostname re-hit the already-degraded database
             // for the whole outage. A short negative cache (5s, far shorter
             // than the 2min success TTL) bounds that to one query per 5s per
-            // hostname while still surfacing the 503 (never silently
-            // upgrading to `allowed`) and self-healing fast once Neon
-            // recovers.
-            corsDomainCache.set(hostname, {
-              allowed: false,
-              unknown: true,
-              expiresAt: Date.now() + CORS_LOOKUP_FAILURE_TTL_MS,
-            });
+            // hostname once failures REPEAT (issue 2109: a single blip lets
+            // the next request re-query), never silently upgrades a hostname
+            // that was never verified to `allowed`, and self-heals fast once
+            // Neon recovers. Issue 2169: the last RESOLVED answer is carried
+            // forward (the expired entry is still in the map), so a merchant
+            // domain verified in the last 15 minutes keeps passing CORS
+            // through the outage instead of 503ing its checkout.
+            const now = Date.now();
+            const entry = corsEntryAfterFailure(corsDomainCache.get(hostname), now);
+            corsDomainCache.set(hostname, entry);
+            const fallback = decideAfterFailedLookup(entry, now);
+            logger.error(
+              { err, origin, failures: entry.failures, served: fallback },
+              'CORS custom-domain lookup failed'
+            );
+            if (fallback === 'allow') return callback(null, true);
+            if (fallback === 'reject') return callback(corsRejection(origin));
             callback(
               new AppError(503, 'CORS_LOOKUP_UNAVAILABLE', 'Unable to verify origin at this time')
             );
@@ -379,6 +391,11 @@ app.use(
     skip: skipGlobalRateLimit,
   })
 );
+
+// issue 2063: the Inngest serve path's own bucket — counts only requests
+// answered ≥400 (forged/unsigned calls), and sits BEFORE the body parser so a
+// capped caller is refused before its body is read. See inngestLimiter.
+app.use('/api/v1/inngest', inngestLimiter);
 
 // Webhook routes need raw body parsing (must be before json middleware)
 app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
@@ -645,6 +662,24 @@ const server = httpServer.listen(config.port, () => {
   // own Host), which Inngest Cloud can't reach — jobs then sit queued
   // forever. Warn loudly so this is caught at boot, not via a 7-hour
   // queue-depth alert.
+  // issue 2064: the global-limiter bypass for Inngest step calls and the
+  // endpoint's own safety both rest on the SDK verifying signatures, which it
+  // only does in cloud mode with a key. With no key in production the bypass
+  // turns itself off (inngestSignatureIsEnforced), but say so loudly.
+  if (config.nodeEnv === 'production' && !config.inngestSigningKey) {
+    logger.error(
+      'INNGEST_SIGNING_KEY is unset in production — the Inngest serve endpoint cannot ' +
+        'verify callers; the global rate-limit bypass for it is disabled'
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'boot.inngest_signing_key_missing',
+      title: 'INNGEST_SIGNING_KEY unset in production',
+      body: 'The Inngest serve endpoint cannot verify request signatures. Set INNGEST_SIGNING_KEY on the API service.',
+    }).catch(() => undefined);
+  }
+
   if (config.nodeEnv === 'production' && !config.inngestServeHost) {
     logger.warn(
       'INNGEST_SERVE_HOST is unset in production — Inngest will register the ' +

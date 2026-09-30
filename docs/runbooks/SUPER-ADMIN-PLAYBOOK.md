@@ -89,6 +89,23 @@ Force AI WhatsApp is a **separate product** with its own 3-tier plan system on t
 
 **Cross-product rule (HARD):** `wbs.bot.*` features REQUIRE a linked active Force AI Store. WBS plan can be at any tier, but if no Force AI Store is linked OR the linked store is suspended/inactive, all bot features resolve to disabled. Bulk campaigns + unified inbox + templates work without Force AI Store. Super-admin override on a `wbs.bot.*` feature CANNOT bypass this precondition — it's a runtime check, not a config flag.
 
+## Money alerts that need a human
+
+- **`order.auto_cancel.captured_on_terminal_order` (P1)** — the nightly
+  auto-cancel sweep asked the provider about a stale unpaid order and the
+  provider said PAID, but the order had already been cancelled or refunded by
+  staff, so the capture is recorded nowhere on the order (issue 2136). The alert
+  names each order, payment and transaction id, and the order page's payment
+  timeline carries a `Reconciliation` event with reason
+  `provider_paid_on_terminal_order`. Check the transaction in the provider
+  dashboard; if the order stays cancelled, refund the customer from the
+  provider dashboard (there is no in-app action on a cancelled + unpaid order).
+- **`payment.refund.claim_stuck` (P1)** — a refund was claimed and the provider
+  never confirmed it. Alerted at 15m, 24h and 72h, not every tick. Check the
+  provider; if the money went out, complete the return with "Already refunded —
+  record only", which writes `refund_reconciled` and stops the alerts
+  (issue 2002).
+
 ## Where the code lives
 
 | What                                 | Path                                                                         |

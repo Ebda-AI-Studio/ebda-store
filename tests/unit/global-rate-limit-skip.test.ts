@@ -15,6 +15,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
 import type { Request } from 'express';
@@ -41,15 +43,25 @@ const inngestReq = (opts: { signature?: string; path?: string; method?: string }
 // Bypass 0 short-circuits on the test env, so every other branch is dead under
 // vitest unless these are cleared. Without this the suite would pass no matter
 // what the predicate said.
-const SAVED = { node: process.env.NODE_ENV, vitest: process.env.VITEST };
+const SAVED = {
+  node: process.env.NODE_ENV,
+  vitest: process.env.VITEST,
+  signingKey: process.env.INNGEST_SIGNING_KEY,
+};
 beforeEach(() => {
-  delete process.env.NODE_ENV;
+  // A production deploy WITH a signing key — the only state in which the
+  // Inngest bypass may apply (issue 2064). Individual cases below break it.
+  process.env.NODE_ENV = 'production';
+  process.env.INNGEST_SIGNING_KEY = 'signkey-test-0000';
   delete process.env.VITEST;
   delete process.env.LOAD_TEST_BYPASS_TOKEN;
 });
 afterEach(() => {
   if (SAVED.node !== undefined) process.env.NODE_ENV = SAVED.node;
+  else delete process.env.NODE_ENV;
   if (SAVED.vitest !== undefined) process.env.VITEST = SAVED.vitest;
+  if (SAVED.signingKey !== undefined) process.env.INNGEST_SIGNING_KEY = SAVED.signingKey;
+  else delete process.env.INNGEST_SIGNING_KEY;
 });
 
 describe('the global mutation limiter skips the refresh route', () => {
@@ -121,6 +133,18 @@ describe('the global mutation limiter skips the refresh route', () => {
 describe('the global mutation limiter skips signed Inngest step callbacks', () => {
   it('lets a signed POST /api/v1/inngest past uncounted', () => {
     expect(skipGlobalRateLimit(inngestReq({ signature: 't=123&s=abc' }))).toBe(true);
+  });
+
+  // issue 2064 — mutation-proof: dropping `inngestSignatureIsEnforced()` from
+  // the Bypass 4 predicate reddens both cases.
+  it('does NOT skip when the deploy has no INNGEST_SIGNING_KEY (the SDK cannot verify)', () => {
+    delete process.env.INNGEST_SIGNING_KEY;
+    expect(skipGlobalRateLimit(inngestReq({ signature: 't=123&s=abc' }))).toBe(false);
+  });
+
+  it('does NOT skip on a deployed service whose NODE_ENV is not production (SDK dev mode)', () => {
+    process.env.NODE_ENV = 'staging';
+    expect(skipGlobalRateLimit(inngestReq({ signature: 't=123&s=abc' }))).toBe(false);
   });
 
   it('does NOT skip an unsigned POST /api/v1/inngest (dev-mode / attacker without the key)', () => {
@@ -272,5 +296,25 @@ describe('req.path at app-level really is the full mounted path', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+/**
+ * issue 2063 — the Inngest path is exempt from the shared cap but NOT
+ * unbounded: its own bucket is mounted on /api/v1/inngest ahead of the body
+ * parser and the serve handler. Mutation-proof: deleting the mount (or moving
+ * it after `express.json`) reddens this.
+ */
+describe('the Inngest path has its own bucket, ahead of body parsing (issue 2063)', () => {
+  it('index.ts mounts inngestLimiter on /api/v1/inngest before express.json and inngestServe', () => {
+    const src = fs.readFileSync(path.resolve(process.cwd(), 'apps/api/src/index.ts'), 'utf8');
+    const mount = src.indexOf("app.use('/api/v1/inngest', inngestLimiter)");
+    const json = src.indexOf("app.use(express.json({ limit: '10mb' }))");
+    const serveMount = src.indexOf("'/api/v1/inngest',\n  inngestServe(");
+    expect(mount, 'inngestLimiter is not mounted').toBeGreaterThan(-1);
+    expect(json).toBeGreaterThan(-1);
+    expect(serveMount).toBeGreaterThan(-1);
+    expect(mount).toBeLessThan(json);
+    expect(mount).toBeLessThan(serveMount);
   });
 });

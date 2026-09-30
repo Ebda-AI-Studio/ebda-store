@@ -78,7 +78,11 @@ linked when a customer of the same store has that email, for display only.
      `idempotencyKey = campaign-recipient/<id>`, mark `sent` + provider id, or `failed` + error;
      wait for a platform-wide send slot before each send (`CAMPAIGN_PLATFORM_SEND_INTERVAL_MS`,
      default 1000 → ≤1/s across all stores, #1955), and sleep `CAMPAIGN_SEND_THROTTLE_MS`
-     (default 1000) after each success.
+     (default 1000) after each success. A step stops inside
+     `CAMPAIGN_BATCH_WALL_BUDGET_MS` (default 60s — each step is one request behind
+     Cloudflare's 100s edge timeout) and never waits on the pacer past it (issue 2115).
+   - `leftover-list-N` / `leftover-N-batch-j` — only when a batch deferred: re-list the
+     still-`queued` recipients and send them in further budgeted steps.
    - `finalize` — counts; `sent`, or `failed` when nothing was delivered.
    - `onFailure` — campaign `failed` (only from scheduled/sending) and every still-`queued`
      recipient → `failed`, so no orphaned `queued` row survives a dead job.

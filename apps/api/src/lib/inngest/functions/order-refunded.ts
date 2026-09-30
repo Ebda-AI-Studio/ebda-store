@@ -57,6 +57,16 @@ const LEGACY_ROLLBACK_STOCK_ROW = {
   reason: 'Order rollback — payment step failed',
 };
 
+/** The customer-facing refund notice set gated by the per-order claim. */
+const REFUND_NOTIFY_CHANNELS = ['email', 'dispatch', 'push'] as const;
+type RefundNotifyChannel = (typeof REFUND_NOTIFY_CHANNELS)[number];
+
+/** Channels a `refund_notified` claim handed back for a replay (issue 2138). */
+function releasedChannels(meta: Record<string, unknown>): RefundNotifyChannel[] {
+  const raw = Array.isArray(meta.released) ? meta.released : [];
+  return REFUND_NOTIFY_CHANNELS.filter(c => raw.includes(c));
+}
+
 /**
  * Fans out side effects when an order is refunded — fires from
  * `OrderService.applyRefundEffects` so EVERY refund path (gateway-driven
@@ -498,39 +508,68 @@ export async function handleOrderRefunded(
   // dispatch was removed and its branch now carries a comment pointing back
   // here. Any new customer refund notification belongs inside this block —
   // adding one elsewhere silently breaks the once-per-order invariant.
+  //
+  // Per CHANNEL (issue 2138 / issue 2135): the claim row's
+  // `metadata.released` lists channels whose send failed and were handed back
+  // for a replay. Releasing the WHOLE claim on an email-only failure used to
+  // re-open it for the dispatcher (a billed WhatsApp/SMS template) and the
+  // admin push too, which had already delivered — and for any LATER
+  // independent `order/refunded` for the order as well. A claim row with no
+  // `released` list (including every row written before this change) means
+  // every channel was sent.
   if (notify && isPartial && !partialAmountKnown) {
     logger.warn(
       { orderId, storeId, refundKey: partial?.refundKey },
       'order/refunded: partial event with no positive refundAmount — no refund notification sent'
     );
   }
-  const shouldNotify =
-    notify &&
-    (isPartial
+  const claimed: RefundNotifyChannel[] | boolean = !notify
+    ? []
+    : isPartial
       ? partialAmountKnown
+        ? [...REFUND_NOTIFY_CHANNELS]
+        : []
       : await step.run('claim-refund-notification', () =>
           runInTenantContext(storeId, () =>
             withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
               await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
               const sent = await tx.orderEvent.findFirst({
                 where: { storeId, orderId, toStatus: 'refund_notified' },
-                select: { id: true },
+                select: { id: true, metadata: true },
               });
-              if (sent) return false;
-              await tx.orderEvent.create({
-                data: {
-                  storeId,
-                  orderId,
-                  fromStatus: null,
-                  toStatus: 'refund_notified',
-                  actorId: null,
-                  metadata: {},
-                },
+              if (!sent) {
+                await tx.orderEvent.create({
+                  data: {
+                    storeId,
+                    orderId,
+                    fromStatus: null,
+                    toStatus: 'refund_notified',
+                    actorId: null,
+                    metadata: {},
+                  },
+                });
+                return [...REFUND_NOTIFY_CHANNELS];
+              }
+              const meta = (sent.metadata ?? {}) as Record<string, unknown>;
+              const released = releasedChannels(meta);
+              if (released.length === 0) return [];
+              // Re-claim exactly the released channels.
+              await tx.orderEvent.update({
+                where: { id: sent.id },
+                data: { metadata: { ...meta, released: [] } as Prisma.InputJsonValue },
               });
-              return true;
+              return released;
             })
           )
-        ));
+        );
+  // A run that started before this change replays the memoized claim step's
+  // old boolean answer: true meant "send the whole set".
+  const notifyChannels: RefundNotifyChannel[] = Array.isArray(claimed)
+    ? claimed
+    : claimed
+      ? [...REFUND_NOTIFY_CHANNELS]
+      : [];
+  const shouldNotify = notifyChannels.length > 0;
 
   // Set when the customer's "Refund issued" email step fails for good. The
   // claim above is already committed, so without a second look that customer
@@ -547,39 +586,53 @@ export async function handleOrderRefunded(
       )
     );
 
-    await Promise.allSettled([
-      step.run('send-customer-refund-email', () =>
-        EmailService.sendOrderRefunded(storeId, emailData, orderLocale)
-      ),
-      step.run('dispatch-notification-channels', () =>
-        notificationDispatcher.dispatch(storeId, 'refund_processed', {
-          customerName,
-          customerPhone: guestPhone || undefined,
-          orderNumber: order.orderNumber,
-          amount: refundAmount / 1000,
-          storeId,
-          storeName: store?.name ?? storeId,
-        })
-      ),
-      step.run('onesignal-admin-refund-push', () =>
-        OneSignalService.notifyAdminsOfRefund({
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          storeId,
-          storeName: store?.name ?? storeId,
-          customerName,
-          total: refundAmount,
-          currency: order.currency,
-          paymentMethod: latestPayment?.provider ?? 'refund',
-        })
-      ),
-    ]).then(results => {
+    const sends: Array<[RefundNotifyChannel, () => Promise<unknown>]> = [
+      [
+        'email',
+        () =>
+          step.run('send-customer-refund-email', () =>
+            EmailService.sendOrderRefunded(storeId, emailData, orderLocale)
+          ),
+      ],
+      [
+        'dispatch',
+        () =>
+          step.run('dispatch-notification-channels', () =>
+            notificationDispatcher.dispatch(storeId, 'refund_processed', {
+              customerName,
+              customerPhone: guestPhone || undefined,
+              orderNumber: order.orderNumber,
+              amount: refundAmount / 1000,
+              storeId,
+              storeName: store?.name ?? storeId,
+            })
+          ),
+      ],
+      [
+        'push',
+        () =>
+          step.run('onesignal-admin-refund-push', () =>
+            OneSignalService.notifyAdminsOfRefund({
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              storeId,
+              storeName: store?.name ?? storeId,
+              customerName,
+              total: refundAmount,
+              currency: order.currency,
+              paymentMethod: latestPayment?.provider ?? 'refund',
+            })
+          ),
+      ],
+    ];
+    const chosen = sends.filter(([channel]) => notifyChannels.includes(channel));
+    await Promise.allSettled(chosen.map(([, send]) => send())).then(results => {
       results.forEach((r, i) => {
         if (r.status === 'rejected') {
           logger.error({ err: r.reason, orderId }, 'order/refunded step failed');
-          // Index 0 is send-customer-refund-email. The dispatcher never
-          // throws (it logs internally) and the admin push is admin-facing.
-          if (i === 0) customerEmailFailed = true;
+          // The dispatcher never throws (it logs internally) and the admin
+          // push is admin-facing; only the customer's email is escalated.
+          if (chosen[i][0] === 'email') customerEmailFailed = true;
         }
       });
     });
@@ -724,19 +777,32 @@ export async function handleOrderRefunded(
   // on the durable Redis queue, so this is a failure to render or enqueue it,
   // not a Resend outage). Every reversal above has committed, so failing the
   // run now costs nothing and dead-letters it to alerts-failure-watch instead
-  // of ending green with the customer never told (#1935). The whole-order
-  // claim is released first, so replaying this event from Inngest sends the
-  // notice; the reversals and the refundReversedAt stamp are idempotent. A
-  // partial return is never claimed, so its replay re-sends as it is.
+  // of ending green with the customer never told (#1935). The claim's EMAIL
+  // channel is released first, so replaying this event from Inngest sends the
+  // email and nothing else; the reversals and the refundReversedAt stamp are
+  // idempotent. A partial return is never claimed, so its replay re-sends as
+  // it is.
   if (customerEmailFailed) {
     if (!isPartial) {
+      // Release ONLY the email channel (issue 2138 / issue 2135): the
+      // dispatcher and the admin push already delivered, and a replay must
+      // not send them twice.
       await step.run('release-refund-notification-claim', () =>
         runInTenantContext(storeId, () =>
           withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
             await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
-            return tx.orderEvent.deleteMany({
+            const claim = await tx.orderEvent.findFirst({
               where: { storeId, orderId, toStatus: 'refund_notified' },
+              select: { id: true, metadata: true },
             });
+            if (!claim) return { released: [] };
+            const meta = (claim.metadata ?? {}) as Record<string, unknown>;
+            const released = [...new Set([...releasedChannels(meta), 'email' as const])];
+            await tx.orderEvent.update({
+              where: { id: claim.id },
+              data: { metadata: { ...meta, released } as Prisma.InputJsonValue },
+            });
+            return { released };
           })
         )
       );

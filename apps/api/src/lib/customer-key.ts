@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+import { config } from '../config';
 
 /**
  * ONE definition of "which customer does this order belong to".
@@ -63,12 +64,39 @@ export function isGuestOrder(order: OrderIdentity): boolean {
 export const GUEST_RFM_KEY_PREFIX = 'GUEST:';
 
 /**
+ * Secret for the guest key's HMAC, derived (not reused raw) from the API's
+ * ENCRYPTION_KEY, which production already refuses to boot without
+ * (config/index.ts). A dedicated label keeps this key independent of every
+ * other use of that secret. Lazy so importing this module never reads config
+ * before the process is ready.
+ */
+let rfmKeySecret: Buffer | undefined;
+function guestKeySecret(): Buffer {
+  rfmKeySecret ??= createHmac('sha256', config.encryptionKey)
+    .update('fwb:customer-rfm-key:v1', 'utf8')
+    .digest();
+  return rfmKeySecret;
+}
+
+/**
  * The key RFM stores for a customer. Registered: the user id, unchanged.
- * Guest: `GUEST:` + sha256 of the `customerKeyOf` value, so the snapshot row
- * joins to the Customers-page row by hashing that row's id — no plain email
- * or phone is written to the analytics table.
+ * Guest: `GUEST:` + a KEYED hash (HMAC-SHA256) of the `customerKeyOf` value,
+ * so the snapshot row still joins to the Customers-page row by hashing that
+ * row's id, and no plain email or phone is written to the analytics table.
+ *
+ * Keyed, not a plain sha256 (issue 2242): this value leaves the platform as
+ * the MCP `customerRef`, next to a masked email/phone. A Kuwait mobile is 8
+ * digits (10^8 preimages) and the masked forms reveal most of it, so an
+ * unkeyed hash was reversible in seconds by anyone holding a transcript — the
+ * "contact details are masked" contract did not hold. Without the server
+ * secret the HMAC cannot be brute-forced.
  */
 export function rfmKeyFor(key: string, isGuest: boolean): string {
   if (!isGuest) return key;
-  return `${GUEST_RFM_KEY_PREFIX}${createHash('sha256').update(key, 'utf8').digest('hex')}`;
+  return `${GUEST_RFM_KEY_PREFIX}${createHmac('sha256', guestKeySecret()).update(key, 'utf8').digest('hex')}`;
+}
+
+/** Test hook: forget the derived secret (after changing ENCRYPTION_KEY). */
+export function __resetGuestKeySecretForTests(): void {
+  rfmKeySecret = undefined;
 }

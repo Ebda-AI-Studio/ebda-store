@@ -28,7 +28,7 @@ const { holder, sendMarketingEmail, captured, awaitCampaignSendSlot } = vi.hoist
     holder: { prisma: null as any },
     sendMarketingEmail: vi.fn(),
     captured: { config: null as any, handler: null as any },
-    awaitCampaignSendSlot: vi.fn(async () => undefined),
+    awaitCampaignSendSlot: vi.fn(async (_maxWaitMs?: number) => true),
   };
 });
 
@@ -143,7 +143,7 @@ beforeEach(() => {
   db = { stores: [], campaigns: [], recipients: [], subscribers: [], customers: [] };
   holder.prisma = createFakePrisma(db);
   sendMarketingEmail.mockReset();
-  awaitCampaignSendSlot.mockClear();
+  awaitCampaignSendSlot.mockReset().mockImplementation(async () => true);
   let n = 0;
   sendMarketingEmail.mockImplementation(async () => ({ id: `msg-${++n}` }));
   process.env.CAMPAIGN_SEND_THROTTLE_MS = String(THROTTLE);
@@ -167,6 +167,7 @@ describe('campaign-send', () => {
     const order: string[] = [];
     awaitCampaignSendSlot.mockImplementation(async () => {
       order.push('slot');
+      return true;
     });
     sendMarketingEmail.mockImplementation(async (_s: unknown, o: { to: string }) => {
       order.push(`send:${o.to}`);
@@ -423,5 +424,37 @@ describe('campaign-send', () => {
       sentCount: 1,
       failedCount: 2,
     });
+  });
+});
+
+/**
+ * issue 2115 — one batch step is one HTTP request behind Cloudflare's 100s
+ * edge timeout. With many stores sharing the platform pacer, a 20-recipient
+ * batch could outlive it; after the retries `onFailure` marked never-mailed
+ * recipients failed. A step now stops inside its budget and the rest resume
+ * in leftover steps. Mutation-proof: ignoring the pacer's `false` (or dropping
+ * the leftover passes) reddens these.
+ */
+describe('campaign-send — batch wall-clock budget (issue 2115)', () => {
+  it('a step whose next pacer slot is past its budget stops, and the rest are sent in later steps', async () => {
+    seed(['a@x.test', 'b@x.test', 'c@x.test']);
+    // The 2nd slot is "too far away" once; everything else is immediate.
+    let calls = 0;
+    awaitCampaignSendSlot.mockImplementation(async () => ++calls !== 2);
+
+    await runJob();
+
+    expect(sentTo().sort()).toEqual(['a@x.test', 'b@x.test', 'c@x.test']);
+    expect(campaign().status).toBe('sent');
+    expect(db.recipients.every(r => r.status === 'sent')).toBe(true);
+  });
+
+  it('passes the remaining budget to the pacer (never an unbounded wait)', async () => {
+    seed(['a@x.test']);
+    await runJob();
+    const [maxWait] = awaitCampaignSendSlot.mock.calls[0] as [number];
+    expect(Number.isFinite(maxWait)).toBe(true);
+    expect(maxWait).toBeLessThanOrEqual(60_000);
+    expect(maxWait).toBeGreaterThan(0);
   });
 });

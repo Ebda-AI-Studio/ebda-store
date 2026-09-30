@@ -72,7 +72,7 @@ function formatDetails(details: unknown): string | null {
 type IconVariant = 'success' | 'failure' | 'webhook' | 'admin';
 
 function getIconVariant(eventType: string): IconVariant {
-  if (['completed', 'refund_completed'].includes(eventType)) return 'success';
+  if (['completed', 'refund_completed', 'refund_reconciled'].includes(eventType)) return 'success';
   if (
     ['failed', 'refund_failed', 'refund_indeterminate', 'cancelled', 'expired'].includes(eventType)
   )

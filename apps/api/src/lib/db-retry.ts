@@ -35,6 +35,12 @@ interface RetryOpts {
  * Postgres codes (`40P01`, `40001`) via `extraRetryCodes` need BOTH `err.code`
  * and `err.meta.code` checked; callers only using Prisma's own codes (like
  * `P2002`) are unaffected since `err.code` already matches for them.
+ *
+ * issue 2012: a CONNECTION-establishment failure (P1001 "Can't reach database
+ * server", P1002 "timed out") is raised as `PrismaClientInitializationError`,
+ * which carries its code on `errorCode` — not `code`. Without harvesting it,
+ * `feature.service.ts`'s `extraRetryCodes: ['P1001','P1002','P1017']` could
+ * never match the class it was written for.
  */
 function extractRetryCodes(err: unknown): string[] {
   if (typeof err !== 'object' || err === null) return [];
@@ -46,8 +52,8 @@ function extractRetryCodes(err: unknown): string[] {
   // Connection-establishment failures (P1001 "can't reach database server",
   // P1002 "timed out") are thrown as `PrismaClientInitializationError`, whose
   // code lives on `errorCode` — `code` is undefined on that class (issue
-  // 1989). Without this, a caller listing P1001/P1002 in `extraRetryCodes`
-  // never actually retried them.
+  // 1989 / issue 2012). Without this, a caller listing P1001/P1002 in
+  // `extraRetryCodes` never actually retried them.
   const errorCode = (err as { errorCode?: unknown }).errorCode;
   if (typeof errorCode === 'string') codes.push(errorCode);
   return codes;

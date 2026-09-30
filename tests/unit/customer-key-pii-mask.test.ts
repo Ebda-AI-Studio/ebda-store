@@ -44,8 +44,21 @@ describe('rfmKeyFor', () => {
   it('keeps a registered id and hashes a guest key (no plain contact at rest)', () => {
     expect(rfmKeyFor('u1', false)).toBe('u1');
     const k = rfmKeyFor('g@x.test', true);
-    expect(k).toBe(`GUEST:${createHash('sha256').update('g@x.test').digest('hex')}`);
+    expect(k).toMatch(/^GUEST:[0-9a-f]{64}$/);
     expect(k).not.toContain('g@x.test');
+    // Stable: the Customers page and the RFM rollup must derive the same key.
+    expect(rfmKeyFor('g@x.test', true)).toBe(k);
+  });
+
+  // issue 2242 — the guest key leaves the platform as the MCP `customerRef`.
+  // An UNKEYED sha256 of an 8-digit Kuwait mobile is reversible by brute
+  // force; the key is now an HMAC under a server-derived secret. Mutation-
+  // proof: reverting rfmKeyFor to createHash('sha256') reddens this.
+  it('is NOT a plain (unkeyed) sha256 of the contact, so it cannot be brute-forced', () => {
+    for (const contact of ['g@x.test', '+96550001111', '50001111']) {
+      const plain = `GUEST:${createHash('sha256').update(contact).digest('hex')}`;
+      expect(rfmKeyFor(contact, true)).not.toBe(plain);
+    }
   });
 });
 

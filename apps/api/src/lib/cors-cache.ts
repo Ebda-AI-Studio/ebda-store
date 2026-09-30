@@ -14,32 +14,115 @@ import { BoundedMap } from './bounded-map';
 // use a much shorter TTL (`CORS_LOOKUP_FAILURE_TTL_MS`) than a resolved one,
 // so the outage self-heals within seconds of Neon recovering instead of
 // waiting out the full 2-minute TTL.
+//
+// issue 2109 / issue 2169 — a failed lookup must not turn ONE transient blip
+// into a 5-second 503 for every request from a merchant hostname (including
+// checkout). So a failure entry also carries:
+//   - `failures`: consecutive failed lookups. The FIRST failure still lets the
+//     next request re-query (one blip costs one request); only from the
+//     second consecutive failure does the entry short-circuit to
+//     'unavailable' for the failure TTL (a real outage still collapses to one
+//     query per 5s per hostname).
+//   - `lastKnownAllowed` / `lastResolvedAt`: the last RESOLVED answer, which
+//     used to be overwritten and lost. While lookups are failing, a hostname
+//     that was verified within `CORS_STALE_SERVE_MAX_MS` keeps its last answer
+//     (stale-allow / stale-reject) instead of going dark; only a hostname
+//     that was never resolved (or resolved too long ago) answers 503.
+//     `bustCorsCache` deletes the whole entry, so a domain REMOVED by the
+//     merchant is never served stale.
 export interface CorsCacheEntry {
   allowed: boolean;
   expiresAt: number;
   unknown?: boolean;
+  failures?: number;
+  lastKnownAllowed?: boolean;
+  lastResolvedAt?: number;
 }
 
 export const corsDomainCache = new BoundedMap<string, CorsCacheEntry>(5000);
 export const CORS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 export const CORS_LOOKUP_FAILURE_TTL_MS = 5 * 1000; // 5 seconds
+/** Consecutive failed lookups before a never-resolved hostname answers 503 without re-querying. */
+export const CORS_FAILURES_BEFORE_UNAVAILABLE = 2;
+/** How long a last-known answer may be served while lookups keep failing. */
+export const CORS_STALE_SERVE_MAX_MS = 15 * 60 * 1000; // 15 minutes
 
 export type CorsCacheDecision = 'allow' | 'reject' | 'unavailable' | 'miss';
+
+function staleAnswer(cached: CorsCacheEntry, now: number): 'allow' | 'reject' | undefined {
+  if (cached.lastKnownAllowed === undefined || cached.lastResolvedAt === undefined) {
+    return undefined;
+  }
+  if (now - cached.lastResolvedAt > CORS_STALE_SERVE_MAX_MS) return undefined;
+  return cached.lastKnownAllowed ? 'allow' : 'reject';
+}
 
 /**
  * Pure decision over a (possibly absent/expired) cache entry — pulled out of
  * the CORS origin-check closure in `index.ts` so it can be unit-tested
- * without booting the Express app. `'unavailable'` is the #1074 case: the
- * last lookup for this hostname failed (DB outage), so the caller must
- * answer 503 WITHOUT re-querying, rather than falling through to the DB.
+ * without booting the Express app. `'unavailable'` is the #1074 case: lookups
+ * for this hostname keep failing (DB outage) and there is no recent resolved
+ * answer to fall back on, so the caller must answer 503 WITHOUT re-querying.
  */
 export function decideCorsCache(
   cached: CorsCacheEntry | undefined,
   now: number
 ): CorsCacheDecision {
   if (!cached || cached.expiresAt <= now) return 'miss';
-  if (cached.unknown) return 'unavailable';
+  if (cached.unknown) {
+    const stale = staleAnswer(cached, now);
+    if (stale) return stale;
+    if ((cached.failures ?? 1) < CORS_FAILURES_BEFORE_UNAVAILABLE) return 'miss';
+    return 'unavailable';
+  }
   return cached.allowed ? 'allow' : 'reject';
+}
+
+/** Entry written after a SUCCESSFUL lookup. */
+export function corsEntryAfterLookup(allowed: boolean, now: number): CorsCacheEntry {
+  return {
+    allowed,
+    expiresAt: now + CORS_CACHE_TTL_MS,
+    lastKnownAllowed: allowed,
+    lastResolvedAt: now,
+  };
+}
+
+/**
+ * Entry written after a FAILED lookup. `prev` is whatever the map holds for
+ * the hostname — possibly EXPIRED (BoundedMap has no TTL awareness), which is
+ * exactly the last-known-good answer we must not throw away.
+ */
+export function corsEntryAfterFailure(
+  prev: CorsCacheEntry | undefined,
+  now: number
+): CorsCacheEntry {
+  const failures = prev?.unknown ? (prev.failures ?? 1) + 1 : 1;
+  const lastKnownAllowed = prev ? (prev.unknown ? prev.lastKnownAllowed : prev.allowed) : undefined;
+  const lastResolvedAt = prev
+    ? prev.unknown
+      ? prev.lastResolvedAt
+      : (prev.lastResolvedAt ?? prev.expiresAt - CORS_CACHE_TTL_MS)
+    : undefined;
+  return {
+    allowed: false,
+    unknown: true,
+    failures,
+    lastKnownAllowed,
+    lastResolvedAt,
+    expiresAt: now + CORS_LOOKUP_FAILURE_TTL_MS,
+  };
+}
+
+/**
+ * What the request whose OWN lookup just failed should get: the recent
+ * last-known answer if there is one, otherwise 503.
+ */
+export function decideAfterFailedLookup(
+  entry: CorsCacheEntry,
+  now: number
+): 'allow' | 'reject' | 'unavailable' {
+  return staleAnswer(entry, now) ?? 'unavailable';
 }
 
 /**

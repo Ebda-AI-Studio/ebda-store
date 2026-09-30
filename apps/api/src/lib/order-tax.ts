@@ -20,11 +20,18 @@ export { computeOrderTax } from '@force/shared';
  * on all 3 live stores, so gating the charge the same way as the display
  * changes nothing charged today).
  *
- * Gated on BOTH `Store.taxEnabled` and the `tax` feature — the same two
- * gates `TaxService.calculateTax` already applies
- * (apps/api/src/services/tax.service.ts:201-207) — so a merchant who flips
- * "Enable tax" off (which only PATCHes `taxEnabled`; existing `TaxRate`
+ * Gated on BOTH `Store.taxEnabled` and the `tax` feature, so a merchant who
+ * flips "Enable tax" off (which only PATCHes `taxEnabled`; existing `TaxRate`
  * rows keep `isActive: true`) is neither shown a VAT line NOR charged one.
+ * (An earlier version of this comment claimed parity with
+ * `TaxService.calculateTax`; that was false — it gated on the feature only,
+ * summed rates and read `defaultTaxRate` — and it has been deleted, issue
+ * 2167 / issue 2211. There is no other order-tax resolver in the API.)
+ *
+ * What it charges: the single highest-priority ACTIVE rate. It does not read
+ * `country`/`state`, `isCompound`, or `TaxSettings.defaultTaxRate`; whether
+ * a store with several active rates should be charged their sum is an open
+ * owner question (issue 2114).
  *
  * Deterministically ordered (`priority desc, createdAt asc, id asc`,
  * `take: 1`) so a store with more than one active rate charges — and

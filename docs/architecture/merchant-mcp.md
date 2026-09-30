@@ -113,9 +113,11 @@ registered shopper by user id, a guest checkout by lowercased email, else
 phone (`lib/customer-key.ts` `customerKeyOf`) — so guests count. A guest's
 Customers-page id IS their email or phone, so tools use an opaque
 **`customerRef`** instead: the user id for a registered customer, and
-`GUEST:<sha256>` for a guest — the same key its RFM snapshot is stored under,
+`GUEST:<hmac>` for a guest — the same key its RFM snapshot is stored under,
 so an agent can correlate a customer with their segment without seeing the
-contact. `admin_get_customer` resolves a ref only against this store's rows;
+contact. The guest hash is an HMAC-SHA256 under a secret derived from the
+API's `ENCRYPTION_KEY` (issue 2242): a plain sha256 of an 8-digit Kuwait mobile
+could be brute-forced back to the number, defeating the masking below. `admin_get_customer` resolves a ref only against this store's rows;
 an unknown or foreign ref is a tool error. A guest checkout with no email and
 no phone is listed (ref `guest:<orderId>`) but has no profile — its one order
 is readable through `admin_get_order`.

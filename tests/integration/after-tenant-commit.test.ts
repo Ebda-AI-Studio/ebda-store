@@ -244,11 +244,16 @@ describe.skipIf(!hasDb)('post-response work and the tenant transaction', () => {
     expect(probe.outcome).toBe('ok');
   });
 
-  it('drains deferred tasks in registration order', async () => {
+  // The drain runs up to DRAIN_CONCURRENCY tasks at once (#1977), each in its
+  // own transaction, so neither start nor completion ORDER is deterministic —
+  // asserting registration order made this test fail ~half the time on main.
+  // The contract is that every queued task runs, once, after the commit.
+  it('drains every deferred task, once', async () => {
     expect(await get(port, `/ordered/${storeId}`)).toBe(200);
     await waitFor(() => deferredOrder.length === 3);
+    await new Promise(r => setTimeout(r, 100));
 
-    expect(deferredOrder).toEqual(['first', 'second', 'third']);
+    expect([...deferredOrder].sort()).toEqual(['first', 'second', 'third']);
   });
 
   it('drops deferred work when the request rolled the transaction back', async () => {
