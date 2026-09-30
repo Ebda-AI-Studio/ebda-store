@@ -4972,3 +4972,45 @@ email, phone; a guest's contact (in `shippingAddress` JSON) is not searched serv
 client-side search matched the same fields, but only on the 25 fetched rows. Cost if wrong: a
 guest order is found by its number but not by the guest's name.
 **Ruling BC-1 — storefront status-message text is readable `-ink` by default; pecannbee keeps the old colours through per-store DATA (`StoreTheme.legacyBannerContrast = true`), set by SQL before deploy (issue 2349 storefront half, owner option A 2026-09-30).** Done: 203 changed lines of role-text classes across 46 files in `apps/web/src` (cart, checkout + the 5 templates' `OrderSummary`/`CartTable`, auth, account, returns, search, compare, wishlist, reviews, bundles) now read `text-<role>-ink` (`success`/`warning`/`info`/`destructive`); arbitrary spellings (`bg-[hsl(var(--success))]/20`) became the token form, which a compiled probe against apps/web's Tailwind 3.4.19 shows emits the identical rule. The three `@force/ui` field errors already read `text-destructive-ink` (ADM-GREY-2), which the storefront aliased to the bare `--destructive`; that alias now points at the per-store `--destructive-ink`, so they are readable by default and identical under the flag — this supersedes ADM-GREY-2's storefront alias. The ink is NOT a fixed token: stores recolour `--success`/`--warning`/`--destructive`, so `statusInkVars` derives each store's ink from its own palette (nearest lightness at >= 4.6:1 derivation target on card and page, bare and under every tint to 30%) in the shared `themeToCssVars` and the `StoreContext` mirror, and `pageSurfaceStyle` re-derives it on a merchant page colour (a dark checkout page gets LIGHTER inks). With the flag, every ink is `var(--<role>)` and the page wrapper sets none, so each `text-<role>-ink` computes to the colour its `text-<role>` did; the SSR sanitizer admits exactly that value on `-ink` keys and nothing else. The code reads the flag and never a slug. Proven: pecannbee with the flag is pixel-identical to origin/main (screenshot diff in the PR). NOT done, and why: bare `text-primary` (brand colour, YWA-TXT-1); rating stars, the wishlist heart and the modern/elegant footers' newsletter error (graphics, or a merchant-coloured footer the root ink is not measured on — exempt by name in the gate, which fails if an exemption goes stale); raw neutral and raw chromatic palette utilities on the storefront (gates 4 and 5 are admin/orders only; not message text). Cost if wrong: if the SQL is not run (or the 120s Redis + 120s/600s-SWR edge store cache has not turned over) before the storefront deploys, pecannbee shows the darker message colours until the flag reaches it — the run order in the PR body is the control.
+
+## Tenant routing canary (2026-10-01, branch `feat/tenant-routing-canary`, PR 1979)
+
+Context: owner decision (Ahmad, 2026-10-01) to merge PR 1979 with tenant routing OFF, fixing issues
+709 and 1980 first. Supersedes the "stay open" half of Ruling EWO-E4.
+
+**Ruling TRC-1 — `STOREFRONT_TENANT_ROUTING_ROUTES` is fail-closed on presence, not only on value
+(issue 1980).** Missing, empty, or unparseable routes NO store through the tenant tree, even with
+`STOREFRONT_TENANT_ROUTING=true`; the full rollout is the explicit token `all`. "Unparseable" rejects
+the WHOLE list when any token is unknown (`about,fqa` routes nothing rather than `/about` alone) and
+when `all` is mixed with other tokens. Evidence: one test per state in
+`tests/unit/web-middleware-tenant-routing.test.ts`, each reddened by its own mutant (missing→all,
+empty→all, lenient parse, mixed-all→all) and restored byte-identical. Cost if wrong: an operator
+who sets only the main flag, expecting the old "unset = all routes", sees no change until they add
+`all`.
+
+**Ruling TRC-2 — issue 709 is fixed by single ownership, not by the root-layout decomposition the
+issue proposed.** The tenant-store layout returns before emitting the theme `<style>`, the
+Organization JSON-LD and the pixel provider while `ROOT_LAYOUT_OWNS_STORE_CHROME` is true, so the
+root layout is the one writer on both trees. `tests/unit/web-tenant-tree-store-chrome-render.test.tsx`
+renders both real layouts composed as Next composes them and asserts exactly one of each with the
+flag off and on; flipping the constant, removing the early return, or removing the root's pixel
+provider each turn it red. The source guard no longer passes vacuously when the root stops mounting
+the provider (review comment on the PR). Cost if wrong: the decomposition PR must flip the constant
+in the same change, or the render test fails, which is the intended alarm.
+
+**Ruling TRC-3 — merged inert; production routing unchanged.** With both variables unset (prod
+today, per the PR's 2026-09-25 `secret list`), the middleware returns responses byte-identical to
+`origin/main` across 672 host × path × cookie cases, and with the main flag set but the list lost it
+is also identical to flag-off `main` (positive control: `all` differs). The only other web changes
+are in the `tenant-store` tree, which middleware 404s for direct hits and never rewrites into while
+the flag is off. Not verified live: no deploy was made or inspected from this branch. Cost if wrong:
+a secret set on `force-web-cf-preview` since 2026-09-25 that nobody recorded would activate on
+deploy; `wrangler secret list` before merge settles it.
+
+**Ruling TRC-4 — the canary preview Worker `force-web-canary-preview` and R2 bucket
+`force-web-canary-cache` are no longer needed by this PR, and were not deleted here.** They held the
+Phase-2 evidence, which is recorded in the plan; the next canary runs on production behind the
+secrets. They are left for the owner to delete because deletion is a production action on the
+Force AI account. It is still live: a plain GET on 2026-10-01 returned the harness's 400 ("x-canary-host
+must be one of …"), so anyone who sends that header gets the 3 live stores rendered by a stale
+2026-09-25 build with the flag on. Cost if wrong: that stale public copy keeps serving until deleted.

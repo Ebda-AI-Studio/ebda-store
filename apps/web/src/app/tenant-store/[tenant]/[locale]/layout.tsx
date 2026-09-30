@@ -69,6 +69,30 @@ export async function generateMetadata({
   return buildStorefrontMetadata(store, isOnCustomDomain, localeFromRouteParam(locale));
 }
 
+/**
+ * Whether the legacy root `app/layout.tsx` still renders the per-store chrome
+ * (theme `<style>`, Organization JSON-LD, SSR consent-gated marketing pixels)
+ * for this tree. It does — this tree is nested INSIDE it until the root-layout
+ * decomposition (plan §3.6) lands — so this layout must not emit that chrome a
+ * second time. Measured on the Phase-2 CF preview (2026-09-25) with the flag on:
+ *
+ * - pixels: a second `MarketingPixelsProvider` runs its own PageView effect, so
+ *   every Meta/TikTok/Snap/X/Pinterest PageView fires twice for consenting
+ *   visitors (double-counted conversions);
+ * - JSON-LD: 4 ld+json blocks instead of 3 (a duplicate Organization node, in
+ *   the route locale rather than the visitor's resolved language);
+ * - `<style>`: `emitZoneCss` does NOT match the root layout's typography
+ *   emitter (it leaves `brand-foreground` unresolved, drops the `!important`
+ *   on `text-decoration:none`, and puts an `@import` after other rules), and
+ *   being later in the document it would win cascade ties on wadyaljuz.
+ *
+ * ONE layer owns each write: the root layout, for now. Flip this to `false` in
+ * the same change that removes that chrome from the root layout for this tree
+ * (and reconcile `emitZoneCss` with the root emitter first). Guarded by
+ * tests/unit/web-tenant-tree-single-pixel-writer.test.ts.
+ */
+const ROOT_LAYOUT_OWNS_STORE_CHROME: boolean = true;
+
 export default async function StoreLayout({
   children,
   params,
@@ -77,7 +101,11 @@ export default async function StoreLayout({
   params: Promise<StoreLayoutParams>;
 }) {
   const { tenant, locale: localeParam } = await params;
+  // Resolved before the ownership check so an unknown tenant fails here the
+  // same way either way.
   const store = await getStoreByTenantParam(tenant);
+  if (ROOT_LAYOUT_OWNS_STORE_CHROME) return <>{children}</>;
+
   const locale = localeFromRouteParam(localeParam);
 
   // Theme CSS injection — shared builder with the legacy layout (see
@@ -98,8 +126,8 @@ export default async function StoreLayout({
     <>
       {combinedStyleTag && <style dangerouslySetInnerHTML={{ __html: combinedStyleTag }} />}
       <JsonLd data={orgJsonLd} />
-      {/* Consent option (a), dormant while STOREFRONT_TENANT_ROUTING is off
-          — see ConsentGatedMarketingPixels.tsx for the full writeup. */}
+      {/* Consent option (a) — only reached once ROOT_LAYOUT_OWNS_STORE_CHROME
+          is false; see ConsentGatedMarketingPixels.tsx for the full writeup. */}
       <ConsentGatedMarketingPixels pixels={store.marketingPixels} />
       {children}
     </>

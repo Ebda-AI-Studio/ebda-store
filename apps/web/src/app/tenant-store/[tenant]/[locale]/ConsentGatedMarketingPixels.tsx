@@ -31,9 +31,11 @@ import { readMarketingConsentFromCookie } from '@/lib/consent-cookie';
  * decomposition (moving the legacy provider stack into a route-group-only
  * layout, deferred out of this PR — see PR body) lands, a Track-A page
  * reached with the flag on would render pixels from BOTH layouts when
- * consent is granted (a double-fire bug, not a leak). Phase 2's CF-preview
- * verification is exactly where this would be caught before any real
- * traffic sees it; it is provably inert today because the flag is off.
+ * consent is granted (a double-fire bug, not a leak). Phase 2 caught it, so
+ * this component is currently NOT reached: the tenant-store layout returns
+ * early while `ROOT_LAYOUT_OWNS_STORE_CHROME` is true (the root layout is the
+ * single pixel writer until the decomposition lands) — see `./layout.tsx` and
+ * tests/unit/web-tenant-tree-single-pixel-writer.test.ts.
  */
 export function ConsentGatedMarketingPixels({ pixels }: { pixels?: Record<string, unknown> }) {
   const [hasMarketingConsent, setHasMarketingConsent] = useState(false);

@@ -146,6 +146,61 @@ function storefrontTenantRoutingEnabled(): boolean {
   return process.env.STOREFRONT_TENANT_ROUTING === 'true';
 }
 
+/** The token that names the home route (`/`) in
+ *  `STOREFRONT_TENANT_ROUTING_ROUTES` — home has no first path segment. */
+const HOME_ROUTE_TOKEN = 'home';
+
+/** The token that means "every Track-A route" — the explicit value for the
+ *  full rollout. It must be the only token in the list. */
+const ALL_ROUTES_TOKEN = 'all';
+
+/**
+ * Parse `STOREFRONT_TENANT_ROUTING_ROUTES` into the routes it allows.
+ * Returns `'all'`, a non-empty set of route tokens, or `null` for "no route".
+ *
+ * FAIL-CLOSED on every bad state (issue #1980). While the main flag is on:
+ * - MISSING → no route. The two variables are set independently as Worker
+ *   secrets, so losing this one must turn the rewrite off, never widen it to
+ *   every Track-A route.
+ * - EMPTY (or only commas/whitespace) → no route.
+ * - UNPARSEABLE → no route. Any token that is not a `CACHEABLE_ROUTES` root,
+ *   `home` or a lone `all` rejects the WHOLE list, so `about,fqa` does not
+ *   quietly ship `/about` alone and `all,about` is not guessed at.
+ *
+ * Widening is always an explicit value change; the full rollout is `all`.
+ */
+function parseTenantRoutingRoutes(raw: string | undefined): 'all' | Set<string> | null {
+  if (raw === undefined) return null;
+  const tokens = raw
+    .split(',')
+    .map(token => token.trim().toLowerCase())
+    .filter(Boolean);
+  if (tokens.length === 0) return null;
+  if (tokens.includes(ALL_ROUTES_TOKEN)) return tokens.length === 1 ? 'all' : null;
+  const known = tokens.every(token => token === HOME_ROUTE_TOKEN || CACHEABLE_ROUTES.has(token));
+  return known ? new Set(tokens) : null;
+}
+
+/**
+ * Route-scoped canary for the rewrite (plan §9 Phase 3: `/about` + `/faq`
+ * first). `STOREFRONT_TENANT_ROUTING_ROUTES` is a comma list of
+ * `CACHEABLE_ROUTES` roots (plus `home` for `/`), e.g. `about,faq`, or `all`.
+ * Missing, empty or unparseable means NO route (see
+ * `parseTenantRoutingRoutes`). The list can only ever NARROW
+ * `CACHEABLE_ROUTES`: it cannot enable cart/checkout/etc, because
+ * `isCacheableTrackARoute` is still required on top of it.
+ *
+ * Read INSIDE the request handler for the same Workers-env reason as the main
+ * flag above. Has no effect at all while `STOREFRONT_TENANT_ROUTING` is off.
+ */
+function tenantRoutingRouteAllowed(pathname: string): boolean {
+  const allowed = parseTenantRoutingRoutes(process.env.STOREFRONT_TENANT_ROUTING_ROUTES);
+  if (allowed === null) return false;
+  if (allowed === 'all') return true;
+  const firstSegment = pathname.replace(/^\//, '').split('/')[0];
+  return allowed.has(firstSegment === '' ? HOME_ROUTE_TOKEN : firstSegment);
+}
+
 /** Resolve the locale that gets baked into the `/tenant-store/[tenant]/[locale]`
  *  rewrite target. Mirrors the cookie read in `app/layout.tsx` (`force-
  *  language`), but — unlike the layout — this runs in middleware, so it
@@ -270,11 +325,18 @@ function propagateDraftHeader(
  * The dark-launch gate for tenant-cacheable routing (Phase 1), which was spelled
  * out identically at three call sites — custom domain, path slug, cookie slug.
  * Inert unless STOREFRONT_TENANT_ROUTING=true, never applied to the admin preview
- * iframe, and only for Track-A allowlisted routes.
+ * iframe, and only for Track-A allowlisted routes that the
+ * STOREFRONT_TENANT_ROUTING_ROUTES canary list names (missing/empty/unparseable
+ * list = no route).
  * See docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
  */
 function isTenantTreeEligible(pathname: string, isPreviewIframe: boolean): boolean {
-  return storefrontTenantRoutingEnabled() && !isPreviewIframe && isCacheableTrackARoute(pathname);
+  return (
+    storefrontTenantRoutingEnabled() &&
+    !isPreviewIframe &&
+    isCacheableTrackARoute(pathname) &&
+    tenantRoutingRouteAllowed(pathname)
+  );
 }
 
 /** Custom-domain requests: the Host itself identifies the store. */

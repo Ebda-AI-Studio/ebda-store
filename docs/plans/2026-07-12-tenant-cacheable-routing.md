@@ -216,15 +216,24 @@ Two concerns need an explicit decision, not a silent default, because they curre
 - Enable `STOREFRONT_TENANT_ROUTING=true` on a CF preview Worker only.
 - **Gate**: two-domain-mode E2E (§10) green on preview; visual diff clean for wady-aljuz + pecannbee in both locales; confirm cache-hit headers differ correctly per tenant+locale for the SAME pathname across two different Host headers hitting the SAME preview Worker (the critical cross-tenant-collision test).
 
+**Phase 2 status (2026-09-25, `feat/tenant-routing-canary`)** — run on an isolated Worker (`force-web-canary-preview`, workers.dev only, own R2 bucket + DOs, flag on for `about,faq,home`):
+
+- Cross-tenant: 40 interleaved responses (pecannbee / wadyaljuz / palora on the same pathnames, both locales) — each carried only its own store, 0 foreign-store hits. `?_preview=` and non-listed routes never entered the tenant tree.
+- Visual: 24 full-page screenshots (both stores × about/faq/home × en/ar × desktop/mobile), preview vs production — 0 differing pixels in all 24 (positive control: en vs ar = 82,202 px).
+- Found and fixed before any canary: the nested layout re-emitted the store chrome the root layout already renders — a second `MarketingPixelsProvider` (every PageView fired twice for consenting visitors), a duplicate Organization JSON-LD, and a divergent typography `<style>` (`emitZoneCss` ≠ the root emitter). Gated behind `ROOT_LAYOUT_OWNS_STORE_CHROME`.
+- NOT provable yet — cache hits: every tenant-tree route still builds as `ƒ` and answers `cache-control: private, no-store`, because the root `app/layout.tsx` still calls `headers()`/`cookies()`. The canary moves traffic onto the new tree with no perf change; the cache-key tests (§10 second bullet) become meaningful only after the root-layout decomposition (§3.6).
+- Blocker for full-page caching (not for the canary): with no `force-language` cookie the middleware keys the request as `en`, but the root layout renders the store's `defaultLanguage` (both live stores default to `ar`). Once pages cache, a cookie-less visitor and an `en`-cookie visitor would share one `/en/` entry with different content. The middleware must learn the store default (or the no-cookie case must get its own key) before Phase 4.
+
 **Phase 3 — Consent-gating decision + production canary**
 
 - Ship the consent-gating adaptation (§3.6) with explicit sign-off.
 - Flip `STOREFRONT_TENANT_ROUTING=true` in production for one low-traffic surface first (e.g. `/about`, `/faq` — no revenue impact if wrong) before PLP/PDP/home.
+- The main flag needs `STOREFRONT_TENANT_ROUTING_ROUTES` beside it (e.g. `about,faq`); with the list missing the flag routes nothing. Pixels and the Organization JSON-LD render exactly once with the flag on or off (#709): the tenant-store layout defers the store chrome to the root layout while `ROOT_LAYOUT_OWNS_STORE_CHROME` is true, guarded by `tests/unit/web-tenant-tree-store-chrome-render.test.tsx`.
 - **Gate**: 24-48h observation window, error-rate/Sentry check, no cross-tenant report, before widening to PLP/PDP/home.
 
 **Phase 4 — Full production rollout**
 
-- Widen the flag to all Track-A routes.
+- Widen the flag to all Track-A routes: set `STOREFRONT_TENANT_ROUTING_ROUTES=all`. The list is fail-closed (#1980): a missing, empty or unparseable value routes nothing, so every widening step is an explicit value change and deleting the variable turns the rewrite off.
 - **Gate**: cache-hit ratio dashboard shows non-zero HITs on Track-A routes (proof the fix worked, not just "no errors"); revalidateTag round-trip test (merchant saves theme → full page reflects within the same budget as today's data-cache purge).
 
 **Phase 5 (optional, later) — PPR/`cacheComponents` spike**
