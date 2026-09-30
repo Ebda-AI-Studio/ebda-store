@@ -1066,6 +1066,8 @@ describe('ReturnService.refundPreview — what the admin confirms is what comple
     expect(preview.gateway).toEqual({
       available: true,
       amount: 1978,
+      // Not a wallet-paid order: nothing of it goes back to the wallet (#1956).
+      walletShare: 0,
       refundableRemaining: PAYMENT_TOTAL,
       unavailableReason: null,
     });

@@ -90,6 +90,7 @@ vi.mock('@api/services/encryption.service', () => ({
 // The function under test (`refund`) fans out to `applyRefundEffects` after
 // the DB transaction commits — this is the mock under direct test control.
 const applyRefundEffects = vi.fn();
+const recordRefundOutsideReturn = vi.fn();
 // `refund()` now also calls the money-integrity Task 6 state machine guard
 // before the DB flip. These tests aren't exercising the guard itself
 // (see tests/unit/order-status-machine.test.ts and
@@ -100,6 +101,7 @@ const applyRefundEffects = vi.fn();
 vi.mock('@api/services/order.service', () => ({
   OrderService: {
     applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a),
+    recordRefundOutsideReturn: (...a: unknown[]) => recordRefundOutsideReturn(...a),
   },
   assertValidTransition: () => undefined,
 }));

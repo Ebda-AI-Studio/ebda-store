@@ -6,6 +6,7 @@ import { PROVIDER_TO_CASH_CODE } from './order-posting';
 import logger from '../../../lib/logger';
 import { allocatePartialReturn } from './partial-return-allocation';
 import { loadPriorReversedQty } from './prior-reversed-qty';
+import { isGatewayRefundMethod, RETURN_WALLET_SHARE_KEY_PREFIX } from '../../../lib/refund-methods';
 
 export interface PartialReturnJournalArgs {
   orderId: string;
@@ -40,6 +41,11 @@ export interface PartialReturnJournalArgs {
  *      DR Sales Revenue   returned gross − pro-rata discount share
  *      DR Tax Payable     pro-rata tax share
  *      CR Cash[provider]  sum of the above
+ *      For a completed RETURN the credit follows the refund method and the
+ *      amount actually refunded (resolveReturnRefundLegs, owner decision
+ *      2026-10-01): card/gateway → the sale's cash account, wallet → 2150,
+ *      off-platform store credit → 2160; the sales-return debit is that
+ *      amount net of the pro-rata tax share.
  *      (Shipping Income is NOT reversed — the order shipped and the customer
  *      kept part of it; a whole-order cancel goes down the full-reversal
  *      path, which does reverse it.)
@@ -214,7 +220,7 @@ export async function postPartialReturnJournal(
 
   let posted = 0;
 
-  // --- Revenue/tax/cash adjustment (mirror of the sale entry, signs flipped) ---
+  // --- Revenue/tax/credit adjustment (mirror of the sale entry, signs flipped) ---
   if (cashCredit > 0) {
     // Mirror the ORIGINAL sale entry's own cash account. Re-deriving it from
     // the payment row is a second, independent decision that can disagree with
@@ -233,11 +239,79 @@ export async function postPartialReturnJournal(
       originalCashLine?.accountId ?? (await getSystemAccountIdByCode(storeId, cashCode, tx));
     const revenueAccountId = await getSystemAccountIdByCode(storeId, '4000', tx);
 
+    // WHERE the money went and HOW MUCH actually went (owner decision
+    // 2026-10-01, #1207 / #1351 — ruling M1-8 resolved). A completed return
+    // records its method and the amount the customer actually got; the credit
+    // follows those, not the pro-rata figure. Backorder cancels and any
+    // method the decision does not cover keep the previous shape.
+    const legs = isBackorderCancel
+      ? null
+      : await resolveReturnRefundLegs(tx, { storeId, orderId, returnId: refundKey });
+    const creditLines: JournalLineInput[] = [];
+    let creditTotal = cashCredit;
+    if (legs) {
+      creditTotal = legs.gateway + legs.wallet + legs.storeCredit;
+      const legLine = (accountId: string, amount: number, lineMemo: string) => {
+        if (amount > 0) {
+          creditLines.push({
+            accountId,
+            debit: 0,
+            credit: amount,
+            lineMemo,
+            refTable: 'orders',
+            refId: order.id,
+          });
+        }
+      };
+      legLine(cashAccountId, legs.gateway, `Order ${order.orderNumber} partial refund`);
+      if (legs.wallet > 0) {
+        legLine(
+          await getSystemAccountIdByCode(storeId, '2150', tx),
+          legs.wallet,
+          `Order ${order.orderNumber} partial refund to customer wallet`
+        );
+      }
+      if (legs.storeCredit > 0) {
+        legLine(
+          await getSystemAccountIdByCode(storeId, '2160', tx),
+          legs.storeCredit,
+          `Order ${order.orderNumber} partial refund as store credit`
+        );
+      }
+    } else {
+      creditLines.push({
+        accountId: cashAccountId,
+        debit: 0,
+        credit: cashCredit,
+        lineMemo: `Order ${order.orderNumber} partial refund`,
+        refTable: 'orders',
+        refId: order.id,
+      });
+    }
+
+    // The tax share stays pro-rata (it is what the sale booked for these
+    // lines); the sales-return debit is what the customer actually got back
+    // net of it, so any difference between the recorded refund and the
+    // allocation re-computed here (two returns whose events are processed out
+    // of order — ruling AP-5b(4)) moves revenue, never cash or tax.
+    const salesReturnDebit = legs ? creditTotal - taxThis : revenueDebit;
+    if (legs && salesReturnDebit !== revenueDebit) {
+      logger.warn(
+        { orderId, refundKey, recorded: creditTotal, allocated: cashCredit },
+        'postPartialReturnJournal: recorded refund differs from the re-computed allocation — the difference is booked to sales returns'
+      );
+    }
+    if (salesReturnDebit < 0) {
+      throw new Error(
+        `postPartialReturnJournal: refund ${refundKey} on order ${orderId} recorded ${creditTotal} fils, less than its tax share ${taxThis}`
+      );
+    }
+
     const lines: JournalLineInput[] = [];
-    if (revenueDebit > 0) {
+    if (salesReturnDebit > 0) {
       lines.push({
         accountId: revenueAccountId,
-        debit: revenueDebit,
+        debit: salesReturnDebit,
         credit: 0,
         lineMemo: order.discount > 0 ? 'Sales return (net of pro-rata discount)' : 'Sales return',
         refTable: 'orders',
@@ -255,27 +329,22 @@ export async function postPartialReturnJournal(
         refId: order.id,
       });
     }
-    lines.push({
-      accountId: cashAccountId,
-      debit: 0,
-      credit: cashCredit,
-      lineMemo: `Order ${order.orderNumber} partial refund`,
-      refTable: 'orders',
-      refId: order.id,
-    });
+    lines.push(...creditLines);
 
-    await postEntry({
-      storeId,
-      source: 'order',
-      sourceId: baseSourceId,
-      memo: `${isBackorderCancel ? 'Backorder line cancelled' : 'Partial return'} — Order ${order.orderNumber}${returnReason ? ` (${returnReason})` : ''}`,
-      memoAr: isBackorderCancel
-        ? `إلغاء بند طلب مسبق — طلب ${order.orderNumber}`
-        : `مرتجع جزئي — طلب ${order.orderNumber}`,
-      lines,
-      tx,
-    });
-    posted += 1;
+    if (creditTotal > 0) {
+      await postEntry({
+        storeId,
+        source: 'order',
+        sourceId: baseSourceId,
+        memo: `${isBackorderCancel ? 'Backorder line cancelled' : 'Partial return'} — Order ${order.orderNumber}${returnReason ? ` (${returnReason})` : ''}`,
+        memoAr: isBackorderCancel
+          ? `إلغاء بند طلب مسبق — طلب ${order.orderNumber}`
+          : `مرتجع جزئي — طلب ${order.orderNumber}`,
+        lines,
+        tx,
+      });
+      posted += 1;
+    }
   }
 
   // --- COGS adjustment (mirror of the sale COGS entry, signs flipped) ---
@@ -328,4 +397,172 @@ export async function postPartialReturnJournal(
     'postPartialReturnJournal: done'
   );
   return { posted };
+}
+
+/**
+ * Where a completed partial return's money actually went, per the owner's
+ * account choice (2026-10-01, ruling M1-8 resolved):
+ *
+ *   - card / gateway (`original`…) → the sale's cash/gateway clearing
+ *     account, for what the provider was actually sent. On an order paid
+ *     partly from the customer wallet, the wallet part of the refund (#1956)
+ *     goes back to the wallet and is credited to 2150 instead.
+ *   - `store_credit` that landed in the customer wallet → 2150 Customer
+ *     Wallet Liability, for the wallet ledger's own amount.
+ *   - `store_credit` with the wallet off (credit handed out off-platform) →
+ *     2160 Store Credit Liability, for the amount recorded on the return.
+ *
+ * Every figure is read from what the completion COMMITTED — the Return row
+ * (`refundMethod`, `refundAmount`) and the wallet ledger rows carrying its
+ * id — never from the event payload, so a redelivered or replayed event books
+ * the same thing. `null` = not a return, not completed, or a method the
+ * decision does not cover (`bank_transfer`, `cash`, `manual`): the caller
+ * keeps the previous treatment (the sale's cash account, pro-rata).
+ */
+export async function resolveReturnRefundLegs(
+  tx: Prisma.TransactionClient,
+  args: { storeId: string; orderId: string; returnId: string }
+): Promise<{ gateway: number; wallet: number; storeCredit: number } | null> {
+  const ret = await tx.return.findFirst({
+    where: { id: args.returnId, storeId: args.storeId, orderId: args.orderId, status: 'completed' },
+    select: { refundMethod: true, refundAmount: true },
+  });
+  if (!ret) return null;
+  const walletRows = await tx.walletTransaction.findMany({
+    where: { storeId: args.storeId, returnId: args.returnId, type: 'refund_credit' },
+    select: { amount: true, idempotencyKey: true },
+  });
+  const walletFor = (prefix: string) =>
+    walletRows
+      .filter(r => r.idempotencyKey.startsWith(prefix))
+      .reduce((sum, r) => sum + r.amount, 0);
+
+  if (isGatewayRefundMethod(ret.refundMethod)) {
+    const wallet = walletFor(RETURN_WALLET_SHARE_KEY_PREFIX);
+    const gateway = ret.refundAmount - wallet;
+    if (gateway < 0 || ret.refundAmount <= 0) return null;
+    return { gateway, wallet, storeCredit: 0 };
+  }
+  if (ret.refundMethod === 'store_credit') {
+    const wallet = walletFor('return-credit:');
+    if (wallet > 0) return { gateway: 0, wallet, storeCredit: 0 };
+    if (ret.refundAmount <= 0) return null;
+    return { gateway: 0, wallet: 0, storeCredit: ret.refundAmount };
+  }
+  return null;
+}
+
+/**
+ * Book a partial refund made OUTSIDE a return — in the provider's dashboard
+ * (arrives by webhook or a refund-status refresh) or the order page's
+ * "refund via provider" with an amount — as a revenue refund for exactly that
+ * amount (owner decision 2026-10-01, #1209 / #1455 — ruling M1-7 resolved):
+ *
+ *   sourceId `${orderId}:partial:refund:<providerRefundId>`
+ *   DR 4090 Sales Returns   amount
+ *   CR Cash[sale's account] amount
+ *
+ * No tax line and no COGS/inventory line: no goods came back and nothing says
+ * which lines the money was for, so no stock moves.
+ *
+ * The `:partial:` infix is deliberate: `postRefundJournal` backs every
+ * `${orderId}:partial:…` entry out when the order is later refunded in full,
+ * so a dashboard partial followed by a full refund nets the ledger to zero,
+ * exactly as partial returns do; and the tax report still resolves the order
+ * from the id's first segment.
+ *
+ * Idempotent per provider refund id (fast-path lookup + postEntry's
+ * (source, sourceId) unique), and it contends on the sale entry's row lock
+ * like the partial-return posting, so it cannot post against a sale that a
+ * concurrent full refund is reversing.
+ */
+export async function postAmountOnlyRefundJournal(args: {
+  orderId: string;
+  storeId?: string;
+  /** `refund:<providerRefundId>` — see amountOnlyRefundKey (lib/refund-methods). */
+  refundKey: string;
+  /** Fils actually refunded. */
+  amount: number;
+  tx?: Prisma.TransactionClient;
+}): Promise<{ posted: number; skipped?: string }> {
+  if (!args.tx) {
+    return withRlsBypass(tx => postAmountOnlyRefundJournal({ ...args, tx }));
+  }
+  const { orderId, refundKey, amount, tx } = args;
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    logger.error({ orderId, refundKey, amount }, 'postAmountOnlyRefundJournal: invalid amount');
+    return { posted: 0, skipped: 'invalid-amount' };
+  }
+  const order = await tx.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, storeId: true, orderNumber: true },
+  });
+  if (!order) return { posted: 0, skipped: 'order-not-found' };
+  if (args.storeId && order.storeId !== args.storeId) {
+    logger.error(
+      { orderId, refundKey, eventStoreId: args.storeId, orderStoreId: order.storeId },
+      'postAmountOnlyRefundJournal: event storeId does not match order — refusing'
+    );
+    return { posted: 0, skipped: 'store-mismatch' };
+  }
+  const storeId = order.storeId;
+  const sourceId = `${orderId}:partial:${refundKey}`;
+
+  const existing = await tx.journalEntry.findFirst({
+    where: { storeId, source: 'order', sourceId },
+    select: { id: true },
+  });
+  if (existing) return { posted: 0, skipped: 'already-posted' };
+
+  const sale = await tx.journalEntry.findFirst({
+    where: { storeId, source: 'order', sourceId: orderId },
+    select: { id: true, lines: { select: { accountId: true, debit: true } } },
+  });
+  if (!sale) {
+    logger.info({ orderId, refundKey }, 'postAmountOnlyRefundJournal: no original sale entry');
+    return { posted: 0, skipped: 'no-original-entry' };
+  }
+  // Same lock as postPartialReturnJournal / postRefundJournal (issue 1187).
+  await tx.$queryRaw`SELECT id FROM public.journal_entries WHERE id = ${sale.id} FOR UPDATE`;
+  const saleStatus = await tx.journalEntry.findUnique({
+    where: { id: sale.id },
+    select: { status: true },
+  });
+  if (saleStatus?.status === 'reversed') {
+    return { posted: 0, skipped: 'original-reversed' };
+  }
+
+  const cashAccountId = sale.lines.find(l => l.debit > 0)?.accountId;
+  if (!cashAccountId) {
+    throw new Error(`postAmountOnlyRefundJournal: sale entry for ${orderId} has no debit line`);
+  }
+  const salesReturnsAccountId = await getSystemAccountIdByCode(storeId, '4090', tx);
+  await postEntry({
+    storeId,
+    source: 'order',
+    sourceId,
+    memo: `Refund outside a return — Order ${order.orderNumber}`,
+    memoAr: `استرداد خارج المرتجعات — طلب ${order.orderNumber}`,
+    lines: [
+      {
+        accountId: salesReturnsAccountId,
+        debit: amount,
+        credit: 0,
+        lineMemo: 'Revenue refunded (no goods returned)',
+        refTable: 'orders',
+        refId: order.id,
+      },
+      {
+        accountId: cashAccountId,
+        debit: 0,
+        credit: amount,
+        lineMemo: `Order ${order.orderNumber} refund ${refundKey.slice('refund:'.length)}`,
+        refTable: 'orders',
+        refId: order.id,
+      },
+    ],
+    tx,
+  });
+  logger.info({ orderId, storeId, refundKey, amount }, 'postAmountOnlyRefundJournal: posted');
+  return { posted: 1 };
 }

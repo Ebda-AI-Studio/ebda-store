@@ -33,6 +33,16 @@ shows the value held on disabled variants on its own line under Stock Value
 (`DISABLED_VARIANT_STOCK_VALUE_SQL`, the exact inverse predicate of
 `STOCK_VALUE_SQL`). No journal entry is posted — see Ruling CL-14.
 
+**Stock VALUE follows the same rule, and the ledger does not** (owner decision
+2026-10-01, #2078). A disabled variant that still holds units is excluded from
+every stock-value reader — the finance dashboard and the analytics inventory
+snapshot (one query, `storeStockValueFils` in `lib/effective-inventory-sql.ts`),
+the inventory page (`STOCK_VALUE_SQL`) and dead stock (`deadStockValueFils`) —
+and disabling it posts **no** journal entry. So the dashboard's stock value and
+the balance sheet's Inventory (1200) differ, by design, by the cost of the units
+held on disabled variants; re-enabling the variant brings them back into the
+value. Pinned by `tests/integration/accounting/owner-money-decisions.test.ts`.
+
 ## Reading stock
 
 Never dereference `product.inventory` to answer "is this available" or "how

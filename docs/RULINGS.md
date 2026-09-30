@@ -505,6 +505,23 @@ true })`: the provider refund already left, so a rolled-back request must not
 drop the only page for it (PR 2279 audit). `runOnRollback` is reserved for
 work that records an irreversible external event.
 
+**RESOLVED 2026-10-01 (branch `fix/owner-money-decisions-1001`) — owner decision
+(Ahmad): a partial refund made outside a return is booked as a revenue refund
+for that amount, with no stock movement, idempotent per provider refund id.**
+All three producers — the refund webhook (#1455), the refund-status refresh
+(#1390) and the order page's refund-via-provider with an amount (#1209) — call
+`OrderService.recordRefundOutsideReturn`, which sends `order/refunded` with an
+amount-only partial payload (`items: []`, `amountOnly: true`, refundKey
+`refund:<providerRefundId>`, `restoreInventory: false`, `notify: false`). The GL
+consumer posts `postAmountOnlyRefundJournal`: DR 4090 Sales Returns / CR the
+sale's cash account, sourceId `${orderId}:partial:refund:<id>` (so a later full
+refund backs it out, and the tax report still resolves the order). The fanout
+treats the empty-item payload as PARTIAL — never whole-order. #1390's second
+point (a zero or unreported refund amount read as partial) was already closed
+on main: `resolveRefundSettlement` reads an unknown amount as FULL. The
+`payment.refund.partial_no_gl` P1 now fires only when the order page's event
+cannot be queued. See OMD-3 and OMD-4 below.
+
 **Ruling M1-8 — the partial-return cash credit keeps its current account and
 amount for every refund method (#1207, #1351).** Crediting a store-credit
 liability for `store_credit`, cash-on-hand for `cash`, and the actual refunded
@@ -513,6 +530,18 @@ wallet) is about to give `store_credit` a real liability. Owner decision:
 which account each method credits, and where a pro-rata-vs-actual difference
 goes. Cost if wrong: store-credit and bank-transfer partial returns keep
 crediting the provider cash account.
+
+**RESOLVED 2026-10-01 (branch `fix/owner-money-decisions-1001`) — owner decision
+(Ahmad): on a partial-return refund, credit the account that matches the refund
+method, for the amount ACTUALLY refunded:** card/gateway → the sale's
+cash/gateway clearing account; wallet → 2150 Customer Wallet Liability; store
+credit → 2160 Store Credit Liability (both new COA template codes; existing
+stores get them on first use through `getSystemAccountIdByCode`'s self-heal).
+`resolveReturnRefundLegs` (partial-return-posting.ts) reads the committed Return
+row (`refundMethod`, `refundAmount`) and the wallet ledger rows carrying the
+return id — never the event payload. `bank_transfer`, `cash` and `manual`, and
+every FULL return, are not covered by the decision and keep the old treatment
+(OMD-2). Where a pro-rata-vs-actual difference goes: OMD-1.
 
 **Ruling M1-9 — a FULL return on a manual method keeps its recorded figure.**
 #1340 is about partial returns; for a whole order settled off-platform nothing
@@ -724,6 +753,13 @@ unusable on those stores even with both keys on. That follow-up needs a product
 decision (where goodwill credits and forfeits land in the P&L), which is why it
 is not guessed here. Cost if wrong: the checkout half of D1 is built, tested
 and dark in practice until that follow-up lands.
+
+_Amended 2026-10-01 (branch `fix/owner-money-decisions-1001`):_ account 2150
+now exists (as "Customer Wallet Liability") and is credited by one path only —
+a partial return whose refund lands in the wallet (M1-8 resolved). Everything
+else this ruling lists — redemption, admin credits, reversal, erasure
+write-off — is still not journaled, and wallet checkout is still refused while
+accounting is on. See OMD-5.
 
 **Ruling W-4 — erasure keeps the wallet ledger, nulls its notes and forfeits the
 balance.** The ledger is a financial record of money the merchant owed and paid
@@ -971,6 +1007,19 @@ is refused while accounting is on, which it is on all three live stores (Ruling
 W-3), so no live order has `walletAmount > 0`. Cost if wrong: the first store to
 enable wallet checkout with accounting off gets a 409 on a partial return of a
 wallet-paid order, and has to pick store credit.
+
+**RESOLVED 2026-10-01 (branch `fix/owner-money-decisions-1001`) — owner decision
+(Ahmad): the partial refund is split pro-rata to the original payment mix;
+rounding to fils is deterministic and any remainder goes to the card.**
+`splitByPaymentMix` (partial-return-allocation.ts) is cumulative like the
+discount/tax allocation: the wallet is owed `floor(cash × walletAmount / total)`
+of everything refunded so far, so the card's cumulative share is at most
+`ceil(…)` ≤ what the card paid and the last piece never overshoots the payment
+(a per-refund floor did: 2.701 against 2.700 left, measured by mutation). The
+gateway gets only its share; the wallet share is credited with key
+`return-wallet-share:<returnId>`, and `WalletService.reverseOrderPayment` nets
+those shares out of a later whole-order reversal. The preview and the admin
+confirm step show both amounts. See OMD-5 and OMD-6.
 
 **Ruling R2-4 — #1705 (non-KWD formatting in invoices and emails) is declined
 under Ruling PC-2.** FWB is KWD-only; the `/1000`, three-decimal, `KWD` output is
@@ -3739,3 +3788,123 @@ transaction/invoice ids + every matching payment id in the context) before
 refusing, and `isTerminalWebhookClientError` exempts `AMBIGUOUS_PAYMENT` from
 the silent `rejected` lane, so the inbox row retries, lands `failed`, and
 dead-letters into alerts-failure-watch's P0 like any other stuck money event.
+
+## 2026-10-01 — owner money decisions (branch `fix/owner-money-decisions-1001`)
+
+Owner (Ahmad) decided four open money questions on 2026-10-01: #2078, #1207 +
+#1351, #1209 + #1455, #1956. M1-7, M1-8 and R2-3 are marked RESOLVED above; W-3
+is amended. Every decision is pinned by
+`tests/integration/accounting/owner-money-decisions.test.ts` (9 tests, amounts
+that do not divide evenly) plus the producer unit tests; each change was
+mutation-proved (the code broken, a named test turned red, the file restored
+byte-identical).
+
+**Ruling OMD-0 — #2078: a disabled variant that still holds units is excluded
+from stock value, and disabling it posts no journal entry (owner decision).**
+Every reader already applied the exclusion on main (M5-6, AP-10, AN-8); this
+change makes the finance dashboard and the analytics snapshot ONE query
+(`storeStockValueFils`) instead of two copies (merged with #2294's CL-14: the
+dashboard also shows the disabled-variant value on its own line and the flip
+writes a zero-quantity `inventory_history` row — still no journal entry), pins all four readers and the
+no-ledger rule in one test, and states the consequence in inventory-model.md
+and the merchant docs: the dashboard's stock value and balance-sheet Inventory
+(1200) differ by the cost of the units on disabled variants. Not changed, and
+NOT covered by the decision: the readers still disagree on WHICH products they
+value — the finance dashboard and analytics snapshot value every non-deleted
+product, including `track_inventory = false` and archived ones; the inventory
+page values only `track_inventory = true`; the opening-balance entry excludes
+archived and untracked products; dead stock values only active, tracked ones.
+A store with an untracked product whose `inventory` column is non-zero sees two
+different stock values. Which products carry value is a separate decision.
+Cost if wrong: that store's finance dashboard and inventory page keep showing
+different totals until it is decided.
+
+**Ruling OMD-1 — a difference between the refund recorded on the return and the
+allocation re-computed by the GL moves the sales-return debit, never cash or
+tax.** The credit is the amount actually refunded; the tax share stays the
+pro-rata share the sale booked for those lines, so the revenue line absorbs the
+difference (warn-logged). On the code as it stands the two can differ only
+when two returns' events are processed out of order (AP-5b(4)), by a fils or
+so; no path lets a merchant type a partial refund amount. Cost if wrong: an
+accountant who wants such differences in a separate fee/other-income account
+reclasses them by hand.
+
+**Ruling OMD-2 — refund methods and return shapes the decision does not cover
+keep the previous treatment and are reported, not guessed.** (a) A partial
+return completed as `bank_transfer`, `cash` or `manual` still credits the sale's
+cash account at the pro-rata figure. `manual` ("Already refunded — record only")
+follows an indeterminate gateway refund, so the gateway account is probably
+right for it; `bank_transfer` and `cash` arguably belong in 1030 Bank Main or a
+cash-on-hand account. (b) A FULL return is still reversed by mirroring the sale
+entry (`postRefundJournal`), so a full return settled as store credit or into
+the wallet still credits the sale's cash account, not 2150/2160 (#1207 asked for
+the same treatment there). (c) A partial return on an order paid partly from
+the wallet and partly by CASH ON DELIVERY has no gateway leg (COD has no
+provider transaction), so "split to the payment mix" cannot apply; the merchant
+picks store credit or bank transfer as before. Each needs the owner. Cost if
+wrong: those refunds keep landing in the sale's cash account.
+
+**Ruling OMD-3 — a refund outside a return books to 4090 Sales Returns, with no
+tax line and no customer notification.** "A revenue refund" left the revenue
+account open; 4090 is the seeded contra-revenue account and was otherwise
+unused, so these refunds stay separable from item-level returns (which debit
+4000). No tax line because nothing says which lines — and so which tax — the
+money was for. `notify: false` because a refund made in the provider's
+dashboard has never notified the customer. Cost if wrong: a reclass between two
+revenue accounts (P&L total unchanged), or VAT over-declared by the refunded
+amount's tax share on a store that charges tax.
+
+**Ruling OMD-4 — the order page's partial refund sends its ledger event
+immediately, not after the request commits.** PaymentService commits the refund
+record on its own transaction before returning; deferring the event to the
+request's commit (AP-2) would drop the ledger entry of a refund that stands
+whenever the request then fails. The webhook path (no request) sends inline
+before its idempotency write, so a failed send is retried; the refresh route
+writes the payment row in the request, so its event rides the request commit.
+A failed send on the order-page path raises the `partial_no_gl` P1 instead of
+failing a refund that already happened; no sweep re-sends it. Cost if wrong:
+that one refund's GL entry is booked by hand from the alert.
+
+**Ruling OMD-5 — 2150 Customer Wallet Liability only ever grows.** It is
+credited by partial returns into the wallet (store credit with the wallet on,
+and the wallet share of a split gateway refund on an order whose sale was
+journaled). Nothing debits it: wallet checkout is refused while accounting is
+on (W-3), and admin credits/debits, whole-order wallet reversals and erasure
+forfeits are not journaled. No live store has the wallet on (W-1), so the
+account stays at 0 in production until one does. Cost if wrong: once a store
+turns the wallet on, 2150 overstates what it owes by every credit spent,
+adjusted or forfeited, until the W-3 follow-up models the rest.
+
+**Ruling OMD-6 — #1956 ships at the money level; the GL books nothing for a
+wallet-paid order.** W-3 still refuses to journal the sale of any order with
+`walletAmount > 0`, so its partial returns find no sale entry and post nothing
+(pinned). The poster's wallet leg (CR 2150 for the `return-wallet-share` rows)
+is in place for when W-3 is lifted. Residuals: the wallet share is credited
+after the provider refund, on the request transaction — if that credit fails,
+the request 5xx's with the card refund already sent, the return stays
+`received`, and "Already refunded — record only" then records it WITHOUT the
+wallet share, which the merchant must add from the Wallet page. When a split
+leaves the gateway nothing to send (an order paid entirely from the wallet, or
+a rounding fils) no provider call is made. Cost if wrong: that customer's wallet
+share is added by hand.
+
+**Ruling OMD-7 — merchant-created accounts can collide with the new system
+codes.** `getSystemAccountIdByCode` finds an account by code without checking
+`isSystem`, so a store where a merchant already created a custom 2150 or 2160
+(one level under a system parent) would have these refunds posted to that
+account. Pre-existing shape of the healer (it applied to 1020 too); not
+measured — production was not queried from this session. What would settle it:
+`SELECT store_id, code, is_system FROM accounts WHERE code IN ('2150','2160')`.
+Cost if wrong: that store's refund credits land in its own custom account
+instead of the liability.
+
+**Ruling OMD-8 — merged over #2279 (`fix/backlog-a-money-services`, merged to
+main during this branch): its `alertUnbookedRefund` helper is kept, and two of
+its three `partial_no_gl` call sites are removed because those refunds are now
+booked.** The webhook and refresh-route sites book instead; the order-page site
+keeps `alertUnbookedRefund({ kind: 'partial_no_gl' })` only for an event that
+could not be queued. #2279's `held_unaccounted` and `held_provenance_unknown`
+alerts are unchanged. Its new partial-return stuck sweep never arms an
+amount-only event (`restoreInventory: false`, and no Return row has a
+`refund:<id>` key), so a refund outside a return has no sweep behind it (OMD-4).
+Cost if wrong: none known beyond OMD-4's.

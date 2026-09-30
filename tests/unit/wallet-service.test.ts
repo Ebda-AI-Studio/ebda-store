@@ -87,6 +87,22 @@ function makeClient(opts: { customers?: Array<{ id: string; storeId: string }> }
       }),
     },
     walletTransaction: {
+      // reverseOrderPayment nets the wallet shares of split gateway refunds
+      // (#1956) out of the whole-order reversal.
+      aggregate: vi.fn(async ({ where }: any) => ({
+        _sum: {
+          amount:
+            entries
+              .filter(
+                e =>
+                  e.storeId === where.storeId &&
+                  e.orderId === where.orderId &&
+                  e.type === where.type &&
+                  e.idempotencyKey.startsWith(where.idempotencyKey.startsWith)
+              )
+              .reduce((sum, e) => sum + e.amount, 0) || null,
+        },
+      })),
       findUnique: vi.fn(async ({ where }: any) => {
         calls.push('entry.findUnique');
         const k = where.storeId_idempotencyKey;

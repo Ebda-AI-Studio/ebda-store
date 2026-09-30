@@ -135,3 +135,47 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
 
   return { prevGross, curGross, discountThis, taxThis, revenueDebit, cashCredit, returnedLines };
 }
+
+/**
+ * Split one partial refund between the customer wallet and the card, in the
+ * proportions the order was originally paid (owner decision 2026-10-01, #1956):
+ * the order total `total` was paid `walletAmount` from the wallet and the rest
+ * at the gateway.
+ *
+ * Cumulative, like the discount/tax allocation above: the wallet is entitled
+ * to `floor(cash × walletAmount / total)` of everything refunded so far, and
+ * this refund takes the difference between that entitlement after and before
+ * it. Every rounding remainder therefore lands on the CARD (the floor is taken
+ * on the wallet side), deterministically, and the card's cumulative share can
+ * never exceed what the card paid: it is at most
+ * `ceil(cash × (total − walletAmount) / total)`, which is ≤ the integer
+ * `total − walletAmount` whenever `cash ≤ total`. A per-refund floor would
+ * instead hand the card up to one extra fil per refund and could push the
+ * last piece over the payment's refundable balance.
+ *
+ * `prevCash` is the cash value of every earlier item-level reversal of the
+ * order (the same allocation, over the prior quantities) — see
+ * ReturnService.allocateThisReturn. All integer fils.
+ */
+export function splitByPaymentMix(input: {
+  /** What this refund is worth (the allocation's `cashCredit`). */
+  cashCredit: number;
+  /** Cash value of the order's earlier item-level reversals. */
+  prevCash: number;
+  /** Order total, fils — what wallet + card paid together. */
+  total: number;
+  /** Part of `total` paid from the customer wallet at checkout. */
+  walletAmount: number;
+}): { walletShare: number; gatewayShare: number } {
+  const { cashCredit, prevCash, total, walletAmount } = input;
+  if (cashCredit <= 0) return { walletShare: 0, gatewayShare: 0 };
+  if (walletAmount <= 0 || total <= 0) return { walletShare: 0, gatewayShare: cashCredit };
+  const w = Math.min(walletAmount, total);
+  const walletEntitled = (cash: number): number =>
+    Math.floor((Math.min(Math.max(cash, 0), total) * w) / total);
+  const walletShare = Math.min(
+    cashCredit,
+    walletEntitled(prevCash + cashCredit) - walletEntitled(prevCash)
+  );
+  return { walletShare, gatewayShare: cashCredit - walletShare };
+}

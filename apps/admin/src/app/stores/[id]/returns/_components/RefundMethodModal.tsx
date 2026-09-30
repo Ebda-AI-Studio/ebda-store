@@ -23,6 +23,9 @@ interface RefundPreview {
     available: boolean;
     /** What would be sent to the customer's original payment method, in fils. */
     amount: number | null;
+    /** On an order paid partly from the customer wallet, the part of this
+     *  refund that goes back to the wallet instead, in fils (#1956). */
+    walletShare?: number;
     refundableRemaining: number | null;
     unavailableReason: string | null;
   };
@@ -227,6 +230,13 @@ export function RefundMethodModal({
                 <p className="text-sm text-foreground">
                   {t('confirmOriginal', { amount: formatCurrency(chosenAmount ?? 0) })}
                 </p>
+                {(gateway?.walletShare ?? 0) > 0 && (
+                  <p className="text-sm text-foreground">
+                    {t('confirmOriginalWalletShare', {
+                      amount: formatCurrency(gateway?.walletShare ?? 0),
+                    })}
+                  </p>
+                )}
                 <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
                   {t('confirmIrreversible')}
                 </p>

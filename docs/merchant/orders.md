@@ -85,3 +85,19 @@ The platform watches the payment state of online orders for you:
 
 - [Delivery Areas & Fees — مناطق التوصيل والرسوم](./shipping-areas.md)
 - [Payment Provider Setup — إعداد بوابات الدفع](./payment-providers.md)
+
+---
+
+## Refunds in your books — الاسترداد في حساباتك
+
+When accounting is on, every refund is recorded in your ledger the way the money actually moved:
+
+- **Part of an order returned** — the returned items come out of your sales. What the customer got back is recorded where it went: back to their **card / payment gateway**, into their **wallet** (a balance you now owe them), or as **store credit** you handed out yourself (also a balance you owe). The amount recorded is the amount actually refunded.
+- **Order paid partly from the wallet** — refunding part of it to the "original payment method" sends it back the same way it was paid: the wallet's share to the wallet, the rest to the card. The confirmation shows both amounts before you send anything.
+- **Partial refund without a return** (for example, one you made in your payment provider's dashboard, or a partial amount from the order page) — recorded as a refund of revenue for exactly that amount. No stock moves. The same refund is never recorded twice, however many times the provider reports it.
+
+عندما تكون المحاسبة مفعّلة، يُسجَّل كل استرداد في دفاترك بالطريقة التي تحرّك بها المال فعلًا:
+
+- **إرجاع جزء من الطلب** — تُخصم الأصناف المرتجعة من مبيعاتك. ويُسجَّل ما استرده العميل حيث ذهب: إلى **بطاقته / بوابة الدفع**، أو إلى **محفظته** (رصيد أصبحت مدينًا له به)، أو كـ**رصيد متجر** تمنحه بنفسك (رصيد مستحق أيضًا). والمبلغ المسجّل هو المبلغ المسترد فعلًا.
+- **طلب دُفع جزء منه من المحفظة** — عند استرداد جزء منه إلى "طريقة الدفع الأصلية" يعود بالطريقة نفسها التي دُفع بها: حصة المحفظة إلى المحفظة، والباقي إلى البطاقة. تعرض نافذة التأكيد المبلغين قبل إرسال أي شيء.
+- **استرداد جزئي بدون إرجاع** (مثل استرداد أجريته من لوحة مزوّد الدفع، أو مبلغ جزئي من صفحة الطلب) — يُسجَّل كاسترداد من الإيرادات بالمبلغ نفسه تمامًا. لا يتحرك المخزون. ولا يُسجَّل الاسترداد نفسه مرتين مهما كرّر المزوّد الإبلاغ عنه.

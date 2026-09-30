@@ -1242,20 +1242,39 @@ export class PaymentService {
       throw markRefundMayHaveExecuted(txError);
     }
 
-    // A partial refund that no item-level flow will book leaves the ledger
-    // without it: `order/refunded`'s GL poster needs line data for a partial,
-    // and only ReturnService (which always passes a refundKey) has it. Until
-    // an amount-only GL adjustment exists (#1209 — the account choice is the
-    // owner's), make the gap visible instead of silent.
-    if (!flipsOrder && !request.refundKey && moneyStoreId) {
-      const orderRef = payment.order?.orderNumber ?? payment.orderId;
-      await alertUnbookedRefund({
-        kind: 'partial_no_gl',
-        store: { id: moneyStoreId, name: payment.order?.store?.name ?? moneyStoreId },
-        orderRef,
-        body: `Order ${orderRef}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return. Nothing posts it to the general ledger — book it by hand.`,
-        context: { paymentId: payment.id, orderId: payment.orderId, refundId: response.refundId },
-      });
+    // A partial refund that no item-level flow books — the order page's
+    // refund-via-provider with an amount, never a return (those always pass a
+    // refundKey). Owner decision 2026-10-01 (#1209): booked as a revenue
+    // refund for exactly this amount, no stock movement, keyed on the
+    // provider's refund id so its later settle webhook books nothing more.
+    // Sent NOW rather than after the caller's request commits: the refund
+    // record above is already committed on its own transaction, so a later
+    // rollback of the request must not drop the ledger entry of a refund that
+    // stands. A failed send is raised for a human instead of failing the
+    // caller — the money has moved either way.
+    if (!flipsOrder && !request.refundKey && moneyStoreId && payment.orderId) {
+      const providerRefundId = response.refundId || `claim-${claimId}`;
+      try {
+        await OrderService.recordRefundOutsideReturn(
+          moneyStoreId,
+          payment.orderId,
+          { providerRefundId, amount: amountToRefund },
+          { sendNow: true }
+        );
+      } catch (sendError) {
+        logger.error(
+          { err: sendError, paymentId: payment.id, orderId: payment.orderId, providerRefundId },
+          '[PAYMENT] partial refund outside a return: order/refunded not sent — the GL entry is missing'
+        );
+        const orderRef = payment.order?.orderNumber ?? payment.orderId;
+        await alertUnbookedRefund({
+          kind: 'partial_no_gl',
+          store: { id: moneyStoreId, name: payment.order?.store?.name ?? moneyStoreId },
+          orderRef,
+          body: `Order ${orderRef}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return, but its ledger event could not be queued — nothing books it: book it by hand.`,
+          context: { paymentId: payment.id, orderId: payment.orderId, refundId: response.refundId },
+        });
+      }
     }
 
     // Refund effects: inventory restore, coupon usage decrement, affiliate
@@ -1618,8 +1637,16 @@ export class PaymentService {
         await invalidateCustomersCache(payment.order.storeId);
       } else if (newStatus === 'completed' && !orderAlreadyReversed && payment.order) {
         // Partial out-of-band refund: record it on the payment below (leaving
-        // the balance refundable) and stop. No order flip, no whole-order
-        // reversal — see the arithmetic above.
+        // the balance refundable). No order flip, no whole-order reversal —
+        // see the arithmetic above. Owner decision 2026-10-01 (#1455): it is
+        // booked as a revenue refund for THIS event's amount, with no stock
+        // movement, keyed on the provider's refund id. Only when this event's
+        // amount was actually added to the total (`accountedThisEvent`) — a
+        // settle notice for a refund already counted (an in-band return or
+        // order-page refund) is not a second refund. Sent BEFORE the durable
+        // metadata write below, like the whole-order branch above: a failed
+        // send leaves nothing written, so the webhook retry re-enters here,
+        // and the GL entry is idempotent on the refund id.
         logger.info(
           {
             paymentId: payment.id,
@@ -1628,8 +1655,15 @@ export class PaymentService {
             settledFils: settledRefund,
             paymentAmountFils: payment.amount,
           },
-          '[PAYMENT WEBHOOK] partial out-of-band refund — recording the balance only, skipping whole-order effects'
+          '[PAYMENT WEBHOOK] partial out-of-band refund — recording the balance and booking it as a revenue refund, skipping whole-order effects'
         );
+        const accountedAmount = settledRefund - (payment.refundedAmount ?? 0);
+        if (accountedThisEvent && accountedAmount > 0) {
+          await OrderService.recordRefundOutsideReturn(payment.order.storeId, payment.orderId, {
+            providerRefundId: webhookData.refund.refundId,
+            amount: accountedAmount,
+          });
+        }
       }
 
       // Durable idempotency write LAST — only after the reversal side-effects
@@ -1741,8 +1775,10 @@ export class PaymentService {
         },
       });
 
-      // Neither of these two cases changes what is booked — each needs a
-      // decision nobody has made yet — but both used to be a single info log.
+      // A refund reported without a usable amount changes nothing booked — it
+      // needs a human — but it used to be a single info log. (The partial
+      // out-of-band refund this block also used to raise is now booked above,
+      // owner decision 2026-10-01.)
       if (newStatus === 'completed' && payment.order) {
         const alertStore = {
           id: payment.order.storeId,
@@ -1775,17 +1811,6 @@ export class PaymentService {
               reportedAmount: webhookData.refund.amount ?? null,
               refundedAmount: payment.refundedAmount,
             },
-          });
-        } else if (accountedThisEvent && !refundIsFull) {
-          // #1455: a partial refund taken outside the platform. The balance
-          // is now right, but the GL poster needs line data only the returns
-          // flow has, so nothing books it.
-          await alertUnbookedRefund({
-            kind: 'partial_no_gl',
-            store: alertStore,
-            orderRef: payment.order.orderNumber,
-            body: `Order ${payment.order.orderNumber}: a partial refund (${webhookData.refund.refundId}) was made in the provider's dashboard, outside a return. Nothing posts it to the general ledger — book it by hand.`,
-            context: { paymentId: payment.id, refundId: webhookData.refund.refundId },
           });
         }
       }

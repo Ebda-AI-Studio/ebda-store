@@ -88,8 +88,12 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
 
 const applyRefundEffects = vi.fn().mockResolvedValue(undefined);
 const assertValidTransitionMock = vi.fn();
+const recordRefundOutsideReturn = vi.fn();
 vi.mock('@api/services/order.service', () => ({
-  OrderService: { applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a) },
+  OrderService: {
+    applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a),
+    recordRefundOutsideReturn: (...a: unknown[]) => recordRefundOutsideReturn(...a),
+  },
   assertValidTransition: (...a: unknown[]) => assertValidTransitionMock(...a),
 }));
 
@@ -373,10 +377,11 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
     });
   });
 
-  // #1969's partial_no_gl P1 fires once per partial refund recorded. Now that
-  // a partially_refunded payment re-enters this route, a refresh that adds
-  // nothing must not page again.
-  it('alerts partial_no_gl once, not on a repeat refresh that records nothing new', async () => {
+  // Owner decision 2026-10-01 (#1455): a partial refund recorded here is
+  // booked as a revenue refund for the amount this refresh added. Now that a
+  // partially_refunded payment re-enters this route, a refresh that adds
+  // nothing must not book it again.
+  it('books the partial once, not on a repeat refresh that records nothing new', async () => {
     mockPaymentNeedingSideEffects();
     getRefundStatus.mockResolvedValue({
       status: 'completed',
@@ -387,11 +392,11 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
     await request(app)
       .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
       .send({});
-    const partialAlerts = () =>
-      sendAlert.mock.calls.filter(
-        c => (c[0] as { source: string }).source === 'payment.refund.partial_no_gl'
-      ).length;
-    expect(partialAlerts()).toBe(1);
+    expect(recordRefundOutsideReturn).toHaveBeenCalledTimes(1);
+    expect(recordRefundOutsideReturn).toHaveBeenCalledWith(STORE_ID, ORDER_ID, {
+      providerRefundId: 'rf_a',
+      amount: 2000,
+    });
 
     paymentFindFirst.mockResolvedValue({
       id: PAYMENT_ID,
@@ -406,7 +411,7 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
     await request(app)
       .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
       .send({});
-    expect(partialAlerts()).toBe(1);
+    expect(recordRefundOutsideReturn).toHaveBeenCalledTimes(1);
   });
 
   it('settles the payment but does not re-reverse an order already marked refunded', async () => {

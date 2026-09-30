@@ -15,7 +15,6 @@ import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
-import { alertUnbookedRefund } from '../services/payment-providers/unbooked-refund-alert';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
@@ -1241,27 +1240,24 @@ router.post(
       // already-refunded payment, so a repeat refresh cannot re-fire it; the
       // fanout subtracts lines already restored by partial returns.
       const refundIsFull = updateData.status === 'refunded';
-      // A partial out-of-band refund recorded here reaches no GL poster — the
-      // partial journal needs line data only the returns flow has (#1455).
-      // Nothing books it, so say so instead of leaving it to a log line.
+      // A partial out-of-band refund recorded here is booked as a revenue
+      // refund for the amount this refresh added, with no stock movement,
+      // keyed on the provider's refund id (owner decision 2026-10-01, #1455).
       //
       // Only when THIS refresh recorded new money. A partially_refunded
       // payment can now re-enter this route (#1432/#1472); a repeat refresh
-      // that adds nothing must not re-page for a refund already alerted.
-      const raisedRefundTotal =
-        typeof updateData.refundedAmount === 'number' &&
-        updateData.refundedAmount > (payment.refundedAmount ?? 0);
-      if (updateData.status === 'partially_refunded' && raisedRefundTotal) {
-        const store = await prisma.store.findUnique({
-          where: { id: storeId },
-          select: { name: true },
-        });
-        await alertUnbookedRefund({
-          kind: 'partial_no_gl',
-          store: { id: storeId, name: store?.name ?? storeId },
-          orderRef: orderId,
-          body: `Order ${orderId}: a partial refund (${status.refundId ?? payment.refundId}) made outside a return was recorded by a refund-status refresh. Nothing posts it to the general ledger — book it by hand.`,
-          context: { paymentId: payment.id, refundId: status.refundId ?? payment.refundId },
+      // that adds nothing books nothing, and the GL entry is idempotent on the
+      // refund id if the refund's own webhook reports it too. The event is
+      // sent after this request commits, with the payment write above.
+      const raisedBy =
+        typeof updateData.refundedAmount === 'number'
+          ? updateData.refundedAmount - (payment.refundedAmount ?? 0)
+          : 0;
+      const providerRefundId = status.refundId ?? payment.refundId;
+      if (updateData.status === 'partially_refunded' && raisedBy > 0 && providerRefundId) {
+        await OrderService.recordRefundOutsideReturn(storeId, orderId, {
+          providerRefundId,
+          amount: raisedBy,
         });
       }
       const needsSideEffects =

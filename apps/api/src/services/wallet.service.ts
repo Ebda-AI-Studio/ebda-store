@@ -10,6 +10,7 @@ import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
 import { withScopedRlsBypass } from '../lib/scoped-rls-bypass';
+import { RETURN_WALLET_SHARE_KEY_PREFIX, returnWalletShareKey } from '../lib/refund-methods';
 
 /**
  * Customer wallet (store credit) — the ONLY writer of `customer_wallets` and
@@ -387,6 +388,36 @@ export class WalletService {
     );
   }
 
+  /**
+   * The wallet's part of a gateway refund on an order paid partly from the
+   * wallet (owner decision 2026-10-01, #1956): the refund goes back the way the
+   * order was paid, pro-rata, and this is the wallet half. Its own key, so it
+   * can never replay into a store-credit completion of the same return.
+   */
+  static async creditReturnWalletShare(
+    args: {
+      storeId: string;
+      customerId: string;
+      returnId: string;
+      orderId: string;
+      amount: number;
+    },
+    client?: WalletClient
+  ): Promise<ApplyEntryResult> {
+    return this.applyEntry(
+      {
+        storeId: args.storeId,
+        customerId: args.customerId,
+        amount: args.amount,
+        type: 'refund_credit',
+        idempotencyKey: returnWalletShareKey(args.returnId),
+        orderId: args.orderId,
+        returnId: args.returnId,
+      },
+      client
+    );
+  }
+
   /** Spend at checkout, inside the order-create transaction. */
   static async debitForOrder(
     args: { storeId: string; customerId: string; orderId: string; amount: number },
@@ -409,7 +440,8 @@ export class WalletService {
    * Put an order's checkout wallet spend back, exactly once. Reads the
    * original `order_payment` entry (NOT `Order.walletAmount`/`customerId`,
    * which erasure may have nulled) so the credit lands on the wallet that
-   * paid. No-op (null) when the order never spent from a wallet.
+   * paid. No-op (null) when the order never spent from a wallet, or when
+   * partial gateway returns already gave every fils of it back.
    */
   static async reverseOrderPayment(
     args: { storeId: string; orderId: string },
@@ -421,11 +453,26 @@ export class WalletService {
         select: { customerId: true, amount: true },
       });
       if (!spend || spend.amount >= 0) return null;
+      // Partial returns refunded through the gateway already put the wallet's
+      // pro-rata share of their lines back (creditReturnWalletShare, #1956).
+      // The whole-order reversal returns only what is left of the spend, or
+      // the customer would get those shares twice.
+      const alreadyReturned = await c.walletTransaction.aggregate({
+        where: {
+          storeId: args.storeId,
+          orderId: args.orderId,
+          type: 'refund_credit',
+          idempotencyKey: { startsWith: RETURN_WALLET_SHARE_KEY_PREFIX },
+        },
+        _sum: { amount: true },
+      });
+      const remaining = -spend.amount - (alreadyReturned._sum.amount ?? 0);
+      if (remaining <= 0) return null;
       return this.applyEntry(
         {
           storeId: args.storeId,
           customerId: spend.customerId,
-          amount: -spend.amount,
+          amount: remaining,
           type: 'order_payment_reversal',
           idempotencyKey: `order-payment-reversal:${args.orderId}`,
           orderId: args.orderId,

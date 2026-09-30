@@ -4043,6 +4043,7 @@
       "continue": "Continue",
       "back": "Back",
       "confirmOriginal": "Send {amount} back to the customer's original payment method?",
+      "confirmOriginalWalletShare": "{amount} goes back to the customer's wallet instead — the part of this order they paid with it.",
       "confirmIrreversible": "This sends a real refund through the payment provider right away. It cannot be undone.",
       "confirmSendRefund": "Send refund",
       "confirmWallet": "Complete this return and add {amount} to the customer's wallet? They can spend it on their next order.",

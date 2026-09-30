@@ -32,6 +32,15 @@ export interface PartialRefund {
    * stay open (they are still owed to the customer).
    */
   backorderLineId?: string;
+  /**
+   * A partial refund made OUTSIDE a return (provider dashboard, the order
+   * page's refund-via-provider with an amount): `items` is empty, `refundKey`
+   * is `refund:<providerRefundId>` and `refundAmount` is what was refunded.
+   * Nothing but the GL acts on it — no stock moves (the caller also sends
+   * `restoreInventory: false`) and, being partial, no whole-order reversal
+   * runs (owner decision 2026-10-01, #1209 / #1455).
+   */
+  amountOnly?: boolean;
 }
 
 // orderEvent.toStatus marker for a completed partial-return restore. Owned
@@ -134,7 +143,10 @@ export async function handleOrderRefunded(
     logger.warn({ orderId, storeId }, 'order/refunded fired without ids — skipping');
     return { skipped: 'missing-ids' };
   }
-  const isPartial = !!partial && partial.items.length > 0;
+  // An amount-only refund has no lines but is still PARTIAL: treating an empty
+  // item list as whole-order would reverse the entire order for a partial
+  // refund made in the provider's dashboard.
+  const isPartial = !!partial && (partial.items.length > 0 || partial.amountOnly === true);
   if (isPartial && !partial?.refundKey) {
     // A partial event without an idempotency key cannot be safely retried —
     // refuse it loudly rather than double-restoring on redelivery.
@@ -165,7 +177,8 @@ export async function handleOrderRefunded(
   // from the old `applyRefundEffects` inner tx — throws on failure so
   // Inngest retries instead of leaving stock un-restored.
   await step.run('restore-inventory', (): Promise<{ skipped: boolean }> => {
-    if (!restoreInventory) return Promise.resolve({ skipped: true });
+    // An amount-only refund returned no goods, whatever the flag says.
+    if (!restoreInventory || partial?.amountOnly) return Promise.resolve({ skipped: true });
 
     return runInTenantContext(storeId, () =>
       withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {

@@ -33,6 +33,7 @@ import {
   invalidateCustomersCache,
 } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 
 /**
@@ -1928,7 +1929,24 @@ export class OrderService {
          * backorder lines.
          */
         backorderLineId?: string;
+        /**
+         * A partial refund made OUTSIDE a return (`items` empty, `refundKey`
+         * `refund:<providerRefundId>`, `refundAmount` = what was refunded):
+         * the GL books it as a revenue refund and nothing else acts on it —
+         * see PartialRefund.amountOnly in order-refunded.ts. Use
+         * `recordRefundOutsideReturn` rather than building this by hand.
+         */
+        amountOnly?: boolean;
       };
+      /**
+       * Send the event now instead of after the request transaction commits.
+       * ONLY for a caller whose facts are already committed on a transaction
+       * of its own — PaymentService.refund commits the refund record before it
+       * returns, so a later rollback of the request cannot un-happen it, and
+       * waiting for the request would drop the GL entry of a refund that
+       * stands whenever the request then fails.
+       */
+      sendNow?: boolean;
     } = {}
   ): Promise<void> {
     const restoreInventory = options.restoreInventory ?? true;
@@ -1997,7 +2015,7 @@ export class OrderService {
     // and for a whole-order reversal the `refundReversalRequestedAt` stamp
     // written above (in the same transaction) lets
     // refund-reversal-stuck-sweep re-send it.
-    await deferAfterTenantCommit('order.applyRefundEffects.sendOrderRefunded', () =>
+    const send = () =>
       inngest.send({
         name: 'order/refunded',
         data: {
@@ -2008,8 +2026,44 @@ export class OrderService {
           partial: options.partial,
           reverseWallet: options.reverseWallet ?? true,
         },
-      })
-    );
+      });
+    if (options.sendNow) {
+      await send();
+      return;
+    }
+    await deferAfterTenantCommit('order.applyRefundEffects.sendOrderRefunded', send);
+  }
+
+  /**
+   * A partial refund made OUTSIDE a return — in the provider's dashboard (the
+   * refund webhook, a refund-status refresh) or the order page's
+   * refund-via-provider with an amount. Owner decision 2026-10-01 (#1209,
+   * #1455): booked as a revenue refund for exactly `amount`, with no stock
+   * movement, idempotent per provider refund id. The GL entry is keyed on
+   * `refund:<providerRefundId>`, so a redelivered webhook or a refresh that
+   * re-reports the same refund books nothing more.
+   *
+   * No customer notification: a refund taken in the dashboard has never
+   * notified the customer, and that is not changed here.
+   */
+  static async recordRefundOutsideReturn(
+    storeId: string,
+    orderId: string,
+    refund: { providerRefundId: string; amount: number },
+    options: { sendNow?: boolean } = {}
+  ): Promise<void> {
+    await this.applyRefundEffects(storeId, orderId, {
+      restoreInventory: false,
+      fireRefundNotification: false,
+      reverseWallet: false,
+      sendNow: options.sendNow,
+      partial: {
+        items: [],
+        refundKey: amountOnlyRefundKey(refund.providerRefundId),
+        refundAmount: refund.amount,
+        amountOnly: true,
+      },
+    });
   }
 
   static async getCustomerOrders(

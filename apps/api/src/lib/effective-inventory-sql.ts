@@ -1,4 +1,4 @@
-import { Prisma } from '@force/database';
+import { Prisma, prisma, type DbClient } from '@force/database';
 
 /**
  * SQL twin of `effectiveInventory` (lib/effective-inventory.ts), for queries
@@ -60,3 +60,24 @@ export const DISABLED_VARIANT_STOCK_VALUE_SQL = Prisma.sql`COALESCE(
     WHERE pv.product_id = p.id AND NOT pv.is_active AND pv.inventory > 0),
   0
 )`;
+
+/**
+ * The store's on-hand stock value in fils — ONE query for the finance
+ * dashboard and the analytics inventory snapshot, which used to carry two
+ * copies of it. Non-deleted products, valued by `STOCK_VALUE_SQL`: a disabled
+ * variant that still holds units counts for nothing (owner decision
+ * 2026-10-01, #2078), and disabling one posts no journal entry — so this
+ * figure and the balance sheet's Inventory (1200) differ by the cost of the
+ * units on disabled variants, by design. See docs/architecture/inventory-model.md.
+ */
+export async function storeStockValueFils(
+  storeId: string,
+  client: DbClient = prisma
+): Promise<number> {
+  const rows = await client.$queryRaw<{ total: bigint }[]>`
+    SELECT COALESCE(SUM(${STOCK_VALUE_SQL}), 0) AS total
+    FROM public.products p
+    WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL
+  `;
+  return Number(rows[0]?.total ?? 0);
+}

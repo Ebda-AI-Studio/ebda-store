@@ -12,7 +12,11 @@ import {
 } from './payment-providers/payment.factory';
 import { refundMayHaveExecuted } from './payment-providers/refund-outcome';
 import logger from '../lib/logger';
-import { allocatePartialReturn } from './accounting/posting/partial-return-allocation';
+import {
+  allocatePartialReturn,
+  splitByPaymentMix,
+} from './accounting/posting/partial-return-allocation';
+import { GATEWAY_REFUND_METHODS, REFUND_METHODS } from '../lib/refund-methods';
 import {
   loadBackorderCancelledQty,
   loadPriorReversedQty,
@@ -66,26 +70,9 @@ interface ListReturnsOptions {
   type?: string;
 }
 
-/**
- * Refund methods that mean "send the money back through the payment provider".
- *
- * Exported so the route can validate against the same set the service branches
- * on. They drifted apart once already: the service matched `'gateway'` and
- * `'original_payment'` while the admin has always sent `'original'`, so the
- * gateway branch was unreachable and the failure was silent — an unknown
- * method simply fell through to the manual path, which looks like a successful
- * completion.
- */
-export const GATEWAY_REFUND_METHODS = ['original', 'gateway', 'original_payment'] as const;
-
-/** Every method the completion endpoint accepts. Anything else is rejected. */
-export const REFUND_METHODS = [
-  ...GATEWAY_REFUND_METHODS,
-  'store_credit',
-  'bank_transfer',
-  'cash',
-  'manual',
-] as const;
+// The refund-method sets live in lib/refund-methods.ts so the GL poster reads
+// the same set this service branches on; re-exported for the route.
+export { GATEWAY_REFUND_METHODS, REFUND_METHODS };
 
 /** This return's share of the order's money — see ReturnService.allocateThisReturn. */
 interface PartialAllocation {
@@ -95,6 +82,14 @@ interface PartialAllocation {
   returnedLineCount: number;
   /** After this return, has every unit of every line come back? */
   allLinesNowReturned: boolean;
+  /**
+   * `cashCredit` split by how the order was paid (#1956): the part that goes
+   * back to the customer wallet because the order was partly paid from it,
+   * and the part refunded at the gateway. `walletShare` is 0 for every order
+   * that did not use the wallet, so `gatewayShare === cashCredit` there.
+   */
+  walletShare: number;
+  gatewayShare: number;
 }
 
 /** Fils as a 3-decimal KWD string, for merchant-facing error text. */
@@ -782,14 +777,24 @@ export class ReturnService {
         refundAmount = partial.cashCredit;
       }
 
-      if (isGatewayRefund && returnRequest.orderId) {
+      // A partial return on an order paid partly from the customer wallet
+      // refunds the wallet's pro-rata share to the wallet and only the rest at
+      // the gateway (#1956). When the whole allocation is the wallet's (an
+      // order paid entirely from it, or a rounding fils), nothing is sent.
+      const walletShare = isGatewayRefund && partial ? partial.walletShare : 0;
+      const skipProvider = isGatewayRefund && partial !== null && partial.gatewayShare === 0;
+
+      if (isGatewayRefund && returnRequest.orderId && !skipProvider) {
         const plan = await this.planGatewayRefund(
           returnId,
           returnRequest.orderId,
           isFullReturn,
           partial
         );
-        refundAmount = plan.amount;
+        // What the customer is owed: for a partial return the whole
+        // allocation (gateway + wallet share), for a full one what the gateway
+        // sends.
+        refundAmount = partial ? partial.cashCredit : plan.amount;
 
         try {
           const result = await PaymentService.refund(
@@ -924,6 +929,20 @@ export class ReturnService {
           returnId,
           orderId: returnRequest.orderId,
           amount: walletCreditAmount,
+        });
+      }
+
+      // The wallet's share of a gateway refund (#1956), on the same request
+      // transaction as the completion row. Keyed on the return, so a replayed
+      // completion credits nothing more. The GL reads this ledger row to book
+      // the share against the wallet liability (resolveReturnRefundLegs).
+      if (walletShare > 0 && returnRequest.orderId) {
+        await WalletService.creditReturnWalletShare({
+          storeId,
+          customerId: returnRequest.customerId,
+          returnId,
+          orderId: returnRequest.orderId,
+          amount: walletShare,
         });
       }
 
@@ -1077,15 +1096,37 @@ export class ReturnService {
     let gateway: {
       available: boolean;
       amount: number | null;
+      /**
+       * Part of the refund that goes back to the customer wallet instead of
+       * the gateway, because the order was partly paid from it (#1956).
+       * `amount` is then only the gateway's part. 0 for every other order.
+       */
+      walletShare: number;
       refundableRemaining: number | null;
       unavailableReason: string | null;
-    } = { available: false, amount: null, refundableRemaining: null, unavailableReason: null };
+    } = {
+      available: false,
+      amount: null,
+      walletShare: 0,
+      refundableRemaining: null,
+      unavailableReason: null,
+    };
     if (!isInventoryRestoring) {
       gateway.unavailableReason = 'EXCHANGE_CANNOT_REFUND_TO_GATEWAY';
     } else if (!returnRequest.orderId) {
       gateway.unavailableReason = 'NO_COMPLETED_PAYMENT';
     } else if (partial && partial.returnedLineCount === 0) {
       gateway.unavailableReason = 'PARTIAL_REFUND_NOTHING_TO_REFUND';
+    } else if (partial && partial.gatewayShare === 0) {
+      // All of it is the wallet's share — complete() sends nothing to the
+      // provider and puts the whole allocation back in the wallet.
+      gateway = {
+        available: true,
+        amount: 0,
+        walletShare: partial.walletShare,
+        refundableRemaining: null,
+        unavailableReason: null,
+      };
     } else {
       try {
         const plan = await this.planGatewayRefund(
@@ -1098,6 +1139,7 @@ export class ReturnService {
           available: true,
           // Absent means "the whole remaining payment" to PaymentService.
           amount: plan.amount ?? plan.refundableRemaining,
+          walletShare: partial?.walletShare ?? 0,
           refundableRemaining: plan.refundableRemaining,
           unavailableReason: null,
         };
@@ -1139,7 +1181,14 @@ export class ReturnService {
     });
     const order = await prisma.order.findFirst({
       where: { id: orderId, storeId },
-      select: { subtotal: true, discount: true, tax: true, taxIncludedInPrice: true },
+      select: {
+        subtotal: true,
+        discount: true,
+        tax: true,
+        taxIncludedInPrice: true,
+        total: true,
+        walletAmount: true,
+      },
     });
     const alloc = allocatePartialReturn({
       subtotal: order?.subtotal ?? 0,
@@ -1154,7 +1203,29 @@ export class ReturnService {
     for (const { line, qty } of alloc.returnedLines) {
       thisQty.set(line.id, (thisQty.get(line.id) ?? 0) + qty);
     }
+    // Split by the order's payment mix (#1956), cumulatively over the order's
+    // earlier item-level reversals — their cash value is the same allocation
+    // taken over the prior quantities as one block (the allocator telescopes).
+    let split = { walletShare: 0, gatewayShare: alloc.cashCredit };
+    if ((order?.walletAmount ?? 0) > 0) {
+      const prior = allocatePartialReturn({
+        subtotal: order?.subtotal ?? 0,
+        discount: order?.discount ?? 0,
+        tax: order?.tax ?? 0,
+        taxIncludedInPrice: order?.taxIncludedInPrice ?? false,
+        lines: orderLines,
+        prevQty: new Map(),
+        requested: [...prevQty].map(([orderItemId, quantity]) => ({ orderItemId, quantity })),
+      });
+      split = splitByPaymentMix({
+        cashCredit: alloc.cashCredit,
+        prevCash: prior.cashCredit,
+        total: order?.total ?? 0,
+        walletAmount: order?.walletAmount ?? 0,
+      });
+    }
     return {
+      ...split,
       cashCredit: alloc.cashCredit,
       returnedLineCount: alloc.returnedLines.length,
       // After this return, is nothing left with the customer? Counted in LINES,
@@ -1296,6 +1367,9 @@ export class ReturnService {
     // refund (it compares against the remaining, not the original, amount),
     // so the whole-order fanout it owns still fires exactly once.
     if (!isFullReturn && partial) {
+      // Only the gateway's share goes to the provider; on an order paid partly
+      // from the customer wallet the rest goes back to the wallet (#1956).
+      const toGateway = partial.gatewayShare;
       if (partial.cashCredit <= 0) {
         throw new AppError(
           400,
@@ -1303,7 +1377,7 @@ export class ReturnService {
           'This partial return resolves to a zero refund — every claimed line is already covered by an earlier completed return.'
         );
       }
-      if (partial.cashCredit > refundableRemaining) {
+      if (toGateway > refundableRemaining) {
         // STRICTLY greater. Equality is not a contradiction, it is the normal
         // final piece: the allocator telescopes, so every return's cashCredit
         // over an order sums to exactly the goods the customer paid for
@@ -1326,14 +1400,14 @@ export class ReturnService {
         throw new AppError(
           409,
           'PARTIAL_REFUND_EXCEEDS_PAYMENT',
-          `This return is worth ${formatKwd(partial.cashCredit)} KWD but only ${formatKwd(refundableRemaining)} KWD is left on the payment, because part of it was already refunded outside this return. Complete it with store credit or bank transfer instead, and settle the difference with the customer directly.`,
-          { refundAmount: partial.cashCredit, refundableRemaining }
+          `This return is worth ${formatKwd(toGateway)} KWD at the gateway but only ${formatKwd(refundableRemaining)} KWD is left on the payment, because part of it was already refunded outside this return. Complete it with store credit or bank transfer instead, and settle the difference with the customer directly.`,
+          { refundAmount: toGateway, refundableRemaining }
         );
       }
       return {
         paymentId: payment.id,
         transactionId: payment.transactionId,
-        amount: partial.cashCredit,
+        amount: toGateway,
         refundableRemaining,
       };
     }

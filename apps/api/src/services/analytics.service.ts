@@ -1,5 +1,5 @@
 import { prisma, Prisma } from '@force/database';
-import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
+import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
@@ -881,14 +881,10 @@ export class AnalyticsService {
    * and active reorder rules count.
    */
   static async stockSnapshot(storeId: string) {
-    const [valueRow, backorderRow, rulesCount] = await Promise.all([
-      // Variant-aware quantity AND cost (a variant at its own cost, falling
-      // back to the parent's) — STOCK_VALUE_SQL, shared with the finance
-      // dashboard's stock value.
-      prisma.$queryRaw<{ total: bigint }[]>`
-        SELECT COALESCE(SUM(${STOCK_VALUE_SQL}), 0) AS total
-        FROM public.products p WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL
-      `,
+    const [stockValue, backorderRow, rulesCount] = await Promise.all([
+      // Variant-aware quantity AND cost, active variants only — the finance
+      // dashboard's own query (storeStockValueFils), so the two cannot drift.
+      storeStockValueFils(storeId),
       prisma.$queryRaw<{ count: bigint; value: bigint }[]>`
         SELECT
           COUNT(*) AS count,
@@ -903,7 +899,7 @@ export class AnalyticsService {
       prisma.reorderRule.count({ where: { storeId, isActive: true } }),
     ]);
     return {
-      stockValue: Number(valueRow[0]?.total ?? 0),
+      stockValue,
       openBackorderCount: Number(backorderRow[0]?.count ?? 0),
       backorderedDemandValue: Number(backorderRow[0]?.value ?? 0),
       reorderRulesCount: rulesCount,

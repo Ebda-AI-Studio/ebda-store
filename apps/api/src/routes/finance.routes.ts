@@ -15,7 +15,10 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { DISABLED_VARIANT_STOCK_VALUE_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
+import {
+  DISABLED_VARIANT_STOCK_VALUE_SQL,
+  storeStockValueFils,
+} from '../lib/effective-inventory-sql';
 import { z } from 'zod';
 import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
@@ -600,20 +603,16 @@ router.get(
       const to = parseFinanceDate(req.query.to, now, 'end');
 
       const data = await runInTenantContext(req.params.storeId, async () => {
-        const [pnl, bs, stockValueRows, disabledValueRows] = await Promise.all([
+        const [pnl, bs, stockValue, disabledValueRows] = await Promise.all([
           profitAndLoss(req.params.storeId, from, to),
           balanceSheet(req.params.storeId, to),
-          // Variant-aware quantity AND cost: `products.inventory` is not
-          // stock for a variant product, and a variant is valued at its own
-          // cost (falling back to the parent's). See STOCK_VALUE_SQL in
-          // lib/effective-inventory-sql.ts.
-          prisma.$queryRaw<{ total: bigint }[]>`
-            SELECT COALESCE(SUM(${STOCK_VALUE_SQL}), 0) AS total
-            FROM public.products p
-            WHERE p.store_id = ${req.params.storeId} AND p.deleted_at IS NULL
-          `,
+          // Variant-aware quantity AND cost, active variants only — the same
+          // query the analytics inventory snapshot uses. See
+          // storeStockValueFils in lib/effective-inventory-sql.ts.
+          storeStockValueFils(req.params.storeId),
           // issue 2146: value on DISABLED variants — not stock, so not in
-          // stockValue, but shown beside it rather than vanishing.
+          // stockValue (owner decision 2026-10-01, #2078), but shown beside it
+          // rather than vanishing.
           prisma.$queryRaw<{ total: bigint }[]>`
             SELECT COALESCE(SUM(${DISABLED_VARIANT_STOCK_VALUE_SQL}), 0) AS total
             FROM public.products p
@@ -621,7 +620,6 @@ router.get(
           `,
         ]);
 
-        const stockValue = Number(stockValueRows[0]?.total ?? 0);
         const disabledVariantStockValue = Number(disabledValueRows[0]?.total ?? 0);
 
         return {

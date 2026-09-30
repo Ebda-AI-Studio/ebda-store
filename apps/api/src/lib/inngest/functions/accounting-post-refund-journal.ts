@@ -2,7 +2,10 @@ import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postRefundJournal } from '../../../services/accounting/posting/refund-posting';
-import { postPartialReturnJournal } from '../../../services/accounting/posting/partial-return-posting';
+import {
+  postAmountOnlyRefundJournal,
+  postPartialReturnJournal,
+} from '../../../services/accounting/posting/partial-return-posting';
 import { featureService } from '../../../services/feature.service';
 
 /**
@@ -19,6 +22,10 @@ import { featureService } from '../../../services/feature.service';
  *     revenue/tax/COGS (postPartialReturnJournal), keyed on
  *     `partial.refundKey` (the Return id, or `backorder:<lineId>`) so an
  *     at-least-once redelivery never posts twice.
+ *   - PARTIAL refund made outside a return (`partial.amountOnly`, refundKey
+ *     `refund:<providerRefundId>`): a revenue refund for exactly
+ *     `partial.refundAmount`, no stock or COGS (postAmountOnlyRefundJournal,
+ *     owner decision 2026-10-01).
  *
  * Idempotent — postRefundJournal skips already-reversed entries;
  * postPartialReturnJournal posts one entry set per refundKey.
@@ -42,6 +49,8 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
       partial?: {
         items?: Array<{ orderItemId: string; quantity: number }>;
         refundKey?: string;
+        refundAmount?: number;
+        amountOnly?: boolean;
       };
     };
     if (!orderId || !storeId) {
@@ -59,6 +68,22 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
         'accountingPostRefundJournal: accounting.basic disabled, skipping'
       );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
+    }
+    // A partial refund made outside a return carries no lines, only an
+    // amount. It must never reach the whole-sale reversal below.
+    if (partial?.amountOnly) {
+      const refundKey = partial.refundKey;
+      const amount = partial.refundAmount;
+      if (!refundKey || typeof amount !== 'number') {
+        logger.error(
+          { storeId, orderId, refundKey, amount },
+          'accountingPostRefundJournal: amount-only refund event missing refundKey/amount — skipping'
+        );
+        return { skipped: 'amount-only-missing-fields' };
+      }
+      return step.run('post-amount-only-refund', () =>
+        postAmountOnlyRefundJournal({ orderId, storeId, refundKey, amount })
+      );
     }
     // Partial-return events carry an item-level payload; postRefundJournal
     // reverses the WHOLE sale journal, which would erase revenue the merchant

@@ -25,7 +25,7 @@ beforeAll(async () => {
 });
 
 describe('account.service', () => {
-  it('seeds 27 system accounts on a fresh store and is idempotent', async () => {
+  it('seeds 29 system accounts on a fresh store and is idempotent', async () => {
     const ts = Date.now();
     const store = await prisma.store.create({
       data: {
@@ -38,12 +38,12 @@ describe('account.service', () => {
     try {
       await seedCoaForStore(store.id);
       const first = await prisma.account.count({ where: { storeId: store.id } });
-      expect(first).toBe(27);
+      expect(first).toBe(29);
 
       // Re-running must not duplicate
       await seedCoaForStore(store.id);
       const second = await prisma.account.count({ where: { storeId: store.id } });
-      expect(second).toBe(27);
+      expect(second).toBe(29);
 
       const tree = await listAccountsTree(store.id);
       expect(tree.assets.find(a => a.code === '1000')?.nameEn).toBe('Cash KNET');

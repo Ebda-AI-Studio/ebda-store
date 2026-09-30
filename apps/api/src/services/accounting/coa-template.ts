@@ -26,6 +26,23 @@ export const COA_TEMPLATE: CoaTemplateRow[] = [
   { code: '1200', nameEn: 'Inventory', nameAr: 'المخزون', type: 'asset' },
   { code: '2000', nameEn: 'Accounts Payable', nameAr: 'الذمم الدائنة', type: 'liability' },
   { code: '2100', nameEn: 'Tax Payable', nameAr: 'الضريبة المستحقة', type: 'liability' },
+  // What the store owes customers as credit (owner decision 2026-10-01, M1-8):
+  // 2150 = balances held in the on-platform customer wallet; 2160 = store
+  // credit the merchant issues off-platform (the `store_credit` refund method
+  // with the customer wallet off). Existing stores get them on first use via
+  // getSystemAccountIdByCode's template self-heal.
+  {
+    code: '2150',
+    nameEn: 'Customer Wallet Liability',
+    nameAr: 'التزام محفظة العملاء',
+    type: 'liability',
+  },
+  {
+    code: '2160',
+    nameEn: 'Store Credit Liability',
+    nameAr: 'التزام رصيد المتجر',
+    type: 'liability',
+  },
   { code: '3000', nameEn: "Owner's Equity", nameAr: 'حقوق الملكية', type: 'equity' },
   { code: '3100', nameEn: "Owner's Draws", nameAr: 'سحوبات المالك', type: 'equity' },
   { code: '4000', nameEn: 'Sales Revenue', nameAr: 'إيرادات المبيعات', type: 'revenue' },

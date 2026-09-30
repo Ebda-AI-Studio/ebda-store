@@ -81,8 +81,12 @@ vi.mock('@api/services/encryption.service', () => ({
 // throws, and can assert the exact (from, to) it was called with.
 const assertValidTransitionMock = vi.fn();
 const applyRefundEffects = vi.fn().mockResolvedValue(undefined);
+const recordRefundOutsideReturn = vi.fn();
 vi.mock('@api/services/order.service', () => ({
-  OrderService: { applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a) },
+  OrderService: {
+    applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a),
+    recordRefundOutsideReturn: (...a: unknown[]) => recordRefundOutsideReturn(...a),
+  },
   assertValidTransition: (...a: unknown[]) => assertValidTransitionMock(...a),
 }));
 
@@ -843,11 +847,11 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
   });
 
   /**
-   * #1455. A partial refund made in the provider's dashboard is now counted in
-   * the balance, but no GL poster can book it (the partial journal needs line
-   * data only a Return carries). Nothing books it, so it is raised.
+   * #1455, owner decision 2026-10-01: a partial refund made in the provider's
+   * dashboard is booked as a revenue refund for THIS event's amount, keyed on
+   * the provider's refund id, with no stock movement — no longer only raised.
    */
-  it('a partial out-of-band refund raises a no-ledger-entry alert', async () => {
+  it('a partial out-of-band refund is booked as a revenue refund for its amount', async () => {
     webhookFor(
       { refundedAmount: 0, status: 'completed', metadata: {} },
       {
@@ -858,11 +862,32 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
 
     await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
 
-    expect(await alertSources()).toContain('payment.refund.partial_no_gl');
+    expect(recordRefundOutsideReturn).toHaveBeenCalledOnce();
+    expect(recordRefundOutsideReturn).toHaveBeenCalledWith(STORE_ID, ORDER_ID, {
+      providerRefundId: 'rf_p',
+      amount: 2000,
+    });
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+    expect(await alertSources()).not.toContain('payment.refund.partial_no_gl');
+  });
+
+  it('the settle notice for a refund already accounted books nothing more (control)', async () => {
+    webhookFor(
+      {
+        refundedAmount: 2000,
+        status: 'partially_refunded',
+        metadata: { refundEventIds: ['rf_p'] },
+      },
+      { refundId: 'rf_p', amount: 2000 }
+    );
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(recordRefundOutsideReturn).not.toHaveBeenCalled();
   });
 });
 
-describe('PaymentService.refund — a partial refund outside a return is raised (#1209)', () => {
+describe('PaymentService.refund — a partial refund outside a return is booked (#1209)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockProviderConfig();
@@ -898,8 +923,22 @@ describe('PaymentService.refund — a partial refund outside a return is raised 
     return vi.mocked(sendAlert).mock.calls.map(c => (c[0] as { source: string }).source);
   };
 
-  it('the order page partial refund posts no GL entry, so it alerts', async () => {
+  it('the order page partial refund is booked as a revenue refund, sent now', async () => {
     await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 });
+    expect(recordRefundOutsideReturn).toHaveBeenCalledWith(
+      STORE_ID,
+      ORDER_ID,
+      { providerRefundId: 'rf_1', amount: 1000 },
+      { sendNow: true }
+    );
+    expect(await alertSources()).toEqual([]);
+  });
+
+  it('when that event cannot be queued, it alerts instead of failing the refund', async () => {
+    recordRefundOutsideReturn.mockRejectedValueOnce(new Error('inngest down'));
+    await expect(
+      PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 })
+    ).resolves.toMatchObject({ refundId: 'rf_1' });
     expect(await alertSources()).toContain('payment.refund.partial_no_gl');
   });
 
@@ -911,6 +950,7 @@ describe('PaymentService.refund — a partial refund outside a return is raised 
       itemLevel: true,
     });
     expect(await alertSources()).toEqual([]);
+    expect(recordRefundOutsideReturn).not.toHaveBeenCalled();
   });
 });
 

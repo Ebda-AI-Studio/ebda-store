@@ -67,3 +67,11 @@ For large reconciliations, Enterprise stores can upload a CSV with SKU or Barcod
 **البضاعة الراكدة** (المخزون ← البضاعة الراكدة) تُحدَّث أسبوعياً. يُحدَّد المنتج عندما يكون متوفراً في المخزون ولم يُبَع منذ 90 يوماً أو أكثر وتبلغ قيمة مخزونه بسعر التكلفة 50 د.ك على الأقل. المنتج **الذي ليس له سعر تكلفة** يُحدَّد أيضاً — تظهر قيمته **غير معروفة (لا يوجد سعر تكلفة)**، ويعرض تنبيه في أعلى الصفحة عدد المنتجات المحدَّدة التي تحتاج إلى سعر تكلفة. أضف أسعار التكلفة من صفحة المنتج ليتمكن الفحص من تقييمها. المنتج الذي لم يُبَع أبداً يُحتسب من يوم إضافته، فلا يُحدَّد المنتج الجديد خلال أول 90 يوماً؛ وعند تحديده يظهر **لم يُبَع أبداً**.
 
 **اقتراحات إعادة الطلب** (المخزون ← اقتراحات إعادة الطلب) تُحدَّث يومياً. لكل منتج اقتراح مفتوح **واحد** (أو بطاقة بضاعة راكدة مفتوحة واحدة) في كل مرة: كل فحص يحدّثه بأحدث الأرقام بدلاً من إضافة اقتراح جديد. تجاهله يغلقه؛ وإذا ظل المنتج مستوفياً للشروط، يفتح الفحص التالي اقتراحاً جديداً.
+
+---
+
+## Disabled variants and stock value — التنويعات المعطّلة وقيمة المخزون
+
+A variant you **disable** is no longer stock anywhere — not on the storefront, not in the inventory counts, and **not in your stock value**, even if it still holds units. The finance dashboard, the analytics inventory card, the inventory page and the dead-stock list all leave it out. Disabling a variant does **not** write anything to your accounts, so the stock value on the finance dashboard can be lower than the Inventory line of your balance sheet by the cost of those units. Enable the variant again and its units count again.
+
+التنويعة التي **تعطّلها** لا تُحسب مخزونًا في أي مكان — لا في المتجر، ولا في أعداد المخزون، **ولا في قيمة المخزون**، حتى لو كانت ما زالت تحمل وحدات. لوحة المالية وبطاقة المخزون في التحليلات وصفحة المخزون وقائمة المخزون الراكد كلها تستبعدها. تعطيل التنويعة **لا** يسجّل أي قيد في حساباتك، لذلك قد تكون قيمة المخزون في لوحة المالية أقل من بند المخزون في الميزانية بمقدار تكلفة تلك الوحدات. أعد تفعيل التنويعة لتُحتسب وحداتها من جديد.
