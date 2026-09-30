@@ -269,6 +269,13 @@ class RedisService {
     await c.set(`user:tv:${userId}`, String(version));
   }
 
+  /** Drop the cached tv so the next authenticate reads Postgres. */
+  async clearUserTokenVersion(userId: string): Promise<void> {
+    const c = this.getClient();
+    if (!c) return;
+    await c.del(`user:tv:${userId}`);
+  }
+
   async getUserTokenVersion(userId: string): Promise<number | null> {
     const c = this.getClient();
     if (!c) return null;

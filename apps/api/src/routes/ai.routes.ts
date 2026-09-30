@@ -24,6 +24,7 @@ import {
   balanceProductLanguages,
   revertProductBalance,
 } from '../services/ai-autofill.service';
+import { withSavepoint } from '../lib/savepoint';
 
 const router = Router({ mergeParams: true });
 
@@ -371,10 +372,14 @@ const bulkTranslateSchema = z.object({
 async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
   const message = err instanceof AppError ? err.message : 'Failed to enqueue job';
   try {
-    await prisma.bulkAiJob.update({
-      where: { id: jobId },
-      data: { status: 'failed', errorMessage: message, completedAt: new Date() },
-    });
+    // Savepointed: best-effort inside the request's tenant transaction — a
+    // swallowed failure must not abort it (issue 2215's class).
+    await withSavepoint(() =>
+      prisma.bulkAiJob.update({
+        where: { id: jobId },
+        data: { status: 'failed', errorMessage: message, completedAt: new Date() },
+      })
+    );
   } catch {
     // best-effort
   }

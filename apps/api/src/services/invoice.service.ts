@@ -1,5 +1,6 @@
 import { prisma } from '@force/database';
 import { groupOrderLinesForDisplay, orderTaxPlacement } from '@force/shared';
+import { emailMoney } from './email-templates/_util';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -43,6 +44,9 @@ const INVOICE_LABELS = {
     total: 'Total',
     subtotal: 'Subtotal',
     discount: 'Discount',
+    coupon: 'Coupon',
+    promotion: 'Promotion',
+    loyaltyPoints: 'Loyalty points',
     tax: 'Tax',
     taxIncluded: 'Incl. VAT',
     shipping: 'Shipping',
@@ -69,6 +73,9 @@ const INVOICE_LABELS = {
     total: 'الإجمالي',
     subtotal: 'المجموع الفرعي',
     discount: 'الخصم',
+    coupon: 'كوبون',
+    promotion: 'عرض ترويجي',
+    loyaltyPoints: 'نقاط الولاء',
     tax: 'الضريبة',
     taxIncluded: 'شامل ضريبة القيمة المضافة',
     shipping: 'الشحن',
@@ -149,9 +156,14 @@ export class InvoiceService {
     const lang = ar ? 'ar' : 'en';
     const dir = ar ? 'rtl' : 'ltr';
 
-    const currency = order.store.currency || 'KWD';
+    // The order's OWN currency (issue 1705): a local `/1000 + toFixed(3)`
+    // printed "10.000 USD" for a USD order the storefront, admin and gateway
+    // all show as $100.00. KWD keeps its exact "X.XXX KWD" rendering; any
+    // other currency goes through the shared `formatPrice` — the same
+    // `emailMoney` helper the order emails use.
+    const currency = order.currency || order.store.currency || 'KWD';
     const taxPlacement = orderTaxPlacement(order);
-    const formatPrice = (fils: number) => `${(fils / 1000).toFixed(3)} ${currency}`;
+    const formatPrice = (minor: number) => emailMoney(minor, currency, 'en');
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
     // Bill To should reflect the buyer info entered in checkout, not the
     // authenticated account (a logged-in admin testing checkout would otherwise
@@ -170,11 +182,42 @@ export class InvoiceService {
         ? order.appliedPromotion.nameAr
         : order.appliedPromotion.name
       : null;
-    const discountAnnotation = order.couponCode
-      ? ` (${escapeHtml(order.couponCode)})`
-      : promotionLabel
-        ? ` (${escapeHtml(promotionLabel)})`
-        : '';
+    // Issue 2239: the discount is split into its levers exactly as the admin,
+    // orders-app and account order screens do — coupon, promotion, loyalty
+    // points, then any remainder — instead of one aggregate line annotated
+    // with only the coupon, which attributed redeemed points to the coupon
+    // and printed a loyalty-only discount unexplained. The rows always
+    // reconcile to `order.discount`.
+    const couponPortion = order.couponDiscount ?? 0;
+    const promotionPortion = order.promotionDiscount ?? 0;
+    const loyaltyPortion = order.loyaltyDiscount ?? 0;
+    const otherDiscount = Math.max(
+      0,
+      order.discount - couponPortion - promotionPortion - loyaltyPortion
+    );
+    const discountRow = (label: string, amount: number) =>
+      `<div class="row discount"><span class="label">${label}</span><span class="val">−${formatPrice(amount)}</span></div>`;
+    const discountRowsHtml = [
+      couponPortion > 0
+        ? discountRow(
+            `${escapeHtml(labels.coupon)}${order.couponCode ? ` (${escapeHtml(order.couponCode)})` : ''}`,
+            couponPortion
+          )
+        : '',
+      promotionPortion > 0
+        ? discountRow(
+            `${escapeHtml(labels.promotion)}${promotionLabel ? ` (${escapeHtml(promotionLabel)})` : ''}`,
+            promotionPortion
+          )
+        : '',
+      loyaltyPortion > 0
+        ? discountRow(
+            `${escapeHtml(labels.loyaltyPoints)}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed})` : ''}`,
+            loyaltyPortion
+          )
+        : '',
+      otherDiscount > 0 ? discountRow(escapeHtml(labels.discount), otherDiscount) : '',
+    ].join('');
 
     const isPaid = order.paymentStatus === 'paid';
     const isCancelled = order.status === 'cancelled';
@@ -424,7 +467,9 @@ export class InvoiceService {
     .totals { width: 320px; }
     .totals .row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; font-size: 14px; }
     .totals .row .label { color: var(--ink-soft); }
-    .totals .row .val { color: var(--ink); font-variant-numeric: tabular-nums; }
+    /* Amounts are an LTR run even on the Arabic invoice, so a leading minus
+       stays in front of the figure instead of flipping to the far end. */
+    .totals .row .val { color: var(--ink); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
     .totals .discount .val { color: var(--success); }
     .totals .tax-included { font-size: 12px; padding: 6px 0 0; }
     .totals .tax-included .val { color: var(--ink-soft); }
@@ -588,11 +633,7 @@ export class InvoiceService {
       <section class="totals-wrap">
         <div class="totals">
           <div class="row"><span class="label">${escapeHtml(labels.subtotal)}</span><span class="val">${formatPrice(order.subtotal)}</span></div>
-          ${
-            order.discount > 0
-              ? `<div class="row discount"><span class="label">${escapeHtml(labels.discount)}${discountAnnotation}</span><span class="val">−${formatPrice(order.discount)}</span></div>`
-              : ''
-          }
+          ${discountRowsHtml}
           ${
             (taxPlacement.taxRow ?? 0) > 0
               ? `<div class="row"><span class="label">${escapeHtml(labels.tax)}</span><span class="val">${formatPrice(taxPlacement.taxRow ?? 0)}</span></div>`

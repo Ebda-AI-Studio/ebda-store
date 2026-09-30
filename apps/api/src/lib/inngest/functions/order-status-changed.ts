@@ -181,6 +181,7 @@ export async function handleOrderStatusChanged(
             taxIncludedInPrice: order.taxIncludedInPrice,
             shipping: order.shipping,
             total: order.total,
+            currency: order.currency,
             shippingAddress: shippingAddrFull,
           },
           orderLocale
@@ -251,6 +252,7 @@ export async function handleOrderStatusChanged(
         orderNumber: order.orderNumber,
         amount: order.total,
         reason: 'Order refunded',
+        currency: order.currency,
       })
     );
   }

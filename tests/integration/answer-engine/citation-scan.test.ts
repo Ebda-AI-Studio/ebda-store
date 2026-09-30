@@ -494,7 +494,12 @@ describe('scanStoreCitations — cron per-store isolation (whole-branch fix wave
             resultA = await scanStoreCitations(failingStoreId);
           })()
         ).resolves.not.toThrow();
-        expect(resultA).toEqual({ storeId: failingStoreId, skipped: 'error', checks: 0 });
+        expect(resultA).toEqual({
+          storeId: failingStoreId,
+          skipped: 'error',
+          checks: 0,
+          ungroundedChecks: 0,
+        });
 
         // Store B (the NEXT store the cron loop would reach) — proves store
         // A's throw did not abort anything beyond its own step: B is scanned
@@ -508,7 +513,7 @@ describe('scanStoreCitations — cron per-store isolation (whole-branch fix wave
           providers: [working],
           prompts: FIXED_PROMPTS,
         });
-        expect(resultB).toEqual({ storeId, skipped: false, checks: 1 });
+        expect(resultB).toEqual({ storeId, skipped: false, checks: 1, ungroundedChecks: 0 });
         expect(working.queryMock).toHaveBeenCalledTimes(1);
 
         const rows = await prisma.answerEngineCheck.findMany({

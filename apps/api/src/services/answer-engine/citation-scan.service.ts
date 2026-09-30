@@ -39,6 +39,7 @@ import { getEnabledProviders } from './registry';
 import { generatePrompts, type GeneratedPrompt } from './prompts';
 import { detectCitation, type AnswerEngineProvider } from './provider';
 import { isPaidEngineOverBudget } from './budget';
+import { withSavepoint } from '../../lib/savepoint';
 
 export interface CitationScanEngineResult {
   engine: string;
@@ -48,6 +49,10 @@ export interface CitationScanEngineResult {
    * (DB/RLS infra error) — logged and skipped rather than aborting the rest
    * of this engine's prompts (fail-soft contract, see the module header). */
   writeErrors?: number;
+  /** Checks written from an UNGROUNDED fallback (the engine could not run
+   * search grounding — `groundingUnavailableReason` set). Summed by the
+   * weekly cron, which alerts when any occur (issue 2119). */
+  ungrounded?: number;
 }
 
 export interface RunCitationScanOptions {
@@ -127,6 +132,7 @@ export async function runCitationScan(
 
     let checks = 0;
     let writeErrors = 0;
+    let ungrounded = 0;
     let skipped: CitationScanEngineResult['skipped'];
 
     for (const prompt of prompts) {
@@ -181,21 +187,27 @@ export async function runCitationScan(
       try {
         const citation = detectCitation(citationStore, answer);
 
-        await prisma.answerEngineCheck.create({
-          data: {
-            storeId,
-            engine: provider.engine,
-            promptText: prompt.text,
-            locale: prompt.locale,
-            cited: citation.cited,
-            rank: citation.rank,
-            snippet: citation.snippet,
-            citedUrls: answer.citedUrls ?? [],
-            competitorUrls: citation.competitorUrls,
-            groundingUnavailableReason: answer.groundingUnavailableReason ?? null,
-          },
-        });
+        // Savepointed: the scan runs inside `runInTenantContext`'s single
+        // transaction and this catch swallows (issue 2215's class) — one
+        // failed write must not abort the rest of the scan's writes.
+        await withSavepoint(() =>
+          prisma.answerEngineCheck.create({
+            data: {
+              storeId,
+              engine: provider.engine,
+              promptText: prompt.text,
+              locale: prompt.locale,
+              cited: citation.cited,
+              rank: citation.rank,
+              snippet: citation.snippet,
+              citedUrls: answer.citedUrls ?? [],
+              competitorUrls: citation.competitorUrls,
+              groundingUnavailableReason: answer.groundingUnavailableReason ?? null,
+            },
+          })
+        );
         checks += 1;
+        if (answer.groundingUnavailableReason) ungrounded += 1;
 
         if (isPaidEngine) {
           const feature = paidEngineFeature(provider.engine);
@@ -220,6 +232,7 @@ export async function runCitationScan(
       checks,
       ...(skipped ? { skipped } : {}),
       ...(writeErrors ? { writeErrors } : {}),
+      ...(ungrounded ? { ungrounded } : {}),
     });
   }
 

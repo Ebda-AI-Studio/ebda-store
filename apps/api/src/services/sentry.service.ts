@@ -3,11 +3,20 @@ import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { Prisma } from '@force/database';
 import { clientErrorStatus } from '../middleware/error-handler';
 
 // ==========================================
 // Sentry Error Monitoring Service (v8 API)
 // ==========================================
+
+/** Prisma P2003 / P2025 — answered as a client error, but often a server defect (issue 1988). */
+function isPrismaIntegrityError(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    (err.code === 'P2003' || err.code === 'P2025')
+  );
+}
 
 export class SentryService {
   private static isInitialized = false;
@@ -73,14 +82,26 @@ export class SentryService {
       // classified by the same function that handler uses — without it every
       // `schema.parse(req.body)` failure reached Sentry as a crash
       // (FORCE-API-2C/1B/25/27).
-      const code = err.statusCode ?? err.status ?? clientErrorStatus(err);
-      if (this.isInitialized && (!code || code >= 500)) {
+      const ownStatus = err.statusCode ?? err.status;
+      const code = ownStatus ?? clientErrorStatus(err);
+      // Issue 1988: a Prisma P2003 (FK violation) or P2025 (row not found) is
+      // answered 400/404 like a client error, but the class this repo has
+      // actually shipped was a SERVER defect — FORCE-API-28's nested
+      // `$transaction` P2003, an internal writer's `update` on a vanished row.
+      // Silencing them removed the only signal that reopens such an issue
+      // (RULINGS SN-2). They are still captured, at WARNING level, so they stay
+      // trackable without paging like a crash. P2002 (duplicate key — a
+      // merchant typing an existing SKU) and Zod/body-parser input errors stay
+      // suppressed.
+      const integrityDefect = ownStatus === undefined && isPrismaIntegrityError(err);
+      if (this.isInitialized && (!code || code >= 500 || integrityDefect)) {
         const { authorization, cookie, 'x-csrf-token': csrfToken, ...safeHeaders } = req.headers;
         // suppress unused-var warning — these are intentionally dropped
         void authorization;
         void cookie;
         void csrfToken;
         Sentry.captureException(err, {
+          ...(integrityDefect ? { level: 'warning' as const } : {}),
           extra: {
             url: req.url,
             method: req.method,

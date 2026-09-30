@@ -11,6 +11,7 @@ import {
   getCustomerProfile,
   RFM_SEGMENT_VALUES,
   segmentsForCustomers,
+  filterCustomersBySegment,
   type AggregatedCustomer,
 } from '../../services/customer-aggregate.service';
 import {
@@ -201,13 +202,14 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
 
       return runInTenantContext(store.id, async () => {
         const { customers, truncated, summary } = await aggregateCustomers(store.id);
-        const segmentOf = await segmentsForCustomers(store.id, customers);
 
+        // Segment filter reads only that segment's members; per-row segments
+        // only for the returned page (issue 2243).
         const bySegment =
           args.segment === 'guest'
             ? customers.filter(c => c.isGuest)
             : args.segment
-              ? customers.filter(c => segmentOf.get(c.id) === args.segment)
+              ? await filterCustomersBySegment(store.id, customers, args.segment as RfmSegment)
               : customers;
         const q = args.search?.toLowerCase();
         const filtered = q
@@ -221,10 +223,12 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
           : bySegment;
 
         const start = (page - 1) * limit;
+        const pageRows = filtered.slice(start, start + limit);
+        const segmentOf = await segmentsForCustomers(store.id, pageRows);
         return ok({
-          customers: filtered
-            .slice(start, start + limit)
-            .map(c => maskedCustomerSummary(c, segmentOf.get(c.id) ?? null, store.currency)),
+          customers: pageRows.map(c =>
+            maskedCustomerSummary(c, segmentOf.get(c.id) ?? null, store.currency)
+          ),
           pagination: {
             page,
             limit,

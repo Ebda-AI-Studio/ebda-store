@@ -4,6 +4,7 @@ import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { throwIfBundleFkViolation } from '../lib/bundle-fk-errors';
+import { withSavepoint } from '../lib/savepoint';
 
 interface CreateOptionInput {
   name: string;
@@ -693,25 +694,31 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    const results = await Promise.all(
-      updates.map(async update => {
-        try {
+    // One at a time, each in its own savepoint (issue 2215's class). The
+    // route runs in the request's single tenant transaction: a failing item
+    // used to abort it while the catch reported "success: false" for that
+    // item and success for the rest — and the COMMIT then silently rolled
+    // every item back. Savepoints on one connection cannot interleave, so the
+    // items are not run concurrently.
+    const results: Array<{ variantId: string; success: boolean }> = [];
+    for (const update of updates) {
+      try {
+        const updated = await withSavepoint(async () => {
           const variant = await prisma.productVariant.findFirst({
             where: { id: update.variantId, productId },
           });
-          if (!variant) {
-            return { variantId: update.variantId, success: false };
-          }
+          if (!variant) return false;
           await prisma.productVariant.update({
             where: { id: update.variantId },
             data: { inventory: update.inventory },
           });
-          return { variantId: update.variantId, success: true };
-        } catch {
-          return { variantId: update.variantId, success: false };
-        }
-      })
-    );
+          return true;
+        });
+        results.push({ variantId: update.variantId, success: updated });
+      } catch {
+        results.push({ variantId: update.variantId, success: false });
+      }
+    }
 
     // Variant stock is serialised into the storefront product list, detail
     // and suggest caches (lib/public-cache.ts, which states that ANY write

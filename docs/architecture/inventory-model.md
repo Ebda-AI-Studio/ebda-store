@@ -44,9 +44,15 @@ Spread `EFFECTIVE_STOCK_SELECT` into a product `select` rather than listing
 the columns by hand. It selects every variant WITH its `isActive` flag and lets
 the helper drop the disabled ones; a hand-written select must do the same
 (`variants: { select: { inventory: true, isActive: true } }`). A select that
-pre-filters with `where: { isActive: true }` is safe for display but, for a
-product whose variants are all disabled, reads as variant-less and falls back
-to the parent column — which the invariant holds at `0`. An omitted `variants` is indistinguishable at runtime
+pre-filters with `where: { isActive: true }` must NEVER feed a stock
+computation: for a product whose variants are all disabled it reads as
+variant-less and falls back to the parent column — and that column is NOT
+reliably `0` (converting a stocked simple product to variants leaves it as it
+was). The PDP and the WhatsApp bridge did exactly this (issue 2147); they now
+select every variant with `isActive` and drop the disabled ones for display
+AFTER the stock is computed. `tests/unit/effective-inventory.test.ts` fails on
+a pre-filtered variants relation in any file that calls `effectiveInventory`,
+`isOrderable` or `enrichStockFlags`. An omitted `variants` is indistinguishable at runtime
 from "this product has no variants", which is exactly how a variant-blind read
 passes review and fails in production.
 
@@ -131,7 +137,9 @@ product.costPrice`. Order lines snapshot it at sale time
 
 `cancelBackorder` (`POST …/backorders/:id/cancel`) takes back only that
 line's unfulfilled units (`qty − qtyFulfilled`) — owner decision 2026-09-30,
-ruling AP-5 in `docs/RULINGS.md`. In one `withMoneyTx` it claims the line
+ruling AP-5 in `docs/RULINGS.md`. In one transaction — the request's own
+inside a request (so a rolled-back request leaves the line open and drops the
+event together, issue 2276), a `withMoneyTx` outside one — it claims the line
 (conditional on `cancelledAt: null`, so a second cancel is a 404) and writes a
 `backorder_line_cancelled` orderEvent recording those units. After commit it
 fires the ITEM-LEVEL `order/refunded` event (`partial`, refundKey
@@ -142,8 +150,16 @@ fires the ITEM-LEVEL `order/refunded` event (`partial`, refundKey
   VAT share, its COGS. The sale entry itself stays posted. Shipping is not
   reversed; a whole-order cancel still reverses the whole sale and backs these
   adjustments out first.
-- no stock moves (none was reserved for a backordered unit), and coupon,
-  affiliate, loyalty and wallet stay as they are — the order is still live.
+- no stock moves, and coupon, affiliate, loyalty and wallet stay as they are —
+  the order is still live. For a VARIANT line that is exact: checkout floors
+  the variant at 0, so the backordered units were never taken. For a
+  NON-variant line it is a known residual (issue 2277, open for the owner):
+  checkout force-decremented the units, so `products.inventory` holds them as
+  a negative backorder debt that this cancel does not clear — the product keeps
+  reading out of stock and stays on low-stock / reorder reports for units that
+  will never ship, while the GL adjustment debits Inventory 1200 for their cost.
+- a line whose allocation is 0 (its units already reversed, or a fully
+  discounted order) is still posted but tells the customer nothing (issue 2274).
   The item's other open backorder lines stay open.
 
 Every later item-level allocation — the GL, a return's provider refund, its

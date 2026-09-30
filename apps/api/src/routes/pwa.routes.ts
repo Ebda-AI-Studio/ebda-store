@@ -7,7 +7,9 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { PWAService, generatePwaIconSet } from '../services/pwa.service';
+import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { tenantContext } from '../middleware/tenant-context';
+import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 
 const router = Router();
@@ -180,8 +182,22 @@ router.post(
         );
       }
 
+      const previous = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { pwaSettings: true },
+      });
       const generated = await generatePwaIconSet(storeId, file.buffer);
       const result = await PWAService.updateSettings(storeId, { settings: generated });
+      // Every generation writes NEW versioned keys (pwa.service.ts), so the
+      // previous generation's icons are unreferenced from here on. Delete
+      // them once this write commits (issue 2201) instead of leaving ~9
+      // objects per upload for an opt-in sweeper — `cleanupRemovedJsonUrls`
+      // re-checks every URL against the shared reference registry, so an
+      // icon still used anywhere else is kept.
+      // Diffed against the MERGED settings (what updateSettings persisted), so
+      // only URLs this generation replaced are candidates.
+      const previousSettings = (previous?.pwaSettings ?? {}) as Record<string, unknown>;
+      void cleanupRemovedJsonUrls(previousSettings, { ...previousSettings, ...generated });
 
       await auditLog({
         action: 'pwa.icons.uploaded',

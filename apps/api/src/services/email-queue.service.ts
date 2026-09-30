@@ -8,6 +8,7 @@ import { redis } from './redis.service';
 import { EmailService, EmailOptions } from './email.service';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
 
 export interface QueuedEmail {
   id: string;
@@ -47,9 +48,13 @@ class EmailQueueService {
     if (redis.isAvailable()) {
       await redis.getClient()?.lpush(QUEUE_KEY, JSON.stringify(queuedEmail));
     } else {
-      // Fallback: send immediately if Redis is not available
+      // Fallback: send immediately if Redis is not available. There is no
+      // queue to retry from, so a failed send REJECTS here (issue 2142): the
+      // caller's own failure handling (e.g. the refund fanout's #1935 gate,
+      // an Inngest step retry) is the only retry left, and resolving would
+      // tell it the email went out.
       logger.warn('[EMAIL QUEUE] Redis unavailable, sending immediately');
-      await this.sendEmail(queuedEmail);
+      await this.sendEmail(queuedEmail, { inline: true });
     }
 
     return id;
@@ -107,7 +112,7 @@ class EmailQueueService {
   /**
    * Send email with retry logic — dispatches to the right sender based on storeId.
    */
-  private async sendEmail(email: QueuedEmail): Promise<void> {
+  private async sendEmail(email: QueuedEmail, opts: { inline?: boolean } = {}): Promise<void> {
     email.attempts++;
     email.lastAttempt = new Date().toISOString();
 
@@ -124,7 +129,15 @@ class EmailQueueService {
     } catch (error) {
       email.error = error instanceof Error ? error.message : 'Unknown error';
 
-      if (email.attempts < email.maxAttempts) {
+      if (opts.inline) {
+        logger.error(
+          { emailId: email.id, storeId: email.storeId, err: error },
+          '[EMAIL QUEUE] Inline send failed (Redis unavailable) — rethrowing to the caller'
+        );
+        throw error;
+      }
+
+      if (email.attempts < email.maxAttempts && redis.isAvailable()) {
         // Re-queue for retry with delay
         logger.warn(
           { emailId: email.id, attempt: email.attempts, maxAttempts: email.maxAttempts },
@@ -132,24 +145,57 @@ class EmailQueueService {
         );
 
         setTimeout(() => {
-          if (redis.isAvailable()) {
-            redis
-              .getClient()
-              ?.lpush(QUEUE_KEY, JSON.stringify(email))
-              .catch(() => {});
+          const client = redis.isAvailable() ? redis.getClient() : null;
+          if (!client) {
+            // Redis went away between the failure and the retry: the email
+            // would vanish here, so it is a permanent failure, loudly.
+            void this.reportPermanentFailure(email, 'redis unavailable at retry');
+            return;
           }
+          client.lpush(QUEUE_KEY, JSON.stringify(email)).catch(err => {
+            void this.reportPermanentFailure(email, `re-queue failed: ${String(err)}`);
+          });
         }, RETRY_DELAY_MS * email.attempts);
       } else {
         // Move to failed queue
-        logger.error(
-          { emailId: email.id, attempts: email.attempts },
-          '[EMAIL QUEUE] Email failed permanently'
-        );
         if (redis.isAvailable()) {
-          await redis.getClient()?.lpush(FAILED_KEY, JSON.stringify(email));
+          await redis
+            .getClient()
+            ?.lpush(FAILED_KEY, JSON.stringify(email))
+            .catch(() => undefined);
         }
+        await this.reportPermanentFailure(email, 'max attempts reached');
       }
     }
+  }
+
+  /**
+   * A queued email that will never be sent (issue 2142). `enqueue` resolved
+   * long ago — the caller (an order / refund / return email step) was told
+   * it went out — so this is the ONLY place the failure can surface. It used
+   * to be a log line; it is now a P1 alert, and the email sits in
+   * `email:failed`, listed and replayable at the super-admin Email queue page
+   * (`GET /admin/email-queue/failed`). No recipient address in the alert.
+   */
+  private async reportPermanentFailure(email: QueuedEmail, why: string): Promise<void> {
+    logger.error(
+      { emailId: email.id, storeId: email.storeId, attempts: email.attempts, why },
+      '[EMAIL QUEUE] Email failed permanently'
+    );
+    await sendAlert({
+      level: 'p1',
+      source: 'email.queue.permanent_failure',
+      title: 'Queued email failed permanently',
+      body:
+        `Email ${email.id} was not delivered after ${email.attempts} attempt(s) (${why}). ` +
+        'Replay it from the super-admin Email queue page once the provider recovers.',
+      context: {
+        emailId: email.id,
+        storeId: email.storeId,
+        subject: email.options.subject,
+        error: email.error,
+      },
+    }).catch(() => undefined);
   }
 
   /**

@@ -801,15 +801,14 @@ export class ProductService {
         logger.warn({ err, productId: product.id }, '[product.create] inngest send failed')
       );
 
-    // #1937: kick the recommendations sweep HERE, synchronously (AWAITED —
-    // never a bare `void`, which would inherit this request's tenant
-    // transaction via AsyncLocalStorage and P2028 the moment it outlives the
-    // response), rather than in the debounced `product.upserted` Inngest
-    // consumer's `op === 'create'` branch. That handler debounces on
-    // productId for 10s and delivers only the LAST event in the window, so a
-    // create-then-quick-edit silently dropped the kick. Doing it once, here,
-    // at the one true creation site removes the dependency on which event
-    // survives debounce entirely. Swallows its own errors internally.
+    // #1937: kick the recommendations sweep HERE, at the one true creation
+    // site, rather than in the debounced `product.upserted` Inngest
+    // consumer's `op === 'create'` branch (that handler delivers only the
+    // LAST event in its 10s window, so a create-then-quick-edit silently
+    // dropped the kick). The helper queues itself with
+    // `deferAfterTenantCommit`, so inside a request it runs AFTER this
+    // create commits (never publishing a jobId for an uncommitted row) and
+    // a rolled-back create drops it; awaiting it costs nothing when deferred.
     await enqueueRecommendationsSweepForNewProduct(storeId, product.id);
 
     return product;
@@ -1645,9 +1644,14 @@ export class ProductService {
         values: { orderBy: { position: 'asc' } },
       },
     },
+    // ALL variants, with `isActive` — NOT pre-filtered (issue 2147). A
+    // `where: { isActive: true }` here made a product whose variants are all
+    // disabled read as variant-less, so `enrichStockFlags` fell back to the
+    // parent `inventory` column and the PDP advertised stock checkout refuses.
+    // The helper computes stock from active variants; `publicDetailWithStock`
+    // then drops the disabled ones from the display list.
     variants: {
       orderBy: { position: 'asc' },
-      where: { isActive: true },
       select: {
         id: true,
         title: true,
@@ -1657,6 +1661,7 @@ export class ProductService {
         compareAtPrice: true,
         inventory: true,
         allowBackorder: true,
+        isActive: true,
         imageUrl: true,
         options: {
           include: {
@@ -1744,6 +1749,7 @@ export class ProductService {
         compareAtPrice: number | null;
         inventory: number;
         allowBackorder: boolean;
+        isActive: boolean;
         imageUrl: string | null;
         options: Array<{
           value: {
@@ -1776,6 +1782,7 @@ export class ProductService {
         compareAtPrice: v.compareAtPrice ?? undefined,
         inventory: v.inventory,
         allowBackorder: v.allowBackorder,
+        isActive: v.isActive,
         imageUrl: v.imageUrl ?? undefined,
         options,
         optionsAr,
@@ -1786,6 +1793,32 @@ export class ProductService {
       ...product,
       options: reshapedOptions,
       variants: reshapedVariants,
+    };
+  }
+
+  /**
+   * Reshape a PDP row and compute its stock flags from ALL its variants (a
+   * disabled one counts for nothing — `enrichStockFlags`), THEN drop the
+   * disabled variants from what the shopper is shown. Filtering before the
+   * computation is exactly what issue 2147 was: an all-disabled product
+   * looked variant-less and inherited the parent column's stock.
+   */
+  private static publicDetailWithStock<
+    T extends Parameters<typeof ProductService.reshapePublicProductDetail>[0],
+  >(product: T) {
+    const disabled = new Set(
+      ((product.variants ?? []) as Array<{ id: string; isActive?: boolean }>)
+        .filter(v => v.isActive === false)
+        .map(v => v.id)
+    );
+    const enriched = enrichStockFlags(
+      this.reshapePublicProductDetail(product) as unknown as Parameters<typeof enrichStockFlags>[0]
+    );
+    return {
+      ...enriched,
+      variants: (enriched.variants as Array<{ id: string }> | undefined)?.filter(
+        v => !disabled.has(v.id)
+      ),
     };
   }
 
@@ -1812,11 +1845,7 @@ export class ProductService {
       ratingCount: ratingAggregate._count.rating,
     };
 
-    const reshaped = this.reshapePublicProductDetail(product);
-    return {
-      ...enrichStockFlags(reshaped as Parameters<typeof enrichStockFlags>[0]),
-      ratingStats,
-    };
+    return { ...this.publicDetailWithStock(product), ratingStats };
   }
 
   static async getPublicById(storeId: string, productId: string) {
@@ -1842,11 +1871,7 @@ export class ProductService {
       ratingCount: ratingAggregate._count.rating,
     };
 
-    const reshaped = this.reshapePublicProductDetail(product);
-    return {
-      ...enrichStockFlags(reshaped as Parameters<typeof enrichStockFlags>[0]),
-      ratingStats,
-    };
+    return { ...this.publicDetailWithStock(product), ratingStats };
   }
 
   static async getCategories(storeId: string) {

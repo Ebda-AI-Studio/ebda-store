@@ -3,9 +3,11 @@
 
 export interface AnswerEngineSummaryEngine {
   engine: string;
+  /** Grounded checks only — an ungrounded fallback is not a citation. */
   totalChecks: number;
   citedCount: number;
-  citedRate: number;
+  /** `null` when the engine has no grounded check yet (unknown, not 0%). */
+  citedRate: number | null;
   groundedCaveat: boolean;
   /** True when the latest run could not perform grounded web search at all
    * (retired model, rejected tool, quota) — distinct from `groundedCaveat`
@@ -53,7 +55,8 @@ export function engineLabel(engine: string): string {
   }
 }
 
-export function formatPercent(rate: number): string {
+export function formatPercent(rate: number | null): string {
+  if (rate === null) return '—';
   return `${Math.round(rate * 100)}%`;
 }
 

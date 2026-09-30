@@ -14,6 +14,7 @@ import { BoundedMap } from '../lib/bounded-map';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { withSavepoint } from '../lib/savepoint';
 
 // ==========================================
 // CSRF Protection with Redis + In-Memory Fallback
@@ -1434,19 +1435,25 @@ export async function auditLog(entry: AuditLogEntry) {
       logger.info({ audit: entry }, '[AUDIT]');
     }
 
-    // Store in database
-    await prisma.auditLog.create({
-      data: {
-        action: entry.action,
-        userId: entry.userId,
-        storeId: entry.storeId,
-        resourceType: entry.resourceType,
-        resourceId: entry.resourceId,
-        details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},
-        ipAddress: entry.ip,
-        userAgent: entry.userAgent,
-      },
-    });
+    // Store in database. Savepointed (issue 2215's class): route handlers
+    // call this AFTER their business write, inside the request's single
+    // tenant transaction, and the catch below swallows — an unguarded failure
+    // aborted that transaction, so the write the client was told succeeded
+    // rolled back at COMMIT.
+    await withSavepoint(() =>
+      prisma.auditLog.create({
+        data: {
+          action: entry.action,
+          userId: entry.userId,
+          storeId: entry.storeId,
+          resourceType: entry.resourceType,
+          resourceId: entry.resourceId,
+          details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},
+          ipAddress: entry.ip,
+          userAgent: entry.userAgent,
+        },
+      })
+    );
   } catch (error) {
     // Don't fail the request if audit logging fails
     logger.error({ err: error }, '[AUDIT ERROR] Failed to write audit log');

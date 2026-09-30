@@ -15,6 +15,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => ({
   findFirst: vi.fn(),
   applyRefundEffects: vi.fn().mockResolvedValue(undefined),
+  inTenant: false,
+  withMoneyTx: vi.fn(),
 }));
 
 const tx = {
@@ -30,10 +32,24 @@ const tx = {
 };
 
 vi.mock('@force/database', () => ({
-  prisma: { backorderLine: { findFirst: h.findFirst } },
+  // Inside a request the service runs on the ambient (proxied) client, so the
+  // mock `prisma` carries the same tx accessors.
+  prisma: new Proxy(
+    { backorderLine: { findFirst: h.findFirst } },
+    {
+      get: (target: any, key: string) =>
+        key === 'backorderLine'
+          ? { ...tx.backorderLine, findFirst: h.findFirst }
+          : (target[key] ?? (tx as any)[key]),
+    }
+  ),
   Prisma: {},
+  hasTenantContext: () => h.inTenant,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withMoneyTx: (_c: any, fn: any) => fn(tx),
+  withMoneyTx: (_c: any, fn: any) => {
+    h.withMoneyTx();
+    return fn(tx);
+  },
 }));
 vi.mock('@api/services/order.service', () => ({
   OrderService: { applyRefundEffects: h.applyRefundEffects },
@@ -109,5 +125,63 @@ describe('cancelBackorder → order/refunded', () => {
     expect(tx.orderEvent.create).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ orderId: 'o1' }) })
     );
+  });
+});
+
+/**
+ * Issue 2274 — a line whose allocation is ZERO (its units already reversed by
+ * a prior return, or a fully discounted order) must not tell the customer a
+ * refund was issued; the consumer used to turn `refundAmount: 0` into the
+ * ORDER TOTAL. Mutation proof: drop `&& alloc.cashCredit > 0` → red.
+ */
+describe('cancelBackorder — a zero allocation notifies nobody (issue 2274)', () => {
+  it('fully discounted order: GL adjustment still fires, the customer is not told', async () => {
+    h.applyRefundEffects.mockClear();
+    tx.order.findUniqueOrThrow.mockResolvedValueOnce({
+      subtotal: 3000,
+      discount: 3000,
+      tax: 0,
+      taxIncludedInPrice: false,
+      paymentStatus: 'paid',
+      items: [
+        { id: 'oi1', quantity: 2, price: 1000 },
+        { id: 'oi2', quantity: 1, price: 1000 },
+      ],
+    });
+    await cancelBackorder('s1', 'bo1', 'r');
+    expect(h.applyRefundEffects).toHaveBeenCalledWith(
+      's1',
+      'o1',
+      expect.objectContaining({
+        fireRefundNotification: false,
+        partial: expect.objectContaining({ refundAmount: 0 }),
+      })
+    );
+  });
+});
+
+/**
+ * Issue 2276 — inside a request the claim + marker must ride the request's
+ * transaction (one commit decision with the deferred `order/refunded` send),
+ * not a separate `withMoneyTx` that commits on its own.
+ * Mutation proof: always call `withMoneyTx` → the first case goes red.
+ */
+describe('cancelBackorder — transaction ownership (issue 2276)', () => {
+  it('inside a request, runs on the ambient transaction (no nested withMoneyTx)', async () => {
+    h.withMoneyTx.mockClear();
+    h.inTenant = true;
+    try {
+      await cancelBackorder('s1', 'bo1', 'r');
+    } finally {
+      h.inTenant = false;
+    }
+    expect(h.withMoneyTx).not.toHaveBeenCalled();
+    expect(tx.orderEvent.create).toHaveBeenCalled();
+  });
+
+  it('outside a request, opens its own money transaction', async () => {
+    h.withMoneyTx.mockClear();
+    await cancelBackorder('s1', 'bo1', 'r');
+    expect(h.withMoneyTx).toHaveBeenCalledTimes(1);
   });
 });

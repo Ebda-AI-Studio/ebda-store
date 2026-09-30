@@ -245,7 +245,7 @@ describe('GeminiAnswerEngineProvider', () => {
     }
   });
 
-  it('logs the grounding-unavailable warning at most once per process, not once per query', async () => {
+  it('logs the grounding-unavailable warning once per scan (until reset), not once per query', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined as never);
     global.fetch = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string);

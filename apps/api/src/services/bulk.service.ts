@@ -617,7 +617,14 @@ export class BulkService {
     // so far in THIS import, two rows sharing the same NEW sku both read
     // `existing: null` and both reach the Phase 4 batch insert, which fails
     // the whole batch on the (storeId, sku) unique index (P2002).
-    const seenSkus = new Set<string>();
+    //
+    // Keyed sku → the product the row writes it ONTO (an existing id, or a
+    // per-row marker for a create). Phase 4 writes `sku` on BOTH branches,
+    // so an UPDATE claiming a sku is a collision just like a create is
+    // (issue 2048): two rows slug-matched to two different existing products
+    // both taking sku X, or an update + a create sharing X, abort the whole
+    // withMoneyTx batch. Only the SAME product re-asserting its sku is safe.
+    const skuClaimedBy = new Map<string, string>();
 
     // Parsed row data for Phase 3
     interface ParsedRow {
@@ -716,13 +723,14 @@ export class BulkService {
           continue;
         }
 
-        // #1029: a second row creating a brand-new product with a SKU
-        // already claimed by an earlier row in this same import — fail this
-        // row instead of letting both reach the batch insert. Only applies
-        // to CREATEs: two rows updating the same already-existing product to
-        // the same SKU aren't a unique-index collision.
-        if (row.sku && !existing) {
-          if (seenSkus.has(row.sku)) {
+        // #1029 / issue 2048: a row claiming a SKU an earlier row in this
+        // same import already claimed for a DIFFERENT product — fail this row
+        // instead of letting both reach the batch write. Two rows updating the
+        // same existing product to the same SKU are not a collision.
+        if (row.sku) {
+          const target = existing?.id ?? `new:${rowIndex}`;
+          const claimedBy = skuClaimedBy.get(row.sku);
+          if (claimedBy !== undefined && claimedBy !== target) {
             result.failed++;
             result.errors.push({
               row: rowIndex,
@@ -730,7 +738,7 @@ export class BulkService {
             });
             continue;
           }
-          seenSkus.add(row.sku);
+          skuClaimedBy.set(row.sku, target);
         }
 
         // Ensure unique slug using the in-memory Set (avoid DB round-trip)

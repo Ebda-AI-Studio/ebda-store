@@ -11,7 +11,7 @@ import { inngest } from '../client';
  * disable automated fills without touching code.
  *
  * #1937: this function used to ALSO kick the recommendations sweep on
- * `op === 'create'`. That kick now happens synchronously at the one true
+ * `op === 'create'`. That kick now happens (post-commit) at the one true
  * creation site (`ProductService.create()` →
  * `enqueueRecommendationsSweepForNewProduct`), because this handler's
  * `debounce: { key: 'event.data.productId', period: '10s' }` delivers only

@@ -138,3 +138,90 @@ describe('aggregateAnswerEngineChecks — groundingUnavailable (issue #929)', ()
     });
   });
 });
+
+describe('aggregateAnswerEngineChecks — latest run, not latest-per-prompt (issue 2118)', () => {
+  it('a RETIRED prompt text carrying an old reason does not pin the banner', () => {
+    // Prompt A was asked once, hit a 429, then the merchant re-ordered their
+    // categories so it is never generated again. Prompt B is the live one.
+    const summary = aggregateAnswerEngineChecks([
+      row({
+        engine: 'gemini',
+        promptText: 'prompt B',
+        cited: true,
+        citedUrls: ['https://store.example/x'],
+        runAt: new Date('2026-09-26T00:00:00Z'),
+      }),
+      row({
+        engine: 'gemini',
+        promptText: 'prompt A',
+        groundingUnavailableReason: 'http_429',
+        runAt: new Date('2026-06-01T00:00:00Z'),
+      }),
+    ]);
+
+    expect(summary.engines[0].groundingUnavailable).toBe(false);
+    expect(summary.engines[0].groundedCaveat).toBe(false);
+  });
+
+  it('a retired prompt with empty citedUrls does not hold the grounded caveat either', () => {
+    const summary = aggregateAnswerEngineChecks([
+      row({
+        engine: 'gemini',
+        promptText: 'prompt B',
+        citedUrls: ['https://other.example/y'],
+        runAt: new Date('2026-09-26T00:00:00Z'),
+      }),
+      row({ engine: 'gemini', promptText: 'prompt A', runAt: new Date('2026-06-01T00:00:00Z') }),
+    ]);
+    expect(summary.engines[0].groundedCaveat).toBe(false);
+  });
+});
+
+describe('aggregateAnswerEngineChecks — ungrounded rows are not citations (issue 2120)', () => {
+  it('leaves ungrounded fallback rows out of the cited arithmetic and the trend', () => {
+    const now = new Date('2026-09-26T00:00:00Z');
+    const summary = aggregateAnswerEngineChecks([
+      // Grounded, cited.
+      row({
+        engine: 'gemini',
+        promptText: 'a',
+        cited: true,
+        citedUrls: ['https://s/x'],
+        runAt: now,
+      }),
+      // Grounded, not cited.
+      row({ engine: 'gemini', promptText: 'b', citedUrls: ['https://o/y'], runAt: now }),
+      // Ungrounded fallback that "cited" by brand substring.
+      row({
+        engine: 'gemini',
+        promptText: 'c',
+        cited: true,
+        groundingUnavailableReason: 'http_429',
+        runAt: now,
+      }),
+    ]);
+
+    expect(summary.engines[0]).toMatchObject({
+      totalChecks: 2,
+      citedCount: 1,
+      citedRate: 0.5,
+      groundingUnavailable: true,
+    });
+    expect(summary.trend).toEqual([
+      expect.objectContaining({ totalChecks: 2, citedCount: 1, citedRate: 0.5 }),
+    ]);
+  });
+
+  it('an engine with only ungrounded rows reports an UNKNOWN rate, not 0%', () => {
+    const summary = aggregateAnswerEngineChecks([
+      row({ engine: 'gemini', cited: true, groundingUnavailableReason: 'http_429' }),
+    ]);
+    expect(summary.engines[0]).toMatchObject({
+      totalChecks: 0,
+      citedCount: 0,
+      citedRate: null,
+      groundingUnavailable: true,
+    });
+    expect(summary.trend).toEqual([]);
+  });
+});

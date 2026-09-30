@@ -35,6 +35,8 @@ export class AppError extends Error {
  * `schema.parse` in public/auth/admin routes) and 2A (duplicate-SKU P2002).
  * Both middlewares now classify through this one function; a parity test
  * (`tests/unit/error-status-parity.test.ts`) pins it to the responses below.
+ * Sentry still captures a P2003 / P2025 at WARNING level (issue 1988) — they
+ * are answered as client errors but are often server defects (FORCE-API-28).
  */
 export function clientErrorStatus(err: unknown): number | undefined {
   if (err instanceof AppError) return err.statusCode < 500 ? err.statusCode : undefined;

@@ -1,6 +1,97 @@
 import { orderTaxPlacement } from '@force/shared';
-import { escapeHtml } from './_util';
+import { escapeHtml, emailMoney } from './_util';
 import type { OrderEmailData } from '../email.service';
+
+const LABELS = {
+  en: {
+    subtotal: 'Subtotal',
+    coupon: 'Coupon',
+    promotion: 'Promotion',
+    loyaltyPoints: 'Loyalty points',
+    discount: 'Discount',
+    tax: 'Tax',
+    shipping: 'Shipping',
+    total: 'Total',
+    taxIncluded: 'Incl. VAT',
+  },
+  ar: {
+    subtotal: 'المجموع الفرعي',
+    coupon: 'كوبون',
+    promotion: 'عرض ترويجي',
+    loyaltyPoints: 'نقاط الولاء',
+    discount: 'الخصم',
+    tax: 'الضريبة',
+    shipping: 'الشحن',
+    total: 'الإجمالي',
+    taxIncluded: 'شامل ضريبة القيمة المضافة',
+  },
+} as const;
+
+/**
+ * The totals block, shared by both locales so they cannot drift.
+ *
+ *  - Tax placement is the shared `orderTaxPlacement` (issue 2210): exclusive
+ *    tax is a summed row — only when there IS tax (issue 2168); INCLUSIVE tax
+ *    is already inside `total`, so it is a caption after Total.
+ *  - Issue 2239: the discount is split into coupon / promotion / loyalty
+ *    points / remainder like the invoice and every order screen, so redeemed
+ *    points are never attributed to the coupon.
+ */
+function totalsRows(d: OrderEmailData, locale: 'en' | 'ar'): string {
+  const L = LABELS[locale];
+  const money = (v: number) => emailMoney(v, d.currency, locale);
+  const row = (label: string, value: string, cls = '') =>
+    `<tr${cls ? ` class="${cls}"` : ''}>
+          <td colspan="2">${label}</td>
+          <td style="text-align: right;">${value}</td>
+        </tr>`;
+  const promotionName = locale === 'ar' ? d.promotionNameAr || d.promotionName : d.promotionName;
+  const coupon = d.couponDiscount ?? 0;
+  const promotion = d.promotionDiscount ?? 0;
+  const loyalty = d.loyaltyDiscount ?? 0;
+  const other = Math.max(0, (d.discount ?? 0) - coupon - promotion - loyalty);
+  // A payload without the lever split (an older producer) keeps the previous
+  // single annotated line: coupon code first, else the promotion name.
+  const hasLevers =
+    d.couponDiscount !== undefined ||
+    d.promotionDiscount !== undefined ||
+    d.loyaltyDiscount !== undefined;
+  const legacyLabel = hasLevers ? null : d.couponCode ? d.couponCode : promotionName;
+  const legacyAnnotation = legacyLabel ? ` (${escapeHtml(legacyLabel)})` : '';
+  const { taxRow, includedTaxCaption } = orderTaxPlacement(d);
+  return [
+    row(L.subtotal, money(d.subtotal)),
+    coupon > 0
+      ? row(
+          `${L.coupon}${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : ''}`,
+          `-${money(coupon)}`
+        )
+      : '',
+    promotion > 0
+      ? row(
+          `${L.promotion}${promotionName ? ` (${escapeHtml(promotionName)})` : ''}`,
+          `-${money(promotion)}`
+        )
+      : '',
+    loyalty > 0
+      ? row(
+          `${L.loyaltyPoints}${d.loyaltyPointsRedeemed ? ` (${d.loyaltyPointsRedeemed})` : ''}`,
+          `-${money(loyalty)}`
+        )
+      : '',
+    other > 0 ? row(`${L.discount}${legacyAnnotation}`, `-${money(other)}`) : '',
+    taxRow !== null && taxRow > 0 ? row(L.tax, money(taxRow)) : '',
+    row(L.shipping, money(d.shipping)),
+    row(L.total, money(d.total), 'total-row'),
+    includedTaxCaption !== null
+      ? `<tr class="tax-included">
+          <td colspan="3" style="text-align: right; color: #6b7280; font-size: 12px;">${L.taxIncluded} ${money(includedTaxCaption)}</td>
+        </tr>`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n        ');
+}
 
 export const orderConfirmationTemplate = {
   subject: {
@@ -9,14 +100,13 @@ export const orderConfirmationTemplate = {
   },
 
   en: (d: OrderEmailData, _storeName: string) => {
-    const { taxRow, includedTaxCaption } = orderTaxPlacement(d);
     const itemsHtml = d.items
       .map(
         item => `
       <tr>
         <td>${escapeHtml(item.name)}</td>
         <td style="text-align: center;">${item.quantity}</td>
-        <td style="text-align: right;">${(item.price / 1000).toFixed(3)} KWD</td>
+        <td style="text-align: right;">${emailMoney(item.price, d.currency, 'en')}</td>
       </tr>`
       )
       .join('');
@@ -38,41 +128,7 @@ export const orderConfirmationTemplate = {
       </thead>
       <tbody>${itemsHtml}</tbody>
       <tfoot>
-        <tr>
-          <td colspan="2">Subtotal</td>
-          <td style="text-align: right;">${(d.subtotal / 1000).toFixed(3)} KWD</td>
-        </tr>
-        ${
-          taxRow !== null
-            ? `<tr>
-          <td colspan="2">Tax</td>
-          <td style="text-align: right;">${(taxRow / 1000).toFixed(3)} KWD</td>
-        </tr>`
-            : ''
-        }
-        <tr>
-          <td colspan="2">Shipping</td>
-          <td style="text-align: right;">${(d.shipping / 1000).toFixed(3)} KWD</td>
-        </tr>
-        ${
-          d.discount && d.discount > 0
-            ? `<tr>
-          <td colspan="2">Discount${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : d.promotionName ? ` (${escapeHtml(d.promotionName)})` : ''}</td>
-          <td style="text-align: right;">-${(d.discount / 1000).toFixed(3)} KWD</td>
-        </tr>`
-            : ''
-        }
-        <tr class="total-row">
-          <td colspan="2">Total</td>
-          <td style="text-align: right;">${(d.total / 1000).toFixed(3)} KWD</td>
-        </tr>
-        ${
-          includedTaxCaption !== null
-            ? `<tr>
-          <td colspan="3" style="text-align: right; color: #6b7280; font-size: 12px;">Incl. VAT ${(includedTaxCaption / 1000).toFixed(3)} KWD</td>
-        </tr>`
-            : ''
-        }
+        ${totalsRows(d, 'en')}
       </tfoot>
     </table>
 
@@ -88,14 +144,13 @@ export const orderConfirmationTemplate = {
   },
 
   ar: (d: OrderEmailData, _storeName: string) => {
-    const { taxRow, includedTaxCaption } = orderTaxPlacement(d);
     const itemsHtml = d.items
       .map(
         item => `
       <tr>
         <td>${escapeHtml(item.nameAr || item.name)}</td>
         <td style="text-align: center;">${item.quantity}</td>
-        <td style="text-align: right;">${(item.price / 1000).toFixed(3)} د.ك</td>
+        <td style="text-align: right;">${emailMoney(item.price, d.currency, 'ar')}</td>
       </tr>`
       )
       .join('');
@@ -117,41 +172,7 @@ export const orderConfirmationTemplate = {
       </thead>
       <tbody>${itemsHtml}</tbody>
       <tfoot>
-        <tr>
-          <td colspan="2">المجموع الفرعي</td>
-          <td style="text-align: right;">${(d.subtotal / 1000).toFixed(3)} د.ك</td>
-        </tr>
-        ${
-          taxRow !== null
-            ? `<tr>
-          <td colspan="2">الضريبة</td>
-          <td style="text-align: right;">${(taxRow / 1000).toFixed(3)} د.ك</td>
-        </tr>`
-            : ''
-        }
-        <tr>
-          <td colspan="2">الشحن</td>
-          <td style="text-align: right;">${(d.shipping / 1000).toFixed(3)} د.ك</td>
-        </tr>
-        ${
-          d.discount && d.discount > 0
-            ? `<tr>
-          <td colspan="2">الخصم${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : d.promotionNameAr || d.promotionName ? ` (${escapeHtml(d.promotionNameAr || d.promotionName || '')})` : ''}</td>
-          <td style="text-align: right;">-${(d.discount / 1000).toFixed(3)} د.ك</td>
-        </tr>`
-            : ''
-        }
-        <tr class="total-row">
-          <td colspan="2">الإجمالي</td>
-          <td style="text-align: right;">${(d.total / 1000).toFixed(3)} د.ك</td>
-        </tr>
-        ${
-          includedTaxCaption !== null
-            ? `<tr>
-          <td colspan="3" style="text-align: right; color: #6b7280; font-size: 12px;">شامل ضريبة القيمة المضافة ${(includedTaxCaption / 1000).toFixed(3)} د.ك</td>
-        </tr>`
-            : ''
-        }
+        ${totalsRows(d, 'ar')}
       </tfoot>
     </table>
 

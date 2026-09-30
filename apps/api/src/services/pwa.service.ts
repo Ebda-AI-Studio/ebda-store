@@ -112,7 +112,10 @@ const ICON_TARGETS: ReadonlyArray<{
  * was already live and referenced by `Store.pwaSettings` — the previous
  * generation's icons stay exactly as they were, still serving, still
  * consistent with the DB, until this call fully succeeds and its caller
- * persists the new URLs. A failed run leaves orphaned new-version objects in
+ * persists the new URLs. On success the route deletes the PREVIOUS
+ * generation's objects once the write commits (`cleanupRemovedJsonUrls` in
+ * pwa.routes.ts, issue 2201), so a regeneration does not accumulate ~9
+ * objects per upload. A failed run leaves orphaned new-version objects in
  * R2, never a half-updated live set. Those orphans are cheap and are REPORTED
  * by the weekly `r2-orphan-sweep` and `scripts/r2-orphan-audit.ts` (deleted
  * only when an operator opts in: `R2_ORPHAN_SWEEP_APPLY=true` / `--apply`).

@@ -1,4 +1,4 @@
-import { escapeHtml } from './_util';
+import { escapeHtml, emailMoney } from './_util';
 import type { OrderRefundEmailData } from '../email.service';
 
 export const orderRefundedTemplate = {
@@ -11,7 +11,7 @@ export const orderRefundedTemplate = {
     <h2>Your refund has been requested</h2>
     <p>Hi ${escapeHtml(d.customerName)},</p>
     <p>
-      A refund of <strong>${(d.refundAmount / 1000).toFixed(3)} KWD</strong>
+      A refund of <strong>${emailMoney(d.refundAmount, d.currency, 'en')}</strong>
       for order <strong>#${escapeHtml(d.orderNumber)}</strong> has been submitted to the
       payment provider. The amount will appear on your original payment method within
       1–3 business days, depending on the provider and your bank.
@@ -27,11 +27,11 @@ export const orderRefundedTemplate = {
       <tbody>
         <tr>
           <td>Order Total</td>
-          <td style="text-align: right;">${(d.orderTotal / 1000).toFixed(3)} KWD</td>
+          <td style="text-align: right;">${emailMoney(d.orderTotal, d.currency, 'en')}</td>
         </tr>
         <tr class="total-row">
           <td>Refunded</td>
-          <td style="text-align: right;">-${(d.refundAmount / 1000).toFixed(3)} KWD</td>
+          <td style="text-align: right;">-${emailMoney(d.refundAmount, d.currency, 'en')}</td>
         </tr>
       </tbody>
     </table>
@@ -43,7 +43,7 @@ export const orderRefundedTemplate = {
     <h2>تم استرداد مبلغ طلبك</h2>
     <p>مرحباً ${escapeHtml(d.customerName)}،</p>
     <p>
-      أصدرنا استرداداً بقيمة <strong>${(d.refundAmount / 1000).toFixed(3)} د.ك</strong>
+      أصدرنا استرداداً بقيمة <strong>${emailMoney(d.refundAmount, d.currency, 'ar')}</strong>
       للطلب رقم <strong>${escapeHtml(d.orderNumber)}</strong>. سيظهر المبلغ في طريقة الدفع
       الأصلية خلال 5 إلى 10 أيام عمل وفقاً لبنكك.
     </p>
@@ -58,11 +58,11 @@ export const orderRefundedTemplate = {
       <tbody>
         <tr>
           <td>إجمالي الطلب</td>
-          <td style="text-align: right;">${(d.orderTotal / 1000).toFixed(3)} د.ك</td>
+          <td style="text-align: right;">${emailMoney(d.orderTotal, d.currency, 'ar')}</td>
         </tr>
         <tr class="total-row">
           <td>المبلغ المسترد</td>
-          <td style="text-align: right;">-${(d.refundAmount / 1000).toFixed(3)} د.ك</td>
+          <td style="text-align: right;">-${emailMoney(d.refundAmount, d.currency, 'ar')}</td>
         </tr>
       </tbody>
     </table>

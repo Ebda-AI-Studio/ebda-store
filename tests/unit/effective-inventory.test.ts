@@ -162,4 +162,22 @@ describe('no API query re-derives variant stock blind to isActive (#1103)', () =
     });
     expect(offenders).toEqual([]);
   });
+
+  // Issue 2147: a select that PRE-FILTERS the relation to active rows (with any
+  // select after it) hands a product whose variants are all disabled to the
+  // helper as variant-less, and the helper then falls back to the parent
+  // column. In any file that computes stock, variants must be selected
+  // unfiltered, with `isActive`, and disabled rows dropped for display after.
+  // Mutation proof: restore `where: { isActive: true }` on the PDP select or a
+  // wa-bridge select → this goes red.
+  it('no stock-computing file pre-filters its variants relation to isActive', () => {
+    const preFiltered =
+      /variants:\s*{\s*(?:orderBy:\s*{[^}]*},\s*)?where:\s*{\s*isActive:\s*true\s*}/;
+    const computesStock = /effectiveInventory\(|isOrderable\(|enrichStockFlags\(/;
+    const offenders = files(API_SRC).filter(f => {
+      const src = fs.readFileSync(f, 'utf8');
+      return computesStock.test(src) && preFiltered.test(src);
+    });
+    expect(offenders.map(f => path.relative(API_SRC, f))).toEqual([]);
+  });
 });

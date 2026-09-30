@@ -2,6 +2,7 @@ import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { withSavepoint } from '../lib/savepoint';
 
 /**
  * Per-store Pages CMS service.
@@ -326,12 +327,19 @@ export class PagesService {
       select: { coverImage: true },
     });
     try {
-      await prisma.storePage.delete({
-        where: { storeId_slug: { storeId, slug } },
-      });
-    } catch {
+      // Savepointed and P2025-only (issue 2215's class): this runs in the
+      // request's tenant transaction, and the old bare catch treated ANY
+      // error as "already deleted" — an FK/RLS failure aborted the
+      // transaction while the route answered success.
+      await withSavepoint(() =>
+        prisma.storePage.delete({
+          where: { storeId_slug: { storeId, slug } },
+        })
+      );
+    } catch (err) {
       // P2025 = record not found. Treat as idempotent delete.
-      return;
+      if ((err as { code?: string }).code === 'P2025') return;
+      throw err;
     }
     if (existing?.coverImage) {
       void deleteR2ObjectIfOrphan(existing.coverImage).catch(err =>

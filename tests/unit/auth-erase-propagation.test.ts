@@ -29,13 +29,21 @@ vi.mock('@api/services/account-lockout.service', () => ({
   },
 }));
 
-const { setUserTokenVersion } = vi.hoisted(() => ({
+const { setUserTokenVersion, clearUserTokenVersion, sendAlert } = vi.hoisted(() => ({
   setUserTokenVersion: vi.fn().mockResolvedValue(undefined),
+  clearUserTokenVersion: vi.fn().mockResolvedValue(undefined),
+  sendAlert: vi.fn().mockResolvedValue('sent'),
 }));
 
 vi.mock('@api/services/redis.service', () => ({
-  redis: { isAvailable: vi.fn().mockReturnValue(false), getClient: vi.fn(), setUserTokenVersion },
+  redis: {
+    isAvailable: vi.fn().mockReturnValue(false),
+    getClient: vi.fn(),
+    setUserTokenVersion,
+    clearUserTokenVersion,
+  },
 }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert }));
 
 vi.mock('@api/services/r2-cleanup.service', () => ({
   deleteR2ObjectIfOrphan: vi.fn().mockResolvedValue(undefined),
@@ -77,7 +85,11 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     customer: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
     customerAddress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     newsletterSubscriber: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    campaignRecipient: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    campaignRecipient: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     $transaction: vi.fn(),
     // `SET LOCAL app.bypass_rls` brackets the addresses delete — see the
     // rls-bypass test below for why removing it silently under-erases.
@@ -393,11 +405,28 @@ describe('AuthService.eraseAccount — revokes live access tokens (#1871)', () =
     expect(setUserTokenVersion).toHaveBeenCalledWith(CUSTOMER.id, 8);
   });
 
-  it('still completes the erasure when the tv cache write fails (fail-open)', async () => {
+  it('still completes the erasure when the tv cache write fails, deleting the stale key instead', async () => {
     mockPrisma.user.update.mockResolvedValueOnce({ tokenVersion: 8 });
-    setUserTokenVersion.mockRejectedValueOnce(new Error('redis down'));
+    setUserTokenVersion.mockRejectedValueOnce(new Error('redis blip'));
 
     await expect(AuthService.eraseAccount(CUSTOMER.id)).resolves.toBeDefined();
+    // A miss makes the next request read the bumped tv + inactive status.
+    expect(clearUserTokenVersion).toHaveBeenCalledWith(CUSTOMER.id);
+  });
+
+  // Issue 1964: on the inline paths (POST /auth/me/erase, the retention
+  // cron) a failed push was a warn nobody watched while old access tokens
+  // kept authenticating against the anonymized row.
+  it('raises a P1 alert when the push cannot land at all, and still completes the erasure', async () => {
+    sendAlert.mockClear();
+    mockPrisma.user.update.mockResolvedValueOnce({ tokenVersion: 8 });
+    setUserTokenVersion.mockRejectedValueOnce(new Error('redis down'));
+    clearUserTokenVersion.mockRejectedValueOnce(new Error('redis down'));
+
+    await expect(AuthService.eraseAccount(CUSTOMER.id)).resolves.toBeDefined();
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'auth.eraseAccount.revoke-sessions' })
+    );
   });
 });
 

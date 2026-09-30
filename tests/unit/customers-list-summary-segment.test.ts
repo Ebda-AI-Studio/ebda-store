@@ -14,6 +14,9 @@ const h = vi.hoisted(() => ({
   orderFindMany: vi.fn(),
   userFindMany: vi.fn(),
   rfmFindMany: vi.fn(),
+  rfmGroupBy: vi.fn(),
+  // The store's snapshot rows; the two mocks below query them faithfully.
+  rfmRows: [] as Array<{ customerId: string; segment: string }>,
   caller: { role: 'store_admin' as string, userId: 'admin-a' },
 }));
 
@@ -24,7 +27,7 @@ vi.mock('@force/database', async importOriginal => {
     prisma: {
       order: { findMany: h.orderFindMany },
       user: { findMany: h.userFindMany, findUnique: vi.fn() },
-      customerRfmSnapshot: { findMany: h.rfmFindMany },
+      customerRfmSnapshot: { findMany: h.rfmFindMany, groupBy: h.rfmGroupBy },
       store: { findUnique: vi.fn() },
     },
   };
@@ -113,10 +116,21 @@ beforeEach(() => {
   h.userFindMany.mockResolvedValue([
     { id: 'u4', email: 'u4@x.test', firstName: 'Z', lastName: 'O', phone: null },
   ]);
-  h.rfmFindMany.mockResolvedValue([
+  h.rfmRows = [
     { customerId: 'u1', segment: 'vip' },
     { customerId: GUEST_RFM_KEY, segment: 'at_risk' },
-  ]);
+  ];
+  h.rfmFindMany.mockImplementation(
+    async ({ where }: { where: { segment?: string; customerId?: { in: string[] } } }) =>
+      h.rfmRows.filter(
+        r =>
+          (where.segment === undefined || r.segment === where.segment) &&
+          (where.customerId === undefined || where.customerId.in.includes(r.customerId))
+      )
+  );
+  h.rfmGroupBy.mockImplementation(async () =>
+    Array.from(new Set(h.rfmRows.map(r => r.segment))).map(segment => ({ segment }))
+  );
 });
 
 describe('GET /customers — KPI summary', () => {
@@ -159,10 +173,15 @@ describe('GET /customers — KPI summary', () => {
 describe('GET /customers?segment=', () => {
   it('filters to the RFM segment server-side, across the whole set', async () => {
     const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=vip`);
+    // Issue 2243: the filter reads that segment's members only — never the
+    // store's whole snapshot table.
     expect(h.rfmFindMany).toHaveBeenCalledWith({
-      where: { storeId: STORE },
-      select: { customerId: true, segment: true },
+      where: { storeId: STORE, segment: 'vip' },
+      select: { customerId: true },
     });
+    for (const [args] of h.rfmFindMany.mock.calls) {
+      expect(args.where.segment ?? args.where.customerId).toBeDefined();
+    }
     expect(res.body.data.data.map((c: { id: string }) => c.id)).toEqual(['u1']);
     expect(res.body.data.meta.total).toBe(1);
   });
@@ -177,7 +196,7 @@ describe('GET /customers?segment=', () => {
   it('a snapshot keyed the pre-2026-09-30 way (hash of email:phone) matches nothing', async () => {
     const { createHash } = await import('node:crypto');
     const legacy = `GUEST:${createHash('sha256').update('guest@x.test:').digest('hex')}`;
-    h.rfmFindMany.mockResolvedValue([{ customerId: legacy, segment: 'lost' }]);
+    h.rfmRows = [{ customerId: legacy, segment: 'lost' }];
     const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=lost`);
     expect(res.body.data.meta.total).toBe(0);
   });
@@ -231,5 +250,17 @@ describe('zero-order union (issue 2051)', () => {
     await request(app).get(`/api/v1/stores/${STORE}/customers`);
     const where = h.userFindMany.mock.calls[0][0].where;
     expect(where.id.notIn.sort()).toEqual(['u1', 'u2', 'u3']);
+  });
+});
+
+describe('GET /customers — segment reads are bounded (issue 2243)', () => {
+  it('reads per-row segments for the returned page only', async () => {
+    await request(app).get(`/api/v1/stores/${STORE}/customers?perPage=1`);
+    const pageRead = h.rfmFindMany.mock.calls.find(([a]) => a.where.customerId);
+    expect(pageRead?.[0].where.customerId.in).toHaveLength(1);
+    // No unbounded read of every snapshot in the store.
+    for (const [args] of h.rfmFindMany.mock.calls) {
+      expect(args.where.segment ?? args.where.customerId).toBeDefined();
+    }
   });
 });

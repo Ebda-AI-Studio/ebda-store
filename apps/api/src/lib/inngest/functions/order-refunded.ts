@@ -474,6 +474,7 @@ export async function handleOrderRefunded(
     customerEmail,
     orderTotal: order.total,
     refundAmount,
+    currency: order.currency,
     reason:
       typeof (latestPayment?.metadata as Record<string, unknown> | null)?.refundReason === 'string'
         ? ((latestPayment?.metadata as Record<string, unknown>).refundReason as string)

@@ -1296,8 +1296,11 @@ model Order {
   // Persisted per-order rather than re-read from `Store.taxIncludedInPrice`
   // because the merchant can flip that switch at any time: months later the
   // GL posting and the refund allocator must still read THIS order's money
-  // the way it was charged. Every `order.tax` consumer honours it — see
-  // services/accounting/posting/{order-posting,partial-return-allocation}.ts.
+  // the way it was charged. Every `order.tax` consumer honours it: the money
+  // paths (services/accounting/posting/{order-posting,partial-return-allocation}.ts)
+  // and every post-purchase display via `orderTaxPlacement` (@force/shared) —
+  // invoice, confirmation email, admin + orders-app order cards, the account
+  // order page — plus the XLSX export's "Tax Included In Price" column.
   taxIncludedInPrice    Boolean            @default(false) @map("tax_included_in_price")
   shipping              Int                @default(0)
   discount              Int                @default(0)

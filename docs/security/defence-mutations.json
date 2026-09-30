@@ -777,8 +777,8 @@
       "tier": "unit",
       "why": "the Redis tokenVersion bump used to run BARE inside the caller ambient tenant transaction (e.g. PUT /admin/users/:id) — a later COMMIT/audit-log failure rolled back Postgres while Redis kept the bumped version, a permanent lockout with no recovery path",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "    void deferAfterTenantCommit('auth.revokeAllSessions.setTokenVersion', () =>",
-      "replace": "    void ((_n: string, fn: () => Promise<unknown>) => fn())('auth.revokeAllSessions.setTokenVersion', () =>",
+      "find": "    await deferAfterTenantCommit('auth.revokeAllSessions.setTokenVersion', () =>",
+      "replace": "    await ((_n: string, fn: () => Promise<unknown>) => fn())('auth.revokeAllSessions.setTokenVersion', () =>",
       "test": "tests/unit/revoke-all-sessions-deferred.test.ts"
     },
     {

@@ -29,11 +29,29 @@ const CACHE_TTL = 300; // 5 minutes
 // reused) absorbs them. Deliberately NOT a stale-value fallback: this map gates
 // paid features, so a second failure still throws (fail closed) instead of
 // serving a map that might say ON for something that was turned off.
+const CONNECTION_FAILURE_CODES = ['P1001', 'P1002', 'P1017'];
 const DB_READ_RETRY = {
   retries: 1,
   baseDelayMs: 100,
-  extraRetryCodes: ['P1001', 'P1002', 'P1017'],
+  extraRetryCodes: CONNECTION_FAILURE_CODES,
 };
+
+// Issue 1991: during a SUSTAINED outage the retry above doubled the connection
+// attempts on the hottest read (store resolve, every add-to-cart) exactly when
+// the database is struggling. After a read whose retry also failed on a
+// connection error, retries are suspended for this window: every read still
+// makes its ONE attempt (so recovery is seen at once — no fail-fast sentinel
+// that would keep failing after the database is back), it just stops paying
+// for a second one. Process-wide, not per store: the outage is.
+const RETRY_SUSPEND_AFTER_OUTAGE_MS = 5_000;
+
+function isConnectionFailure(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { code?: unknown; errorCode?: unknown };
+  return [e.code, e.errorCode].some(
+    c => typeof c === 'string' && CONNECTION_FAILURE_CODES.includes(c)
+  );
+}
 
 class FeatureService {
   /**
@@ -49,6 +67,9 @@ class FeatureService {
    * docs/audits/2026-07-13-cache-stampede.md).
    */
   private inFlight = new Map<string, Promise<Record<FeatureKey, boolean>>>();
+
+  /** When a read last failed on a connection error AFTER its retry (issue 1991). */
+  private connectionOutageAt = 0;
 
   // ==========================================
   // Cache Helpers
@@ -220,10 +241,21 @@ class FeatureService {
 
     const pending = (async () => {
       logger.debug({ storeId }, '[FeatureService] Cache miss, reading from DB');
-      const features = await retryOnWriteConflict(() => this.readFromDb(storeId), {
-        ...DB_READ_RETRY,
-        label: 'feature.readFromDb',
-      });
+      const inOutage = Date.now() - this.connectionOutageAt < RETRY_SUSPEND_AFTER_OUTAGE_MS;
+      let features: Record<FeatureKey, boolean>;
+      try {
+        features = await retryOnWriteConflict(() => this.readFromDb(storeId), {
+          ...DB_READ_RETRY,
+          retries: inOutage ? 0 : DB_READ_RETRY.retries,
+          label: 'feature.readFromDb',
+        });
+      } catch (err) {
+        // Still fails CLOSED (RULINGS SN-4) — this only stops the next reads
+        // from paying for a retry while the outage lasts.
+        if (isConnectionFailure(err)) this.connectionOutageAt = Date.now();
+        throw err;
+      }
+      this.connectionOutageAt = 0;
 
       // 3. Populate cache (best-effort)
       await this.writeToCache(storeId, features);

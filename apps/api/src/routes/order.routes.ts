@@ -113,6 +113,8 @@ router.get(
           discount: true,
           couponDiscount: true,
           promotionDiscount: true,
+          loyaltyDiscount: true,
+          taxIncludedInPrice: true,
           total: true,
           currency: true,
           couponCode: true,
@@ -178,8 +180,14 @@ router.get(
         { header: 'Discount (KWD)', key: 'discount', width: 16 },
         { header: 'Coupon', key: 'coupon', width: 14 },
         { header: 'Promotion', key: 'promotion', width: 18 },
+        // Loyalty points' share of Discount (issue 2239) — invisible before.
+        { header: 'Loyalty Discount (KWD)', key: 'loyaltyDiscount', width: 20 },
         { header: 'Shipping (KWD)', key: 'shipping', width: 16 },
         { header: 'Tax (KWD)', key: 'tax', width: 12 },
+        // Issue 2168: for an inclusive order Tax is INSIDE Total, so
+        // Subtotal − Discount + Shipping + Tax ≠ Total. This column says which
+        // formula reconciles the row.
+        { header: 'Tax Included In Price', key: 'taxIncluded', width: 20 },
         { header: 'Total (KWD)', key: 'total', width: 14 },
         { header: 'Area', key: 'area', width: 18 },
         { header: 'City', key: 'city', width: 16 },
@@ -252,8 +260,10 @@ router.get(
             discount: Number((order.discount / 1000).toFixed(3)),
             coupon: order.couponCode ?? '',
             promotion: order.appliedPromotion?.name ?? '',
+            loyaltyDiscount: Number((order.loyaltyDiscount / 1000).toFixed(3)),
             shipping: Number((order.shipping / 1000).toFixed(3)),
             tax: Number((order.tax / 1000).toFixed(3)),
+            taxIncluded: order.taxIncludedInPrice ? 'Yes' : 'No',
             total: Number((order.total / 1000).toFixed(3)),
             area: addr?.area ?? addr?.state ?? '',
             city: addr?.city ?? '',

@@ -118,7 +118,6 @@ const UNREVIEWED_PREDATING_THIS_REGISTRY = new Set([
   'lib/inngest/functions/bulk-ai-product-faqs.ts',
   'lib/inngest/functions/bulk-ai-recommendations.ts',
   'lib/inngest/functions/order-refunded.ts',
-  'services/accounting/backorder.service.ts',
   'services/accounting/purchase-order.service.ts',
   'services/accounting/stock-adjustment.service.ts',
   'services/feature.service.ts',

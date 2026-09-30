@@ -6576,7 +6576,31 @@
       "loadFailed": "Could not load product velocity."
     }
   },
+  "emailQueue": {
+    "title": "Email queue — failed emails",
+    "subtitle": "Queued emails that failed every attempt. Each one raised a P1 alert. Retry puts them all back on the queue.",
+    "refresh": "Refresh",
+    "retryAll": "Retry all",
+    "retrying": "Retrying…",
+    "confirmRetry": "Put every failed email back on the queue? Only do this once the email provider has recovered.",
+    "retrySuccess": "Re-queued {count} email(s)",
+    "retryFailed": "Retry failed: {message}",
+    "loading": "Loading…",
+    "empty": "No failed emails",
+    "failedToLoad": "Failed to load failed emails",
+    "stats": "{pending} pending · {failed} failed",
+    "statsUnknown": "Queue status unknown",
+    "webhookInboxLink": "Payment webhook inbox",
+    "columns": {
+      "created": "Queued",
+      "subject": "Subject",
+      "to": "To",
+      "attempts": "Attempts",
+      "error": "Last error"
+    }
+  },
   "webhookEvents": {
+    "emailQueueLink": "Failed emails",
     "title": "Payment webhook inbox",
     "subtitle": "Durable record of every payment-provider webhook. Replay re-fires the event (idempotency-safe).",
     "refresh": "Refresh",

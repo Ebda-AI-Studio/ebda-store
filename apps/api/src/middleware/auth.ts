@@ -68,8 +68,10 @@ function extractToken(req: Request): string | undefined {
  * degraded Redis turns every authenticated request into a round-trip. The
  * reasoning attached to it was wrong: it claimed a stale-low `tv` would keep a
  * revoked token alive "for at most the same bound the Redis tier already
- * accepts". The Redis tier accepts no such bound — revocation CLEARS that key,
- * so the next request reads Postgres and sees the bump immediately. An
+ * accepts". The Redis tier accepts no such bound — revocation OVERWRITES that
+ * key with the bumped value, or DELETES it when that write fails
+ * (`pushTokenVersion` in auth.service.ts), so the next request sees the bump
+ * immediately, from the cache or from Postgres. An
  * in-process memo has nothing clearing it, and being per-process, nothing
  * could: a bump on one instance cannot evict another instance's copy. It
  * bought a cache hit and sold the revocation guarantee, keeping logged-out

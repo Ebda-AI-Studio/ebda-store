@@ -196,7 +196,10 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
         allowBackorder: true,
         // Required by the `inStock` flag below: for a variant product the
         // stock is the variant sum, not `inventory`. See lib/effective-inventory.ts.
-        variants: { where: { isActive: true }, select: { inventory: true, allowBackorder: true } },
+        // All variants WITH `isActive` — never pre-filtered: an all-disabled
+        // product would otherwise read as variant-less and inherit the parent
+        // column (issue 2147). effectiveInventory drops the disabled ones.
+        variants: { select: { inventory: true, allowBackorder: true, isActive: true } },
         images: {
           select: { url: true },
           orderBy: { position: 'asc' },
@@ -275,7 +278,10 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         allowBackorder: true,
         // Required by the `inStock` flag below: for a variant product the
         // stock is the variant sum, not `inventory`. See lib/effective-inventory.ts.
-        variants: { where: { isActive: true }, select: { inventory: true, allowBackorder: true } },
+        // All variants WITH `isActive` — never pre-filtered: an all-disabled
+        // product would otherwise read as variant-less and inherit the parent
+        // column (issue 2147). effectiveInventory drops the disabled ones.
+        variants: { select: { inventory: true, allowBackorder: true, isActive: true } },
         // Issue 3: include imageUrl so WBS can send product images before the list
         images: {
           select: { url: true },
@@ -642,14 +648,17 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
         categories: {
           select: { categoryId: true },
         },
+        // All variants WITH `isActive` (issue 2147): `inStock` below reads
+        // effectiveInventory, which must see every variant; the disabled ones
+        // are dropped from the offered list instead.
         variants: {
-          where: { isActive: true },
           select: {
             id: true,
             title: true,
             price: true,
             inventory: true,
             allowBackorder: true,
+            isActive: true,
           },
         },
       },
@@ -711,12 +720,14 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
           inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
           sku: p.sku ?? undefined,
           imageUrl: p.images[0]?.url ?? undefined,
-          variants: p.variants.map(v => ({
-            id: v.id,
-            name: v.title,
-            price: v.price ?? p.price,
-            inStock: v.inventory > 0 || v.allowBackorder,
-          })),
+          variants: p.variants
+            .filter(v => v.isActive)
+            .map(v => ({
+              id: v.id,
+              name: v.title,
+              price: v.price ?? p.price,
+              inStock: v.inventory > 0 || v.allowBackorder,
+            })),
         })),
         // Bundle entries: only isPurchasable ones (via listPurchasableBundles),
         // never the per-component allocated prices — `price`/`compareAtPrice`

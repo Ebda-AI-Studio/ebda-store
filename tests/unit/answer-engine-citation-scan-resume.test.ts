@@ -23,6 +23,8 @@ vi.mock('@force/database', () => ({
     store: { findUnique: vi.fn().mockResolvedValue({ domain: 'shop.example', name: 'Shop' }) },
     answerEngineCheck: { findMany: mockFindMany, create: mockCreate },
   },
+  // withSavepoint (lib/savepoint.ts) asks this; no request transaction here.
+  hasTenantContext: () => false,
 }));
 vi.mock('@api/services/ai.service', () => ({ recordUsage: mockRecordUsage }));
 vi.mock('@api/services/answer-engine/budget', () => ({

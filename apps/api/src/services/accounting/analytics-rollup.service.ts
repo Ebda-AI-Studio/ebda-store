@@ -20,6 +20,11 @@ import { prisma } from '@force/database';
 import { RfmSegment } from '@force/database';
 import logger from '../../lib/logger';
 import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
+// Every snapshot write below is savepointed (issue 2215's class): the daily
+// rollup runs each store inside ONE `runInTenantContext` transaction, and each
+// block swallows its own failure — without a savepoint the first failed write
+// aborted the transaction and silently doomed every later block's writes.
+import { withSavepoint } from '../../lib/savepoint';
 
 // ---------------------------------------------------------------------------
 // Public result type
@@ -338,7 +343,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
 
     if (toCreate.length > 0) {
       try {
-        await prisma.customerCohortSnapshot.createMany({ data: toCreate });
+        await withSavepoint(() => prisma.customerCohortSnapshot.createMany({ data: toCreate }));
         rowsWritten += toCreate.length;
       } catch (err) {
         logger.error(
@@ -350,16 +355,18 @@ export async function runCohortRollup(storeId: string): Promise<number> {
 
     for (const { id, row } of toUpdate) {
       try {
-        await prisma.customerCohortSnapshot.update({
-          where: { id },
-          data: {
-            customersTotal: row.customersTotal,
-            customersActive: row.customersActive,
-            ordersInPeriod: row.ordersInPeriod,
-            revenueInPeriod: row.revenueInPeriod,
-            computedAt: new Date(),
-          },
-        });
+        await withSavepoint(() =>
+          prisma.customerCohortSnapshot.update({
+            where: { id },
+            data: {
+              customersTotal: row.customersTotal,
+              customersActive: row.customersActive,
+              ordersInPeriod: row.ordersInPeriod,
+              revenueInPeriod: row.revenueInPeriod,
+              computedAt: new Date(),
+            },
+          })
+        );
         rowsWritten++;
       } catch (err) {
         logger.error(
@@ -494,7 +501,7 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
 
     if (toCreate.length > 0) {
       try {
-        await prisma.funnelSnapshot.createMany({ data: toCreate });
+        await withSavepoint(() => prisma.funnelSnapshot.createMany({ data: toCreate }));
         rowsWritten += toCreate.length;
       } catch (err) {
         logger.error(
@@ -506,19 +513,21 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
 
     for (const { id, row } of toUpdate) {
       try {
-        await prisma.funnelSnapshot.update({
-          where: { id },
-          data: {
-            productViews: row.productViews,
-            cartsCreated: row.cartsCreated,
-            cartItemsAdded: row.cartItemsAdded,
-            checkoutsStarted: row.checkoutsStarted,
-            ordersCompleted: row.ordersCompleted,
-            ordersAbandoned: row.ordersAbandoned,
-            revenueFils: row.revenueFils,
-            computedAt: new Date(),
-          },
-        });
+        await withSavepoint(() =>
+          prisma.funnelSnapshot.update({
+            where: { id },
+            data: {
+              productViews: row.productViews,
+              cartsCreated: row.cartsCreated,
+              cartItemsAdded: row.cartItemsAdded,
+              checkoutsStarted: row.checkoutsStarted,
+              ordersCompleted: row.ordersCompleted,
+              ordersAbandoned: row.ordersAbandoned,
+              revenueFils: row.revenueFils,
+              computedAt: new Date(),
+            },
+          })
+        );
         rowsWritten++;
       } catch (err) {
         logger.error(
@@ -683,7 +692,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
 
     if (toCreate.length > 0) {
       try {
-        await prisma.customerRfmSnapshot.createMany({ data: toCreate });
+        await withSavepoint(() => prisma.customerRfmSnapshot.createMany({ data: toCreate }));
         rowsWritten += toCreate.length;
       } catch (err) {
         logger.error({ err, storeId, count: toCreate.length }, 'rfm-rollup: batched create failed');
@@ -692,19 +701,21 @@ export async function runRfmRollup(storeId: string): Promise<number> {
 
     for (const { id, row, previousSegment } of toUpdate) {
       try {
-        await prisma.customerRfmSnapshot.update({
-          where: { id },
-          data: {
-            isGuest: row.isGuest,
-            recencyDays: row.recencyDays,
-            frequencyOrders: row.frequencyOrders,
-            monetaryFils: row.monetaryFils,
-            rfmScore: row.rfmScore,
-            segment: row.segment,
-            previousSegment,
-            computedAt: new Date(),
-          },
-        });
+        await withSavepoint(() =>
+          prisma.customerRfmSnapshot.update({
+            where: { id },
+            data: {
+              isGuest: row.isGuest,
+              recencyDays: row.recencyDays,
+              frequencyOrders: row.frequencyOrders,
+              monetaryFils: row.monetaryFils,
+              rfmScore: row.rfmScore,
+              segment: row.segment,
+              previousSegment,
+              computedAt: new Date(),
+            },
+          })
+        );
         rowsWritten++;
       } catch (err) {
         logger.error(
@@ -723,9 +734,11 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   // scoped to this store.
   let staleRemoved = 0;
   try {
-    const removed = await prisma.customerRfmSnapshot.deleteMany({
-      where: { storeId, customerId: { notIn: computedRows.map(r => r.customerId) } },
-    });
+    const removed = await withSavepoint(() =>
+      prisma.customerRfmSnapshot.deleteMany({
+        where: { storeId, customerId: { notIn: computedRows.map(r => r.customerId) } },
+      })
+    );
     staleRemoved = removed.count;
   } catch (err) {
     logger.error({ err, storeId }, 'rfm-rollup: stale snapshot sweep failed');

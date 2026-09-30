@@ -5,6 +5,8 @@ import { isAiQuotaCapError } from '../lib/ai-quota';
 import { containsArabic } from '../lib/ai/description-richness';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { withSavepoint } from '../lib/savepoint';
 
 /**
  * Diff incoming admin-form values against the stored values and update the
@@ -244,10 +246,14 @@ export async function fillProductFields(
         });
         const picked = suggestions.filter(s => s.confidence !== 'low').map(s => s.id);
         if (picked.length > 0) {
-          await prisma.productCategory.createMany({
-            data: picked.map(categoryId => ({ productId, categoryId })),
-            skipDuplicates: true,
-          });
+          // Savepointed: the catch below swallows, and this can run inside a
+          // request's / Inngest `runInTenantContext` transaction (issue 2215).
+          await withSavepoint(() =>
+            prisma.productCategory.createMany({
+              data: picked.map(categoryId => ({ productId, categoryId })),
+              skipDuplicates: true,
+            })
+          );
         }
       }
     }
@@ -623,52 +629,77 @@ export async function sweepStore(storeId: string): Promise<{ products: number; f
  * this store — the sweep is store-wide and smart-skips, so the first job
  * already covers every new product; don't spawn N near-identical jobs.
  *
- * Called directly from `ProductService.create()` — the ONE true creation
- * site — rather than gated on the `op === 'create'` branch of the debounced
+ * Called from `ProductService.create()` — the ONE true creation site —
+ * rather than gated on the `op === 'create'` branch of the debounced
  * `product.upserted` handler (`ai-autofill-product.ts`). That handler's
  * Inngest function debounces on `productId` for 10s, and Inngest debounce
  * delivers only the LAST event in the window: a create followed by a quick
  * edit inside 10s coalesced into one `op: 'update'` delivery, silently
- * skipping the kick every time (#1937). Calling this once, synchronously, at
- * creation removes the dependency on which event survives debounce entirely.
+ * skipping the kick every time (#1937).
+ *
+ * POST-COMMIT (issues 2108 / 2214 / 2215). Inside a request the create runs
+ * in the request's single tenant transaction, which commits only after the
+ * handler returns. Doing the job insert + `inngest.send` inline there
+ * published a jobId for an UNCOMMITTED row (the consumer's first step
+ * P2025s on it; a rolled-back create dead-lettered a P1 for a product that
+ * never existed), held the Neon connection across the Inngest round-trip,
+ * and — worst — a failing `bulkAiJob` query aborted the request transaction
+ * while the swallowing catch below let the handler answer 201 for a product
+ * whose COMMIT then silently rolled back. So the kick is queued with
+ * `deferAfterTenantCommit`: it runs after COMMIT in a fresh tenant
+ * transaction (a rolled-back create drops it), and outside a request it runs
+ * inline as before. The inline path can still sit inside a caller's ambient
+ * transaction (an Inngest/MCP `runInTenantContext`), so the two queries are
+ * savepointed: a failure there rolls back to the savepoint only, which is
+ * what makes "non-fatal" below actually true.
  */
 export async function enqueueRecommendationsSweepForNewProduct(
   storeId: string,
   productId: string
 ): Promise<void> {
-  try {
-    const existing = await prisma.bulkAiJob.findFirst({
-      where: { storeId, kind: 'recommendations', status: { in: ['queued', 'running'] } },
-      select: { id: true },
-    });
-    if (existing) {
-      logger.info(
-        { storeId, productId, jobId: existing.id },
-        '[ai-autofill] recommendations sweep already pending, skipping'
-      );
-      return;
-    }
+  await deferAfterTenantCommit('ai-autofill.recommendations-kick', () =>
+    enqueueRecommendationsSweepNow(storeId, productId)
+  );
+}
 
-    const job = await prisma.bulkAiJob.create({
-      data: {
-        storeId,
-        userId: null, // system-initiated — no authenticated user context
-        kind: 'recommendations',
-      },
-      select: { id: true },
+async function enqueueRecommendationsSweepNow(storeId: string, productId: string): Promise<void> {
+  try {
+    const jobId = await withSavepoint(async () => {
+      const existing = await prisma.bulkAiJob.findFirst({
+        where: { storeId, kind: 'recommendations', status: { in: ['queued', 'running'] } },
+        select: { id: true },
+      });
+      if (existing) {
+        logger.info(
+          { storeId, productId, jobId: existing.id },
+          '[ai-autofill] recommendations sweep already pending, skipping'
+        );
+        return null;
+      }
+      const job = await prisma.bulkAiJob.create({
+        data: {
+          storeId,
+          userId: null, // system-initiated — no authenticated user context
+          kind: 'recommendations',
+        },
+        select: { id: true },
+      });
+      return job.id;
     });
+    if (!jobId) return;
 
     await inngest.send({
       name: 'bulk-ai/recommendations-requested',
-      data: { jobId: job.id, storeId, force: false },
+      data: { jobId, storeId, force: false },
     });
 
     logger.info(
-      { storeId, productId, jobId: job.id },
+      { storeId, productId, jobId },
       '[ai-autofill] recommendations sweep enqueued for new product'
     );
   } catch (err) {
-    // Non-fatal: the product was already created; recommendations will be
+    // Non-fatal: this runs after the product's COMMIT (or, inline, behind a
+    // savepoint), so the product exists either way; recommendations will be
     // generated on the next manual bulk sweep.
     logger.warn(
       { err, storeId, productId },

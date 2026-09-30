@@ -50,6 +50,14 @@ export async function getCachedAnalytics<T>(
   return data;
 }
 
+/** Residual window of the all-time customer count (see getAllTimeCustomers). */
+const ALL_TIME_CUSTOMERS_TTL_S = 900;
+
+/** Last millisecond of the minute containing `d`. */
+export function endOfMinute(d: Date): Date {
+  return new Date(Math.floor(d.getTime() / 60_000) * 60_000 + 59_999);
+}
+
 interface DateRange {
   startDate: Date;
   endDate: Date;
@@ -160,7 +168,12 @@ export class AnalyticsService {
   static async getDashboardStats(storeId: string, dateRange?: DateRange): Promise<DashboardStats> {
     const now = new Date();
     const startDate = dateRange?.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
-    const endDate = dateRange?.endDate || now;
+    // The default window ends "now". Quantised to the END of the current
+    // minute (issue 2247): a raw `now` made the key below unique per
+    // millisecond, so a caller that omits the range never hit the 120s cache
+    // and recomputed the whole dashboard on every request. Ending at the
+    // minute's last millisecond still includes every order placed so far.
+    const endDate = dateRange?.endDate || endOfMinute(now);
 
     // Build a cache key that includes the date range so different periods don't collide
     const cacheKey = `analytics:dashboard:${storeId}:${startDate.toISOString()}:${endDate.toISOString()}`;
@@ -185,7 +198,7 @@ export class AnalyticsService {
       await Promise.all([
         this.getPeriodStats(storeId, startDate, endDate),
         this.getPeriodStats(storeId, prevStartDate, prevEndDate),
-        this.countDistinctCustomers(storeId),
+        this.getAllTimeCustomers(storeId),
         prisma.product.count({
           where: { storeId, status: 'active' },
         }),
@@ -254,6 +267,27 @@ export class AnalyticsService {
       profitRevenueMissingCost: currentStats.revenueMissingCost,
       profitChange: profitChange === null ? null : Math.round(profitChange * 10) / 10,
     };
+  }
+
+  /**
+   * All-time distinct customers for the dashboard, cached on its OWN key
+   * (issues 2247 / 2269). The all-time `countDistinctCustomers` call has no
+   * date bound, and its DISTINCT key is a computed expression no index can
+   * serve, so it is a full scan of the store's orders. It used to ride the
+   * dashboard's range-keyed 120s cache, i.e. it re-ran for every distinct
+   * date range and every cache miss. It does not depend on the range at all.
+   *
+   * Staleness class: BOUNDED-stale (dashboard analytics, not money or
+   * permissions). A new customer appears within ALL_TIME_CUSTOMERS_TTL_S;
+   * no write path invalidates it on purpose — the period-scoped
+   * `totalCustomers` KPI the dashboard actually shows is still live.
+   */
+  static async getAllTimeCustomers(storeId: string): Promise<number> {
+    return getCachedAnalytics(
+      `analytics:customers:all-time:${storeId}`,
+      ALL_TIME_CUSTOMERS_TTL_S,
+      () => this.countDistinctCustomers(storeId)
+    );
   }
 
   /**

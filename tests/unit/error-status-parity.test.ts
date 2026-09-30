@@ -67,6 +67,13 @@ const CASES: Array<[string, () => Error]> = [
   ['Prisma P2025', () => prismaError('P2025')],
   ['Prisma P2003', () => prismaError('P2003')],
   ['Prisma P1001 (unreachable DB)', () => prismaError('P1001')],
+  // The class Prisma actually throws for P1001 — `code` is undefined on it,
+  // the code is on `errorCode` (issue 1989).
+  [
+    'Prisma P1001 as a genuine PrismaClientInitializationError',
+    () =>
+      new Prisma.PrismaClientInitializationError("Can't reach database server", 'test', 'P1001'),
+  ],
   ['plain Error', () => new Error('boom')],
 ];
 
@@ -112,11 +119,31 @@ describe('SentryService.errorHandler — client errors are not captured', () => 
     expect(next).toHaveBeenCalledWith(err);
   };
 
-  it.each(CASES)('%s', (_name, make) => {
+  // P2003 / P2025 are answered 4xx but captured at WARNING (issue 1988).
+  const WARNING_CAPTURED = new Set(['Prisma P2025', 'Prisma P2003']);
+
+  it.each(CASES)('%s', (name, make) => {
     const err = make();
     gate(err);
     const answeredWith = statusWrittenBy(err);
-    expect(captureException).toHaveBeenCalledTimes(answeredWith >= 500 ? 1 : 0);
+    expect(captureException).toHaveBeenCalledTimes(
+      answeredWith >= 500 || WARNING_CAPTURED.has(name) ? 1 : 0
+    );
+  });
+
+  // Issue 1988 — the FORCE-API-28 class (a nested-transaction P2003, an
+  // internal writer's P2025) is a SERVER defect answered 4xx. It must still
+  // reach Sentry, or RULINGS SN-2's "the issue reopens on its own" is false.
+  // Mutation proof: drop `|| integrityDefect` in sentry.service.ts → red.
+  it.each(['P2003', 'P2025'])('captures a Prisma %s at warning level', code => {
+    gate(prismaError(code));
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException.mock.calls[0][1]).toMatchObject({ level: 'warning' });
+  });
+
+  it('keeps a duplicate-key P2002 (a merchant typing an existing SKU) out of Sentry', () => {
+    gate(prismaError('P2002'));
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('the FORCE-API-2C ZodError specifically is not captured', () => {

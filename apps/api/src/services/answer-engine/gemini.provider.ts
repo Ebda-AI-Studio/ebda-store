@@ -42,10 +42,12 @@
  * signal from a plain `grounded: false` (which also covers "grounding ran
  * fine but cited nothing"), so the dashboard can show "search grounding
  * unavailable" instead of the generic "no live citations" caveat. A warning
- * is logged at most ONCE PER PROCESS for this condition — a single citation
- * scan queries every enabled prompt (~8) against Gemini, and a retired
- * model/tripped quota fails identically on every one of them, so per-query
- * logging would spam 8 near-duplicate warnings for one root cause.
+ * is logged at most ONCE PER STORE SCAN for this condition — a single
+ * citation scan queries every enabled prompt (~8) against Gemini, and a
+ * retired model/tripped quota fails identically on every one of them, so
+ * per-query logging would spam 8 near-duplicate warnings for one root cause.
+ * The weekly cron resets the throttle per store (`scanStoreCitations`) and
+ * raises a P1 alert when any check in a run was ungrounded (issue 2119).
  *
  * Any OTHER non-2xx response (5xx, auth failure, malformed request, etc.)
  * is a real error and throws — `citation-scan.service.ts`'s per-engine
@@ -75,8 +77,8 @@ const MODEL = process.env.ANSWER_ENGINE_GEMINI_MODEL || 'gemini-2.5-flash-lite';
 const GROUNDING_UNAVAILABLE_STATUSES = new Set([400, 404, 429]);
 
 // Module-level flag: see the FALLBACK CONTRACT note above for why this is
-// throttled to once per process rather than once per query. Exported so
-// tests (and, if ever needed, an explicit per-scan boundary) can reset it.
+// throttled rather than logged per query. Reset at every store-scan
+// boundary by `scanStoreCitations` (answer-engine-citation-scan.ts).
 let hasWarnedGroundingUnavailable = false;
 export function resetGeminiGroundingWarnOnce(): void {
   hasWarnedGroundingUnavailable = false;

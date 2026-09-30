@@ -10,6 +10,8 @@ import logger from '../lib/logger';
 import { redis } from './redis.service';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { sendAlert } from './alerts.service';
+import { SEND_CAP_WINDOW_MS } from './campaign.service';
 import { inngest } from '../lib/inngest/client';
 import { WalletService } from './wallet.service';
 import { withScopedRlsBypass } from '../lib/scoped-rls-bypass';
@@ -174,6 +176,50 @@ export interface EraseOutcome {
  */
 export function eraseNeedsCrmReview(o: EraseOutcome): boolean {
   return o.crmChecked && o.crmAmbiguous;
+}
+
+/**
+ * Push a bumped tokenVersion into the tv cache the authenticate middleware
+ * reads FIRST (`user:tv:<id>`, no TTL — a hit never consults Postgres).
+ *
+ * A failed SET must not leave the old, stale-LOW value being served: that
+ * keeps every already-issued access token valid for its full life after a
+ * revocation the caller was told succeeded (issues 1964 / 2062). So it falls
+ * back to DELETING the key — a miss makes the next request read the bumped
+ * value (and `status`) from Postgres. Only when both fail is the revocation
+ * genuinely not in effect, and that is a P1 alert + error log, the same
+ * visibility a failed deferred task gets (`reportDeferredFailure`). Never
+ * throws: revocation's DB half has already committed.
+ */
+async function pushTokenVersion(userId: string, tv: number, source: string): Promise<void> {
+  try {
+    await redis.setUserTokenVersion(userId, tv);
+    return;
+  } catch (setErr) {
+    try {
+      await redis.clearUserTokenVersion(userId);
+      logger.warn(
+        { err: setErr, userId, source },
+        '[auth] tokenVersion cache SET failed — key deleted, next request reads Postgres'
+      );
+      return;
+    } catch (delErr) {
+      logger.error(
+        { err: delErr, setErr, userId, source },
+        '[auth] tokenVersion cache SET and DEL both failed — revoked access tokens may still authenticate'
+      );
+      await sendAlert({
+        level: 'p1',
+        source,
+        title: 'Session revocation did not reach the token-version cache',
+        body:
+          'The DB tokenVersion bump committed but Redis kept the old value, so access tokens ' +
+          'issued before the revocation keep authenticating until they expire (30 min) or ' +
+          'the key is deleted.',
+        context: { userId },
+      }).catch(() => undefined);
+    }
+  }
 }
 
 export class AuthService {
@@ -1264,10 +1310,15 @@ export class AuthService {
     // transaction rolled back — matching `eraseAccount`'s propagation above.
     // Outside a request transaction (Inngest, scripts, self-service auth
     // routes with no ambient tx) it still runs inline, unchanged.
-    void deferAfterTenantCommit('auth.revokeAllSessions.setTokenVersion', () =>
-      redis.setUserTokenVersion(userId, updated.tokenVersion)
+    //
+    // Awaited: when deferred it resolves at once; inline (logout-all, password
+    // change/reset, MFA changes) the caller's success now means the cache
+    // holds the bump. A failed push is never quiet — see pushTokenVersion
+    // (issue 2062).
+    await deferAfterTenantCommit('auth.revokeAllSessions.setTokenVersion', () =>
+      pushTokenVersion(userId, updated.tokenVersion, 'auth.revokeAllSessions.setTokenVersion')
     ).catch(err =>
-      logger.warn({ err, userId }, '[auth.revokeAllSessions] redis tokenVersion bump failed')
+      logger.error({ err, userId }, '[auth.revokeAllSessions] tokenVersion push failed')
     );
 
     // Revoke all live refresh tokens — prevents session resumption via
@@ -1718,8 +1769,36 @@ export class AuthService {
       // Hard delete: a subscription row is nothing but the address + consent,
       // and a recipient row is nothing but the address + send status. The
       // campaign's aggregate counts survive on `campaigns`.
+      //
+      // EXCEPT a recipient row SENT inside the rolling send-cap window: the
+      // platform-wide cap (`sentInLast24h`) counts those rows, so deleting one
+      // hands the store back send headroom on the shared Resend key (issue
+      // 2083). Those rows are anonymized instead — the address becomes a
+      // per-row tombstone (unique per campaign) and every other link is
+      // dropped — so the send still counts and no PII remains.
       if (user.storeId && user.email) {
         const normalizedEmail = user.email.trim().toLowerCase();
+        const capWindowStart = new Date(Date.now() - SEND_CAP_WINDOW_MS);
+        const inWindow = await tx.campaignRecipient.findMany({
+          where: {
+            storeId: user.storeId,
+            email: normalizedEmail,
+            sentAt: { gte: capWindowStart },
+          },
+          select: { id: true },
+        });
+        for (const r of inWindow) {
+          await tx.campaignRecipient.update({
+            where: { id: r.id },
+            data: {
+              email: `erased-${r.id}@anonymized.local`,
+              subscriberId: null,
+              customerId: null,
+              providerMessageId: null,
+              error: null,
+            },
+          });
+        }
         await tx.campaignRecipient.deleteMany({
           where: { storeId: user.storeId, email: normalizedEmail },
         });
@@ -1790,13 +1869,16 @@ export class AuthService {
     // would keep accepting the old access tokens (the cache key has no TTL).
     // Same step `revokeAllSessions` performs. Deferred so the ambient-tx
     // branch only revokes once the erase has COMMITTED; inline (awaited)
-    // everywhere else. Fail-open like revokeAllSessions: the DB bump stands.
+    // everywhere else. The erasure itself never fails on this (the DB bump
+    // stands), but a push that cannot land is ALERTED, not warned — on the
+    // inline cron path a swallowed warn left every erased user's old access
+    // tokens valid against the stale cache (issue 1964). See pushTokenVersion.
     if (erasedTokenVersion !== undefined) {
       const tv = erasedTokenVersion;
-      await deferAfterTenantCommit('auth.eraseAccount.revoke-sessions', async () =>
-        redis.setUserTokenVersion(userId, tv)
+      await deferAfterTenantCommit('auth.eraseAccount.revoke-sessions', () =>
+        pushTokenVersion(userId, tv, 'auth.eraseAccount.revoke-sessions')
       ).catch(err =>
-        logger.warn({ err, userId }, '[auth.eraseAccount] token-version cache update failed')
+        logger.error({ err, userId }, '[auth.eraseAccount] token-version push failed')
       );
     }
 

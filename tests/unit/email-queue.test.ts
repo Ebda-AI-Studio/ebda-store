@@ -27,6 +27,9 @@ vi.mock('@api/services/circuit-breaker.service', () => ({
   withCircuitBreaker: vi.fn((name, operation) => operation()),
 }));
 
+const { sendAlertMock } = vi.hoisted(() => ({ sendAlertMock: vi.fn().mockResolvedValue('sent') }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: sendAlertMock }));
+
 describe('Email Queue Service', () => {
   let mockRedisClient: any;
 
@@ -291,5 +294,62 @@ describe('Email Queue Integration', () => {
       // This is a compile-time check of the constant
       expect(true).toBe(true); // Placeholder - actual value checked in integration tests
     });
+  });
+});
+
+/**
+ * Issue 2142 — a queued email that can never be sent must not be silent.
+ * `enqueue` resolved long before the send, so the caller (the refund fanout's
+ * #1935 gate, every `{ queue: true }` order email) cannot see the failure;
+ * the queue itself must raise it. And with Redis down there is no queue at
+ * all, so the inline send must reject to its caller.
+ *
+ * Mutation proof: drop the `reportPermanentFailure` call in the max-attempts
+ * branch → the first case goes red; drop `if (opts.inline) … throw` → the
+ * second goes red.
+ */
+describe('Email queue — terminal failure is loud (issue 2142)', () => {
+  let client: any;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    client = {
+      lpush: vi.fn().mockResolvedValue(1),
+      rpop: vi.fn(),
+      llen: vi.fn().mockResolvedValue(0),
+      lrange: vi.fn().mockResolvedValue([]),
+    };
+    vi.mocked(redis.isAvailable).mockReturnValue(true);
+    vi.mocked(redis.getClient).mockReturnValue(client);
+  });
+
+  it('the last failed attempt moves the email to email:failed AND raises a P1 alert', async () => {
+    const exhausted: QueuedEmail = {
+      id: 'email_1',
+      storeId: 'store-1',
+      options: { to: 'buyer@example.com', subject: 'Refund issued', html: '<p/>' },
+      attempts: 2,
+      maxAttempts: 3,
+      createdAt: new Date().toISOString(),
+    };
+    client.rpop.mockResolvedValueOnce(JSON.stringify(exhausted));
+    vi.mocked(EmailService.sendRaw).mockRejectedValue(new Error('resend 503'));
+
+    await (emailQueue as any).processQueue();
+
+    expect(client.lpush).toHaveBeenCalledWith('email:failed', expect.any(String));
+    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+    const alert = sendAlertMock.mock.calls[0][0];
+    expect(alert).toMatchObject({ level: 'p1', source: 'email.queue.permanent_failure' });
+    // No recipient address in the alert.
+    expect(JSON.stringify(alert)).not.toContain('buyer@example.com');
+  });
+
+  it('with Redis unavailable, a failed inline send REJECTS enqueue (no silent success)', async () => {
+    vi.mocked(redis.isAvailable).mockReturnValue(false);
+    vi.mocked(EmailService.sendRaw).mockRejectedValue(new Error('resend 503'));
+
+    await expect(
+      emailQueue.enqueue('store-1', { to: 'b@example.com', subject: 's', html: '<p/>' })
+    ).rejects.toThrow('resend 503');
   });
 });

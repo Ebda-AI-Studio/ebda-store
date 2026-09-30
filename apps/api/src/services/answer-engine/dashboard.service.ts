@@ -37,9 +37,24 @@
  * different from "grounding worked but cited nothing" (the caveat proxy's
  * case) — a merchant should be told the signal is temporarily unavailable,
  * not that their store simply wasn't cited. `groundingUnavailable` is true
- * when ANY of an engine's latest-per-prompt checks carries a reason; it
+ * when ANY of an engine's checks in its MOST RECENT RUN carries a reason; it
  * takes priority over the generic `groundedCaveat` in the UI (see
  * `EngineSummaryCards.tsx`).
+ *
+ * MOST RECENT RUN (issue 2118): both flags read the engine's latest scan —
+ * the rows within LATEST_RUN_WINDOW_MS of its newest `runAt` — not
+ * latest-per-prompt across all history. Prompt text is regenerated from the
+ * store's current top categories/products, so a retired prompt's last row
+ * stays "latest" for its key forever; a single old 429 on it used to pin the
+ * banner for months.
+ *
+ * UNGROUNDED ROWS ARE NOT CITATIONS (issue 2120): a check that fell back to
+ * an ungrounded call has no cited URLs, so `detectCitation` can only have
+ * marked it cited by a brand-name substring in model-knowledge prose. Those
+ * rows are left out of `totalChecks` / `citedCount` / `citedRate` and the
+ * weekly trend, which describe grounded checks only — the same card cannot
+ * print a cited rate while its banner says the signal is unavailable. An
+ * engine with no grounded check has `citedRate: null` (unknown, not 0%).
  */
 import { prisma, Prisma } from '@force/database';
 import { getCachedAnalytics } from '../analytics.service';
@@ -53,9 +68,11 @@ export interface AnswerEngineSummary {
 
 export interface AnswerEngineSummaryEngine {
   engine: string;
+  /** Grounded checks only — see UNGROUNDED ROWS in the file header. */
   totalChecks: number;
   citedCount: number;
-  citedRate: number;
+  /** `null` when the engine has no grounded check to measure. */
+  citedRate: number | null;
   /** True when this engine's most recent run returned no verifiable web
    * citations for any prompt — see file header. Dashboard should surface
    * this as "based on model knowledge / unverified". */
@@ -91,6 +108,10 @@ export interface AnswerEngineSummaryPrompt {
 // so 1000 rows covers roughly 8+ months of history — comfortably enough for
 // the trend + latest-per-prompt views this endpoint serves.
 const MAX_ROWS = 1000;
+
+// One weekly scan writes a store's rows seconds-to-minutes apart; anything
+// within this window of an engine's newest row belongs to that same run.
+const LATEST_RUN_WINDOW_MS = 60 * 60 * 1000;
 
 type CheckRow = {
   engine: string;
@@ -146,36 +167,43 @@ export function aggregateAnswerEngineChecks(checks: CheckRow[]): AnswerEngineSum
 
   // Per-engine totals — across ALL fetched rows (not just latest-per-prompt),
   // so `citedRate` reflects real history, not just the most recent run.
-  const engineTotals = new Map<string, { total: number; cited: number }>();
+  // Every engine gets an entry; only GROUNDED rows are counted (file header).
+  const engineTotals = new Map<string, { total: number; cited: number; newest: number }>();
   for (const c of checks) {
-    const entry = engineTotals.get(c.engine) ?? { total: 0, cited: 0 };
+    const entry = engineTotals.get(c.engine) ?? { total: 0, cited: 0, newest: 0 };
+    entry.newest = Math.max(entry.newest, c.runAt.getTime());
+    engineTotals.set(c.engine, entry);
+    if (c.groundingUnavailableReason != null) continue;
     entry.total += 1;
     if (c.cited) entry.cited += 1;
-    engineTotals.set(c.engine, entry);
   }
 
   const engines: AnswerEngineSummaryEngine[] = Array.from(engineTotals.entries()).map(
     ([engine, totals]) => {
-      const latestForEngine = latestPerPrompt.filter(c => c.engine === engine);
+      // The engine's most recent run — see MOST RECENT RUN in the header.
+      const latestRun = latestPerPrompt.filter(
+        c => c.engine === engine && totals.newest - c.runAt.getTime() <= LATEST_RUN_WINDOW_MS
+      );
       const groundedCaveat =
-        latestForEngine.length > 0 &&
-        latestForEngine.every(c => asStringArray(c.citedUrls).length === 0);
-      const groundingUnavailable = latestForEngine.some(c => c.groundingUnavailableReason != null);
+        latestRun.length > 0 && latestRun.every(c => asStringArray(c.citedUrls).length === 0);
+      const groundingUnavailable = latestRun.some(c => c.groundingUnavailableReason != null);
 
       return {
         engine,
         totalChecks: totals.total,
         citedCount: totals.cited,
-        citedRate: totals.total > 0 ? totals.cited / totals.total : 0,
+        citedRate: totals.total > 0 ? totals.cited / totals.total : null,
         groundedCaveat,
         groundingUnavailable,
       };
     }
   );
 
-  // Week-over-week trend, combined across engines.
+  // Week-over-week trend, combined across engines — grounded rows only, so a
+  // week in which nothing could be grounded has no point rather than a 0%.
   const weekBuckets = new Map<string, { total: number; cited: number }>();
   for (const c of checks) {
+    if (c.groundingUnavailableReason != null) continue;
     const key = weekStartKey(c.runAt);
     const entry = weekBuckets.get(key) ?? { total: 0, cited: 0 };
     entry.total += 1;

@@ -1,5 +1,5 @@
 /**
- * Guard: the 81 admin files translated for B2 (admin i18n coverage, parts 1
+ * Guard: the 82 admin files translated for B2 (admin i18n coverage, parts 1
  * + 2) must never regress a hardcoded English string back into JSX.
  *
  * The file list is intentionally inlined here (not read from the throwaway
@@ -34,7 +34,7 @@
  *     brackets, ternaries, comparisons) — not a string at all.
  *
  * To prove this test can fail: temporarily hardcode a new English string
- * into any of the 81 files below (e.g. replace a `{t('foo')}` call with
+ * into any of the 82 files below (e.g. replace a `{t('foo')}` call with
  * literal JSX text) and re-run — the test must go red. Restore afterwards.
  *
  * B2 part 2 (2026-09-25) covered 47 files flagged by the same audit
@@ -54,7 +54,7 @@ import KNOWN_DEBT from './admin-i18n-known-debt.json';
 
 const ADMIN_SRC = resolve(__dirname, '../../apps/admin/src');
 
-// The 81 files this guard covers (paths relative to apps/admin/src). Part 1
+// The 82 files this guard covers (paths relative to apps/admin/src). Part 1
 // (55 files, largest-hardcoded-string-count first) per the 2026-09-25 audit;
 // 26 new part-2 files appended below (21 more part-2 files were already
 // covered by part 1 and are not repeated).
@@ -150,6 +150,7 @@ const B2_FILES = [
   'app/stores/[id]/stock/scan/page.tsx',
   'app/stores/[id]/stock/suppliers/page.tsx',
   'app/stores/[id]/stock/warehouses/page.tsx',
+  'app/email-queue/page.tsx',
   'app/webhook-events/page.tsx',
 ] as const;
 
@@ -267,9 +268,9 @@ describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)',
 });
 
 describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
-  it('lists exactly the 81 files this guard covers', () => {
-    expect(B2_FILES.length).toBe(81);
-    expect(new Set(B2_FILES).size).toBe(81); // no duplicates
+  it('lists exactly the 82 files this guard covers', () => {
+    expect(B2_FILES.length).toBe(82);
+    expect(new Set(B2_FILES).size).toBe(82); // no duplicates
   });
 
   it.each(B2_FILES)('%s has no un-allowlisted hardcoded strings', relativePath => {

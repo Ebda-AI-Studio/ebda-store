@@ -22,6 +22,8 @@ vi.mock('@force/database', () => ({
       update: (...args: unknown[]) => mockBulkAiJobUpdate(...args),
     },
   },
+  // withSavepoint (lib/savepoint.ts) asks this; no request transaction here.
+  hasTenantContext: () => false,
 }));
 
 const mockInngestSend = vi.fn();

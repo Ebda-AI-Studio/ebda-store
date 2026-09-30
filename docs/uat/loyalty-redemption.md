@@ -48,7 +48,9 @@ updated: 2026-06-14
 11. **Admin cross-check:** in admin Loyalty → the member → the same `redeem_discount`
     transaction is visible; the order detail shows the loyalty discount in the total.
     Open the same order in the orders app (orders.force-ai.co) too: its summary card
-    shows the same "Loyalty points (N)" line, not a generic "Discount" line.
+    shows the same "Loyalty points (N)" line, not a generic "Discount" line. The
+    invoice (Invoice button) and the order-confirmation email show it the same way,
+    and the orders XLSX export has a "Loyalty Discount (KWD)" column.
 
 **Switch language to Arabic and repeat steps 4–7** — the control reads
 "استخدام نقاط الولاء", the discount line reads "نقاط الولاء", and the layout is RTL-correct.

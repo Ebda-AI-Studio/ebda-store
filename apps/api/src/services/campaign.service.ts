@@ -42,14 +42,22 @@ export function campaignThrottleMs(): number {
   return Number.isFinite(n) && n >= 0 ? n : 1000;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+/** The rolling send-cap window. Exported so every deleter of recipient rows
+ *  can keep the rows this window still counts (see `sentInLast24h`). */
+export const SEND_CAP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** Campaign emails this store actually sent in the last 24h. `sentAt` is set
  *  only on a successful send and survives a later unsubscribe, so a recipient
- *  who unsubscribed still counts against the window it was sent in. */
+ *  who unsubscribed still counts against the window it was sent in.
+ *
+ *  The count reads `campaign_recipients` rows, so no path may DELETE a sent
+ *  row inside the window — that hands the store back cap headroom on the one
+ *  shared Resend key. The DELETE route refuses (#1951); account erasure
+ *  anonymizes those rows instead of deleting them (issue 2083,
+ *  `AuthService.eraseAccount`). A new deleter must do the same. */
 export async function sentInLast24h(storeId: string, now: Date = new Date()): Promise<number> {
   return prisma.campaignRecipient.count({
-    where: { storeId, sentAt: { gte: new Date(now.getTime() - DAY_MS) } },
+    where: { storeId, sentAt: { gte: new Date(now.getTime() - SEND_CAP_WINDOW_MS) } },
   });
 }
 

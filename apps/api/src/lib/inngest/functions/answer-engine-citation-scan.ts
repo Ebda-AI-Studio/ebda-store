@@ -27,6 +27,8 @@ import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
 import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
 import { featureService } from '../../../services/feature.service';
+import { sendAlert } from '../../../services/alerts.service';
+import { resetGeminiGroundingWarnOnce } from '../../../services/answer-engine/gemini.provider';
 import {
   runCitationScan,
   type RunCitationScanOptions,
@@ -42,6 +44,8 @@ export interface ScanStoreResult {
    * feature check or the scan itself threw and was isolated (see below). */
   skipped: boolean | 'error';
   checks: number;
+  /** Checks written from an ungrounded fallback — see issue 2119. */
+  ungroundedChecks: number;
 }
 
 /**
@@ -71,6 +75,10 @@ export async function scanStoreCitations(
   storeId: string,
   opts: RunCitationScanOptions = {}
 ): Promise<ScanStoreResult> {
+  // The Gemini adapter warns once when grounding is unavailable; scope that
+  // throttle to this store's scan rather than the whole (long-lived) process,
+  // so a recurrence in a later week is logged again (issue 2119).
+  resetGeminiGroundingWarnOnce();
   try {
     const enabled = await featureService.isFeatureEnabled(storeId, 'answer_engine_insights');
     if (!enabled) {
@@ -78,7 +86,7 @@ export async function scanStoreCitations(
         { storeId },
         'answer-engine-citation-scan: answer_engine_insights disabled, skipping'
       );
-      return { storeId, skipped: true, checks: 0 };
+      return { storeId, skipped: true, checks: 0, ungroundedChecks: 0 };
     }
 
     // runCitationScan uses bare prisma internally. Wrap in
@@ -86,13 +94,14 @@ export async function scanStoreCitations(
     // for the AnswerEngineCheck writes.
     const engineResults = await runInTenantContext(storeId, () => runCitationScan(storeId, opts));
     const checks = engineResults.reduce((sum, r) => sum + r.checks, 0);
-    return { storeId, skipped: false, checks };
+    const ungroundedChecks = engineResults.reduce((sum, r) => sum + (r.ungrounded ?? 0), 0);
+    return { storeId, skipped: false, checks, ungroundedChecks };
   } catch (err) {
     logger.error(
       { storeId, err: err instanceof Error ? err.message : String(err) },
       'answer-engine-citation-scan: per-store scan threw, isolating this store and continuing the cron'
     );
-    return { storeId, skipped: 'error', checks: 0 };
+    return { storeId, skipped: 'error', checks: 0, ungroundedChecks: 0 };
   }
 }
 
@@ -152,6 +161,8 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
     let skippedStores = 0;
     let erroredStores = 0;
     let totalChecks = 0;
+    let ungroundedChecks = 0;
+    let ungroundedStores = 0;
 
     for (const batch of batches) {
       for (const store of batch) {
@@ -178,14 +189,50 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
         }
         scannedStores += 1;
         totalChecks += result.checks;
+        ungroundedChecks += result.ungroundedChecks;
+        if (result.ungroundedChecks > 0) ungroundedStores += 1;
       }
     }
 
     logger.info(
-      { stores: stores.length, scannedStores, skippedStores, erroredStores, totalChecks },
+      {
+        stores: stores.length,
+        scannedStores,
+        skippedStores,
+        erroredStores,
+        totalChecks,
+        ungroundedChecks,
+      },
       'answer-engine-citation-scan-cron completed'
     );
-    return { stores: stores.length, scannedStores, skippedStores, erroredStores, totalChecks };
+
+    // Issue 2119: a scan whose checks fell back to UNGROUNDED answers still
+    // counts as a healthy run above, and the adapter only logs. Name the
+    // degradation where an operator will see it: a retired or rationed
+    // grounding model needs a new ANSWER_ENGINE_GEMINI_MODEL (RULINGS GEM-2).
+    if (ungroundedChecks > 0) {
+      await step.run('alert-grounding-unavailable', () =>
+        sendAlert({
+          level: 'p1',
+          source: 'cron.answer-engine-citation-scan',
+          title: 'Answer-engine search grounding unavailable',
+          body:
+            `${ungroundedChecks} of ${totalChecks} citation checks across ${ungroundedStores} ` +
+            'store(s) fell back to ungrounded answers this run. Re-probe the Gemini model ' +
+            '(ANSWER_ENGINE_GEMINI_MODEL, RULINGS GEM-2) — merchants see "grounding unavailable".',
+          context: { ungroundedChecks, totalChecks, ungroundedStores },
+        })
+      );
+    }
+
+    return {
+      stores: stores.length,
+      scannedStores,
+      skippedStores,
+      erroredStores,
+      totalChecks,
+      ungroundedChecks,
+    };
   }
 );
 

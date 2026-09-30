@@ -35,6 +35,9 @@ vi.mock('@api/lib/logger', () => ({
   },
 }));
 
+const { sendAlertMock } = vi.hoisted(() => ({ sendAlertMock: vi.fn().mockResolvedValue('sent') }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: sendAlertMock }));
+
 // The config module pulls from process.env — stub out enough for the service.
 vi.mock('@api/config', () => ({
   config: {
@@ -201,6 +204,20 @@ describe('sendPurchaseConversion — skip conditions', () => {
   });
 });
 
+/** The Meta request body: form-encoded, `data` a JSON string (issues 1960 / 2173). */
+function metaBody(init: RequestInit): {
+  data: any[];
+  access_token: string | null;
+  test_event_code?: string;
+} {
+  const form = new URLSearchParams(init.body as string);
+  return {
+    data: JSON.parse(form.get('data') ?? '[]'),
+    access_token: form.get('access_token'),
+    test_event_code: form.get('test_event_code') ?? undefined,
+  };
+}
+
 // ── Meta CAPI request shape ───────────────────────────────────────────────────
 
 describe('sendPurchaseConversion — Meta CAPI payload', () => {
@@ -215,7 +232,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
   // audit-followup #190: the plaintext long-lived token must never be part of
   // the URL — OpenTelemetry/Sentry auto-instrument outbound fetch calls and
   // record the full URL (including query string) in traces/breadcrumbs. It
-  // goes in the JSON body instead, exactly like TikTok's request already
+  // goes in the form body instead, exactly like TikTok's request already
   // keeps its token out of its URL (in a header).
   it('sends the access token in the POST body, never in the URL', async () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
@@ -223,15 +240,29 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).not.toContain('access_token');
     expect(url).not.toContain('EAAB_REAL_TOKEN_XYZ');
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.access_token).toBe('EAAB_REAL_TOKEN_XYZ');
+  });
+
+  // Issues 1960 / 2173: the documented Graph transport — form-encoded, with
+  // `data` as a JSON string — not a token inside a JSON body.
+  it('posts form-encoded (data as a JSON string + access_token field)', async () => {
+    await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+      'application/x-www-form-urlencoded'
+    );
+    const form = new URLSearchParams(init.body as string);
+    expect(JSON.parse(form.get('data')!)[0].event_name).toBe('Purchase');
+    expect(form.get('access_token')).toBe('EAAB_REAL_TOKEN_XYZ');
   });
 
   it('sends event_name=Purchase and action_source=website', async () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].event_name).toBe('Purchase');
     expect(body.data[0].action_source).toBe('website');
   });
@@ -240,7 +271,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].event_id).toBe(ORDER.id);
   });
 
@@ -249,7 +280,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].custom_data.value).toBeCloseTo(5.0, 3);
     expect(body.data[0].custom_data.currency).toBe('KWD');
   });
@@ -258,7 +289,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].user_data.em).toEqual([sha256('test@example.com')]);
   });
 
@@ -266,7 +297,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].user_data.ph).toEqual([sha256('+96599998888')]);
   });
 
@@ -274,7 +305,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.test_event_code).toBe('TEST12345');
   });
 
@@ -283,7 +314,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(pixels, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.test_event_code).toBeUndefined();
   });
 
@@ -291,7 +322,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].event_source_url).toBe(STORE_URL);
   });
 
@@ -306,7 +337,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, order, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].user_data).toEqual({});
   });
 
@@ -321,7 +352,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     await sendPurchaseConversion(META_PIXELS, order, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
+    const body = metaBody(init);
     expect(body.data[0].user_data.em).toEqual([sha256('guest@shop.com')]);
     expect(body.data[0].user_data.ph).toEqual([sha256('+96599001122')]);
   });
@@ -480,5 +511,59 @@ describe('isErasedCustomerOrder — right-to-erasure CAPI suppression', () => {
   it('is false for a non-object shippingAddress', () => {
     expect(isErasedCustomerOrder('anonymized')).toBe(false);
     expect(isErasedCustomerOrder(42)).toBe(false);
+  });
+});
+
+/**
+ * Issues 1960 / 2173 — a CAPI failure is fail-open for the order, but it must
+ * not be silent: a broken transport or token stops every store's server-side
+ * conversions while the browser pixel keeps firing.
+ *
+ * Mutation proof: drop the `alertCapiFailure` call in the Meta catch, or the
+ * `events_received !== 1` check → a case goes red.
+ */
+describe('sendPurchaseConversion — failures raise a P1 alert', () => {
+  beforeEach(() => sendAlertMock.mockClear());
+
+  it('alerts on a non-2xx from Meta, without the token in the alert', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: async () => '{"error":{"message":"An active access token must be used"}}',
+    });
+    await expect(sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL)).resolves.toBeUndefined();
+    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+    const alert = sendAlertMock.mock.calls[0][0];
+    expect(alert).toMatchObject({ level: 'p1', source: 'pixels-capi.meta' });
+    expect(JSON.stringify(alert)).not.toContain('EAAB_REAL_TOKEN_XYZ');
+  });
+
+  it('alerts when Meta answers 2xx but did not take the event', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ events_received: 0 }),
+      text: async () => '{"events_received":0}',
+    });
+    await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
+    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('alerts on a TikTok error code', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 40001, message: 'bad token' }),
+      text: async () => '',
+    });
+    await sendPurchaseConversion(TIKTOK_PIXELS, ORDER, STORE_URL);
+    expect(sendAlertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'pixels-capi.tiktok' })
+    );
+  });
+
+  it('does not alert on success', async () => {
+    await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
+    expect(sendAlertMock).not.toHaveBeenCalled();
   });
 });

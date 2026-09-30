@@ -3377,6 +3377,106 @@ the debt). The guard's docstring now states exactly which shapes are enforced an
 (template literals, text between two interpolations, lower-case ternary literals, files outside the
 list). Cost if wrong: the 66 strings keep rendering in English on an Arabic admin until someone
 translates them and deletes their debt entries.
+## 2026-10-01 — backlog batch b-services (branch `fix/backlog-b-services`)
+
+**Ruling BS-1 — issues 2247 / 2269: the all-time customer count keeps its full scan, but on its
+own 900s cache key; no expression index or persisted `customer_key` column is added.** The count
+has no UI consumer today (`allTimeCustomers` is read by the MCP `admin_get_analytics` payload and
+the integration parity test only), and it was the one unbounded scan. It now runs at most once per
+store per 15 minutes instead of once per distinct date range per 120s, and the default window's
+cache key is quantised to the minute so a range-less caller finally hits the 120s cache. An
+expression index cannot give an index-only scan for `COUNT(DISTINCT <expr>)`, and a persisted key
+column would have to be maintained on every order write path (create, guest claim, address edit).
+The windowed counts keep using `@@index([storeId, createdAt])`. Cost if wrong: on a store with tens
+of thousands of orders one dashboard request per 15 minutes pays a full orders scan, and the MCP
+all-time figure lags a new customer by up to 15 minutes.
+
+**Ruling BS-2 — issue 1705: the currency sweep covers every order-money surface a customer or the
+merchant's accountant receives (invoice, confirmation / payment / refund emails, the two admin
+alert emails); the remaining `/1000 + toFixed(3)` sites are left KWD-only on purpose.** Those are:
+the XLSX exports (`order.routes.ts`, `customers.routes.ts` — their headers say "(KWD)"), the bank
+reconciliation narrations (the GL's base currency is KWD by design), the coupon / minimum-order
+error strings, the loyalty ledger description, the abandoned-cart and payment-link WhatsApp copy,
+`shipping.routes.ts`, `product-feed.ts` and `onesignal.service.ts`. KWD emails render
+byte-identically (`emailMoney` keeps the old "X.XXX KWD" / "X.XXX د.ك" form for KWD). Cost if
+wrong: a store selling in a non-KWD currency sees 3-decimal "/1000" figures in its spreadsheet
+exports and a few merchant-facing messages until they get the same treatment.
+
+**Ruling BS-3 — issue 2142 amends R2-8: the refund fanout's in-band gate still covers only a render
+or enqueue failure; a delivery failure is surfaced by the queue itself.** `enqueue` resolves once
+the email is on the Redis list, so no `{ queue: true }` caller can see a later Resend failure. The
+queue now raises a P1 alert (`email.queue.permanent_failure`, no recipient address in it) when an
+email exhausts its attempts or cannot be re-queued, and the dead-letter list `email:failed` is shown
+and replayable at the super-admin page `/email-queue` (R2-8's "no UI" residual is closed). With
+Redis down, the inline send now rejects to its caller, so the #1935 gate and Inngest step retries
+see that failure. The `refund_notified` claim is NOT released on a delivery failure — replaying the
+dead-lettered email from `/email-queue` is the recovery, and it cannot double-notify. Cost if wrong:
+the customer is told late — after the P1 alert and an operator's replay.
+
+**Ruling BS-4 — issues 1989 / 1991 amend SN-4: the one retry now matches the error Prisma really
+throws, and it is suspended for 5s after a read whose retry also failed; there is still no
+fail-fast sentinel.** P1001/P1002 arrive as `PrismaClientInitializationError`, whose code is on
+`errorCode` (verified against `@prisma/client`'s own class: `code` is undefined), so
+`extractRetryCodes` reads it — SN-4's retry had been matching only a hand-built test shape. During a
+sustained outage each read still makes ONE attempt (recovery is seen at once — the concern that kept
+O2-2 from adding a negative cache), it just stops paying for a second. Cost if wrong: in the 5s after
+an outage, one isolated connection blip that a retry would have absorbed still 500s that request.
+
+**Ruling BS-5 — issue 1988: Prisma P2003 / P2025 reach Sentry again, at warning level; P2002 and
+input-validation errors stay suppressed.** SN-2's safety net ("a first add-to-cart 500 would reappear
+and re-open the issue on its own") had silently stopped existing: FORCE-API-28's class is answered 400
+since the 2026-09-02 mapping, and #1982 then kept every 4xx out of Sentry. Warning level keeps them
+trackable (and able to reopen a resolved issue) without paging like a crash. P2002 is the merchant's
+duplicate SKU, a genuine client error. Cost if wrong: a merchant repeatedly deleting an already-deleted
+row adds warning-level P2025 noise to Sentry.
+
+**Ruling BS-6 — issues 1960 / 2173: Meta CAPI posts form-encoded (`data` JSON string +
+`access_token` field) and every Meta / TikTok failure raises a P1; the live endpoint was NOT
+exercised from this branch.** Form-encoding is the transport Meta's CAPI documentation shows and the
+one `meta-provisioner.service.ts` already uses against Graph successfully; a token inside a JSON body
+is undocumented. No merchant pixel token is available to a batch agent (and prod is off-limits), so
+the proof is the outcome measurement instead: a non-2xx, an `events_received` other than 1, or a
+TikTok `code` other than 0 now alerts (`pixels-capi.meta` / `pixels-capi.tiktok`) on the first real
+order. What would settle it before that: send one Purchase with a `test_event_code` from a pixel's
+Events Manager → Test Events. Cost if wrong: if Graph also rejects the form shape, server-side
+conversions stay broken until the first alert — now minutes, not months.
+
+**Ruling BS-7 — issue 2147 reverses M5-6: a stock-computing query no longer pre-filters variants to
+`isActive`.** M5-6 accepted the fallback because the parent column "is held at 0 by the invariant",
+but `VariantService.createOption` converts a stocked simple product to variants without zeroing it,
+so the PDP and the WhatsApp bridge advertised the old parent stock for a product whose variants were
+all disabled. They now select every variant with `isActive` and drop the disabled ones for display
+after the stock is computed; a unit gate fails on the pre-filtered shape in any stock-computing file.
+The conversion path itself is NOT changed to zero the parent column — that is a stock write whose
+correct target (discard the units, or move them onto a variant) is a merchant decision. Cost if
+wrong: none on reads; the stale parent value stays on the row, unread.
+
+**Ruling BS-8 — issues 2274 / 2276 / 2277 amend AP-5.** (a) 2276: the claim + `backorder_line_cancelled`
+marker now run on the request's transaction when there is one (`hasTenantContext()`), so they commit
+or roll back with the deferred `order/refunded` send; a rolled-back request leaves the line open
+(integration-tested), which removes the need for a recovery sweep. (b) 2274: a zero allocation is
+posted but never notifies, and the consumer reads a partial's `refundAmount` with `??`, so 0 can no
+longer become the order total. (c) 2277 is NOT fixed: the "none was reserved" claim was false for
+non-variant lines and is corrected in code and `inventory-model.md`; whether the cancel should heal
+the negative backorder debt (restore all unfulfilled units, only the negative portion, or nothing)
+is a stock semantics decision left to the owner on the issue. Cost if wrong: until decided, a
+non-variant product whose backorder line is cancelled keeps a negative on-hand that reads out of
+stock and disagrees with account 1200.
+
+**Ruling BS-9 — issue 2215's class sweep: a best-effort DB write whose failure is swallowed is
+savepointed wherever it can run inside a tenant transaction.** A heuristic scan of
+`apps/api/src/{services,routes,middleware}` found 23 `try { await prisma.X.<write> } catch { log }`
+sites; each was traced to its mounts. Savepointed (reachable inside a request or an explicit
+`runInTenantContext`): `auditLog` (security.ts), `recordUsage` (ai.service), `recordPaymentEvent`,
+the order-status `orderEvent`, `pages.remove` (now also swallows ONLY P2025), variant
+`bulkUpdateInventory` (now sequential — savepoints on one connection cannot interleave), the
+autofill category `createMany`, every analytics-rollup snapshot write, the citation-scan check
+write, and the bulk-AI enqueue-failure mark. Left as they are, not reachable inside a tenant
+transaction: account-lockout (`/auth`), abandoned-cart and SMS queue (process timers), expense OCR
+(Inngest, no context), `payment.factory` `releaseClaim` (its own deliberate transaction),
+wbs-integration (context-less router). Cost if wrong: a site the scan's pattern missed (a write
+wrapped in a helper, or a `.catch(() => …)` chain) still poisons its request.
+
 
 ## 2026-10-01 — backlog batch a-money-services (branch `fix/backlog-a-money-services`)
 

@@ -780,21 +780,61 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
  * resolved by hashing its own id the same way. Rows with no snapshot (no paid
  * order yet, a contact-less guest, or not yet rolled up) are absent from the
  * map: unknown, never a fabricated segment.
+ *
+ * Reads ONLY the snapshots of the rows passed (issue 2243) — call it with the
+ * one page being rendered, never the whole aggregated list: it used to load
+ * the store's entire snapshot table (every customer it ever had, guests
+ * included) on every Customers request and every MCP lookup. Filtering and
+ * the filter pills have their own indexed reads below.
  */
 export async function segmentsForCustomers(
   storeId: string,
   rows: ReadonlyArray<{ id: string; isGuest: boolean }>
 ): Promise<Map<string, RfmSegment>> {
+  const out = new Map<string, RfmSegment>();
+  if (rows.length === 0) return out;
+  const keyOf = new Map(rows.map(r => [r.id, rfmKeyFor(r.id, r.isGuest)]));
   const snapshots = await prisma.customerRfmSnapshot.findMany({
-    where: { storeId },
+    where: { storeId, customerId: { in: Array.from(new Set(keyOf.values())) } },
     select: { customerId: true, segment: true },
   });
   const byKey = new Map(snapshots.map(s => [s.customerId, s.segment]));
-  const out = new Map<string, RfmSegment>();
-  if (byKey.size === 0) return out;
   for (const row of rows) {
-    const seg = byKey.get(rfmKeyFor(row.id, row.isGuest));
+    const seg = byKey.get(keyOf.get(row.id)!);
     if (seg) out.set(row.id, seg);
   }
   return out;
+}
+
+/**
+ * The rows of `rows` whose RFM snapshot is in `segment` — the server-side
+ * segment filter. One `(storeId, segment)` index read of the member keys
+ * instead of every snapshot in the store (issue 2243).
+ */
+export async function filterCustomersBySegment<T extends { id: string; isGuest: boolean }>(
+  storeId: string,
+  rows: ReadonlyArray<T>,
+  segment: RfmSegment
+): Promise<T[]> {
+  const members = await prisma.customerRfmSnapshot.findMany({
+    where: { storeId, segment },
+    select: { customerId: true },
+  });
+  if (members.length === 0) return [];
+  const keys = new Set(members.map(m => m.customerId));
+  return rows.filter(r => keys.has(rfmKeyFor(r.id, r.isGuest)));
+}
+
+/**
+ * The RFM segments present in the store, canonical order — the Customers
+ * page's filter pills. A `groupBy` over the `(storeId, segment)` index, not
+ * a read of every snapshot (issue 2243).
+ */
+export async function presentRfmSegments(storeId: string): Promise<RfmSegment[]> {
+  const groups = await prisma.customerRfmSnapshot.groupBy({
+    by: ['segment'],
+    where: { storeId },
+  });
+  const present = new Set(groups.map(g => g.segment));
+  return RFM_SEGMENT_VALUES.filter(s => present.has(s));
 }

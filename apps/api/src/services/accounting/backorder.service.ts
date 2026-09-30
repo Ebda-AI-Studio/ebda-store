@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx, hasTenantContext } from '@force/database';
 import logger from '../../lib/logger';
 import { OrderService } from '../order.service';
 import { allocatePartialReturn } from './posting/partial-return-allocation';
@@ -65,7 +65,12 @@ export async function listOpenBackorders(storeId: string) {
  * a pro-rata adjustment for this line only (`postPartialReturnJournal` —
  * revenue net of its discount share, its VAT share, its COGS), and the fanout
  * skips every whole-order reversal (coupon, affiliate, loyalty, wallet) and
- * restores no stock (none was ever reserved for a backordered unit). The
+ * restores no stock. NOTE (issue 2277, open owner question): that is NOT
+ * because nothing was taken — for a NON-variant product checkout
+ * force-decremented these units, so `products.inventory` carries them as a
+ * negative backorder debt, and this cancel leaves that debt on the row (the
+ * GL adjustment meanwhile debits Inventory 1200 for their cost). Variant
+ * lines are floored at 0 at checkout, so for them nothing was taken. The
  * refundKey makes a redelivered event a no-op on both sides. A whole-order
  * cancel/refund still reverses the whole sale — and backs these adjustments
  * out first, so it nets to zero.
@@ -90,7 +95,22 @@ export async function cancelBackorder(
   const refundKey = backorderRefundKey(backorderId);
   const now = new Date();
 
-  const cancelled = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+  // ONE commit decision with the request (issue 2276). `withMoneyTx` is not
+  // proxied onto the ambient tenant transaction, so inside a request it opened
+  // a SEPARATE transaction that committed the claim + marker on its own —
+  // while the `order/refunded` send below is queued by deferAfterTenantCommit
+  // and DROPPED if the request then rolls back (or its COMMIT times out). The
+  // line was durably cancelled, its units counted as reversed, and the GL
+  // adjustment and customer notice never happened, with no retry path (the
+  // claim makes a second cancel a 404). On the ambient transaction the marker
+  // and the deferred event share one outcome. Outside a request it keeps its
+  // own money transaction, as before.
+  const inCancelTx = <T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> =>
+    hasTenantContext()
+      ? fn(prisma as unknown as Prisma.TransactionClient)
+      : withMoneyTx(prisma, fn);
+
+  const cancelled = await inCancelTx(async (tx: Prisma.TransactionClient) => {
     // 1. Claim — only a still-open line is cancelled, exactly once.
     const claim = await tx.backorderLine.updateMany({
       where: { id: backorderId, storeId, cancelledAt: null, fulfilledAt: null },
@@ -169,8 +189,12 @@ export async function cancelBackorder(
     return {
       quantity,
       refundAmount: alloc.cashCredit,
-      // "Refund issued" only when money was actually taken for the order.
-      notify: order.paymentStatus === 'paid',
+      // "Refund issued" only when money was actually taken for the order AND
+      // this line gives some back (issue 2274): a zero allocation — its units
+      // already reversed by a prior return, or a fully discounted order — is
+      // still posted to the GL but must not tell the customer a refund was
+      // issued. ReturnService refuses the same case (PARTIAL_REFUND_NOTHING_TO_REFUND).
+      notify: order.paymentStatus === 'paid' && alloc.cashCredit > 0,
     };
   });
 
@@ -182,7 +206,9 @@ export async function cancelBackorder(
     // a failed enqueue is alerted by deferAfterTenantCommit; outside one the
     // caller sees it.
     await OrderService.applyRefundEffects(storeId, orderId, {
-      restoreInventory: false, // Inventory was never reserved for a backordered item
+      // No stock restore — see the docblock: correct for variant lines (floored
+      // at 0 at checkout), a known residual for non-variant lines (issue 2277).
+      restoreInventory: false,
       // One cancelled LINE never returns the order's wallet spend (D1). The
       // partial payload already skips it; stated for the reader.
       reverseWallet: false,

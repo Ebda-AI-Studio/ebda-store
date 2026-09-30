@@ -647,6 +647,30 @@ describe('order-refunded fanout — a partial announces only its OWN amount (iss
   });
 });
 
+/**
+ * Issue 2274, backorder shape — a single backorder LINE cancel (restoreInventory
+ * false, refundKey `backorder:<lineId>`) whose allocation is 0 must not tell
+ * the customer anything. Complements the generic partial cases above.
+ */
+describe('order-refunded fanout — zero-amount backorder line cancel (issue 2274)', () => {
+  it('never emails the order total for a backorder cancel that refunds nothing', async () => {
+    h.sendOrderRefunded.mockReset().mockResolvedValue(undefined);
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      couponCode: null,
+      customerId: null,
+      items: [{ id: 'i1', productId: 'p1', variantId: null, quantity: 2 }],
+    });
+    h.orderEventFindFirst.mockResolvedValue(null);
+    await handleOrderRefunded('o1', 's1', false, true, stepStub, {
+      items: [{ orderItemId: 'i1', quantity: 1 }],
+      refundKey: 'backorder:bo1',
+      refundAmount: 0,
+    });
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+  });
+});
+
 describe('order-refunded fanout — claim-reversed step', () => {
   // These two cases are the entire reason Order.refundReversedAt exists rather
   // than the sweep keying on InventoryHistory marker-absence. Both legitimately

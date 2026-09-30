@@ -30,6 +30,7 @@ import { computeCostMicros } from '../lib/ai-pricing';
 import { safeFetchImage } from '../lib/safe-fetch';
 import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
 import { rethrowAsAppError } from '../lib/ai/gemini-errors';
+import { withSavepoint } from '../lib/savepoint';
 
 // Gemini Vision accepts only these mime types for inline_data. Anything else
 // (image/svg+xml, image/gif, image/tiff, image/x-icon) gets a 400. We
@@ -203,19 +204,25 @@ export async function recordUsage(
     // Collapsing the two would make an unpriced deployment look free.
     const costMicros = cachedHit ? 0 : computeCostMicros(model, inputTokens, outputTokens);
 
-    await prisma.aiUsage.create({
-      data: {
-        storeId,
-        feature,
-        inputTokens,
-        outputTokens,
-        cachedHit,
-        model,
-        costMicros,
-        subjectType: provenance.subjectType ?? null,
-        subjectId: provenance.subjectId ?? null,
-      },
-    });
+    // Savepointed: this usage row is written from request handlers that run
+    // in the request's single tenant transaction, and the catch below
+    // swallows — an unguarded failure would abort that transaction and turn
+    // the handler's 2xx into a silent rollback (issue 2215's class).
+    await withSavepoint(() =>
+      prisma.aiUsage.create({
+        data: {
+          storeId,
+          feature,
+          inputTokens,
+          outputTokens,
+          cachedHit,
+          model,
+          costMicros,
+          subjectType: provenance.subjectType ?? null,
+          subjectId: provenance.subjectId ?? null,
+        },
+      })
+    );
   } catch (err) {
     // Never fail the user-facing request because we couldn't log usage.
     logger.warn({ err, storeId, feature }, 'Failed to record AI usage');

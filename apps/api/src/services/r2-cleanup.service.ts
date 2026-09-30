@@ -128,6 +128,7 @@ async function deleteR2ObjectIfOrphanNow(url: string | null | undefined): Promis
  * can fire-and-forget without blocking the request response. The
  * function still awaits internally so the Node process keeps the work
  * alive until it finishes (no detached promises that can be GC'd).
+ * The URLs are checked sequentially — see the body (issue 2042).
  */
 export function cleanupRemovedImages(
   oldUrls: Array<string | null | undefined>,
@@ -138,7 +139,24 @@ export function cleanupRemovedImages(
     (u): u is string => typeof u === 'string' && u.length > 0 && !newSet.has(u)
   );
   if (removed.length === 0) return Promise.resolve();
-  return Promise.all(removed.map(url => deleteR2ObjectIfOrphan(url))).then(() => undefined);
+  // ONE AT A TIME (issue 2042). Each check opens its own `withRlsBypass`
+  // transaction, i.e. pins a pooled connection. Inside a request the calls
+  // are deferred and drained sequentially anyway, but OUTSIDE one (Inngest
+  // bulk import, crons, scripts) a `Promise.all` turned N removed images into
+  // N concurrent pinned transactions against DB_CONNECTION_LIMIT (15), shared
+  // with storefront traffic — the losers timed out on `maxWait`, the catch
+  // swallowed it, and the R2 objects leaked. This is post-response cleanup;
+  // latency does not matter, connection pressure does.
+  //
+  // Queued as ONE deferred task, synchronously: inside a request it must be
+  // registered before the handler returns (a later `deferAfterTenantCommit`
+  // from a still-running loop would arrive after the scope closed), and the
+  // drain then runs the whole list in one fresh tenant transaction.
+  return deferAfterTenantCommit('r2-cleanup.deleteRemoved', async () => {
+    for (const url of removed) {
+      await deleteR2ObjectIfOrphanNow(url);
+    }
+  }).then(() => undefined);
 }
 
 /**

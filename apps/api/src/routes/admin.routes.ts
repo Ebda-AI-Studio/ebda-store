@@ -16,6 +16,8 @@ import { config } from '../config';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
+import { emailQueue } from '../services/email-queue.service';
+import { maskEmail } from '../lib/pii-mask';
 import {
   prisma,
   withRlsBypass,
@@ -1990,6 +1992,66 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
       res.json({ success: true, data: { replayed: row.id } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ── Email queue dead-letter — super-admin observability + replay ──
+// Issue 2142: an order-lifecycle email queued with `{ queue: true }` that fails
+// every attempt lands in the Redis list `email:failed` and fires a P1 alert
+// (`email.queue.permanent_failure`). This is where an operator sees those
+// emails and puts them back on the queue once the provider recovers. The
+// recipient address is masked; the body is never returned.
+router.get(
+  '/email-queue/failed',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 100) || 100));
+      const [emails, stats] = await Promise.all([
+        emailQueue.getFailedEmails(limit),
+        emailQueue.getStats(),
+      ]);
+      res.json({
+        success: true,
+        data: {
+          stats: { pending: stats.pending, failed: stats.failed },
+          emails: emails.map(e => ({
+            id: e.id,
+            storeId: e.storeId,
+            to: (Array.isArray(e.options.to) ? e.options.to : [e.options.to]).map(maskEmail),
+            subject: e.options.subject,
+            attempts: e.attempts,
+            error: e.error ?? null,
+            createdAt: e.createdAt,
+            lastAttempt: e.lastAttempt ?? null,
+          })),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/email-queue/failed/retry',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const retried = await emailQueue.retryFailed();
+      await auditLog({
+        action: 'email_queue.retry_failed',
+        userId: req.user!.userId,
+        resourceType: 'setting',
+        resourceId: 'email:failed',
+        details: { retried },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { retried } });
     } catch (err) {
       next(err);
     }

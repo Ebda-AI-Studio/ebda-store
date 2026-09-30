@@ -9,7 +9,7 @@ import logger from '../lib/logger';
  * Keep these large enough that resizing DOWN happens (sharp upscales
  * poorly). 1200×800 hero @ 3:2 covers a 600×400 CSS-px hero at 2x DPR.
  */
-const ASPECT_TARGETS: Record<string, { w: number; h: number }> = {
+export const ASPECT_TARGETS: Record<string, { w: number; h: number }> = {
   '3:2': { w: 1200, h: 800 }, // legacy hero desktop
   '1:1': { w: 1000, h: 1000 }, // category + product
   // 3:4 was hero mobile portrait — DEPRECATED 2026-05-18 (Ahmad: mobile

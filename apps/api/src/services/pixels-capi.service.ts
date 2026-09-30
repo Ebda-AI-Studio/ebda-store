@@ -26,6 +26,7 @@
 
 import crypto from 'crypto';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
 
 // ─── Hashing helpers ─────────────────────────────────────────────────────────
 
@@ -124,17 +125,6 @@ interface MetaCAPIPayload {
     };
   }>;
   test_event_code?: string;
-  // The long-lived per-store token, sent as a body field rather than a URL
-  // query parameter — the API auto-instruments outbound HTTP (OpenTelemetry
-  // `http.url` span attribute, Sentry fetch breadcrumbs), which would
-  // otherwise capture the plaintext token in every trace/log for this call.
-  // Meta's own Conversions API examples pass `access_token` as a request
-  // parameter (form field in their curl sample) rather than exclusively a
-  // query string, and the Graph API treats query-string and body parameters
-  // interchangeably; TikTok's call below already keeps its token out of the
-  // URL (in an `Access-Token` header) for the same reason.
-  // audit-followup #190.
-  access_token: string;
 }
 
 /**
@@ -182,7 +172,6 @@ async function sendMetaCAPI(
         },
       },
     ],
-    access_token: accessToken,
   };
 
   if (testEventCode) {
@@ -191,10 +180,24 @@ async function sendMetaCAPI(
 
   const url = `https://graph.facebook.com/${META_API_VERSION}/${pixelId}/events`;
 
+  // Transport (issues 1960 / 2173): FORM-ENCODED — `data` as a JSON string plus
+  // `access_token` as a form field — which is the shape Meta's Conversions API
+  // documents (its curl sample uses `-F data=… -F access_token=…`) and the
+  // shape this repo's own Graph client already uses successfully
+  // (meta-provisioner.service.ts). The token stays out of the URL, which
+  // OpenTelemetry / Sentry record for every outbound fetch (#190). A token in
+  // a JSON body is not a documented Graph transport; that is what this
+  // replaces.
+  const form = new URLSearchParams({
+    data: JSON.stringify(payload.data),
+    access_token: accessToken,
+  });
+  if (payload.test_event_code) form.set('test_event_code', payload.test_event_code);
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
     signal: AbortSignal.timeout(10_000),
   });
 
@@ -206,6 +209,13 @@ async function sendMetaCAPI(
   }
 
   const json = (await response.json()) as { events_received?: number };
+  // A 2xx that did not take the event is still a broken integration — measure
+  // the outcome, not the status code.
+  if (json.events_received !== 1) {
+    throw new Error(
+      `Meta CAPI accepted the request but reported events_received=${String(json.events_received)} for pixel ${pixelId}`
+    );
+  }
   logger.info(
     { orderId: order.id, pixelId, eventsReceived: json.events_received },
     '[pixels-capi] meta purchase event sent'
@@ -312,6 +322,28 @@ async function sendTikTokCAPI(
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** P1 alert for a failed server-side conversion. Never throws; no token or PII. */
+async function alertCapiFailure(
+  platform: 'Meta' | 'TikTok',
+  err: unknown,
+  order: PurchaseOrderData,
+  pixelId: string
+): Promise<void> {
+  await sendAlert({
+    level: 'p1',
+    source: `pixels-capi.${platform.toLowerCase()}`,
+    title: `${platform} server-side conversion failed`,
+    body:
+      `A Purchase conversion was not accepted by ${platform}. Checkout is unaffected (fail-open), ` +
+      'but ad attribution is degrading until this is fixed — check the token and the pixel.',
+    context: {
+      orderId: order.id,
+      pixelId,
+      error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+    },
+  }).catch(() => undefined);
+}
+
 /**
  * Send server-side Purchase conversion events to every configured platform
  * (currently Meta CAPI and TikTok Events API).
@@ -344,11 +376,15 @@ export async function sendPurchaseConversion(
     try {
       await sendMetaCAPI(meta.pixelId, meta.accessToken, order, storeUrl, meta.testEventCode);
     } catch (err) {
-      // fail-open: log + continue
+      // fail-open: log + continue — and ALERT (issues 1960 / 2173). The order
+      // must not fail on a CAPI error, but a silent failure here stops every
+      // store's server-side Purchase conversions while the browser pixel keeps
+      // firing, which nobody notices. Throttled per title (5 min).
       logger.error(
         { err, orderId: order.id, pixelId: meta.pixelId },
         '[pixels-capi] meta capi send failed — failing open'
       );
+      await alertCapiFailure('Meta', err, order, meta.pixelId);
     }
   }
 
@@ -369,11 +405,12 @@ export async function sendPurchaseConversion(
         tiktok.testEventCode
       );
     } catch (err) {
-      // fail-open
+      // fail-open, alerted like Meta above
       logger.error(
         { err, orderId: order.id, pixelId: tiktok.pixelId },
         '[pixels-capi] tiktok events api send failed — failing open'
       );
+      await alertCapiFailure('TikTok', err, order, tiktok.pixelId);
     }
   }
 }

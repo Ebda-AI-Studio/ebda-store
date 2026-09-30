@@ -394,4 +394,28 @@ describe.skipIf(!hasDb)('backorder line cancel → line-only GL reversal', () =>
     });
     expect(o.refundReversedAt).toBeNull();
   });
+
+  // Issue 2276: the claim + marker ride the request's transaction. When that
+  // transaction rolls back, the line stays open and no marker survives — so
+  // the dropped deferred event does not strand a cancelled-but-unposted line.
+  // Mutation proof: run the claim on `withMoneyTx` unconditionally → the line
+  // is committed cancelled despite the rollback and this goes red.
+  it('a rolled-back request leaves the line open and writes no marker', async () => {
+    const { order, backorders } = await seedOrder();
+    await expect(
+      runInTenantContext(storeId, async () => {
+        await cancelBackorder(storeId, backorders[0].id, 'r', OWNER);
+        throw new Error('request rolled back');
+      })
+    ).rejects.toThrow('request rolled back');
+    const line = await prisma.backorderLine.findUniqueOrThrow({
+      where: { id: backorders[0].id },
+      select: { cancelledAt: true },
+    });
+    expect(line.cancelledAt).toBeNull();
+    const markers = await prisma.orderEvent.count({
+      where: { orderId: order.id, toStatus: 'backorder_line_cancelled' },
+    });
+    expect(markers).toBe(0);
+  });
 });

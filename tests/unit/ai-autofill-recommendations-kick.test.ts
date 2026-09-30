@@ -27,7 +27,13 @@ vi.mock('@force/database', () => ({
       create: (...args: unknown[]) => mockBulkAiJobCreate(...args),
     },
   },
+  // Outside a tenant context: withSavepoint is a pass-through, and the
+  // deferred drain's fresh tenant tx just invokes the callback.
+  hasTenantContext: () => false,
+  runInTenantContext: async (_s: string, fn: () => Promise<unknown>) => fn(),
+  onClosedTenantTxAccess: vi.fn(),
 }));
+vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn() }));
 
 const mockInngestSend = vi.fn();
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
@@ -35,6 +41,7 @@ vi.mock('../../apps/api/src/lib/inngest/client', () => ({
 }));
 
 import { enqueueRecommendationsSweepForNewProduct } from '../../apps/api/src/services/ai-autofill.service';
+import { withDeferredWork } from '../../apps/api/src/lib/after-tenant-commit';
 
 const STORE_ID = '11111111-1111-1111-1111-111111111111';
 const PRODUCT_ID = '22222222-2222-2222-2222-222222222222';
@@ -85,5 +92,32 @@ describe('enqueueRecommendationsSweepForNewProduct', () => {
     await expect(
       enqueueRecommendationsSweepForNewProduct(STORE_ID, PRODUCT_ID)
     ).resolves.toBeUndefined();
+  });
+
+  // Issues 2108 / 2214 / 2215: inside a request the kick must wait for the
+  // product's COMMIT — never publish a jobId for an uncommitted row, never
+  // run a bulkAiJob query that could abort the request transaction.
+  it('inside a request, runs only AFTER the tenant transaction commits', async () => {
+    await withDeferredWork({ storeId: STORE_ID }, async () => {
+      await enqueueRecommendationsSweepForNewProduct(STORE_ID, PRODUCT_ID);
+      // Still inside the (uncommitted) request transaction: nothing ran.
+      expect(mockBulkAiJobFindFirst).not.toHaveBeenCalled();
+      expect(mockBulkAiJobCreate).not.toHaveBeenCalled();
+      expect(mockInngestSend).not.toHaveBeenCalled();
+    });
+    // Committed → drained.
+    expect(mockBulkAiJobCreate).toHaveBeenCalledTimes(1);
+    expect(mockInngestSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('a rolled-back create drops the kick — no orphan job, no event', async () => {
+    await expect(
+      withDeferredWork({ storeId: STORE_ID }, async () => {
+        await enqueueRecommendationsSweepForNewProduct(STORE_ID, PRODUCT_ID);
+        throw new Error('request rolled back');
+      })
+    ).rejects.toThrow('request rolled back');
+    expect(mockBulkAiJobCreate).not.toHaveBeenCalled();
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 });

@@ -11,8 +11,9 @@ import { customerKeyOf } from '../lib/customer-key';
 import {
   aggregateCustomers,
   getCustomerProfile,
+  filterCustomersBySegment,
   parseSegmentFilter,
-  RFM_SEGMENT_VALUES,
+  presentRfmSegments,
   segmentsForCustomers,
   type ShippingAddressShape,
 } from '../services/customer-aggregate.service';
@@ -464,23 +465,21 @@ router.get(
 
       const { customers, truncated, summary } = await aggregateCustomers(storeId);
 
-      // Segment per row. A guest's snapshot is keyed by the HASH of the same
-      // key this list groups by (`lib/customer-key.ts`), so guests resolve
-      // too — before, RFM keyed guests by hash(email:phone) and this filter
-      // could only ever match registered shoppers (analytics audit §4).
-      // Staff never receive segments, matching the 403 above.
+      // A guest's snapshot is keyed by the HASH of the same key this list
+      // groups by (`lib/customer-key.ts`), so guests resolve too — before,
+      // RFM keyed guests by hash(email:phone) and this filter could only
+      // ever match registered shoppers (analytics audit §4). Staff never
+      // receive segments, matching the 403 above.
       const canSeeSegments = req.user?.role !== 'staff';
-      const segmentOf = canSeeSegments
-        ? await segmentsForCustomers(storeId, customers)
-        : new Map<string, RfmSegment>();
 
       // Segment filter runs server-side, over the whole aggregated set, so the
       // total + pagination reflect the segment rather than one page of it.
+      // It reads only that segment's members (issue 2243).
       const bySegment =
         segment === 'guest'
           ? customers.filter(c => c.isGuest)
           : segment
-            ? customers.filter(c => segmentOf.get(c.id) === segment)
+            ? await filterCustomersBySegment(storeId, customers, segment)
             : customers;
 
       // Optional server-side filter so search is consistent across pages
@@ -498,15 +497,17 @@ router.get(
       const total = filtered.length;
       const totalPages = Math.max(1, Math.ceil(total / perPage));
       const start = (page - 1) * perPage;
-      const pageItems = filtered
-        .slice(start, start + perPage)
-        .map(c => (canSeeSegments ? { ...c, segment: segmentOf.get(c.id) ?? null } : c));
+      const pageSlice = filtered.slice(start, start + perPage);
+      // Segment per row — for this page's rows only.
+      const segmentOf = canSeeSegments
+        ? await segmentsForCustomers(storeId, pageSlice)
+        : new Map<string, RfmSegment>();
+      const pageItems = pageSlice.map(c =>
+        canSeeSegments ? { ...c, segment: segmentOf.get(c.id) ?? null } : c
+      );
       // Segments present anywhere in the store (not just this page) — the
       // page's filter pills. Canonical order; omitted for staff.
-      const presentSegments = new Set(segmentOf.values());
-      const segments = canSeeSegments
-        ? RFM_SEGMENT_VALUES.filter(s => presentSegments.has(s))
-        : undefined;
+      const segments = canSeeSegments ? await presentRfmSegments(storeId) : undefined;
 
       // Double-wrapped on purpose: the admin `apiGet` helper unwraps one
       // `data` layer, so the inner `{ data, meta }` is what reaches the page.

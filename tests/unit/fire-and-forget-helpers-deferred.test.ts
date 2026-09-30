@@ -148,3 +148,47 @@ describe('recordAffiliateEvent', () => {
     expect(prismaMock.affiliateEvent.create).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Issue 2042 — outside a request (Inngest bulk import, crons, scripts) every
+ * removed URL used to open its own pinned `withRlsBypass` transaction AT ONCE
+ * (`Promise.all`), N of them against a 15-connection pool shared with the
+ * storefront; the losers timed out and the objects leaked. The checks now run
+ * one at a time, as a single deferred task.
+ *
+ * Mutation proof: restore `Promise.all(removed.map(deleteR2ObjectIfOrphan))`
+ * → the peak-concurrency assertion goes red.
+ */
+describe('cleanupRemovedImages — bounded fan-out (issue 2042)', () => {
+  it('checks removed URLs one at a time outside a request', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    prismaMock.$queryRawUnsafe.mockImplementation(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise(r => setTimeout(r, 5));
+      inFlight--;
+      return [{ referenced: false }];
+    });
+    const removed = Array.from({ length: 20 }, (_, i) => `https://cdn.example.com/s/${i}.png`);
+
+    await cleanupRemovedImages(removed, []);
+
+    expect(prismaMock.$queryRawUnsafe).toHaveBeenCalledTimes(20);
+    expect(storageMock.delete).toHaveBeenCalledTimes(20);
+    expect(peak).toBe(1);
+  });
+
+  it('inside a request, queues ONE task that runs after the commit', async () => {
+    prismaMock.$queryRawUnsafe.mockResolvedValue([{ referenced: false }]);
+    await withDeferredWork({ storeId: STORE_ID }, async () => {
+      void cleanupRemovedImages(
+        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
+        []
+      );
+      expect(storageMock.delete).not.toHaveBeenCalled();
+    });
+    expect(runInTenantContextMock).toHaveBeenCalledTimes(1);
+    expect(storageMock.delete).toHaveBeenCalledTimes(2);
+  });
+});

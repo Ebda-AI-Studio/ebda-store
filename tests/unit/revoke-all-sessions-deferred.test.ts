@@ -45,7 +45,7 @@ vi.mock('@api/services/r2-cleanup.service', () => ({
   deleteR2ObjectIfOrphan: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { mockPrisma, redisMock, sendMock } = vi.hoisted(() => {
+const { mockPrisma, redisMock, sendMock, sendAlertMock } = vi.hoisted(() => {
   const mockPrisma = {
     user: { update: vi.fn() },
     refreshToken: {
@@ -54,10 +54,16 @@ const { mockPrisma, redisMock, sendMock } = vi.hoisted(() => {
     },
     merchantApiKey: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
   };
-  const redisMock = { setUserTokenVersion: vi.fn().mockResolvedValue(undefined) };
+  const redisMock = {
+    setUserTokenVersion: vi.fn().mockResolvedValue(undefined),
+    clearUserTokenVersion: vi.fn().mockResolvedValue(undefined),
+  };
   const sendMock = vi.fn().mockResolvedValue({ ids: [] });
-  return { mockPrisma, redisMock, sendMock };
+  const sendAlertMock = vi.fn().mockResolvedValue('sent');
+  return { mockPrisma, redisMock, sendMock, sendAlertMock };
 });
+
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: sendAlertMock }));
 
 vi.mock('@api/services/redis.service', () => ({ redis: redisMock }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: sendMock } }));
@@ -139,5 +145,47 @@ describe('#1859 AuthService.revokeAllSessions — Redis tv bump defers past the 
     expect(mockPrisma.merchantApiKey.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: USER_ID, revokedAt: null } })
     );
+  });
+});
+
+/**
+ * Issue 2062 — the inline path (logout-all, password change/reset) used to
+ * swallow a failed tv push into a warn while the caller reported success, and
+ * the no-TTL key kept serving the stale-LOW version. Now a failed SET deletes
+ * the key (the next request reads Postgres), and only a failed DELETE too is
+ * treated as "revocation not in effect" — a P1 alert.
+ *
+ * Mutation proof: in auth.service.ts pushTokenVersion, drop the
+ * `clearUserTokenVersion` fallback or the `sendAlert` → a case goes red.
+ */
+describe('revokeAllSessions — a failed tv push is never quiet (issue 2062)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.user.update.mockResolvedValue({ tokenVersion: 7 });
+    redisMock.setUserTokenVersion.mockResolvedValue(undefined);
+    redisMock.clearUserTokenVersion.mockResolvedValue(undefined);
+  });
+
+  it('a failed SET deletes the key so the next request reads the bump from Postgres', async () => {
+    redisMock.setUserTokenVersion.mockRejectedValueOnce(new Error('redis blip'));
+
+    await AuthService.revokeAllSessions(USER_ID);
+
+    expect(redisMock.clearUserTokenVersion).toHaveBeenCalledWith(USER_ID);
+    expect(sendAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('SET and DEL both failing raises a P1 alert — the caller is not told a silent success', async () => {
+    redisMock.setUserTokenVersion.mockRejectedValueOnce(new Error('redis down'));
+    redisMock.clearUserTokenVersion.mockRejectedValueOnce(new Error('redis down'));
+
+    await expect(AuthService.revokeAllSessions(USER_ID)).resolves.toBeUndefined();
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+    expect(sendAlertMock.mock.calls[0][0]).toMatchObject({
+      level: 'p1',
+      source: 'auth.revokeAllSessions.setTokenVersion',
+      context: { userId: USER_ID },
+    });
   });
 });

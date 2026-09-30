@@ -43,6 +43,13 @@ function extractRetryCodes(err: unknown): string[] {
   if (typeof code === 'string') codes.push(code);
   const metaCode = (err as { meta?: { code?: unknown } }).meta?.code;
   if (typeof metaCode === 'string') codes.push(metaCode);
+  // Connection-establishment failures (P1001 "can't reach database server",
+  // P1002 "timed out") are thrown as `PrismaClientInitializationError`, whose
+  // code lives on `errorCode` — `code` is undefined on that class (issue
+  // 1989). Without this, a caller listing P1001/P1002 in `extraRetryCodes`
+  // never actually retried them.
+  const errorCode = (err as { errorCode?: unknown }).errorCode;
+  if (typeof errorCode === 'string') codes.push(errorCode);
   return codes;
 }
 

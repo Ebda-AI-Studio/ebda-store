@@ -14,6 +14,7 @@
 import type { PaymentStatus } from '@force/database';
 import { Prisma, prisma } from '@force/database';
 import logger from '../lib/logger';
+import { withSavepoint } from '../lib/savepoint';
 
 /** Coarse-grained categorisation so audit UIs can filter quickly. */
 export type PaymentEventType =
@@ -44,21 +45,26 @@ interface RecordPaymentEventInput {
  */
 export async function recordPaymentEvent(input: RecordPaymentEventInput): Promise<void> {
   try {
-    await prisma.paymentEvent.create({
-      data: {
-        paymentId: input.paymentId,
-        storeId: input.storeId,
-        orderId: input.orderId,
-        eventType: input.eventType,
-        fromStatus: input.fromStatus ?? null,
-        toStatus: input.toStatus ?? null,
-        provider: input.provider ?? null,
-        providerPayload: input.providerPayload ?? Prisma.JsonNull,
-        details: (input.details ?? {}) as Prisma.InputJsonValue,
-        triggeredByUserId: input.triggeredByUserId ?? null,
-        occurredAt: input.occurredAt ?? new Date(),
-      },
-    });
+    // Savepointed (issue 2215's class): order routes write this inside the
+    // request's tenant transaction, AFTER the payment/status writes it
+    // records; a failure the catch below swallows must not abort them.
+    await withSavepoint(() =>
+      prisma.paymentEvent.create({
+        data: {
+          paymentId: input.paymentId,
+          storeId: input.storeId,
+          orderId: input.orderId,
+          eventType: input.eventType,
+          fromStatus: input.fromStatus ?? null,
+          toStatus: input.toStatus ?? null,
+          provider: input.provider ?? null,
+          providerPayload: input.providerPayload ?? Prisma.JsonNull,
+          details: (input.details ?? {}) as Prisma.InputJsonValue,
+          triggeredByUserId: input.triggeredByUserId ?? null,
+          occurredAt: input.occurredAt ?? new Date(),
+        },
+      })
+    );
   } catch (err) {
     // Audit logging must never break the payment flow.
     logger.error(

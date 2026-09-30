@@ -60,6 +60,7 @@ async function bustProductCaches(storeId: string): Promise<void> {
 // so any Order.status writer can import it without pulling in this heavy
 // service graph. Re-exported here for the existing import sites.
 import { assertValidTransition, VALID_ORDER_TRANSITIONS } from './order-status-machine';
+import { withSavepoint } from '../lib/savepoint';
 export { assertValidTransition, VALID_ORDER_TRANSITIONS };
 
 /**
@@ -1731,15 +1732,20 @@ export class OrderService {
     // status change (the Order row is the source of truth; this is the aid).
     // actorId is null here: updateStatus has no acting-user id in scope.
     try {
-      await prisma.orderEvent.create({
-        data: {
-          storeId,
-          orderId,
-          fromStatus: order.status,
-          toStatus: status,
-          actorId: null,
-        },
-      });
+      // Savepointed (issue 2215's class): the status update above shares the
+      // request's tenant transaction; a swallowed failure here must not abort
+      // it and silently roll the status change back behind a 2xx.
+      await withSavepoint(() =>
+        prisma.orderEvent.create({
+          data: {
+            storeId,
+            orderId,
+            fromStatus: order.status,
+            toStatus: status,
+            actorId: null,
+          },
+        })
+      );
     } catch (err) {
       logger.error(
         { err, orderId, storeId, fromStatus: order.status, toStatus: status },

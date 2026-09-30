@@ -12,6 +12,7 @@ import { emailVerificationTemplate } from './email-templates/email-verification'
 import { resendVerificationTemplate } from './email-templates/resend-verification';
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from './email-templates/order-confirmation';
+import { emailMoney } from './email-templates/_util';
 import { orderRefundedTemplate } from './email-templates/order-refunded';
 import { paymentSuccessTemplate } from './email-templates/payment-success';
 import { paymentFailedTemplate } from './email-templates/payment-failed';
@@ -280,6 +281,13 @@ export interface OrderEmailData {
   taxIncludedInPrice?: boolean | null;
   shipping: number;
   discount?: number;
+  /** The levers `discount` is made of (issue 2239) — see order.service create(). */
+  couponDiscount?: number;
+  promotionDiscount?: number;
+  loyaltyDiscount?: number;
+  loyaltyPointsRedeemed?: number | null;
+  /** The order's currency; money renders in it (issue 1705). Default KWD. */
+  currency?: string;
   couponCode?: string;
   /** Name of the automatic promotion that discounted this order, when a
    *  promotion (rather than a coupon code) was the winning lever. Mutually
@@ -310,6 +318,8 @@ export interface OrderRefundEmailData {
   refundAmount: number;
   /** Optional admin-supplied reason shown to the customer. */
   reason?: string;
+  /** The order's currency; money renders in it (issue 1705). Default KWD. */
+  currency?: string;
 }
 
 // Lazy platform-sender Resend client. Shared between sendPlatform +
@@ -950,6 +960,7 @@ export class EmailService {
     orderNumber: string;
     amount: number;
     reason?: string;
+    currency?: string;
   }): Promise<void> {
     const content = this.adminRefundTemplate(data);
     await this.sendPlatform(
@@ -1006,7 +1017,7 @@ export class EmailService {
       <p><strong>Customer:</strong> ${escapeHtml(d.customerName)} (${escapeHtml(
         d.customerEmail
       )})</p>
-      <p><strong>Total:</strong> ${(d.total / 1000).toFixed(3)} KWD</p>
+      <p><strong>Total:</strong> ${emailMoney(d.total, d.currency, 'en')}</p>
       <p><strong>Items:</strong> ${d.items.length}</p>
       <p style="text-align: center; margin: 24px 0;">
         <a href="${config.adminUrl}/orders" class="button">View Order</a>
@@ -1021,11 +1032,12 @@ export class EmailService {
     orderNumber: string;
     amount: number;
     reason?: string;
+    currency?: string;
   }): string {
     return `
       <h2>Refund Processed</h2>
       <p><strong>Order #${escapeHtml(d.orderNumber)}</strong></p>
-      <p><strong>Amount:</strong> ${(d.amount / 1000).toFixed(3)} KWD</p>
+      <p><strong>Amount:</strong> ${emailMoney(d.amount, d.currency, 'en')}</p>
       ${d.reason ? `<p><strong>Reason:</strong> ${escapeHtml(d.reason)}</p>` : ''}
       <p style="text-align: center; margin: 24px 0;">
         <a href="${config.adminUrl}/orders" class="button">View Details</a>

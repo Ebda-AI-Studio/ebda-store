@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { Button, Badge } from '@force/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
@@ -147,7 +148,10 @@ export default function WebhookEventsPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="p-4 sm:p-6">
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex items-center justify-end gap-3">
+          <Link href="/email-queue" className="text-sm text-primary hover:underline">
+            {t('emailQueueLink')}
+          </Link>
           <Button variant="outline" size="sm" onClick={() => fetchEvents()}>
             {t('refresh')}
           </Button>
