@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, hasTenantContext, runInTenantContext } from '@force/database';
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../../middleware/error-handler';
 
@@ -110,4 +110,31 @@ export async function assertStoreOwns(
   if (accounts.length !== accountIds.length) notFound();
   if (customers.length !== customerIds.length) notFound();
   if (categories.length !== categoryIds.length) notFound();
+}
+
+/**
+ * Run the ownership guard in the same RLS posture as the writes it protects,
+ * WITHOUT opening a second transaction when one is already ambient (issue
+ * 2057).
+ *
+ * - Ambient tenant context (the HTTP routes wrap the service call in
+ *   `runInTenantContext(req.params.storeId, …)`; barcode reconcile does the
+ *   same): the `prisma` proxy already routes onto that transaction with the
+ *   store GUC set, so the guard runs there. Opening a nested
+ *   `runInTenantContext` would take a SECOND pool connection while the outer
+ *   one is held (the double-nest `routes/index.ts` warns about) and read a
+ *   different snapshot from the writes it guards.
+ * - No ambient context (Inngest: expense OCR, reorder suggestions): open a
+ *   tenant-scoped transaction for the guard alone, so a GUC-less read under
+ *   RLS cannot 404 every legitimately-owned id.
+ */
+export async function assertStoreOwnsInTenantScope(
+  storeId: string,
+  ids: StoreOwnedIds
+): Promise<void> {
+  if (hasTenantContext()) {
+    await assertStoreOwns(storeId, ids);
+    return;
+  }
+  await runInTenantContext(storeId, () => assertStoreOwns(storeId, ids));
 }

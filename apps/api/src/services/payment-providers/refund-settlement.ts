@@ -76,6 +76,17 @@ export interface RefundSettlement {
    * again, so callers raise it for reconciliation.
    */
   heldUnaccountedEvent: boolean;
+  /**
+   * True when the payment PREDATES the per-refund ledger (a refund is
+   * accounted but no refund ids are recorded) and this event names a refund
+   * with a usable amount that was therefore NOT added. The rule cannot tell a
+   * settle notice for the refund already counted (benign) from a genuinely
+   * NEW second refund (the refundable balance is then overstated, and a later
+   * return could pay it out again), so it is raised for a human to check in
+   * the provider dashboard — with its own wording, not the "reported without
+   * an amount" text (PR 2279 audit P1).
+   */
+  heldProvenanceUnknown: boolean;
 }
 
 export function resolveRefundSettlement(input: {
@@ -178,11 +189,21 @@ export function resolveRefundSettlement(input: {
     settledTotal: isFullRefund ? Math.max(settled, Math.max(paymentAmount, 0)) : settled,
     isFullRefund,
     accountedThisEvent,
+    // Only when the AMOUNT is unusable (issue 2029). A provenance-unknown
+    // event WITH a credible amount is a different case with different wording
+    // — heldProvenanceUnknown below — because it may be a benign settle notice
+    // for the refund already counted OR a genuinely new refund (PR 2279 audit).
     heldUnaccountedEvent:
       typeof reportedEventId === 'string' &&
       reportedEventId.length > 0 &&
       !ids.includes(reportedEventId) &&
-      !accountedThisEvent &&
+      credibleAmount === null &&
+      !isFullRefund,
+    heldProvenanceUnknown:
+      !provenanceKnown &&
+      credibleAmount !== null &&
+      typeof reportedEventId === 'string' &&
+      reportedEventId.length > 0 &&
       !isFullRefund,
   };
 }

@@ -35,31 +35,41 @@
       "id": "tenant-stock-adjustment-guard-context",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "the cross-tenant product/variant ownership guard runs outside any tenant context on a context-less router — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read",
+      "why": "the cross-tenant product/variant ownership guard is skipped — the service stops calling assertStoreOwnsInTenantScope, so body-supplied foreign ids reach the writes (issue 2057 moved the RLS-posture decision into that helper)",
       "source": "apps/api/src/services/accounting/stock-adjustment.service.ts",
-      "find": "  await runInTenantContext(input.storeId, () =>",
-      "replace": "  await ((_s: string, fn: () => unknown) => fn())(input.storeId, () =>",
+      "find": "  await assertStoreOwnsInTenantScope(input.storeId, {",
+      "replace": "  await (async (_s: string, _i: unknown) => undefined)(input.storeId, {",
       "test": "tests/unit/accounting-guard-tenant-context.test.ts"
     },
     {
       "id": "tenant-purchase-order-guard-context",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "the cross-tenant product/variant/supplier ownership guard runs outside any tenant context on a context-less router — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read",
+      "why": "the cross-tenant product/variant/supplier ownership guard is skipped — the service stops calling assertStoreOwnsInTenantScope, so body-supplied foreign ids reach the writes (issue 2057 moved the RLS-posture decision into that helper)",
       "source": "apps/api/src/services/accounting/purchase-order.service.ts",
-      "find": "  await runInTenantContext(input.storeId, () =>",
-      "replace": "  await ((_s: string, fn: () => unknown) => fn())(input.storeId, () =>",
+      "find": "  await assertStoreOwnsInTenantScope(input.storeId, {",
+      "replace": "  await (async (_s: string, _i: unknown) => undefined)(input.storeId, {",
       "test": "tests/unit/accounting-guard-tenant-context.test.ts"
     },
     {
       "id": "tenant-expense-guard-context",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "the cross-tenant supplier/account ownership guard runs outside any tenant context on a context-less router — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read",
+      "why": "the cross-tenant supplier/account ownership guard is skipped — the service stops calling assertStoreOwnsInTenantScope, so body-supplied foreign ids reach the writes (issue 2057 moved the RLS-posture decision into that helper)",
       "source": "apps/api/src/services/accounting/expense.service.ts",
-      "find": "  await runInTenantContext(input.storeId, () =>",
-      "replace": "  await ((_s: string, fn: () => unknown) => fn())(input.storeId, () =>",
+      "find": "  await assertStoreOwnsInTenantScope(input.storeId, {",
+      "replace": "  await (async (_s: string, _i: unknown) => undefined)(input.storeId, {",
       "test": "tests/unit/accounting-guard-tenant-context.test.ts"
+    },
+    {
+      "id": "tenant-guard-context-no-ambient",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "with no ambient tenant transaction (Inngest callers: expense OCR, reorder suggestions) the ownership guard runs GUC-less — under RLS enforcement it would 404 every legitimately-owned id instead of scoping the read",
+      "source": "apps/api/src/services/accounting/assert-store-owns.ts",
+      "find": "  await runInTenantContext(storeId, () => assertStoreOwns(storeId, ids));",
+      "replace": "  await assertStoreOwns(storeId, ids);",
+      "test": "tests/unit/assert-store-owns-in-tenant-scope.test.ts"
     },
     {
       "id": "tenant-bank-reconcile-guard-context",
@@ -1337,8 +1347,8 @@
       "tier": "unit",
       "why": "a shopper's own / retention-cron erasure scrubs wallet notes and forfeits balances only in the store whose GUC is set, not every store (#1957)",
       "source": "apps/api/src/services/wallet.service.ts",
-      "find": "    await withScopedRlsBypass(client, async () => {\n      const { wallets, forfeited } = await run();",
-      "replace": "    await (async (f: () => Promise<void>) => f())(async () => {\n      const { wallets, forfeited } = await run();",
+      "find": "    await withScopedRlsBypass(client, async () => {\n      const { forfeited, notesScrubbedStores } = await run();",
+      "replace": "    await (async (f: () => Promise<void>) => f())(async () => {\n      const { forfeited, notesScrubbedStores } = await run();",
       "test": "tests/unit/auth-erase-propagation.test.ts"
     },
     {

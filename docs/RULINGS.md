@@ -437,6 +437,14 @@ advisory key serialises every return create/complete on one order and locks no
 row. Proven on Postgres by `tests/integration/return-order-lock.test.ts` (red
 with the lock removed). Cost if wrong: none for money — anything else that
 needs to serialise with return completion must take the same key, not the row.
+_Amended 2026-10-01 (issues 2004 / 2030):_ the HOLD DURATION matters too —
+`complete()` keeps the key across the provider round-trip (~16s worst case for
+MyFatoorah), so the customer-facing `create()` no longer blocks on it: it polls
+`pg_try_advisory_xact_lock` for 3s, then answers 409 `RETURN_ORDER_BUSY`
+(localized on the storefront returns page). `complete()` still waits — it is
+the merchant's own action and must serialise. Cost if wrong: a shopper who
+submits a return while the merchant is refunding another return on the same
+order is asked to retry.
 
 **Ruling M1-3 — a provider failure releases the claim only when it proves
 nothing was sent.** A 4xx (except 408) or a 2xx whose body says failure is a
@@ -478,6 +486,24 @@ account, CR the sale's cash account) and the account choice changes the books
 of live stores. Until the owner picks one, each such refund fires a P1
 `payment.refund.partial_no_gl` alert naming the order. Cost if wrong: the
 ledger keeps understating refunds for these until booked by hand.
+_Amended 2026-10-01 (issues 2001/2025/2026/2032):_ the claim "each such refund
+fires a P1" was not true as built — `sendAlert` throttles per title for 5 min
+and the title was constant, so a second refund on the same store inside that
+window was dropped. `alertUnbookedRefund` (payment-providers/unbooked-refund-alert.ts)
+now puts the order in the title (one throttle key per order), always writes an
+error log line with order/payment/refund ids first (the record when Telegram
+throttles or is down; the payment_event rows remain the durable trail), and on
+the request path sends after COMMIT instead of inside the open transaction.
+Still no durable "unbooked refunds" UI — the ledger fix itself awaits this ruling.
+A third kind, `held_provenance_unknown` (PR 2279 audit P1), pages when a
+payment that predates the per-refund ledger receives a refund WITH a usable
+amount: it is held rather than added, and the system cannot tell a settle
+notice for the counted refund from a genuinely new one, so a human checks.
+Cost if wrong: an extra P1 per benign settle notice on a pre-ledger payment.
+The post-COMMIT send is queued with `deferAfterTenantCommit(..., { runOnRollback:
+true })`: the provider refund already left, so a rolled-back request must not
+drop the only page for it (PR 2279 audit). `runOnRollback` is reserved for
+work that records an irreversible external event.
 
 **Ruling M1-8 — the partial-return cash credit keeps its current account and
 amount for every refund method (#1207, #1351).** Crediting a store-credit
@@ -640,7 +666,10 @@ whole-order stock-restoring enqueue (option a); the sweep keys on that stamp
 (immutable, #855; status-agnostic, #839); `restoreInventory:false` backorder
 events are not armed, so the sweep never invents stock. Pre-column orders keep
 the old status + `updatedAt` predicate. Cost if wrong: one extra `UPDATE orders`
-per cancel/refund enqueue.
+per cancel/refund enqueue. _Amended 2026-10-01 (issue 2132):_ an unarmed
+`restoreInventory:false` event's `claim-reversed` now matches only rows whose
+`refundReversalRequestedAt` is null, so it can no longer close a claim a
+dropped stock-restoring event armed (#858 had re-opened through that path).
 
 **Ruling M2-5 — #1552 keeps each BackorderLine's quantity equal to the whole
 force-decremented LINE, not the shortfall.** That is what every existing
@@ -741,7 +770,9 @@ run only on that store's rows, with no RLS bypass. The shopper's OWN account
 erasure (`POST /auth/me/erase`) and the `soft-deleted-user-anonymize` retention
 cron pass no scope and may span every store: the wallet statements run inside
 `withScopedRlsBypass` (restores the prior GUC in a `finally`, #2037), and each
-affected store gets its own `audit_logs` row (`customer.wallet.erased`, that
+store whose balance that run forfeited OR whose ledger notes it scrubbed (not
+every store holding a wallet, and nothing on a re-run — issues 2122/2125, PR
+2279 audit) gets its own `audit_logs` row (`customer.wallet.erased`, that
 store's `storeId`, `details.actor` = the acting user id or `'system'`) so a
 store whose liability changed without any action of its own can see why. Every
 `expire` ledger entry carries the actor in `actorId`. Supersedes the #1957
@@ -2635,7 +2666,17 @@ failure can no longer roll the request back — it is alerted by
 refund-reversal-stuck-sweep (its `refundReversalRequestedAt` stamp commits with
 the request). A PARTIAL-return event has no sweep. Cost if wrong: a partial
 return whose post-commit enqueue fails keeps its returned lines' stock and GL
-unadjusted until someone replays it from the alert.
+unadjusted until someone replays it from the alert. _Residual closed
+2026-10-01 (issues 2246 / 2267):_ `applyRefundEffects` now stamps
+`Return.reversalRequestedAt` in the completing transaction, the fanout's
+partial arm stamps `reversalAppliedAt`, and refund-reversal-stuck-sweep
+re-sends the item-level event (notify:false) for a return requested but not
+applied (`handlePartialReturnReversalSweep`; migration
+`20261001090000_return_partial_reversal_stamps`). No 12h recency floor on this
+branch: the column is new, so there is no back-catalog, and a floor would
+abandon a return armed before a long Inngest outage. A request that rolls back
+after a gateway refund is still the refund-key path (REFUND_ALREADY_ISSUED →
+record-only completion), not this sweep.
 
 **Ruling AP-3 — `postOrderPaymentJournal` books no sale for an order that is
 already `cancelled` or `refunded`.** Evidence: ORD-1778670342233-50212B65
@@ -3336,3 +3377,34 @@ the debt). The guard's docstring now states exactly which shapes are enforced an
 (template literals, text between two interpolations, lower-case ternary literals, files outside the
 list). Cost if wrong: the 66 strings keep rendering in English on an Arabic admin until someone
 translates them and deletes their debt entries.
+
+## 2026-10-01 — backlog batch a-money-services (branch `fix/backlog-a-money-services`)
+
+**Ruling AMS-1 — revenue_drop needs 50.000 KWD of weekly revenue in either
+window, and every anomaly baseline is the 3 weeks BEFORE the current one
+(issues 2245 / 2268; extends AP-6).** revenue_drop was dead until the P&L fix
+and was the only metric with no thin-data floor; its 28d/4 baseline also
+contained the week it was compared against (so were margin_drop's and
+refund_spike's). Pinned by `tests/integration/accounting/profit-anomaly-revenue-floor.test.ts`.
+The stored column is still named `baseline28d`; it now holds the prior-21d
+per-week figure, and the merchant-facing label (`finance.anomalies.baseline28d`,
+key unchanged) now reads "Weekly baseline (prior 3 weeks)" in en/ar. Cost if wrong: a store whose weekly revenue is below
+50.000 KWD in both windows gets no revenue alert even when it falls to zero.
+
+**Ruling AMS-2 — no `@@unique` on `payments.transaction_id` / `invoice_id` in
+this batch; ambiguity is refused in code instead (issue 769).** A unique index
+would fail the deploy's `migrate deploy` if production already holds a
+duplicate, and this lane may not read production. `handleWebhook` and
+`PaymentService.refund` now read up to two rows and refuse more than one
+(409 `AMBIGUOUS_PAYMENT`, logged with both payment ids) rather than binding an
+arbitrary — possibly another tenant's — row. The constraint can ship after a
+read-only check returns zero rows for
+`SELECT transaction_id FROM payments WHERE transaction_id IS NOT NULL GROUP BY 1 HAVING count(*) > 1`
+(and the same for `invoice_id`). Cost if wrong: a genuine collision now stops
+that payment's webhook/refund for a human instead of processing it. _Amended
+(PR 2279 audit P1):_ on the webhook path that human is actually paged —
+`handleWebhook` sends a P0 (`payment.webhook.ambiguous_payment`, provider +
+transaction/invoice ids + every matching payment id in the context) before
+refusing, and `isTerminalWebhookClientError` exempts `AMBIGUOUS_PAYMENT` from
+the silent `rejected` lane, so the inbox row retries, lands `failed`, and
+dead-letters into alerts-failure-watch's P0 like any other stuck money event.

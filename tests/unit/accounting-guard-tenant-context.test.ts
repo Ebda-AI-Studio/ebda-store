@@ -33,8 +33,14 @@ const mockAssertStoreOwns = vi.fn(async () => {
   throw STOP;
 });
 
+const mockAssertInScope = vi.fn(async () => {
+  order.push('assertStoreOwnsInTenantScope');
+  throw STOP;
+});
+
 vi.mock('@api/services/accounting/assert-store-owns', () => ({
   assertStoreOwns: (...args: unknown[]) => mockAssertStoreOwns(...args),
+  assertStoreOwnsInTenantScope: (...args: unknown[]) => mockAssertInScope(...args),
 }));
 
 const mockRunInTenantContext = vi.fn(
@@ -90,7 +96,7 @@ beforeEach(() => {
 });
 
 describe('#1241 — the tenant-ownership guard runs INSIDE a tenant-scoped context', () => {
-  it('stock-adjustment.createAdjustment wraps assertStoreOwns in runInTenantContext', async () => {
+  it('stock-adjustment.createAdjustment runs the guard via assertStoreOwnsInTenantScope, opening no transaction itself', async () => {
     const { createAdjustment } = await import('@api/services/accounting/stock-adjustment.service');
 
     await expect(
@@ -101,15 +107,14 @@ describe('#1241 — the tenant-ownership guard runs INSIDE a tenant-scoped conte
       })
     ).rejects.toBe(STOP);
 
-    expect(mockRunInTenantContext).toHaveBeenCalledWith(STORE_ID, expect.any(Function));
-    expect(order).toEqual([
-      'runInTenantContext:enter',
-      'assertStoreOwns',
-      'runInTenantContext:exit',
-    ]);
+    // Issue 2057: the service must not open its own nested tenant tx — the
+    // helper decides (ambient → reuse, none → open one). Helper pinned below.
+    expect(mockRunInTenantContext).not.toHaveBeenCalled();
+    expect(mockAssertInScope).toHaveBeenCalledWith(STORE_ID, expect.any(Object));
+    expect(order).toEqual(['assertStoreOwnsInTenantScope']);
   });
 
-  it('purchase-order.createPurchaseOrder wraps assertStoreOwns in runInTenantContext', async () => {
+  it('purchase-order.createPurchaseOrder runs the guard via assertStoreOwnsInTenantScope, opening no transaction itself', async () => {
     const { createPurchaseOrder } = await import('@api/services/accounting/purchase-order.service');
 
     await expect(
@@ -120,15 +125,14 @@ describe('#1241 — the tenant-ownership guard runs INSIDE a tenant-scoped conte
       })
     ).rejects.toBe(STOP);
 
-    expect(mockRunInTenantContext).toHaveBeenCalledWith(STORE_ID, expect.any(Function));
-    expect(order).toEqual([
-      'runInTenantContext:enter',
-      'assertStoreOwns',
-      'runInTenantContext:exit',
-    ]);
+    // Issue 2057: the service must not open its own nested tenant tx — the
+    // helper decides (ambient → reuse, none → open one). Helper pinned below.
+    expect(mockRunInTenantContext).not.toHaveBeenCalled();
+    expect(mockAssertInScope).toHaveBeenCalledWith(STORE_ID, expect.any(Object));
+    expect(order).toEqual(['assertStoreOwnsInTenantScope']);
   });
 
-  it('expense.createExpense wraps assertStoreOwns in runInTenantContext', async () => {
+  it('expense.createExpense runs the guard via assertStoreOwnsInTenantScope, opening no transaction itself', async () => {
     const { createExpense } = await import('@api/services/accounting/expense.service');
 
     await expect(
@@ -143,12 +147,11 @@ describe('#1241 — the tenant-ownership guard runs INSIDE a tenant-scoped conte
       } as never)
     ).rejects.toBe(STOP);
 
-    expect(mockRunInTenantContext).toHaveBeenCalledWith(STORE_ID, expect.any(Function));
-    expect(order).toEqual([
-      'runInTenantContext:enter',
-      'assertStoreOwns',
-      'runInTenantContext:exit',
-    ]);
+    // Issue 2057: the service must not open its own nested tenant tx — the
+    // helper decides (ambient → reuse, none → open one). Helper pinned below.
+    expect(mockRunInTenantContext).not.toHaveBeenCalled();
+    expect(mockAssertInScope).toHaveBeenCalledWith(STORE_ID, expect.any(Object));
+    expect(order).toEqual(['assertStoreOwnsInTenantScope']);
   });
 
   it('bank-reconcile.importBankStatement runs assertStoreOwns against the withRlsBypass tx, not the bare client', async () => {

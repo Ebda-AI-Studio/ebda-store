@@ -14,14 +14,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockOrderFindMany, mockSend, mockSendAlert } = vi.hoisted(() => ({
+const { mockOrderFindMany, mockReturnFindMany, mockSend, mockSendAlert } = vi.hoisted(() => ({
   mockOrderFindMany: vi.fn(),
+  mockReturnFindMany: vi.fn(),
   mockSend: vi.fn(),
   mockSendAlert: vi.fn(),
 }));
 
 vi.mock('@force/database', () => ({
-  withRlsBypass: (fn: (tx: unknown) => unknown) => fn({ order: { findMany: mockOrderFindMany } }),
+  withRlsBypass: (fn: (tx: unknown) => unknown) =>
+    fn({ order: { findMany: mockOrderFindMany }, return: { findMany: mockReturnFindMany } }),
 }));
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { send: mockSend, createFunction: vi.fn(() => ({})) },
@@ -31,7 +33,10 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { handleRefundReversalStuckSweep } from '@api/lib/inngest/functions/refund-reversal-stuck-sweep';
+import {
+  handleRefundReversalStuckSweep,
+  handlePartialReturnReversalSweep,
+} from '@api/lib/inngest/functions/refund-reversal-stuck-sweep';
 
 const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
 const minsAgo = (m: number) => new Date(Date.now() - m * 60_000);
@@ -39,6 +44,7 @@ const minsAgo = (m: number) => new Date(Date.now() - m * 60_000);
 beforeEach(() => {
   vi.clearAllMocks();
   mockOrderFindMany.mockResolvedValue([]);
+  mockReturnFindMany.mockResolvedValue([]);
   mockSend.mockResolvedValue(undefined);
   mockSendAlert.mockResolvedValue(undefined);
 });
@@ -168,5 +174,58 @@ describe('refund-reversal-stuck-sweep', () => {
 
     expect(res.swept).toBe(2);
     expect(res.resent).toBe(1);
+  });
+});
+
+// Issues 2246 / 2267: a PARTIAL return's item-level event had no stamp and no
+// sweep, so a failed post-commit enqueue lost its stock restore + GL posting.
+describe('refund-reversal-stuck-sweep — partial returns', () => {
+  it('re-sends the ITEM-LEVEL event, rebuilt from the Return, with notify:false', async () => {
+    mockReturnFindMany.mockResolvedValue([
+      {
+        id: 'ret-1',
+        storeId: 's1',
+        orderId: 'o1',
+        refundAmount: 1250,
+        reversalRequestedAt: minsAgo(20),
+        items: [{ orderItemId: 'oi-1', quantity: 1 }],
+      },
+    ]);
+
+    const res = await handlePartialReturnReversalSweep(stepStub);
+
+    expect(res).toMatchObject({ swept: 1, resent: 1 });
+    expect(mockSend).toHaveBeenCalledWith({
+      name: 'order/refunded',
+      data: {
+        orderId: 'o1',
+        storeId: 's1',
+        restoreInventory: true,
+        notify: false,
+        partial: {
+          items: [{ orderItemId: 'oi-1', quantity: 1 }],
+          refundKey: 'ret-1',
+          refundAmount: 1250,
+        },
+      },
+    });
+  });
+
+  it('selects only requested-but-unapplied returns inside the window', async () => {
+    await handlePartialReturnReversalSweep(stepStub);
+    const where = mockReturnFindMany.mock.calls[0][0].where;
+    expect(where.reversalAppliedAt).toBeNull();
+    expect(where.reversalRequestedAt.lt).toBeInstanceOf(Date);
+    // No recency floor: an armed return older than 12h is still recovered.
+    expect(where.reversalRequestedAt).not.toHaveProperty('gt');
+  });
+
+  it('does nothing when no partial return is stuck', async () => {
+    expect(await handlePartialReturnReversalSweep(stepStub)).toEqual({
+      swept: 0,
+      resent: 0,
+      alerted: 0,
+    });
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });

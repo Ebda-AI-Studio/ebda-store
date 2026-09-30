@@ -1,5 +1,5 @@
-import { assertStoreOwns } from './assert-store-owns';
-import { prisma, withMoneyTx, runInTenantContext } from '@force/database';
+import { assertStoreOwnsInTenantScope } from './assert-store-owns';
+import { prisma, withMoneyTx } from '@force/database';
 import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';
@@ -29,18 +29,21 @@ export async function createPurchaseOrder(
   // weighted-average cost, backorders and order items, and read back the
   // foreign supplier row via getPurchaseOrder's `include: { supplier: true }`.
   //
-  // #1241: this router is mounted CONTEXT-LESS (bare `/stores`, see
-  // routes/index.ts) — there is no ambient tenantContext transaction for the
-  // `prisma` proxy to pick up. Under RLS-enforced posture a read with no GUC
-  // set returns zero rows, so the guard itself would 404 every legitimately-
-  // owned id. Wrap it in its own tenant-scoped transaction so it runs in the
-  // same RLS posture as the writes it protects.
-  await runInTenantContext(input.storeId, () =>
-    assertStoreOwns(input.storeId, {
-      productIds: input.items.map(i => i.productId),
-      variantIds: input.items.map(i => i.variantId),
-      supplierIds: [input.supplierId],
-    })
+  // #1241 / issue 2057: the guard must run under the store's RLS GUC —
+  // on the ambient request transaction when there is one, in its own
+  // tenant-scoped transaction when there is not (Inngest callers). See
+  // assertStoreOwnsInTenantScope.
+  await assertStoreOwnsInTenantScope(input.storeId, {
+    productIds: input.items.map(i => i.productId),
+    variantIds: input.items.map(i => i.variantId),
+    supplierIds: [input.supplierId],
+  });
+  // Issue 2145: a disabled variant is not stock (inventory-model.md), so a PO
+  // drafted against one would receive units that every stock and valuation
+  // surface then reads as 0. Refuse at draft time; receive refuses too.
+  await assertVariantsActive(
+    input.storeId,
+    input.items.map(i => i.variantId)
   );
 
   const subtotal = input.items.reduce((s, i) => s + i.qty * i.unitCost, 0);
@@ -73,6 +76,29 @@ export async function createPurchaseOrder(
     },
     include: { items: true },
   });
+}
+
+/**
+ * 409 VARIANT_INACTIVE unless every named variant is active. Receiving into a
+ * disabled variant would book cost and AP for units that no stock or value
+ * surface counts (issue 2145); the merchant re-enables the variant first.
+ */
+async function assertVariantsActive(
+  storeId: string,
+  variantIds: (string | null | undefined)[]
+): Promise<void> {
+  const ids = [...new Set(variantIds.filter((v): v is string => !!v))];
+  if (ids.length === 0) return;
+  const inactive = await prisma.productVariant.count({
+    where: { id: { in: ids }, isActive: false, product: { storeId } },
+  });
+  if (inactive > 0) {
+    throw new AppError(
+      409,
+      'VARIANT_INACTIVE',
+      'A variant on this purchase order is disabled. Re-enable it before ordering or receiving stock for it.'
+    );
+  }
 }
 
 export interface ReceiveInput {
@@ -237,9 +263,18 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
               productId: item.productId,
               product: { storeId: input.storeId },
             },
-            select: { inventory: true, costPrice: true },
+            select: { inventory: true, costPrice: true, isActive: true },
           });
           if (!variant) throw new Error(`Variant ${item.variantId} not found in store`);
+          // Issue 2145: a disabled variant is not stock — receiving into it
+          // would post AP/Inventory for units every surface reads as 0.
+          if (!variant.isActive) {
+            throw new AppError(
+              409,
+              'VARIANT_INACTIVE',
+              'A variant on this purchase order is disabled. Re-enable it before receiving stock for it.'
+            );
+          }
 
           // WAC over THIS variant's own on-hand (floored at 0 — variant rows
           // never go negative, see docs/architecture/inventory-model.md).
@@ -412,7 +447,10 @@ export async function createPoFromSuggestion(
 ): Promise<PurchaseOrder & { items: PurchaseOrderItem[] }> {
   const sug = await prisma.reorderSuggestion.findFirst({
     where: { id: suggestionId, storeId },
-    include: { product: { select: { costPrice: true, name: true } } },
+    include: {
+      product: { select: { costPrice: true, name: true } },
+      variant: { select: { costPrice: true } },
+    },
   });
   if (!sug) throw new AppError(404, 'SUGGESTION_NOT_FOUND', 'Reorder suggestion not found.');
   if (sug.status !== 'open')
@@ -439,7 +477,10 @@ export async function createPoFromSuggestion(
         productId: sug.productId,
         variantId: sug.variantId ?? undefined,
         qty: sug.suggestedQty,
-        unitCost: sug.product.costPrice ?? 0,
+        // A variant line drafts at the VARIANT's cost (the row receive
+        // averages against), falling back to the parent — the parent's cost
+        // is no longer updated by variant receipts (2145 comment).
+        unitCost: sug.variant?.costPrice ?? sug.product.costPrice ?? 0,
       },
     ],
     createdBy,

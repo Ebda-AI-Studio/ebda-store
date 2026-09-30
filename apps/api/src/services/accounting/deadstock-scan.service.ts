@@ -11,6 +11,8 @@
  *   3. For each product: compute daysSinceSale + stockValueFils (null when the
  *      product has no cost price — value UNKNOWN, not zero).
  *   4. Flag if daysSinceSale >= 90 AND (stockValueFils >= 50000 OR value unknown).
+ *      A product that has never sold is aged from its createdAt instead, so a
+ *      newly listed product is not "90 days dead" on day one.
  *      A product without a cost price used to be skipped entirely, which made
  *      the scan blind on every store that never entered costs (2026-09-30
  *      audit: pecannbee 0/210, palora 0/22) while the page said "No dead stock".
@@ -76,7 +78,7 @@ const GEMINI_CHUNK_SIZE = 20;
 const GEMINI_THROTTLE_MS = 2500;
 const EXPIRE_AFTER_DAYS = 30;
 const DEADSTOCK_DAYS_THRESHOLD = 90;
-const DEADSTOCK_VALUE_FILS_THRESHOLD = 50_000; // 500 KWD in fils (1 KWD = 1000 fils)
+const DEADSTOCK_VALUE_FILS_THRESHOLD = 50_000; // 50 KWD in fils (1 KWD = 1000 fils)
 
 // ---------------------------------------------------------------------------
 // Helper: days since last paid sale for a product
@@ -248,6 +250,8 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         nameAr: true,
         inventory: true,
         costPrice: true,
+        // A never-sold product is aged from its listing date (issue 2271).
+        createdAt: true,
         // For a variant product the on-hand quantity is the variant sum;
         // `inventory` is unused for one. See lib/effective-inventory.ts.
         // `costPrice` per variant: a variant is valued at its own cost
@@ -270,7 +274,15 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
     const collected: DeadstockCandidate[] = [];
 
     for (const product of products) {
-      const days = daysSince(lastSales.get(product.id));
+      const lastSale = lastSales.get(product.id);
+      const days = daysSince(lastSale);
+      // Issue 2271: "never sold" is only dead stock once the product has been
+      // LISTED for the threshold. Without this, a product added three days ago
+      // with stock read as 9999 days unsold and was flagged on every store
+      // with no cost prices (the value threshold cannot gate an unknown value).
+      // The 9999 sentinel stays for display — a flagged never-sold product is
+      // then at least 90 days old, so "Never sold" is true of it.
+      if (!lastSale && daysSince(product.createdAt) < DEADSTOCK_DAYS_THRESHOLD) continue;
       // Variant-aware on-hand — valuing against `product.inventory` reported
       // 0 (or a negative) stock-on-hand for the entire variant catalogue, so
       // no variant product could ever clear the dead-stock value threshold.
@@ -356,68 +368,81 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   // including scannedAt — else create one. Each candidate runs in its own
   // SAVEPOINT so one failed write rolls back only itself instead of aborting
   // the whole transaction (every later statement would otherwise fail 25P02).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rowsUpserted = await withRlsBypass(async (tx: any) => {
-    let upserted = 0;
+  //
+  // Chunked (issue 2259): one withRlsBypass per PHASE3_CHUNK_SIZE candidates,
+  // the way phase 1 chunks its scan. The candidate set is uncapped (every
+  // uncosted store's whole stale catalogue can qualify) and each candidate
+  // costs ~5 round-trips with its savepoint, so a single transaction could
+  // cross the 30s interactive-tx ceiling. A chunk that fails commits nothing
+  // of its own; earlier chunks stay committed, and the next weekly run
+  // refreshes the same one-open-row-per-product set.
+  const PHASE3_CHUNK_SIZE = 25;
+  let rowsUpserted = 0;
+  for (let chunkStart = 0; chunkStart < candidates.length; chunkStart += PHASE3_CHUNK_SIZE) {
+    const slice = candidates.slice(chunkStart, chunkStart + PHASE3_CHUNK_SIZE);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rowsUpserted += await withRlsBypass(async (tx: any) => {
+      let upserted = 0;
 
-    for (const candidate of candidates) {
-      const copy = copyMap.get(candidate.productId) ?? {
-        discountPercent: 20,
-        copyEn: 'Clearance — limited time offer!',
-        copyAr: null,
-      };
+      for (const candidate of slice) {
+        const copy = copyMap.get(candidate.productId) ?? {
+          discountPercent: 20,
+          copyEn: 'Clearance — limited time offer!',
+          copyAr: null,
+        };
 
-      try {
-        await withSavepointOn(tx, async () => {
-          const existing = await tx.deadStockFlag.findFirst({
-            where: {
-              storeId,
-              productId: candidate.productId,
-              variantId: null,
-              status: 'open',
-            },
-            orderBy: { scannedAt: 'desc' },
-            select: { id: true },
-          });
-
-          const payload = {
-            daysSinceSale: candidate.daysSinceSale,
-            stockOnHand: candidate.stockOnHand,
-            stockValueFils: candidate.stockValueFils,
-            suggestedDiscountBps: Math.round(copy.discountPercent * 100),
-            clearanceCopyEn: copy.copyEn,
-            clearanceCopyAr: copy.copyAr ?? undefined,
-            status: 'open' as const,
-          };
-
-          if (existing) {
-            await tx.deadStockFlag.update({
-              where: { id: existing.id },
-              data: { ...payload, scannedAt: scanStartedAt },
-            });
-          } else {
-            await tx.deadStockFlag.create({
-              data: {
+        try {
+          await withSavepointOn(tx, async () => {
+            const existing = await tx.deadStockFlag.findFirst({
+              where: {
                 storeId,
                 productId: candidate.productId,
                 variantId: null,
-                scannedAt: scanStartedAt,
-                ...payload,
+                status: 'open',
               },
+              orderBy: { scannedAt: 'desc' },
+              select: { id: true },
             });
-          }
-        });
-        upserted += 1;
-      } catch (err) {
-        logger.error(
-          { err, storeId, productId: candidate.productId },
-          'deadstock-scan: failed to upsert flag'
-        );
-      }
-    }
 
-    return upserted;
-  });
+            const payload = {
+              daysSinceSale: candidate.daysSinceSale,
+              stockOnHand: candidate.stockOnHand,
+              stockValueFils: candidate.stockValueFils,
+              suggestedDiscountBps: Math.round(copy.discountPercent * 100),
+              clearanceCopyEn: copy.copyEn,
+              clearanceCopyAr: copy.copyAr ?? undefined,
+              status: 'open' as const,
+            };
+
+            if (existing) {
+              await tx.deadStockFlag.update({
+                where: { id: existing.id },
+                data: { ...payload, scannedAt: scanStartedAt },
+              });
+            } else {
+              await tx.deadStockFlag.create({
+                data: {
+                  storeId,
+                  productId: candidate.productId,
+                  variantId: null,
+                  scannedAt: scanStartedAt,
+                  ...payload,
+                },
+              });
+            }
+          });
+          upserted += 1;
+        } catch (err) {
+          logger.error(
+            { err, storeId, productId: candidate.productId },
+            'deadstock-scan: failed to upsert flag'
+          );
+        }
+      }
+
+      return upserted;
+    });
+  }
 
   logger.info(
     { storeId, scanned, flagged: rowsUpserted, expiredCount },

@@ -23,6 +23,7 @@ import { withDeferredWork } from '@api/lib/after-tenant-commit';
 import { OrderService } from '@api/services/order.service';
 import { seedCoaForStore } from '@api/services/accounting/account.service';
 import { postOrderPaymentJournal } from '@api/services/accounting/posting/order-posting';
+import { handlePartialReturnReversalSweep } from '@api/lib/inngest/functions/refund-reversal-stuck-sweep';
 
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
@@ -74,6 +75,8 @@ afterAll(async () => {
   await prisma.journalEntry.updateMany({ where: { storeId }, data: { reversedById: null } });
   await prisma.journalEntry.deleteMany({ where: { storeId } });
   await prisma.sequence.deleteMany({ where: { storeId } });
+  await prisma.returnItem.deleteMany({ where: { return: { storeId } } });
+  await prisma.return.deleteMany({ where: { storeId } });
   await prisma.orderEvent.deleteMany({ where: { storeId } });
   await prisma.orderItem.deleteMany({ where: { order: { storeId } } });
   await prisma.payment.deleteMany({ where: { order: { storeId } } });
@@ -190,5 +193,89 @@ describe.skipIf(!hasDb)('no sale entry for an order that is already cancelled/re
       where: { storeId, source: 'order', sourceId: { startsWith: order.id } },
     });
     expect(entries.map(e => e.sourceId).sort()).toEqual([order.id, `${order.id}:cogs`].sort());
+  });
+});
+
+// Issues 2246 / 2267 (Ruling AP-2's residual): a PARTIAL return's item-level
+// event is sent after COMMIT; if that enqueue fails, nothing used to notice.
+describe.skipIf(!hasDb)('a partial return whose post-commit enqueue fails is recovered', () => {
+  async function completedPartialReturn() {
+    const order = await paidOrder('delivered');
+    const line = await prisma.orderItem.findFirstOrThrow({ where: { orderId: order.id } });
+    const ret = await prisma.return.create({
+      data: {
+        storeId,
+        orderId: order.id,
+        customerId: OWNER,
+        returnNumber: `RET-LS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'return',
+        status: 'completed',
+        reason: 'defective',
+        refundAmount: 1000,
+        refundedAt: new Date(),
+        items: {
+          create: [
+            { orderItemId: line.id, productId, productName: 'Ledger State Product', quantity: 1 },
+          ],
+        },
+      },
+    });
+    return { order, line, ret };
+  }
+  const partialFor = (retId: string, lineId: string) => ({
+    items: [{ orderItemId: lineId, quantity: 1 }],
+    refundKey: retId,
+    refundAmount: 1000,
+  });
+
+  it('arms the Return in the committing request, and the sweep re-sends the item-level event', async () => {
+    const { order, line, ret } = await completedPartialReturn();
+    const failing = vi.spyOn(inngest, 'send').mockRejectedValue(new Error('inngest down'));
+
+    // The deferred send fails AFTER commit — swallowed + alerted by contract.
+    await withDeferredWork({ storeId }, () =>
+      runInTenantContext(storeId, () =>
+        OrderService.applyRefundEffects(storeId, order.id, {
+          partial: partialFor(ret.id, line.id),
+        })
+      )
+    );
+    expect(failing).toHaveBeenCalled();
+    failing.mockRestore();
+
+    const armed = await prisma.return.findUniqueOrThrow({ where: { id: ret.id } });
+    expect(armed.reversalRequestedAt).not.toBeNull();
+    expect(armed.reversalAppliedAt).toBeNull();
+
+    // Past the staleness window, the sweep re-sends it.
+    await prisma.return.update({
+      where: { id: ret.id },
+      data: { reversalRequestedAt: new Date(Date.now() - 20 * 60_000) },
+    });
+    const spy = vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
+    await handlePartialReturnReversalSweep({ run: (_id, fn) => fn() });
+    const resent = refundedEvents(spy, order.id);
+    expect(resent).toHaveLength(1);
+    expect((resent[0][0] as { data: unknown }).data).toMatchObject({
+      restoreInventory: true,
+      notify: false,
+      partial: { refundKey: ret.id, items: [{ orderItemId: line.id, quantity: 1 }] },
+    });
+  });
+
+  it('a request that rolls back leaves nothing armed (no refund happened)', async () => {
+    const { order, line, ret } = await completedPartialReturn();
+    await expect(
+      withDeferredWork({ storeId }, () =>
+        runInTenantContext(storeId, async () => {
+          await OrderService.applyRefundEffects(storeId, order.id, {
+            partial: partialFor(ret.id, line.id),
+          });
+          throw new Error('simulated request failure');
+        })
+      )
+    ).rejects.toThrow('simulated request failure');
+    const after = await prisma.return.findUniqueOrThrow({ where: { id: ret.id } });
+    expect(after.reversalRequestedAt).toBeNull();
   });
 });

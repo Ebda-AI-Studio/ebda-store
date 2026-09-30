@@ -4,7 +4,11 @@ import { PaymentService } from '../../../services/payment-providers/payment.fact
 import type { PaymentProvider } from '../../../services/payment-providers/types';
 import logger from '../../logger';
 import { inngest } from '../client';
-import { shouldProcessInboxRow, shouldApplyWebhookEffects } from '../webhook-offload.guard';
+import {
+  shouldProcessInboxRow,
+  shouldApplyWebhookEffects,
+  isTerminalWebhookClientError,
+} from '../webhook-offload.guard';
 import { AppError } from '../../../middleware/error-handler';
 
 /**
@@ -188,8 +192,11 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
       // 'rejected' and RETURN without throwing: no retry, no inngest/function.failed,
       // no P0. The durable row + lastError remain for audit. Only 5xx / unknown
       // (DB, network — genuinely transient) rethrow to retry + escalate.
-      const isTerminalClientError =
-        err instanceof AppError && err.statusCode >= 400 && err.statusCode < 500;
+      //
+      // EXCEPT an operational refusal of a verified event (AMBIGUOUS_PAYMENT,
+      // issue 769): it retries and dead-letters into the P0 path instead of
+      // the silent 'rejected' lane. See isTerminalWebhookClientError.
+      const isTerminalClientError = err instanceof AppError && isTerminalWebhookClientError(err);
       if (isTerminalClientError) {
         await step
           .run('mark-rejected', async () =>

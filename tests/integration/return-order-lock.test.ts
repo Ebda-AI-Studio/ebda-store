@@ -235,4 +235,59 @@ describe.skipIf(!hasDb)('returns on one order are serialised by the order lock',
     expect(refused).toHaveLength(1);
     expect(refused[0].reason).toMatchObject({ code: 'INVALID_QUANTITY' });
   });
+
+  // Issues 2004 / 2030: complete() holds the order's returns lock across the
+  // provider refund round-trip. A customer's create() on the same order must
+  // not queue behind it until its own transaction times out — it waits a
+  // short bounded window and then answers a clean 409.
+  it('a create() behind a long-held order lock fails fast with RETURN_ORDER_BUSY', async () => {
+    const { orderId, lineAId } = await deliveredOrder();
+    let release!: () => void;
+    const held = new Promise<void>(r => (release = r));
+    let locked!: () => void;
+    const lockTaken = new Promise<void>(r => (locked = r));
+    // Stand-in for a completion mid-refund: holds the same advisory key.
+    const holder = runInTenantContext(storeId, async () => {
+      const { prisma } = await import('@force/database');
+      await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`return-order:${orderId}`}, 0))`;
+      locked();
+      await held;
+    });
+    await lockTaken;
+    const started = Date.now();
+    try {
+      await expect(
+        inRequest(() =>
+          ReturnService.create(storeId, {
+            orderId,
+            customerId,
+            type: 'return',
+            reason: 'defective',
+            items: [
+              { orderItemId: lineAId, productId: productAId, productName: 'rol-a', quantity: 1 },
+            ],
+          })
+        )
+      ).rejects.toMatchObject({ statusCode: 409, code: 'RETURN_ORDER_BUSY' });
+      // Bounded: well inside the 30s interactive-transaction ceiling.
+      expect(Date.now() - started).toBeLessThan(10_000);
+    } finally {
+      release();
+      await holder;
+    }
+    // Once the holder is gone the same request goes through.
+    await expect(
+      inRequest(() =>
+        ReturnService.create(storeId, {
+          orderId,
+          customerId,
+          type: 'return',
+          reason: 'defective',
+          items: [
+            { orderItemId: lineAId, productId: productAId, productName: 'rol-a', quantity: 1 },
+          ],
+        })
+      )
+    ).resolves.toBeDefined();
+  }, 30_000);
 });

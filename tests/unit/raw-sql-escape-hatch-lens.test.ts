@@ -171,8 +171,8 @@ const UNSAFE_INTERPOLATION_ALLOWED: Record<string, string> = {
     "baseSql's ${asOf ? ... : ''} ternary chooses between two fixed SQL fragments " +
     '(neither derived from caller text); the actual date value is bound as $2, never interpolated',
   'apps/api/src/services/accounting/bank-reconcile.service.ts':
-    "the unmatched-ledger query's ${periodStart ? ... : ''} ternary chooses between two fixed " +
-    'SQL fragments; periodStart itself is bound as $4, never interpolated',
+    'the only interpolation is COUNTED_STATUSES_SQL, a module constant imported from ' +
+    'reports.service.ts; periodStart and statementId are always bound as $4/$5, never interpolated',
   'apps/api/src/lib/r2-references.ts':
     'table/column identifiers come from the R2_REFERENCE_COLUMNS module constant (checked against ' +
     'schema.prisma by tests/unit/r2-reference-registry.test.ts) and are double-quote-escaped; the ' +

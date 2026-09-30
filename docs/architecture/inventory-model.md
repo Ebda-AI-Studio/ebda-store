@@ -102,6 +102,14 @@ Consequences worth stating explicitly:
   that variant's own on-hand; a variant-less line writes it to the product.
   The parent's `costPrice` on a variant product is only the fallback for a
   variant with no cost of its own — see `purchase-order.service.ts`.
+- **A disabled variant cannot be ordered or received into** (issue 2145). A
+  PO line naming one is refused at draft time and again at receive time
+  (409 `VARIANT_INACTIVE`) — its units would otherwise book AP and cost for
+  stock every surface reads as 0. The merchant re-enables the variant first.
+  A reorder suggestion for a variant drafts its PO at the variant's cost.
+  Known gap, owner decision pending: reorder suggestions are product-level
+  (`variantId: null`), so a PO drafted from one for a VARIANT product has no
+  variant to receive into and its receive writes the parent column.
 - **Reading cost** uses the same rule everywhere: `variant.costPrice ??
 product.costPrice`. Order lines snapshot it at sale time
   (`lib/order-line-cost.ts` — checkout, bundle components, admin manual

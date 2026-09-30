@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   // Spy for the final claim-reversed step (stamps Order.refundReversedAt).
   orderUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
+  // Issues 2246 / 2267: the partial arm marks its Return applied.
+  returnUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
   storeFindUnique: vi.fn(),
   inventoryHistoryFindFirst: vi.fn(),
   inventoryHistoryCreate: vi.fn(),
@@ -69,6 +71,7 @@ const txClient = {
 vi.mock('@force/database', () => ({
   prisma: {
     order: { findUnique: h.orderFindUnique, updateMany: h.orderUpdateMany },
+    return: { updateMany: h.returnUpdateMany },
     store: { findUnique: h.storeFindUnique },
     backorderLine: { updateMany: h.backorderLineUpdateMany },
   },
@@ -595,6 +598,55 @@ describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
   });
 });
 
+describe('order-refunded fanout — a partial announces only its OWN amount (issue 2274)', () => {
+  beforeEach(() => {
+    h.orderFindUnique.mockResolvedValue({
+      ...ORDER,
+      total: 50_000,
+      couponCode: null,
+      customerId: null,
+      items: [{ id: 'i1', productId: 'p1', variantId: null, quantity: 2 }],
+    });
+    h.orderEventFindFirst.mockResolvedValue(null);
+    h.sendOrderRefunded.mockResolvedValue(undefined);
+  });
+  const partial = (refundAmount: number | undefined) => ({
+    items: [{ orderItemId: 'i1', quantity: 1 }],
+    refundKey: 'ret-2274',
+    refundAmount,
+  });
+
+  it('refundAmount 0 notifies NOBODY — never falls through to the order total', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub, partial(0));
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
+  });
+
+  it('an absent refundAmount notifies nobody either', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub, partial(undefined));
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+  });
+
+  it('marks its OWN Return reversal-applied, idempotently, and never claims the order', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub, partial(1_250));
+    expect(h.returnUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'ret-2274', storeId: 's1', reversalAppliedAt: null },
+      data: { reversalAppliedAt: expect.any(Date) },
+    });
+    expect(h.orderUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('a positive partial amount is announced as-is', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub, partial(1_250));
+    expect(h.sendOrderRefunded).toHaveBeenCalledTimes(1);
+    const emailData = h.sendOrderRefunded.mock.calls[0].find(
+      (a: unknown) => typeof a === 'object' && a !== null && 'refundAmount' in a
+    );
+    expect(emailData).toMatchObject({ refundAmount: 1_250 });
+  });
+});
+
 describe('order-refunded fanout — claim-reversed step', () => {
   // These two cases are the entire reason Order.refundReversedAt exists rather
   // than the sweep keying on InventoryHistory marker-absence. Both legitimately
@@ -611,6 +663,24 @@ describe('order-refunded fanout — claim-reversed step', () => {
     );
     // and no stock moved
     expect(h.productUpdate).not.toHaveBeenCalled();
+  });
+
+  // Issue 2132: an unarmed (restoreInventory:false) event must only close an
+  // UNARMED claim — never one a dropped stock-restoring event armed.
+  it('restoreInventory:false only matches an UNARMED claim', async () => {
+    await handleOrderRefunded('o1', 's1', false, false, stepStub);
+    expect(h.orderUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ refundReversalRequestedAt: null }),
+      })
+    );
+  });
+
+  it('restoreInventory:true closes the armed claim (no requestedAt filter)', async () => {
+    await handleOrderRefunded('o1', 's1', true, false, stepStub);
+    const where = h.orderUpdateMany.mock.calls.at(-1)?.[0]?.where;
+    expect(where).toMatchObject({ id: 'o1', refundReversedAt: null });
+    expect(where).not.toHaveProperty('refundReversalRequestedAt');
   });
 
   it('stamps the claim when every product is untracked (no history row written)', async () => {

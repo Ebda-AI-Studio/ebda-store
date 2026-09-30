@@ -103,7 +103,17 @@ function isLineGone(err: unknown): boolean {
   return (err as { code?: unknown } | null)?.code === 'P2025';
 }
 
-/** Deleting a line that a concurrent request already deleted is a no-op. */
+/**
+ * Deleting a line that a concurrent request already deleted is a no-op.
+ *
+ * Every by-id line write whose P2025 is swallowed or re-mapped MUST run
+ * inside `withSavepoint()` (issues 2009/2011): on the store-scoped mount
+ * (`/stores/:storeId/cart`, under `tenantContext`) the request is ONE
+ * transaction, and if the failed statement reached Postgres, every later
+ * statement (the `cart.update` that follows) would die with 25P02. The
+ * savepoint makes the recovery correct by construction; off the ambient
+ * transaction (`/public/cart`) it is a pass-through.
+ */
 function ignoreLineGone(err: unknown): void {
   if (!isLineGone(err)) throw err;
 }
@@ -616,7 +626,9 @@ export class CartService {
       throw new AppError(404, 'NOT_FOUND', 'Cart bundle not found');
     }
 
-    await prisma.cartBundle.delete({ where: { id: cartBundleId } }).catch(ignoreLineGone);
+    await withSavepoint(() => prisma.cartBundle.delete({ where: { id: cartBundleId } })).catch(
+      ignoreLineGone
+    );
 
     await prisma.cart.update({
       where: { id: cart.id, storeId },
@@ -844,7 +856,9 @@ export class CartService {
     }
 
     if (quantity <= 0) {
-      await prisma.cartItem.delete({ where: { id: itemId } }).catch(ignoreLineGone);
+      await withSavepoint(() => prisma.cartItem.delete({ where: { id: itemId } })).catch(
+        ignoreLineGone
+      );
     } else {
       // Variant lines are authoritative on the VARIANT row; only a
       // variant-less line falls back to the product column. Mirrors
@@ -860,17 +874,17 @@ export class CartService {
         throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
       }
 
-      await prisma.cartItem
-        .update({
+      await withSavepoint(() =>
+        prisma.cartItem.update({
           where: { id: itemId },
           data: { quantity },
         })
-        .catch((err: unknown) => {
-          // Removed concurrently (see isLineGone): the same 404 the
-          // `findFirst` guard above answers, not a 500.
-          if (isLineGone(err)) throw new AppError(404, 'NOT_FOUND', 'Cart item not found');
-          throw err;
-        });
+      ).catch((err: unknown) => {
+        // Removed concurrently (see isLineGone): the same 404 the
+        // `findFirst` guard above answers, not a 500.
+        if (isLineGone(err)) throw new AppError(404, 'NOT_FOUND', 'Cart item not found');
+        throw err;
+      });
     }
 
     // Track activity for abandonment detection
@@ -893,7 +907,9 @@ export class CartService {
       throw new AppError(404, 'NOT_FOUND', 'Cart item not found');
     }
 
-    await prisma.cartItem.delete({ where: { id: itemId } }).catch(ignoreLineGone);
+    await withSavepoint(() => prisma.cartItem.delete({ where: { id: itemId } })).catch(
+      ignoreLineGone
+    );
 
     // Track activity for abandonment detection
     await prisma.cart.update({

@@ -4,6 +4,7 @@ import { seedCoaForStore } from '../../../apps/api/src/services/accounting/accou
 import { createSupplier } from '../../../apps/api/src/services/accounting/supplier.service';
 import {
   createPurchaseOrder,
+  createPoFromSuggestion,
   receivePurchaseOrder,
 } from '../../../apps/api/src/services/accounting/purchase-order.service';
 
@@ -49,6 +50,7 @@ afterAll(async () => {
   await prisma.journalLine.deleteMany({ where: { entry: { storeId } } });
   await prisma.journalEntry.deleteMany({ where: { storeId } });
   await prisma.sequence.deleteMany({ where: { storeId } });
+  await prisma.reorderSuggestion.deleteMany({ where: { storeId } });
   await prisma.purchaseOrderItem.deleteMany({ where: { po: { storeId } } });
   await prisma.purchaseOrder.deleteMany({ where: { storeId } });
   await prisma.supplier.deleteMany({ where: { storeId } });
@@ -135,5 +137,106 @@ describe('PO receive — a variant line writes its cost to the VARIANT', () => {
     expect(parent.costPrice).toBe(3000);
     expect(parent.inventory).toBe(0);
     expect(parent.lastCostUpdateAt).not.toBeNull();
+  });
+});
+
+describe('PO against a DISABLED variant (issue 2145)', () => {
+  async function variantProduct() {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const vp = await prisma.product.create({
+      data: {
+        storeId,
+        name: 'Disabled Variant PO Test',
+        slug: `disabled-variant-po-${suffix}`,
+        price: 5000,
+        inventory: 0,
+        hasVariants: true,
+        status: 'active',
+        variants: {
+          create: [
+            { title: 'Live', costPrice: 1000, inventory: 5 },
+            { title: 'Off', costPrice: 5000, inventory: 100, isActive: true },
+          ],
+        },
+      },
+      include: { variants: true },
+    });
+    return { vp, off: vp.variants.find(v => v.title === 'Off')! };
+  }
+
+  it('refuses to DRAFT a line for a disabled variant', async () => {
+    const { vp, off } = await variantProduct();
+    await prisma.productVariant.update({ where: { id: off.id }, data: { isActive: false } });
+    await expect(
+      createPurchaseOrder({
+        storeId,
+        supplierId,
+        items: [{ productId: vp.id, variantId: off.id, qty: 10, unitCost: 9000 }],
+      })
+    ).rejects.toMatchObject({ statusCode: 409, code: 'VARIANT_INACTIVE' });
+  });
+
+  it('refuses to RECEIVE into a variant disabled after the PO was drafted, leaving stock and cost untouched', async () => {
+    const { vp, off } = await variantProduct();
+    const po = await createPurchaseOrder({
+      storeId,
+      supplierId,
+      items: [{ productId: vp.id, variantId: off.id, qty: 10, unitCost: 9000 }],
+    });
+    await prisma.productVariant.update({ where: { id: off.id }, data: { isActive: false } });
+
+    await expect(
+      receivePurchaseOrder({
+        storeId,
+        poId: po.id,
+        receipts: [{ poItemId: po.items[0].id, qtyReceived: 10 }],
+      })
+    ).rejects.toMatchObject({ statusCode: 409, code: 'VARIANT_INACTIVE' });
+
+    const v = await prisma.productVariant.findUniqueOrThrow({ where: { id: off.id } });
+    expect(v.inventory).toBe(100);
+    expect(v.costPrice).toBe(5000);
+    const item = await prisma.purchaseOrderItem.findUniqueOrThrow({
+      where: { id: po.items[0].id },
+    });
+    expect(item.qtyReceived).toBe(0);
+  });
+});
+
+describe('createPoFromSuggestion — a variant suggestion drafts at the VARIANT cost', () => {
+  it('uses variant.costPrice, not the parent cost that variant receipts no longer update', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const vp = await prisma.product.create({
+      data: {
+        storeId,
+        name: 'Suggestion Variant Cost',
+        slug: `sug-variant-cost-${suffix}`,
+        price: 5000,
+        costPrice: null,
+        inventory: 0,
+        hasVariants: true,
+        status: 'active',
+        variants: { create: [{ title: 'Only', costPrice: 1750, inventory: 0 }] },
+      },
+      include: { variants: true },
+    });
+    const sug = await prisma.reorderSuggestion.create({
+      data: {
+        storeId,
+        productId: vp.id,
+        variantId: vp.variants[0].id,
+        suggestedQty: 12,
+        velocity7d: 1,
+        velocity28d: 1,
+        onHand: 0,
+        onOrder: 0,
+        openBacklog: 0,
+        urgencyDays: 2,
+        supplierId,
+        reasoningEn: 'test',
+      },
+    });
+    const po = await createPoFromSuggestion(sug.id, storeId);
+    expect(po.items[0].unitCost).toBe(1750);
   });
 });

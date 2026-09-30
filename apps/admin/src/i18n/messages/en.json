@@ -5855,7 +5855,7 @@
         "refund_spike": "Refund spike"
       },
       "current7d": "Current (7d)",
-      "baseline28d": "Baseline (28d)",
+      "baseline28d": "Weekly baseline (prior 3 weeks)",
       "delta": "Delta",
       "acknowledge": "Acknowledge",
       "acknowledged": "Acknowledged",
@@ -6354,6 +6354,9 @@
         "totalLabel": "Total"
       },
       "searchPlaceholder": "Search POs…",
+      "errors": {
+        "VARIANT_INACTIVE": "A variant on this purchase order is disabled. Re-enable it on the product page before ordering or receiving stock for it."
+      },
       "emptyState": "No purchase orders yet. Create one with the button above."
     },
     "backorders": {
@@ -6401,7 +6404,7 @@
       "description": "Slow-moving SKUs with AI-suggested clearance.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
-      "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days and is worth at least KWD 50 at cost — or has no cost price set, in which case its value is shown as unknown.",
+      "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least KWD 50 at cost — or has no cost price set, in which case its value is shown as unknown.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
       "explainer": "We'll flag products with 0 sales in 90 days and stock value above KWD 50, with AI-generated bilingual clearance copy and suggested discount %.",
       "notify": "Notify me when ready",

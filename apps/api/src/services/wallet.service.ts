@@ -121,6 +121,13 @@ function assertValidInput(input: ApplyEntryInput): void {
   }
 }
 
+/**
+ * The note the erasure forfeit itself writes. System text, no PII — excluded
+ * from the erasure's own note scrub so a re-run does not find "a note to
+ * scrub" it wrote last time and append another audit row (PR 2279 audit).
+ */
+const ERASURE_FORFEIT_NOTE = 'Forfeited on account erasure';
+
 export class WalletService {
   /**
    * Apply one signed ledger entry. See the file header for the locking and
@@ -444,9 +451,10 @@ export class WalletService {
    *   - `scope.storeId` null (the shopper's own account erasure, the retention
    *     cron): every store the customer holds a wallet in. Wallets are
    *     store-scoped under RLS, so this runs inside `withScopedRlsBypass`
-   *     (#1957/#2037), and each affected store gets its OWN `audit_logs` row
-   *     naming the actor, so a store whose liability changed without any
-   *     action of its own can see why.
+   *     (#1957/#2037), and each store whose balance this run forfeited gets
+   *     its OWN `audit_logs` row naming the actor, so a store whose liability
+   *     changed without any action of its own can see why. A store with
+   *     nothing to forfeit, or a re-run, writes no row.
    * The `expire` entries carry `scope.actorId` (a user id, or 'system').
    */
   static async forfeitOnErasure(
@@ -456,8 +464,27 @@ export class WalletService {
   ): Promise<void> {
     const storeFilter = scope.storeId ? { storeId: scope.storeId } : {};
     const run = async () => {
+      // Which stores' ledgers this run is about to scrub (PR 2279 audit): a
+      // store whose balance was 0 still has merchant-authored notes nulled,
+      // and must see why. A re-run finds no non-null note and adds nothing.
+      const scrubbedRows = await client.walletTransaction.findMany({
+        where: {
+          customerId,
+          ...storeFilter,
+          note: { not: null },
+          NOT: { note: ERASURE_FORFEIT_NOTE },
+        },
+        select: { storeId: true },
+        distinct: ['storeId'],
+      });
+      const notesScrubbedStores = new Set(scrubbedRows.map(r => r.storeId));
       await client.walletTransaction.updateMany({
-        where: { customerId, ...storeFilter, note: { not: null } },
+        where: {
+          customerId,
+          ...storeFilter,
+          note: { not: null },
+          NOT: { note: ERASURE_FORFEIT_NOTE },
+        },
         data: { note: null },
       });
       const wallets = await client.customerWallet.findMany({
@@ -484,18 +511,22 @@ export class WalletService {
             amount: -w.balance,
             type: 'expire',
             idempotencyKey: `erasure-forfeit:${w.id}:${latest?.id ?? 'none'}`,
-            note: 'Forfeited on account erasure',
+            note: ERASURE_FORFEIT_NOTE,
             actorId: scope.actorId,
           },
           client
         );
-        forfeited.set(w.storeId, w.balance);
+        // Only money THIS run moved counts as forfeited: a replayed entry was
+        // already written (and audited) by the run that created it (issue 2122).
+        if (!result.replayed) {
+          forfeited.set(w.storeId, (forfeited.get(w.storeId) ?? 0) + w.balance);
+        }
         logger.info(
           { storeId: w.storeId, walletId: w.id, forfeited: w.balance, replayed: result.replayed },
           '[WalletService] balance forfeited on account erasure'
         );
       }
-      return { wallets, forfeited };
+      return { forfeited, notesScrubbedStores };
     };
 
     if (scope.storeId) {
@@ -504,10 +535,17 @@ export class WalletService {
     }
 
     await withScopedRlsBypass(client, async () => {
-      const { wallets, forfeited } = await run();
-      // One row per affected store, written with THAT store's id.
+      const { forfeited, notesScrubbedStores } = await run();
+      // One row per store whose liability THIS run changed, written with THAT
+      // store's id (issues 2122 / 2125). Driven by `forfeited`, not by every
+      // wallet: a zero-balance store's liability did not change, and a re-run
+      // of an already-erased account (retention cron retries, a double-submit)
+      // finds every balance at 0 and writes nothing — the erasure stays
+      // idempotent for the audit trail as well as for the ledger.
       const actorIsUser = scope.actorId !== 'system';
-      for (const storeId of new Set(wallets.map(w => w.storeId))) {
+      const touched = new Set<string>([...forfeited.keys(), ...notesScrubbedStores]);
+      for (const storeId of touched) {
+        const forfeitedFils = forfeited.get(storeId) ?? 0;
         await client.auditLog.create({
           data: {
             action: 'customer.wallet.erased',
@@ -518,7 +556,8 @@ export class WalletService {
             details: {
               actor: scope.actorId,
               reason: 'account_erasure',
-              forfeitedFils: forfeited.get(storeId) ?? 0,
+              forfeitedFils,
+              notesScrubbed: notesScrubbedStores.has(storeId),
             },
           },
         });

@@ -232,6 +232,25 @@ describe('withDeferredWork — inside a request transaction', () => {
     expect(loggerMock.warn).toHaveBeenCalledTimes(1);
   });
 
+  // PR 2279 audit: work that records something irreversible that already
+  // happened outside the DB (a provider refund's P1) must survive a rollback.
+  it('runs a runOnRollback task even when the transaction rolled back, and still drops the rest', async () => {
+    const survivor = vi.fn(async () => undefined);
+    const dropped = vi.fn(async () => undefined);
+
+    await expect(
+      withDeferredWork({ storeId: STORE_ID }, async () => {
+        void deferAfterTenantCommit('survivor', survivor, { runOnRollback: true });
+        void deferAfterTenantCommit('dropped', dropped);
+        throw new Error('Handler returned 500');
+      })
+    ).rejects.toThrow('Handler returned 500');
+    await awaitDeferredWork(1000);
+
+    expect(survivor).toHaveBeenCalledTimes(1);
+    expect(dropped).not.toHaveBeenCalled();
+  });
+
   it('leaves the scope behind, so nested deferrals inside a drained task run inline', async () => {
     const inner = vi.fn(async () => 'inner');
 

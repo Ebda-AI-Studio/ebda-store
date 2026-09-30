@@ -117,6 +117,36 @@ async function lockOrderReturns(orderId: string): Promise<void> {
   await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`return-order:${orderId}`}, 0))`;
 }
 
+/**
+ * The same lock, for the CUSTOMER-facing `create()` — bounded (issues 2004 /
+ * 2030). `complete()` holds this key across the provider refund round-trip
+ * (up to ~16s for MyFatoorah's two calls), and a storefront return submission
+ * must not sit on a pooled connection behind a merchant's refund until its own
+ * 30s transaction times out as a P2028 500. It polls the non-blocking
+ * `pg_try_advisory_xact_lock` for a short window — long enough for a racing
+ * create or a quick completion to finish — then answers a clean 409 the
+ * shopper can retry. Same key, so the serialisation #1393 needs is unchanged.
+ */
+const CREATE_LOCK_WAIT_MS = 3_000;
+const CREATE_LOCK_POLL_MS = 100;
+async function lockOrderReturnsBounded(orderId: string): Promise<void> {
+  const deadline = Date.now() + CREATE_LOCK_WAIT_MS;
+  for (;;) {
+    const rows = await prisma.$queryRaw<
+      Array<{ locked: boolean }>
+    >`SELECT pg_try_advisory_xact_lock(hashtextextended(${`return-order:${orderId}`}, 0)) AS locked`;
+    if (rows[0]?.locked) return;
+    if (Date.now() >= deadline) {
+      throw new AppError(
+        409,
+        'RETURN_ORDER_BUSY',
+        'Another return on this order is being processed. Please try again in a moment.'
+      );
+    }
+    await new Promise(resolve => setTimeout(resolve, CREATE_LOCK_POLL_MS));
+  }
+}
+
 export class ReturnService {
   /**
    * Generate unique return number
@@ -325,8 +355,9 @@ export class ReturnService {
     //
     // Read under the order's returns lock: two requests submitted together
     // (a double-tapped submit, two tabs) would otherwise both read the claims
-    // as they were before either, and both reserve the same units.
-    await lockOrderReturns(data.orderId);
+    // as they were before either, and both reserve the same units. Bounded:
+    // a merchant's in-flight gateway refund on this order holds the same key.
+    await lockOrderReturnsBounded(data.orderId);
     const priorReturns = await prisma.return.findMany({
       where: {
         storeId,

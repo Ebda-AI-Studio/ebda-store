@@ -68,7 +68,11 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
     // Customer wallet (D1): erasure scrubs ledger notes and forfeits any
     // balance. No wallet here — the forfeit path itself is covered against a
     // real DB in tests/integration/customer-wallet.test.ts.
-    walletTransaction: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    walletTransaction: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      // Stores whose ledger notes the erasure scrubs (PR 2279 audit).
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     customerWallet: { findMany: vi.fn().mockResolvedValue([]) },
     customer: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
     customerAddress: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -498,7 +502,12 @@ describe('AuthService.eraseAccount — erasure scope (Ruling W-7)', () => {
     await AuthService.eraseAccount(CUSTOMER.id, { scopeStoreId: 'store-1', actorId: 'merchant-1' });
 
     expect(mockPrisma.walletTransaction.updateMany).toHaveBeenCalledWith({
-      where: { customerId: CUSTOMER.id, storeId: 'store-1', note: { not: null } },
+      where: {
+        customerId: CUSTOMER.id,
+        storeId: 'store-1',
+        note: { not: null },
+        NOT: { note: 'Forfeited on account erasure' },
+      },
       data: { note: null },
     });
     expect(mockPrisma.customerWallet.findMany).toHaveBeenCalledWith(
@@ -533,7 +542,12 @@ describe('AuthService.eraseAccount — erasure scope (Ruling W-7)', () => {
     expect(mockPrisma.user.update).not.toHaveBeenCalled();
   });
 
-  it('unscoped (self / cron): one audit row per affected store, and the ledger entry names the actor', async () => {
+  // Issues 2122 / 2125: rows are written only for stores whose balance this
+  // run forfeited. Zero-balance wallets (untouched stores, or every wallet on
+  // a re-run of an already-erased account) write NOTHING — the positive case
+  // (one row per forfeiting store, naming the actor) runs against a real DB in
+  // tests/integration/customer-wallet.test.ts and rls-force-app.test.ts.
+  it('unscoped (self / cron): a store whose liability did not change gets NO audit row', async () => {
     mockPrisma.customerWallet.findMany.mockResolvedValueOnce([
       { id: 'w-a', storeId: 'store-a', balance: 0 },
       { id: 'w-b', storeId: 'store-b', balance: 0 },
@@ -541,13 +555,30 @@ describe('AuthService.eraseAccount — erasure scope (Ruling W-7)', () => {
 
     await AuthService.eraseAccount(CUSTOMER.id, { actorId: 'system' });
 
-    const rows = mockPrisma.auditLog.create.mock.calls.map(
-      c => (c[0] as { data: { storeId: string; userId: string | null; action: string } }).data
+    const walletRows = mockPrisma.auditLog.create.mock.calls.filter(
+      c => (c[0] as { data: { action: string } }).data.action === 'customer.wallet.erased'
     );
-    expect(rows.map(r => r.storeId).sort()).toEqual(['store-a', 'store-b']);
-    for (const r of rows) {
-      expect(r.action).toBe('customer.wallet.erased');
-      expect(r.userId).toBeNull(); // 'system' is not a user row
-    }
+    expect(walletRows).toEqual([]);
+  });
+
+  // PR 2279 audit: a zero-balance store whose merchant-authored ledger notes
+  // the erasure scrubbed must still get its own row saying so.
+  it('unscoped: a zero-balance store whose ledger notes were scrubbed DOES get a row', async () => {
+    mockPrisma.customerWallet.findMany.mockResolvedValueOnce([
+      { id: 'w-a', storeId: 'store-a', balance: 0 },
+    ]);
+    mockPrisma.walletTransaction.findMany.mockResolvedValueOnce([{ storeId: 'store-a' }]);
+
+    await AuthService.eraseAccount(CUSTOMER.id, { actorId: 'system' });
+
+    const rows = mockPrisma.auditLog.create.mock.calls
+      .map(c => (c[0] as { data: { storeId: string; action: string; details: unknown } }).data)
+      .filter(d => d.action === 'customer.wallet.erased');
+    expect(rows).toEqual([
+      expect.objectContaining({
+        storeId: 'store-a',
+        details: expect.objectContaining({ forfeitedFils: 0, notesScrubbed: true }),
+      }),
+    ]);
   });
 });

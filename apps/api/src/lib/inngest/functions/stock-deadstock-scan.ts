@@ -14,6 +14,7 @@ import { featureService } from '../../../services/feature.service';
  *   1. Expires stale open flags (>30 days old).
  *   2. Evaluates each active trackInventory product against the dead-stock criteria
  *      (daysSinceSale >= 90 AND (stockValueFils >= 50,000 OR no cost price → value unknown)).
+ *      A never-sold product is aged from its createdAt, not flagged on day one.
  *   3. Calls Gemini for bilingual clearance copy on candidates.
  *   4. Upserts DeadStockFlag rows.
  *

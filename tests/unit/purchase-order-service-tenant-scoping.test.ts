@@ -55,7 +55,10 @@ describe('createPoFromSuggestion — cross-tenant scoping', () => {
 
     expect(mockReorderSuggestionFindFirst).toHaveBeenCalledWith({
       where: { id: 'sug-owned-by-store-b', storeId: STORE_A },
-      include: { product: { select: { costPrice: true, name: true } } },
+      include: {
+        product: { select: { costPrice: true, name: true } },
+        variant: { select: { costPrice: true } },
+      },
     });
   });
 
@@ -85,7 +88,10 @@ describe('createPoFromSuggestion — cross-tenant scoping', () => {
 
     expect(mockReorderSuggestionFindFirst).toHaveBeenCalledWith({
       where: { id: 'sug-1', storeId: STORE_A },
-      include: { product: { select: { costPrice: true, name: true } } },
+      include: {
+        product: { select: { costPrice: true, name: true } },
+        variant: { select: { costPrice: true } },
+      },
     });
   });
 });

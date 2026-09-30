@@ -676,7 +676,11 @@ export class OrderService {
           )} KWD required for this coupon`
         );
       }
-      // Targeting is evaluated for EVERY coupon type, including free_shipping.
+      // Targeting is evaluated for EVERY coupon type, including free_shipping —
+      // on THIS (storefront checkout) path. `createAdminOrder` below does NOT
+      // evaluate targeting yet: whether a merchant-created order may bypass a
+      // coupon's customer-group / first-order / quantity / scope rules is an
+      // open owner decision (issue 1370).
       // It used to be skipped for free_shipping, which zeroed the shipping line
       // unconditionally: a code restricted to a customer group, to first orders,
       // to a minimum quantity, or to specific products or categories applied to
@@ -1784,7 +1788,8 @@ export class OrderService {
     // Inngest event as retriable steps that dead-letter on failure (Lens E,
     // E2-4) — they used to run here as in-process fire-and-forget `.catch(log)`
     // calls that vanished silently on a provider outage or a mid-deploy. Only
-    // the money reversal (applyRefundEffects, above — awaited) and the
+    // the money reversal request (applyRefundEffects, above — awaited; its
+    // event is sent after COMMIT and swept if dropped, Ruling AP-2) and the
     // real-time socket ping (below — fast in-process) stay inline.
     if (status === 'delivered') {
       // Existing event kept: 7-day review-request job + WBS delivered notify.
@@ -1938,11 +1943,25 @@ export class OrderService {
     // event that claimed a still-live order (#858) can no longer hide a
     // dropped fanout. restoreInventory:false (backorder-line cancel) is not
     // armed: the sweep re-sends restoreInventory:true, which would invent
-    // stock that was never reserved. Partial events never claim, so never arm.
+    // stock that was never reserved. Partial events never claim the ORDER; they
+    // arm their own Return instead (below).
     if (restoreInventory && !options.partial) {
       await prisma.order.updateMany({
         where: { id: orderId, storeId },
         data: { refundReversalRequestedAt: new Date(), refundReversedAt: null },
+      });
+    }
+    // The PARTIAL equivalent (issues 2246 / 2267): a partial event keyed on a
+    // Return (ReturnService passes the Return id as refundKey) arms THAT row,
+    // in the same transaction, and the fanout's partial arm stamps
+    // `reversalAppliedAt` when it has run. refund-reversal-stuck-sweep re-sends
+    // the item-level event for a return requested but never applied — the
+    // post-commit enqueue failure Ruling AP-2 had accepted as a residual. A
+    // partial keyed on anything else (no Return row) matches nothing here.
+    if (restoreInventory && options.partial?.refundKey) {
+      await prisma.return.updateMany({
+        where: { id: options.partial.refundKey, storeId, orderId },
+        data: { reversalRequestedAt: new Date(), reversalAppliedAt: null },
       });
     }
 

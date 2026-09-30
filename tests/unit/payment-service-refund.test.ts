@@ -37,10 +37,19 @@ const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
 const paymentEventFindMany = vi.fn().mockResolvedValue([]);
 const paymentEventCreate = vi.fn().mockResolvedValue({});
 
+let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = null;
+
 vi.mock('@force/database', () => ({
   prisma: {
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
+      // refund() resolves by transactionId with findMany({ take: 2 }) and
+      // refuses more than one match (issue 769); a single fixture row here.
+      findMany: async (...a: unknown[]) => {
+        if (paymentFindManyOverride) return paymentFindManyOverride(...a);
+        const r = await paymentFindFirst(...a);
+        return r ? [r] : [];
+      },
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
       findUnique: vi.fn().mockResolvedValue({ metadata: {} }),
@@ -515,5 +524,28 @@ describe('PaymentService.refund — an item-level refund never reverses the orde
 
     expect(result.wholeOrderEffectsApplied).toBe(true);
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
+  });
+});
+
+describe('PaymentService.refund — a transaction id matching more than one payment (issue 769)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('refuses with AMBIGUOUS_PAYMENT before any claim or provider call', async () => {
+    mockHappyPathUpToEffects();
+    paymentFindManyOverride = async () => [
+      { id: 'pay-a', transactionId: TRANSACTION_ID },
+      { id: 'pay-b', transactionId: TRANSACTION_ID },
+    ];
+    try {
+      await expect(
+        PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 })
+      ).rejects.toMatchObject({ statusCode: 409, code: 'AMBIGUOUS_PAYMENT' });
+      expect(providerRefund).not.toHaveBeenCalled();
+      expect(paymentUpdateMany).not.toHaveBeenCalled();
+    } finally {
+      paymentFindManyOverride = null;
+    }
   });
 });

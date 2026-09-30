@@ -185,6 +185,117 @@ export async function handleRefundReversalStuckSweep(
   return { swept: stuck.length, resent, alerted: veryStale.length };
 }
 
+/**
+ * The PARTIAL-return branch (issues 2246 / 2267, closing Ruling AP-2's
+ * residual). A partial return's item-level `order/refunded` is sent after the
+ * request commits; if that enqueue fails, the Return is completed and the
+ * customer refunded while the returned lines are never restocked and the
+ * pro-rata GL adjustment never posts. `applyRefundEffects` stamps
+ * `Return.reversalRequestedAt` in the completion transaction and the fanout's
+ * partial arm stamps `reversalAppliedAt`; this re-sends the item-level event
+ * for the gap, rebuilt from the Return's own lines.
+ *
+ * Idempotent end to end: the fanout's partial restore is keyed on the
+ * `partial_return_restored` marker per refundKey and the GL poster on the
+ * refundKey source id, so a re-send of an event that DID run is a no-op.
+ * `notify: false` — a plumbing retry, never a second "Refund issued".
+ */
+interface StuckPartialReturn {
+  id: string;
+  storeId: string;
+  orderId: string;
+  refundAmount: number;
+  reversalRequestedAt: Date | null;
+  items: Array<{ orderItemId: string; quantity: number }>;
+}
+
+export async function handlePartialReturnReversalSweep(
+  step: SweepStep
+): Promise<{ swept: number; resent: number; alerted: number }> {
+  const cutoff = new Date(Date.now() - REFUND_REVERSAL_STUCK_MINUTES * 60_000);
+
+  const stuck: StuckPartialReturn[] = await step.run('find-stuck-partial-returns', async () =>
+    withRlsBypass(tx =>
+      tx.return.findMany({
+        where: {
+          reversalAppliedAt: null,
+          // NO recency floor (PR 2279 audit): the column is new and NULL for
+          // every historical return, so there is no back-catalog to protect,
+          // and this sweep is the ONLY recovery — a floor would silently
+          // abandon a return armed before a >12h Inngest outage.
+          reversalRequestedAt: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          storeId: true,
+          orderId: true,
+          refundAmount: true,
+          reversalRequestedAt: true,
+          items: { select: { orderItemId: true, quantity: true } },
+        },
+        orderBy: { reversalRequestedAt: 'asc' },
+        take: SWEEP_TAKE,
+      })
+    )
+  );
+
+  if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };
+
+  let resent = 0;
+  await step.run('resend-partial-order-refunded', async () => {
+    for (const r of stuck) {
+      try {
+        await inngest.send({
+          name: 'order/refunded',
+          data: {
+            orderId: r.orderId,
+            storeId: r.storeId,
+            restoreInventory: true,
+            notify: false,
+            partial: {
+              items: r.items,
+              refundKey: r.id,
+              refundAmount: r.refundAmount > 0 ? r.refundAmount : undefined,
+            },
+          },
+        });
+        resent += 1;
+      } catch (err) {
+        logger.error(
+          { err, returnId: r.id },
+          '[refund-reversal-stuck-sweep] partial re-send failed'
+        );
+      }
+    }
+  });
+  logger.warn(
+    { count: stuck.length, resent },
+    '[refund-reversal-stuck-sweep] re-sent item-level order/refunded for unapplied partial returns'
+  );
+
+  const veryStaleCutoff = Date.now() - 3 * REFUND_REVERSAL_STUCK_MINUTES * 60_000;
+  const veryStale = stuck.filter(
+    r => r.reversalRequestedAt && r.reversalRequestedAt.getTime() < veryStaleCutoff
+  );
+  if (veryStale.length > 0) {
+    await step.run('alert-very-stale-partial', async () => {
+      await sendAlert({
+        level: 'p1',
+        scope: 'platform',
+        source: 'order.refund.partial_reversal.stuck',
+        title: `partial-return reversals stuck for ${veryStale.length} return(s)`,
+        body:
+          `${veryStale.length} completed partial return(s) still have no item-level reversal after ` +
+          `> ${3 * REFUND_REVERSAL_STUCK_MINUTES}m — returned stock NOT restored, pro-rata GL ` +
+          `adjustment NOT posted. Re-send isn't landing; investigate Inngest delivery.`,
+        context: { returnIds: veryStale.slice(0, 20).map(r => r.id) },
+      }).catch(() => undefined);
+    });
+  }
+
+  return { swept: stuck.length, resent, alerted: veryStale.length };
+}
+
 export const refundReversalStuckSweep: InngestFunction.Any = inngest.createFunction(
   {
     id: 'refund-reversal-stuck-sweep',
@@ -210,7 +321,13 @@ export const refundReversalStuckSweep: InngestFunction.Any = inngest.createFunct
   async ({ step }) => {
     const reversals = await handleRefundReversalStuckSweep(step);
     // Same tick, same wake-up of the database — see refund-claim-stuck-sweep.ts.
+    const partials = await handlePartialReturnReversalSweep(step);
     const claims = await handleStuckRefundClaimSweep(step);
-    return { ...reversals, stuckRefundClaims: claims.stuck };
+    return {
+      ...reversals,
+      partialReturnsSwept: partials.swept,
+      partialReturnsResent: partials.resent,
+      stuckRefundClaims: claims.stuck,
+    };
   }
 );

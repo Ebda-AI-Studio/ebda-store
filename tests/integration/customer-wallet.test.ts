@@ -517,7 +517,18 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     // Erasure is documented idempotent — a re-run must not fail on the key.
     // eraseAccount now returns its CRM-scrub outcome (#1880); a re-run must
     // still resolve, and must not be flagged as an ambiguous CRM match.
+    const erasureAudits = () =>
+      prisma.auditLog.findMany({
+        where: { resourceId: c, action: 'customer.wallet.erased' },
+        select: { storeId: true, details: true },
+      });
+    const afterFirst = await erasureAudits();
+    expect(afterFirst).toEqual([
+      { storeId, details: expect.objectContaining({ forfeitedFils: 4200 }) },
+    ]);
     await expect(AuthService.eraseAccount(c)).resolves.toMatchObject({ crmAmbiguous: false });
+    // Issues 2122 / 2125: the re-run moved no money, so it appends no audit row.
+    expect(await erasureAudits()).toEqual(afterFirst);
   });
 
   // ─── 8. FK cascade ────────────────────────────────────────────────────

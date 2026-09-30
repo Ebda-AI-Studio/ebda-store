@@ -20,6 +20,9 @@ vi.mock('@force/database', () => ({
     $transaction: vi.fn(),
   },
   Prisma: { TransactionIsolationLevel: { Serializable: 'Serializable' } },
+  // updateItem's line write runs inside withSavepoint (issues 2009/2011),
+  // which asks this; standalone path here, so it is a pass-through.
+  hasTenantContext: () => false,
   OrderStatus: {
     pending: 'pending',
     confirmed: 'confirmed',

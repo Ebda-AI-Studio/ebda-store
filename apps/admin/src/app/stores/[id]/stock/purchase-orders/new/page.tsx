@@ -214,7 +214,10 @@ export default function NewPurchaseOrderPage() {
         payload
       );
       if (apiError) {
-        setError(apiError.message);
+        // Coded refusals have en/ar copy; anything else shows the API text.
+        setError(
+          apiError.code === 'VARIANT_INACTIVE' ? t('errors.VARIANT_INACTIVE') : apiError.message
+        );
         return;
       }
       if (data?.id) {

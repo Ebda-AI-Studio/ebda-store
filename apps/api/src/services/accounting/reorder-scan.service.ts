@@ -421,74 +421,87 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
 
   // --- Phase 3: Upsert ReorderSuggestion rows in a SHORT RLS-bypass tx --------
   // DB writes only — no network, so this stays well under the 30s timeout.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rowsUpserted = await withRlsBypass(async (tx: any) => {
-    let upserted = 0;
+  //
+  // Chunked (issue 2259): one withRlsBypass per PHASE3_CHUNK_SIZE candidates,
+  // the way phase 1 chunks its scan. The candidate set is uncapped (every
+  // uncosted store's whole stale catalogue can qualify) and each candidate
+  // costs ~5 round-trips with its savepoint, so a single transaction could
+  // cross the 30s interactive-tx ceiling. A chunk that fails commits nothing
+  // of its own; earlier chunks stay committed, and the next weekly run
+  // refreshes the same one-open-row-per-product set.
+  const PHASE3_CHUNK_SIZE = 25;
+  let rowsUpserted = 0;
+  for (let chunkStart = 0; chunkStart < candidates.length; chunkStart += PHASE3_CHUNK_SIZE) {
+    const slice = candidates.slice(chunkStart, chunkStart + PHASE3_CHUNK_SIZE);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rowsUpserted += await withRlsBypass(async (tx: any) => {
+      let upserted = 0;
 
-    for (const candidate of candidates) {
-      const reasoning = reasoningMap.get(candidate.productId) ?? {
-        reasoningEn: 'AI reasoning unavailable — manual review suggested',
-        reasoningAr: null,
-      };
+      for (const candidate of slice) {
+        const reasoning = reasoningMap.get(candidate.productId) ?? {
+          reasoningEn: 'AI reasoning unavailable — manual review suggested',
+          reasoningAr: null,
+        };
 
-      try {
-        // One OPEN suggestion per item: refresh it (newest first, in case
-        // pre-fix duplicates still exist) or create one. Own SAVEPOINT per
-        // candidate so a failed write cannot abort the rest of the batch.
-        await withSavepointOn(tx, async () => {
-          const existing = await tx.reorderSuggestion.findFirst({
-            where: {
-              storeId,
-              productId: candidate.productId,
-              variantId: null,
-              status: 'open',
-            },
-            orderBy: { scannedAt: 'desc' },
-            select: { id: true },
-          });
-
-          const payload = {
-            suggestedQty: candidate.suggestedQty,
-            velocity7d: candidate.velocity7d,
-            velocity28d: candidate.velocity28d,
-            onHand: candidate.onHand,
-            onOrder: candidate.onOrder,
-            openBacklog: candidate.openBacklog,
-            urgencyDays: candidate.urgencyDays,
-            supplierId: candidate.supplierId,
-            reasoningEn: reasoning.reasoningEn,
-            reasoningAr: reasoning.reasoningAr ?? undefined,
-            status: 'open' as const,
-          };
-
-          if (existing) {
-            await tx.reorderSuggestion.update({
-              where: { id: existing.id },
-              data: { ...payload, scannedAt: scanStartedAt },
-            });
-          } else {
-            await tx.reorderSuggestion.create({
-              data: {
+        try {
+          // One OPEN suggestion per item: refresh it (newest first, in case
+          // pre-fix duplicates still exist) or create one. Own SAVEPOINT per
+          // candidate so a failed write cannot abort the rest of the batch.
+          await withSavepointOn(tx, async () => {
+            const existing = await tx.reorderSuggestion.findFirst({
+              where: {
                 storeId,
                 productId: candidate.productId,
                 variantId: null,
-                scannedAt: scanStartedAt,
-                ...payload,
+                status: 'open',
               },
+              orderBy: { scannedAt: 'desc' },
+              select: { id: true },
             });
-          }
-        });
-        upserted += 1;
-      } catch (err) {
-        logger.error(
-          { err, storeId, productId: candidate.productId },
-          'reorder-scan: failed to upsert suggestion'
-        );
-      }
-    }
 
-    return upserted;
-  });
+            const payload = {
+              suggestedQty: candidate.suggestedQty,
+              velocity7d: candidate.velocity7d,
+              velocity28d: candidate.velocity28d,
+              onHand: candidate.onHand,
+              onOrder: candidate.onOrder,
+              openBacklog: candidate.openBacklog,
+              urgencyDays: candidate.urgencyDays,
+              supplierId: candidate.supplierId,
+              reasoningEn: reasoning.reasoningEn,
+              reasoningAr: reasoning.reasoningAr ?? undefined,
+              status: 'open' as const,
+            };
+
+            if (existing) {
+              await tx.reorderSuggestion.update({
+                where: { id: existing.id },
+                data: { ...payload, scannedAt: scanStartedAt },
+              });
+            } else {
+              await tx.reorderSuggestion.create({
+                data: {
+                  storeId,
+                  productId: candidate.productId,
+                  variantId: null,
+                  scannedAt: scanStartedAt,
+                  ...payload,
+                },
+              });
+            }
+          });
+          upserted += 1;
+        } catch (err) {
+          logger.error(
+            { err, storeId, productId: candidate.productId },
+            'reorder-scan: failed to upsert suggestion'
+          );
+        }
+      }
+
+      return upserted;
+    });
+  }
 
   logger.info(
     { storeId, scanned: candidates.length, suggested: rowsUpserted, expiredCount },

@@ -38,3 +38,27 @@ export function shouldApplyWebhookEffects(
   if (!existingOrder) return true; // no order yet → handleWebhook will resolve it
   return !existingOrder.webhookProcessedAt;
 }
+
+/**
+ * 4xx codes that are OPERATIONAL refusals of a verified, genuine provider
+ * event — not bad bytes. They must retry and dead-letter into the P0 path,
+ * never land in the silent `rejected` lane (which payment-webhook-stuck-sweep
+ * does not look at). AMBIGUOUS_PAYMENT: the provider id matches more than one
+ * payment (issue 769 / PR 2279 audit).
+ */
+export const OPERATIONAL_WEBHOOK_CLIENT_ERRORS: ReadonlySet<string> = new Set([
+  'AMBIGUOUS_PAYMENT',
+]);
+
+/**
+ * Is this webhook-processing failure a TERMINAL client error (forged or
+ * invalid signature, store mismatch, malformed payload) that must be marked
+ * `rejected` without retrying or paging? Duck-typed on `statusCode`/`code`
+ * so the decision stays pure and importable without the error class.
+ */
+export function isTerminalWebhookClientError(err: unknown): boolean {
+  const e = err as { statusCode?: unknown; code?: unknown } | null;
+  if (!e || typeof e.statusCode !== 'number') return false;
+  if (e.statusCode < 400 || e.statusCode >= 500) return false;
+  return !(typeof e.code === 'string' && OPERATIONAL_WEBHOOK_CLIENT_ERRORS.has(e.code));
+}

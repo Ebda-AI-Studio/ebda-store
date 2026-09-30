@@ -116,7 +116,10 @@ export default function PurchaseOrderDetailPage() {
         { receipts }
       );
       if (apiError) {
-        setReceiveError(apiError.message);
+        // Coded refusals have en/ar copy; anything else shows the API text.
+        setReceiveError(
+          apiError.code === 'VARIANT_INACTIVE' ? t('errors.VARIANT_INACTIVE') : apiError.message
+        );
       } else {
         loadPO();
       }

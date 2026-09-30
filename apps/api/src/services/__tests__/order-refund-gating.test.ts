@@ -10,6 +10,10 @@ vi.mock('@force/database', () => ({
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
+    // A partial event arms its own Return (issues 2246 / 2267).
+    return: {
+      updateMany: vi.fn(),
+    },
     // These money-reversal tables must NOT be touched by applyRefundEffects
     // anymore (Task 1 of the money-integrity redesign) — the assertions
     // below confirm it via `.not.toHaveBeenCalled()`.
@@ -253,6 +257,12 @@ describe('OrderService.applyRefundEffects — fires order/refunded with reversal
     });
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
     expect(inngest.send).toHaveBeenCalledTimes(2);
+    // …but the partial arms ITS Return, so the partial sweep can recover it.
+    expect(prisma.return.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.return.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ret-1', storeId: 'store-1', orderId: 'order-123' },
+      data: { reversalRequestedAt: expect.any(Date), reversalAppliedAt: null },
+    });
   });
 
   it('is a no-op (no event fired) when the order does not exist', async () => {

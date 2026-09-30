@@ -77,6 +77,19 @@ interface DeferredTask {
   /** Stable, greppable identifier — appears in logs and alert headers. */
   name: string;
   run: () => Promise<unknown>;
+  /** See DeferOptions.runOnRollback. */
+  runOnRollback?: boolean;
+}
+
+export interface DeferOptions {
+  /**
+   * Run this task even when the request transaction rolls back. ONLY for
+   * work that records something that already happened OUTSIDE the database
+   * and cannot be undone — e.g. the P1 for a provider refund that has
+   * already left the gateway (PR 2279 audit). The default premise (the
+   * rolled-back rows no longer exist, so drop the work) is false for those.
+   */
+  runOnRollback?: boolean;
 }
 
 interface DeferralScope {
@@ -118,7 +131,11 @@ export function hasDeferralScope(): boolean {
  * (the result is not knowable yet). Callers that already treat this work as
  * fire-and-forget — every current one does — can ignore the difference.
  */
-export function deferAfterTenantCommit<T>(name: string, run: () => Promise<T>): Promise<T | null> {
+export function deferAfterTenantCommit<T>(
+  name: string,
+  run: () => Promise<T>,
+  options: DeferOptions = {}
+): Promise<T | null> {
   const scope = deferralStorage.getStore();
   if (!scope) {
     return run();
@@ -144,7 +161,7 @@ export function deferAfterTenantCommit<T>(name: string, run: () => Promise<T>): 
       body: `${name} was queued via deferAfterTenantCommit after its request's scope already ${scope.closed}.`,
       context: { task: name, storeId: ctx.storeId, scopeState: scope.closed },
     }).catch(() => undefined);
-    if (scope.closed === 'rolledback') {
+    if (scope.closed === 'rolledback' && !options.runOnRollback) {
       // The rows this work would react to no longer exist — dropping it is
       // the SAME decision the on-time rollback path already makes.
       return Promise.resolve(null);
@@ -155,7 +172,7 @@ export function deferAfterTenantCommit<T>(name: string, run: () => Promise<T>): 
     // P2028 this module exists to avoid.
     return runOneDeferredTask({ name, run }, ctx).then(() => null);
   }
-  scope.tasks.push({ name, run });
+  scope.tasks.push({ name, run, runOnRollback: options.runOnRollback });
   return Promise.resolve(null);
 }
 
@@ -195,13 +212,19 @@ export async function withDeferredWork<T>(
     // must not be deferred at all — write it on the same transaction as the
     // write it records, as the affiliate money audit rows do
     // (`affiliateEventCreate`, #1590).
-    if (scope.tasks.length > 0) {
+    // Tasks that opted into `runOnRollback` record something irreversible
+    // that already happened outside the database: they still run (tracked
+    // for graceful shutdown, never blocking the error response).
+    const survivors = scope.tasks.filter(t => t.runOnRollback);
+    const dropped = scope.tasks.filter(t => !t.runOnRollback);
+    if (dropped.length > 0) {
       logger.warn(
-        { storeId: ctx.storeId, dropped: scope.tasks.map(t => t.name) },
+        { storeId: ctx.storeId, dropped: dropped.map(t => t.name) },
         '[after-tenant-commit] tenant transaction failed — dropping deferred work'
       );
-      scope.tasks.length = 0;
     }
+    scope.tasks.length = 0;
+    if (survivors.length > 0) void trackDrain(survivors, ctx);
     // Close the scope even though nothing is queued: a fire-and-forget
     // promise from the handler can still be resolving and call
     // deferAfterTenantCommit after we throw — see the `closed` field's doc.

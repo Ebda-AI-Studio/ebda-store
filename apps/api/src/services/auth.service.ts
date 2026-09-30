@@ -1441,7 +1441,8 @@ export class AuthService {
    *
    * Idempotent: re-running on an already-erased account is a no-op (the
    * second call's `update` succeeds with the same data, the `deleteMany`s
-   * delete zero rows). Callers should still clear auth cookies on the
+   * delete zero rows, and the wallet forfeit finds every balance at 0 so it
+   * writes neither a ledger entry nor a `customer.wallet.erased` audit row). Callers should still clear auth cookies on the
    * client side after the response.
    *
    * NOT a soft-delete superset — soft-deleted accounts still expose PII

@@ -209,7 +209,11 @@ router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 // calls `runInTenantContext` internally for the cycle-count reconcile path,
 // which would double-nest a second `basePrisma.$transaction` inside the
 // outer per-request tx. inventoryRoutes stays CONTEXT-LESS — Phase 2
-// candidate.
+// candidate. (The accounting create* services it and the stock-adjustment /
+// PO / expense routes reach no longer add a nested tx of their own: their
+// ownership guard reuses an ambient context via
+// assertStoreOwnsInTenantScope — issue 2057. reconcileCountSession's own
+// runInTenantContext is what still blocks this router.)
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);

@@ -29,12 +29,21 @@ const paymentUpdate = vi.fn().mockResolvedValue({});
 const orderUpdate = vi.fn().mockResolvedValue({});
 const orderFindUnique = vi.fn().mockResolvedValue({ storeId: 'store_1' });
 const paymentConfigFindMany = vi.fn();
+let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = null;
 const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
 
 vi.mock('@force/database', () => ({
   prisma: {
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
+      // handleWebhook resolves the payment with findMany({ take: 2 }) so an
+      // ambiguous id is refused (issue 769). Tests that want a collision set
+      // paymentFindManyOverride; otherwise it mirrors paymentFindFirst.
+      findMany: async (...a: unknown[]) => {
+        if (paymentFindManyOverride) return paymentFindManyOverride(...a);
+        const r = await paymentFindFirst(...a);
+        return r ? [r] : [];
+      },
       updateMany: (...a: unknown[]) => paymentUpdateMany(...a),
       update: (...a: unknown[]) => paymentUpdate(...a),
       findUnique: vi.fn().mockResolvedValue({ metadata: {} }),
@@ -802,6 +811,22 @@ describe('refund webhook — what it cannot book is raised, not logged (#1477, #
     expect(await alertSources()).toContain('payment.refund.held_unaccounted');
   });
 
+  // PR 2279 audit P1: a payment that predates the per-refund ledger (2000
+  // refunded, no ids recorded) gets a NEW refund with a usable amount. It is
+  // held, not added — the balance may be overstated — so it must page, under
+  // its own kind.
+  it('a refund with an amount on a pre-ledger payment raises held_provenance_unknown', async () => {
+    webhookFor(
+      { refundedAmount: 2000, status: 'partially_refunded', metadata: {} },
+      { refundId: 'rf_new', amount: 3000 }
+    );
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(await alertSources()).toContain('payment.refund.held_provenance_unknown');
+    expect(await alertSources()).not.toContain('payment.refund.held_unaccounted');
+  });
+
   it('the settle notice for an already-counted refund raises nothing (control)', async () => {
     webhookFor(
       {
@@ -886,5 +911,52 @@ describe('PaymentService.refund — a partial refund outside a return is raised 
       itemLevel: true,
     });
     expect(await alertSources()).toEqual([]);
+  });
+});
+
+describe('handleWebhook — a provider id matching MORE than one payment is refused (issue 769)', () => {
+  it('throws AMBIGUOUS_PAYMENT and writes nothing', async () => {
+    vi.clearAllMocks();
+    mockProviderConfig();
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      amount: 5000,
+    });
+    const row = (id: string, storeId: string) => ({
+      id,
+      orderId: `order-${id}`,
+      amount: 5000,
+      currency: 'KWD',
+      status: 'pending',
+      provider: 'myfatoorah',
+      metadata: {},
+      order: { storeId, store: { name: 'S' }, status: 'pending' },
+    });
+    paymentFindManyOverride = async () => [row('pay-a', 'store-a'), row('pay-b', 'store-b')];
+    try {
+      await expect(
+        PaymentService.handleWebhook('myfatoorah', { fake: true })
+      ).rejects.toMatchObject({ statusCode: 409, code: 'AMBIGUOUS_PAYMENT' });
+      expect(paymentUpdateMany).not.toHaveBeenCalled();
+      expect(paymentUpdate).not.toHaveBeenCalled();
+      // …and LOUDLY: a P0 naming the provider, the ids and every matching payment.
+      const { sendAlert } = await import('@api/services/alerts.service');
+      const p0 = vi
+        .mocked(sendAlert)
+        .mock.calls.map(
+          c => c[0] as { level: string; source: string; context: Record<string, unknown> }
+        )
+        .find(a => a.source === 'payment.webhook.ambiguous_payment');
+      expect(p0).toBeDefined();
+      expect(p0!.level).toBe('p0');
+      expect(p0!.context).toMatchObject({
+        provider: 'myfatoorah',
+        transactionId: TRANSACTION_ID,
+        paymentIds: ['pay-a', 'pay-b'],
+      });
+    } finally {
+      paymentFindManyOverride = null;
+    }
   });
 });

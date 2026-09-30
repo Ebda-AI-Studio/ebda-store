@@ -447,3 +447,85 @@ describe('an id is only recorded when its amount was counted', () => {
     expect(r.accountedThisEvent, 'the refresh route must record this one').toBe(true);
   });
 });
+
+describe('heldUnaccountedEvent means "an unaccounted refund whose amount could not be used" (issue 2029)', () => {
+  it('provenance unknown + a credible amount is NOT held-unaccounted — it is held-provenance-unknown', () => {
+    // 5000 payment, a 2000 partial refunded before refund-id bookkeeping
+    // (no ids recorded); the settle webhook for it arrives with its amount.
+    const r = resolveRefundSettlement({
+      paymentAmount: PAYMENT,
+      alreadyRefunded: 2000,
+      reported: [2000],
+      reportedEventId: 'R1',
+      accountedEventIds: [],
+    });
+    expect(r.accountedThisEvent).toBe(false);
+    expect(r.isFullRefund).toBe(false);
+    expect(r.heldUnaccountedEvent).toBe(false);
+    // …but it IS raised under its own kind: indistinguishable from a new refund.
+    expect(r.heldProvenanceUnknown).toBe(true);
+  });
+
+  // PR 2279 audit P1: a genuinely NEW second refund on a pre-ledger payment.
+  // 5000 paid, 2000 refunded pre-ledger, provider now reports R2 for 3000.
+  // settled stays at max(2000, 3000) = 3000 while the gateway returned 5000,
+  // so the balance is overstated by 2000 — this must be raised, not only warned.
+  it('a second refund on a pre-ledger payment is flagged heldProvenanceUnknown', () => {
+    const r = resolveRefundSettlement({
+      paymentAmount: PAYMENT,
+      alreadyRefunded: 2000,
+      reported: [3000],
+      reportedEventId: 'R2',
+      accountedEventIds: [],
+    });
+    expect(r.settledTotal).toBe(3000);
+    expect(r.isFullRefund).toBe(false);
+    expect(r.heldUnaccountedEvent).toBe(false);
+    expect(r.heldProvenanceUnknown).toBe(true);
+  });
+
+  it('heldProvenanceUnknown is false once provenance is known or the id is accounted', () => {
+    expect(
+      resolveRefundSettlement({
+        paymentAmount: PAYMENT,
+        alreadyRefunded: 2000,
+        reported: [1000],
+        reportedEventId: 'R2',
+        accountedEventIds: ['R1'],
+      }).heldProvenanceUnknown
+    ).toBe(false);
+    expect(
+      resolveRefundSettlement({
+        paymentAmount: PAYMENT,
+        alreadyRefunded: 0,
+        reported: [1000],
+        reportedEventId: 'R1',
+        accountedEventIds: [],
+      }).heldProvenanceUnknown
+    ).toBe(false);
+  });
+
+  it('an unaccounted id with NO usable amount on a partially refunded payment IS held-unaccounted', () => {
+    const r = resolveRefundSettlement({
+      paymentAmount: PAYMENT,
+      alreadyRefunded: 2000,
+      reported: [null],
+      reportedEventId: 'R2',
+      accountedEventIds: ['R1'],
+    });
+    expect(r.accountedThisEvent).toBe(false);
+    expect(r.heldUnaccountedEvent).toBe(true);
+  });
+
+  it('an unaccounted id with a usable amount is accounted, not held', () => {
+    const r = resolveRefundSettlement({
+      paymentAmount: PAYMENT,
+      alreadyRefunded: 2000,
+      reported: [1000],
+      reportedEventId: 'R2',
+      accountedEventIds: ['R1'],
+    });
+    expect(r.accountedThisEvent).toBe(true);
+    expect(r.heldUnaccountedEvent).toBe(false);
+  });
+});

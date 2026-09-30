@@ -10,6 +10,7 @@ import { inngest } from '../../lib/inngest/client';
 import { OneSignalService } from '../onesignal.service';
 import { redis } from '../redis.service';
 import { sendAlert } from '../alerts.service';
+import { alertUnbookedRefund } from './unbooked-refund-alert';
 import { recordPaymentEvent } from '../payment-event.service';
 import { invalidateCustomersCache } from '../../lib/public-cache';
 import { buildPaymentLineItems } from '../../lib/payment-line-items';
@@ -797,10 +798,26 @@ export class PaymentService {
       );
     }
 
-    const payment = await prisma.payment.findFirst({
+    // transactionId is not unique (issue 769 / Ruling AMS-2): a collision
+    // must never pick an arbitrary row to refund. Read two; refuse on more.
+    const refundMatches = await prisma.payment.findMany({
       where: { transactionId: request.transactionId },
       include: { order: { include: { store: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
     });
+    if (refundMatches.length > 1) {
+      logger.error(
+        { transactionId: request.transactionId, paymentIds: refundMatches.map(m => m.id) },
+        '[PAYMENT] refund transaction id matches more than one payment — refusing to guess'
+      );
+      throw new AppError(
+        409,
+        'AMBIGUOUS_PAYMENT',
+        'This transaction id matches more than one payment. Refund it from the provider dashboard and contact support.'
+      );
+    }
+    const payment = refundMatches[0];
 
     if (!payment) {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
@@ -1158,15 +1175,14 @@ export class PaymentService {
     // an amount-only GL adjustment exists (#1209 — the account choice is the
     // owner's), make the gap visible instead of silent.
     if (!flipsOrder && !request.refundKey && moneyStoreId) {
-      await sendAlert({
-        level: 'p1',
-        scope: 'store',
+      const orderRef = payment.order?.orderNumber ?? payment.orderId;
+      await alertUnbookedRefund({
+        kind: 'partial_no_gl',
         store: { id: moneyStoreId, name: payment.order?.store?.name ?? moneyStoreId },
-        source: 'payment.refund.partial_no_gl',
-        title: 'Partial refund with no ledger entry',
-        body: `Order ${payment.order?.orderNumber ?? payment.orderId}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return. Nothing posts it to the general ledger — book it by hand.`,
+        orderRef,
+        body: `Order ${orderRef}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return. Nothing posts it to the general ledger — book it by hand.`,
         context: { paymentId: payment.id, orderId: payment.orderId, refundId: response.refundId },
-      }).catch(() => undefined);
+      });
     }
 
     // Refund effects: inventory restore, coupon usage decrement, affiliate
@@ -1282,7 +1298,14 @@ export class PaymentService {
     // payload that arrived with a forged/recycled transaction ID can never
     // resolve to a different merchant's order than the one that owned the
     // HMAC secret we just verified against.
-    const payment = await prisma.payment.findFirst({
+    //
+    // transactionId / invoiceId carry NO unique constraint (issue 769 — adding
+    // one needs a production duplicate check first, see Ruling AMS-2), so a
+    // bare findFirst could bind a colliding id to an arbitrary row, including
+    // another tenant's when no storeId was resolved. Read up to two: more than
+    // one match is refused loudly (it lands in the webhook inbox for a human)
+    // instead of processing whichever row Postgres returned first.
+    const paymentMatches = await prisma.payment.findMany({
       where: {
         AND: [
           {
@@ -1302,7 +1325,59 @@ export class PaymentService {
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
     });
+    if (paymentMatches.length > 1) {
+      logger.error(
+        {
+          provider,
+          storeId,
+          transactionId: webhookData.transactionId,
+          invoiceId: webhookData.invoiceId,
+          paymentIds: paymentMatches.map(m => m.id),
+        },
+        '[PAYMENT WEBHOOK] provider ids match more than one payment — refusing to guess which one'
+      );
+      // LOUD, not just logged: this is a real provider event (the signature
+      // already verified) that nothing will apply — a captured payment whose
+      // order may never flip to paid. P0 per incident (the ids are in the
+      // title, so a second collision is not throttled into the first). The
+      // webhook processor also exempts this code from its terminal-4xx lane,
+      // so it retries and dead-letters into the existing P0 path.
+      const firstStoreId = paymentMatches[0]?.order?.storeId;
+      await sendAlert({
+        level: 'p0',
+        scope: storeId ? 'store' : 'platform',
+        ...(storeId
+          ? {
+              store: {
+                id: storeId,
+                name: paymentMatches[0]?.order?.store?.name ?? storeId,
+              },
+            }
+          : {}),
+        source: 'payment.webhook.ambiguous_payment',
+        title: `Webhook id matches ${paymentMatches.length}+ payments — ${provider} ${webhookData.transactionId ?? webhookData.invoiceId ?? ''}`,
+        body:
+          `A verified ${provider} webhook names a transaction/invoice id that matches more than one payment, ` +
+          `so it was NOT applied. The customer may have paid for an order that still reads unpaid. ` +
+          `Find the right payment in the provider dashboard and replay the event from /webhook-events.`,
+        context: {
+          provider,
+          storeId: storeId ?? firstStoreId ?? null,
+          transactionId: webhookData.transactionId,
+          invoiceId: webhookData.invoiceId ?? null,
+          paymentIds: paymentMatches.map(m => m.id),
+        },
+      }).catch(() => undefined);
+      throw new AppError(
+        409,
+        'AMBIGUOUS_PAYMENT',
+        'Webhook transaction/invoice id matches more than one payment'
+      );
+    }
+    const payment = paymentMatches[0] ?? null;
 
     if (!payment) {
       logger.error(
@@ -1424,6 +1499,7 @@ export class PaymentService {
         isFullRefund: refundIsFull,
         accountedThisEvent,
         heldUnaccountedEvent,
+        heldProvenanceUnknown,
       } = resolveRefundSettlement({
         paymentAmount: payment.amount,
         alreadyRefunded: payment.refundedAmount,
@@ -1586,7 +1662,9 @@ export class PaymentService {
           refundReference: webhookData.refund.refundReference ?? null,
           ...(newStatus === 'completed' && heldUnaccountedEvent
             ? { heldUnaccountedRefund: true, reason: 'refund_amount_not_reported' }
-            : {}),
+            : newStatus === 'completed' && heldProvenanceUnknown
+              ? { heldUnaccountedRefund: true, reason: 'refund_provenance_unknown' }
+              : {}),
         },
       });
 
@@ -1602,28 +1680,40 @@ export class PaymentService {
           // amount. The balance was held, so if this is a real second refund
           // the payment still looks refundable by that much — and a later
           // return would pay it out again.
-          await sendAlert({
-            level: 'p1',
-            scope: 'store',
+          await alertUnbookedRefund({
+            kind: 'held_unaccounted',
             store: alertStore,
-            source: 'payment.refund.held_unaccounted',
-            title: 'Refund reported without an amount',
+            orderRef: payment.order.orderNumber,
             body: `Order ${payment.order.orderNumber}: the provider reported refund ${webhookData.refund.refundId} as completed without an amount this system can use, so the refunded total was NOT raised. Check the provider dashboard: if this is a new refund, the payment's refundable balance is overstated.`,
             context: { paymentId: payment.id, refundId: webhookData.refund.refundId },
-          }).catch(() => undefined);
+          });
+        } else if (heldProvenanceUnknown) {
+          // PR 2279 audit P1: the payment predates the per-refund ledger, so a
+          // refund with a usable amount was HELD (not added). If it is a new
+          // second refund, the refundable balance is overstated.
+          await alertUnbookedRefund({
+            kind: 'held_provenance_unknown',
+            store: alertStore,
+            orderRef: payment.order.orderNumber,
+            body: `Order ${payment.order.orderNumber}: the provider reported refund ${webhookData.refund.refundId} (${webhookData.refund.amount ?? '?'} fils) as completed, but this payment predates the per-refund ledger, so the amount was NOT added to the refunded total. Check the provider dashboard: if this is a NEW refund, the payment's refundable balance is overstated and a later return could pay it out again.`,
+            context: {
+              paymentId: payment.id,
+              refundId: webhookData.refund.refundId,
+              reportedAmount: webhookData.refund.amount ?? null,
+              refundedAmount: payment.refundedAmount,
+            },
+          });
         } else if (accountedThisEvent && !refundIsFull) {
           // #1455: a partial refund taken outside the platform. The balance
           // is now right, but the GL poster needs line data only the returns
           // flow has, so nothing books it.
-          await sendAlert({
-            level: 'p1',
-            scope: 'store',
+          await alertUnbookedRefund({
+            kind: 'partial_no_gl',
             store: alertStore,
-            source: 'payment.refund.partial_no_gl',
-            title: 'Partial refund with no ledger entry',
+            orderRef: payment.order.orderNumber,
             body: `Order ${payment.order.orderNumber}: a partial refund (${webhookData.refund.refundId}) was made in the provider's dashboard, outside a return. Nothing posts it to the general ledger — book it by hand.`,
             context: { paymentId: payment.id, refundId: webhookData.refund.refundId },
-          }).catch(() => undefined);
+          });
         }
       }
 

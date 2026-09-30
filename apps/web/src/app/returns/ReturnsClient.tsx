@@ -246,18 +246,25 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         // throw, so keep the localized connection copy for those codes.
         const transportFailure =
           json.error?.code === 'NETWORK_ERROR' || json.error?.code === 'TIMEOUT';
+        // A merchant is completing another return on this order right now.
+        const orderBusy = json.error?.code === 'RETURN_ORDER_BUSY';
         setSubmitResult({
           type: 'error',
-          text: transportFailure
+          text: orderBusy
             ? t(
-                'Failed to submit return request. Please check your connection.',
-                '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.'
+                'Another return on this order is being processed. Please try again in a moment.',
+                'يتم الآن معالجة إرجاع آخر لهذا الطلب. يرجى المحاولة مرة أخرى بعد قليل.'
               )
-            : json.error?.message ||
-              t(
-                'Failed to submit return request. Please try again.',
-                '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
-              ),
+            : transportFailure
+              ? t(
+                  'Failed to submit return request. Please check your connection.',
+                  '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.'
+                )
+              : json.error?.message ||
+                t(
+                  'Failed to submit return request. Please try again.',
+                  '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
+                ),
         });
       }
     } catch {

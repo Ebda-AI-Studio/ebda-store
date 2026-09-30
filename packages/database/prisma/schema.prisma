@@ -1743,6 +1743,12 @@ model Return {
   refundMethod String?   @map("refund_method") // original, store_credit, bank_transfer
   refundedAt   DateTime? @map("refunded_at")
 
+  // Partial-return reversal recovery (issues 2246 / 2267): stamped when the
+  // item-level order/refunded is requested (same tx as completion) and when
+  // the fanout has applied it; refund-reversal-stuck-sweep re-sends the gap.
+  reversalRequestedAt DateTime? @map("reversal_requested_at")
+  reversalAppliedAt   DateTime? @map("reversal_applied_at")
+
   // Shipping
   trackingNumber String?   @map("tracking_number")
   shippedAt      DateTime? @map("shipped_at")

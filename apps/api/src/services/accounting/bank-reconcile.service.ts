@@ -25,6 +25,7 @@ import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
 import { assertStoreOwns } from './assert-store-owns';
+import { COUNTED_STATUSES_SQL } from './reports.service';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -320,7 +321,10 @@ export async function runAutoMatch(
               : { credit: { gte: minFils, lte: maxFils } }),
             entry: {
               storeId,
-              status: 'posted',
+              // A refunded sale's original entry is flipped to 'reversed' but
+              // its cash line still happened at the bank — it must stay
+              // matchable, the same counted set the reports use.
+              status: { in: ['posted', 'reversed'] },
               postedAt: { gte: from, lte: to },
               id: excludedIds.length > 0 ? { notIn: excludedIds } : undefined,
             },
@@ -576,7 +580,7 @@ export async function getReconciliationSummary(
  *   period, not a closing balance.
  *
  * LEDGER BALANCE (ledgerBalanceFils):
- *   Sum of all posted JournalLine rows for the GL account linked to this
+ *   Sum of all counted (posted + reversed) JournalLine rows for the GL account linked to this
  *   statement, up to the statement's periodEnd (or "now" when periodEnd is null).
  *   Bank/cash accounts are ASSET accounts (debit-natural), so:
  *     ledgerBalance = debit_total − credit_total
@@ -592,7 +596,7 @@ export async function getReconciliationSummary(
  *   no corresponding ledger entry — they represent the "missing" ledger side.
  *
  * UNMATCHED LEDGER FILS:
- *   Net of posted JournalLine entries against the GL account in the period that
+ *   Net of counted (posted + reversed) JournalLine entries against the GL account in the period that
  *   are NOT matched to any BankTransaction. These are ledger entries that have
  *   no bank confirmation.
  *
@@ -645,7 +649,9 @@ export async function getReconciliationDifference(
     }
 
     // ── Ledger side ──
-    // Sum all posted journal lines against the linked GL account up to periodEnd.
+    // Sum every COUNTED journal line (posted + reversed — a reversal pair only
+    // nets when both halves count, the same set the balance sheet uses; issue
+    // 2186) against the linked GL account up to periodEnd.
     // Using raw SQL for the same pattern as trialBalance (pgbouncer-safe schema prefix).
     const ledgerRows = await tx.$queryRawUnsafe<
       Array<{ debit_total: bigint; credit_total: bigint }>
@@ -657,7 +663,7 @@ export async function getReconciliationDifference(
        JOIN public.journal_entries e ON e.id = l.entry_id
        WHERE l.account_id = $1
          AND e.store_id = $2
-         AND e.status = 'posted'
+         AND ${COUNTED_STATUSES_SQL}
          AND e.posted_at <= $3::timestamp`,
       glAccountId,
       storeId,
@@ -685,8 +691,8 @@ export async function getReconciliationDifference(
        JOIN public.journal_entries e ON e.id = l.entry_id
        WHERE l.account_id = $1
          AND e.store_id = $2
-         AND e.status = 'posted'
-         ${periodStart ? 'AND e.posted_at >= $4::timestamp' : ''}
+         AND ${COUNTED_STATUSES_SQL}
+         AND ($4::timestamp IS NULL OR e.posted_at >= $4::timestamp)
          AND e.posted_at <= $3::timestamp
          AND NOT EXISTS (
            SELECT 1 FROM public.bank_transactions bt
@@ -696,7 +702,11 @@ export async function getReconciliationDifference(
       glAccountId,
       storeId,
       ledgerAsOf.toISOString(),
-      ...(periodStart ? [periodStart.toISOString()] : []),
+      // ALWAYS bound (issue 2186): the placeholder set is constant, so a
+      // statement with a null periodStart binds five values for $1..$5
+      // instead of four — the old conditional spread shifted statementId
+      // onto $4 and Postgres rejected the bind.
+      periodStart ? periodStart.toISOString() : null,
       statementId
     );
 

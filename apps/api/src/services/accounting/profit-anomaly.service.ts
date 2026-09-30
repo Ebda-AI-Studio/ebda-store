@@ -2,14 +2,17 @@
  * Profit Anomaly Scan Service — Accounting Smart Layer (Batch 3, Task 5)
  *
  * Computes four store-wide metrics comparing a 7-day current window against a
- * 28-day rolling baseline, then surfaces significant deviations as ProfitAnomaly
+ * per-week baseline over the 21 days BEFORE it (the stored column is still
+ * named baseline28d), then surfaces significant deviations as ProfitAnomaly
  * rows with Gemini-generated bilingual explanations.
  *
  * Metrics:
- *   margin_drop   — gross margin % (current 7d vs baseline 28d)
+ *   margin_drop   — gross margin % (current 7d vs the prior 21d)
  *   cost_spike    — average unit cost shift derived from recent InventoryHistory
- *   revenue_drop  — weekly revenue vs 28d/4 per-week baseline
- *   refund_spike  — weekly refund count vs 28d/4 per-week baseline
+ *   revenue_drop  — weekly revenue vs prior-21d/3 per-week baseline
+ *   refund_spike  — weekly refund count vs prior-21d/3 per-week baseline
+ *
+ * Every metric has a thin-data floor (see step 5); none alarms on noise.
  *
  * Severity thresholds (|delta| from baseline):
  *   > 40%  → p0  (wake someone, Telegram alert)
@@ -91,10 +94,15 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   const window7dStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const window28dStart = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
 
-  // ---- 1. Load PnL for current 7d and full 28d baseline ----
-  const [pnl7d, pnl28d] = await Promise.all([
+  // ---- 1. Load PnL for current 7d and the PRIOR 21d baseline ----
+  // The baseline EXCLUDES the current week (issue 2245): a 28d window that
+  // contains the 7d one compares a week against an average that already
+  // includes it, so a store whose revenue simply stopped reads the same −100%
+  // on every nightly run. 1 week vs the 3 weeks before it.
+  const priorEnd = new Date(window7dStart.getTime() - 1);
+  const [pnl7d, pnlPrior] = await Promise.all([
     profitAndLoss(storeId, window7dStart, now),
-    profitAndLoss(storeId, window28dStart, now),
+    profitAndLoss(storeId, window28dStart, priorEnd),
   ]);
 
   // ---- 2. Compute COGS from expense accounts with code starting '50' ----
@@ -105,20 +113,20 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   }
 
   const cogs7d = cogsFils(pnl7d);
-  const cogs28d = cogsFils(pnl28d);
+  const cogsPrior = cogsFils(pnlPrior);
 
   // Gross margin % = (revenue - cogs) / revenue
   const margin7d = pnl7d.totalRevenue > 0 ? (pnl7d.totalRevenue - cogs7d) / pnl7d.totalRevenue : 0;
-  // 28d margin for comparison (same formula, full period)
-  const margin28d =
-    pnl28d.totalRevenue > 0 ? (pnl28d.totalRevenue - cogs28d) / pnl28d.totalRevenue : 0;
+  // Prior-21d margin for comparison (same formula, the weeks BEFORE this one)
+  const marginPrior =
+    pnlPrior.totalRevenue > 0 ? (pnlPrior.totalRevenue - cogsPrior) / pnlPrior.totalRevenue : 0;
 
-  // Revenue: 7d vs 28d / 4 (per-week equivalent)
+  // Revenue: 7d vs prior 21d / 3 (per-week equivalent)
   const revenue7d = pnl7d.totalRevenue;
-  const revenueBaseline = pnl28d.totalRevenue / 4;
+  const revenueBaseline = pnlPrior.totalRevenue / 3;
 
   // ---- 3. Refund spike: count refunded payments in each window ----
-  const [refunds7dCount, refunds28dCount] = await Promise.all([
+  const [refunds7dCount, refundsPriorCount] = await Promise.all([
     prisma.payment.count({
       where: {
         order: { storeId },
@@ -130,11 +138,11 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
       where: {
         order: { storeId },
         status: 'refunded',
-        paidAt: { gte: window28dStart },
+        paidAt: { gte: window28dStart, lt: window7dStart },
       },
     }),
   ]);
-  const refundBaseline = refunds28dCount / 4; // per-week baseline
+  const refundBaseline = refundsPriorCount / 3; // per-week baseline, prior 3 weeks
 
   // ---- 4. Cost spike: compare average recent inventory moves ----
   // We compare the average unit cost from InventoryHistory in the 7d window
@@ -192,7 +200,18 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   // as of 2026-09-30) the "margin" is 100% by construction, and the first week
   // cost prices appear it would "drop" from that fake 100% and page. Unknown
   // margin is not a margin.
-  const includeMargin = cogs7d > 0 && cogs28d > 0;
+  const includeMargin = cogs7d > 0 && cogsPrior > 0;
+  // revenue_drop was silently dead until the 2026-09-30 P&L fix (every
+  // profitAndLoss returned 0, so 0 vs 0 never alarmed). Live, it has the
+  // same thin-data trap as its siblings (issues 2245/2268): a store doing a
+  // few orders a week reads one quiet week as −67% and pages P0. Only a
+  // meaningful absolute revenue in EITHER window makes the percentage a
+  // signal — a real drop off a real baseline still fires, including the
+  // −100% of a store whose revenue stopped.
+  //   v1 (2026-10-01): 50.000 KWD / week floor in either window.
+  const REVENUE_DROP_MIN_FILS = 50_000;
+  const includeRevenue =
+    revenue7d >= REVENUE_DROP_MIN_FILS || revenueBaseline >= REVENUE_DROP_MIN_FILS;
   const rawMetrics: Array<{
     metric: AnomalyMetric;
     current: number;
@@ -204,7 +223,7 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
           {
             metric: 'margin_drop' as AnomalyMetric,
             current: margin7d,
-            baseline: margin28d,
+            baseline: marginPrior,
             direction: 'down' as const,
           },
         ]
@@ -219,7 +238,16 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
           },
         ]
       : []),
-    { metric: 'revenue_drop', current: revenue7d, baseline: revenueBaseline, direction: 'down' },
+    ...(includeRevenue
+      ? [
+          {
+            metric: 'revenue_drop' as AnomalyMetric,
+            current: revenue7d,
+            baseline: revenueBaseline,
+            direction: 'down' as const,
+          },
+        ]
+      : []),
     ...(includeRefundSpike
       ? [
           {

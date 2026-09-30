@@ -26,6 +26,8 @@ let deadProductId: string;
 let freshProductId: string;
 let costlessProductId: string;
 let variantProductId: string;
+let newProductId: string;
+const bulkIds: string[] = [];
 
 beforeAll(async () => {
   await prisma.user.upsert({
@@ -124,6 +126,46 @@ beforeAll(async () => {
   });
   variantProductId = variantProduct.id;
 
+  // Issue 2271: a never-sold product is aged from its LISTING date. The
+  // fixtures above that must be flagged as never-sold dead stock were listed
+  // 120 days ago; the one below was listed today and must NOT be flagged.
+  const listed120dAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000);
+  await prisma.product.updateMany({
+    where: { id: { in: [deadProductId, costlessProductId, variantProductId] } },
+    data: { createdAt: listed120dAgo },
+  });
+  const brandNew = await prisma.product.create({
+    data: {
+      storeId,
+      name: 'Brand New Product',
+      slug: `brand-new-${Date.now()}`,
+      price: 4000,
+      inventory: 12,
+      trackInventory: true,
+      status: 'active',
+    },
+  });
+  newProductId = brandNew.id;
+
+  // Issue 2259: enough aged candidates to span more than one phase-3 chunk
+  // (25 per transaction), so "one OPEN flag per product" is exercised across
+  // a chunk boundary.
+  for (let i = 0; i < 30; i++) {
+    const p = await prisma.product.create({
+      data: {
+        storeId,
+        name: `Bulk Stale ${i}`,
+        slug: `bulk-stale-${i}-${Date.now()}`,
+        price: 1000,
+        inventory: 3,
+        trackInventory: true,
+        status: 'active',
+        createdAt: listed120dAgo,
+      },
+    });
+    bulkIds.push(p.id);
+  }
+
   // Seed a recent paid order for the fresh product (7 days ago — well within 90d threshold).
   const recentDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   await prisma.order.create({
@@ -197,6 +239,13 @@ describe('deadstock scan', () => {
     expect(flags[0].stockOnHand).toBe(12);
   });
 
+  it('does NOT flag a never-sold product listed less than 90 days ago (issue 2271)', async () => {
+    const flags = await prisma.deadStockFlag.findMany({
+      where: { storeId, productId: newProductId },
+    });
+    expect(flags).toHaveLength(0);
+  });
+
   it("values a variant product at each active variant's own cost", async () => {
     const flags = await prisma.deadStockFlag.findMany({
       where: { storeId, productId: variantProductId },
@@ -223,6 +272,15 @@ describe('deadstock scan', () => {
     expect(after[0].id).toBe(before[0].id);
     expect(after[0].scannedAt.getTime()).toBeGreaterThan(before[0].scannedAt.getTime());
     expect(await openFor(costlessProductId)).toHaveLength(1);
+    // Across the phase-3 chunk boundary too (issue 2259): every bulk product
+    // has exactly one open flag after three runs.
+    const bulkOpen = await prisma.deadStockFlag.groupBy({
+      by: ['productId'],
+      where: { storeId, productId: { in: bulkIds }, status: 'open' },
+      _count: { _all: true },
+    });
+    expect(bulkOpen).toHaveLength(30);
+    expect(bulkOpen.every(g => g._count._all === 1)).toBe(true);
   });
 
   it('result shape includes flagged count', async () => {

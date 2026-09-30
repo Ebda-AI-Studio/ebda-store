@@ -38,6 +38,9 @@ const {
     orderEvent: { findMany: vi.fn().mockResolvedValue([]) },
     // create() takes the order's returns lock (pg_advisory_xact_lock).
     $executeRaw: vi.fn().mockResolvedValue(1),
+    // create() takes the order's returns lock with the bounded
+    // pg_try_advisory_xact_lock poll (issues 2004 / 2030): report it granted.
+    $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
   },
   runInTenantContextMock: vi.fn(
     async (_storeId: string | undefined, fn: () => Promise<unknown>, _userId?: string) => fn()

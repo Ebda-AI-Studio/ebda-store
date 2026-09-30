@@ -28,7 +28,7 @@ export interface TrialBalanceRow {
  * defect the analytics cashflow chart had). The pair nets to zero only when
  * both halves are summed. `draft` never counts.
  */
-const COUNTED_STATUSES_SQL = `e.status IN ('posted', 'reversed')`;
+export const COUNTED_STATUSES_SQL = `e.status IN ('posted', 'reversed')`;
 
 /**
  * Per-account debit/credit totals over journal entries whose `posted_at`

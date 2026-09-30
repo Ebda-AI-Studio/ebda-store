@@ -15,7 +15,7 @@ import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
-import { sendAlert } from '../services/alerts.service';
+import { alertUnbookedRefund } from '../services/payment-providers/unbooked-refund-alert';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
@@ -1209,7 +1209,10 @@ router.post(
       // a failed order-status flip) was silent, and an admin refreshing the
       // refund status had no way to know the reversal chain never ran. Let
       // both propagate to the route's `catch (error) { next(error); }` below
-      // instead.
+      // instead. (Since Ruling AP-2 the `order/refunded` SEND itself runs after
+      // COMMIT via deferAfterTenantCommit, so an enqueue failure there is
+      // alerted, not propagated; the whole-order reversal it requested is
+      // re-sent by refund-reversal-stuck-sweep off the stamp committed here.)
       // Whole-order side effects belong to a whole-order refund. The write
       // above now distinguishes a partial out-of-band refund from a full one,
       // so gating this on the same arithmetic keeps the two coherent: without
@@ -1243,15 +1246,13 @@ router.post(
           where: { id: storeId },
           select: { name: true },
         });
-        await sendAlert({
-          level: 'p1',
-          scope: 'store',
+        await alertUnbookedRefund({
+          kind: 'partial_no_gl',
           store: { id: storeId, name: store?.name ?? storeId },
-          source: 'payment.refund.partial_no_gl',
-          title: 'Partial refund with no ledger entry',
+          orderRef: orderId,
           body: `Order ${orderId}: a partial refund (${status.refundId ?? payment.refundId}) made outside a return was recorded by a refund-status refresh. Nothing posts it to the general ledger — book it by hand.`,
           context: { paymentId: payment.id, refundId: status.refundId ?? payment.refundId },
-        }).catch(() => undefined);
+        });
       }
       const needsSideEffects =
         status.status === 'completed' &&

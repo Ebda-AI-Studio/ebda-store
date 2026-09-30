@@ -436,8 +436,19 @@ export async function handleOrderRefunded(
   // A partial return states its own refund amount — falling back to
   // `order.total` on a partial emailed the customer a full-order "Refund
   // issued" figure for a single returned item (adversarial audit P1-2).
-  const refundAmount =
-    (isPartial ? partial?.refundAmount : undefined) || latestPayment?.refundedAmount || order.total;
+  //
+  // Issue 2274: for a partial the fallback chain is CUT, not `||`-chained. A
+  // partial whose amount is 0 (lines already reversed, a fully discounted
+  // order) or absent used to fall through to the payment's cumulative refund
+  // or the ORDER TOTAL and announce that. A partial now announces only its
+  // own positive amount; otherwise nothing is announced (see partialAmountKnown).
+  const partialAmount = isPartial ? partial?.refundAmount : undefined;
+  const partialAmountKnown = typeof partialAmount === 'number' && partialAmount > 0;
+  const refundAmount = isPartial
+    ? partialAmountKnown
+      ? partialAmount
+      : 0
+    : latestPayment?.refundedAmount || order.total;
 
   // Customer contact info: prefer User row, fall back to the shipping
   // address snapshot for guest orders.
@@ -486,32 +497,39 @@ export async function handleOrderRefunded(
   // dispatch was removed and its branch now carries a comment pointing back
   // here. Any new customer refund notification belongs inside this block —
   // adding one elsewhere silently breaks the once-per-order invariant.
+  if (notify && isPartial && !partialAmountKnown) {
+    logger.warn(
+      { orderId, storeId, refundKey: partial?.refundKey },
+      'order/refunded: partial event with no positive refundAmount — no refund notification sent'
+    );
+  }
   const shouldNotify =
     notify &&
-    (isPartial ||
-      (await step.run('claim-refund-notification', () =>
-        runInTenantContext(storeId, () =>
-          withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-            await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
-            const sent = await tx.orderEvent.findFirst({
-              where: { storeId, orderId, toStatus: 'refund_notified' },
-              select: { id: true },
-            });
-            if (sent) return false;
-            await tx.orderEvent.create({
-              data: {
-                storeId,
-                orderId,
-                fromStatus: null,
-                toStatus: 'refund_notified',
-                actorId: null,
-                metadata: {},
-              },
-            });
-            return true;
-          })
-        )
-      )));
+    (isPartial
+      ? partialAmountKnown
+      : await step.run('claim-refund-notification', () =>
+          runInTenantContext(storeId, () =>
+            withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+              await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+              const sent = await tx.orderEvent.findFirst({
+                where: { storeId, orderId, toStatus: 'refund_notified' },
+                select: { id: true },
+              });
+              if (sent) return false;
+              await tx.orderEvent.create({
+                data: {
+                  storeId,
+                  orderId,
+                  fromStatus: null,
+                  toStatus: 'refund_notified',
+                  actorId: null,
+                  metadata: {},
+                },
+              });
+              return true;
+            })
+          )
+        ));
 
   // Set when the customer's "Refund issued" email step fails for good. The
   // claim above is already committed, so without a second look that customer
@@ -671,10 +689,31 @@ export async function handleOrderRefunded(
     // Stamping it here would hide a later cancel/refund of this order from
     // refund-reversal-stuck-sweep (which keys on refundReversedAt IS NULL),
     // permanently losing the remaining reversal if that fanout ever failed.
-    if (isPartial) return { skipped: true };
+    if (isPartial) {
+      // A partial never claims the ORDER; it marks its own Return applied, so
+      // refund-reversal-stuck-sweep stops re-sending it (issues 2246 / 2267).
+      // Idempotent: a re-delivery matches 0 rows and keeps the first stamp.
+      await runInTenantContext(storeId, () =>
+        prisma.return.updateMany({
+          where: { id: partial!.refundKey, storeId, reversalAppliedAt: null },
+          data: { reversalAppliedAt: new Date() },
+        })
+      );
+      return { skipped: true };
+    }
     return runInTenantContext(storeId, () =>
       prisma.order.updateMany({
-        where: { id: orderId, storeId, refundReversedAt: null },
+        where: {
+          id: orderId,
+          storeId,
+          refundReversedAt: null,
+          // A restoreInventory:false event (backorder-line cancel) is never
+          // armed, so it must never close an ARMED claim (issue 2132 / #858):
+          // if a stock-restoring event was armed and dropped, this stamp would
+          // hide it from refund-reversal-stuck-sweep forever. It may still
+          // close a legacy unarmed row.
+          ...(restoreInventory ? {} : { refundReversalRequestedAt: null }),
+        },
         data: { refundReversedAt: new Date() },
       })
     );
