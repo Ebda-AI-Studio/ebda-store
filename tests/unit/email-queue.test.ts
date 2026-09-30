@@ -569,3 +569,47 @@ describe('Email queue — terminal failure is loud (issue 2142)', () => {
     ).rejects.toThrow('resend 503');
   });
 });
+
+// Issue 2378: the live-queue processor has already rpop'ped an unreadable
+// entry, so a rejected set-aside write must never destroy it silently.
+describe('Email queue — unreadable LIVE entry survives a rejected set-aside (issue 2378)', () => {
+  let client: any;
+  const raw = '{"attempts":0}';
+  beforeEach(() => {
+    vi.clearAllMocks();
+    client = {
+      lpush: vi.fn().mockResolvedValue(1),
+      rpop: vi.fn().mockResolvedValueOnce(raw),
+      llen: vi.fn().mockResolvedValue(0),
+      lrange: vi.fn().mockResolvedValue([]),
+      ltrim: vi.fn().mockResolvedValue('OK'),
+      expire: vi.fn().mockResolvedValue(1),
+    };
+    vi.mocked(redis.isAvailable).mockReturnValue(true);
+    vi.mocked(redis.getClient).mockReturnValue(client);
+  });
+
+  it('parks it in email:failed:corrupt when Redis accepts the write', async () => {
+    await (emailQueue as any).processQueue();
+    expect(client.lpush).toHaveBeenCalledTimes(1);
+    expect(client.lpush).toHaveBeenCalledWith('email:failed:corrupt', raw);
+    expect(sendAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('a rejected set-aside puts it back on email:queue, no alert', async () => {
+    client.lpush.mockRejectedValueOnce(new Error('OOM command not allowed'));
+    await (emailQueue as any).processQueue();
+    expect(client.lpush).toHaveBeenLastCalledWith('email:queue', raw);
+    expect(sendAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('set-aside AND put-back rejected → P1 with size only, no payload', async () => {
+    client.lpush.mockRejectedValueOnce(new Error('OOM')).mockRejectedValueOnce(new Error('OOM'));
+    await (emailQueue as any).processQueue();
+    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+    const alert = sendAlertMock.mock.calls[0][0];
+    expect(alert).toMatchObject({ level: 'p1', source: 'email.queue.unreadable_lost' });
+    expect(alert.context).toEqual({ bytes: raw.length, list: 'email:queue' });
+    expect(JSON.stringify(alert)).not.toContain('attempts');
+  });
+});

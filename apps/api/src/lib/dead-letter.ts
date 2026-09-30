@@ -22,6 +22,50 @@ export async function parkCorrupt(client: ListClient, key: string, raw: string):
   await client.expire(key, CORRUPT_TTL_S);
 }
 
+export type SetAsideOutcome = 'parked' | 'requeued' | 'lost';
+
+/**
+ * Set aside an entry the LIVE queue processor has already `rpop`ped and found
+ * unreadable (issue 2378). The pop removed it, so a rejected write here must
+ * never propagate: that destroyed the entry with only a generic log line.
+ * Same shape as the replayer's guard: park it; if Redis rejects the park, put
+ * the raw entry back on the live queue (LPUSH, the far end from the consumer's
+ * RPOP, so a persistently failing park cannot wedge the head of the queue) and
+ * the next tick tries again; only if BOTH writes fail is it `lost`, which the
+ * caller alerts on. Never throws. Logs size only — the payload is a raw
+ * customer message (no PII in logs).
+ */
+export async function setAsideUnreadable(
+  client: ListClient,
+  keys: { corrupt: string; queue: string },
+  raw: string,
+  log: { error: (obj: object, msg: string) => void }
+): Promise<SetAsideOutcome> {
+  try {
+    await parkCorrupt(client, keys.corrupt, raw);
+    log.error(
+      { bytes: raw.length, list: keys.corrupt },
+      '[dead-letter] unreadable entry set aside'
+    );
+    return 'parked';
+  } catch (err) {
+    try {
+      await client.lpush(keys.queue, raw);
+      log.error(
+        { err, bytes: raw.length, list: keys.queue },
+        '[dead-letter] set-aside write failed — unreadable entry put back on the live queue'
+      );
+      return 'requeued';
+    } catch (err2) {
+      log.error(
+        { err: err2, firstErr: err, bytes: raw.length, list: keys.queue },
+        '[dead-letter] set-aside AND put-back failed — unreadable entry lost'
+      );
+      return 'lost';
+    }
+  }
+}
+
 interface ReplayClient extends ListClient {
   llen(key: string): Promise<number>;
   rpop(key: string): Promise<string | null>;

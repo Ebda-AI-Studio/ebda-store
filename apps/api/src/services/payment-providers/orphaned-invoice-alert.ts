@@ -31,6 +31,18 @@ import logger from '../../lib/logger';
  * invoice: the callers arm (2) only after `createPayment` resolves. Neither
  * touches the database (the transaction may be aborted); it logs, then pages.
  * Never throws.
+ *
+ * The page is DISPATCHED, not awaited (issue 2379). The `record` call site
+ * runs inside the request's tenant transaction, already aborted by the failed
+ * write, and `sendAlert` is a Redis lock plus a Telegram POST capped at 5s:
+ * awaiting it pinned that pooled connection for up to 5s per failed checkout,
+ * during the very DB incident that causes this failure. The error log line
+ * above is the durable record and is written synchronously before this
+ * returns; the Telegram send finishes in the background. Deliberately NOT
+ * `deferAfterTenantCommit({ runOnRollback })`: that runs the task inside a
+ * FRESH tenant transaction, so the page would wait on a pooled connection
+ * from the database that just failed. `sendAlert` touches no database, so a
+ * detached promise is safe here. Ruling PAY-ORPH-1b.
  */
 export interface OrphanedProviderInvoice {
   storeId: string;
@@ -47,6 +59,10 @@ export interface OrphanedProviderInvoice {
 export async function alertOrphanedProviderInvoice(o: OrphanedProviderInvoice): Promise<void> {
   const title = `Gateway invoice with no payment record — ${o.orderNumber}`;
   logger.error({ ...o }, `[payment] ${title}`);
+  void dispatchOrphanPage(o, title);
+}
+
+async function dispatchOrphanPage(o: OrphanedProviderInvoice, title: string): Promise<void> {
   try {
     const outcome = await sendAlert({
       level: 'p1',

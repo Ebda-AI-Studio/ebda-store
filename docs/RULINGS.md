@@ -4774,6 +4774,20 @@ theirs only after `createPayment` resolves. Still no void call (no provider adap
 Pinned by `tests/unit/payment-create-orphaned-record.test.ts` (mutation-proven). Cost if wrong: an
 operator who misses the P1 leaves an invoice payable with nothing recorded.
 
+**Ruling PAY-ORPH-1b — the orphaned-invoice page is dispatched, not awaited (issue 2379).** The
+`record` site runs inside the request's tenant transaction, already aborted by the failed write, and
+awaiting `sendAlert` (Redis lock + Telegram POST capped at 5s) pinned that pooled connection for the
+whole send, once per failed checkout, during the DB incident that produces the failure.
+`alertOrphanedProviderInvoice` now writes its error log line (the durable record) synchronously and
+dispatches the page in the background with its own catch, for all three call sites. Deliberately not
+`deferAfterTenantCommit({ runOnRollback: true })`: `runOneDeferredTask` runs each task inside a
+FRESH `runInTenantContext` transaction (maxWait 10s), so the page would wait on a pooled connection
+from the database that just failed and hold it for the POST; `sendAlert` touches no database, so a
+detached promise is safe. The per-order title stays (per-incident, like the unbooked-refund alert).
+Pinned by `tests/unit/orphaned-invoice-alert.test.ts` (mutation-proven). Cost if wrong: a process
+that exits within the ~5s send window loses that page — the error log line still names the provider
+and transaction id.
+
 **Ruling BF-2b — one shape predicate per queue, shared by reader, replayer and processor (issues
 2371, 2374).** `isQueuedEmail` / `isQueuedSms` check every field the sender and the list route
 dereference. The replayer used to accept any SMS object (`{}` was re-queued, then destroyed by a
@@ -4785,7 +4799,20 @@ by the reader (still counted in `stats.failed`, so the page says "unreadable") a
 destroyed; the SMS idempotency lookup moved inside the send `try`, so a DB blip retries and
 dead-letters rather than dropping. The list mapper also optional-chains as a second net. Cost if
 wrong: an entry the predicate wrongly rejects (a legitimate future field shape) is parked in
-`*:failed:corrupt` for 30 days instead of sent — visible on the page and alerted on replay, not lost.
+`*:failed:corrupt` for 30 days instead of sent — visible on the page and alerted on replay, not lost
+(issue 2378: only while Redis accepts the park — see Ruling BF-2c for when it does not).
+
+**Ruling BF-2c — the live-queue set-aside is guarded after the `rpop` (issue 2378).** The processor
+had already `rpop`ped an unreadable entry when it called `parkCorrupt` unguarded, so a rejected
+LPUSH/LTRIM/EXPIRE destroyed the entry with only a generic "Error processing queue" log. Both
+queues now call `setAsideUnreadable` (`lib/dead-letter.ts`), the replayer's guard shape: park it;
+on a rejected park put the raw entry back on the LIVE queue (LPUSH — the far end from the
+consumer's RPOP, so a persistently failing park cannot wedge the queue head) for the next tick;
+only if both writes fail is it lost, which raises a P1 (`email.queue.unreadable_lost` /
+`sms.queue.unreadable_lost`) with its size and list only — the payload is never logged or alerted
+(no PII). Residual: while Redis keeps rejecting the park but accepting the put-back, the same entry
+cycles once per tick with an error log each time. Cost if wrong: a Redis write failure that
+persists fills the error log with one line per tick until it clears — noise, not loss.
 
 **Ruling ADM-LOAD-1 — the three super-admin ops lists read apiGet's error channel; the rest of the
 admin is a recorded residual (issue 2375).** `apiGet` never throws — a 403, a 500 or an unreachable

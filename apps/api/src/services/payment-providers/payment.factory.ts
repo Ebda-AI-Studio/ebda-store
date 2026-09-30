@@ -743,6 +743,9 @@ export class PaymentService {
     // orphan was silent (issue 2370). Raised here, for EVERY caller; the
     // callers' own catch covers only the later COMMIT failure, and cannot
     // double-alert this case because they arm it only after we resolve.
+    // The helper logs synchronously and dispatches the Telegram page without
+    // awaiting it, so this aborted transaction's connection is not held for
+    // the POST (issue 2379).
     try {
       await PaymentService.recordCreatedPayment(p.name, request, response);
     } catch (err) {

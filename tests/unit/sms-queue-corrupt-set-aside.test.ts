@@ -158,4 +158,31 @@ describe('sms queue set-aside (issue 2353)', () => {
     expect(h.client.lpush).toHaveBeenCalledWith('sms:failed:corrupt', '{"attempts":0}');
     expect(h.notificationLog.findUnique).not.toHaveBeenCalled();
   });
+
+  // Issue 2378: the rpop already removed it, so a rejected set-aside write
+  // must put it back on the live queue, never destroy it silently.
+  it('a rejected set-aside puts the unreadable LIVE entry back on the queue', async () => {
+    h.client.rpop.mockResolvedValueOnce('{"attempts":0}');
+    h.client.lpush.mockRejectedValueOnce(new Error('OOM command not allowed'));
+    await smsQueue.processQueue();
+    expect(h.client.lpush).toHaveBeenLastCalledWith('sms:queue', '{"attempts":0}');
+    expect(h.sendAlert).not.toHaveBeenCalled();
+  });
+
+  it('set-aside AND put-back rejected → P1 with size only, no payload', async () => {
+    h.client.rpop.mockResolvedValueOnce('{"attempts":0}');
+    h.client.lpush.mockRejectedValueOnce(new Error('OOM')).mockRejectedValueOnce(new Error('OOM'));
+    await smsQueue.processQueue();
+    expect(h.sendAlert).toHaveBeenCalledTimes(1);
+    const alert = (h.sendAlert.mock.calls[0] as unknown[])[0] as {
+      level: string;
+      source: string;
+      body: string;
+      context: Record<string, unknown>;
+    };
+    expect(alert.level).toBe('p1');
+    expect(alert.source).toBe('sms.queue.unreadable_lost');
+    expect(alert.context).toEqual({ bytes: 14, list: 'sms:queue' });
+    expect(JSON.stringify(alert)).not.toContain('attempts');
+  });
 });

@@ -10,7 +10,7 @@ import { smsService, SmsConfig } from './sms.service';
 import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
-import { CORRUPT_CAP, parkCorrupt, replayDeadLetters } from '../lib/dead-letter';
+import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-letter';
 
 export interface QueuedSms {
   id: string;
@@ -146,11 +146,27 @@ class SmsQueueService {
       if (!isQueuedSms(sms)) {
         // Unreadable: sending would throw after the rpop and destroy it.
         // Set it aside with the replay's unreadable entries (issue 2371).
-        await parkCorrupt(client, FAILED_CORRUPT_KEY, smsJson);
-        logger.error(
-          { bytes: smsJson.length, list: FAILED_CORRUPT_KEY },
-          '[SMS QUEUE] Unreadable queued SMS set aside'
+        // Issue 2378: the rpop already removed it, so a rejected park must
+        // not propagate — it is put back on the live queue, and only if
+        // that write fails too is it lost (P1, size only: no payload).
+        const outcome = await setAsideUnreadable(
+          client,
+          { corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
+          smsJson,
+          logger
         );
+        if (outcome === 'lost') {
+          await sendAlert({
+            level: 'p1',
+            source: 'sms.queue.unreadable_lost',
+            title: 'Unreadable queued SMS lost',
+            body:
+              `An unreadable entry (${smsJson.length} bytes) was removed from \`${QUEUE_KEY}\` and ` +
+              'Redis rejected both the set-aside and the put-back, so it is gone. It could not be ' +
+              'parsed, so there is no id or recipient to resend from.',
+            context: { bytes: smsJson.length, list: QUEUE_KEY },
+          }).catch(() => undefined);
+        }
         return;
       }
       await this.sendSms(sms);

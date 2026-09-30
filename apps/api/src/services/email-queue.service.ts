@@ -9,7 +9,7 @@ import { EmailService, EmailOptions } from './email.service';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
-import { CORRUPT_CAP, parkCorrupt, replayDeadLetters } from '../lib/dead-letter';
+import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-letter';
 
 export interface QueuedEmail {
   id: string;
@@ -130,11 +130,27 @@ class EmailQueueService {
       if (!isQueuedEmail(email)) {
         // Unreadable: sending would throw after the rpop and destroy it.
         // Set it aside with the replay's unreadable entries (issue 2371).
-        await parkCorrupt(client, FAILED_CORRUPT_KEY, emailJson);
-        logger.error(
-          { bytes: emailJson.length, list: FAILED_CORRUPT_KEY },
-          '[EMAIL QUEUE] Unreadable queued email set aside'
+        // Issue 2378: the rpop already removed it, so a rejected park must
+        // not propagate — it is put back on the live queue, and only if
+        // that write fails too is it lost (P1, size only: no payload).
+        const outcome = await setAsideUnreadable(
+          client,
+          { corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
+          emailJson,
+          logger
         );
+        if (outcome === 'lost') {
+          await sendAlert({
+            level: 'p1',
+            source: 'email.queue.unreadable_lost',
+            title: 'Unreadable queued email lost',
+            body:
+              `An unreadable entry (${emailJson.length} bytes) was removed from \`${QUEUE_KEY}\` and ` +
+              'Redis rejected both the set-aside and the put-back, so it is gone. It could not be ' +
+              'parsed, so there is no id or recipient to resend from.',
+            context: { bytes: emailJson.length, list: QUEUE_KEY },
+          }).catch(() => undefined);
+        }
         return;
       }
       await this.sendEmail(email);
