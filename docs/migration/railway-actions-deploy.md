@@ -137,3 +137,16 @@ Re-enable "Deploy on push" in Railway and the GitHub App resumes deploying; the 
 workflow goes back to a skipped job once `RAILWAY_ACTIONS_DEPLOY` is unset or set to
 anything other than `true`. Fully reversible, and the rollback is a variable rather than a
 secret so it needs no token handling.
+
+## Concurrency: the hourly probe has its own group (2026-09-30)
+
+`cancel-in-progress: false` protects only the RUNNING run. GitHub keeps one
+PENDING run per concurrency group and cancels the older pending run when a new
+one queues. The hourly `guest-checkout-probe` cron used to share the
+`railway-deploy` group, so a push deploy queued behind a running deploy could be
+cancelled by the next cron run, which skips the deploy job — stranding that API
+change (the same class as cf-deploy's HEAD~1 bug). Scheduled runs now use
+`railway-deploy-probe`; push and dispatch runs use `railway-deploy-deploy`. Push
+runs may still replace one another while pending, which is safe: `railway up`
+ships the whole tree at HEAD, so the newer run carries the older one's changes.
+Pinned by `tests/unit/cf-deploy-detect-since-last-success.test.ts`.

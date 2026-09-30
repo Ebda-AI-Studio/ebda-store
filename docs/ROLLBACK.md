@@ -45,7 +45,7 @@ git push
 
 Effect:
 
-- `cf-deploy.yml` re-runs on the push and `wrangler deploy`s the reverted web / admin / orders Workers (~3–5 min, only the apps whose paths changed)
+- `cf-deploy.yml` re-runs on the push and `wrangler deploy`s the reverted web / admin / orders Workers (~3–5 min, only the apps whose paths changed since the last successful `cf-deploy` run)
 - Railway API auto-redeploys from `main` (~2–3 min)
 - Inngest functions auto-redeploy on next API boot
 - OneSignal apps unchanged (no rebuild)

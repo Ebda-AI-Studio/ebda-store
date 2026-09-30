@@ -58,8 +58,18 @@ on:
     - cron: '0 * * * *' # hourly — a single curl call, negligible runner cost
 
 # Never cancel a mid-flight production API deploy.
+#
+# The hourly probe runs in its OWN group. `cancel-in-progress: false` only
+# protects the RUNNING run: GitHub keeps one PENDING run per group and cancels
+# any older pending one when a new run queues. With one shared group, a push
+# deploy queued behind a running deploy was cancelled by the next hourly cron,
+# which then skips the deploy job (event_name == 'schedule') — the API change
+# never shipped, the same stranded-merge class cf-deploy.yml had. Push and
+# dispatch runs still share a group; that is safe because `railway up` ships
+# the whole tree at HEAD, so the newer pending run carries the older one's
+# changes.
 concurrency:
-  group: railway-deploy
+  group: railway-deploy-${{ github.event_name == 'schedule' && 'probe' || 'deploy' }}
   cancel-in-progress: false
 
 permissions:

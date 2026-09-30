@@ -2,9 +2,26 @@
 
 `.github/workflows/cf-deploy.yml` builds the three Next apps with OpenNext and
 deploys them to Cloudflare Workers on every push to `main`. A per-app path filter
-(`detect` job, `dorny/paths-filter`) means a change to one app only rebuilds that
+(`detect` job, native `git diff`) means a change to one app only rebuilds that
 app; a change to `packages/**` or the CF tooling rebuilds all three; a manual
 `workflow_dispatch` deploys all three.
+
+**Diff base = the last SUCCESSFUL `cf-deploy` run on `main`, not `HEAD~1`
+(2026-09-30).** The workflow's concurrency group cancels a superseded run, so two
+back-to-back merges used to strand the first merge's app changes: its run was
+cancelled and the next run diffed only its own commit (#2218's admin changes were
+lost that way). `detect` now asks `gh run list --workflow cf-deploy.yml --branch
+main --status success --limit 1` for the base, so every commit since the last
+green deploy is covered however many runs were cancelled or failed in between.
+One sha is enough: a run is `success` only if every deploy job it did not skip
+succeeded, and a job is skipped only when its app did not change — so after a
+green run every app is current as of that sha. **Fail safe = deploy:** a lookup
+error, no prior success, an unreachable sha or a non-ancestor base deploys all
+three, and so does re-running the run that is already the last success. The one
+deliberate no-op: re-running an OLDER run whose commit is already contained in the
+last success deploys nothing (it would roll production back) — to redeploy `main`
+use `workflow_dispatch`; to roll back use `wrangler rollback` or
+`scripts/rollback.sh`.
 
 | App                        | Worker serves                                                                                       |
 | -------------------------- | --------------------------------------------------------------------------------------------------- |

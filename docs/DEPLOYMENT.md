@@ -145,7 +145,7 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 > ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `force-admin-cf-preview` (`admin.force-ai.co`), `force-web-cf-preview` (`store.force-ai.co` + per-tenant custom domains), `force-orders-cf-preview` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
 
-All three apps deploy automatically via GitHub→CF Workers Builds on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is handled by the API via Cloudflare-for-SaaS (see `apps/api/src/services/cloudflare-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md`). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
+All three apps deploy automatically via GitHub→CF Workers Builds on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). The per-app filter diffs against the **last successful `cf-deploy` run on `main`**, not `HEAD~1`, so a run cancelled by a newer merge never strands its changes; if that lookup fails, all three deploy (details: `docs/migration/cloudflare-ci-deploy.md`). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is handled by the API via Cloudflare-for-SaaS (see `apps/api/src/services/cloudflare-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md`). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
 
 ---
 
@@ -260,7 +260,7 @@ git push origin main
 ### Deploy Web/Admin/Orders (Cloudflare Workers)
 
 ```bash
-# cf-deploy.yml auto-deploys each app on git push touching apps/<app>/**
+# cf-deploy.yml auto-deploys each app changed since the last successful deploy
 git push origin main
 ```
 

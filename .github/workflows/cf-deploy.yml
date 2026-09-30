@@ -3,7 +3,10 @@ name: Deploy to Cloudflare
 # Auto-deploys the three Next apps (web / admin / orders) to Cloudflare Workers
 # via OpenNext on every push to main. A per-app path filter (detect job) means a
 # change to one app only rebuilds that app; a change to packages/** or the CF
-# tooling rebuilds all three. Manual workflow_dispatch deploys all three.
+# tooling rebuilds all three. The filter diffs against the LAST SUCCESSFUL run on
+# main (not HEAD~1), so a run cancelled by the concurrency group below never
+# strands its changes; if that lookup fails it deploys all three. Manual
+# workflow_dispatch deploys all three.
 #
 # Runs on the SELF-HOSTED runner by default (vars.USE_SELF_HOSTED == 'true') so it
 # costs ZERO GitHub Actions minutes; falls back to ubuntu-latest when offline or
@@ -44,6 +47,8 @@ on:
         default: false
 
 # Cancel a superseded deploy if a newer push lands while one is mid-flight.
+# Safe ONLY because detect diffs from the last successful run, not HEAD~1: the
+# newer run picks up the cancelled run's changes.
 concurrency:
   group: cf-deploy-${{ github.ref }}
   cancel-in-progress: true
@@ -55,9 +60,36 @@ permissions:
   contents: read
 
 jobs:
-  # Decide which apps to (re)deploy. A change under packages/** or the CF tooling
-  # marks all three. On workflow_dispatch (no diff base) dorny/paths-filter reports
-  # every filter true, so a manual run deploys all three.
+  # Decide which apps to (re)deploy.
+  #
+  # DIFF BASE = the head sha of the LAST SUCCESSFUL cf-deploy run on main, NOT
+  # HEAD~1. The concurrency group below cancels a superseded run, so when two
+  # merges land back-to-back the first run is cancelled and the second used to
+  # diff only its OWN commit — the first merge's app changes were never
+  # deployed (2026-09-30: #2218's admin changes, run dc47b3c5, cancelled by
+  # #1983's run 8f7ff845, which diffed only itself). Diffing from the last
+  # success covers every commit that has not yet been deployed, however many
+  # runs were cancelled, failed or never triggered in between.
+  #
+  # Why ONE sha is enough (no per-app "last deployed" record): a run concludes
+  # `success` only if every deploy job it did not skip succeeded. A deploy job
+  # is skipped only when nothing that app builds from changed between that
+  # run's base and its head. So by induction, after a successful run at sha S
+  # EVERY app's live build equals its build at S — redeployed or not. A failed
+  # or cancelled run is not `success`, so the next run diffs from the older
+  # success and redeploys whatever that run failed to ship (over-deploy, never
+  # under-deploy).
+  #
+  # FAIL SAFE = DEPLOY. Lookup error, no prior success, an unknown / pruned sha,
+  # or a base that is not an ancestor of HEAD (history rewrite) → deploy all
+  # three. Re-running the run that is already the last success (base == HEAD)
+  # also deploys all three: a re-run is an explicit "ship this again".
+  # The one deliberate no-op: HEAD is a STRICT ancestor of the last success —
+  # e.g. someone re-runs an old, cancelled run after a newer run already
+  # shipped. Everything in HEAD is live already, and deploying it would roll
+  # production back. To redeploy main, dispatch the workflow instead.
+  #
+  # workflow_dispatch always deploys all three.
   detect:
     name: Detect changed apps
     # Self-hosted (same as the deploy jobs). GitHub HOSTED ubuntu-latest runners
@@ -67,6 +99,12 @@ jobs:
     # detect there too — no hosted-runner dependency anywhere in this workflow.
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 5
+    # actions: read — to list this workflow's previous runs (the diff base).
+    # Job-level permissions REPLACE the workflow-level block, so contents: read
+    # is restated for the checkout.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       web: ${{ steps.f.outputs.web }}
       admin: ${{ steps.f.outputs.admin }}
@@ -74,28 +112,75 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Need the parent commit to diff against. main only ever advances by ONE
-          # squash-merge commit (repo policy), so HEAD~1 is always the prior tip.
-          fetch-depth: 2
+          # Full history: the diff base is the last SUCCESSFUL deploy, which can
+          # be any number of commits behind HEAD.
+          fetch-depth: 0
       # Native git diff — no external action. (The previous dorny/paths-filter
       # step failed on push.) A change under packages/** or the CF tooling marks
-      # all three apps; workflow_dispatch (no diff base) deploys all three.
+      # all three apps.
       - id: f
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          deploy_all() {
             printf 'web=true\nadmin=true\norders=true\n' >> "$GITHUB_OUTPUT"
-            echo "workflow_dispatch → deploying all three"
+            echo "→ deploying all three: $1"
+          }
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            deploy_all "workflow_dispatch"
             exit 0
           fi
-          changed="$(git diff --name-only HEAD~1 HEAD)"
-          echo "Changed files:"; echo "$changed"
+
+          # The current run is in_progress, so it can never be its own base.
+          if ! base="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cf-deploy.yml \
+                --branch main --status success --limit 1 \
+                --json headSha --jq '.[0].headSha // empty')"; then
+            echo "::warning::could not look up the last successful cf-deploy run — deploying all three (fail safe)"
+            deploy_all "last-success lookup failed"
+            exit 0
+          fi
+          head="$(git rev-parse HEAD)"
+          if ! [[ "$base" =~ ^[0-9a-f]{40}$ ]]; then
+            deploy_all "no previous successful run on main (got '${base}')"
+            exit 0
+          fi
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "::warning::last successful deploy sha $base is not in this checkout — deploying all three (fail safe)"
+            deploy_all "base $base unreachable"
+            exit 0
+          fi
+          if [ "$base" = "$head" ]; then
+            deploy_all "re-run of the commit that last deployed successfully"
+            exit 0
+          fi
+          if git merge-base --is-ancestor "$head" "$base"; then
+            echo "::warning::$head is already contained in the last successful deploy ($base) — deploying it would roll production back. Nothing to do; dispatch the workflow to redeploy main."
+            printf 'web=false\nadmin=false\norders=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor "$base" "$head"; then
+            echo "::warning::last successful deploy $base is not an ancestor of $head (history rewritten?) — deploying all three (fail safe)"
+            deploy_all "base $base not an ancestor of HEAD"
+            exit 0
+          fi
+
+          if ! changed="$(git diff --name-only "$base" "$head")"; then
+            deploy_all "git diff $base..$head failed"
+            exit 0
+          fi
+          echo "Diff base: $base (last successful cf-deploy on main)"
+          echo "Changed files since then:"; echo "$changed"
+          # Here-strings, not `echo | grep -q`: under pipefail, grep -q exiting
+          # on the first match SIGPIPEs a large echo and the pipeline reports
+          # "no match" — a multi-commit diff would silently skip an app.
           shared=false
-          if echo "$changed" | grep -qE '^(packages/|scripts/cf-(build|setup-local)\.sh$|\.github/workflows/cf-deploy\.yml$|package\.json$|package-lock\.json$)'; then
+          if grep -qE '^(packages/|scripts/cf-(build|setup-local)\.sh$|\.github/workflows/cf-deploy\.yml$|package\.json$|package-lock\.json$)' <<<"$changed"; then
             shared=true
           fi
           for app in web admin orders; do
-            if [ "$shared" = "true" ] || echo "$changed" | grep -qE "^apps/$app/"; then
+            if [ "$shared" = "true" ] || grep -qE "^apps/$app/" <<<"$changed"; then
               echo "$app=true" >> "$GITHUB_OUTPUT"; echo "  → $app: deploy"
             else
               echo "$app=false" >> "$GITHUB_OUTPUT"; echo "  → $app: skip"
