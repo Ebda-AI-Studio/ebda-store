@@ -155,7 +155,7 @@ export default function CompareClient() {
           <button
             type="button"
             onClick={clearAll}
-            className="text-destructive hover:text-destructive/80 text-sm"
+            className="text-destructive-ink hover:text-destructive-ink/80 text-sm"
           >
             {t('Clear All', '\u0645\u0633\u062d \u0627\u0644\u0643\u0644')}
           </button>
@@ -175,7 +175,7 @@ export default function CompareClient() {
                         type="button"
                         onClick={() => removeProduct(product.id)}
                         aria-label={t('Remove from compare', 'إزالة من المقارنة')}
-                        className="absolute -top-2 -right-2 p-1 bg-destructive/20 rounded-full text-destructive hover:bg-destructive/30"
+                        className="absolute -top-2 -right-2 p-1 bg-destructive/20 rounded-full text-destructive-ink hover:bg-destructive/30"
                       >
                         <svg
                           className="w-4 h-4"

@@ -65,7 +65,7 @@ export default function ModernOrderSummary({
           </dd>
         </div>
         {discount > 0 && (
-          <div className="flex items-center justify-between text-success">
+          <div className="flex items-center justify-between text-success-ink">
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
             <dd className="font-medium tabular-nums" style={typography?.price}>
               −{fmt(discount)}
@@ -85,7 +85,7 @@ export default function ModernOrderSummary({
                 {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
-              <span className="text-success">{isRtl ? 'مجاني' : 'Free'}</span>
+              <span className="text-success-ink">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
               fmt(shipping)
             )}
@@ -123,7 +123,7 @@ export default function ModernOrderSummary({
       )}
       {children && <div className="mt-5">{children}</div>}
       {ctaDisabled && ctaBlockedMessage && (
-        <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+        <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning-ink">
           {ctaBlockedMessage}
         </p>
       )}

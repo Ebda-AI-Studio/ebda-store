@@ -33,7 +33,7 @@ export function SectionRetryNotice({
       className={`flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm ${className}`}
     >
       <svg
-        className="h-4 w-4 flex-shrink-0 text-destructive"
+        className="h-4 w-4 flex-shrink-0 text-destructive-ink"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -45,13 +45,13 @@ export function SectionRetryNotice({
           d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
         />
       </svg>
-      <span className="flex-1 text-destructive">
+      <span className="flex-1 text-destructive-ink">
         {t(message ?? "Couldn't load this section.", messageAr ?? 'تعذّر تحميل هذا القسم.')}
       </span>
       <button
         type="button"
         onClick={onRetry}
-        className="rounded bg-destructive/20 px-3 py-1 text-xs font-medium text-destructive hover:bg-destructive/30"
+        className="rounded bg-destructive/20 px-3 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/30"
       >
         {t('Retry', 'إعادة المحاولة')}
       </button>

@@ -135,13 +135,13 @@ export default function LoyaltyClient() {
   function tierColor(tier?: string) {
     switch (tier?.toLowerCase()) {
       case 'gold':
-        return 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]';
+        return 'bg-warning/20 text-warning-ink';
       case 'silver':
         return 'bg-muted text-foreground';
       case 'platinum':
-        return 'bg-info/10 text-info';
+        return 'bg-info/10 text-info-ink';
       default:
-        return 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]';
+        return 'bg-info/20 text-info-ink';
     }
   }
 
@@ -319,7 +319,7 @@ export default function LoyaltyClient() {
             <ul className="mt-6 space-y-2 text-sm text-start max-w-xs mx-auto">
               <li className="flex items-center gap-2 text-foreground">
                 <svg
-                  className="h-4 w-4 flex-shrink-0 text-[hsl(var(--success))]"
+                  className="h-4 w-4 flex-shrink-0 text-success-ink"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -338,7 +338,7 @@ export default function LoyaltyClient() {
               </li>
               <li className="flex items-center gap-2 text-foreground">
                 <svg
-                  className="h-4 w-4 flex-shrink-0 text-[hsl(var(--success))]"
+                  className="h-4 w-4 flex-shrink-0 text-success-ink"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -357,7 +357,7 @@ export default function LoyaltyClient() {
               </li>
               <li className="flex items-center gap-2 text-foreground">
                 <svg
-                  className="h-4 w-4 flex-shrink-0 text-[hsl(var(--success))]"
+                  className="h-4 w-4 flex-shrink-0 text-success-ink"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -422,7 +422,7 @@ export default function LoyaltyClient() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       ) : pointsError ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive-ink">
           {pointsError}
         </div>
       ) : loyaltyPoints ? (
@@ -485,7 +485,7 @@ export default function LoyaltyClient() {
           </div>
         ) : historyError ? (
           <div className="p-6">
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive-ink">
               {historyError}
             </div>
           </div>
@@ -546,7 +546,7 @@ export default function LoyaltyClient() {
                       <td className="px-6 py-4 text-foreground">{txn.description || '-'}</td>
                       <td
                         className={`px-6 py-4 text-right font-semibold ${
-                          isPositive ? 'text-[hsl(var(--success))]' : 'text-destructive'
+                          isPositive ? 'text-success-ink' : 'text-destructive-ink'
                         }`}
                       >
                         {isPositive ? '+' : ''}

@@ -205,7 +205,7 @@ export default function ProfileClient() {
           </h2>
 
           {passwordError && (
-            <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
               {passwordError}
             </div>
           )}

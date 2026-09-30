@@ -419,7 +419,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                       <p className="font-medium text-foreground">{getReviewerName(review)}</p>
                       {/* Verified purchase badge */}
                       {review.verifiedPurchase && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--success))]/10 px-2 py-0.5 text-xs font-medium text-[hsl(var(--success))]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success-ink">
                           <svg
                             className="h-3 w-3"
                             fill="currentColor"
@@ -443,7 +443,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                   </time>
                 </div>
                 {isPending && (
-                  <p className="mt-2 text-xs font-medium text-warning">
+                  <p className="mt-2 text-xs font-medium text-warning-ink">
                     {t(
                       'Your review · pending approval. Only you can see it for now.',
                       'مراجعتك · بانتظار الموافقة. أنت فقط من يستطيع رؤيتها الآن.'
@@ -568,8 +568,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
               <div
                 className={`mb-4 rounded-lg p-4 ${
                   submitMessage.type === 'success'
-                    ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
-                    : 'bg-destructive/10 text-destructive'
+                    ? 'bg-success/10 text-success-ink'
+                    : 'bg-destructive/10 text-destructive-ink'
                 }`}
               >
                 {submitMessage.text}
@@ -589,8 +589,8 @@ export default function ReviewSection({ storeId, productId }: Props) {
               <div
                 className={`mb-4 rounded-lg p-4 ${
                   submitMessage.type === 'success'
-                    ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
-                    : 'bg-destructive/10 text-destructive'
+                    ? 'bg-success/10 text-success-ink'
+                    : 'bg-destructive/10 text-destructive-ink'
                 }`}
               >
                 {submitMessage.text}
@@ -600,7 +600,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
             <form onSubmit={handleSubmitReview} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  {t('Your Rating', 'تقييمك')} <span className="text-destructive">*</span>
+                  {t('Your Rating', 'تقييمك')} <span className="text-destructive-ink">*</span>
                 </label>
                 <StarSelector value={rating} onChange={setRating} />
               </div>

@@ -209,21 +209,21 @@ export default function OrderDetailClient() {
   }
 
   const orderStatusColors: Record<string, string> = {
-    pending: 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]',
-    confirmed: 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]',
-    processing: 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]',
-    shipped: 'bg-info/10 text-info',
-    delivered: 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]',
-    cancelled: 'bg-destructive/20 text-destructive',
+    pending: 'bg-warning/20 text-warning-ink',
+    confirmed: 'bg-info/20 text-info-ink',
+    processing: 'bg-info/20 text-info-ink',
+    shipped: 'bg-info/10 text-info-ink',
+    delivered: 'bg-success/20 text-success-ink',
+    cancelled: 'bg-destructive/20 text-destructive-ink',
     refunded: 'bg-muted text-foreground',
   };
 
   const paymentStatusColors: Record<string, string> = {
-    unpaid: 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]',
-    paid: 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]',
+    unpaid: 'bg-warning/20 text-warning-ink',
+    paid: 'bg-success/20 text-success-ink',
     partially_paid: 'bg-orange-100 text-orange-800',
     refunded: 'bg-muted text-foreground',
-    failed: 'bg-destructive/20 text-destructive',
+    failed: 'bg-destructive/20 text-destructive-ink',
   };
 
   function formatLabel(value: string) {
@@ -298,7 +298,7 @@ export default function OrderDetailClient() {
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
           <div className="flex items-center gap-3">
             <svg
-              className="h-5 w-5 text-destructive flex-shrink-0"
+              className="h-5 w-5 text-destructive-ink flex-shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -310,10 +310,10 @@ export default function OrderDetailClient() {
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
               />
             </svg>
-            <p className="text-destructive flex-1">{error}</p>
+            <p className="text-destructive-ink flex-1">{error}</p>
             <button
               onClick={() => fetchOrder()}
-              className="px-3 py-1 text-sm bg-destructive/20 text-destructive rounded hover:bg-destructive/30 transition-colors"
+              className="px-3 py-1 text-sm bg-destructive/20 text-destructive-ink rounded hover:bg-destructive/30 transition-colors"
             >
               {t(
                 'Retry',
@@ -638,9 +638,7 @@ export default function OrderDetailClient() {
                         {t('Coupon', '\u0643\u0648\u0628\u0648\u0646')}
                         {order.couponCode ? ` (${order.couponCode})` : ''}
                       </span>
-                      <span className="text-[hsl(var(--success))]">
-                        -{formatPrice(couponPortion)}
-                      </span>
+                      <span className="text-success-ink">-{formatPrice(couponPortion)}</span>
                     </div>
                   )}
                   {promotionPortion > 0 && (
@@ -649,9 +647,7 @@ export default function OrderDetailClient() {
                         {t('Promotion', '\u0639\u0631\u0636 \u062a\u0631\u0648\u064a\u062c\u064a')}
                         {promotionName ? ` (${promotionName})` : ''}
                       </span>
-                      <span className="text-[hsl(var(--success))]">
-                        -{formatPrice(promotionPortion)}
-                      </span>
+                      <span className="text-success-ink">-{formatPrice(promotionPortion)}</span>
                     </div>
                   )}
                   {loyaltyPortion > 0 && (
@@ -665,9 +661,7 @@ export default function OrderDetailClient() {
                           ? ` (${order.loyaltyPointsRedeemed.toLocaleString(language === 'ar' ? 'ar' : 'en')})`
                           : ''}
                       </span>
-                      <span className="text-[hsl(var(--success))]">
-                        -{formatPrice(loyaltyPortion)}
-                      </span>
+                      <span className="text-success-ink">-{formatPrice(loyaltyPortion)}</span>
                     </div>
                   )}
                   {otherDiscount > 0 && (
@@ -675,9 +669,7 @@ export default function OrderDetailClient() {
                       <span className="text-muted-foreground">
                         {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
                       </span>
-                      <span className="text-[hsl(var(--success))]">
-                        -{formatPrice(otherDiscount)}
-                      </span>
+                      <span className="text-success-ink">-{formatPrice(otherDiscount)}</span>
                     </div>
                   )}
                 </>
@@ -703,9 +695,7 @@ export default function OrderDetailClient() {
                   <span className="text-muted-foreground">
                     {t('Paid from wallet', 'مدفوع من المحفظة')}
                   </span>
-                  <span className="text-[hsl(var(--success))]">
-                    -{formatPrice(order.walletAmount ?? 0)}
-                  </span>
+                  <span className="text-success-ink">-{formatPrice(order.walletAmount ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-foreground">{t('Amount due', 'المبلغ المستحق')}</span>
@@ -785,10 +775,10 @@ export default function OrderDetailClient() {
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                           payment.status === 'completed' || payment.status === 'paid'
-                            ? 'bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]'
+                            ? 'bg-success/20 text-success-ink'
                             : payment.status === 'pending'
-                              ? 'bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]'
-                              : 'bg-destructive/20 text-destructive'
+                              ? 'bg-warning/20 text-warning-ink'
+                              : 'bg-destructive/20 text-destructive-ink'
                         }`}
                       >
                         {formatLabel(payment.status)}
@@ -899,7 +889,7 @@ export default function OrderDetailClient() {
                 }
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   canTrack
-                    ? 'bg-[hsl(var(--info))] text-white hover:bg-[hsl(var(--info))]/90 cursor-pointer'
+                    ? 'bg-info text-white hover:bg-info/90 cursor-pointer'
                     : 'bg-muted text-muted-foreground/70 cursor-not-allowed'
                 }`}
               >

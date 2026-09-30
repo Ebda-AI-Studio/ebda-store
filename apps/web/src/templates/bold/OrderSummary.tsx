@@ -65,7 +65,7 @@ export default function BoldOrderSummary({
           </dd>
         </div>
         {discount > 0 && (
-          <div className="flex items-center justify-between text-success">
+          <div className="flex items-center justify-between text-success-ink">
             <dt className="font-bold uppercase tracking-wider" style={typography?.label}>
               {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
             </dt>
@@ -87,7 +87,7 @@ export default function BoldOrderSummary({
                 {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
-              <span className="text-success">{isRtl ? 'مجاني' : 'FREE'}</span>
+              <span className="text-success-ink">{isRtl ? 'مجاني' : 'FREE'}</span>
             ) : (
               fmt(shipping)
             )}
@@ -128,7 +128,7 @@ export default function BoldOrderSummary({
       )}
       {children && <div className="border-t-2 border-foreground p-5">{children}</div>}
       {ctaDisabled && ctaBlockedMessage && (
-        <p className="border-t-2 border-warning bg-warning/10 px-5 py-3 text-xs font-bold uppercase tracking-wide text-warning">
+        <p className="border-t-2 border-warning bg-warning/10 px-5 py-3 text-xs font-bold uppercase tracking-wide text-warning-ink">
           {ctaBlockedMessage}
         </p>
       )}

@@ -98,7 +98,7 @@ export function DeliverySection({
           )}
 
           {error && (
-            <p role="alert" className="mt-2 text-sm text-destructive">
+            <p role="alert" className="mt-2 text-sm text-destructive-ink">
               {error}
             </p>
           )}

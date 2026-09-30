@@ -36,6 +36,17 @@ export type {
 } from './color';
 // Brand engine — palette → contrast-safe storefront CSS vars
 export { deriveBrandRoles } from './brand-roles';
+// Storefront status-message ink (issue 2349) — readable per store, legacy pass-through
+export {
+  STATUS_INK_ROLES,
+  STATUS_INK_TINTS,
+  STATUS_INK_MIN_CONTRAST,
+  STATUS_ROLE_DEFAULTS,
+  LEGACY_STATUS_INK_VALUE,
+  deriveStatusInk,
+  statusInkVars,
+} from './status-ink';
+export type { StatusInkRole } from './status-ink';
 // URL-scheme safety (XSS guard for merchant-supplied link fields)
 export { isSafeUrl, sanitizeUrl, safeInternalPath } from './safe-url';
 

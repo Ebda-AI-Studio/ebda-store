@@ -1,4 +1,4 @@
-import { themeToCssVars, type StoreTheme } from '@force/shared';
+import { LEGACY_STATUS_INK_VALUE, themeToCssVars, type StoreTheme } from '@force/shared';
 
 /**
  * Theme color/CSS-variable sanitizers + the `:root { ... }` style-tag
@@ -83,7 +83,13 @@ export function buildThemeStyleTag(
   if (!themeCssVars) return '';
   return `:root { ${Object.entries(themeCssVars)
     .map(([k, v]) => {
-      const sanitized = NON_COLOR_VARS.has(k) ? sanitizeCssValue(v) : sanitizeThemeColor(v);
+      // Issue 2349: a legacy store's ink is exactly `var(--<role>)` — the one
+      // non-colour value an `-ink` var may carry (anchored allow-list).
+      const sanitized = NON_COLOR_VARS.has(k)
+        ? sanitizeCssValue(v)
+        : k.endsWith('-ink') && LEGACY_STATUS_INK_VALUE.test(v)
+          ? v
+          : sanitizeThemeColor(v);
       return `${k}: ${sanitized}`;
     })
     .join('; ')} }`;

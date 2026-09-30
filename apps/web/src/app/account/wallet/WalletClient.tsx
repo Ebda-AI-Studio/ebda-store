@@ -166,7 +166,7 @@ export default function WalletClient() {
             <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         ) : historyError ? (
-          <p className="px-5 py-6 text-sm text-destructive">
+          <p className="px-5 py-6 text-sm text-destructive-ink">
             {t(
               'Could not load your wallet history. Please try again.',
               'تعذّر تحميل سجل المحفظة. يرجى المحاولة مرة أخرى.'
@@ -201,7 +201,7 @@ export default function WalletClient() {
                 <div className="shrink-0 text-end">
                   <p
                     className={`text-sm font-semibold ${
-                      entry.amount > 0 ? 'text-[hsl(var(--success))]' : 'text-foreground'
+                      entry.amount > 0 ? 'text-success-ink' : 'text-foreground'
                     }`}
                   >
                     <span dir="ltr">

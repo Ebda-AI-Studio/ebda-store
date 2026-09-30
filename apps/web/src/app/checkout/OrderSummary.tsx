@@ -210,13 +210,11 @@ export function OrderSummary({
             // data-zone="cta" wires this block into the per-store typography CSS emitter
             <div
               data-zone="cta"
-              className="flex items-center justify-between bg-[hsl(var(--success))]/10 p-3 sm:p-4 rounded-lg"
+              className="flex items-center justify-between bg-success/10 p-3 sm:p-4 rounded-lg"
             >
               <div>
-                <span className="text-sm font-medium text-[hsl(var(--success))]">
-                  {appliedCoupon.code}
-                </span>
-                <span className="text-sm text-[hsl(var(--success))] ml-2">
+                <span className="text-sm font-medium text-success-ink">{appliedCoupon.code}</span>
+                <span className="text-sm text-success-ink ml-2">
                   {appliedCoupon.type === 'percentage'
                     ? `${localize(appliedCoupon.value)}% ${t('off', '\u062e\u0635\u0645')}`
                     : appliedCoupon.type === 'free_shipping'
@@ -226,7 +224,7 @@ export function OrderSummary({
               </div>
               <button
                 onClick={onRemoveCoupon}
-                className="text-[hsl(var(--success))] hover:text-[hsl(var(--success))]/80"
+                className="text-success-ink hover:text-success-ink/80"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -251,7 +249,7 @@ export function OrderSummary({
               </Button>
             </div>
           )}
-          {couponError && <p className="mt-2 text-sm text-destructive">{couponError}</p>}
+          {couponError && <p className="mt-2 text-sm text-destructive-ink">{couponError}</p>}
           {/* A coupon never discounts a bundle (the box price already is the
               discount), and the quote is computed against the loose items
               only — say so, or the customer reads a 10% coupon returning
@@ -328,7 +326,7 @@ export function OrderSummary({
                   </Button>
                 </div>
                 {loyalty.pointsToRedeem > 0 && loyalty.pointsToRedeem < loyalty.minRedeemPoints && (
-                  <p className="mt-2 text-sm text-destructive">
+                  <p className="mt-2 text-sm text-destructive-ink">
                     {t('Minimum', 'الحد الأدنى')}{' '}
                     {localize(loyalty.minRedeemPoints.toLocaleString())}{' '}
                     {t('points to redeem', 'نقطة للاستخدام')}
@@ -389,11 +387,11 @@ export function OrderSummary({
               <>
                 {couponPortion > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                    <span className="text-success-ink" style={typography?.label}>
                       {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
                     </span>
                     <span
-                      className="font-medium text-[hsl(var(--success))] tabular-nums"
+                      className="font-medium text-success-ink tabular-nums"
                       style={typography?.price}
                     >
                       -{formatPrice(couponPortion)}
@@ -402,11 +400,11 @@ export function OrderSummary({
                 )}
                 {promotionDiscount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                    <span className="text-success-ink" style={typography?.label}>
                       {t('Promotion', translations['Promotion'])}
                     </span>
                     <span
-                      className="font-medium text-[hsl(var(--success))] tabular-nums"
+                      className="font-medium text-success-ink tabular-nums"
                       style={typography?.price}
                     >
                       -{formatPrice(promotionDiscount)}
@@ -415,14 +413,14 @@ export function OrderSummary({
                 )}
                 {loyaltyDiscount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                    <span className="text-success-ink" style={typography?.label}>
                       {t(
                         'Loyalty points',
                         '\u0646\u0642\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621'
                       )}
                     </span>
                     <span
-                      className="font-medium text-[hsl(var(--success))] tabular-nums"
+                      className="font-medium text-success-ink tabular-nums"
                       style={typography?.price}
                     >
                       -{formatPrice(loyaltyDiscount)}
@@ -440,7 +438,7 @@ export function OrderSummary({
               {t('Shipping', translations['Shipping'])}
             </span>
             <span
-              className={`font-medium tabular-nums ${freeShipping ? 'text-[hsl(var(--success))]' : ''}`}
+              className={`font-medium tabular-nums ${freeShipping ? 'text-success-ink' : ''}`}
               style={typography?.price}
             >
               {freeShipping
@@ -492,11 +490,11 @@ export function OrderSummary({
           {wallet && wallet.enabled && wallet.applied > 0 && (
             <>
               <div className="flex justify-between text-sm">
-                <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                <span className="text-success-ink" style={typography?.label}>
                   {t('Paid from wallet', 'مدفوع من المحفظة')}
                 </span>
                 <span
-                  className="font-medium text-[hsl(var(--success))] tabular-nums"
+                  className="font-medium text-success-ink tabular-nums"
                   style={typography?.price}
                 >
                   -{formatPrice(wallet.applied)}

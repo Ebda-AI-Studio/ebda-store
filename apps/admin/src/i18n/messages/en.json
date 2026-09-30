@@ -1584,7 +1584,9 @@
         "totalColorLabel": "Total color",
         "totalColorHint": "Color of the Total label and amount. Default: theme foreground.",
         "boldSummaryLabels": "Bold summary labels",
-        "boldSummaryLabelsHint": "Makes Subtotal / Shipping / Total labels bold. On by default."
+        "boldSummaryLabelsHint": "Makes Subtotal / Shipping / Total labels bold. On by default.",
+        "legacyBannerContrastTitle": "Keep the original message colours",
+        "legacyBannerContrastHint": "Off (recommended): warning, error, success and info messages on the cart, checkout, sign-in and account pages use a darker shade of their colour so they are easy to read. On: they keep the original lighter colour."
       },
       "header": {
         "topUtilityBarTitle": "Top utility bar",

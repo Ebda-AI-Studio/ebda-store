@@ -69,7 +69,7 @@ export default function UnsubscribeClient({ token, info, error }: Props) {
               {tr('Order and account emails are not affected.')}
             </p>
             {phase === 'failed' && (
-              <p className="mt-4 text-sm text-destructive" role="alert">
+              <p className="mt-4 text-sm text-destructive-ink" role="alert">
                 {tr('Something went wrong. Please try again later.')}
               </p>
             )}

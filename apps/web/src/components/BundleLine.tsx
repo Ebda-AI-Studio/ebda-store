@@ -145,7 +145,7 @@ export function BundleLine({
   );
 
   const outOfStockNote = stockNote ? (
-    <p data-bundle-stock-note="" className="mt-1 text-xs font-semibold text-destructive">
+    <p data-bundle-stock-note="" className="mt-1 text-xs font-semibold text-destructive-ink">
       {stockNote}
     </p>
   ) : null;
@@ -184,7 +184,7 @@ export function BundleLine({
                 type="button"
                 onClick={onRemove}
                 aria-label={t('Remove bundle', 'إزالة الباقة')}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink"
               >
                 <TrashIcon />
               </button>
@@ -196,7 +196,7 @@ export function BundleLine({
             </span>
             <div className="text-right">
               {savings > 0 && (
-                <p className="text-xs font-medium text-[hsl(var(--success))]">
+                <p className="text-xs font-medium text-success-ink">
                   {t('Save', 'وفّر')} {formatPrice(savings)}
                 </p>
               )}
@@ -234,7 +234,7 @@ export function BundleLine({
         <h3 className="mt-0.5 text-base font-semibold text-foreground">{displayName}</h3>
         {outOfStockNote}
         {savings > 0 && (
-          <p className="text-xs font-medium text-[hsl(var(--success))]">
+          <p className="text-xs font-medium text-success-ink">
             {t('Save', 'وفّر')} {formatPrice(savings)}
           </p>
         )}
@@ -245,7 +245,7 @@ export function BundleLine({
           type="button"
           onClick={onRemove}
           aria-label={t('Remove bundle', 'إزالة الباقة')}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center self-start rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center self-start rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink"
         >
           <TrashIcon />
         </button>

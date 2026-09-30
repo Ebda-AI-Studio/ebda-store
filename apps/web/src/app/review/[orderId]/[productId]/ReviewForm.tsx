@@ -232,7 +232,9 @@ export function ReviewForm({ orderId, productId, token, product, store }: Props)
         </div>
 
         {error && (
-          <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>
+          <p className="text-sm text-destructive-ink bg-destructive/10 rounded-lg px-3 py-2">
+            {error}
+          </p>
         )}
 
         <button

@@ -141,7 +141,7 @@ export default function ModernCartTable({
                   <button
                     type="button"
                     onClick={() => onRemove?.(item.id)}
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
                     aria-label={isRtl ? 'إزالة' : 'Remove'}
                     style={typography?.cta}
                   >

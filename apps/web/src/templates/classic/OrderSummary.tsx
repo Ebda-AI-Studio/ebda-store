@@ -65,7 +65,7 @@ export default function ClassicOrderSummary({
           </dd>
         </div>
         {discount > 0 && (
-          <div className="flex items-center justify-between text-success">
+          <div className="flex items-center justify-between text-success-ink">
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
             <dd className="tabular-nums" style={typography?.price}>
               −{fmt(discount)}
@@ -85,7 +85,7 @@ export default function ClassicOrderSummary({
                 {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
-              <span className="text-success uppercase text-xs">{isRtl ? 'مجاني' : 'Free'}</span>
+              <span className="text-success-ink uppercase text-xs">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
               fmt(shipping)
             )}
@@ -123,7 +123,7 @@ export default function ClassicOrderSummary({
       )}
       {children && <div className="mt-6">{children}</div>}
       {ctaDisabled && ctaBlockedMessage && (
-        <p className="mt-4 border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+        <p className="mt-4 border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-ink">
           {ctaBlockedMessage}
         </p>
       )}

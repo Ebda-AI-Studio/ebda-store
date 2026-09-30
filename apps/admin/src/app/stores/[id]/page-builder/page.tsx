@@ -1715,6 +1715,33 @@ export default function StoreLayoutPage() {
                       className="h-5 w-5 cursor-pointer accent-primary"
                     />
                   </label>
+                  {/* #2349 — per-store StoreTheme flag (shallow-merge theme PATCH on
+                      Save, via pendingThemeUpdates). Off = readable -ink message
+                      colours; on = the legacy bare role colours. */}
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
+                        {t('pageCards.legacyBannerContrastTitle')}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {t('pageCards.legacyBannerContrastHint')}
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.legacyBannerContrast ??
+                        storeInfo?.theme?.legacyBannerContrast === true
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          legacyBannerContrast: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
                 </div>
               </SectionCard>
 

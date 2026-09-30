@@ -106,9 +106,9 @@ function ResetPasswordForm() {
           <div className="rounded-xl border bg-card p-8 shadow-sm">
             {success ? (
               <div className="space-y-4 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/20">
                   <svg
-                    className="h-8 w-8 text-[hsl(var(--success))]"
+                    className="h-8 w-8 text-success-ink"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -146,13 +146,13 @@ function ResetPasswordForm() {
             ) : (
               <>
                 {error && (
-                  <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                  <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
                     {error}
                   </div>
                 )}
 
                 {!token && (
-                  <div className="mb-4 rounded-lg bg-[hsl(var(--warning))]/10 p-3 text-sm text-[hsl(var(--warning))]">
+                  <div className="mb-4 rounded-lg bg-warning/10 p-3 text-sm text-warning-ink">
                     {t(
                       'No reset token found. Please use the link from your password reset email.',
                       '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0631\u0645\u0632 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u062a\u0639\u064a\u064a\u0646. \u064a\u0631\u062c\u0649 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0631\u0627\u0628\u0637 \u0645\u0646 \u0628\u0631\u064a\u062f \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631.'

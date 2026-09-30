@@ -24,14 +24,19 @@
  *      2.66:1 (issue 2381). Raw text on a raw LIGHT tint (`bg-green-100
  *      text-green-700`) is theme-blind but readable, so it is not flagged here.
  *
- * Scope (issues 2341, 2342, 2349, 2380): admin and orders get all five; the
- * storefront (apps/web) and packages/ui get (3) only — a class that emits no
- * CSS is a bug on any surface, but re-colouring storefront text is a visible
- * change the owner has not approved (pecannbee must not change; Ruling YWA-TXT-1).
- * EXCEPT: a packages/ui component that admin or orders imports renders on that
- * app's surface, so it gets all five, measured with that app's tokens (issue
- * 2380 — the source-directory scope reported green on `<Label>`'s text-gray-700
- * while it rendered in the admin dark theme at ~1.8:1).
+ * Scope (issues 2341, 2342, 2349, 2380): admin and orders get all five;
+ * packages/ui gets (3) only. EXCEPT: a packages/ui component that admin or
+ * orders imports renders on that app's surface, so it gets all five, measured
+ * with that app's tokens (issue 2380 — the source-directory scope reported
+ * green on `<Label>`'s text-gray-700 while it rendered in the admin dark theme
+ * at ~1.8:1).
+ * The storefront (apps/web, issue 2349 storefront half, owner option A
+ * 2026-09-30) gets (1)-(3) for the four STATUS roles — `primary` is the
+ * merchant's brand colour (Ruling YWA-TXT-1) — measured from the no-theme
+ * fallback in its globals.css; a store's own inks are derived from its palette
+ * and gated in tests/unit/storefront-status-ink.test.ts, and pecannbee keeps
+ * the old colours through `theme.legacyBannerContrast` (data, Ruling BC-1).
+ * (4) and (5) are not applied to the storefront (Ruling BC-1).
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
@@ -50,12 +55,52 @@ interface AppSpec {
   name: string;
   root: string;
   css?: string; // relative to root; present = contrast gates apply
+  /** Roles the contrast gates measure (default: all five). */
+  roles?: readonly Role[];
+  /** false = skip gates (4) and (5), the raw-palette bans (default true). */
+  paletteBans?: boolean;
+  /** Class strings that are graphics, not message text, each with its reason. */
+  exempt?: ReadonlyArray<{ file: string; cls: string; why: string }>;
 }
 const REPO = resolve(__dirname, '../..');
 const APPS: AppSpec[] = [
   { name: 'admin', root: join(REPO, 'apps/admin'), css: 'src/styles/globals.css' },
   { name: 'orders', root: join(REPO, 'apps/orders'), css: 'src/app/globals.css' },
-  { name: 'web', root: join(REPO, 'apps/web') },
+  {
+    name: 'web',
+    root: join(REPO, 'apps/web'),
+    css: 'src/styles/globals.css',
+    roles: SURFACE_ROLES,
+    paletteBans: false,
+    // Ruling BC-1: rating stars and the wishlist heart are graphics in the
+    // role colour, not message text; the footers' newsletter error sits on a
+    // merchant-coloured footer the root ink is not measured against.
+    exempt: [
+      ...['src/components/ReviewSection.tsx'].flatMap(file => [
+        { file, cls: 'text-[hsl(var(--warning))]', why: 'rating star glyph' },
+      ]),
+      {
+        file: 'src/templates/shared/TestimonialRow.tsx',
+        cls: 'text-warning',
+        why: 'rating star glyph',
+      },
+      {
+        file: 'src/templates/shared/PecannbeeProductCard.tsx',
+        cls: 'text-destructive',
+        why: 'filled wishlist heart',
+      },
+      {
+        file: 'src/templates/modern/Footer.tsx',
+        cls: 'text-xs text-destructive',
+        why: 'merchant-coloured footer surface',
+      },
+      {
+        file: 'src/templates/elegant/Footer.tsx',
+        cls: 'mt-3 text-[10px] tracking-wide text-destructive',
+        why: 'merchant-coloured footer surface',
+      },
+    ],
+  },
   { name: 'ui', root: join(REPO, 'packages/ui') },
 ];
 
@@ -128,14 +173,17 @@ const RAW_CHROMATIC_TEXT =
   /(?<![\w-])((?:[\w-]+:)*text-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d+(?:\/\d+)?)(?![\w/-])/g;
 const THEMED_SURFACE = /(?<![\w:-])bg-(?:card|background|popover)(?![\w/-])/;
 
-function bannedForms(cls: string): string[] {
+/** `paletteBans` = gates (4) and (5); the storefront opts out (Ruling BC-1). */
+function bannedForms(cls: string, roles: readonly Role[] = ROLES, paletteBans = true): string[] {
   const out = droppedForms(cls);
-  for (const m of cls.matchAll(RAW_NEUTRAL))
-    out.push(`raw neutral palette utility (use a semantic token): ${m[1]}`);
-  if (THEMED_SURFACE.test(cls))
-    for (const m of cls.matchAll(RAW_CHROMATIC_TEXT))
-      out.push(`raw palette text on a themed surface (use a role -ink): ${m[1]}`);
-  const arb = new RegExp(`\\S*\\[hsl\\(var\\(--(${ROLES.join('|')})\\)\\)\\]\\S*`, 'g');
+  if (paletteBans) {
+    for (const m of cls.matchAll(RAW_NEUTRAL))
+      out.push(`raw neutral palette utility (use a semantic token): ${m[1]}`);
+    if (THEMED_SURFACE.test(cls))
+      for (const m of cls.matchAll(RAW_CHROMATIC_TEXT))
+        out.push(`raw palette text on a themed surface (use a role -ink): ${m[1]}`);
+  }
+  const arb = new RegExp(`\\S*\\[hsl\\(var\\(--(${roles.join('|')})\\)\\)\\]\\S*`, 'g');
   for (const m of cls.matchAll(arb)) out.push(`arbitrary-value role colour: ${m[0]}`);
   return out;
 }
@@ -146,7 +194,11 @@ function bannedForms(cls: string): string[] {
  * that applies is resolved the way Tailwind resolves it (`dark:hover:` →
  * `dark:` → `hover:` → base), and measured against THIS app's tokens.
  */
-function contrastProblems(cls: string, token: (n: string, t: Theme) => HSL): string[] {
+function contrastProblems(
+  cls: string,
+  token: (n: string, t: Theme) => HSL,
+  roles: readonly Role[] = ROLES
+): string[] {
   const out: string[] = [];
   const tokens = cls.split(/\s+/);
   // A fixed square box is an icon: non-text contrast (3:1) applies.
@@ -177,7 +229,7 @@ function contrastProblems(cls: string, token: (n: string, t: Theme) => HSL): str
         : rgb(token(r, theme)).map((v, i) => (v * a) / 100 + card[i] * (1 - a / 100));
     return ratio(rgb(token(t === 'ink' ? `${r}-ink` : r, theme)), bg);
   };
-  for (const r of ROLES) {
+  for (const r of roles) {
     const states: Array<[Theme, string, 'bare' | 'ink' | undefined, number | undefined]> = [
       ['light', 'rest', text('', r), alpha('', r)],
       ['dark', 'rest', text('dark:', r) ?? text('', r), alpha('dark:', r) ?? alpha('', r)],
@@ -237,11 +289,14 @@ for (const app of APPS.filter(a => a.css)) {
   const token = tokensFrom(join(app.root, app.css!));
   describe(`${app.name}: tinted-pill ink contrast (issues 2233, 2341)`, () => {
     for (const theme of ['light', 'dark'] as const) {
-      it.each(ROLES)(
-        `${theme}: %s-ink on its 5/10/15/20%% tints and the card is >= 4.5:1`,
+      it.each(app.roles ?? ROLES)(
+        `${theme}: %s-ink on its tints and the card is >= 4.5:1`,
         role => {
           const card = rgb(token('card', theme));
-          for (const a of [0, 0.05, 0.1, 0.15, 0.2]) {
+          // The storefront's inks are derived for tints up to 30% (statusInkVars).
+          const alphas =
+            app.name === 'web' ? [0, 0.05, 0.1, 0.15, 0.2, 0.3] : [0, 0.05, 0.1, 0.15, 0.2];
+          for (const a of alphas) {
             const tint = rgb(token(role, theme)).map((v, i) => v * a + card[i] * (1 - a));
             expect(ratio(rgb(token(`${role}-ink`, theme)), tint), `${a}`).toBeGreaterThanOrEqual(
               4.5
@@ -349,18 +404,31 @@ for (const app of APPS) {
         ? 'every role colour resolves to a readable pair, at rest and on hover, in both themes'
         : 'no double or off-scale opacity modifier',
       () => {
-        const offenders = files.flatMap(f =>
-          classStrings(readFileSync(f, 'utf8')).flatMap(cls =>
-            [
-              ...(token
-                ? [...contrastProblems(cls, token), ...bannedForms(cls)]
-                : droppedForms(cls)),
-            ].map(p => `${f.slice(app.root.length + 1)} — ${p} — ${cls}`)
-          )
-        );
+        const offenders = files.flatMap(f => {
+          const rel = f.slice(app.root.length + 1);
+          return classStrings(readFileSync(f, 'utf8'))
+            .filter(cls => !app.exempt?.some(e => e.file === rel && e.cls === cls))
+            .flatMap(cls =>
+              [
+                ...(token
+                  ? [
+                      ...contrastProblems(cls, token, app.roles),
+                      ...bannedForms(cls, app.roles, app.paletteBans ?? true),
+                    ]
+                  : droppedForms(cls)),
+              ].map(p => `${rel} — ${p} — ${cls}`)
+            );
+        });
         expect(offenders).toEqual([]);
       }
     );
+
+    it('every exemption still matches a class string (no stale allow-list)', () => {
+      for (const e of app.exempt ?? []) {
+        const src = readFileSync(join(app.root, e.file), 'utf8');
+        expect(classStrings(src), `${e.file}: ${e.why}`).toContain(e.cls);
+      }
+    });
   });
 }
 
@@ -427,9 +495,10 @@ for (const app of APPS.filter(a => a.css)) {
     it("every imported ui component passes this app's full gate", () => {
       const offenders = rendered.flatMap(f =>
         classStrings(readFileSync(f, 'utf8')).flatMap(cls =>
-          [...contrastProblems(cls, token), ...bannedForms(cls)].map(
-            p => `${f.slice(UI.root.length + 1)} — ${p} — ${cls}`
-          )
+          [
+            ...contrastProblems(cls, token, app.roles),
+            ...bannedForms(cls, app.roles, app.paletteBans ?? true),
+          ].map(p => `${f.slice(UI.root.length + 1)} — ${p} — ${cls}`)
         )
       );
       expect(offenders).toEqual([]);

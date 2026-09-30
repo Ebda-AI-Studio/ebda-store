@@ -198,10 +198,10 @@ function AffiliatePageContent() {
 
           {/* Success State */}
           {success ? (
-            <div className="bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/30 rounded-xl p-8 text-center">
-              <div className="w-12 h-12 bg-[hsl(var(--success))]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="bg-success/10 border border-success/30 rounded-xl p-8 text-center">
+              <div className="w-12 h-12 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg
-                  className="w-6 h-6 text-[hsl(var(--success))]"
+                  className="w-6 h-6 text-success-ink"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -214,10 +214,10 @@ function AffiliatePageContent() {
                   />
                 </svg>
               </div>
-              <h2 className="text-lg font-semibold text-[hsl(var(--success))] mb-2">
+              <h2 className="text-lg font-semibold text-success-ink mb-2">
                 {t('Application Submitted!', 'تم إرسال الطلب!')}
               </h2>
-              <p className="text-[hsl(var(--success))]">
+              <p className="text-success-ink">
                 {t(
                   "We'll review it shortly and get back to you via email.",
                   'سنقوم بمراجعته قريباً والرد عليك عبر البريد الإلكتروني.'
@@ -228,7 +228,7 @@ function AffiliatePageContent() {
             /* Signup Form */
             <div className="bg-card rounded-xl border border-border shadow-sm p-8">
               {error && (
-                <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
+                <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive-ink">
                   {error}
                 </div>
               )}
@@ -236,7 +236,7 @@ function AffiliatePageContent() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
-                    {t('Full Name', 'الاسم الكامل')} <span className="text-destructive">*</span>
+                    {t('Full Name', 'الاسم الكامل')} <span className="text-destructive-ink">*</span>
                   </label>
                   <input
                     id="name"
@@ -253,7 +253,7 @@ function AffiliatePageContent() {
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
                     {t('Email Address', 'البريد الإلكتروني')}{' '}
-                    <span className="text-destructive">*</span>
+                    <span className="text-destructive-ink">*</span>
                   </label>
                   <input
                     id="email"

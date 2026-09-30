@@ -4,6 +4,7 @@
 // Value import is safe: brand-roles.ts → color.ts both import StoreTheme
 // type-only, so there is no runtime circular dependency back to this file.
 import { deriveBrandRoles } from '../utils/brand-roles';
+import { statusInkVars } from '../utils/status-ink';
 import { colorToHslTriplet } from '../utils/color';
 
 /**
@@ -477,6 +478,18 @@ export interface StoreTheme {
    * 7-toggle ceiling). A merchant-chosen corner is unaffected either way.
    */
   saleBadgeLegacyCorner?: boolean;
+  /**
+   * Issue #2349 (owner option A, 2026-09-30) — keep the LEGACY status-message
+   * colours on the storefront. Unset/false (every store by default): warning /
+   * info / success / error banners, pills and message text use the readable
+   * `-ink` shade of their role (>= 4.5:1 on the card, the page and every tint
+   * up to 30%), derived per store by `statusInkVars`. true: every
+   * `--<role>-ink` is `var(--<role>)`, so the message text renders in the bare
+   * role colour exactly as before. Per-store DATA — set for pecannbee by a
+   * jsonb merge before the code deploys, or by the Page Builder toggle (Cart
+   * page → Message colours). The storefront never branches on a slug.
+   */
+  legacyBannerContrast?: boolean;
 }
 
 /**
@@ -919,6 +932,21 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     if (NON_COLOR_VARS.has(key)) continue;
     vars[key] = colorToHslTriplet(vars[key], theme);
   }
+  // Issue 2349 — status-message inks, measured on this store's own surfaces
+  // (after normalisation, so they read the same triplets the page paints).
+  // Legacy stores get `var(--<role>)`: identical to the bare role colour.
+  Object.assign(
+    vars,
+    statusInkVars(
+      {
+        success: vars['--success'],
+        warning: vars['--warning'],
+        destructive: vars['--destructive'],
+      },
+      [vars['--card'], vars['--background']],
+      theme.legacyBannerContrast === true
+    )
+  );
   return vars;
 }
 

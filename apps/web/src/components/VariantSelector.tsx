@@ -206,7 +206,7 @@ export function VariantSelector({
           duplicate display here was just visual noise. */}
       {allPicked && currentVariant && (currentVariant.inventory ?? 1) <= 0 && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
-          <span className="font-medium text-destructive">{t('Out of Stock', 'غير متوفر')}</span>
+          <span className="font-medium text-destructive-ink">{t('Out of Stock', 'غير متوفر')}</span>
         </div>
       )}
       {allPicked && !currentVariant && (

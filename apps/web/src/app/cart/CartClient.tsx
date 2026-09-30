@@ -445,7 +445,7 @@ export default function CartClient() {
             <p
               role="alert"
               data-cart-unavailable-banner=""
-              className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive"
+              className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive-ink"
             >
               {productUnavailableCopy(
                 t,
@@ -647,7 +647,7 @@ export default function CartClient() {
                               </div>
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive-ink"
                                 aria-label={t('Remove item', 'إزالة المنتج')}
                               >
                                 <svg
@@ -840,7 +840,7 @@ export default function CartClient() {
                             {promoApplied && (
                               <p
                                 role="status"
-                                className="mt-2 flex items-center gap-1 text-xs text-success"
+                                className="mt-2 flex items-center gap-1 text-xs text-success-ink"
                               >
                                 <svg
                                   className="h-3.5 w-3.5"
@@ -938,7 +938,7 @@ export default function CartClient() {
                               {promoApplied && (
                                 <p
                                   role="status"
-                                  className="mt-2 flex items-center gap-1 text-xs text-success"
+                                  className="mt-2 flex items-center gap-1 text-xs text-success-ink"
                                 >
                                   <svg
                                     className="h-3.5 w-3.5"
@@ -995,11 +995,11 @@ export default function CartClient() {
                             </div>
                             {promoApplied && (
                               <div className="flex justify-between text-sm">
-                                <span className="text-[hsl(var(--success))]">
+                                <span className="text-success-ink">
                                   {t('Discount', '\u0627\u0644\u062e\u0635\u0645')} (
                                   {promoType === 'percentage' ? `${promoValue}%` : promoName})
                                 </span>
-                                <span className="font-medium text-[hsl(var(--success))]">
+                                <span className="font-medium text-success-ink">
                                   -{formatPrice(discount)}
                                 </span>
                               </div>
@@ -1087,7 +1087,7 @@ export default function CartClient() {
 
                           {/* Below-minimum notice */}
                           {checkoutBlocked && checkoutBlockedMessage && (
-                            <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                            <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning-ink">
                               {checkoutBlockedMessage}
                             </p>
                           )}

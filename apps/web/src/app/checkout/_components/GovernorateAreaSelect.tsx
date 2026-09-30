@@ -475,7 +475,7 @@ export function GovernorateAreaSelect({
             onClear={handleGovernorateCleared}
           />
           {governorateError && (
-            <p role="alert" className="mt-1 text-sm text-destructive">
+            <p role="alert" className="mt-1 text-sm text-destructive-ink">
               {governorateError}
             </p>
           )}
@@ -494,7 +494,7 @@ export function GovernorateAreaSelect({
             onClear={handleAreaCleared}
           />
           {areaError && (
-            <p role="alert" className="mt-1 text-sm text-destructive">
+            <p role="alert" className="mt-1 text-sm text-destructive-ink">
               {areaError}
             </p>
           )}

@@ -34,9 +34,9 @@ export default function ForgotPasswordClient() {
         <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
           <div className="w-full max-w-md space-y-8 text-center">
             <div className="rounded-xl border bg-card p-8 shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success/20">
                 <svg
-                  className="h-6 w-6 text-[hsl(var(--success))]"
+                  className="h-6 w-6 text-success-ink"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -119,7 +119,7 @@ export default function ForgotPasswordClient() {
           {/* Form */}
           <div className="rounded-xl border bg-card p-8 shadow-sm">
             {error && (
-              <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
                 {error}
               </div>
             )}

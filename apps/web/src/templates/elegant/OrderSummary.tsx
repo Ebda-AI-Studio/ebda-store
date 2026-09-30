@@ -65,7 +65,7 @@ export default function ElegantOrderSummary({
           </dd>
         </div>
         {discount > 0 && (
-          <div className="flex items-center justify-between text-success">
+          <div className="flex items-center justify-between text-success-ink">
             <dt className="tracking-wide" style={typography?.label}>
               {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
             </dt>
@@ -87,7 +87,7 @@ export default function ElegantOrderSummary({
                 {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
-              <span className="text-success uppercase tracking-[0.2em] text-xs">
+              <span className="text-success-ink uppercase tracking-[0.2em] text-xs">
                 {isRtl ? 'مجاني' : 'Complimentary'}
               </span>
             ) : (
@@ -127,7 +127,7 @@ export default function ElegantOrderSummary({
       )}
       {children && <div className="mt-8">{children}</div>}
       {ctaDisabled && ctaBlockedMessage && (
-        <p className="mt-6 border border-warning/30 bg-warning/10 px-3 py-2 text-xs font-light tracking-wide text-warning">
+        <p className="mt-6 border border-warning/30 bg-warning/10 px-3 py-2 text-xs font-light tracking-wide text-warning-ink">
           {ctaBlockedMessage}
         </p>
       )}

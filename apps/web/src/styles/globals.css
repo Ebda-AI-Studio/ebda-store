@@ -46,6 +46,16 @@
     --info-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    /* Status-message ink (issue 2349): the role hue dropped until it reads
+       >= 4.5:1 bare and on every tint up to 30%. These are the fallback for a
+       page with no store theme; a store's inks are derived from ITS palette by
+       statusInkVars (@force/shared) and emitted with the theme, and a store
+       with theme.legacyBannerContrast gets var(--<role>) instead. Measured by
+       tests/unit/admin-tint-ink-contrast.test.ts. */
+    --success-ink: 142 76% 24%;
+    --warning-ink: 38 92% 28%;
+    --info-ink: 199 89% 30%;
+    --destructive-ink: 0 84.2% 38%;
 
     /* Borders & Inputs */
     --border: 220 13% 91%;
@@ -130,6 +140,10 @@
     --info-foreground: 0 0% 100%;
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
+    --success-ink: 142 76% 43%;
+    --warning-ink: 38 92% 55%;
+    --info-ink: 199 89% 57%;
+    --destructive-ink: 0 62.8% 66%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 26 100% 55%;

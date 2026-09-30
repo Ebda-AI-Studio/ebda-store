@@ -55,7 +55,7 @@ export default function MinimalOrderSummary({
           </dd>
         </div>
         {discount > 0 && (
-          <div className="flex items-center justify-between text-success">
+          <div className="flex items-center justify-between text-success-ink">
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
             <dd className="tabular-nums" style={typography?.price}>
               −{fmt(discount)}
@@ -75,7 +75,7 @@ export default function MinimalOrderSummary({
                 {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
               </span>
             ) : freeShipping ? (
-              <span className="text-success">{isRtl ? 'مجاني' : 'Free'}</span>
+              <span className="text-success-ink">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
               fmt(shipping)
             )}
@@ -113,7 +113,7 @@ export default function MinimalOrderSummary({
       )}
       {children && <div className="mt-6">{children}</div>}
       {ctaDisabled && ctaBlockedMessage && (
-        <p className="mt-6 text-xs font-light text-warning">{ctaBlockedMessage}</p>
+        <p className="mt-6 text-xs font-light text-warning-ink">{ctaBlockedMessage}</p>
       )}
       {ctaText &&
         (ctaHref && !ctaDisabled ? (

@@ -1,5 +1,11 @@
 import type { CSSProperties } from 'react';
-import { resolveColor, type StoreTheme, type PageColorScheme } from '@force/shared';
+import {
+  colorToHslTriplet,
+  resolveColor,
+  statusInkVars,
+  type StoreTheme,
+  type PageColorScheme,
+} from '@force/shared';
 
 /**
  * Smart per-page surface styling.
@@ -87,6 +93,30 @@ function isDark(hsl: Hsl): boolean {
   return hsl.l < 50;
 }
 
+/**
+ * Issue 2349 — status-message inks re-measured on THIS page's surfaces. The
+ * root inks are measured on the theme's card/background; a merchant page colour
+ * (light or dark) is a different ground, so the wrapper carries its own. A
+ * legacy store (`theme.legacyBannerContrast`) sets nothing here: it inherits
+ * the root's `var(--<role>)` pass-through, exactly as before.
+ */
+function pageInkVars(
+  theme: StoreTheme | undefined,
+  surfaces: Array<string | undefined>
+): Record<string, string> {
+  if (theme?.legacyBannerContrast === true) return {};
+  const role = (v: string | undefined) => (theme && v ? colorToHslTriplet(v, theme) : undefined);
+  return statusInkVars(
+    {
+      success: role(theme?.successColor),
+      warning: role(theme?.warningColor),
+      destructive: role(theme?.destructiveColor),
+    },
+    surfaces,
+    false
+  );
+}
+
 const clamp = (n: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, n));
 const triplet = (h: number, s: number, l: number) =>
   `${Math.round(h)} ${Math.round(clamp(s))}% ${Math.round(clamp(l))}%`;
@@ -113,7 +143,14 @@ export function pageSurfaceStyle(
   // ('light' / 'dark') wins; 'auto' falls back to the background's lightness.
   // 'dark' needs a parseable colour to derive the palette from.
   const wantDark = scheme === 'dark' ? !!hsl : scheme === 'light' ? false : !!hsl && isDark(hsl);
-  if (!hsl || !wantDark) return style as CSSProperties;
+  if (!hsl || !wantDark) {
+    // Light page colour: the text sits on it and on the theme's card.
+    if (hsl) {
+      const card = theme?.cardColor ? colorToHslTriplet(theme.cardColor, theme) : '0 0% 100%';
+      Object.assign(style, pageInkVars(theme, [triplet(hsl.h, hsl.s, hsl.l), card]));
+    }
+    return style as CSSProperties;
+  }
 
   const { h, s, l } = hsl;
   // Surfaces step up in lightness from the page background so cards lift off it;
@@ -136,5 +173,6 @@ export function pageSurfaceStyle(
   style['--border'] = triplet(h, sSurface, l + 18);
   style['--input'] = triplet(h, sSurface, l + 18);
   // --primary / --primary-foreground (brand) intentionally untouched.
+  Object.assign(style, pageInkVars(theme, [style['--background'], style['--card']]));
   return style as CSSProperties;
 }

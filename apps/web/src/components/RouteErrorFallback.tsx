@@ -179,7 +179,7 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
       >
         <svg
           className={`h-8 w-8 ${
-            isTemporarilyUnavailable ? 'text-muted-foreground' : 'text-destructive'
+            isTemporarilyUnavailable ? 'text-muted-foreground' : 'text-destructive-ink'
           }`}
           fill="none"
           viewBox="0 0 24 24"

@@ -283,8 +283,8 @@ export default function SettingsClient() {
         <div
           className={`rounded-lg p-4 ${
             message.type === 'success'
-              ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
-              : 'bg-destructive/10 text-destructive'
+              ? 'bg-success/10 text-success-ink'
+              : 'bg-destructive/10 text-destructive-ink'
           }`}
         >
           {message.text}
@@ -461,10 +461,10 @@ export default function SettingsClient() {
       {/* Danger Zone */}
       <div className="rounded-xl border border-destructive/30 bg-card shadow-sm">
         <div className="border-b border-destructive/30 bg-destructive/10 p-4">
-          <h2 className="font-semibold text-destructive">
+          <h2 className="font-semibold text-destructive-ink">
             {t('Danger Zone', '\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062e\u0637\u0631')}
           </h2>
-          <p className="text-sm text-destructive">
+          <p className="text-sm text-destructive-ink">
             {t(
               'Irreversible actions',
               '\u0625\u062c\u0631\u0627\u0621\u0627\u062a \u0644\u0627 \u064a\u0645\u0643\u0646 \u0627\u0644\u062a\u0631\u0627\u062c\u0639 \u0639\u0646\u0647\u0627'

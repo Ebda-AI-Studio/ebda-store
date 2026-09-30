@@ -41,25 +41,30 @@ module.exports = {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
-          // `-ink` (text on the card) is its own token in admin/orders, where
-          // the role colour fails AA. The storefront has no such token and its
-          // look must not change (Ruling YWA-TXT-1), so here it is the SAME
-          // declaration as DEFAULT — @force/ui form errors use `text-destructive-ink`
-          // and stay pixel-identical on every store, per-store overrides included
-          // (issue 2380).
-          ink: 'hsl(var(--destructive))',
+          // Issue 2349 (owner option A, 2026-09-30) — readable message text. The
+          // value is per store (`statusInkVars`, emitted with the theme); a store
+          // with `theme.legacyBannerContrast` gets `var(--destructive)`, i.e. the
+          // SAME colour as DEFAULT, so its @force/ui form errors (`text-destructive-ink`,
+          // issue 2380) and message text stay pixel-identical.
+          ink: 'hsl(var(--destructive-ink))',
         },
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
+          // Issue 2349 — readable message text; per-store value from the theme.
+          ink: 'hsl(var(--success-ink))',
         },
         warning: {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
+          // Issue 2349 — readable message text; per-store value from the theme.
+          ink: 'hsl(var(--warning-ink))',
         },
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
+          // Issue 2349 — readable message text; per-store value from the theme.
+          ink: 'hsl(var(--info-ink))',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',

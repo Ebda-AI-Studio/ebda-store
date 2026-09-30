@@ -73,7 +73,7 @@ export default function ElegantCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
+                  className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                   style={typography?.cta}
                 >

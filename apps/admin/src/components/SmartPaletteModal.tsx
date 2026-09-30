@@ -60,6 +60,8 @@ export interface ThemeUpdates {
   summaryLabelColor?: string;
   summaryTotalColor?: string;
   summaryLabelBold?: boolean;
+  /** #2349 — keep the legacy (lighter) status-message colours (Page Builder → Cart page). */
+  legacyBannerContrast?: boolean;
   /** Products listing page (PLP) text colors. */
   plpBreadcrumbColor?: string;
   plpHeadingColor?: string;

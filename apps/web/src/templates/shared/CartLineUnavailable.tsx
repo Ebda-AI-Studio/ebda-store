@@ -14,7 +14,7 @@ export function CartLineUnavailableNotice() {
     <p
       role="status"
       data-cart-line-unavailable=""
-      className="mt-1 text-xs font-semibold text-destructive"
+      className="mt-1 text-xs font-semibold text-destructive-ink"
     >
       {t(
         'No longer available — remove it to check out',

@@ -23,6 +23,7 @@ import {
   resolveBackgroundPreset,
   deriveBrandRoles,
   colorToHslTriplet,
+  statusInkVars,
 } from '@force/shared';
 
 /**
@@ -77,6 +78,19 @@ function themeToCssVars(theme: StoreTheme): Record<string, string> {
     if (NON_COLOR_VARS.has(key)) continue;
     vars[key] = colorToHslTriplet(vars[key], theme);
   }
+  // Issue 2349 — status-message inks. MUST match the shared themeToCssVars.
+  Object.assign(
+    vars,
+    statusInkVars(
+      {
+        success: vars['--success'],
+        warning: vars['--warning'],
+        destructive: vars['--destructive'],
+      },
+      [vars['--card'], vars['--background']],
+      theme.legacyBannerContrast === true
+    )
+  );
   return vars;
 }
 

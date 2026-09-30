@@ -76,7 +76,7 @@ export default function LoginClient() {
             {error && (
               <div
                 role="alert"
-                className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+                className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink"
               >
                 {error}
               </div>

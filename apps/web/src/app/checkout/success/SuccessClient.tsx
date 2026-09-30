@@ -158,8 +158,8 @@ function SuccessContent() {
           {/* Status icon \u2014 reflects the VERIFIED payment state, not an
               unconditional checkmark. */}
           {paymentState === 'verifying' || paymentState === 'pending' ? (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--warning))]/15">
-              <div className="h-9 w-9 animate-spin rounded-full border-4 border-[hsl(var(--warning))] border-t-transparent" />
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15">
+              <div className="h-9 w-9 animate-spin rounded-full border-4 border-warning border-t-transparent" />
             </div>
           ) : paymentState === 'failed' ? (
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--destructive,0_84%_60%))]/15">
@@ -178,9 +178,9 @@ function SuccessContent() {
               </svg>
             </div>
           ) : (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success/20">
               <svg
-                className="h-10 w-10 text-[hsl(var(--success))]"
+                className="h-10 w-10 text-success-ink"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -199,8 +199,8 @@ function SuccessContent() {
           <p className="mt-2 text-lg text-muted-foreground">{subCopy}</p>
 
           {isCod && (
-            <div className="mt-4 rounded-lg border border-[hsl(var(--warning))]/30 bg-[hsl(var(--warning))]/10 px-4 py-3">
-              <p className="text-sm font-medium text-[hsl(var(--warning))]">
+            <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+              <p className="text-sm font-medium text-warning-ink">
                 {t(
                   'Cash on Delivery — Pay when your order arrives',
                   '\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645 — \u0627\u062f\u0641\u0639 \u0639\u0646\u062f \u0648\u0635\u0648\u0644 \u0637\u0644\u0628\u0643'

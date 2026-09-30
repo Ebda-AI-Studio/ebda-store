@@ -1784,7 +1784,7 @@ export default function CheckoutClient() {
                   <div
                     role="alert"
                     data-checkout-unavailable-banner=""
-                    className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive"
+                    className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive-ink"
                   >
                     <p>{unavailableLinesNotice}</p>
                     <Link href={storeUrl('/cart')} className="mt-1 inline-block underline">
@@ -1827,7 +1827,7 @@ export default function CheckoutClient() {
                             }
                           />
                           {formErrors.firstName && (
-                            <p role="alert" className="mt-1 text-sm text-destructive">
+                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
                               {formErrors.firstName}
                             </p>
                           )}
@@ -1849,7 +1849,7 @@ export default function CheckoutClient() {
                             }
                           />
                           {formErrors.lastName && (
-                            <p role="alert" className="mt-1 text-sm text-destructive">
+                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
                               {formErrors.lastName}
                             </p>
                           )}
@@ -1873,7 +1873,7 @@ export default function CheckoutClient() {
                           }
                         />
                         {formErrors.phone && (
-                          <p role="alert" className="mt-1 text-sm text-destructive">
+                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
                             {formErrors.phone}
                           </p>
                         )}
@@ -1898,7 +1898,7 @@ export default function CheckoutClient() {
                           }
                         />
                         {formErrors.email && (
-                          <p role="alert" className="mt-1 text-sm text-destructive">
+                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
                             {formErrors.email}
                           </p>
                         )}
@@ -1948,7 +1948,7 @@ export default function CheckoutClient() {
                             )}
                           </p>
                         ) : shippingUnavailable ? (
-                          <p className="text-sm text-destructive">
+                          <p className="text-sm text-destructive-ink">
                             {t(
                               'Not available for delivery to this area',
                               '\u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u0644\u0644\u062a\u0648\u0635\u064a\u0644 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0637\u0642\u0629'
@@ -1956,7 +1956,7 @@ export default function CheckoutClient() {
                           </p>
                         ) : shippingError ? (
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm text-destructive">
+                            <p className="text-sm text-destructive-ink">
                               {t(
                                 "Couldn't calculate shipping. Please retry.",
                                 '\u062a\u0639\u0630\u0651\u0631 \u062d\u0633\u0627\u0628 \u0627\u0644\u0634\u062d\u0646. \u064a\u0631\u062c\u0649 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.'
@@ -2014,7 +2014,7 @@ export default function CheckoutClient() {
                             }
                           />
                           {formErrors.block && (
-                            <p role="alert" className="mt-1 text-sm text-destructive">
+                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
                               {formErrors.block}
                             </p>
                           )}
@@ -2032,7 +2032,7 @@ export default function CheckoutClient() {
                             }
                           />
                           {formErrors.street && (
-                            <p role="alert" className="mt-1 text-sm text-destructive">
+                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
                               {formErrors.street}
                             </p>
                           )}
@@ -2064,7 +2064,7 @@ export default function CheckoutClient() {
                             }
                           />
                           {formErrors.house && (
-                            <p role="alert" className="mt-1 text-sm text-destructive">
+                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
                               {formErrors.house}
                             </p>
                           )}
@@ -2148,7 +2148,7 @@ export default function CheckoutClient() {
                         <button
                           type="button"
                           onClick={handleClearSavedData}
-                          className="mt-2 ms-7 text-xs text-destructive hover:underline"
+                          className="mt-2 ms-7 text-xs text-destructive-ink hover:underline"
                         >
                           {t(
                             'Clear saved data',
@@ -2162,7 +2162,7 @@ export default function CheckoutClient() {
                     {belowMinimumOrder && minimumOrderMessage && (
                       <p
                         role="alert"
-                        className="hidden lg:block mt-4 rounded-lg bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+                        className="hidden lg:block mt-4 rounded-lg bg-warning/10 px-3 py-2 text-sm font-medium text-warning-ink"
                       >
                         {minimumOrderMessage}
                       </p>
@@ -2288,7 +2288,7 @@ export default function CheckoutClient() {
             {step === 1 && belowMinimumOrder && minimumOrderMessage && (
               <p
                 role="alert"
-                className="order-2 lg:hidden mt-4 rounded-lg bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+                className="order-2 lg:hidden mt-4 rounded-lg bg-warning/10 px-3 py-2 text-sm font-medium text-warning-ink"
               >
                 {minimumOrderMessage}
               </p>
