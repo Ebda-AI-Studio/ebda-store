@@ -12,7 +12,10 @@ Answer one question: **what should the merchant do next?**
 1. `admin_list_orders` with `limit: 50`. Add `from`/`to` only if the merchant
    named a period. Sorted newest first.
 2. `admin_get_order` on the ones you are going to flag — only those. The list
-   payload has no line items, addresses, or payment records.
+   payload carries each order's `delivery` block (carrier, area, shipped /
+   delivered timestamps) but no line items, street addresses, or payment
+   records; `admin_get_order` adds those plus the status history. Contact
+   details are masked in both.
 
 ## What counts as stuck
 

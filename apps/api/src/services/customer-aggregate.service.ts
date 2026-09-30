@@ -1,0 +1,800 @@
+import { prisma, Prisma, type RfmSegment } from '@force/database';
+import { getCached, customersCacheKey } from '../lib/public-cache';
+import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
+import { AppError } from '../middleware/error-handler';
+
+/**
+ * Customer aggregation — the Customers page's definition of "a customer"
+ * (registered buyers, guest checkouts keyed by contact, and zero-order
+ * registered shoppers), extracted from `customers.routes.ts` so the merchant
+ * MCP tools (`admin_list_customers` / `admin_get_customer`) read the SAME rows
+ * the dashboard renders instead of a second, drifting copy of the query.
+ *
+ * Grouping is `customerKeyOf` (`lib/customer-key.ts`) — the helper the RFM
+ * rollup also keys on, so a segment's members resolve to these rows.
+ */
+/**
+ * Cache TTL for the aggregated-customers snapshot. Must stay >= the
+ * project-wide 120s Redis TTL floor (ESLint `cacheTtlSelectors` rule) — a
+ * shorter TTL would hammer Neon compute on every cache miss. 300s balances
+ * freshness (a new order shows up in the customers list within 5 min) against
+ * the cost of re-scanning up to `MAX_ORDERS_SCANNED` orders on every request.
+ */
+const CUSTOMERS_CACHE_TTL_SECONDS = 300;
+
+export interface AggregatedCustomer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  /** Sub-fields of the latest shipping address, useful in spreadsheet. */
+  address1: string;
+  address2: string;
+  city: string;
+  area: string;
+  country: string;
+  postalCode: string;
+  totalOrders: number;
+  totalSpent: number;
+  /** Average order value = totalSpent / totalOrders, in fils. */
+  avgOrderValue: number;
+  lastOrderTotal: number;
+  // Null for a registered shopper with zero orders (#1882) — everything
+  // else in this shape is order-derived, so there is no order to date.
+  lastOrderDate: Date | null;
+  lastOrderNumber: string;
+  lastOrderStatus: string;
+  lastOrderPaymentStatus: string;
+  /** Oldest order's createdAt — "customer since" date. Null, see lastOrderDate. */
+  firstOrderDate: Date | null;
+  /** Comma-joined list of order statuses the customer has touched. */
+  statuses: string;
+  /** Counts: paid + pending + cancelled + failed. */
+  paidCount: number;
+  pendingCount: number;
+  cancelledCount: number;
+  failedCount: number;
+  /** Comma-joined list of payment methods ever used. */
+  paymentMethods: string;
+  isGuest: boolean;
+}
+
+export interface ShippingAddressShape {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  area?: string;
+  governorate?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  block?: string;
+  street?: string;
+}
+
+export function formatShippingAddress(addr: ShippingAddressShape | null): string {
+  if (!addr) return '';
+  return [addr.address1, addr.address2, addr.area, addr.city, addr.country]
+    .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+    .join(', ');
+}
+
+/**
+ * Order statuses that do NOT count toward customer spend in the KPI strip.
+ * Same population as the dashboard's revenue (`analytics.service.ts`
+ * `getPeriodStats`: `status notIn ['cancelled','refunded']`), so the
+ * Customers page and Analytics never disagree about what "spent" means.
+ */
+const KPI_EXCLUDED_STATUSES = new Set(['cancelled', 'refunded']);
+
+/**
+ * Store-wide KPI strip for the Customers page. Computed over the WHOLE
+ * aggregated set (never the current page, search or segment), so it
+ * describes the store. A rate/average with no denominator is `null` —
+ * unknown, rendered as unknown — never a fabricated 0.
+ */
+export interface CustomersSummary {
+  /** Every row the list can show: buyers, zero-order registered, guests. */
+  customers: number;
+  /** Rows keyed as guests (no customer account). */
+  guests: number;
+  /** Customers with at least one counted (non-cancelled/refunded) order. */
+  buyers: number;
+  /** Customers with two or more counted orders. */
+  repeatBuyers: number;
+  /** repeatBuyers / buyers, 0..1. Null when there are no buyers. */
+  repeatRate: number | null;
+  /** Counted orders across all customers. */
+  orders: number;
+  /** Sum of counted order totals, in fils. */
+  totalSpent: number;
+  /** totalSpent / orders, in fils. Null when there are no counted orders. */
+  avgOrderValue: number | null;
+}
+
+// A literal list, not `Object.values(RfmSegment)`: reading the enum VALUE at
+// module load breaks every unit test that mocks '@force/database' wholesale.
+// The type assertion below still fails the build if the enum gains a member.
+export const RFM_SEGMENT_VALUES = [
+  'vip',
+  'loyal',
+  'potential',
+  'new_customer',
+  'at_risk',
+  'hibernating',
+  'lost',
+] as const satisfies readonly RfmSegment[];
+const RFM_SEGMENTS_COMPLETE: [Exclude<RfmSegment, (typeof RFM_SEGMENT_VALUES)[number]>] extends [
+  never,
+]
+  ? true
+  : false = true;
+void RFM_SEGMENTS_COMPLETE;
+const RFM_SEGMENTS: ReadonlySet<string> = new Set(RFM_SEGMENT_VALUES);
+
+/** Parse `?segment=` into an RFM segment or `'guest'`; anything else → null. */
+export function parseSegmentFilter(raw: unknown): RfmSegment | 'guest' | null {
+  if (typeof raw !== 'string') return null;
+  if (raw === 'guest') return 'guest';
+  return RFM_SEGMENTS.has(raw) ? (raw as RfmSegment) : null;
+}
+
+export function summarizeCustomers(
+  rows: Array<{ isGuest: boolean }>,
+  counted: Map<string, { orders: number; spent: number }>
+): CustomersSummary {
+  let buyers = 0;
+  let repeatBuyers = 0;
+  let orders = 0;
+  let totalSpent = 0;
+  for (const c of counted.values()) {
+    if (c.orders >= 1) buyers += 1;
+    if (c.orders >= 2) repeatBuyers += 1;
+    orders += c.orders;
+    totalSpent += c.spent;
+  }
+  return {
+    customers: rows.length,
+    guests: rows.filter(r => r.isGuest).length,
+    buyers,
+    repeatBuyers,
+    repeatRate: buyers > 0 ? repeatBuyers / buyers : null,
+    orders,
+    totalSpent,
+    avgOrderValue: orders > 0 ? Math.round(totalSpent / orders) : null,
+  };
+}
+
+/**
+ * Hard cap on the number of orders scanned to build the aggregated customer
+ * list / export. Protects the API from an OOM/timeout on stores with tens of
+ * thousands of orders (the previous `findMany` had NO `take`). When the cap is
+ * hit, the result carries `truncated: true` so the UI can surface a notice.
+ *
+ * 20k orders × the small projected row is well within a single request's
+ * memory budget and covers the overwhelming majority of stores in full.
+ */
+const MAX_ORDERS_SCANNED = 20000;
+
+/**
+ * Hard cap on the number of orders returned for a SINGLE customer's profile
+ * (`GET /customers/:customerKey`). Matches the `take: 100` convention used
+ * elsewhere in the API as an "unbounded growth" guard (e.g.
+ * `product.service.ts`, `stock-adjustment.service.ts`). Unlike
+ * `MAX_ORDERS_SCANNED` above (which bounds a store-wide scan), this bounds a
+ * single customer's order history — 100 orders for one customer covers the
+ * overwhelming majority of cases; a truncated result carries `truncated: true`
+ * so the UI can surface a notice, same pattern as the aggregation endpoints.
+ */
+export const MAX_CUSTOMER_ORDERS = 100;
+
+/**
+ * Aggregate customers from order history. Now includes:
+ * - guest orders (no User row) keyed by shipping email/phone
+ * - cancelled / unpaid orders (no status filter — Ahmad 2026-05-16:
+ *   'get the info even if cancelled or unpaid')
+ * - latest shipping address + per-order payment amount so the export
+ *   surfaces what the merchant needs to ship + reconcile
+ *
+ * Bounded by `MAX_ORDERS_SCANNED`: we fetch up to the cap + 1 to detect
+ * truncation, then aggregate only the capped slice. Orders are newest-first,
+ * so a truncated result keeps the most recent activity.
+ */
+/** Shape of each order returned by aggregateCustomers (includes items for the Purchases sheet). */
+export interface OrderWithItems {
+  id: string;
+  orderNumber: string;
+  total: number;
+  status: string;
+  paymentStatus: string;
+  createdAt: Date;
+  shippingAddress: unknown;
+  payments: Array<{ provider: string; method: string | null }>;
+  customer: {
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+  } | null;
+  items: Array<{
+    id: string;
+    productName: string;
+    sku: string | null;
+    variantName: string | null;
+    quantity: number;
+    price: number;
+    total: number;
+  }>;
+}
+
+async function aggregateCustomersUncached(storeId: string): Promise<{
+  customers: AggregatedCustomer[];
+  truncated: boolean;
+  ordersScanned: number;
+  orders: OrderWithItems[];
+  summary: CustomersSummary;
+}> {
+  const fetched = await prisma.order.findMany({
+    where: { storeId, deletedAt: null },
+    select: {
+      id: true,
+      orderNumber: true,
+      total: true,
+      status: true,
+      paymentStatus: true,
+      createdAt: true,
+      shippingAddress: true,
+      // Payment method lives on the Payment row(s), not the Order. Pull
+      // the provider + method via the relation; first payment wins for the
+      // summary string.
+      payments: { select: { provider: true, method: true } },
+      customer: {
+        select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+      },
+      // Include line items for the Purchases sheet.
+      items: {
+        select: {
+          id: true,
+          productName: true,
+          sku: true,
+          variantName: true,
+          quantity: true,
+          price: true,
+          total: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    // Fetch one extra row to detect whether more orders exist beyond the cap.
+    take: MAX_ORDERS_SCANNED + 1,
+  });
+
+  const truncated = fetched.length > MAX_ORDERS_SCANNED;
+  const orders = truncated ? fetched.slice(0, MAX_ORDERS_SCANNED) : fetched;
+
+  // Per-key transient tracking sets so we can emit comma-joined fields
+  // after the loop without polluting the AggregatedCustomer shape.
+  const statusSets = new Map<string, Set<string>>();
+  const paymentMethodSets = new Map<string, Set<string>>();
+  // KPI accumulator: counted (non-cancelled/refunded) orders + spend per key.
+  const countedByKey = new Map<string, { orders: number; spent: number }>();
+
+  const map = new Map<string, AggregatedCustomer>();
+  // Real user ids seen on orders — the exclusion set for the zero-order union
+  // below. NOT `map.keys()`: guest rows are keyed by email/phone, so a set of
+  // map keys never excludes a registered shopper who checked out as a guest
+  // (issue 2051 — that shopper got a second, phantom zero-order row).
+  const orderUserIds = new Set<string>();
+  for (const order of orders) {
+    const shipping = (order.shippingAddress ?? null) as ShippingAddressShape | null;
+    const isGuest = !order.customer?.id;
+    if (order.customer?.id) orderUserIds.add(order.customer.id);
+    // `customerKeyOf` is the grouping the RFM rollup also uses, so a segment's
+    // members resolve to these rows. A guest order with no contact is its own
+    // row, keyed by the order.
+    const key = customerKeyOf(order) ?? `guest:${order.id}`;
+
+    const firstName = order.customer?.firstName ?? shipping?.firstName ?? '';
+    const lastName = order.customer?.lastName ?? shipping?.lastName ?? '';
+    const email = order.customer?.email ?? shipping?.email ?? '';
+    const phone = order.customer?.phone ?? shipping?.phone ?? '';
+    const address = formatShippingAddress(shipping);
+    const status = order.status ?? '';
+    const paymentStatus = order.paymentStatus ?? '';
+    // First payment provider on the order — multi-payment orders pick
+    // the first record (matching the merchant-facing "this order paid
+    // by X" expectation).
+    const paymentMethod = order.payments?.[0]?.provider ?? '';
+
+    let statusSet = statusSets.get(key);
+    if (!statusSet) {
+      statusSet = new Set();
+      statusSets.set(key, statusSet);
+    }
+    if (status) statusSet.add(status);
+
+    if (!KPI_EXCLUDED_STATUSES.has(status)) {
+      const counted = countedByKey.get(key) ?? { orders: 0, spent: 0 };
+      counted.orders += 1;
+      counted.spent += order.total;
+      countedByKey.set(key, counted);
+    }
+
+    let methodSet = paymentMethodSets.get(key);
+    if (!methodSet) {
+      methodSet = new Set();
+      paymentMethodSets.set(key, methodSet);
+    }
+    if (paymentMethod) methodSet.add(paymentMethod);
+
+    const existing = map.get(key);
+    if (existing) {
+      existing.totalOrders += 1;
+      existing.totalSpent += order.total;
+      // `existing.firstOrderDate` is `Date | null` on the type (#1882's
+      // zero-order-customer rows have no order to date), but every row this
+      // order-aggregation loop ever creates or touches sets a real Date —
+      // the null case is only ever added AFTER this loop finishes. Guard
+      // anyway rather than a non-null assertion, so a future change to that
+      // invariant fails loudly here instead of miscomparing against null.
+      existing.firstOrderDate =
+        !existing.firstOrderDate || order.createdAt < existing.firstOrderDate
+          ? order.createdAt
+          : existing.firstOrderDate;
+      // findMany is ordered by createdAt desc, so the first row we see
+      // for this key is the most recent. Subsequent rows are older —
+      // only top up missing fields, never overwrite the newest snapshot.
+      if (!existing.phone && phone) existing.phone = phone;
+      if (!existing.address && address) {
+        existing.address = address;
+        existing.address1 = shipping?.address1 ?? '';
+        existing.address2 = shipping?.address2 ?? '';
+        existing.city = shipping?.city ?? '';
+        existing.area = shipping?.area ?? '';
+        existing.country = shipping?.country ?? '';
+        existing.postalCode = shipping?.postalCode ?? '';
+      }
+      if (paymentStatus === 'paid') existing.paidCount += 1;
+      else if (status === 'cancelled') existing.cancelledCount += 1;
+      else if (paymentStatus === 'failed') existing.failedCount += 1;
+      else existing.pendingCount += 1;
+    } else {
+      const newRow: AggregatedCustomer = {
+        id: order.customer?.id ?? key,
+        firstName,
+        lastName,
+        email,
+        phone,
+        address,
+        address1: shipping?.address1 ?? '',
+        address2: shipping?.address2 ?? '',
+        city: shipping?.city ?? '',
+        area: shipping?.area ?? '',
+        country: shipping?.country ?? '',
+        postalCode: shipping?.postalCode ?? '',
+        totalOrders: 1,
+        totalSpent: order.total,
+        avgOrderValue: order.total,
+        lastOrderTotal: order.total,
+        lastOrderDate: order.createdAt,
+        lastOrderNumber: order.orderNumber,
+        lastOrderStatus: status,
+        lastOrderPaymentStatus: paymentStatus,
+        firstOrderDate: order.createdAt,
+        statuses: '',
+        paidCount: paymentStatus === 'paid' ? 1 : 0,
+        pendingCount: 0,
+        cancelledCount: status === 'cancelled' ? 1 : 0,
+        failedCount: paymentStatus === 'failed' ? 1 : 0,
+        paymentMethods: '',
+        isGuest,
+      };
+      if (paymentStatus !== 'paid' && status !== 'cancelled' && paymentStatus !== 'failed') {
+        newRow.pendingCount = 1;
+      }
+      map.set(key, newRow);
+    }
+  }
+
+  // #1882: the aggregation above is entirely order-derived, so a registered
+  // shopper who has never placed an order has no row and is invisible to
+  // both this list and the detail route — which makes the erase/export
+  // routes (PR #1852) unreachable through the admin UI for that population.
+  // Union in customer-role Users this store has that own no order yet.
+  // `deletedAt: null` also excludes erased accounts (eraseAccount sets it).
+  //
+  // Issue 2051: exclude by REAL user ids (not map keys, which are contact
+  // strings for guest rows), and skip a user whose email/phone already keys a
+  // guest row — that is the same human, who checked out without signing in,
+  // and already has a row with real history. When the scan was truncated the
+  // union is skipped: a user whose orders fell past the cap is not a
+  // zero-order customer, and "0 orders" would be stated as fact.
+  const registeredIds = Array.from(orderUserIds);
+  const zeroOrderUsers = truncated
+    ? []
+    : await prisma.user.findMany({
+        where: {
+          storeId,
+          role: 'customer',
+          deletedAt: null,
+          ...(registeredIds.length > 0 ? { id: { notIn: registeredIds } } : {}),
+        },
+        select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+      });
+  for (const user of zeroOrderUsers) {
+    if ((user.email && map.has(user.email.toLowerCase())) || (user.phone && map.has(user.phone))) {
+      continue;
+    }
+    map.set(user.id, {
+      id: user.id,
+      firstName: user.firstName ?? '',
+      lastName: user.lastName ?? '',
+      email: user.email ?? '',
+      phone: user.phone ?? '',
+      address: '',
+      address1: '',
+      address2: '',
+      city: '',
+      area: '',
+      country: '',
+      postalCode: '',
+      totalOrders: 0,
+      totalSpent: 0,
+      avgOrderValue: 0,
+      lastOrderTotal: 0,
+      lastOrderDate: null,
+      lastOrderNumber: '',
+      lastOrderStatus: '',
+      lastOrderPaymentStatus: '',
+      firstOrderDate: null,
+      statuses: '',
+      paidCount: 0,
+      pendingCount: 0,
+      cancelledCount: 0,
+      failedCount: 0,
+      paymentMethods: '',
+      isGuest: false,
+    });
+  }
+
+  // Materialize comma-joined sets + recompute avgOrderValue after the
+  // full aggregation pass.
+  for (const [key, row] of map.entries()) {
+    row.statuses = Array.from(statusSets.get(key) ?? []).join(', ');
+    row.paymentMethods = Array.from(paymentMethodSets.get(key) ?? []).join(', ');
+    row.avgOrderValue = row.totalOrders > 0 ? Math.round(row.totalSpent / row.totalOrders) : 0;
+  }
+
+  const customers = Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  return {
+    customers,
+    truncated,
+    ordersScanned: orders.length,
+    orders: orders as OrderWithItems[],
+    summary: summarizeCustomers(customers, countedByKey),
+  };
+}
+
+/**
+ * Cached wrapper around `aggregateCustomersUncached`. Called on EVERY
+ * `GET /customers` and `/customers/export.xlsx` request — without a cache
+ * this re-scans up to `MAX_ORDERS_SCANNED` orders (with items + payments +
+ * customer) on every page load, unlike the public product-list path which
+ * already caches via `lib/public-cache.ts`. Keyed per store (both endpoints
+ * call this with no other filter params, so a single key per store is
+ * correct — search/pagination are applied AFTER aggregation, in memory).
+ *
+ * TTL floor: the ESLint `cacheTtlSelectors` rule blocks `getCached()` calls
+ * under 120s (see `CACHE_TTL_FLOOR` in `apps/api/eslint.config.mjs`) —
+ * `CUSTOMERS_CACHE_TTL_SECONDS` (300s) respects that floor.
+ */
+export async function aggregateCustomers(storeId: string): Promise<{
+  customers: AggregatedCustomer[];
+  truncated: boolean;
+  ordersScanned: number;
+  orders: OrderWithItems[];
+  summary: CustomersSummary;
+}> {
+  const result = await getCached(customersCacheKey(storeId), CUSTOMERS_CACHE_TTL_SECONDS, () =>
+    aggregateCustomersUncached(storeId)
+  );
+
+  // getCached() round-trips through JSON.stringify/parse when served from
+  // Redis, which turns Date fields into ISO strings. Re-hydrate them
+  // unconditionally (cheap, and a no-op on values that are already real Date
+  // instances on a cache miss) so every caller — especially the .xlsx export,
+  // which needs real Date objects for ExcelJS's `numFmt` date formatting —
+  // sees identical types whether this was a cache hit or a fresh computation.
+  for (const c of result.customers) {
+    // #1882: a zero-order customer's dates are `null`, not a JSON-string
+    // timestamp — `new Date(null)` would silently coerce to the 1970 epoch.
+    c.lastOrderDate = c.lastOrderDate ? new Date(c.lastOrderDate) : null;
+    c.firstOrderDate = c.firstOrderDate ? new Date(c.firstOrderDate) : null;
+  }
+  for (const o of result.orders) {
+    o.createdAt = new Date(o.createdAt);
+  }
+
+  return result;
+}
+
+/**
+ * One customer's profile + order history, by Customers-page key (a User.id
+ * UUID, a guest's lowercased email, or a guest's phone — `customerKeyOf`).
+ * Throws `AppError(404)` when nothing in THIS store matches. Extracted from
+ * `GET /customers/:customerKey` so `admin_get_customer` returns the same
+ * profile the dashboard renders. Pass the DECODED key.
+ */
+export async function getCustomerProfile(storeId: string, customerKey: string) {
+  const decodedKey = customerKey;
+
+  // UUID v4 detection — `Order.customerId` is a uuid string when
+  // present. Guest keys are emails / phones / synthetic IDs.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedKey);
+
+  // A guest key resolves to exactly the orders `customerKeyOf` groups under
+  // it: guest checkouts (no customer_id) whose LOWERCASED shipping email is
+  // the key, or — when the order has no email — whose phone is the key. The
+  // previous exact-case JSON match 404'd any guest who typed a capital letter
+  // in their email (the list key is lowercased), and also pulled a signed-in
+  // shopper's orders into a guest profile, so the detail disagreed with the
+  // row the merchant clicked. Resolved by id first (a JSON-path equality in
+  // Prisma cannot lowercase), then loaded through the one typed query below.
+  let orderScope: Prisma.OrderWhereInput;
+  if (isUuid) {
+    orderScope = { customerId: decodedKey };
+  } else {
+    const guestOrderIds = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id::text AS id
+      FROM public.orders
+      WHERE store_id = ${storeId}
+        AND deleted_at IS NULL
+        AND customer_id IS NULL
+        AND (
+              LOWER(shipping_address->>'email') = ${decodedKey}
+           OR (COALESCE(shipping_address->>'email', '') = ''
+               AND shipping_address->>'phone' = ${decodedKey})
+        )
+      ORDER BY created_at DESC
+      LIMIT ${MAX_CUSTOMER_ORDERS + 1}
+    `;
+    orderScope = { id: { in: guestOrderIds.map(r => r.id) } };
+  }
+
+  // Fetch one extra row (like `aggregateCustomers`' MAX_ORDERS_SCANNED
+  // pattern above) to detect truncation without a separate count query.
+  // Unlike the siblings, this query previously had NO `take` at all — a
+  // customer with an unusually large order history could load its full
+  // set of orders (each with items + payments) on every profile view.
+  const fetchedOrders = await prisma.order.findMany({
+    where: {
+      storeId,
+      deletedAt: null,
+      ...orderScope,
+    },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          createdAt: true,
+        },
+      },
+      items: {
+        select: {
+          id: true,
+          productName: true,
+          quantity: true,
+          price: true,
+          total: true,
+        },
+      },
+      payments: {
+        select: {
+          provider: true,
+          status: true,
+          amount: true,
+          refundedAmount: true,
+          metadata: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: MAX_CUSTOMER_ORDERS + 1,
+  });
+
+  if (fetchedOrders.length === 0) {
+    // No orders at all — could still be a registered shopper who has
+    // never checked out. Guest keys (email/phone) have no order-less
+    // identity to resolve to, so only a UUID key gets this fallback.
+    // #1882: without it, a zero-order customer-role User is invisible
+    // to both this route and the list aggregation below, which makes
+    // the erase/export routes (PR #1852) unreachable through the admin
+    // UI for that population even though the routes themselves work.
+    if (isUuid) {
+      const zeroOrderUser = await prisma.user.findFirst({
+        where: { id: decodedKey, storeId, role: 'customer', deletedAt: null },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          createdAt: true,
+        },
+      });
+      if (zeroOrderUser) {
+        return {
+          customer: {
+            id: zeroOrderUser.id,
+            isGuest: false,
+            firstName: zeroOrderUser.firstName ?? '',
+            lastName: zeroOrderUser.lastName ?? '',
+            email: zeroOrderUser.email ?? '',
+            phone: zeroOrderUser.phone ?? '',
+            address: '',
+            address1: '',
+            address2: '',
+            city: '',
+            area: '',
+            country: '',
+            postalCode: '',
+            accountCreatedAt: zeroOrderUser.createdAt,
+            firstOrderDate: null,
+            lastOrderDate: null,
+            totalOrders: 0,
+            totalSpent: 0,
+            avgOrderValue: 0,
+            paidCount: 0,
+            pendingCount: 0,
+            cancelledCount: 0,
+            failedCount: 0,
+            refundedCount: 0,
+            totalRefunded: 0,
+            paymentMethods: [],
+            statuses: [],
+            groupId: null,
+            group: null,
+          },
+          orders: [],
+          truncated: false,
+        };
+      }
+    }
+    throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+  }
+
+  const truncated = fetchedOrders.length > MAX_CUSTOMER_ORDERS;
+  const orders = truncated ? fetchedOrders.slice(0, MAX_CUSTOMER_ORDERS) : fetchedOrders;
+
+  // Aggregate stats from the order list (capped at MAX_CUSTOMER_ORDERS —
+  // see `truncated` above). The first order (newest) wins for
+  // current-snapshot fields (latest address, phone, etc.). Mirror the
+  // listing-page logic exactly so the detail view's totals match what
+  // the merchant saw in the list.
+  const newest = orders[0];
+  const oldest = orders[orders.length - 1];
+  const newestShipping = (newest.shippingAddress ?? null) as ShippingAddressShape | null;
+
+  let totalSpent = 0;
+  let totalRefunded = 0;
+  let paidCount = 0;
+  let pendingCount = 0;
+  let cancelledCount = 0;
+  let failedCount = 0;
+  let refundedCount = 0;
+  const paymentMethodSet = new Set<string>();
+  const statusSet = new Set<string>();
+
+  for (const o of orders) {
+    totalSpent += o.total;
+    statusSet.add(o.status);
+    const ps = o.paymentStatus;
+    // Refund takes precedence — a refunded order shouldn't double-count
+    // as paid + refunded in the customer header.
+    if (ps === 'refunded' || o.status === 'refunded') {
+      refundedCount += 1;
+      for (const p of o.payments ?? []) totalRefunded += p.refundedAmount ?? 0;
+    } else if (ps === 'paid') paidCount += 1;
+    else if (o.status === 'cancelled') cancelledCount += 1;
+    else if (ps === 'failed') failedCount += 1;
+    else pendingCount += 1;
+
+    const method = o.payments?.[0]?.provider;
+    if (method) paymentMethodSet.add(method);
+  }
+
+  const customer = {
+    id: newest.customer?.id ?? decodedKey,
+    isGuest: !newest.customer?.id,
+    firstName: newest.customer?.firstName ?? newestShipping?.firstName ?? '',
+    lastName: newest.customer?.lastName ?? newestShipping?.lastName ?? '',
+    email: newest.customer?.email ?? newestShipping?.email ?? '',
+    phone: newest.customer?.phone ?? newestShipping?.phone ?? '',
+    address: formatShippingAddress(newestShipping),
+    address1: newestShipping?.address1 ?? '',
+    address2: newestShipping?.address2 ?? '',
+    city: newestShipping?.city ?? '',
+    area: newestShipping?.area ?? '',
+    country: newestShipping?.country ?? '',
+    postalCode: newestShipping?.postalCode ?? '',
+    accountCreatedAt: newest.customer?.createdAt ?? null,
+    firstOrderDate: oldest.createdAt,
+    lastOrderDate: newest.createdAt,
+    totalOrders: orders.length,
+    totalSpent,
+    avgOrderValue: orders.length > 0 ? Math.round(totalSpent / orders.length) : 0,
+    paidCount,
+    pendingCount,
+    cancelledCount,
+    failedCount,
+    refundedCount,
+    totalRefunded,
+    paymentMethods: Array.from(paymentMethodSet),
+    statuses: Array.from(statusSet),
+  };
+
+  // Resolve the assigned group. Groups live on the `customers` table — a
+  // separate, phone/email-keyed identity from the order's `users` row —
+  // so we look it up by identifier (phone first, the primary GCC
+  // identifier; email as fallback) rather than by the User id.
+  const identityOr: Prisma.CustomerWhereInput[] = [];
+  if (customer.phone) identityOr.push({ phone: customer.phone });
+  if (customer.email) identityOr.push({ email: { equals: customer.email, mode: 'insensitive' } });
+  let groupId: string | null = null;
+  let group: { id: string; name: string; nameAr: string | null } | null = null;
+  if (identityOr.length > 0) {
+    const grouped = await prisma.customer.findFirst({
+      where: { storeId, OR: identityOr },
+      select: {
+        groupId: true,
+        group: { select: { id: true, name: true, nameAr: true } },
+      },
+    });
+    if (grouped) {
+      groupId = grouped.groupId;
+      group = grouped.group;
+    }
+  }
+
+  return { customer: { ...customer, groupId, group }, orders, truncated };
+}
+
+/**
+ * RFM segment per Customers-page row, keyed by the row's `id`.
+ *
+ * A snapshot's `customerId` is `rfmKeyFor(customerKeyOf(order))` — the user
+ * id for a registered buyer, `GUEST:sha256(key)` for a guest — so each row is
+ * resolved by hashing its own id the same way. Rows with no snapshot (no paid
+ * order yet, a contact-less guest, or not yet rolled up) are absent from the
+ * map: unknown, never a fabricated segment.
+ */
+export async function segmentsForCustomers(
+  storeId: string,
+  rows: ReadonlyArray<{ id: string; isGuest: boolean }>
+): Promise<Map<string, RfmSegment>> {
+  const snapshots = await prisma.customerRfmSnapshot.findMany({
+    where: { storeId },
+    select: { customerId: true, segment: true },
+  });
+  const byKey = new Map(snapshots.map(s => [s.customerId, s.segment]));
+  const out = new Map<string, RfmSegment>();
+  if (byKey.size === 0) return out;
+  for (const row of rows) {
+    const seg = byKey.get(rfmKeyFor(row.id, row.isGuest));
+    if (seg) out.set(row.id, seg);
+  }
+  return out;
+}

@@ -6489,7 +6489,9 @@
       "aiLabel": "AI:",
       "shareOfCustomers": "{pct}% of customers",
       "shareOfTotal": "{pct}% of total",
-      "loadFailed": "Failed to load segments data"
+      "loadFailed": "Failed to load segments data",
+      "viewCustomers": "View customers",
+      "viewSegmentCustomers": "View the customers in {segment}"
     },
     "products": {
       "title": "Product Velocity",

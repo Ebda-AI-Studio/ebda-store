@@ -69,3 +69,13 @@ export function segmentFilterOptions(
     ...(hasGuests ? (['guest'] as const) : []),
   ];
 }
+
+/**
+ * `?segment=` → a filter value. Unknown / missing → `'all'`, mirroring the
+ * API, which ignores an unknown segment rather than 400ing (an old bookmark
+ * to a retired segment still loads the list).
+ */
+export function parseSegmentParam(raw: string | null | undefined): SegmentFilter {
+  if (raw === 'guest') return 'guest';
+  return isRfmSegment(raw ?? undefined) ? (raw as RfmSegmentKey) : 'all';
+}

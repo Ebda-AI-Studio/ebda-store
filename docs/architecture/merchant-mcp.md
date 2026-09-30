@@ -76,13 +76,74 @@ a distinct code or message — there is a test asserting all three bodies are on
 
 ## Tools (phase 1 — read only)
 
-`admin_get_store` · `admin_list_products` · `admin_get_product` ·
-`admin_list_orders` · `admin_get_order` · `admin_get_analytics`
+| Tool                                        | Returns                                                                | Delegates to                 |
+| ------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------- |
+| `admin_get_store`                           | name, currency, domain                                                 | resolved store               |
+| `admin_list_products` / `admin_get_product` | incl. draft/archived, variant-aware stock                              | `ProductService`             |
+| `admin_list_orders` / `admin_get_order`     | totals, status, **delivery detail**, status history (get)              | `OrderService`               |
+| `admin_get_analytics`                       | dashboard stats, top products, low stock                               | `AnalyticsService`           |
+| `admin_list_coupons`                        | code, type, value, usage vs limit, active dates, derived state         | `CouponService.list`         |
+| `admin_list_customers`                      | Customers-page rows: order count, total spent, last order, RFM segment | `customer-aggregate.service` |
+| `admin_get_customer`                        | one customer's totals, segment, order history                          | `customer-aggregate.service` |
+| `admin_get_funnel`                          | views → carts → orders over 7/30/90 days, step rates, daily rows       | `funnel-report.service`      |
+| `admin_list_reviews`                        | rating, text, product, status, merchant reply, date                    | `ReviewService.listForStore` |
 
 Every one is a thin façade over the **same service method the dashboard calls**.
 No tool re-implements a query or a permission check, so RLS, feature gates and
 validation stay defined once. `admin_list_products` sees draft and archived
-products; the buyer surface never does.
+products; the buyer surface never does. Every list tool takes `page` + `limit`
+(Zod-bounded) and returns its total. Registrars: `tools/admin-read.tools.ts`
+and `tools/admin-read-customers-marketing.tools.ts`.
+
+### Contact details are masked
+
+Tool output lands in a third-party LLM's context and transcript, so every
+customer contact leaves masked — email `a***@gmail.com`, phone
+`+965 ****1234` (`lib/pii-mask.ts`) — and no street-level address is
+returned (`maskAddress` keeps name, area, governorate, city, country). This
+applies to customers, reviewers, and the order tools (`admin_get_order`'s
+shipping/billing address and customer email; a nameless customer's
+`customerName` in `admin_list_orders`). There is **no unmask flag**: the
+merchant has the full record on the dashboard (Ruling MCP-R2).
+
+### Customers: the same rows as the Customers page
+
+`admin_list_customers` groups exactly like the admin Customers page — a
+registered shopper by user id, a guest checkout by lowercased email, else
+phone (`lib/customer-key.ts` `customerKeyOf`) — so guests count. A guest's
+Customers-page id IS their email or phone, so tools use an opaque
+**`customerRef`** instead: the user id for a registered customer, and
+`GUEST:<sha256>` for a guest — the same key its RFM snapshot is stored under,
+so an agent can correlate a customer with their segment without seeing the
+contact. `admin_get_customer` resolves a ref only against this store's rows;
+an unknown or foreign ref is a tool error. A guest checkout with no email and
+no phone is listed (ref `guest:<orderId>`) but has no profile — its one order
+is readable through `admin_get_order`.
+
+### Funnel: unknown is `null`, never 0 (owner ruling AUD-2)
+
+`admin_get_funnel` reports `checkoutsStarted` and `ordersAbandoned` as `null`
+with a reason in `unavailable`: both are derived from `abandoned_carts`, which
+guest carts never produce, so a 0 would falsely say "nobody did this". With no
+rollup rows for the window every stage is `null` and `daysCovered` is 0.
+
+### Delivery detail
+
+`admin_list_orders` rows and `admin_get_order` carry a `delivery` block with
+only what the platform records: `method` (carrier of a booked shipment, else
+`null`), `shipmentStatus`, `trackingNumber`, `estimatedDeliveryAt`,
+`governorate`, `area` (the zone the shipping fee matched on — the zone row
+itself is not stored on the order), `city`, `country`, `shippingFee`, and the
+`placedAt` / `shippedAt` / `deliveredAt` timestamps. `slot` is always `null`:
+checkout does not capture a delivery slot. `admin_get_order` adds
+`statusHistory` from the append-only `order_events` trail.
+
+### Not exposed: payouts / settlements
+
+There is no settlement data to expose: no gateway-settlement model exists
+(only `affiliate_payouts` and per-order `payments`). A tool that presented
+`payments` as payouts would be inventing a concept; a real settlement tool
+needs a MyFatoorah/Tap settlement import first (Ruling MCP-R3).
 
 Phases 2 and 3 (writes, then destructive ops with a `confirm_token` two-step)
 land as separate registrars — see

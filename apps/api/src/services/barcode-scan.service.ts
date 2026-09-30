@@ -313,7 +313,7 @@ export async function pickOrderItemByBarcode(
   const remainingRows = await prisma.$queryRaw<[{ remaining: bigint }]>`
     SELECT COUNT(*)::bigint AS remaining
     FROM public.order_items
-    WHERE order_id = ${orderId}::uuid
+    WHERE order_id = ${orderId}
       AND picked_qty < quantity
   `;
   const orderFullyPicked = Number(remainingRows[0].remaining) === 0;

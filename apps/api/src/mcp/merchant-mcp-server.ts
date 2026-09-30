@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpStore } from './resolve-store';
 import { registerAdminReadTools } from './tools/admin-read.tools';
+import { registerAdminCustomerMarketingReadTools } from './tools/admin-read-customers-marketing.tools';
 
 /**
  * Builds a per-request MCP server for the MERCHANT-ADMIN surface, scoped to a
@@ -20,5 +21,6 @@ import { registerAdminReadTools } from './tools/admin-read.tools';
 export function buildMerchantMcpServer(store: McpStore): McpServer {
   const server = new McpServer({ name: `force-merchant-${store.slug}`, version: '1.0.0' });
   registerAdminReadTools(server, store);
+  registerAdminCustomerMarketingReadTools(server, store);
   return server;
 }

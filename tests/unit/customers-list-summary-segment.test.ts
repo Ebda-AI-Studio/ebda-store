@@ -57,6 +57,11 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 const STORE = '11111111-1111-4111-8111-111111111111';
+// The RFM key the rollup stores for the guest row below — computed with the
+// SAME helper, so this test fails if the list and the rollup ever key guests
+// differently again (analytics audit 2026-09-30 §4).
+import { rfmKeyFor } from '@api/lib/customer-key';
+const GUEST_RFM_KEY = rfmKeyFor('guest@x.test', true);
 let app: Express;
 
 function order(
@@ -108,7 +113,10 @@ beforeEach(() => {
   h.userFindMany.mockResolvedValue([
     { id: 'u4', email: 'u4@x.test', firstName: 'Z', lastName: 'O', phone: null },
   ]);
-  h.rfmFindMany.mockResolvedValue([{ customerId: 'u1' }]);
+  h.rfmFindMany.mockResolvedValue([
+    { customerId: 'u1', segment: 'vip' },
+    { customerId: GUEST_RFM_KEY, segment: 'at_risk' },
+  ]);
 });
 
 describe('GET /customers — KPI summary', () => {
@@ -152,16 +160,39 @@ describe('GET /customers?segment=', () => {
   it('filters to the RFM segment server-side, across the whole set', async () => {
     const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=vip`);
     expect(h.rfmFindMany).toHaveBeenCalledWith({
-      where: { storeId: STORE, isGuest: false, segment: 'vip' },
-      select: { customerId: true },
+      where: { storeId: STORE },
+      select: { customerId: true, segment: true },
     });
     expect(res.body.data.data.map((c: { id: string }) => c.id)).toEqual(['u1']);
     expect(res.body.data.meta.total).toBe(1);
   });
 
-  it('segment=guest returns guest rows without an RFM query', async () => {
+  it('resolves a GUEST segment member to its Customers-page row (shared key)', async () => {
+    const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=at_risk`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.data.map((c: { id: string }) => c.id)).toEqual(['guest@x.test']);
+    expect(res.body.data.data[0].segment).toBe('at_risk');
+  });
+
+  it('a snapshot keyed the pre-2026-09-30 way (hash of email:phone) matches nothing', async () => {
+    const { createHash } = await import('node:crypto');
+    const legacy = `GUEST:${createHash('sha256').update('guest@x.test:').digest('hex')}`;
+    h.rfmFindMany.mockResolvedValue([{ customerId: legacy, segment: 'lost' }]);
+    const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=lost`);
+    expect(res.body.data.meta.total).toBe(0);
+  });
+
+  it('attaches each row its segment and lists the segments present', async () => {
+    const res = await request(app).get(`/api/v1/stores/${STORE}/customers?perPage=100`);
+    const byId = Object.fromEntries(
+      res.body.data.data.map((c: { id: string; segment: string | null }) => [c.id, c.segment])
+    );
+    expect(byId).toMatchObject({ u1: 'vip', 'guest@x.test': 'at_risk', u2: null });
+    expect(res.body.data.meta.segments).toEqual(['vip', 'at_risk']);
+  });
+
+  it('segment=guest returns guest rows only', async () => {
     const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=guest`);
-    expect(h.rfmFindMany).not.toHaveBeenCalled();
     expect(res.body.data.data).toHaveLength(1);
     expect(res.body.data.data[0].isGuest).toBe(true);
   });
@@ -170,17 +201,35 @@ describe('GET /customers?segment=', () => {
     const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=bogus`);
     expect(res.status).toBe(200);
     expect(res.body.data.meta.total).toBe(5);
-    expect(h.rfmFindMany).not.toHaveBeenCalled();
   });
 
-  it('refuses an RFM segment filter to staff (rfm-batch is admin-only)', async () => {
+  it('refuses an RFM segment filter to staff, and never sends staff segments', async () => {
     h.caller = { role: 'staff', userId: 'staff-a' };
     const res = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=vip`);
     expect(res.status).toBe(403);
-    expect(h.rfmFindMany).not.toHaveBeenCalled();
-    // …but staff keep the plain list and the guest filter.
-    h.caller = { role: 'staff', userId: 'staff-a' };
+    // …but staff keep the plain list and the guest filter, with no segments.
     const plain = await request(app).get(`/api/v1/stores/${STORE}/customers?segment=guest`);
     expect(plain.status).toBe(200);
+    expect(h.rfmFindMany).not.toHaveBeenCalled();
+    expect(plain.body.data.meta.segments).toBeUndefined();
+    expect(plain.body.data.data[0]).not.toHaveProperty('segment');
+  });
+});
+
+describe('zero-order union (issue 2051)', () => {
+  it('does not add a phantom zero-order row for a user who checked out as a guest', async () => {
+    // u5 has an account but only a guest-checkout order under the same email.
+    h.orderFindMany.mockResolvedValue([order('o9', null, 5000, 'delivered', 'u5@x.test')]);
+    h.userFindMany.mockResolvedValue([
+      { id: 'u5', email: 'U5@x.test', firstName: 'F', lastName: 'L', phone: null },
+    ]);
+    const res = await request(app).get(`/api/v1/stores/${STORE}/customers`);
+    expect(res.body.data.data.map((c: { id: string }) => c.id)).toEqual(['u5@x.test']);
+  });
+
+  it('excludes by real user ids, not by guest contact keys', async () => {
+    await request(app).get(`/api/v1/stores/${STORE}/customers`);
+    const where = h.userFindMany.mock.calls[0][0].where;
+    expect(where.id.notIn.sort()).toEqual(['u1', 'u2', 'u3']);
   });
 });

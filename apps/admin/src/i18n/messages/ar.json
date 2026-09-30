@@ -6489,7 +6489,9 @@
       "aiLabel": "الذكاء الاصطناعي:",
       "shareOfCustomers": "{pct}% من العملاء",
       "shareOfTotal": "{pct}% من الإجمالي",
-      "loadFailed": "تعذّر تحميل بيانات الشرائح"
+      "loadFailed": "تعذّر تحميل بيانات الشرائح",
+      "viewCustomers": "عرض العملاء",
+      "viewSegmentCustomers": "عرض العملاء في شريحة {segment}"
     },
     "products": {
       "title": "سرعة بيع المنتجات",

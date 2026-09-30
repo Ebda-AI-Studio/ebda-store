@@ -2516,3 +2516,79 @@ feature elsewhere sees it only after switching tabs, navigating a full reload, o
 cached value gained `summary`; a v1 entry read after deploy would render an unknown KPI strip for up
 to the 300s TTL. The version bump turns it into a clean miss. Cost if wrong: one extra aggregation
 per store right after deploy.
+
+## 2026-09-30 — Merchant MCP read tools + RFM segment drill-down (branch `feat/mcp-read-tools-rfm-drilldown`)
+
+Source: `force-website-builder-audit-accounting-mcp-2026-09-30.md` §7 and
+`force-website-builder-audit-analytics-2026-09-30.md` §4. Builds on the Customers-page segment
+filter merged in PR 2218.
+
+**Ruling MCP-R1 — the funnel follows owner ruling AUD-2: a stage the platform cannot capture for
+guest shoppers is `null` with a reason, never 0.** `checkoutsStarted` and `ordersAbandoned` come from
+`abandoned_carts`, which guest carts never produce. The AUD-2 text itself was not found in this repo
+or the two audit documents; it is applied as the brief stated it. Cost if wrong: an agent that
+expected a number gets `null` and must read `unavailable`, which the tool description tells it to.
+
+**Ruling MCP-R2 — contact details are always masked on the MCP surface; there is no `includeContact`
+opt-in.** The audit suggested an opt-in flag; every key today carries only `merchant:read`, so a
+flag would unmask for every key and the masking would be decorative. Applied to the existing
+`admin_get_order` / `admin_list_orders` as well — they previously returned full addresses and
+emails, the same PII the customer tools mask. Cost if wrong: an agent drafting a courier hand-off
+cannot read the street address or phone and the merchant copies it from the dashboard.
+
+**Ruling MCP-R3 — no payouts/settlements tool, and no `admin_list_payments` in this batch.** No
+settlement model exists. Exposing `payments` as "collections" is cheap to build but has no dashboard
+surface to be a façade over, so it would be the one tool with its own query and its own definition
+of a collection; it waits for a settlement import to give it a real shape. Cost if wrong: a merchant
+asking "what did MyFatoorah pay me" gets "not available" rather than a per-order payments list.
+
+**Ruling MCP-R4 — delivery `slot` is always `null`, `method` is the booked-shipment carrier or `null`,
+and the zone is reported as the address's area/governorate.** Checkout captures no slot and no
+delivery method, and the matched `ShippingZone` is not stored on the order; resolving it after the
+fact would be a guess once zones are edited. Cost if wrong: an agent sees `method: null` on most
+orders (0 shipments exist in prod per the audit) and must read `deliveryNote`.
+
+**Ruling MCP-R5 — guest customers are referenced by `GUEST:<sha256(key)>`, never by their email or
+phone; a contact-less guest row (`guest:<orderId>`) is listable but has no profile.** Resolved only
+against the calling store's aggregation, so a foreign or invented ref is a tool error. Cost if
+wrong: an agent holding a contact-less guest's ref gets a summary and must use `admin_get_order`.
+
+**Ruling RFM-K1 — guest RFM snapshots are re-keyed from `GUEST:sha256("<email>:<phone>")` to
+`rfmKeyFor(customerKeyOf(order))` (`lib/customer-key.ts`), the Customers-page grouping with the
+contact hashed; no data migration is written.** The nightly `runRfmRollup` recomputes every
+snapshot, and a new stale-row sweep at the end of each run deletes rows whose key no paid order
+produces — which removes every old-format guest row on the first run after deploy. Until that run,
+guest drill-downs match nothing (the old keys cannot be joined — that is the bug) and segment counts
+on the Segments page are unchanged. `previousSegment` history for guests resets once. The cohort
+rollup uses the same key, so a guest who reused an email with a new phone is one cohort member, not
+two. Cost if wrong: for up to a day after deploy a guest-only store's drill-down lists are empty,
+and one night's "segment movers" narration is blind to guest moves.
+
+**Ruling RFM-K2 — the stale-row sweep does not run when a store has zero paid orders.** The early
+return is unchanged, so a store whose every paid order was later refunded keeps its last snapshots.
+Cost if wrong: such a store's Segments page shows customers who no longer qualify, until it has a
+paid order again.
+
+**Ruling RFM-K3 — issue 2051 is fixed here (superseding AUI-3 for 2051 only).** The zero-order union
+now excludes by real user ids, skips a user whose email/phone already keys a guest row, and is
+skipped entirely on a truncated scan. 2046 and 2049 remain open. Cost if wrong: a registered
+shopper with no orders and a contact matching an unrelated guest row is hidden from the list.
+
+**Ruling RFM-K4 — the customer detail route resolves a guest key the way the list groups it.** A
+guest key now matches guest checkouts (no `customer_id`) whose LOWERCASED email is the key, or — for
+an order with no email — whose phone is the key. The old exact-case JSON match 404'd any guest who
+typed a capital letter, and pulled signed-in orders sharing the email into a guest profile. Cost if
+wrong: a merchant who relied on a guest profile also showing that person's signed-in orders now
+sees them only on the registered row.
+
+**Ruling SQL-1 — `::uuid` casts against TEXT id columns removed in three raw queries, with a static
+gate.** Every id/FK column here is TEXT, so `store_id = ${x}::uuid` is `text = uuid` and errors on
+every call: the guest half of `GET /customers/search` and the barcode "order fully picked" check
+were failing at runtime (reproduced on a migrated scratch Postgres; production not queried).
+`tests/unit/raw-sql-no-uuid-cast-on-text-ids.test.ts` fails on the pattern. Cost if wrong: none
+known — the casts could never have succeeded on this schema.
+
+**Ruling MUT-1 — the `storeId` filter on the batched shipments read in `admin_list_orders` survives
+mutation and is kept.** Its `orderId IN (...)` comes from an already store-scoped page and order ids
+are globally unique, so removing `storeId` changes no observable result (an equivalent mutant). It
+stays as defence in depth. Cost if wrong: none; it is one indexed predicate.

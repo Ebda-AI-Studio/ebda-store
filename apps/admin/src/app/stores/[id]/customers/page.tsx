@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
-import { apiGet, apiFetch, unwrapList } from '../../../../lib/api';
+import { apiGet, apiFetch } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { SearchInput } from '@/components/SearchInput';
@@ -16,6 +16,7 @@ import { CustomersKpiStrip, type CustomersSummary } from './_components/Customer
 import {
   SEGMENT_BADGE_CLASSES,
   badgeKeyFor,
+  parseSegmentParam,
   segmentFilterOptions,
   type SegmentFilter,
 } from './_components/customerSegments';
@@ -37,6 +38,9 @@ interface CustomerRow {
   lastOrderDate: string | null;
   /** True when the row was synthesized from a guest order (no customer User row). */
   isGuest: boolean;
+  /** RFM segment resolved server-side (guests included); null = no snapshot.
+   *  Absent for staff, who do not receive segments. */
+  segment?: string | null;
   // The API row also carries the latest address and payment status; the list
   // no longer shows them — they live on the customer detail page, which has
   // the full address block and per-order payment status (audit 2026-09-30 §10).
@@ -53,6 +57,8 @@ interface CustomersListResponse {
     truncated: boolean;
     /** Store-wide KPI strip — unaffected by page, search or segment. */
     summary?: CustomersSummary;
+    /** RFM segments present anywhere in the store (filter pills). */
+    segments?: string[];
   };
 }
 
@@ -65,12 +71,19 @@ export default function StoreCustomersPage() {
   const locale = useLocale();
 
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
-  const [rfmMap, setRfmMap] = useState<Map<string, string>>(new Map());
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [presentSegments, setPresentSegments] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Committed (already debounced by the shared SearchInput) search term.
   const [search, setSearch] = useState('');
-  const [segment, setSegment] = useState<SegmentFilter>('all');
+  // Seeded from `?segment=` so a segment card on Insights → Segments lands
+  // here already filtered (the drill-down), and a reload keeps the filter.
+  const [segment, setSegment] = useState<SegmentFilter>(() =>
+    parseSegmentParam(searchParams?.get('segment'))
+  );
   const [summary, setSummary] = useState<CustomersSummary | null>(null);
   // Server-side pagination state.
   const [page, setPage] = useState(1);
@@ -87,6 +100,19 @@ export default function StoreCustomersPage() {
   useEffect(() => {
     setPage(1);
   }, [search, segment]);
+
+  // Keep `?segment=` in step with the pills so the filtered view is
+  // shareable and survives back-navigation from a customer's detail page.
+  useEffect(() => {
+    const current = searchParams?.get('segment') ?? null;
+    const wanted = segment === 'all' ? null : segment;
+    if (current === wanted || !pathname) return;
+    const qs = new URLSearchParams(searchParams?.toString() ?? '');
+    if (wanted) qs.set('segment', wanted);
+    else qs.delete('segment');
+    const q = qs.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }, [segment, pathname, router, searchParams]);
 
   /**
    * Fetch a single page of aggregated customers from the server. The previous
@@ -127,31 +153,13 @@ export default function StoreCustomersPage() {
       setTotalPages(Math.max(1, data.meta?.totalPages ?? 1));
       setTruncated(Boolean(data.meta?.truncated));
       setSummary(data.meta?.summary ?? null);
+      setPresentSegments(data.meta?.segments ?? []);
     } catch {
       setError(t('connectionError'));
       setSummary(null);
     } finally {
       setIsLoading(false);
     }
-
-    // Segments / RFM fetch is intentionally OUTSIDE the main try/catch so
-    // a segments API failure never sets the customers-page error state and
-    // never leaves the table blank. Badges simply stay hidden.
-    apiGet<Array<{ customerId: string; segment: string }>>(
-      `/api/v1/stores/${storeId}/insights/customers/rfm-batch`
-    )
-      .then(({ data }) => {
-        if (!data) return;
-        const rows = unwrapList<{ customerId: string; segment: string }>(data);
-        setRfmMap(
-          new Map(
-            rows.map((r: { customerId: string; segment: string }) => [r.customerId, r.segment])
-          )
-        );
-      })
-      .catch(() => {
-        // insights not yet computed — RFM badges stay hidden, no error state
-      });
   }, [storeId, t, page, search, segment]);
 
   useEffect(() => {
@@ -205,11 +213,16 @@ export default function StoreCustomersPage() {
 
   const segmentOptions = useMemo(
     () =>
-      segmentFilterOptions(rfmMap.values(), (summary?.guests ?? 0) > 0).map(value => ({
+      // The active segment stays selectable even when the store has no member
+      // in it (a drill-down link to an emptied segment still shows its pill).
+      segmentFilterOptions(
+        segment === 'all' || segment === 'guest' ? presentSegments : [...presentSegments, segment],
+        (summary?.guests ?? 0) > 0
+      ).map(value => ({
         value,
         label: value === 'all' ? t('segmentAll') : t(`badges.${value}`),
       })),
-    [rfmMap, summary?.guests, t]
+    [presentSegments, segment, summary?.guests, t]
   );
 
   /**
@@ -222,7 +235,7 @@ export default function StoreCustomersPage() {
       header: t('colCustomer'),
       primaryOnMobile: true,
       cell: customer => {
-        const badgeKey = badgeKeyFor(customer, rfmMap.get(customer.id));
+        const badgeKey = badgeKeyFor(customer, customer.segment ?? undefined);
         const name = `${customer.firstName} ${customer.lastName}`.trim();
         return (
           // Explicit page direction: DataTable wraps every cell in <bdi>, which

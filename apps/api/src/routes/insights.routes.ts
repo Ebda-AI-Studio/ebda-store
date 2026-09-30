@@ -22,6 +22,7 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { generateInsightNarration } from '../services/accounting/insights-narration.service';
 import { inngest } from '../lib/inngest/client';
+import { listFunnelSnapshots } from '../services/accounting/funnel-report.service';
 
 const router = Router({ mergeParams: true });
 
@@ -311,15 +312,9 @@ router.get(
       }
       const { window: days } = parsed.data;
 
-      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
       const [funnelDays, narration] = await Promise.all([
-        runInTenantContext(storeId, () =>
-          prisma.funnelSnapshot.findMany({
-            where: { storeId, periodDate: { gte: since } },
-            orderBy: { periodDate: 'desc' },
-          })
-        ),
+        // Shared with the merchant MCP `admin_get_funnel` tool.
+        runInTenantContext(storeId, () => listFunnelSnapshots(storeId, days)),
         generateInsightNarration(storeId, 'funnel'),
       ]);
 
@@ -357,16 +352,16 @@ router.get(
       ]);
 
       // Page contract (segments/page.tsx RfmSegmentRow): segment / count /
-      // totalMonetaryFils / recommendedAction as a flat string. The page calls
-      // `seg.segment.replace(...)` and renders `recommendedAction` directly as
-      // text, so the API must emit those exact field names + a flat string.
-      // English is the active locale used consistently across the insights
-      // pages (narration callouts also read `.en`).
+      // totalMonetaryFils / recommendedAction (English, flat string — kept for
+      // existing readers such as the dashboard summary card) plus
+      // recommendedActionAr, so the page renders the admin's locale instead
+      // of always English (analytics audit §4).
       const segments = rawSegments.map(s => ({
         segment: s.segment,
         count: s._count.id,
         totalMonetaryFils: Number(s._sum.monetaryFils ?? 0),
         recommendedAction: SEGMENT_ACTIONS[s.segment]?.en ?? null,
+        recommendedActionAr: SEGMENT_ACTIONS[s.segment]?.ar ?? null,
       }));
 
       res.json({ data: { segments, narration: narration ?? undefined } });

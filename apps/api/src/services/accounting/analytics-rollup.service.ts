@@ -16,10 +16,10 @@
  * Zero-customer stores: every function returns 0 cleanly — no throws.
  */
 
-import crypto from 'crypto';
 import { prisma } from '@force/database';
 import { RfmSegment } from '@force/database';
 import logger from '../../lib/logger';
+import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 
 // ---------------------------------------------------------------------------
 // Public result type
@@ -93,25 +93,25 @@ function monthDiff(startYm: string, endYm: string): number {
   return (ey - sy) * 12 + (em - sm);
 }
 
-/** sha256 hex of a string — used for guest key derivation. */
-function sha256hex(s: string): string {
-  return crypto.createHash('sha256').update(s, 'utf8').digest('hex');
-}
-
-/** Derives the guest customer key from a shipping address JSON object. */
-function guestKey(shippingAddress: unknown): string | null {
-  if (!shippingAddress || typeof shippingAddress !== 'object') return null;
-  const addr = shippingAddress as Record<string, unknown>;
-  const email = typeof addr.email === 'string' ? addr.email.trim().toLowerCase() : '';
-  const phone = typeof addr.phone === 'string' ? addr.phone.trim() : '';
-  if (!email && !phone) return null;
-  const raw = `${email}:${phone}`;
-  const h = sha256hex(raw);
-  // Reject the all-zero-input hash (empty email + empty phone) as a safety net.
-  // sha256('') = e3b0c44... — if both fields were empty we returned null above,
-  // but guard again here.
-  if (raw === ':') return null;
-  return `GUEST:${h}`;
+/**
+ * The customer key an RFM/cohort row is stored under: `customerKeyOf` (the
+ * Customers-page grouping — user id, else lowercased email, else phone) with
+ * a guest's contact hashed by `rfmKeyFor`. Shared with the Customers list so
+ * a segment's members resolve to the rows the merchant sees. `null` = a guest
+ * with no contact at all (skipped).
+ *
+ * Before 2026-09-30 guests were keyed `GUEST:sha256("<email>:<phone>")`,
+ * which the list (keyed by plain email/phone) could never join, and which
+ * split one guest into two customers when they reused an email with a new
+ * phone. Rows in the old format are removed by the stale-row sweep at the end
+ * of `runRfmRollup`, so the first nightly run after deploy converges.
+ */
+function orderCustomerKey(o: {
+  customerId: string | null;
+  shippingAddress: unknown;
+}): string | null {
+  const key = customerKeyOf(o);
+  return key ? rfmKeyFor(key, isGuestOrder(o)) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
   const currentYm = toYearMonth(new Date());
   const cohortMonths = monthRange(launchYm, currentYm);
 
-  // Step 2: load ALL paid orders for this store (customerId + guestKey + createdAt + total)
+  // Step 2: load ALL paid orders for this store (customerId + shipping contact + createdAt + total)
   // We pull the minimum required fields to build cohort memberships in memory.
   type RawOrder = {
     id: string;
@@ -235,7 +235,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
 
   const customerOrders: CustomerOrder[] = [];
   for (const o of allOrders as RawOrder[]) {
-    const key = o.customerId ?? guestKey(o.shippingAddress);
+    const key = orderCustomerKey(o);
     if (!key) continue; // guest with no contact info — skip
     customerOrders.push({ key, createdAt: o.createdAt, total: o.total });
   }
@@ -579,7 +579,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   const statsMap = new Map<string, CustomerStats>();
 
   for (const o of allOrders as RawOrder[]) {
-    const key = o.customerId ?? guestKey(o.shippingAddress);
+    const key = orderCustomerKey(o);
     if (!key) continue;
 
     const isGuest = !o.customerId;
@@ -715,7 +715,26 @@ export async function runRfmRollup(storeId: string): Promise<number> {
     }
   }
 
-  logger.info({ storeId, customers: metrics.length, rowsWritten }, 'rfm-rollup completed');
+  // Stale-row sweep. A snapshot whose key no paid order produces any more —
+  // the customer's paid orders were all refunded/deleted, or the row was
+  // written under the pre-2026-09-30 guest key format — would otherwise keep
+  // counting in the segment totals forever (the unique key means no later
+  // run ever touches it). Only runs when this run computed a full set, and
+  // scoped to this store.
+  let staleRemoved = 0;
+  try {
+    const removed = await prisma.customerRfmSnapshot.deleteMany({
+      where: { storeId, customerId: { notIn: computedRows.map(r => r.customerId) } },
+    });
+    staleRemoved = removed.count;
+  } catch (err) {
+    logger.error({ err, storeId }, 'rfm-rollup: stale snapshot sweep failed');
+  }
+
+  logger.info(
+    { storeId, customers: metrics.length, rowsWritten, staleRemoved },
+    'rfm-rollup completed'
+  );
   return rowsWritten;
 }
 

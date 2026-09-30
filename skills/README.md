@@ -40,4 +40,7 @@ broken product rather than a missing feature. When phase 2 (writes) and phase 3
 (destructive) land, the skills that need them land with them.
 
 Current tools: `admin_get_store`, `admin_list_products`, `admin_get_product`,
-`admin_list_orders`, `admin_get_order`, `admin_get_analytics` — all read-only.
+`admin_list_orders`, `admin_get_order`, `admin_get_analytics`,
+`admin_list_coupons`, `admin_list_customers`, `admin_get_customer`,
+`admin_get_funnel`, `admin_list_reviews` — all read-only. Customer contact
+details come back masked (see `docs/architecture/merchant-mcp.md`).

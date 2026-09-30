@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -16,6 +17,7 @@ interface RfmSegmentRow {
   count: number;
   totalMonetaryFils: number;
   recommendedAction: string | null;
+  recommendedActionAr?: string | null;
 }
 
 interface SegmentsData {
@@ -142,8 +144,20 @@ export default function InsightsSegmentsPage() {
               const revSharePct =
                 totalRevenue > 0 ? ((seg.totalMonetaryFils / totalRevenue) * 100).toFixed(1) : '0';
 
+              const action =
+                locale === 'ar'
+                  ? (seg.recommendedActionAr ?? seg.recommendedAction)
+                  : seg.recommendedAction;
+
+              // Drill-down: the card opens the Customers list filtered to this
+              // segment (server-side `?segment=`), guests included.
               return (
-                <div key={seg.segment} className={`rounded-xl border p-4 space-y-3 ${colorClass}`}>
+                <Link
+                  key={seg.segment}
+                  href={`/stores/${storeId}/customers?segment=${encodeURIComponent(seg.segment)}`}
+                  aria-label={t('viewSegmentCustomers', { segment: t(`segment.${seg.segment}`) })}
+                  className={`block rounded-xl border p-4 space-y-3 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${colorClass}`}
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold">{icon}</span>
                     <span className="text-xs font-medium opacity-70">
@@ -152,8 +166,11 @@ export default function InsightsSegmentsPage() {
                   </div>
                   <div>
                     <h3 className="text-base font-semibold capitalize">
-                      {/* Use i18n label so the display matches the customers page badge */}
-                      {t(`segment.${seg.segment}`) || seg.segment.replace(/_/g, ' ')}
+                      {/* i18n label so the display matches the customers page badge.
+                          Every RfmSegment has a key in en + ar, so no fallback —
+                          `useT` returns the raw key, never '' (the old `||`
+                          fallback could not fire). */}
+                      {t(`segment.${seg.segment}`)}
                     </h3>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -171,13 +188,16 @@ export default function InsightsSegmentsPage() {
                       </p>
                     </div>
                   </div>
-                  {seg.recommendedAction && (
+                  {action && (
                     <div className="border-t border-current/10 pt-2">
                       <p className="text-xs opacity-70 mb-0.5">{t('recommendedAction')}</p>
-                      <p className="text-xs leading-snug">{seg.recommendedAction}</p>
+                      <p className="text-xs leading-snug">{action}</p>
                     </div>
                   )}
-                </div>
+                  <p className="text-xs font-medium underline-offset-2 hover:underline">
+                    {t('viewCustomers')} {locale === 'ar' ? '←' : '→'}
+                  </p>
+                </Link>
               );
             })}
           </div>

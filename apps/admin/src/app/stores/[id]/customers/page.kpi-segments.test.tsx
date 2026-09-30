@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   unwrapList: (d: unknown) => (Array.isArray(d) ? d : []),
 }));
+const nav = vi.hoisted(() => ({ query: '', replace: vi.fn() }));
 
 vi.mock('next-intl', () => {
   const t = Object.assign((key: string) => key, { has: () => true });
@@ -21,7 +22,9 @@ vi.mock('next-intl', () => {
 });
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'store-1' }),
-  useRouter: () => ({ push: () => {} }),
+  useRouter: () => ({ push: () => {}, replace: nav.replace }),
+  usePathname: () => '/stores/store-1/customers',
+  useSearchParams: () => new URLSearchParams(nav.query),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: ReactNode }) => (
@@ -50,6 +53,7 @@ const ROWS = [
     avgOrderValue: 10000,
     lastOrderDate: '2026-09-01T00:00:00.000Z',
     isGuest: false,
+    segment: 'vip',
     address: 'Block 1, Salmiya',
     lastOrderPaymentStatus: 'paid',
   },
@@ -69,19 +73,22 @@ function listResponse(summary: unknown = SUMMARY) {
   return {
     data: {
       data: ROWS,
-      meta: { page: 1, perPage: 20, total: 1, totalPages: 1, truncated: false, summary },
+      meta: {
+        page: 1,
+        perPage: 20,
+        total: 1,
+        totalPages: 1,
+        truncated: false,
+        summary,
+        // Store-wide segments present — the API resolves them (guests included).
+        segments: ['vip'],
+      },
     },
   };
 }
 
 function mockApi(list: () => unknown) {
-  api.apiGet.mockImplementation((url: string) =>
-    Promise.resolve(
-      url.includes('rfm-batch')
-        ? { data: [{ customerId: 'u1', segment: 'vip' }] }
-        : (list() as object)
-    )
-  );
+  api.apiGet.mockImplementation(() => Promise.resolve(list() as object));
 }
 
 function renderPage() {
@@ -92,7 +99,10 @@ function renderPage() {
   );
 }
 
-beforeEach(() => mockApi(() => listResponse()));
+beforeEach(() => {
+  nav.query = '';
+  mockApi(() => listResponse());
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -144,7 +154,7 @@ describe('Customers page table + filters', () => {
     expect(screen.queryByText('paid')).toBeNull();
   });
 
-  it('builds segment pills from the loaded snapshots and filters server-side', async () => {
+  it('builds segment pills from meta.segments and filters server-side', async () => {
     renderPage();
     const vip = await screen.findByRole('radio', { name: 'badges.vip' });
     // Only segments present in the loaded data get a pill (+ All, + Guest).
@@ -162,6 +172,40 @@ describe('Customers page table + filters', () => {
         )
       ).toBe(true)
     );
+    // …and the URL follows, so the filtered view survives a reload / back.
+    await waitFor(() =>
+      expect(nav.replace).toHaveBeenCalledWith('/stores/store-1/customers?segment=vip', {
+        scroll: false,
+      })
+    );
+    // No second RFM round-trip: segments ride on the list response.
+    expect(api.apiGet.mock.calls.some((c: unknown[]) => String(c[0]).includes('rfm-batch'))).toBe(
+      false
+    );
+  });
+
+  it('drill-down: ?segment= from an Insights segment card filters the first request', async () => {
+    nav.query = 'segment=at_risk';
+    renderPage();
+    await screen.findByText('Ahmed S');
+    const first = String(api.apiGet.mock.calls[0]?.[0]);
+    expect(first).toContain('segment=at_risk');
+    // The active segment keeps a pill even if the store has no member in it.
+    expect(screen.getByRole('radio', { name: 'badges.at_risk' })).toBeTruthy();
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it('ignores an unknown ?segment= (unfiltered, like the API)', async () => {
+    nav.query = 'segment=bogus';
+    renderPage();
+    await screen.findByText('Ahmed S');
+    expect(String(api.apiGet.mock.calls[0]?.[0])).not.toContain('segment=');
+  });
+
+  it('badges a row from its server-resolved segment', async () => {
+    renderPage();
+    const row = await screen.findByText('Ahmed S');
+    expect(row.parentElement?.textContent).toContain('badges.vip');
   });
 
   it('uses the shared debounced SearchInput and sends search server-side', async () => {

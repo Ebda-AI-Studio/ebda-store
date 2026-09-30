@@ -74,6 +74,12 @@ Three departures from `Store.agentApiKey`, each deliberate:
 
 ## Tool surface (15 tools, phase 1)
 
+> **Status 2026-09-30:** the read tools shipped, plus five reads this table did
+> not plan (`admin_list_customers`, `admin_get_customer`, `admin_get_funnel`,
+> `admin_list_reviews`; `admin_list_coupons` below). The current, authoritative
+> list is `docs/architecture/merchant-mcp.md`; write and destructive tools
+> remain unbuilt.
+
 Every tool is a **façade over the existing service layer** — no tool re-implements
 business logic, so RLS, feature gates, validation and audit stay in one place.
 

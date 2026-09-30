@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import type { McpStore } from '../resolve-store';
 import { ProductService } from '../../services/product.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
@@ -8,6 +8,7 @@ import { OrderService } from '../../services/order.service';
 import { AnalyticsService } from '../../services/analytics.service';
 import { assertScope, MERCHANT_SCOPES } from '../merchant-auth';
 import { ok } from './tool-result';
+import { maskAddress, maskEmail } from '../../lib/pii-mask';
 
 /**
  * Phase 1 of the merchant-admin MCP surface: READ tools only.
@@ -49,17 +50,75 @@ function deriveCustomerName(o: {
   customer?: { firstName?: string | null; lastName?: string | null; email?: string | null } | null;
   shippingAddress?: unknown;
 }): string | undefined {
+  // A nameless customer falls back to their email — MASKED, like every
+  // contact detail this surface returns (see pii-mask.ts for why).
   const fromUser =
-    `${o.customer?.firstName ?? ''} ${o.customer?.lastName ?? ''}`.trim() || o.customer?.email;
+    `${o.customer?.firstName ?? ''} ${o.customer?.lastName ?? ''}`.trim() ||
+    maskEmail(o.customer?.email);
   if (fromUser) return fromUser;
 
   const addr = (o.shippingAddress ?? {}) as Record<string, unknown>;
   const fromAddress =
     `${typeof addr.firstName === 'string' ? addr.firstName : ''} ${
       typeof addr.lastName === 'string' ? addr.lastName : ''
-    }`.trim() || (typeof addr.email === 'string' ? addr.email : undefined);
+    }`.trim() || maskEmail(typeof addr.email === 'string' ? addr.email : null);
   return fromAddress || undefined;
 }
+
+/**
+ * What an agent may know about where and how an order is delivered.
+ *
+ * Only what the platform actually records — nothing is inferred:
+ *  - `method` is the carrier of a BOOKED shipment (`shipments` row); an order
+ *    with no booked shipment has no recorded delivery method, so it is null.
+ *  - `slot` is always null: checkout does not capture a delivery slot.
+ *  - the zone is expressed as the address's area / governorate (the values
+ *    the shipping-fee calculator matched on); the matched zone row itself is
+ *    not stored on the order.
+ *  - street-level address and phone are never included.
+ */
+export const DELIVERY_FIELDS_NOTE =
+  'delivery.slot is always null (checkout does not capture a delivery slot). ' +
+  'delivery.method is the carrier of a booked shipment and null when none was booked. ' +
+  'area/governorate identify the delivery zone; street address and phone are not returned.';
+
+interface ShipmentSummary {
+  carrier: string;
+  status: string;
+  trackingNumber: string | null;
+  estimatedDeliveryAt: Date | null;
+}
+
+function deliveryOf(o: any, shipment: ShipmentSummary | undefined) {
+  const addr = (o.shippingAddress ?? {}) as Record<string, unknown>;
+  const str = (k: string) => (typeof addr[k] === 'string' && addr[k] ? (addr[k] as string) : null);
+  return {
+    method: shipment?.carrier ?? null,
+    shipmentStatus: shipment?.status ?? null,
+    trackingNumber: shipment?.trackingNumber ?? null,
+    estimatedDeliveryAt: shipment?.estimatedDeliveryAt ?? null,
+    governorate: str('governorate'),
+    // The storefront writes the selected delivery area to `state` on the KW
+    // address model; newer orders also carry an explicit `area`.
+    area: str('area') ?? str('state'),
+    areaAr: str('areaAr'),
+    city: str('city'),
+    country: str('country'),
+    slot: null,
+    shippingFee: o.shipping ?? null,
+    placedAt: o.createdAt,
+    shippedAt: o.shippedAt ?? null,
+    deliveredAt: o.deliveredAt ?? null,
+  };
+}
+
+const SHIPMENT_SUMMARY_SELECT = {
+  orderId: true,
+  carrier: true,
+  status: true,
+  trackingNumber: true,
+  estimatedDeliveryAt: true,
+} as const;
 
 /** Shared shape so a product looks the same from every admin tool. */
 function productSummary(p: any) {
@@ -198,7 +257,8 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
     {
       description:
         "List this store's orders with admin detail — customer, totals, payment " +
-        'and fulfilment status. Filterable by status and date range.',
+        'and fulfilment status, and delivery detail (carrier, area/governorate, ' +
+        'shipped/delivered timestamps). Filterable by status and date range.',
       inputSchema: {
         status: z.string().optional(),
         from: z.string().optional().describe('ISO date, inclusive'),
@@ -229,6 +289,18 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
           limit: args.limit ?? 25,
         })
       );
+      // One batched read for the page's booked shipments (never one per order).
+      const orderIds: string[] = (result.orders ?? []).map((o: any) => o.id);
+      const shipments =
+        orderIds.length > 0
+          ? await runInTenantContext(store.id, () =>
+              prisma.shipment.findMany({
+                where: { storeId: store.id, orderId: { in: orderIds } },
+                select: SHIPMENT_SUMMARY_SELECT,
+              })
+            )
+          : [];
+      const shipmentByOrder = new Map(shipments.map(s => [s.orderId, s]));
       return ok({
         orders: (result.orders ?? []).map((o: any) => ({
           id: o.id,
@@ -240,8 +312,10 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
           customerName: deriveCustomerName(o),
           itemCount: o.items?.length ?? undefined,
           createdAt: o.createdAt,
+          delivery: deliveryOf(o, shipmentByOrder.get(o.id)),
         })),
         pagination: result.pagination ?? result.meta ?? undefined,
+        deliveryNote: DELIVERY_FIELDS_NOTE,
       });
     }
   );
@@ -250,16 +324,41 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
     'admin_get_order',
     {
       description:
-        'Full detail for one order: line items, addresses, payment and shipment ' +
-        'records. Throws if the id belongs to another store.',
+        'Full detail for one order: line items, payment records, delivery detail ' +
+        '(carrier, area/governorate, shipped/delivered timestamps) and the status ' +
+        'history. Addresses are reduced to locality and contact details are MASKED. ' +
+        'Throws if the id belongs to another store.',
       inputSchema: { orderId: z.string().min(1) },
     },
     async ({ orderId }: { orderId: string }, extra: any) => {
       assertScope(extra?.authInfo, MERCHANT_SCOPES.read, 'admin_get_order');
-      const o: any = await runInTenantContext(store.id, () =>
-        OrderService.getById(store.id, orderId)
-      );
-      return ok(o);
+      return runInTenantContext(store.id, async () => {
+        // Store-scoped: throws 404 for another store's order id.
+        const o: any = await OrderService.getById(store.id, orderId);
+        const [shipment, events] = await Promise.all([
+          prisma.shipment.findFirst({
+            where: { storeId: store.id, orderId: o.id },
+            select: SHIPMENT_SUMMARY_SELECT,
+          }),
+          prisma.orderEvent.findMany({
+            where: { storeId: store.id, orderId: o.id },
+            select: { fromStatus: true, toStatus: true, createdAt: true },
+            orderBy: { createdAt: 'asc' },
+            take: 100,
+          }),
+        ]);
+        return ok({
+          ...o,
+          // Masked: this payload lands in a third-party LLM context.
+          shippingAddress: maskAddress(o.shippingAddress),
+          billingAddress: maskAddress(o.billingAddress),
+          customer: o.customer ? { ...o.customer, email: maskEmail(o.customer.email) } : null,
+          delivery: deliveryOf(o, shipment ?? undefined),
+          // Status timestamps: every transition from the append-only order_events trail.
+          statusHistory: events.map(e => ({ from: e.fromStatus, to: e.toStatus, at: e.createdAt })),
+          deliveryNote: DELIVERY_FIELDS_NOTE,
+        });
+      });
     }
   );
 

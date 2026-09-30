@@ -1,29 +1,29 @@
-# Handoff — RLS strict-policy contextless reads
+# Handoff — merchant MCP read tools + RFM segment drill-down
 
-_Updated 2026-09-25. Branch `fix/rls-strict-policy-contextless-reads`, worktree
-`_worktrees/force-website-builder__fix-rls-strict-policy-contextless-reads`, off `origin/main` @ `4b710e6c`._
+_Updated 2026-09-30. Branch `feat/mcp-read-tools-rfm-drilldown`, worktree
+`_worktrees/force-website-builder__feat-mcp-read-tools-rfm-drilldown`, off `origin/main`
+(rebased after PR 2218 merged)._
 
 ## Goal
 
-Fix the defect class behind the 2026-09-25 RLS cutover rollback (public store payloads lost their
-FAQs/how-tos under `force_app`) and add the gate that would have caught it. Production stays on the
-owner role; nothing here flips it.
+Close accounting/MCP audit §7 (merchant MCP read coverage) and analytics audit §4 (RFM segments have
+counts but no drill-down; guest RFM keys cannot join the Customers list).
 
 ## Current state
 
-Code, tests, CI job and docs committed; PR open (not merged). Details + remaining risks:
-`docs/plans/2026-07-02-rls-cutover.md` § "2026-09-25 — first Phase 3 attempt"; rulings RLS-S1…S5 in
-`docs/RULINGS.md`.
+Code, tests and docs committed; PR open against `main`. Not deployed.
 
 ## Done
 
-- 24 STRICT-policy tables enumerated from a migrated scratch Postgres; every contextless reader fixed
-  (public store resolve, AI recommendations, admin FAQ/how-to CRUD, `$transaction` GUC inheritance,
-  checkout backorder insert, 12 bulk-AI jobs, insights narration, R2 orphan check).
-- `scripts/rls-payload-parity.mjs` + CI job "RLS Payload Parity (owner vs force_app)": fails on main
-  (8/111), passes on the branch (111/111).
-- Integration: `tests/integration/public-store-faqs-rls.test.ts` (fails on main, passes here);
-  force_app tests for strict reads, transaction inheritance, `runInStoreScope`, strict-table registry.
+- MCP tools `admin_list_coupons`, `admin_list_customers`, `admin_get_customer`, `admin_get_funnel`,
+  `admin_list_reviews`; delivery detail + status history on the order tools; contact masking on every
+  customer-bearing tool (`lib/pii-mask.ts`).
+- One customer key (`lib/customer-key.ts`) for the Customers list, export, RFM and cohort rollups;
+  aggregation extracted to `services/customer-aggregate.service.ts`; stale RFM snapshot sweep.
+- Segments page cards link to `/customers?segment=`; Customers page reads/syncs `?segment=` and badges
+  guests; Arabic recommended action.
+- Issue 2051 (phantom zero-order rows) fixed; `::uuid`-on-TEXT raw SQL fixed in 3 places + static gate.
+- Rulings MCP-R1…R5, RFM-K1…K4, SQL-1, MUT-1 in `docs/RULINGS.md`.
 
 ## In progress
 
@@ -31,5 +31,8 @@ Nothing.
 
 ## Left to do
 
-- Merge after CI is green, then run the parity script against a restored production copy.
-- Phase 2 staging soak for the admin/Inngest paths the parity gate does not drive (list in the plan).
+- After deploy: the first nightly `analytics-daily-rollup` re-keys guest snapshots (Ruling RFM-K1);
+  until then guest drill-downs are empty. Verify on prod with a read-only count of
+  `customer_rfm_snapshots` rows whose `customer_id` is a `GUEST:` key that no Customers-page row
+  hashes to (should be 0 after the run).
+- Live-check the MCP tools against a store with `merchant_mcp` on (pecannbee) once deployed.
