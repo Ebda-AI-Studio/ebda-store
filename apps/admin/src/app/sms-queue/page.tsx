@@ -155,7 +155,11 @@ export default function SmsQueuePage() {
             <Button variant="outline" size="sm" onClick={() => fetchFailed()}>
               {t('refresh')}
             </Button>
-            <Button size="sm" disabled={retrying || messages.length === 0} onClick={retryAll}>
+            <Button
+              size="sm"
+              disabled={retrying || (stats ? stats.failed === 0 : messages.length === 0)}
+              onClick={retryAll}
+            >
               {retrying ? t('retrying') : t('retryAll')}
             </Button>
           </div>
@@ -196,7 +200,7 @@ export default function SmsQueuePage() {
             rowKey={e => e.id}
             emptyState={
               <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
-                {t('empty')}
+                {(stats?.failed ?? 0) > 0 ? t('emptyUnreadable') : t('empty')}
               </div>
             }
           />
