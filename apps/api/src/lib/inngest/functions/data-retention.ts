@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, withRlsBypass } from '@force/database';
-import { AuthService } from '../../../services/auth.service';
+import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { auditLog } from '../../../middleware/security';
@@ -135,12 +135,14 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
       try {
         await step.run(`anonymize-${id}`, async () => {
           // Retention erasure spans every store (Ruling W-7); actor is 'system'.
-          await AuthService.eraseAccount(id, { actorId: 'system' });
+          const outcome = await AuthService.eraseAccount(id, { actorId: 'system' });
           await auditLog({
             action: 'user.account.anonymized_by_retention_cron',
             userId: id,
             resourceType: 'user',
             resourceId: id,
+            // #1880: record whether the merchant-CRM copy was scrubbed.
+            details: { ...outcome, crmReviewNeeded: eraseNeedsCrmReview(outcome) },
           });
         });
         anonymized += 1;

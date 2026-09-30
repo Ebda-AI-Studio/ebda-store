@@ -31,6 +31,11 @@ vi.mock('@api/middleware/security', () => ({
   resetEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   auditLog: vi.fn(),
   generateCsrfToken: vi.fn(() => 'csrf'),
+  // #1801: `/auth/refresh` verifies the presented token's signature before
+  // querying Neon. Every case in this file presents a shaped-but-arbitrary
+  // token and expects the route to reach `AuthService.refreshTokens` (mocked
+  // above), so this must return truthy rather than actually verify a JWT.
+  verifyRefreshJwt: vi.fn(() => ({ sub: 'test' })),
 }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: unknown, _res: unknown, next: () => void) => next(),

@@ -365,6 +365,20 @@ describe('restrictPlatformOnlyOrigins — an encoded path cannot buy a permissio
     ['/api/v1/stores/pub%6cic/store-1/coupons', 'percent-encoded l in `public`'],
     ['/api/v1/stores/public/%2e%2e/store-1/customers', 'encoded .. traversal out of /public/'],
     ['/api/v1/stores/public/../store-1/customers', 'literal .. traversal out of /public/'],
+    // #1820: the public-prefix anchor guards only the FIRST segment after
+    // public/; a deeper `..` satisfied it. Every dot segment is refused now.
+    ['/api/v1/stores/public/x/../../store-1/customers', 'deeper .. traversal out of /public/'],
+    ['/api/v1/stores/public/x/%2e%2e/%2e%2e/store-1/customers', 'deeper encoded .. traversal'],
+    ['/api/v1/stores/../store-1/returns', '.. in a per-store allow-listed shape'],
+    ['/api/v1/stores/store-1/./reviews/../customers', 'dot segments inside a per-store shape'],
+    // Deny side (#1820 audit follow-up): the deny patterns match the UNRESOLVED
+    // path, so a traversal INTO a platform-only prefix used to match no deny
+    // pattern and fall through to next().
+    ['/api/v1/stores/public/../../admin/impersonate', '.. traversal into /admin'],
+    ['/api/v1/stores/public/%2e%2e/%2e%2e/admin/stores', 'encoded .. traversal into /admin'],
+    ['/api/v1/foo/../admin/users', '.. traversal into /admin from outside /stores'],
+    ['/api/v1/foo/../payment-settings/store-1', '.. traversal into /payment-settings'],
+    ['/api/v1/stores/public/../../payment-settings/store-1', '.. traversal into /payment-settings'],
     ['/api/v1/stores/store-1/%72eviews', 'percent-encoded r in `reviews`'],
   ])('denies %s (%s)', path => {
     const req = makeReq(MERCHANT_ORIGIN, path);

@@ -127,7 +127,7 @@ export default function CustomerDetailPage() {
   const t = useT('customers.detail');
   const tPrivacy = useT('customers.detail.privacy');
   const { user } = useAuth();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
   // Owner/admin roles only — matches the API's `authorize('store_admin',
   // 'super_admin')` on both routes. Hiding the card for staff/other roles
   // is UX only; the API is the real gate.
@@ -261,16 +261,26 @@ export default function CustomerDetailPage() {
     if (!storeId || !customer) return;
     setIsErasing(true);
     try {
-      const { error: apiError } = await apiPost(
-        `/api/v1/stores/${storeId}/customers/${customer.id}/erase`,
-        {}
-      );
+      const { data, error: apiError } = await apiPost<{
+        crmReviewNeeded?: boolean;
+        crmChecked?: boolean;
+        crmRowsScrubbed?: number;
+      }>(`/api/v1/stores/${storeId}/customers/${customer.id}/erase`, {});
       if (apiError) {
         toastError(tPrivacy('eraseFailed'), apiError.message ?? '');
         setIsErasing(false);
         return;
       }
-      toastSuccess(tPrivacy('erasedToastTitle'), tPrivacy('erasedToastDescription'));
+      // The account is erased either way, but the merchant-CRM copy is
+      // matched by email/phone and can be missed or refused as ambiguous —
+      // say so instead of an unqualified success (#1880).
+      if (data?.crmReviewNeeded) {
+        toastWarning(tPrivacy('erasedCrmReviewTitle'), tPrivacy('erasedCrmAmbiguous'));
+      } else if (data?.crmChecked && data.crmRowsScrubbed === 0) {
+        toastSuccess(tPrivacy('erasedToastTitle'), tPrivacy('erasedCrmNotMatched'));
+      } else {
+        toastSuccess(tPrivacy('erasedToastTitle'), tPrivacy('erasedToastDescription'));
+      }
       setShowEraseModal(false);
       // Do NOT re-fetch: the GET route matches a customer only by
       // customerId or shippingAddress.email/phone, and eraseAccount just
@@ -283,7 +293,7 @@ export default function CustomerDetailPage() {
     } finally {
       setIsErasing(false);
     }
-  }, [storeId, customer, tPrivacy, toastError, toastSuccess, router]);
+  }, [storeId, customer, tPrivacy, toastError, toastSuccess, toastWarning, router]);
 
   const displayName =
     customer && (customer.firstName || customer.lastName)

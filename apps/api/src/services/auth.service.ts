@@ -148,6 +148,34 @@ const REASON_ROTATED = 'rotated';
  */
 const REASON_GRACE_PREFIX = 'rotated_grace_';
 
+/**
+ * What `eraseAccount` did to the merchant-CRM copy of the shopper (#1880).
+ * The `customers` table has no FK to `users`, so the scrub matches by
+ * email/phone and can legitimately find nothing (a differently-normalised
+ * phone, a changed email) or refuse an ambiguous match. Callers record this
+ * in the audit row and surface it, so an erasure that left the CRM copy
+ * readable is not reported as complete.
+ */
+export interface EraseOutcome {
+  /** The account had a store and an email/phone, so a CRM copy could exist. */
+  crmChecked: boolean;
+  /** `customers` rows scrubbed. */
+  crmRowsScrubbed: number;
+  /** An identifier matched more than one row, so that identifier scrubbed nothing. */
+  crmAmbiguous: boolean;
+}
+
+/**
+ * True when a CRM copy is KNOWN to have been left behind: an identifier
+ * matched more than one row, so it scrubbed nothing. A zero match is NOT
+ * flagged — CRM rows only exist for shoppers a merchant has grouped, so most
+ * erasures legitimately match nothing; it is recorded (`crmRowsScrubbed: 0`)
+ * and shown as information, not as a failure.
+ */
+export function eraseNeedsCrmReview(o: EraseOutcome): boolean {
+  return o.crmChecked && o.crmAmbiguous;
+}
+
 export class AuthService {
   private static readonly SALT_ROUNDS = 12;
 
@@ -622,6 +650,8 @@ export class AuthService {
     role: string;
     emailVerified: boolean;
     tokenVersion: number;
+    status: string;
+    deletedAt: Date | null;
   }): Promise<{
     user: {
       id: string;
@@ -635,6 +665,19 @@ export class AuthService {
     accessToken: string;
     refreshToken: string;
   }> {
+    // The session-mint chokepoint re-checks status itself (#1864). `login()`
+    // gates before issuing a challenge, but `/auth/mfa/verify` calls this up to
+    // 5 minutes later with a freshly-read row: a super_admin suspended between
+    // the challenge and the TOTP code would otherwise get a live session
+    // stamped with the CURRENT (already-bumped) token version, and the
+    // authenticate middleware only reads status on a tv-cache MISS, which
+    // `revokeAllSessions` just filled. Same code as login's gate. A
+    // soft-deleted row is treated the same — login never finds it
+    // (`deletedAt: null`), and this path must not either.
+    if (user.status !== 'active' || user.deletedAt) {
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is not active');
+    }
+
     const tokens = await this.generateTokens({
       userId: user.id,
       email: user.email,
@@ -942,8 +985,11 @@ export class AuthService {
     }
 
     // Reject refresh for a non-active account. S3-1, 2026-09-22 security
-    // audit: this is the second of the two places a NEW valid session can be
-    // minted (the other is login()) — without this check, an already-open
+    // audit: this is one of the two places a NEW valid session can be minted
+    // (the other is issueSessionFor, reached from login() AND
+    // /auth/mfa/verify, which checks status itself — #1864; super_admin
+    // impersonation in admin.routes.ts signs its own short-lived access token
+    // and is an operator action, not a user session) — without this check, an already-open
     // session on a suspended user kept refreshing forever, independent of
     // whether the admin PUT handler also revoked the row (belt and braces
     // with the revokeAllSessions call added to that handler).
@@ -1412,7 +1458,7 @@ export class AuthService {
   static async eraseAccount(
     userId: string,
     opts: { scopeStoreId?: string; actorId?: string } = {}
-  ): Promise<void> {
+  ): Promise<EraseOutcome> {
     const actorId = opts.actorId ?? 'system';
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -1470,6 +1516,12 @@ export class AuthService {
         select: { playerId: true },
       })
     ).map(s => s.playerId);
+
+    // Set by `anonymize` below: the user's token version after the erase bumps it.
+    let erasedTokenVersion: number | undefined;
+    // What the merchant-CRM scrub actually did (#1880) — returned to the
+    // caller so a partial erasure is recorded and shown, not just logged.
+    const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
 
     const anonymize = async (tx: Prisma.TransactionClient) => {
       // Orders: preserve for tax records (Kuwait MOF ≥5y), drop the PII.
@@ -1581,6 +1633,7 @@ export class AuthService {
         // Both branches therefore require an unambiguous, single-row match. An
         // ambiguous match scrubs NOTHING and says so: a compliance gap someone
         // can act on beats destroying the wrong person's record.
+        outcome.crmChecked = true;
         const crmIdSet = new Set<string>();
 
         if (user.email) {
@@ -1591,6 +1644,7 @@ export class AuthService {
           if (byEmail.length === 1) {
             crmIdSet.add(byEmail[0].id);
           } else if (byEmail.length > 1) {
+            outcome.crmAmbiguous = true;
             logger.warn(
               { userId, storeId: user.storeId, matches: byEmail.length },
               '[auth.eraseAccount] CRM email match is ambiguous (case-variant rows) — scrubbing no email-matched row rather than erasing another data subject'
@@ -1606,6 +1660,7 @@ export class AuthService {
           if (byPhone.length === 1) {
             crmIdSet.add(byPhone[0].id);
           } else if (byPhone.length > 1) {
+            outcome.crmAmbiguous = true;
             logger.warn(
               { userId, storeId: user.storeId, matches: byPhone.length },
               '[auth.eraseAccount] CRM phone match is ambiguous — scrubbing no phone-matched row rather than erasing another data subject'
@@ -1650,6 +1705,7 @@ export class AuthService {
               },
             });
           }
+          outcome.crmRowsScrubbed = crmIds.length;
         }
       }
 
@@ -1676,7 +1732,15 @@ export class AuthService {
       // into the original credential. Email is rewritten (not nulled) so
       // the composite-unique (storeId, email) index has no collision risk
       // if the same address is re-registered later.
-      await tx.user.update({
+      //
+      // `tokenVersion` is bumped IN the same write (#1871): deleting the
+      // refresh rows stops the NEXT session, but every access token already
+      // issued carries the old `tv`, and `authenticate` only reads `status` on
+      // a tv-cache miss — so without the bump the erased shopper (on the
+      // merchant path, not even the actor) kept a working 30-minute session
+      // that could write a name/phone straight back onto this row. Atomic with
+      // the erase, so a rolled-back erase does not revoke anything.
+      const erased = await tx.user.update({
         where: { id: userId },
         data: {
           email: anonymizedEmail,
@@ -1688,8 +1752,11 @@ export class AuthService {
           passwordHash: crypto.randomBytes(32).toString('hex'),
           status: 'inactive',
           deletedAt: new Date(),
+          tokenVersion: { increment: 1 },
         },
+        select: { tokenVersion: true },
       });
+      erasedTokenVersion = erased?.tokenVersion;
     };
 
     if (hasTenantContext()) {
@@ -1715,6 +1782,21 @@ export class AuthService {
       // `soft-deleted-user-anonymize` retention cron, scripts. Own money-safe
       // transaction, exactly as before.
       await withMoneyTx(prisma, anonymize);
+    }
+
+    // Push the bumped token version into the tv cache the authenticate
+    // middleware reads FIRST — a warm cache still holding the old version
+    // would keep accepting the old access tokens (the cache key has no TTL).
+    // Same step `revokeAllSessions` performs. Deferred so the ambient-tx
+    // branch only revokes once the erase has COMMITTED; inline (awaited)
+    // everywhere else. Fail-open like revokeAllSessions: the DB bump stands.
+    if (erasedTokenVersion !== undefined) {
+      const tv = erasedTokenVersion;
+      await deferAfterTenantCommit('auth.eraseAccount.revoke-sessions', async () =>
+        redis.setUserTokenVersion(userId, tv)
+      ).catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] token-version cache update failed')
+      );
     }
 
     // The avatar URL was just nulled out of the DB — clean up R2 after
@@ -1744,6 +1826,8 @@ export class AuthService {
     ).catch(err =>
       logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
     );
+
+    return outcome;
   }
 
   /**

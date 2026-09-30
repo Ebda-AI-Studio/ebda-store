@@ -59,6 +59,9 @@ on:
       - 'apps/api/src/lib/ai/product-alt-text-generator.ts'
       - 'apps/api/src/routes/public.routes.ts'
       - 'apps/api/src/services/auth.service.ts'
+      # cors-trust-requires-live-store (#1214): the credentialed-CORS custom-domain
+      # lookup clause lives here, not in middleware/.
+      - 'apps/api/src/lib/cors-cache.ts'
       - 'apps/api/src/services/accounting/**'
       # cart.service.ts holds the ambient-transaction branches. Their
       # absence is a P2003 on the first cart write of a session, and a

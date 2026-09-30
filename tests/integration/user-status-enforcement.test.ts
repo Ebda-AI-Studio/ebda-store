@@ -95,6 +95,10 @@ async function sessionForActor(actor: { id: string; email: string }): Promise<st
       role: true,
       emailVerified: true,
       tokenVersion: true,
+      // issueSessionFor re-checks these itself (#1864), so the actor must be
+      // a genuinely active account.
+      status: true,
+      deletedAt: true,
     },
   });
   const session = await AuthService.issueSessionFor(user);
@@ -135,6 +139,20 @@ describe('S3-1: suspended/inactive users are rejected', () => {
     expect(r.status).toBe(403);
     const body = await r.json();
     expect(body.error.code).toBe('ACCOUNT_SUSPENDED');
+  });
+
+  it('the MFA-verify session mint refuses an account suspended after its challenge (#1864)', async () => {
+    // /auth/mfa/verify calls issueSessionFor with a row it re-reads AFTER the
+    // TOTP check — up to 5 minutes after login()'s own status gate passed.
+    const u = await createUser({ role: 'customer' });
+    await prisma.user.update({ where: { id: u.id }, data: { status: 'suspended' } });
+    const row = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+
+    await expect(AuthService.issueSessionFor(row)).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'ACCOUNT_SUSPENDED',
+    });
+    expect(await prisma.refreshToken.count({ where: { userId: u.id } })).toBe(0);
   });
 
   it('a suspended user cannot refresh an already-open session', async () => {

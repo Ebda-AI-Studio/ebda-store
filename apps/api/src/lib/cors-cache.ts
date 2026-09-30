@@ -42,7 +42,36 @@ export function decideCorsCache(
   return cached.allowed ? 'allow' : 'reject';
 }
 
-/** Bust the CORS cache for a domain (call when a store's domain changes). */
+/**
+ * Prisma `where` for the credentialed-CORS custom-domain lookup (#1214).
+ *
+ * Mirrors `/public/store/resolve`: only an `active` or `suspended` store that
+ * is not soft-deleted keeps its domain as a trusted origin (suspended stores
+ * still serve their branded maintenance page). An inactive or deleted store's
+ * domain used to stay a `credentials: true` origin indefinitely, so offboarding
+ * a merchant never revoked it.
+ *
+ * This NARROWS the trust, it does not remove it: an active, fully configured
+ * merchant domain is still merchant-controlled, which is why the platform-only
+ * origin gate and CSRF tokens (middleware/security.ts) are the real boundary.
+ * There is also no persisted domain-verification state to filter on — the
+ * Store model has no hostname/SSL status column — so "configured" is all this
+ * can check.
+ */
+export function corsCustomDomainWhere(hostname: string) {
+  return {
+    domain: hostname,
+    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },
+    deletedAt: null,
+  };
+}
+
+/**
+ * Bust the CORS cache for a domain. Called when a store's domain changes and,
+ * via `bustStoreCaches`, whenever a store's status or other storefront-visible
+ * state is written. The cache is per-process, so other replicas converge on
+ * `CORS_CACHE_TTL_MS` (2 minutes) — bounded staleness.
+ */
 export function bustCorsCache(domain: string): void {
   const normalized = domain.toLowerCase().replace(/^www\./, '');
   corsDomainCache.delete(normalized);

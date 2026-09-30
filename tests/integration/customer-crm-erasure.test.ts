@@ -144,7 +144,9 @@ describe.skipIf(!hasDb)('eraseAccount scrubs the merchant-CRM copy of the shoppe
   it('anonymizes the `customers` row and hard-deletes its addresses', async () => {
     const s = await seed();
 
-    await AuthService.eraseAccount(s.userId);
+    const outcome = await AuthService.eraseAccount(s.userId);
+    // #1880: the outcome reports the scrub (email and phone hit the same row).
+    expect(outcome).toEqual({ crmChecked: true, crmRowsScrubbed: 1, crmAmbiguous: false });
 
     const crm = await readCustomer(s.ownStoreCustomerId);
     expect(crm).not.toBeNull();
@@ -175,7 +177,10 @@ describe.skipIf(!hasDb)('eraseAccount scrubs the merchant-CRM copy of the shoppe
     const s = await seed();
 
     await AuthService.eraseAccount(s.userId);
-    await expect(AuthService.eraseAccount(s.userId)).resolves.toBeUndefined();
+    // The second pass finds nothing left to scrub and says so.
+    await expect(AuthService.eraseAccount(s.userId)).resolves.toMatchObject({
+      crmRowsScrubbed: 0,
+    });
 
     const crm = await readCustomer(s.ownStoreCustomerId);
     expect(crm!.email).toBe(`erased-${s.ownStoreCustomerId}@anonymized.local`);

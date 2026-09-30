@@ -852,16 +852,6 @@
       "test": "tests/unit/platform-only-origins.test.ts"
     },
     {
-      "id": "origin-public-prefix-rejects-traversal",
-      "domain": "authn / session",
-      "tier": "unit",
-      "why": "the /stores/public/ allow pattern loses its anchor, so `/stores/public/../<id>/customers` satisfies it and a merchant origin reads another tenant's customer PII",
-      "source": "apps/api/src/middleware/security.ts",
-      "find": "  /^\\/api\\/v1\\/stores\\/public\\/[^./][^/]*(\\/|$)/,",
-      "replace": "  /^\\/api\\/v1\\/stores\\/public\\//,",
-      "test": "tests/unit/platform-only-origins.test.ts"
-    },
-    {
       "id": "refresh-bucket-not-shared-unknown",
       "domain": "authn / session",
       "tier": "unit",
@@ -977,8 +967,8 @@
       "tier": "unit",
       "why": "the refresh bucket keys on an UNVERIFIED `sub`, so the caller chooses its own partition — a loop signing a fresh random subject mints a new 120/15min bucket per request and is never throttled, while the route sha256s and hits Neon before any signature check",
       "source": "apps/api/src/middleware/security.ts",
-      "find": "      const verified = jwt.verify(presented, config.jwtSecret, {\n        algorithms: ['HS256'],\n        issuer: 'force-api',\n        audience: 'force-app',\n      });",
-      "replace": "      const verified = jwt.decode(presented);",
+      "find": "    const verified = jwt.verify(presented, config.jwtSecret, {\n      algorithms: ['HS256'],\n      issuer: 'force-api',\n      audience: 'force-app',\n      ignoreExpiration: opts.ignoreExpiration === true,\n    });",
+      "replace": "    const verified = jwt.decode(presented);",
       "test": "tests/unit/refresh-limiter-bucket.test.ts"
     },
     {
@@ -987,8 +977,8 @@
       "tier": "unit",
       "why": "the length ceiling before the HMAC is removed, so a 10mb body is verified once per request — the key generator becomes the amplifier the limiter exists to prevent",
       "source": "apps/api/src/middleware/security.ts",
-      "find": "  if (presented && presented.length <= MAX_REFRESH_TOKEN_CHARS) {",
-      "replace": "  if (presented) {",
+      "find": "  if (presented.length > MAX_REFRESH_TOKEN_CHARS) return null;",
+      "replace": "",
       "test": "tests/unit/refresh-limiter-bucket.test.ts"
     },
     {
@@ -1120,6 +1110,146 @@
       "find": "          if (byEmail.length === 1) {\n            crmIdSet.add(byEmail[0].id);\n          } else if (byEmail.length > 1) {",
       "replace": "          if (byEmail.length >= 1) {\n            for (const c of byEmail) crmIdSet.add(c.id);\n          } else if (byEmail.length > 1) {",
       "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "ratelimit-store-resolved-per-request",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "every limiter is built at module load, before redis.connect(); a store that reads the client once at construction gets null and silently counts per process in production — per-replica budgets that reset on every deploy (#1862)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "    const client = this.resolveClient();\n    if (!client) return this.memory;",
+      "replace": "    return this.memory;",
+      "test": "tests/unit/rate-limit-redis-at-boot.test.ts"
+    },
+    {
+      "id": "ratelimit-never-waits-on-connecting-redis",
+      "domain": "availability",
+      "tier": "unit",
+      "why": "a limiter that uses a client which exists but is not connected queues on ioredis's offline queue and holds the request for seconds at boot or during an outage (#1862)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  redis.isAvailable() ? redis.getClient() : null;",
+      "replace": "  redis.getClient();",
+      "test": "tests/unit/rate-limit-redis-at-boot.test.ts"
+    },
+    {
+      "id": "refresh-failed-body-token-keeps-cookie-session",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "a failed BODY token no longer falls back to the cookie: a cross-site form posting refreshToken=garbage (or a stale iOS localStorage token) either wipes a live cookie session or 401s it instead of rotating it (#1527)",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "        await rotateAndRespond(cookieRefreshToken, undefined);",
+      "replace": "        throw firstError;",
+      "test": "tests/unit/refresh-route-failure-paths.test.ts"
+    },
+    {
+      "id": "refresh-dead-cookie-cleared-despite-body-token",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a dead session whose client posts its refresh token in the BODY (the iOS WebKit web/admin/orders clients) never gets its dead cookies cleared, so the cookieless guest branch in csrfProtection never fires and POST /payments/create 403s permanently (#1527 audit P1)",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "    let sessionDead = isAuthFailure(firstError);",
+      "replace": "    let sessionDead = isAuthFailure(firstError) && !bodyRefreshToken;",
+      "test": "tests/unit/refresh-route-failure-paths.test.ts"
+    },
+    {
+      "id": "refresh-route-verifies-before-db",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "/auth/refresh hashes and queries Neon for any presented blob before a signature check — an unauthenticated DB round trip per request on a route exempt from the global cap (#1801)",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "    if (!verifyRefreshJwt(presented, { ignoreExpiration: true })) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/refresh-route-failure-paths.test.ts"
+    },
+    {
+      "id": "mfa-challenge-algorithms-pinned",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the MFA challenge-token verify loses its HS256 pin — the one verify call that does not pin its algorithm (#1680)",
+      "source": "apps/api/src/routes/mfa.routes.ts",
+      "find": "        algorithms: ['HS256'],",
+      "replace": "",
+      "test": "tests/unit/jwt-verification-lens.test.ts"
+    },
+    {
+      "id": "issue-session-rejects-inactive",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "issueSessionFor mints a session for a suspended or deleted account; /auth/mfa/verify reaches it up to 5 minutes after login()'s status gate, so an account suspended mid-challenge gets a live session (#1864)",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    if (user.status !== 'active' || user.deletedAt) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/issue-session-status-gate.test.ts"
+    },
+    {
+      "id": "erasure-bumps-token-version",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "erasure deletes refresh rows but leaves tokenVersion, so every access token already issued keeps authenticating (warm tv cache) and an erased shopper can write PII back onto the row (#1871)",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "          tokenVersion: { increment: 1 },\n        },\n        select: { tokenVersion: true },",
+      "replace": "        },\n        select: { tokenVersion: true },",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "erasure-pushes-token-version-to-cache",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "the bumped tokenVersion never reaches the tv cache the authenticate middleware reads first (key has no TTL), so the old access tokens stay valid despite the DB bump (#1871)",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    if (erasedTokenVersion !== undefined) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "erasure-reports-crm-scrub",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "erasure stops reporting how many CRM rows it scrubbed, so a partial erasure is audited and shown as complete (#1880)",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "          outcome.crmRowsScrubbed = crmIds.length;",
+      "replace": "",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "origin-gate-rejects-any-dot-segment",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the platform-only origin gate stops refusing . / .. segments: the allow-list patterns constrain only the segments they name and the deny patterns match the UNRESOLVED path, so behind a proxy that resolves .. a merchant origin reaches /stores/:id/customers or /admin (#1820)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  if (hasDotSegment(rawPath) || hasDotSegment(gatePath)) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/platform-only-origins.test.ts"
+    },
+    {
+      "id": "cors-trust-requires-live-store",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "an inactive or soft-deleted store's custom domain stays a credentials:true CORS origin indefinitely (#1214)",
+      "source": "apps/api/src/lib/cors-cache.ts",
+      "find": "    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },\n    deletedAt: null,",
+      "replace": "",
+      "test": "tests/unit/cors-custom-domain-trust.test.ts"
+    },
+    {
+      "id": "mcp-write-tool-calls-the-gate",
+      "domain": "agent identity",
+      "tier": "unit",
+      "why": "a registered write tool that skips assertAgentWrite ships unauthenticated; the gate is per handler, so the registered-tool suite must catch a handler that forgets it (#1643)",
+      "source": "apps/api/src/mcp/tools/cart.tools.ts",
+      "find": "        context = assertAgentWrite('add_to_cart', extra);",
+      "replace": "        context = agentContextFrom(extra);",
+      "test": "tests/unit/mcp-write-tools-gated.test.ts"
+    },
+    {
+      "id": "reset-email-bucket-per-tenant",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "the reset-email budget is keyed on the email alone, so flooding one store's account locks password recovery for the same address on every other store and the platform admin (#1861)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  return `reset-email-${storeId}-${email || 'unknown'}`;",
+      "replace": "  return `reset-email-${email || 'unknown'}`;",
+      "test": "tests/unit/reset-email-limiter.test.ts"
     },
     {
       "id": "money-return-completion-claim",
@@ -1367,7 +1497,7 @@
       "tier": "unit",
       "why": "a browser holding a token cookie but no refresh token keeps its dead session for up to a year, so the cookieless guest CSRF branch never fires and POST /payments/create 403s permanently (#1531)",
       "source": "apps/api/src/routes/auth.routes.ts",
-      "find": "      if (req.cookies?.token || req.cookies?.refresh_token) {\n        clearSessionCookies(res);\n      }",
+      "find": "    if (req.cookies?.token || req.cookies?.refresh_token) {\n      clearSessionCookies(res);\n    }",
       "replace": "",
       "test": "tests/unit/auth-refresh-dead-cookie-clear.test.ts"
     },

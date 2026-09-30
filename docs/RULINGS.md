@@ -1765,6 +1765,15 @@ refresh — which the clients now treat as back-pressure rather than a sign-out,
 so it degrades instead of signing people out. That is the order those two fixes
 had to land in.
 
+> AMENDED (#1801): this ruling named the unauthenticated Neon round trip as the
+> reason the KEY must verify, then left the ROUTE hashing and querying before
+> any signature check. `POST /auth/refresh` now calls the same
+> `verifyRefreshJwt` helper first and 401s `TOKEN_INVALID` without touching the
+> database. It verifies the signature only (`ignoreExpiration`): the DB row's
+> `expiresAt` stays the authority on lifetime, because the JWT `exp` follows
+> `REFRESH_TOKEN_EXPIRES_IN`, which can be shorter than the row, and gating on
+> it would sign out sessions that refresh today.
+
 **Ruling P2-B2-7 — the throttle retry is one attempt, and it is not a recovery
 from a real throttle. Saying so is the point.**
 
@@ -2012,6 +2021,112 @@ here as failed saves rather than as silent credential loss discovered later.
 
 ---
 
+## 2026-09-25 — P2 batch S1 (auth/session core)
+
+**Ruling S1-1 — #1863 is not changed: `/verify-email` keeps sharing
+authLimiter's `<ip>-unknown` bucket, per Ruling P2-B2-3.** That ruling split
+out `/auth/refresh` (the only route a client calls unprompted) and kept every
+other emailless auth route together deliberately, as user-initiated, low-volume
+routes where one per-IP ceiling is the right posture. `/verify-email` is the same
+shape. Cost if wrong: a Kuwait carrier CGNAT egress with 15+ verification or
+reset clicks in 15 minutes 429s the 16th, with authLimiter's "Too many login
+attempts" copy — the fix, if it is ever measured, is the same split P2-B2-3
+names.
+
+**Ruling S1-2 — #1649 is left for the owner, not changed.** Deduplicating
+denied-write audit rows (one row per store/ip/tool/minute) changes what
+`classifyAgentDenials` counts: `integrationBroken` and
+`integrationNeverCredentialed` fire at 3 rows per 16-minute window and
+`anonymousFlood` at 50, so a per-minute sample would delay the first and make
+the second unreachable from one IP unless every row also carries an attempts
+count and the thresholds are re-expressed in attempts. That re-calibrates five
+registered detection defences. Cost if wrong: an anonymous flood keeps opening
+one short interactive transaction per refused write, bounded by publicLimiter
+at 300/min/IP.
+
+**Ruling S1-3 — #1801: `/auth/refresh` verifies the signature, not the
+lifetime.** The JWT `exp` follows `REFRESH_TOKEN_EXPIRES_IN` (`.env.example`
+ships `30d`), while the DB row is written for 365 days, so gating the route on
+`exp` could sign out sessions that refresh today. The DB row's `expiresAt`
+stays the lifetime authority. Cost if wrong: a refresh token signed with a
+since-rotated `JWT_SECRET`, or before the `force-api`/`force-app` claims existed,
+now fails at refresh instead of silently rotating, so a session idle since such
+a change has to log in again.
+
+**Ruling S1-4 — #1862: a limiter with no connected Redis counts in process
+memory, never waits.** The store resolves Redis per request and uses it only
+when `redis.isAvailable()`, so a request at boot or during an outage is served
+at once and still limited per process. The merchant MCP and WBS bridge limiters,
+which had no shared store at all, now use the same store with
+`passOnStoreError: true`, and the WBS key is hashed before it becomes a Redis
+key. Cost if wrong: if production runs more than one replica, each limit that
+used to be N×replicas becomes N, the numbers every limiter's docstring
+already claims; replica count was not verifiable from this session.
+
+**Ruling S1-5 — #1214 is narrowed, not closed: there is no persisted domain
+verification to filter on.** The Store model has no hostname/SSL status column,
+so the CORS lookup can require a live store (active or suspended, not deleted)
+but not a verified domain. Persisting Cloudflare's custom-hostname status needs
+a migration plus a writer, which is outside this batch. Cost if wrong: a merchant
+can still point any hostname it controls at its store and have it trusted for
+credentialed CORS; the platform-only origin gate and CSRF tokens stay the real
+boundary, as the code comment says.
+
+**Ruling S1-6 — #1880: a CRM zero-match is recorded, not flagged.** CRM rows
+exist only for shoppers a merchant has grouped, so most erasures legitimately
+match nothing. `crmReviewNeeded` is true only for an ambiguous match, which is
+known to have left a record behind; a zero-match is written as
+`crmRowsScrubbed: 0` and shown as a note in the success toast. Cost if wrong: a
+real CRM copy that the scrub missed because the phone was normalised
+differently gets a note, not a warning.
+
+**Ruling S1-7 — #1527 is closed by falling back to the cookie, not by
+skipping the clear; `/auth/logout`'s sibling is not changed.** The first
+version cleared cookies only when no body token was sent. The scoped audit
+(P1) showed that reinstated the permanent checkout 403 for the iOS WebKit
+clients (web, admin, orders), which always post their localStorage refresh
+token in the body alongside the cookies: when that session died, the dead
+cookies were never cleared. Now a failed body token with a different cookie
+token present retries rotation with the cookie as an ambient-cookie caller
+(Set-Cookie only, nothing in the body). A live cookie rotates, so garbage in
+the body cannot wipe it. Cookies are cleared only when the cookie token also
+fails on authentication, or when there was no separate cookie token. Both
+halves are mutation entries (`refresh-failed-body-token-keeps-cookie-session`,
+`refresh-dead-cookie-cleared-despite-body-token`). Logout also runs a
+destructive session effect on a simple cross-site POST, but signing out is its
+purpose, and CORS already rejects a form POST from any origin that is not a
+platform origin or a registered store domain before it reaches the route.
+Cost if wrong: a cross-site form can make a victim's live cookie session
+rotate (it cannot read the result, and the session stays valid), and a
+merchant-controlled custom domain can sign a visiting user out.
+
+**Ruling S1-8 — #1861: the same-account availability tradeoff stays.** The
+per-tenant key stops a flood on one store from locking the same email
+elsewhere; it cannot give the targeted account a fresh bucket without giving
+the flood one. The flood itself mails the owner working reset links (15-minute
+links, not invalidated by later requests). Cost if wrong: an attacker who knows
+an address can keep that account's own reset requests at 429, so the owner has
+to use a link already in their inbox.
+
+**Ruling S1-9 — #1864's sibling in super_admin impersonation is left for the
+owner.** `POST /admin/impersonate` signs its own one-hour access token and
+checks `deletedAt` but not `status`, so a super_admin can impersonate a
+suspended account. That may be intended for support investigations. Cost if
+wrong: an impersonation session acts as a suspended account for up to an hour.
+
+**Ruling S1-10 — the `origin-public-prefix-rejects-traversal` mutation entry is
+retired.** Once #1820's `hasDotSegment` check refuses a `.`/`..` segment
+anywhere in the path, removing the `[^./]` anchor on the `/stores/public/`
+pattern changes nothing observable: every traversal the anchor stopped is
+stopped first by the whole-path check, and the entry scored SURVIVED. The
+anchor stays in the code as belt and braces; the property is tracked by
+`origin-gate-rejects-any-dot-segment`, which KILLS (the check now runs at the
+top of `restrictPlatformOnlyOrigins`, covering the deny side too). Cost if wrong: if the
+whole-path check is ever removed, the anchor is back to being the only guard
+for the first segment, and no mutation entry would say so.
+
+---
+
 Context: P2 batch M3 (checkout, coupons, loyalty, VAT), 2026-09-25 — issues #181, #193, #1368,
 #1379, #1426, #1427, #1444, #1526, #1528, #1569, #1807.
 
@@ -2244,6 +2359,20 @@ back to writing its OWN fresh row instead of updating the existing one — one
 extra row and a fresh coalescing window, never a lost attempt and never a
 reintroduced interactive transaction per repeat, since the update path itself
 never opens one.
+
+**Ruling S1-11 — merge of main (#2088): the merchant-MCP limiters keep main's
+`mmcp` / `mmcp-ip` prefixes but resolve Redis per request through
+`rateLimitRedisClient`.** Main added `makeRateLimitStore(redis.getClient(), …)`
+to both merchant-MCP limiters while this branch added its own
+`'merchant-mcp'` store to one of them; a union would be a duplicate `store`
+key. `redis.getClient()` evaluated at module load is null (routes are imported
+before `redis.connect()`), which is exactly the #1862 per-process MemoryStore
+defect this batch fixes, so main's two stores were switched to the lazy
+resolver and this branch's duplicate dropped. A sweep of `apps/api/src` found
+no other eager `makeRateLimitStore` call. Cost if wrong: the `mmcp` budget
+keys differ from the `merchant-mcp` name this branch first used, which only
+matters if something outside the code reads those Redis keys by name; grep
+finds nothing that does.
 
 ## 2026-09-26 — Answer-engine Gemini grounding (issue #929)
 

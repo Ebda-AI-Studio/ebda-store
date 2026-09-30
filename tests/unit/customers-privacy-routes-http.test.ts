@@ -65,9 +65,13 @@ vi.mock('@api/middleware/auth', async importOriginal => {
 // which the mocked prisma above provides, keyed to admin-a owning store A
 // and admin-b owning store B for every test below.
 
-vi.mock('@api/services/auth.service', () => ({
-  AuthService: { eraseAccount: h.eraseAccount, exportAccount: h.exportAccount },
-}));
+vi.mock('@api/services/auth.service', async importOriginal => {
+  const actual = await importOriginal<typeof import('@api/services/auth.service')>();
+  return {
+    ...actual,
+    AuthService: { eraseAccount: h.eraseAccount, exportAccount: h.exportAccount },
+  };
+});
 vi.mock('@api/middleware/security', () => ({
   auditLog: h.auditLog,
   writeLimiter: (_req: any, _res: any, next: any) => next(),
@@ -101,7 +105,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   vi.clearAllMocks();
   h.caller = { role: 'store_admin', userId: 'admin-a', impersonatedBy: undefined };
-  h.eraseAccount.mockResolvedValue(undefined);
+  h.eraseAccount.mockResolvedValue({ crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false });
   h.exportAccount.mockResolvedValue({ account: {} });
 
   const dbMock = await import('@force/database');

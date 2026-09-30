@@ -7,8 +7,7 @@ import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { buildMerchantMcpServer } from '../mcp/merchant-mcp-server';
 import { verifyMerchantKey, MERCHANT_MCP_FEATURE, MERCHANT_KEY_HEADER } from '../mcp/merchant-auth';
 import { AppError } from '../middleware/error-handler';
-import { makeRateLimitStore } from '../middleware/security';
-import { redis } from '../services/redis.service';
+import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import logger from '../lib/logger';
 
 /**
@@ -79,7 +78,8 @@ export function merchantMcpIpLimiterKey(req: Request): string {
 }
 
 export const merchantMcpIpLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'mmcp-ip'),
+  // Resolved per request (#1862): redis.getClient() at module load is null.
+  store: makeRateLimitStore(rateLimitRedisClient, 'mmcp-ip'),
   windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
@@ -114,7 +114,9 @@ export function merchantMcpLimiterKey(req: Request): string {
 }
 
 export const merchantMcpLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'mmcp'),
+  // Shared across replicas via Redis (F8, #1862), resolved per request;
+  // fail-OPEN on a Redis store error (see middleware/security.ts).
+  store: makeRateLimitStore(rateLimitRedisClient, 'mmcp'),
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,

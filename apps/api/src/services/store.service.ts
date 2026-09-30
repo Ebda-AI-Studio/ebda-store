@@ -9,6 +9,7 @@ import { sendAlert } from './alerts.service';
 import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
+import { bustCorsCache } from '../lib/cors-cache';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -38,6 +39,9 @@ export async function bustStoreCaches(
   await invalidateCached(`public:store:${storeId}`);
   if (slug) await invalidateCached(`public:store:${slug}`);
   if (domain) await invalidateCached(`public:store:resolve:${domain}`);
+  // The credentialed-CORS trust for the domain depends on the store's status
+  // too (#1214), so it is busted on the same writes.
+  if (domain) bustCorsCache(domain);
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the

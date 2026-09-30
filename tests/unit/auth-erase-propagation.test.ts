@@ -29,8 +29,12 @@ vi.mock('@api/services/account-lockout.service', () => ({
   },
 }));
 
+const { setUserTokenVersion } = vi.hoisted(() => ({
+  setUserTokenVersion: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@api/services/redis.service', () => ({
-  redis: { isAvailable: vi.fn().mockReturnValue(false), getClient: vi.fn() },
+  redis: { isAvailable: vi.fn().mockReturnValue(false), getClient: vi.fn(), setUserTokenVersion },
 }));
 
 vi.mock('@api/services/r2-cleanup.service', () => ({
@@ -103,7 +107,7 @@ vi.mock('@force/database', () => ({
   withRlsBypass: (fn: any) => fn(mockPrisma),
 }));
 
-import { AuthService } from '@api/services/auth.service';
+import { AuthService, eraseNeedsCrmReview } from '@api/services/auth.service';
 
 const CUSTOMER = {
   id: 'user-erase-1',
@@ -152,7 +156,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
   it('resolves successfully even when the account/erased enqueue rejects (fail-open)', async () => {
     sendMock.mockRejectedValue(new Error('inngest is down'));
 
-    await expect(AuthService.eraseAccount(CUSTOMER.id)).resolves.toBeUndefined();
+    await expect(AuthService.eraseAccount(CUSTOMER.id)).resolves.toBeDefined();
 
     // The primary anonymization transaction still ran to completion.
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -342,6 +346,86 @@ describe('AuthService.eraseAccount — the CRM scrub refuses an ambiguous identi
     );
     expect(scrubbed).toEqual(['crm-email']);
     expect(scrubbed).not.toContain('crm-other');
+  });
+});
+
+/**
+ * #1871 — erasure must kill the sessions that are ALREADY open. Deleting the
+ * refresh rows only stops the next one; every issued access token carries the
+ * old `tv`, and `authenticate` reads `status` only on a tv-cache miss. On the
+ * merchant path the shopper is not the actor, so nothing clears their cookies
+ * and their token kept writing PII back onto the erased row.
+ */
+describe('AuthService.eraseAccount — revokes live access tokens (#1871)', () => {
+  it('bumps tokenVersion in the erase write and pushes it into the tv cache', async () => {
+    mockPrisma.user.update.mockResolvedValueOnce({ tokenVersion: 8 });
+
+    await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CUSTOMER.id },
+        data: expect.objectContaining({ tokenVersion: { increment: 1 } }),
+      })
+    );
+    expect(setUserTokenVersion).toHaveBeenCalledWith(CUSTOMER.id, 8);
+  });
+
+  it('still completes the erasure when the tv cache write fails (fail-open)', async () => {
+    mockPrisma.user.update.mockResolvedValueOnce({ tokenVersion: 8 });
+    setUserTokenVersion.mockRejectedValueOnce(new Error('redis down'));
+
+    await expect(AuthService.eraseAccount(CUSTOMER.id)).resolves.toBeDefined();
+  });
+});
+
+/**
+ * #1880 — the CRM scrub can match nothing or refuse an ambiguous match. That
+ * used to be a warn line only, while the route reported an unqualified
+ * success. The outcome is now returned so it reaches the audit row and the UI.
+ */
+describe('AuthService.eraseAccount — reports what the CRM scrub did (#1880)', () => {
+  const withIdentity = (extra: Record<string, unknown>) =>
+    mockPrisma.user.findUnique.mockResolvedValue({ ...CUSTOMER, ...extra });
+
+  it('reports a scrubbed row', async () => {
+    withIdentity({ phone: '96550001111', email: null });
+    mockPrisma.customer.findMany.mockResolvedValue([{ id: 'crm-only' }]);
+
+    const o = await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(o).toEqual({ crmChecked: true, crmRowsScrubbed: 1, crmAmbiguous: false });
+    expect(eraseNeedsCrmReview(o)).toBe(false);
+  });
+
+  it('reports a miss (recorded, but most shoppers have no CRM row, so not a review flag)', async () => {
+    withIdentity({ phone: '96550001111', email: null });
+    mockPrisma.customer.findMany.mockResolvedValue([]);
+
+    const o = await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(o).toEqual({ crmChecked: true, crmRowsScrubbed: 0, crmAmbiguous: false });
+    expect(eraseNeedsCrmReview(o)).toBe(false);
+  });
+
+  it('reports an ambiguous match as needing review, even when another identifier scrubbed', async () => {
+    withIdentity({ phone: '96550001111', email: 'shopper@example.com' });
+    mockPrisma.customer.findMany
+      .mockResolvedValueOnce([{ id: 'crm-email' }])
+      .mockResolvedValueOnce([{ id: 'crm-email' }, { id: 'crm-other' }]);
+
+    const o = await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(o).toEqual({ crmChecked: true, crmRowsScrubbed: 1, crmAmbiguous: true });
+    expect(eraseNeedsCrmReview(o)).toBe(true);
+  });
+
+  it('does not ask for review when no CRM copy can exist (no store / no identifier)', async () => {
+    withIdentity({ email: null, phone: null });
+    const o = await AuthService.eraseAccount(CUSTOMER.id);
+
+    expect(o.crmChecked).toBe(false);
+    expect(eraseNeedsCrmReview(o)).toBe(false);
   });
 });
 

@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
 import { API_BASE } from '../helpers/api-base';
+import { AuthService } from '../../apps/api/src/services/auth.service';
 
 // One knob (TEST_API_URL) configures the whole integration suite. Neither the
 // server's API_URL nor its API_HOST is read here: API_HOST is a BARE HOSTNAME
@@ -107,31 +108,50 @@ describe('GDPR erase + export endpoints', () => {
     });
     expect(eraseRes.status).toBe(200);
 
-    // Re-export via the JWT — it's still valid (passwordHash rotates
-    // but the in-flight JWT signed against the old payload doesn't
-    // get revoked until expiry). The exported bundle should show the
-    // anonymized identity.
-    const exportRes = await fetch(`${API_URL}/auth/me/export`, {
-      headers: { Authorization: `Bearer ${u.accessToken}` },
-    });
-    expect(exportRes.status).toBe(200);
-    const bundle = await exportRes.json();
-    expect(bundle.user.email).toMatch(/^erased-.*@anonymized\.local$/);
-    expect(bundle.user.firstName).toBe('Erased');
-    expect(bundle.user.lastName).toBe('User');
-    expect(bundle.user.phone).toBeNull();
-    expect(bundle.user.avatar).toBeNull();
-    expect(bundle.user.dateOfBirth).toBeNull();
-    expect(bundle.user.status).toBe('inactive');
+    // Read the result straight from the DB: the access token that performed
+    // the erase is dead afterwards (#1871, asserted below), so it can no
+    // longer be used to export the anonymized bundle.
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: u.userId } });
+    expect(user.email).toMatch(/^erased-.*@anonymized\.local$/);
+    expect(user.firstName).toBe('Erased');
+    expect(user.lastName).toBe('User');
+    expect(user.phone).toBeNull();
+    expect(user.avatar).toBeNull();
+    expect(user.dateOfBirth).toBeNull();
+    expect(user.status).toBe('inactive');
+    expect(user.deletedAt).not.toBeNull();
     // PII-only child rows are gone — addresses, push, loyalty, etc.
-    expect(bundle.addresses).toHaveLength(0);
-    expect(bundle.pushSubscriptions).toHaveLength(0);
-    expect(bundle.onesignalSubscriptions).toHaveLength(0);
-    expect(bundle.loyaltyPoints).toHaveLength(0);
-    expect(bundle.loyaltyTransactions).toHaveLength(0);
+    const where = { userId: u.userId };
+    expect(await prisma.address.count({ where })).toBe(0);
+    expect(await prisma.pushSubscription.count({ where: { customerId: u.userId } })).toBe(0);
+    expect(await prisma.oneSignalSubscription.count({ where })).toBe(0);
+    expect(await prisma.loyaltyPoints.count({ where: { customerId: u.userId } })).toBe(0);
+    expect(await prisma.loyaltyTransaction.count({ where: { customerId: u.userId } })).toBe(0);
   });
 
-  it('erase is idempotent: a second call on the same account succeeds', async () => {
+  it('kills the access token that was live at erase time (#1871)', async () => {
+    const u = await registerCustomer();
+
+    const before = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+    expect(before.status).toBe(200);
+
+    const eraseRes = await fetch(`${API_URL}/auth/me/erase`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+    expect(eraseRes.status).toBe(200);
+
+    // The tv cache was warm from the request above, so this rejects only if
+    // the erase bumped tokenVersion AND pushed it into the cache.
+    const after = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${u.accessToken}` },
+    });
+    expect(after.status).toBe(401);
+  });
+
+  it('erase is idempotent: a second erase of the same account succeeds', async () => {
     const u = await registerCustomer();
 
     const first = await fetch(`${API_URL}/auth/me/erase`, {
@@ -140,11 +160,10 @@ describe('GDPR erase + export endpoints', () => {
     });
     expect(first.status).toBe(200);
 
-    const second = await fetch(`${API_URL}/auth/me/erase`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${u.accessToken}` },
-    });
-    expect(second.status).toBe(200);
+    // The shopper's own token is revoked by the first erase, so the second
+    // pass is the path that repeats in practice: the retention cron
+    // re-running over an already-erased row.
+    await expect(AuthService.eraseAccount(u.userId)).resolves.toBeDefined();
   });
 
   it('rejects unauthenticated erase requests', async () => {

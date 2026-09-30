@@ -23,11 +23,12 @@ import { Router, Request, Response } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
+import { createHash } from 'node:crypto';
 import { prisma } from '@force/database';
 import { groupOrderLinesForDisplay } from '@force/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
-import { makeRateLimitStore } from '../middleware/security';
+import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import {
   EFFECTIVE_STOCK_SELECT,
   effectiveInventory,
@@ -39,7 +40,6 @@ import { AppError } from '../middleware/error-handler';
 import { CustomerAddressService } from '../services/customer-address.service';
 import { encryption } from '../services/encryption.service';
 import { featureService } from '../services/feature.service';
-import { redis } from '../services/redis.service';
 import {
   listPurchasableBundles,
   describeBundleContents,
@@ -68,10 +68,16 @@ const router = Router();
 const bridgeRateLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
-  keyGenerator: req =>
-    (req.headers['x-wbs-api-key'] as string | undefined) ||
-    ipKeyGenerator(req.ip ?? '') ||
-    'anonymous',
+  // The API key is HASHED before it becomes a bucket key: the store is Redis,
+  // and a rate-limit store is not a secret store — a plaintext key would sit
+  // in Redis (and any dump of it) in clear. Same rule as merchantMcpLimiter.
+  keyGenerator: req => {
+    const apiKey = req.headers['x-wbs-api-key'];
+    if (typeof apiKey === 'string' && apiKey) {
+      return `wbs:${createHash('sha256').update(apiKey).digest('hex').slice(0, 24)}`;
+    }
+    return ipKeyGenerator(req.ip ?? '') || 'anonymous';
+  },
   message: {
     success: false,
     error: 'rate_limit_exceeded',
@@ -82,7 +88,10 @@ const bridgeRateLimit = rateLimit({
   // Redis-backed so the 120/min cap is shared across all API replicas (F8)
   // instead of multiplying by replica count — matches every other limiter
   // in the codebase (`middleware/security.ts`).
-  store: makeRateLimitStore(redis.getClient(), 'wa-bridge'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'wa-bridge'),
+  // Fail-OPEN on a Redis store error, same posture as every other limiter
+  // (see middleware/security.ts): a Redis blip must not 500 the bridge.
+  passOnStoreError: true,
 });
 
 // Rate limit applies to every wa-bridge call (including the

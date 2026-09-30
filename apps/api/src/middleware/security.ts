@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit, { ipKeyGenerator, type Store } from 'express-rate-limit';
+import rateLimit, {
+  ipKeyGenerator,
+  MemoryStore,
+  type Options,
+  type Store,
+} from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
@@ -238,7 +243,10 @@ const STOREFRONT_ALLOWED_STORE_PATHS: RegExp[] = [
   // unusable — while working perfectly on store.force-ai.co, which is a
   // platform origin and returns early long before this list is consulted.
   // Anchored against a `.` segment so `/stores/public/../<id>/customers`
-  // cannot satisfy a bare prefix. A store id never begins with a dot.
+  // cannot satisfy a bare prefix. A store id never begins with a dot. Belt and
+  // braces since #1820: restrictPlatformOnlyOrigins refuses a dot segment
+  // ANYWHERE before either list is consulted, and that is the guard the
+  // mutation record tracks.
   /^\/api\/v1\/stores\/public\/[^./][^/]*(\/|$)/,
   // Customer order tracking — lib/api.ts getOrderTimeline. NOT the order list,
   // detail or invoice, which are merchant-admin and stay denied.
@@ -379,6 +387,19 @@ export function restrictPlatformOnlyOrigins(req: Request, res: Response, next: N
   const rawPath = req.path;
   const gatePath = normalizePlatformGatePath(rawPath);
 
+  // No `.`/`..` segment, anywhere, on EITHER side of the gate (#1820). The
+  // allow-list patterns constrain only the segments they name
+  // (`/stores/public/x/../../<id>/customers` satisfied the public prefix), and
+  // the deny patterns are tested against a path `normalizePlatformGatePath`
+  // does NOT resolve, so `/stores/public/../../admin/impersonate` matched no
+  // deny pattern and fell through to next(). Express 4 routes on the
+  // unresolved path so both 404 today, but a proxy or router that resolves
+  // `..` first would hand a merchant origin the admin surface. No real
+  // storefront or admin call contains a whole dot segment, so refuse outright.
+  if (hasDotSegment(rawPath) || hasDotSegment(gatePath)) {
+    return refuseNonPlatformOrigin(req, res, origin, gatePath);
+  }
+
   // Allow-list FIRST: the storefront's own calls under /stores are permitted,
   // everything else under that prefix is not. Order matters — the deny pattern
   // covers the whole prefix, so checking it first would 403 the storefront.
@@ -390,6 +411,7 @@ export function restrictPlatformOnlyOrigins(req: Request, res: Response, next: N
   // encoded variant is refused by the raw test, and a raw path that only
   // LOOKS storefront-shaped until it is decoded is refused by the normalized
   // one. A real storefront call is unencoded and satisfies both.
+  // (Dot segments never reach this point — refused above.)
   const storefrontShaped = (candidate: string) =>
     STOREFRONT_ALLOWED_STORE_PATHS.some(pattern => pattern.test(candidate));
 
@@ -401,6 +423,15 @@ export function restrictPlatformOnlyOrigins(req: Request, res: Response, next: N
     return next();
   }
 
+  return refuseNonPlatformOrigin(req, res, origin, gatePath);
+}
+
+/** True when any whole path segment is `.` or `..`. */
+function hasDotSegment(candidate: string): boolean {
+  return candidate.split('/').some(segment => segment === '.' || segment === '..');
+}
+
+function refuseNonPlatformOrigin(req: Request, res: Response, origin: string, gatePath: string) {
   logger.warn(
     { origin, path: req.path, gatePath, method: req.method },
     '[SECURITY] blocked non-platform origin on a platform-only route'
@@ -626,21 +657,108 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
 type RedisCaller = { call: (...args: any[]) => unknown };
 
 /**
- * Build a RedisStore for express-rate-limit so limits are shared across all API
- * replicas. The default in-memory MemoryStore counts per-process, letting a
- * client multiply its allowance by the replica count under horizontal scale
- * (F8). Returns `undefined` when Redis is unavailable so express-rate-limit
- * falls back to its in-memory store (dev / test only).
+ * Resolves the Redis client a rate limiter should use for THIS request, or
+ * null when Redis is not connected right now.
+ *
+ * Gated on `isAvailable()` (connected), not merely on a client object
+ * existing: ioredis queues commands on a client that is still connecting or
+ * reconnecting, and `maxRetriesPerRequest: 3` would hold the request for
+ * seconds before failing. A limiter must never make a request wait on Redis.
+ */
+export const rateLimitRedisClient = (): RedisCaller | null =>
+  redis.isAvailable() ? redis.getClient() : null;
+
+/**
+ * A rate-limit store that picks its backend PER REQUEST (#1862).
+ *
+ * Every limiter in this file is built at module load, and this module is
+ * imported (via `./routes`) before `redis.connect()` has run — so reading
+ * `redis.getClient()` at construction time returned null for every limiter,
+ * and each one silently counted in a per-process MemoryStore in production:
+ * reset on every deploy, multiplied by the replica count (F8).
+ *
+ * This store defers the decision to the request: when Redis is connected it
+ * delegates to a `RedisStore` (built on first use, rebuilt if the client
+ * object changes); when it is not — during boot, or a mid-life outage — it
+ * counts in a local MemoryStore, so the request is served immediately and is
+ * still limited per process. It never waits on Redis and never throws on
+ * Redis's absence; a Redis COMMAND error still propagates to the limiter,
+ * where the fail-open `passOnStoreError` flag serves the request.
+ */
+class RedisOrMemoryStore implements Store {
+  readonly prefix: string;
+  // Keys are shared across replicas whenever Redis is up.
+  readonly localKeys = false;
+  private readonly memory = new MemoryStore();
+  private redisStore: RedisStore | undefined;
+  private redisStoreClient: RedisCaller | undefined;
+  private options: Options | undefined;
+
+  constructor(
+    private readonly resolveClient: () => RedisCaller | null | undefined,
+    name: string
+  ) {
+    this.prefix = `rl:${name}:`;
+  }
+
+  init(options: Options): void {
+    this.options = options;
+    this.memory.init(options);
+  }
+
+  private current(): Store {
+    const client = this.resolveClient();
+    if (!client) return this.memory;
+    if (!this.redisStore || this.redisStoreClient !== client) {
+      const store = new RedisStore({
+        sendCommand: (...args: string[]) => client.call(...args) as Promise<number | string>,
+        prefix: this.prefix,
+      });
+      // RedisStore loads its Lua scripts from its constructor and never
+      // handles those promises; a failed load is retried inside increment/get,
+      // so mark them handled here instead of leaking an unhandledRejection.
+      store.incrementScriptSha.catch(() => undefined);
+      store.getScriptSha.catch(() => undefined);
+      if (this.options) store.init(this.options);
+      this.redisStore = store;
+      this.redisStoreClient = client;
+    }
+    return this.redisStore;
+  }
+
+  get(key: string) {
+    return this.current().get?.(key);
+  }
+
+  increment(key: string) {
+    return this.current().increment(key);
+  }
+
+  decrement(key: string) {
+    return this.current().decrement(key);
+  }
+
+  resetKey(key: string) {
+    return this.current().resetKey(key);
+  }
+}
+
+/**
+ * Build the store for an express-rate-limit limiter so limits are shared
+ * across all API replicas (F8) whenever Redis is connected. Pass a RESOLVER
+ * (`rateLimitRedisClient`), never `redis.getClient()` evaluated at module load
+ * — that is exactly the null-at-import defect in #1862. A plain client object
+ * is accepted for tests.
  */
 export function makeRateLimitStore(
-  redisClient: RedisCaller | null | undefined,
+  redisClient: RedisCaller | null | undefined | (() => RedisCaller | null | undefined),
   prefix: string
-): Store | undefined {
-  if (!redisClient) return undefined;
-  return new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args) as Promise<number | string>,
-    prefix: `rl:${prefix}:`,
-  });
+): Store {
+  const resolve =
+    typeof redisClient === 'function'
+      ? (redisClient as () => RedisCaller | null | undefined)
+      : () => redisClient;
+  return new RedisOrMemoryStore(resolve, prefix);
 }
 
 // Strict limiter for auth endpoints.
@@ -674,7 +792,7 @@ const skipForLoadTest = (req: Request): boolean => {
 };
 const skipForLoadTestOrTests = (req: Request): boolean => isTestEnv || skipForLoadTest(req);
 export const authLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'auth'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'auth'),
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
   message: {
@@ -711,7 +829,18 @@ export const authLimiter = rateLimit({
  */
 export function resetEmailLimiterKey(req: Request): string {
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  return `reset-email-${email || 'unknown'}`;
+  // Scoped by the tenant the request names (#1861). An account is
+  // `authScope(email, storeId)`, so one email is a DISTINCT account in each
+  // store; a single `reset-<email>` bucket let a flood aimed at store A lock
+  // password recovery for the same address on store B (and on the platform
+  // admin). Rotating `storeId` cannot widen the flood to one inbox: a store
+  // where that email has no account sends nothing. Capped so a caller cannot
+  // mint arbitrarily long Redis keys.
+  const storeId =
+    typeof req.body?.storeId === 'string' && req.body.storeId.trim()
+      ? req.body.storeId.trim().toLowerCase().slice(0, 64)
+      : 'platform';
+  return `reset-email-${storeId}-${email || 'unknown'}`;
 }
 
 /**
@@ -724,13 +853,22 @@ export function resetEmailLimiterKey(req: Request): string {
  * front of `authLimiter`, keyed on the normalised email alone (no IP
  * component) so rotating source IPs cannot reopen it.
  *
+ * AVAILABILITY TRADEOFF (#1861), stated because the flooding side is only half
+ * of it: an IP-independent account budget is symmetric — the account's owner
+ * cannot get a fresh bucket either. Anyone who knows an address can spend its
+ * 3/hour and the owner's own request then 429s. Two things bound that: the key
+ * is per tenant (above), so a flood can only lock the one account it targets;
+ * and the flood itself mails the owner a working reset link each time (links
+ * live 15 minutes and are not invalidated by later requests), so recovery is
+ * delayed to "use the link already in your inbox", not removed.
+ *
  * Not applied to `/reset-password` (the confirm step): that request body is
  * `{ token, password }` — it carries no email to key on, and `authLimiter`
  * already bounds it (IP + the literal string "unknown", since
  * `req.body?.email` is absent) at 15/15min/IP.
  */
 export const resetEmailLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'reset-email'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'reset-email'),
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3,
   message: {
@@ -784,7 +922,7 @@ export function verifyEmailLimiterKey(req: Request): string {
 }
 
 export const verifyEmailLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'verify-email'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'verify-email'),
   windowMs: 15 * 60 * 1000,
   max: 60,
   message: {
@@ -835,8 +973,9 @@ const MAX_REFRESH_TOKEN_CHARS = 4096;
  * that is fatal even though a bucket is not a capability: the attacker would
  * be choosing the partition, so a loop posting `jwt.sign({}, 'x', {subject:
  * randomUUID()})` mints a fresh 120-per-15-min bucket per request and is never
- * throttled — while `AuthService.refreshTokens` sha256s and hits Neon before
- * any signature check, making each one an unauthenticated DB round trip.
+ * throttled. (Each of those also used to cost an unauthenticated Neon round
+ * trip, because the route hashed and queried before any signature check; the
+ * route now verifies first via `verifyRefreshJwt` — #1801.)
  * Verification is a single HMAC (microseconds) and cannot be forged, so
  * bucket cardinality is bounded by real issued sessions. Anything that does
  * not verify — garbage, wrong secret, expired, oversized — shares the strict
@@ -848,26 +987,49 @@ export function refreshLimiterKey(req: Request): string {
     (typeof req.cookies?.refresh_token === 'string' ? req.cookies.refresh_token : undefined);
 
   let subject = 'anon';
-  // Length ceiling before any crypto: bodies are accepted up to 10mb, and
-  // HMAC-ing a 10mb "token" once per request is itself the amplifier. A real
-  // refresh JWT is a few hundred bytes.
-  if (presented && presented.length <= MAX_REFRESH_TOKEN_CHARS) {
-    try {
-      const verified = jwt.verify(presented, config.jwtSecret, {
-        algorithms: ['HS256'],
-        issuer: 'force-api',
-        audience: 'force-app',
-      });
-      if (verified && typeof verified === 'object' && typeof verified.sub === 'string') {
-        subject = verified.sub;
-      }
-    } catch {
-      // Unverifiable token -> shared anonymous bucket. Deliberately silent:
-      // this runs before the route, and the route produces the 401.
-    }
+  // Unverifiable token -> shared anonymous bucket. Deliberately silent: this
+  // runs before the route, and the route produces the 401.
+  const verified = verifyRefreshJwt(presented);
+  if (verified && typeof verified.sub === 'string') {
+    subject = verified.sub;
   }
 
   return `${ipKeyGenerator(req.ip ?? '')}-refresh-${subject}`;
+}
+
+/**
+ * Verify a presented refresh token's SIGNATURE (HS256, force-api/force-app)
+ * and return its payload, or null for anything that does not verify. One
+ * helper for the limiter key above and the `/auth/refresh` route (#1801), so
+ * the two cannot drift.
+ *
+ * Length ceiling before any crypto: bodies are accepted up to 10mb, and
+ * HMAC-ing a 10mb "token" once per request is itself the amplifier. A real
+ * refresh JWT is a few hundred bytes.
+ *
+ * `ignoreExpiration` exists for the ROUTE: there the DB row's `expiresAt` is
+ * the authority on lifetime (`AuthService.refreshTokens` enforces it), and the
+ * JWT's own `exp` follows `REFRESH_TOKEN_EXPIRES_IN`, which may be shorter than
+ * the row. Gating the route on `exp` would sign out sessions that refresh
+ * today. The limiter keeps the stricter reading (expired -> anon bucket).
+ */
+export function verifyRefreshJwt(
+  presented: unknown,
+  opts: { ignoreExpiration?: boolean } = {}
+): jwt.JwtPayload | null {
+  if (typeof presented !== 'string' || !presented) return null;
+  if (presented.length > MAX_REFRESH_TOKEN_CHARS) return null;
+  try {
+    const verified = jwt.verify(presented, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: 'force-api',
+      audience: 'force-app',
+      ignoreExpiration: opts.ignoreExpiration === true,
+    });
+    return verified && typeof verified === 'object' ? verified : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -879,7 +1041,7 @@ export function refreshLimiterKey(req: Request): string {
  * in its bucket.
  */
 export const refreshLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'refresh'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'refresh'),
   windowMs: 15 * 60 * 1000,
   max: 120,
   message: {
@@ -912,7 +1074,7 @@ export const refreshLimiter = rateLimit({
  * office NAT that worked yesterday starts 429-ing today.
  */
 export const refreshIpLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'refresh-ip'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'refresh-ip'),
   windowMs: 15 * 60 * 1000,
   max: 600,
   message: {
@@ -929,7 +1091,7 @@ export const refreshIpLimiter = rateLimit({
 
 // Limiter for API writes (orders, payments)
 export const writeLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'write'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'write'),
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 writes per minute
   message: {
@@ -949,7 +1111,7 @@ export const writeLimiter = rateLimit({
 
 // Stricter limiter for payment operations
 export const paymentLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'payment'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'payment'),
   windowMs: 60 * 1000, // 1 minute
   max: 10, // 10 payment attempts per minute
   message: {
@@ -969,7 +1131,7 @@ export const paymentLimiter = rateLimit({
 
 // File upload limiter - more restrictive
 export const uploadLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'upload'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'upload'),
   windowMs: 60 * 1000, // 1 minute
   max: 20, // 20 uploads per minute
   message: {
@@ -995,7 +1157,7 @@ export const uploadLimiter = rateLimit({
 
 // Daily upload limit per user
 export const dailyUploadLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'upload-daily'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'upload-daily'),
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   max: 500, // 500 uploads per day per user
   message: {
@@ -1019,7 +1181,7 @@ export const dailyUploadLimiter = rateLimit({
 
 // Public API rate limiter - protect public endpoints from abuse
 export const publicLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'public'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'public'),
   windowMs: 60 * 1000, // 1 minute
   // Storefront browsing burns through this fast on real mobile sessions:
   // home + Next.js App Router RSC prefetches on link hover/viewport entry +
@@ -1046,7 +1208,7 @@ export const publicLimiter = rateLimit({
 
 // Store resolver rate limiter - stricter for domain resolution
 export const storeResolveLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'store-resolve'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'store-resolve'),
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 requests per minute
   message: {
@@ -1066,7 +1228,7 @@ export const storeResolveLimiter = rateLimit({
 
 // Cart rate limiter - prevent cart bombing
 export const cartLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'cart'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'cart'),
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 cart operations per minute
   message: {
@@ -1095,7 +1257,7 @@ export const cartLimiter = rateLimit({
 // loop). 5 attempts per minute per IP+session is generous for a real human
 // who fat-fingered their address but cuts off bot enumeration.
 export const newsletterLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'newsletter'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'newsletter'),
   windowMs: 60 * 1000, // 1 minute
   max: 5,
   message: {
@@ -1123,7 +1285,7 @@ export const newsletterLimiter = rateLimit({
 // but prevents rapid enumeration of valid coupon codes.
 // ipKeyGenerator() collapses IPv6 /128 → /64 (ERR_ERL_KEY_GEN_IPV6).
 export const couponValidateLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'coupon-validate'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'coupon-validate'),
   windowMs: 60 * 1000, // 1 minute
   max: 20,
   message: {
@@ -1148,7 +1310,7 @@ export const couponValidateLimiter = rateLimit({
 // bounding scrape/enumeration volume against the targeting resolver.
 // ipKeyGenerator() collapses IPv6 /128 → /64 (ERR_ERL_KEY_GEN_IPV6).
 export const promotionPreviewLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'promotion-preview'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'promotion-preview'),
   windowMs: 60 * 1000, // 1 minute
   max: 20,
   message: {
@@ -1183,7 +1345,7 @@ export const promotionPreviewLimiter = rateLimit({
 // Key by normalized IP so IPv6 /128 bots can't bypass via address churn
 // (ipKeyGenerator collapses to /64 prefix — ERR_ERL_KEY_GEN_IPV6).
 export const viewIngestLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'view-ingest'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'view-ingest'),
   windowMs: 60 * 1000, // 1 minute
   max: 60, // 60 view beacons per minute per IP (generous for real browsing)
   message: {
@@ -1214,7 +1376,7 @@ export const viewIngestLimiter = rateLimit({
 // (no DB lookup — limiters must stay cheap); requests with no tenant header
 // fall back to the normalized IP so they never share one global bucket.
 export const publicTenantLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'public-tenant'),
+  store: makeRateLimitStore(rateLimitRedisClient, 'public-tenant'),
   windowMs: 60 * 1000,
   max: Number(process.env.PUBLIC_TENANT_RATE_LIMIT_PER_MIN) || 6000,
   message: {

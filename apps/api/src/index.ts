@@ -18,6 +18,7 @@ import {
   csrfProtection,
   restrictPlatformOnlyOrigins,
   makeRateLimitStore,
+  rateLimitRedisClient,
 } from './middleware/security';
 import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
@@ -189,6 +190,7 @@ import {
   corsDomainCache,
   CORS_CACHE_TTL_MS,
   CORS_LOOKUP_FAILURE_TTL_MS,
+  corsCustomDomainWhere,
   decideCorsCache,
   isPlatformOrigin,
 } from './lib/cors-cache';
@@ -275,9 +277,10 @@ app.use(
         }
         // decision === 'miss' — fall through to the DB lookup below.
 
-        // Async DB lookup — only allow if a store with this custom domain exists
+        // Async DB lookup — only allow if a LIVE store (active/suspended, not
+        // deleted) owns this custom domain. See corsCustomDomainWhere (#1214).
         prisma.store
-          .findFirst({ where: { domain: hostname }, select: { id: true } })
+          .findFirst({ where: corsCustomDomainWhere(hostname), select: { id: true } })
           .then(store => {
             const allowed = store !== null;
             corsDomainCache.set(hostname, { allowed, expiresAt: Date.now() + CORS_CACHE_TTL_MS });
@@ -352,7 +355,7 @@ app.use(
     // limiters in middleware/security.ts (deliberate availability-over-
     // strictness tradeoff, adversarial audit P2).
     passOnStoreError: true,
-    store: makeRateLimitStore(redis.getClient(), 'global'),
+    store: makeRateLimitStore(rateLimitRedisClient, 'global'),
     // Skip the limiter for two cases:
     //
     // 1. Load test bypass token. We only check when LOAD_TEST_BYPASS_TOKEN

@@ -4,7 +4,11 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
-import { AuthService, GENERIC_RESEND_VERIFICATION_RESULT } from '../services/auth.service';
+import {
+  AuthService,
+  GENERIC_RESEND_VERIFICATION_RESULT,
+  eraseNeedsCrmReview,
+} from '../services/auth.service';
 import {
   authLimiter,
   refreshLimiter,
@@ -13,6 +17,7 @@ import {
   verifyEmailLimiter,
   auditLog,
   generateCsrfToken,
+  verifyRefreshJwt,
 } from '../middleware/security';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
@@ -434,37 +439,36 @@ const refreshGuards = [refreshIpLimiter, refreshLimiter];
 
 // POST /auth/refresh
 router.post('/refresh', refreshGuards, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Accept the refresh token from the JSON body (Bearer/localStorage
-    // clients — the iOS admin PWA) OR the HTTP-only refresh cookie
-    // (pure-browser path). Body wins when both are present so an explicit
-    // localStorage token isn't shadowed by a stale cookie.
-    const bodyRefreshToken = req.body?.refreshToken as string | undefined;
-    const refreshToken = bodyRefreshToken || (req.cookies?.refresh_token as string | undefined);
+  // Accept the refresh token from the JSON body (Bearer/localStorage
+  // clients — the iOS admin PWA) OR the HTTP-only refresh cookie
+  // (pure-browser path). Body wins when both are present so an explicit
+  // localStorage token isn't shadowed by a stale cookie. Read outside the
+  // `try` because the failure path needs to know which one was used.
+  const bodyRefreshToken = req.body?.refreshToken as string | undefined;
+  const cookieRefreshToken =
+    typeof req.cookies?.refresh_token === 'string' ? req.cookies.refresh_token : undefined;
 
-    if (!refreshToken) {
-      // Session cookies present but no refresh token to present is a dead
-      // session, the same fact the 401 branch below heals (#1531): a `token`
-      // cookie minted before rotating refresh tokens shipped, or one whose
-      // `refresh_token` partner is gone. It would otherwise never reach that
-      // branch (this 400 returns first) and, with a 365-day maxAge, keep the
-      // cookieless guest branch in csrfProtection from firing for up to a
-      // year — a permanent 403 on POST /payments/create. A caller with no
-      // session cookie at all gets no Set-Cookie.
-      if (req.cookies?.token || req.cookies?.refresh_token) {
-        clearSessionCookies(res);
-      }
-      res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Refresh token is required' },
-      });
-      return;
+  // Rotate ONE presented token and answer. `presentedInBody` is the body token
+  // when the caller supplied it (Bearer/localStorage clients get the pair back
+  // in the body), undefined for the ambient-cookie path (Set-Cookie only).
+  const rotateAndRespond = async (
+    presented: string,
+    presentedInBody: string | undefined
+  ): Promise<void> => {
+    // Verify the signature BEFORE hashing + querying Neon (#1801). This route
+    // is exempt from the global mutation cap and its per-subject bucket is
+    // 120/15min, so without this every unforgeable-but-garbage blob cost an
+    // unauthenticated DB round trip. Same code as an unknown token, so the
+    // clients' `!res.ok -> rejected` mapping is unchanged. Expiry is left to
+    // the DB row (see verifyRefreshJwt).
+    if (!verifyRefreshJwt(presented, { ignoreExpiration: true })) {
+      throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
     }
 
     // Rotation: this returns a NEW access + NEW refresh token and revokes
     // the presented one. Reuse of an already-rotated token throws inside
     // refreshTokens() and revokes the whole family (see AuthService).
-    const tokens = await AuthService.refreshTokens(refreshToken);
+    const tokens = await AuthService.refreshTokens(presented);
 
     // Replace BOTH cookies with the rotated pair (browser path). The
     // refresh cookie MUST be updated — leaving the old one would make the
@@ -487,7 +491,7 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     // cookie — see the full argument on that function.
     const sessionId = req.headers['x-session-id'] as string | undefined;
     const csrfToken =
-      sessionId && mayIssueCsrfToken(req, tokens.accessToken, bodyRefreshToken)
+      sessionId && mayIssueCsrfToken(req, tokens.accessToken, presentedInBody)
         ? // Bound to the rotated session's owner (decode, not verify — we
           // minted this token microseconds ago) so the issued token is only
           // usable by a request authenticating as that same user.
@@ -520,11 +524,36 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     // 401-retry helpers key off it instead of accessToken).
     res.json({
       success: true,
-      data: bodyRefreshToken
+      data: presentedInBody
         ? { ...tokens, csrfToken, refreshed: true }
         : { csrfToken, refreshed: true },
     });
-  } catch (error) {
+  };
+
+  const refreshToken = bodyRefreshToken || cookieRefreshToken;
+
+  if (!refreshToken) {
+    // Session cookies present but no refresh token to present is a dead
+    // session, the same fact the 401 branch below heals (#1531): a `token`
+    // cookie minted before rotating refresh tokens shipped, or one whose
+    // `refresh_token` partner is gone. It would otherwise never reach that
+    // branch (this 400 returns first) and, with a 365-day maxAge, keep the
+    // cookieless guest branch in csrfProtection from firing for up to a
+    // year — a permanent 403 on POST /payments/create. A caller with no
+    // session cookie at all gets no Set-Cookie.
+    if (req.cookies?.token || req.cookies?.refresh_token) {
+      clearSessionCookies(res);
+    }
+    res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: 'Refresh token is required' },
+    });
+    return;
+  }
+
+  try {
+    await rotateAndRespond(refreshToken, bodyRefreshToken);
+  } catch (firstError) {
     // A refresh that fails on AUTHENTICATION means this browser is holding a
     // session that no longer exists — a revoked family (password change,
     // reuse detection), a deleted account, or natural expiry. The cookies
@@ -540,12 +569,53 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     // Clearing here returns them to a genuinely cookieless state, where guest
     // checkout works. Gated on AppError 401 SPECIFICALLY: a transient failure
     // (database unreachable, Redis down) must never sign every user out.
-    if (error instanceof AppError && error.statusCode === 401) {
+    //
+    // And never on the strength of a BODY token alone (#1527). A body token is
+    // caller-supplied: `express.urlencoded` is mounted globally and
+    // csrfProtection skips /auth/, so a cross-site auto-submitting form posting
+    // `refreshToken=garbage` rides the victim's SameSite=None cookies and 401s
+    // on the garbage — clearing then would wipe a cookie session that was never
+    // tried.
+    //
+    // But not "only when no body token was sent" either (#1527's first
+    // version, reverted after the scoped audit): the iOS
+    // WebKit clients (web, admin, orders) persist the refresh token in
+    // localStorage and ALWAYS post it in the body, with the cookies alongside.
+    // When that session dies, gating the clear on "no body token" kept the dead
+    // cookies forever and brought the permanent checkout 403 back for exactly
+    // that client class. So a failed BODY token with a DIFFERENT cookie token
+    // present retries rotation with the cookie (as an ambient-cookie caller:
+    // Set-Cookie only, no tokens in the body): a live cookie session rotates
+    // and the request succeeds (garbage in the body cannot wipe it), and the
+    // cookies are cleared only when the cookie token ALSO fails on
+    // authentication — or when there was no separate cookie token to try.
+    let error: unknown = firstError;
+    let sessionDead = isAuthFailure(firstError);
+    if (
+      sessionDead &&
+      bodyRefreshToken &&
+      cookieRefreshToken &&
+      cookieRefreshToken !== bodyRefreshToken
+    ) {
+      try {
+        await rotateAndRespond(cookieRefreshToken, undefined);
+        return;
+      } catch (cookieError) {
+        error = cookieError;
+        sessionDead = isAuthFailure(cookieError);
+      }
+    }
+    if (sessionDead) {
       clearSessionCookies(res);
     }
     next(error);
   }
 });
+
+/** A refresh that failed on AUTHENTICATION (not a transient fault). */
+function isAuthFailure(error: unknown): boolean {
+  return error instanceof AppError && error.statusCode === 401;
+}
 
 // POST /auth/logout
 // Optional-auth: we denylist the access-token jti when a valid Bearer token
@@ -691,21 +761,25 @@ router.post(
       const userId = req.user!.userId;
 
       // The shopper's OWN erasure spans every store (Ruling W-7).
-      await AuthService.eraseAccount(userId, { actorId: userId });
+      const outcome = await AuthService.eraseAccount(userId, { actorId: userId });
 
+      // #1880: record what the merchant-CRM scrub did, so a self-service
+      // erasure that left the CRM copy behind is queryable in the audit log.
+      // Not surfaced to the shopper — the merchant CRM is the store's record,
+      // and the shopper cannot act on it.
       await auditLog({
         action: 'user.account.erased',
         userId,
         resourceType: 'user',
         resourceId: userId,
+        details: { ...outcome, crmReviewNeeded: eraseNeedsCrmReview(outcome) },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      // Best-effort clear both auth cookies — the JWT itself is no longer
-      // valid against the user row (passwordHash rotated, status flipped
-      // to inactive) but expiring the cookies removes the dead tokens from
-      // subsequent requests cleanly.
+      // Best-effort clear both auth cookies. The access token itself is
+      // already dead: eraseAccount bumps tokenVersion and pushes it into the
+      // tv cache the authenticate middleware reads first (#1871).
       clearSessionCookies(res);
 
       res.json({

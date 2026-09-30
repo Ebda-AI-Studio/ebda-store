@@ -57,6 +57,26 @@ describe('resetEmailLimiterKey (S5-3)', () => {
     expect(withIp).toBe(withoutIp);
   });
 
+  it('scopes the bucket per tenant — a flood on store A cannot lock the same email on store B (#1861)', () => {
+    const a = resetEmailLimiterKey(req({ email: 'shopper@example.com', storeId: 'store-a' }));
+    const b = resetEmailLimiterKey(req({ email: 'shopper@example.com', storeId: 'store-b' }));
+    const platform = resetEmailLimiterKey(req({ email: 'shopper@example.com' }));
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(platform);
+    expect(b).not.toBe(platform);
+  });
+
+  it('keeps one bucket per account however the storeId is spelled, and caps its length', () => {
+    const canonical = resetEmailLimiterKey(req({ email: 'a@x.com', storeId: 'store-a' }));
+    expect(resetEmailLimiterKey(req({ email: 'a@x.com', storeId: ' Store-A ' }))).toBe(canonical);
+    const huge = resetEmailLimiterKey(req({ email: 'a@x.com', storeId: 'x'.repeat(10_000) }));
+    expect(huge.length).toBeLessThan(200);
+    // A non-string storeId is the platform scope, never a thrown error.
+    expect(resetEmailLimiterKey(req({ email: 'a@x.com', storeId: { not: 'x' } }))).toBe(
+      resetEmailLimiterKey(req({ email: 'a@x.com' }))
+    );
+  });
+
   it('falls back to a shared unknown bucket for a missing/non-string email, never throws', () => {
     expect(() => resetEmailLimiterKey(req({}))).not.toThrow();
     expect(resetEmailLimiterKey(req({}))).toBe(resetEmailLimiterKey(req({ email: 123 })));

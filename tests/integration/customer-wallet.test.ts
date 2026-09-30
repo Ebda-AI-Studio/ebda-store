@@ -515,7 +515,9 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     expect(await ledgerSum(c)).toBe(0);
 
     // Erasure is documented idempotent — a re-run must not fail on the key.
-    await expect(AuthService.eraseAccount(c)).resolves.toBeUndefined();
+    // eraseAccount now returns its CRM-scrub outcome (#1880); a re-run must
+    // still resolve, and must not be flagged as an ambiguous CRM match.
+    await expect(AuthService.eraseAccount(c)).resolves.toMatchObject({ crmAmbiguous: false });
   });
 
   // ─── 8. FK cascade ────────────────────────────────────────────────────

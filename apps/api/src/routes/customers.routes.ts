@@ -7,7 +7,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { getCached, customersCacheKey, invalidateCustomersCache } from '../lib/public-cache';
-import { AuthService } from '../services/auth.service';
+import { AuthService, eraseNeedsCrmReview } from '../services/auth.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 
@@ -1437,10 +1437,15 @@ router.post(
       await resolveStoreCustomerOrThrow(storeId, customerId);
 
       // A store deletes ONLY its own data (owner decision, Ruling W-7).
-      await AuthService.eraseAccount(customerId, {
+      const outcome = await AuthService.eraseAccount(customerId, {
         scopeStoreId: storeId,
         actorId: req.user!.userId,
       });
+      // #1880: the CRM copy is matched by email/phone and can be missed or
+      // refused as ambiguous. Record what happened so a partial erasure is
+      // queryable in the audit log, and tell the admin UI so it does not show
+      // an unqualified success.
+      const crmReviewNeeded = eraseNeedsCrmReview(outcome);
 
       await auditLog({
         action: 'customer.account.erased_by_merchant',
@@ -1448,7 +1453,7 @@ router.post(
         storeId,
         resourceType: 'user',
         resourceId: customerId,
-        details: { actorRole: req.user!.role },
+        details: { actorRole: req.user!.role, ...outcome, crmReviewNeeded },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
@@ -1466,7 +1471,10 @@ router.post(
         logger.warn({ err, storeId, customerId }, '[customers.erase] cache invalidation failed')
       );
 
-      res.json({ success: true, data: { message: 'Customer data erased' } });
+      res.json({
+        success: true,
+        data: { message: 'Customer data erased', ...outcome, crmReviewNeeded },
+      });
     } catch (error) {
       next(error);
     }
