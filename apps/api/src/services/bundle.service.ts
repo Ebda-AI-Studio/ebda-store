@@ -127,6 +127,30 @@ export interface ResolvedBundle {
    * itself; `resolveBundle` only exposes the state, it does not enforce it.
    */
   isPurchasable: boolean;
+  /**
+   * `isPurchasable` WITHOUT the `[startsAt, expiresAt]` clause — every input
+   * that only changes through a WRITE (which busts the caches). A cached
+   * surface stores this plus the window and applies `withinSaleWindow` at
+   * READ time, because crossing a window boundary is not a write and nothing
+   * would invalidate a cached `isPurchasable` (issue 2111).
+   */
+  sellableIgnoringWindow: boolean;
+}
+
+/**
+ * The time half of `isPurchasable`: inside `[startsAt, expiresAt]`, both
+ * bounds inclusive. Accepts ISO strings too, because a value that went
+ * through `getCached`'s JSON round-trip comes back as one.
+ */
+export function withinSaleWindow(
+  w: { startsAt?: Date | string | null; expiresAt?: Date | string | null },
+  now: Date = new Date()
+): boolean {
+  const t = now.getTime();
+  return (
+    (w.startsAt == null || new Date(w.startsAt).getTime() <= t) &&
+    (w.expiresAt == null || t <= new Date(w.expiresAt).getTime())
+  );
 }
 
 /**
@@ -265,13 +289,9 @@ export async function resolveBundle(
   // drift or a 100%-off discount, and neither should silently sell.
   const priceIsSellable = price > 0 || componentSum === 0;
 
-  const isPurchasable =
-    bundle.isActive &&
-    (bundle.startsAt === null || bundle.startsAt <= now) &&
-    (bundle.expiresAt === null || now <= bundle.expiresAt) &&
-    available >= 1 &&
-    allComponentsPurchasable &&
-    priceIsSellable;
+  const sellableIgnoringWindow =
+    bundle.isActive && available >= 1 && allComponentsPurchasable && priceIsSellable;
+  const isPurchasable = sellableIgnoringWindow && withinSaleWindow(bundle, now);
 
   return {
     id: bundle.id,
@@ -289,6 +309,7 @@ export async function resolveBundle(
     startsAt: bundle.startsAt,
     expiresAt: bundle.expiresAt,
     isPurchasable,
+    sellableIgnoringWindow,
   };
 }
 

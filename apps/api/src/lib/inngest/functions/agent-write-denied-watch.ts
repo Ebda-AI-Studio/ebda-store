@@ -86,18 +86,31 @@ function bodyFor(finding: AgentDenialFinding, truncated: boolean): string {
   const window = `${DENIAL_WINDOW_MINUTES} min`;
 
   switch (finding.kind) {
-    case 'platform_fault':
-      // #1653: computed across EVERY store now (a fault spread thinly no
-      // longer hides below any one store's threshold), so this is genuinely
-      // platform-scoped — no single store to name. `storesAffected` is what
-      // used to be implied by "the store named above is an example".
+    case 'platform_fault': {
+      // #1653: computed across EVERY store (a fault spread thinly no longer
+      // hides below any one store's threshold), so the finding is
+      // platform-scoped — but it still NAMES the stores (issue 2061). One
+      // affected store points at that store's own ciphertext, not at a global
+      // env var that is fine; several point at ENCRYPTION_KEY.
+      const named = (finding.stores ?? []).map(s => `"${s.name}" (${s.id})`);
+      const more =
+        (finding.storesAffected ?? 0) > named.length
+          ? ` and ${(finding.storesAffected ?? 0) - named.length} more`
+          : '';
+      const where = named.length > 0 ? ` Store(s): ${named.join(', ')}${more}.` : '';
+      const fix =
+        finding.storesAffected === 1 && finding.stores?.[0]
+          ? `Only ONE store is affected, so this is most likely that store's Store.agent_api_key ` +
+            `ciphertext (a partial key rotation), not the platform ENCRYPTION_KEY — re-issue its key at ` +
+            `/stores/${finding.stores[0].id}/agent-key.`
+          : `Check ENCRYPTION_KEY on the API, then the Store.agent_api_key ciphertext of the stores named.`;
       return (
         `${countPhrase} agent write(s) across ${finding.storesAffected ?? 'multiple'} store(s) were ` +
         `refused in the last ${window} because the credential lookup itself FAILED ` +
         `(details.credential="error") — a DB error or an AES decrypt error, not a caller mistake. ` +
-        `Agent checkout is down and the rows blame the caller. Check ENCRYPTION_KEY on the API and the ` +
-        `Store.agent_api_key ciphertext. Tools: ${tools}.`
+        `Agent checkout is failing and the rows blame the caller.${where} ${fix} Tools: ${tools}.`
       );
+    }
     case 'integration_broken':
       return (
         `${countPhrase} agent write(s) on "${finding.store?.name}" were refused in the last ${window}. ` +
@@ -309,6 +322,7 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
         tools: finding.tools,
         storeId: finding.store?.id,
         storesAffected: finding.storesAffected,
+        storeIds: finding.stores?.map(s => s.id),
         windowMinutes: DENIAL_WINDOW_MINUTES,
         truncated,
         droppedStores,

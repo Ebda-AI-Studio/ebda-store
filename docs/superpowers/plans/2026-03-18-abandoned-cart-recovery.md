@@ -318,7 +318,7 @@ Admin routes (authenticate + authorize('store_admin', 'super_admin') + requireSt
 
 Public route:
 
-- `GET /public/:storeId/cart/recover/:abandonedCartId` — Returns cart items for recovery
+- `GET /stores/public/:storeId/cart/recover/:abandonedCartId?sig=` — Returns cart items for recovery (the path moved under the `/stores` mount; as of 2026-10-01 no storefront code calls it and `markRecovered` has no caller — see issue 2035)
   - Verify HMAC signature from `?sig=` query param
   - Return cart items snapshot + coupon code if exists
   - No auth required (recovery links sent via WhatsApp to anonymous users)

@@ -153,6 +153,9 @@ async function seedStore(tag: string, withFeature: boolean): Promise<Fixture> {
     const g1 = await mkOrder(1, {
       shippingAddress: addr(guestEmail, guestPhone),
       shipping: 1_000,
+      // Shopper free text — the directions + callback number shape (issue 2244).
+      notes: `Behind the mosque, call 9999 8${tag === 'a' ? '421' : '777'} or ${guestEmail}`,
+      customerNotes: 'Leave at the door please',
       shippedAt: new Date('2026-09-20T10:00:00Z'),
       deliveredAt: new Date('2026-09-21T10:00:00Z'),
     });
@@ -527,6 +530,15 @@ describe.skipIf(!hasDb)(
         expect(res.text).not.toContain(A.street);
         expect(res.text).not.toContain(A.guestEmail.toLowerCase());
         expect(res.text).not.toContain(A.guestEmail);
+        // Issue 2244: free-text notes keep their words, lose the contact.
+        expect(p.notes).toBe('Behind the mosque, call [phone] or [email]');
+        expect(p.customerNotes).toBe('Leave at the door please');
+        expect(res.text).not.toContain('9999 8421');
+        // An allowlist, not a spread: internal columns do not ride out, and
+        // no payment carries a payable hosted-checkout link (PR 2301 audit).
+        expect(p.idempotencyKey).toBeUndefined();
+        for (const pay of p.payments ?? []) expect(pay).not.toHaveProperty('paymentUrl');
+        expect(p.storeId).toBeUndefined();
       });
 
       it("admin_get_order still refuses store B's order id", async () => {

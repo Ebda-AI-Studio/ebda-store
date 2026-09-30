@@ -363,6 +363,41 @@ describe('contract: GET /wa-bridge/store-catalog (FWB → WBS consumer)', () => 
     expect(Array.isArray(product.variants)).toBe(true);
   });
 
+  // Issue 2077: the catalog select used `where: { isActive: true }`, so a
+  // product whose variants are ALL disabled filtered to zero variant rows and
+  // `effectiveInventory` fell back to the stale parent column — the bot told
+  // shoppers it was in stock while the cart refused every variant.
+  it('200 — a product whose variants are ALL disabled is out of stock and lists no variants', async () => {
+    const { prisma } = await import('@force/database');
+    (prisma.product.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      {
+        ...MOCK_PRODUCT,
+        inventory: 50, // stale parent column — must NOT be read as stock
+        variants: [
+          {
+            id: 'v1',
+            title: 'Large',
+            price: 3500,
+            inventory: 9,
+            allowBackorder: false,
+            isActive: false,
+          },
+        ],
+      },
+    ]);
+    const res = await request(app)
+      .get('/api/v1/wa-bridge/store-catalog')
+      .set('x-wbs-api-key', TEST_WBS_API_KEY);
+
+    expect(res.status).toBe(200);
+    const product = res.body.catalog.products[0];
+    expect(product.inStock).toBe(false);
+    expect(product.variants).toEqual([]);
+    const args = (prisma.product.findMany as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+    expect(args.select.variants.where).toBeUndefined();
+    expect(args.select.variants.select.isActive).toBe(true);
+  });
+
   it('200 — botCopy is null or record (not undefined)', async () => {
     const res = await request(app)
       .get('/api/v1/wa-bridge/store-catalog')

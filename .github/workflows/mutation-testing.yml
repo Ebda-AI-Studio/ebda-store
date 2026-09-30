@@ -78,6 +78,9 @@ on:
       # there — added because `mutation-gate-trigger-coverage` failed without
       # it (#1319).
       - 'apps/api/src/services/return.service.ts'
+      # ...and the complete route that gates a GATEWAY return refund on
+      # orders:refund, not only returns:write (issue 2024).
+      - 'apps/api/src/routes/return.routes.ts'
       # Carrier clients: iCarry's resolveBaseUrl is the SSRF defence
       # (assertPublicHttpUrl on a merchant-supplied baseUrl). Added because
       # `mutation-gate-trigger-coverage` failed without it — the defence was

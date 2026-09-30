@@ -64,6 +64,19 @@ describe('analytics routes honour the period picker', () => {
     expect(to.toISOString()).toBe(END);
   });
 
+  // Issue 2256: a rejected sub-query is REPORTED in `failed`, so the page can
+  // tell "did not load" from "zero sales" — the 200 alone cannot.
+  it('dashboard: names the sub-queries that failed; an all-good dashboard reports none', async () => {
+    svc.getDashboardStats.mockRejectedValueOnce(new Error('pool timeout'));
+    const partial = await request(app).get(`/stores/s1/analytics/dashboard?${QS}`);
+    expect(partial.status).toBe(200);
+    expect(partial.body.data.stats).toBeNull();
+    expect(partial.body.data.failed).toEqual(['stats']);
+
+    const ok = await request(app).get(`/stores/s1/analytics/dashboard?${QS}`);
+    expect(ok.body.data.failed).toEqual([]);
+  });
+
   it('cashflow: reads startDate/endDate (the names the admin sends)', async () => {
     const res = await request(app).get(`/stores/s1/analytics/cashflow?${QS}`);
     expect(res.status).toBe(200);

@@ -23,6 +23,8 @@ interface SlugRedirectList {
   rows: SlugRedirectRow[];
   total: number;
   limit: number;
+  /** Next page's cursor, or null on the last page (issue 2255). */
+  nextCursor?: string | null;
 }
 
 export default function SlugRedirectsPage() {
@@ -40,6 +42,7 @@ export default function SlugRedirectsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [appliedQuery, setAppliedQuery] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(() => {
     if (!storeId) return;
@@ -59,6 +62,32 @@ export default function SlugRedirectsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Issue 2255: the list used to stop at the first 200 rows with no way to
+  // reach the rest by browsing. "Load more" appends the next page.
+  async function loadMore() {
+    if (!list?.nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setLoadError(null);
+    const params = new URLSearchParams({ cursor: list.nextCursor });
+    if (appliedQuery) params.set('q', appliedQuery);
+    const { data, error: apiError } = await apiGet<SlugRedirectList>(
+      `/api/v1/stores/${storeId}/slug-redirects?${params.toString()}`
+    );
+    setLoadingMore(false);
+    if (apiError || !data) {
+      setLoadError(apiError?.message || t('redirectsLoadError'));
+      return;
+    }
+    setList(prev =>
+      prev
+        ? {
+            ...data,
+            rows: [...prev.rows, ...data.rows.filter(r => !prev.rows.some(p => p.id === r.id))],
+          }
+        : data
+    );
+  }
 
   async function handleDelete(id: string) {
     if (!window.confirm(t('redirectsDeleteConfirm'))) return;
@@ -151,6 +180,18 @@ export default function SlugRedirectsPage() {
               onDelete={handleDelete}
               t={t}
             />
+            {list.nextCursor && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                >
+                  {loadingMore ? t('redirectsLoadingMore') : t('redirectsLoadMore')}
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

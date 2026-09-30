@@ -75,7 +75,9 @@
  * `agent.write.failed` (an AUTHORISED write that then threw) is deliberately
  * out of scope here — a different class with a different owner, already
  * reaching Sentry through the tool handler. Named so it is a decision, not an
- * omission.
+ * omission. (Since issue 2151 an anonymous `open_writes` caller's `failed`
+ * rows are coalesced and may carry `details.count`; the watcher reads only
+ * `agent.write.denied`, so nothing here changes.)
  */
 
 import type { AgentCredentialOutcome } from './agent-auth';
@@ -163,7 +165,18 @@ export interface AgentDenialFinding {
   tools: string[];
   /** Only set on the cross-store roll-up. */
   storesAffected?: number;
+  /**
+   * `platform_fault` only: WHICH stores the faults landed on (newest-first
+   * order is not implied), capped at `MAX_NAMED_STORES`. A decrypt failure
+   * can be one store's corrupted `agent_api_key` ciphertext rather than the
+   * platform `ENCRYPTION_KEY`, and a wake-someone-now alert that names no
+   * store is not actionable (issue 2061).
+   */
+  stores?: Array<{ id: string; name: string; slug?: string }>;
 }
+
+/** How many affected stores a platform-scoped finding names. */
+export const MAX_NAMED_STORES = 10;
 
 /** Single bucket for rows with no recorded source address. */
 const UNKNOWN_IP = '<unknown>';
@@ -250,6 +263,14 @@ export function classifyAgentDenials(rows: AgentDenialRow[]): AgentDenialFinding
       distinctIps: countDistinctIps(allFaults),
       tools: toolsOf(allFaults),
       storesAffected: new Set(allFaults.map(r => r.storeId)).size,
+      stores: [...byStore.entries()]
+        .filter(([, storeRows]) => storeRows.some(r => r.credential === 'error'))
+        .slice(0, MAX_NAMED_STORES)
+        .map(([id, storeRows]) => ({
+          id,
+          name: storeRows.find(r => r.storeName)?.storeName ?? id,
+          slug: storeRows.find(r => r.storeSlug)?.storeSlug ?? undefined,
+        })),
     });
   }
 

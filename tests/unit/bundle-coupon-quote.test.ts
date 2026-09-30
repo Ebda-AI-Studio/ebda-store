@@ -237,6 +237,9 @@ vi.mock('@api/middleware/auth', () => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (_req: any, _res: any, next: any) =>
       next(),
+  // coupons/validate runs optionalAuthenticate (issue 2066): no token = guest.
+  optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
+  customerUserId: () => undefined,
 }));
 vi.mock('@api/middleware/store-access', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

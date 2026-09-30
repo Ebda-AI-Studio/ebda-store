@@ -454,7 +454,8 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
   // in the body), undefined for the ambient-cookie path (Set-Cookie only).
   const rotateAndRespond = async (
     presented: string,
-    presentedInBody: string | undefined
+    presentedInBody: string | undefined,
+    opts: { staleBodyToken?: boolean } = {}
   ): Promise<void> => {
     // Verify the signature BEFORE hashing + querying Neon (#1801). This route
     // is exempt from the global mutation cap and its per-subject bucket is
@@ -474,7 +475,28 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     // Replace BOTH cookies with the rotated pair (browser path). The
     // refresh cookie MUST be updated — leaving the old one would make the
     // next refresh present the now-rotated token and self-revoke the family.
-    setSessionCookies(res, tokens.accessToken, tokens.refreshToken);
+    //
+    // But only when the rotated session is one this browser's cookie already
+    // carries, or the caller is a platform origin (issue 2217). A BODY token
+    // is caller-supplied: csrfProtection skips /auth/, express.urlencoded is
+    // global and every merchant custom domain is CORS-allowlisted with
+    // credentials, so a merchant-origin page could auto-submit the
+    // ATTACKER's own refresh token and have its rotation Set-Cookie'd
+    // (SameSite=None, 365 days) into the victim's browser — silently signing
+    // the victim into the attacker's account. A body-lane caller that is not
+    // replacing its own cookie gets the pair in the body, which is all a
+    // Bearer/localStorage client needs.
+    if (
+      !presentedInBody ||
+      presentedInBody === cookieRefreshToken ||
+      isPlatformOrigin(req.headers.origin as string | undefined, {
+        webUrl: config.webUrl,
+        adminUrl: config.adminUrl,
+        nodeEnv: config.nodeEnv,
+      })
+    ) {
+      setSessionCookies(res, tokens.accessToken, tokens.refreshToken);
+    }
 
     // Re-issue the CSRF token alongside the rotated pair.
     //
@@ -523,11 +545,23 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     //
     // `refreshed` is the success signal for the cookie path (the frontends'
     // 401-retry helpers key off it instead of accessToken).
+    //
+    // `staleRefreshToken` (issue 2170): set on the cookie FALLBACK below, where
+    // the caller's body token was dead and the cookie session was rotated
+    // instead. The caller's stored copy is now a revoked token; presented again
+    // past the rotation grace it trips reuse detection and revokes EVERY
+    // session of the user. The flag tells the client to drop its stored
+    // pair and continue on the cookie. (The pair itself is not returned: this
+    // caller authenticated by the ambient cookie.)
     res.json({
       success: true,
       data: presentedInBody
         ? { ...tokens, csrfToken, refreshed: true }
-        : { csrfToken, refreshed: true },
+        : {
+            csrfToken,
+            refreshed: true,
+            ...(opts.staleBodyToken ? { staleRefreshToken: true } : {}),
+          },
     });
   };
 
@@ -590,6 +624,19 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
     // and the request succeeds (garbage in the body cannot wipe it), and the
     // cookies are cleared only when the cookie token ALSO fails on
     // authentication — or when there was no separate cookie token to try.
+    //
+    // Bound to the SAME principal (issue 1962). The fallback only ever fires
+    // when the two tokens differ, i.e. are different sessions by construction:
+    //  - a body token that does not even verify (the cross-site
+    //    `refreshToken=garbage` form) proved nothing about either session, so
+    //    it neither rotates the cookie nor clears it — rotating it used to
+    //    desync the iOS client's stored copy into a later family revoke;
+    //  - a cookie that belongs to a DIFFERENT user (admin/web/orders share one
+    //    API-domain cookie) is not this caller's session to rotate or clear;
+    //  - only a cookie whose `sub` matches the body token's is the caller's own
+    //    live session, and is rotated;
+    //  - a cookie that does not verify at all is dead whoever sent it, and is
+    //    cleared as before.
     let error: unknown = firstError;
     let sessionDead = isAuthFailure(firstError);
     if (
@@ -598,13 +645,23 @@ router.post('/refresh', refreshGuards, async (req: Request, res: Response, next:
       cookieRefreshToken &&
       cookieRefreshToken !== bodyRefreshToken
     ) {
-      try {
-        await rotateAndRespond(cookieRefreshToken, undefined);
-        return;
-      } catch (cookieError) {
-        error = cookieError;
-        sessionDead = isAuthFailure(cookieError);
+      const bodyClaims = verifyRefreshJwt(bodyRefreshToken, { ignoreExpiration: true });
+      const cookieClaims = verifyRefreshJwt(cookieRefreshToken, { ignoreExpiration: true });
+      if (bodyClaims?.sub && cookieClaims?.sub === bodyClaims.sub) {
+        try {
+          await rotateAndRespond(cookieRefreshToken, undefined, { staleBodyToken: true });
+          return;
+        } catch (cookieError) {
+          error = cookieError;
+          sessionDead = isAuthFailure(cookieError);
+        }
+      } else if (cookieClaims) {
+        // Garbage body token, or a cookie of another principal: this request
+        // is evidence about neither cookie session — leave it untouched.
+        sessionDead = false;
       }
+      // (A cookie that does not verify cannot be anyone's session: it is
+      // cleared below, keeping #1531's heal for a dead cookie.)
     }
     if (sessionDead) {
       clearSessionCookies(res);

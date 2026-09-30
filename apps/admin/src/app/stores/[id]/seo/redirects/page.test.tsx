@@ -104,4 +104,29 @@ describe('slug redirects page', () => {
     expect(await screen.findByText('old-a')).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  // Issue 2255: rows past the first page were reachable only by searching for
+  // a slug the merchant already knew. "Load more" pages through all of them.
+  it('pages through every row with Load more, appending the next page', async () => {
+    apiGet
+      .mockResolvedValueOnce({
+        data: { rows: [row('a'), row('b')], total: 3, limit: 2, nextCursor: 'b' },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { rows: [row('c')], total: 3, limit: 2, nextCursor: null },
+        error: null,
+      });
+    render(<SlugRedirectsPage />);
+    await screen.findByText('old-a');
+
+    fireEvent.click(screen.getByText('redirectsLoadMore'));
+
+    expect(await screen.findByText('old-c')).toBeTruthy();
+    expect(screen.getByText('old-a')).toBeTruthy();
+    expect(String(apiGet.mock.calls[1][0])).toContain('cursor=b');
+    // Last page: no more button, and no "showing N of M" notice.
+    await waitFor(() => expect(screen.queryByText('redirectsLoadMore')).toBeNull());
+    expect(screen.queryByText(/redirectsShowingOf/)).toBeNull();
+  });
 });

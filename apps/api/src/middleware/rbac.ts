@@ -129,7 +129,7 @@ const rolePermissions: Record<Role, Permission[]> = {
 // Permission Checking
 // ==========================================
 
-function hasPermission(role: Role, permission: Permission): boolean {
+export function hasPermission(role: Role, permission: Permission): boolean {
   const permissions = rolePermissions[role];
   return permissions?.includes(permission) || false;
 }

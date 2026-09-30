@@ -130,10 +130,12 @@ not see or remove a spuriously-captured bulk-import alias, or a stale
 redirect blocking an old slug being re-purposed for something new.
 
 - **API** — `apps/api/src/routes/slug-redirects.routes.ts`:
-  `GET /stores/:storeId/slug-redirects?q=` (list, newest first, 200 per
-  request — hard ceiling 500 — returned as `{ rows, total, limit }` so the UI
-  can say "showing 200 of N"; `q` filters by a case-insensitive fragment of
-  either slug, so a row past the cap is still findable)
+  `GET /stores/:storeId/slug-redirects?q=&limit=&cursor=` (list, newest
+  first then id, 200 per request by default — `limit` up to 500 — returned as
+  `{ rows, total, limit, nextCursor }`; pass `nextCursor` back as `cursor` for
+  the next page, `null` on the last one (issue 2255), so every row is
+  reachable by browsing; `q` filters by a case-insensitive fragment of either
+  slug)
   and `DELETE /stores/:storeId/slug-redirects/:id` (delete scoped to BOTH
   `id` and `storeId`, so a merchant cannot delete another tenant's row).
   `authenticate → authorize('store_admin','super_admin') → requireStoreAccess`,
@@ -141,7 +143,8 @@ redirect blocking an old slug being re-purposed for something new.
   `deleteSlugRedirect` in `slug-redirect.service.ts`.
 - **Admin UI** — `/stores/[id]/seo/redirects`, linked from the main SEO
   settings page. Search box, a "showing the newest N of M" notice whenever
-  rows were withheld, and errors as a banner above the table (a failed
+  rows are not all loaded yet plus a "Load more" button that appends the next
+  page, and errors as a banner above the table (a failed
   delete never unmounts it; a failed load offers a retry). **Read + delete only** — there is deliberately no
   create/edit form, since rows are written exclusively by
   `recordSlugRedirect` alongside the entity rename that produced them.

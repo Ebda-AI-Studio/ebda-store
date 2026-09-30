@@ -167,6 +167,15 @@ export function refreshAccessToken(): Promise<string | null> {
           if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
           if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
         }
+        // The server rotated the COOKIE session because our stored token was
+        // dead (issue 2170). The stored refresh token would trip reuse
+        // detection (every session revoked) and the stored access token is a
+        // dead Bearer that outranks the fresh cookie — drop both and continue
+        // on the cookie.
+        if (json.data.staleRefreshToken) {
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('accessToken');
+        }
         // On the cookie path the server rotates the httpOnly cookies but
         // deliberately withholds the token pair from the body (a merchant
         // custom origin must never be able to READ a session token — see

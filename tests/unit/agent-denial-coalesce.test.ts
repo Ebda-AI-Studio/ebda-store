@@ -32,6 +32,8 @@ const mockIncrementRateLimit = vi.fn();
 const mockIsAvailable = vi.fn();
 const mockRedisGet = vi.fn();
 const mockRedisSet = vi.fn();
+const mockRedisDel = vi.fn();
+const mockGetRateLimitCount = vi.fn();
 
 vi.mock('@force/database', () => ({
   prisma: {
@@ -48,10 +50,12 @@ vi.mock('@api/middleware/security', () => ({ auditLog: (...a: unknown[]) => mock
 vi.mock('@api/services/redis.service', () => ({
   redis: {
     incrementRateLimit: (...a: unknown[]) => mockIncrementRateLimit(...a),
+    getRateLimitCount: (...a: unknown[]) => mockGetRateLimitCount(...a),
     isAvailable: () => mockIsAvailable(),
     getClient: () => ({
       get: (...a: unknown[]) => mockRedisGet(...a),
       set: (...a: unknown[]) => mockRedisSet(...a),
+      del: (...a: unknown[]) => mockRedisDel(...a),
     }),
   },
 }));
@@ -76,15 +80,32 @@ const context: McpAgentContext = {
   grant: 'denied',
 };
 
-/** In-memory fake for the `<key>:row` id cache — a real Redis GET/SET pair. */
+/**
+ * In-memory fake for the `<key>:row` id cache — a real Redis GET/SET/DEL,
+ * honouring `NX` (the reservation the first writer takes, issue 2150).
+ */
 function fakeRedisRowCache() {
   const store = new Map<string, string>();
-  mockRedisSet.mockImplementation(async (key: string, value: string) => {
+  mockRedisSet.mockImplementation(async (key: string, value: string, ...opts: unknown[]) => {
+    if (opts.includes('NX') && store.has(key)) return null;
     store.set(key, value);
     return 'OK';
   });
   mockRedisGet.mockImplementation(async (key: string) => store.get(key) ?? null);
+  mockRedisDel.mockImplementation(async (key: string) => (store.delete(key) ? 1 : 0));
   return store;
+}
+
+/** Per-key INCR counter the module's `countAttempt`/`readAttemptCount` share. */
+function fakeCounter() {
+  const counters = new Map<string, number>();
+  mockIncrementRateLimit.mockImplementation(async (key: string) => {
+    const n = (counters.get(key) ?? 0) + 1;
+    counters.set(key, n);
+    return n;
+  });
+  mockGetRateLimitCount.mockImplementation(async (key: string) => counters.get(key) ?? 0);
+  return counters;
 }
 
 /**
@@ -328,14 +349,141 @@ describe('#1644 / #1649 auditAgentWrite — denial coalescing WITH a count', () 
     expect(findings.some(f => f.kind === 'anonymous_flood')).toBe(false);
   });
 
-  it('never dedupes `failed` — an authorised write that then threw is not the anonymous-flood surface', async () => {
+  it('never dedupes `failed` for a KEY-BEARING caller — bounded by who holds a key', async () => {
     mockIncrementRateLimit.mockResolvedValue(999);
+    const keyed: McpAgentContext = { ...context, credential: 'valid', grant: 'credential' };
 
-    await auditAgentWrite({ store, tool: 'place_order', outcome: 'failed', context });
-    await auditAgentWrite({ store, tool: 'place_order', outcome: 'failed', context });
+    await auditAgentWrite({ store, tool: 'place_order', outcome: 'failed', context: keyed });
+    await auditAgentWrite({ store, tool: 'place_order', outcome: 'failed', context: keyed });
 
     expect(mockAuditLog).toHaveBeenCalledTimes(2);
     expect(mockIncrementRateLimit).not.toHaveBeenCalled();
     expect(mockAuditLogCreate).not.toHaveBeenCalled();
+  });
+
+  // Issue 2151: with the `agent_checkout_open_writes` escape hatch on, the
+  // grant is `open_writes` and the caller presented NOTHING — `failed` is then
+  // reachable by an anonymous caller (add_to_cart with a made-up productId),
+  // so it must be coalesced like a denial, not cost a transaction per attempt.
+  it('coalesces `failed` from an open_writes (anonymous) caller into one row with a count', async () => {
+    fakeRedisRowCache();
+    fakeCounter();
+    const open: McpAgentContext = { ...context, credential: 'none', grant: 'open_writes' };
+
+    for (let i = 0; i < 20; i++) {
+      await auditAgentWrite({ store, tool: 'add_to_cart', outcome: 'failed', context: open });
+    }
+
+    expect(mockAuditLog).not.toHaveBeenCalled();
+    expect(mockAuditLogCreate).toHaveBeenCalledTimes(1);
+    expect(mockAuditLogCreate.mock.calls[0][0].data.action).toBe('agent.write.failed');
+    expect(mockAuditLogUpdate.mock.calls.at(-1)?.[0].data.details.count).toBe(20);
+    // Its own window — never merged with a denial row for the same source.
+    expect(mockIncrementRateLimit.mock.calls[0][0]).toMatch(/^agent:failed:/);
+  });
+
+  // Issue 2150: the row id used to be cached only AFTER the first insert's
+  // transaction committed, so a CONCURRENT burst — the real attack shape —
+  // all missed the cache and each opened its own transaction.
+  it('a concurrent burst opens ONE transaction, and the row still carries every attempt', async () => {
+    const db = await import('@force/database');
+    fakeRedisRowCache();
+    fakeCounter();
+    // Hold the first insert open until the whole burst has arrived.
+    let releaseInsert!: () => void;
+    const insertGate = new Promise<void>(r => (releaseInsert = r));
+    mockAuditLogCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+      await insertGate;
+      return { id: `row-${mockAuditLogCreate.mock.calls.length}`, ...data };
+    });
+
+    const burst = Array.from({ length: 25 }, () =>
+      auditAgentWrite({ store, tool: 'add_to_cart', outcome: 'denied', context })
+    );
+    await new Promise(r => setTimeout(r, 10));
+    releaseInsert();
+    await Promise.all(burst);
+
+    expect(db.runInTenantContext).toHaveBeenCalledTimes(1);
+    expect(mockAuditLogCreate).toHaveBeenCalledTimes(1);
+    const rows = await materialiseRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].count).toBe(25);
+  });
+
+  // PR 2301 audit: repeats that see `pending` write nothing and defer to the
+  // reserving writer. If ITS insert then fails, the whole burst used to leave
+  // zero rows — invisible to the denial watcher during exactly the flood.
+  it('a burst whose reserving insert FAILS still leaves one row carrying every attempt', async () => {
+    const db = await import('@force/database');
+    fakeRedisRowCache();
+    fakeCounter();
+    let failInsert!: () => void;
+    const gate = new Promise<void>(r => (failInsert = r));
+    // The tenant-wrapped insert fails after the burst arrived; the unscoped
+    // fallback insert (outside runInTenantContext) succeeds.
+    vi.mocked(db.runInTenantContext).mockImplementationOnce((async () => {
+      await gate;
+      throw new Error('P2028 transaction timeout');
+    }) as never);
+
+    const burst = Array.from({ length: 12 }, () =>
+      auditAgentWrite({ store, tool: 'add_to_cart', outcome: 'denied', context })
+    );
+    await new Promise(r => setTimeout(r, 10));
+    failInsert();
+    await Promise.all(burst);
+
+    const rows = await materialiseRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].count).toBe(12);
+  });
+
+  it('releases a reservation whose insert failed, so the next attempt can write a row', async () => {
+    const cache = fakeRedisRowCache();
+    fakeCounter();
+    mockAuditLogCreate.mockRejectedValueOnce(new Error('pool timeout'));
+
+    await auditAgentWrite({ store, tool: 'add_to_cart', outcome: 'denied', context });
+    expect([...cache.values()]).not.toContain('pending');
+
+    // The failed attempt is still recorded, on the unscoped fallback insert.
+    expect(mockAuditLogCreate).toHaveBeenCalledTimes(2);
+
+    await auditAgentWrite({ store, tool: 'add_to_cart', outcome: 'denied', context });
+    expect(mockAuditLogCreate).toHaveBeenCalledTimes(3);
+  });
+
+  // Issue 2141 (second report): `incrementRateLimit` guards only
+  // `isAvailable()`; a command that fails mid-flight REJECTS, and that
+  // rejection used to escape to the outer catch — no row at all.
+  it('still writes the row when the Redis counter command rejects', async () => {
+    mockIncrementRateLimit.mockRejectedValue(new Error('Connection is closed.'));
+    mockRedisSet.mockResolvedValue('OK');
+
+    await auditAgentWrite({ store, tool: 'add_to_cart', outcome: 'denied', context });
+
+    expect(mockAuditLogCreate).toHaveBeenCalledTimes(1);
+    expect(mockAuditLogCreate.mock.calls[0][0].data.details.count).toBe(1);
+  });
+
+  // Issue 2054 (second report): `publicLimiter` buckets IPv6 by prefix, so the
+  // coalescing window must too, or rotating the low bits makes every request
+  // a "first" with its own transaction.
+  it('keys IPv6 sources by the same prefix publicLimiter uses', async () => {
+    fakeRedisRowCache();
+    fakeCounter();
+
+    for (const ip of ['2001:db8:1:2::1', '2001:db8:1:2:ffff::9', '2001:db8:1:3::7']) {
+      await auditAgentWrite({
+        store,
+        tool: 'add_to_cart',
+        outcome: 'denied',
+        context: { ...context, ip },
+      });
+    }
+
+    expect(mockAuditLogCreate).toHaveBeenCalledTimes(1);
+    expect(new Set(mockIncrementRateLimit.mock.calls.map(c => c[0])).size).toBe(1);
   });
 });

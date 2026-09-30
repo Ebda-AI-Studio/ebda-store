@@ -280,9 +280,12 @@ router.post(
 
       // Same unconditional ceiling as product uploads — a receipt photographed
       // on a phone is a 10 MB camera original otherwise, and this route accepts
-      // up to exactly that. 2000px on the longest side stays comfortably above
-      // what the downstream OCR job needs to read receipt text (a typical
-      // receipt photo is 3000-4000px), while cutting stored bytes by ~95%.
+      // up to exactly that. 2000px on the longest side is BELOW a typical
+      // 3000-4000px receipt photo, so it was measured rather than assumed
+      // (issue 1049, Ruling DRM-2): the OCR model (Gemini Flash Lite, which
+      // downsamples internally anyway) extracted identical totals and 22/22
+      // line totals from a 3024x4032 receipt photo and its 2000px version,
+      // blurred and skewed, 3 runs each. Stored bytes drop ~95%.
       const receiptBuffer = await enforceMaxDimensions(req.file!.buffer);
 
       // Upload to R2 under stores/<storeId>/receipts/

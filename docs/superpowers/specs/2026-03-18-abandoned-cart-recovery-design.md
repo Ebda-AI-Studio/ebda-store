@@ -342,7 +342,7 @@ All routes: `authenticate → authorize('store_admin', 'super_admin') → requir
 ### Public Route for Cart Recovery
 
 ```
-GET /public/:storeId/cart/recover/:abandonedCartId → Returns cart items for recovery
+GET /stores/public/:storeId/cart/recover/:abandonedCartId?sig= → Returns cart items for recovery  (path moved under /stores; unconsumed as of 2026-10-01 — issue 2035)
 ```
 
 No auth required (recovery links are sent via WhatsApp/SMS to anonymous users). The storefront fetches items and merges into current cart.

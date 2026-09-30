@@ -37,8 +37,10 @@ describe('listSlugRedirects', () => {
     expect(mockPrisma.slugRedirect.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { storeId: 'store-1' },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
+        // `id` breaks createdAt ties so a bulk import pages stably (issue 2255);
+        // one row past the page tells whether another page exists.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 201,
       })
     );
   });
@@ -48,18 +50,24 @@ describe('listSlugRedirects', () => {
     mockPrisma.slugRedirect.count.mockResolvedValue(0);
     await listSlugRedirects('store-1', { limit: 10_000 });
     expect(mockPrisma.slugRedirect.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 500 })
+      expect.objectContaining({ take: 501 })
     );
   });
 
   it('returns the TOTAL alongside the capped page, so the cap is never silent', async () => {
     // Scoped audit, PR 1978: a bulk import writes hundreds of rows; the list
     // returned the newest 200 with no signal that anything was withheld.
-    const rows = Array.from({ length: 200 }, (_, i) => ({ id: `r${i}` }));
+    const rows = Array.from({ length: 201 }, (_, i) => ({ id: `r${i}` }));
     mockPrisma.slugRedirect.findMany.mockResolvedValue(rows);
     mockPrisma.slugRedirect.count.mockResolvedValue(731);
     const result = await listSlugRedirects('store-1');
-    expect(result).toEqual({ rows, total: 731, limit: 200 });
+    // The 201st row is only the "more exists" probe; its predecessor is the cursor.
+    expect(result).toEqual({
+      rows: rows.slice(0, 200),
+      total: 731,
+      limit: 200,
+      nextCursor: 'r199',
+    });
     expect(mockPrisma.slugRedirect.count).toHaveBeenCalledWith({ where: { storeId: 'store-1' } });
   });
 

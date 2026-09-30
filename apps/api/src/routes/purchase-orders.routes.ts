@@ -126,7 +126,7 @@ router.post(
           storeId: req.params.storeId,
           ...body.data,
           expectedDate: body.data.expectedDate ? new Date(body.data.expectedDate) : undefined,
-          createdBy: (req as any).user?.id,
+          createdBy: req.user?.userId,
         })
       );
       res.status(201).json({ data });
@@ -162,7 +162,7 @@ router.post(
           storeId: req.params.storeId,
           poId: req.params.id,
           receipts: body.data.receipts,
-          receivedBy: (req as any).user?.id,
+          receivedBy: req.user?.userId,
         })
       );
       res.json({ data });

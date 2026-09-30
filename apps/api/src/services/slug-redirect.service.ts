@@ -81,7 +81,7 @@ export const SLUG_REDIRECT_LIST_MAX = 500;
  */
 export async function listSlugRedirects(
   storeId: string,
-  opts: { q?: string; limit?: number } = {}
+  opts: { q?: string; limit?: number; cursor?: string } = {}
 ) {
   const limit = Math.min(opts.limit ?? SLUG_REDIRECT_LIST_LIMIT, SLUG_REDIRECT_LIST_MAX);
   const q = opts.q?.trim();
@@ -98,13 +98,21 @@ export async function listSlugRedirects(
   };
   // Sequential, not Promise.all: inside the request's tenant transaction both
   // run on one connection anyway.
-  const rows = await prisma.slugRedirect.findMany({
+  //
+  // Cursor-paged (issue 2255): every row is reachable by browsing, not only by
+  // searching for a slug the merchant already knows. `id` breaks `createdAt`
+  // ties so a bulk import's rows (one timestamp) page stably. One row past
+  // the page is fetched to know whether another page exists.
+  const fetched = await prisma.slugRedirect.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
-    take: limit,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: limit + 1,
+    ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
   });
+  const rows = fetched.slice(0, limit);
+  const nextCursor = fetched.length > limit ? rows[rows.length - 1].id : null;
   const total = await prisma.slugRedirect.count({ where });
-  return { rows, total, limit };
+  return { rows, total, limit, nextCursor };
 }
 
 /**

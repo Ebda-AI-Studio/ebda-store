@@ -1,5 +1,23 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { bustStoreCachesById } from './store.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import logger from '../lib/logger';
+
+/**
+ * Issue 2212: `taxRatePercent` (and taxEnabled/taxIncludedInPrice) ride the
+ * cached `public:store:*` payloads, so EVERY tax write must bust them — or
+ * checkout displays a total computed at the old rate while order-create
+ * charges the new one, for up to the Redis TTL plus the edge's s-maxage.
+ * Deferred until AFTER the request's tenant transaction commits: a bust
+ * before the commit lets a concurrent storefront read re-seed the cache from
+ * the pre-write row for a full TTL. Outside a request it runs inline.
+ */
+function bustPublicTaxCaches(storeId: string): void {
+  void deferAfterTenantCommit('tax.bustStoreCaches', () => bustStoreCachesById(storeId)).catch(
+    err => logger.error({ err, storeId }, '[tax] public store cache bust failed')
+  );
+}
 
 interface CreateTaxRateData {
   name: string;
@@ -63,6 +81,7 @@ export class TaxService {
         defaultTaxRate: true,
       },
     });
+    bustPublicTaxCaches(storeId);
 
     return {
       taxEnabled: store.taxEnabled,
@@ -126,6 +145,7 @@ export class TaxService {
         isActive: data.isActive ?? true,
       },
     });
+    bustPublicTaxCaches(storeId);
 
     return {
       ...rate,
@@ -152,6 +172,7 @@ export class TaxService {
         isActive: data.isActive,
       },
     });
+    bustPublicTaxCaches(storeId);
 
     return {
       ...rate,
@@ -165,6 +186,7 @@ export class TaxService {
   static async deleteRate(storeId: string, rateId: string) {
     await this.getRate(storeId, rateId);
     await prisma.taxRate.delete({ where: { id: rateId, storeId } });
+    bustPublicTaxCaches(storeId);
   }
 
   /**
@@ -177,6 +199,7 @@ export class TaxService {
       where: { id: rateId, storeId },
       data: { isActive: !rate.isActive },
     });
+    bustPublicTaxCaches(storeId);
 
     return {
       ...updated,

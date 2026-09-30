@@ -23,7 +23,7 @@ export function requireFeature(featureKey: FeatureKey) {
     // Super-admin bypass — platform staff can access any store's features
     // regardless of toggle state. This lets them debug and reproduce issues
     // in a merchant's environment without needing to re-enable features.
-    if ((req as any).user?.role === 'super_admin') {
+    if (req.user?.role === 'super_admin') {
       return next();
     }
 

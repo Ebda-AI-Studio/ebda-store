@@ -83,9 +83,9 @@ const ROTATED = { accessToken: 'new-access', refreshToken: 'new-refresh' };
 const invalid = () => new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
 
 describe('#1527 a failed BODY-token refresh never clears a LIVE cookie session', () => {
-  it('rotates the live cookie instead when a stale body token 401s', async () => {
-    const stale = realToken('stale');
-    const live = realToken('live');
+  it('rotates the live cookie instead when a stale body token 401s (same user)', async () => {
+    const stale = realToken('user-a');
+    const live = realToken('user-a');
     mockRefreshTokens.mockImplementation(async (t: string) => {
       if (t === live) return ROTATED;
       throw invalid();
@@ -101,9 +101,12 @@ describe('#1527 a failed BODY-token refresh never clears a LIVE cookie session',
     expect(body.data.refreshed).toBe(true);
     expect(body.data.accessToken).toBeUndefined();
     expect(body.data.refreshToken).toBeUndefined();
+    // Issue 2170: the caller's stored copy is now dead — say so, or its next
+    // refresh presents a rotated token and revokes the whole family.
+    expect(body.data.staleRefreshToken).toBe(true);
   });
 
-  it('does not clear a live cookie session for a cross-site form posting garbage', async () => {
+  it('neither rotates NOR clears a live cookie for a cross-site form posting garbage (issue 1962)', async () => {
     const live = realToken('live');
     mockRefreshTokens.mockImplementation(async (t: string) => {
       if (t === live) return ROTATED;
@@ -112,8 +115,36 @@ describe('#1527 a failed BODY-token refresh never clears a LIVE cookie session',
     const t = run({ body: { refreshToken: 'garbage' }, cookies: { refresh_token: live } });
     await t.go();
 
-    expect(t.next).not.toHaveBeenCalled();
+    // The garbage proved nothing about the cookie session: it is not rotated
+    // (that desynced iOS clients into a family revoke) and not cleared.
+    expect(mockRefreshTokens).not.toHaveBeenCalledWith(live);
     expect(t.cleared).toEqual([]);
+    expect(t.next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+  });
+
+  it('never rotates a cookie that belongs to a DIFFERENT user than the body token (issue 1962)', async () => {
+    const mine = realToken('user-a');
+    const someoneElse = realToken('user-b');
+    mockRefreshTokens.mockImplementation(async (t: string) => {
+      if (t === someoneElse) return ROTATED;
+      throw invalid();
+    });
+    const t = run({ body: { refreshToken: mine }, cookies: { refresh_token: someoneElse } });
+    await t.go();
+
+    expect(mockRefreshTokens).not.toHaveBeenCalledWith(someoneElse);
+    expect(t.cleared).toEqual([]);
+    expect(t.res.json).not.toHaveBeenCalled();
+    expect(t.next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+  });
+
+  it('a dead body token + an UNVERIFIABLE cookie still clears the cookie (#1531 heal)', async () => {
+    const t = run({
+      body: { refreshToken: realToken('user-a') },
+      cookies: { refresh_token: 'not-a-jwt' },
+    });
+    await t.go();
+    expect(t.cleared.sort()).toEqual(['refresh_token', 'token']);
   });
 
   it('stale body token + dead cookie token -> cookies cleared', async () => {
@@ -122,8 +153,8 @@ describe('#1527 a failed BODY-token refresh never clears a LIVE cookie session',
     // cookies must still go, or the cookieless guest checkout branch never
     // fires and POST /payments/create 403s permanently.
     const t = run({
-      body: { refreshToken: realToken('stale') },
-      cookies: { refresh_token: realToken('dead') },
+      body: { refreshToken: realToken('user-a') },
+      cookies: { refresh_token: realToken('user-a') },
     });
     await t.go();
 
@@ -132,12 +163,15 @@ describe('#1527 a failed BODY-token refresh never clears a LIVE cookie session',
   });
 
   it('keeps the cookies when the cookie retry fails TRANSIENTLY (not a sign-out)', async () => {
-    const live = realToken('live');
+    const live = realToken('user-a');
     mockRefreshTokens.mockImplementation(async (t: string) => {
       if (t === live) throw new Error('database unreachable');
       throw invalid();
     });
-    const t = run({ body: { refreshToken: realToken('stale') }, cookies: { refresh_token: live } });
+    const t = run({
+      body: { refreshToken: realToken('user-a') },
+      cookies: { refresh_token: live },
+    });
     await t.go();
 
     expect(t.cleared).toEqual([]);
@@ -186,5 +220,68 @@ describe('#1801 the route verifies the signature before touching the database', 
     await run({ body: { refreshToken: expired } }).go();
 
     expect(mockRefreshTokens).toHaveBeenCalledTimes(2);
+  });
+});
+
+// Issue 2217: a BODY token is caller-supplied, and this route is CSRF-exempt
+// with credentialed CORS for every merchant domain — so writing Set-Cookie for
+// whatever token was posted let a merchant-origin page install the ATTACKER's
+// session into the victim's browser.
+describe('issue 2217 — the body lane never installs a caller-chosen session as cookies', () => {
+  function withOrigin(origin: string | undefined, body: string, cookie?: string) {
+    const t = run({
+      body: { refreshToken: body },
+      ...(cookie ? { cookies: { refresh_token: cookie } } : {}),
+    });
+    return {
+      ...t,
+      go: () =>
+        refreshHandler()(
+          {
+            headers: origin ? { origin } : {},
+            body: { refreshToken: body },
+            cookies: cookie ? { refresh_token: cookie } : {},
+          },
+          t.res,
+          t.next
+        ),
+    };
+  }
+
+  beforeEach(() => mockRefreshTokens.mockResolvedValue(ROTATED));
+
+  it('a merchant-origin body token that is not the browser cookie: pair in the body, NO Set-Cookie', async () => {
+    const attackers = realToken('attacker');
+    const t = withOrigin('https://merchant.example', attackers, realToken('victim'));
+    await t.go();
+    expect(t.res.cookie).not.toHaveBeenCalled();
+    const body = t.res.json.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(body.data.refreshToken).toBe('new-refresh');
+  });
+
+  it('no cookie at all on a merchant origin: still no Set-Cookie', async () => {
+    const t = withOrigin('https://merchant.example', realToken('attacker'));
+    await t.go();
+    expect(t.res.cookie).not.toHaveBeenCalled();
+  });
+
+  it('the iOS client whose body token IS its cookie keeps getting both cookies rotated', async () => {
+    const same = realToken('user-a');
+    const t = withOrigin('https://merchant.example', same, same);
+    await t.go();
+    expect(t.res.cookie).toHaveBeenCalledTimes(2);
+  });
+
+  it('a platform origin keeps getting the cookies', async () => {
+    const { config } = await import('@api/config');
+    const t = withOrigin(config.adminUrl, realToken('user-a'));
+    await t.go();
+    expect(t.res.cookie).toHaveBeenCalledTimes(2);
+  });
+
+  it('the ambient-cookie lane (no body token) always rotates its cookies', async () => {
+    const t = run({ cookies: { refresh_token: realToken('user-a') } });
+    await t.go();
+    expect(t.res.cookie).toHaveBeenCalledTimes(2);
   });
 });

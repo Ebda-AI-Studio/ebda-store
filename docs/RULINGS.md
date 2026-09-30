@@ -349,7 +349,7 @@ true }` (they list variants to the shopper), so for an all-disabled product
 they read the parent column instead — which the inventory-model invariant
 holds at 0, and which is ≤ 0 on every product the 2026-08-30 drift touched.
 Cost if wrong: a variant product whose parent column is somehow positive AND
-whose variants are all disabled shows that number on the PDP and to the bot.
+whose variants are all disabled shows that number on the PDP and to the bot. _(Superseded by Ruling BS-7, issue 2147 — issue 2077 fixed the same WhatsApp-bridge selects in parallel.)_
 
 **Ruling M5-7 — #1547: `payment-abandonments.routes.ts` has no recovery or
 charge endpoint to test.** The issue's fix idea named "abandonment recovery
@@ -2213,6 +2213,40 @@ Cost if wrong: a cross-site form can make a victim's live cookie session
 rotate (it cannot read the result, and the session stays valid), and a
 merchant-controlled custom domain can sign a visiting user out.
 
+Amended (issues 1962, 2170, 2217 — backlog batch d-routes-mcp, 2026-10-01).
+The "rotate but harmless" residual above was wrong for the body-token client
+class, so it is no longer accepted: (a) the cookie fallback is SUBJECT-BOUND —
+it rotates the cookie only when both tokens verify and share a `sub`; a body
+token that does not verify (the cross-site `refreshToken=garbage` form) or a
+cookie of a different user neither rotates nor clears the cookie, while a
+cookie that does not verify is still cleared (#1531's heal); (b) the fallback
+answers `staleRefreshToken: true` and all three clients drop their stored pair,
+so a stale localStorage token is never re-presented into reuse detection; (c) a
+BODY-lane rotation writes Set-Cookie only when the body token is this browser's
+own cookie token or the origin is a platform origin, so a merchant-origin page
+can no longer install an attacker-chosen session into the victim's browser.
+Mutation entries: `refresh-cookie-fallback-same-subject`,
+`refresh-body-token-does-not-install-cookies`.
+
+Residual restated per client class (PR 2301 audit P1 — the first wording, "heals
+by one extra 401 round", was false for the storefront). admin and orders run on
+platform origins, so their cookies are always rotated. The storefront on a
+merchant custom domain is the one class the cookie refusal touches, and before
+this fix it had no Bearer path: a body-lane refresh that installed no cookie
+left the expired `token` cookie in place, and the shopper looped 401 → refresh
+→ 401. Chosen fix, option (a): on iOS/iPadOS WebKit (the only clients that post a
+body token) `apps/web` now persists the rotated access token and sends it as a
+Bearer from `buildHeaders`, exactly as admin and orders do. It drops the stored
+Bearer whenever a refresh answers on the cookie lane, on the stale-token
+fallback, on login, and on session end, and never sends it from a non-iOS
+browser. This was preferred over (b), a `cookiesWithheld` flag, because (b) needs
+the same Bearer lane in the client and adds a second signal. The gate itself is
+unchanged: relaxing it for "no cookie present" would reopen 2217 for a fresh
+browser. Mutation entry: `storefront-ios-body-lane-sends-bearer`.
+Cost if wrong: the storefront's iOS localStorage now holds a 30-minute access
+token next to the 365-day refresh token it already held, so an XSS on a
+storefront gains nothing it could not already mint.
+
 **Ruling S1-8 — #1861: the same-account availability tradeoff stays.** The
 per-tenant key stops a flood on one store from locking the same email
 elsewhere; it cannot give the targeted account a fresh bucket without giving
@@ -2252,7 +2286,17 @@ substitutes the coupon's own group (first-order already resolves permissively wi
 Checkout sends the typed phone and email, and `OrderService.create` re-evaluates against the real
 identity, which stays the authority. Cost if wrong: a shopper outside the group sees the code
 accepted on the cart page and refused at checkout. That is the behaviour every targeted code had
-before this batch, now confined to the one criterion the cart page cannot know.
+before this batch, now confined to the one criterion the cart page cannot know. Issue 2066
+widened "unknown" to include a typed identity that resolves to NO `Customer` row
+(`custCtx.customerGroupId ?? coupon.customerGroupId`): the quote cannot see the signed-in account
+that `OrderService.create` keys the group from, so a VIP typing a recipient's phone was refused a
+code checkout would honour. **Revised after the PR 2301 audit:** substituting on every unmatched
+identity quoted VIP codes as valid to GUESTS, whom order-create then hard-400s. The route now runs
+`optionalAuthenticate` and resolves the group from the verified signed-in account
+(`customerUserId`) — the same identity `OrderService.create` uses — while a guest whose typed
+contact matches no Customer row is still refused at the quote, as checkout would refuse them.
+Cost if wrong: a guest who IS a group member but typed a contact formatted differently from their
+Customer row is refused a code they would have been refused at checkout anyway.
 
 **Ruling M3-2 — `tests/` is not added to `npm run typecheck` in this batch (#1444).** The swapped
 arguments are fixed and the test now asserts the credited amount. Type-checking `tests/unit` as one
@@ -2457,8 +2501,9 @@ dropping the attempt — self-healing at the cost of starting a new window.
 Redis unavailable (`incrementRateLimit` returning 0, its documented fail-open
 value) degrades to exactly today's per-attempt behaviour: one row per denial,
 same as before this change. `agent.write.failed` (an AUTHORISED write that
-then threw) is never coalesced — it requires credential possession, so it is
-already bounded by who holds a key, not by an anonymous caller's request rate.
+then threw) was originally never coalesced on the claim that it requires
+credential possession — corrected in the addendum below (issue 2151): only a
+VALID-key caller's `failed` is per-attempt.
 
 `credential` is part of the key on purpose: `classifyAgentDenials` PARTITIONS on
 `details.credential` (`none` / `invalid` / …), so the coalescing key must be at
@@ -2492,6 +2537,29 @@ back to writing its OWN fresh row instead of updating the existing one — one
 extra row and a fresh coalescing window, never a lost attempt and never a
 reintroduced interactive transaction per repeat, since the update path itself
 never opens one.
+
+Addendum (issues 2150, 2151, 2141, 2054 — backlog batch d-routes-mcp,
+2026-10-01). (a) The `failed` exemption is now gated on the GRANT, not the
+outcome: only `grant === 'credential'` gets a per-attempt `agent.write.failed`
+row; an `open_writes` (escape hatch on, `credential: 'none'`) `failed` is
+coalesced under its own `agent:failed:` key, because "requires credential
+possession" is false on exactly the rollback lever most likely to be on during
+an incident. (b) Concurrent repeats: the first writer `SET <key>:row pending NX
+EX 45` before inserting; a repeat that reads `pending` writes nothing (its INCR
+already happened, and the writer re-reads the counter after publishing the row
+id, so it is carried); a failed insert releases the reservation. (c) The key's
+ip is `ipKeyGenerator(ip)` (express-rate-limit's /56 IPv6 prefix, identical to
+`publicLimiter`'s default bucketing). (d) A rejected `incrementRateLimit` reads
+as 0 (per-attempt fallback) instead of dropping the row. Accepted residuals:
+concurrent flushes to one row are last-writer-wins, so a count can briefly
+read lower than the counter until the next flush; and a process that dies
+holding a `pending` reservation suppresses that window's rows for up to 45s
+(its attempts stay in the counter and the next row's `base` skips them). A
+reserving insert that FAILS (pool timeout / P2028) no longer loses the burst:
+it releases the slot and writes one plain, non-transactional row carrying the
+counter's attempts (PR 2301 audit). Cost
+if wrong: an under-count of at most one window's in-flight attempts on a
+single row — never a per-attempt transaction for an anonymous caller.
 
 **Ruling S1-11 — merge of main (#2088): the merchant-MCP limiters keep main's
 `mmcp` / `mmcp-ip` prefixes but resolve Redis per request through
@@ -2623,7 +2691,10 @@ renders "not tracked for guest checkout"; a non-zero count renders as a number l
 "registered customers only".** Abandoned carts are recorded only with a customer contact, so a 0 on
 such a store says nothing about shoppers (pecannbee: 0 checkouts started vs 55 completed in 30d).
 "Takes guest orders" = at least one order with `customer_id IS NULL` in the surface's window (90d
-for abandoned-cart stats). A non-zero count is real, just partial, so it is kept rather than hidden.
+for abandoned-cart stats). Paid or not: every surface reads it through `storeTakesGuestOrders`
+(`lib/guest-checkout.ts`) — the insights dashboard used to derive it from its PAID orders and read
+`false` on a store whose guest orders are unpaid COD (issue 2257). A non-zero count is real, just
+partial, so it is kept rather than hidden.
 Cost if wrong: a mixed store (e.g. wady-aljuz, 5/41 orders registered) shows a registered-only
 undercount next to all-customer figures; the label is the only guard against reading it as total.
 
@@ -2986,7 +3057,10 @@ Source: `force-website-builder-audit-accounting-mcp-2026-09-30.md` §8, §9, §1
 with `status NOT IN ('cancelled','refunded')`; the table's per-row "Total spent" keeps its existing
 all-status sum.** The KPI population is the same one the dashboard's revenue uses
 (`analytics.service.ts` `getPeriodStats`), so the two pages cannot disagree about what "spent"
-means; the KPI card says "Excludes cancelled and refunded orders". The row column was not changed
+means; the KPI card says "All orders except cancelled and refunded — paid or not" (issue 2235: the
+earlier "Excludes cancelled and refunded orders" implied collected money, but a `pending` or
+`failed`-payment order is counted; whether the population should exclude unpaid/failed payments,
+here AND in `getPeriodStats`, is an open owner question on issue 2235). The row column was not changed
 because it also feeds the detail page and the export, and changing its meaning is a separate
 decision. Cost if wrong: on a store with cancelled orders the KPI total is lower than the sum of the
 row column, which the card label explains but a merchant may still question.
@@ -3033,7 +3107,11 @@ opt-in.** The audit suggested an opt-in flag; every key today carries only `merc
 flag would unmask for every key and the masking would be decorative. Applied to the existing
 `admin_get_order` / `admin_list_orders` as well — they previously returned full addresses and
 emails, the same PII the customer tools mask. Cost if wrong: an agent drafting a courier hand-off
-cannot read the street address or phone and the merchant copies it from the dashboard.
+cannot read the street address or phone and the merchant copies it from the dashboard. Issue 2244
+extends it to shopper free text: `admin_get_order` is an allowlist and its `notes`/`customerNotes`
+pass through `redactFreeText` (phone-shaped 8+ digit runs — not ISO dates or order references — and emails replaced). Cost if wrong: a
+note whose meaning IS a free-standing number of 8+ digits (a gift-card code typed into the note)
+reads as `[phone]`, and the merchant reads it on the dashboard.
 
 **Ruling MCP-R3 — no payouts/settlements tool, and no `admin_list_payments` in this batch.** No
 settlement model exists. Exposing `payments` as "collections" is cheap to build but has no dashboard
@@ -3983,3 +4061,46 @@ reverse-coupon step and decremented the count — handing another customer's red
 mutation survived by design: dropping `isActive` from the coupon lookup leaves the reservation's own
 `isActive: true` guard to refuse an inactive coupon (404), so the belt holds without the braces. Cost if
 wrong: a store admin can still give any coupon to any order — but never silently, and never as staff.
+
+## Backlog batch d-routes-mcp (2026-10-01)
+
+**Ruling DRM-1 — the AI product feed keeps its 600s cache and 24h edge SWR across a bundle's
+sale-window boundary; the two storefront bundle routes do not (issue 2111).** The public bundle
+list and detail routes now cache the window-independent state (`sellableIgnoringWindow` + the
+window) and apply `withinSaleWindow` on every request, so an expiry or a start takes effect on the
+next request with no invalidation. The feed (`public:products:<id>:feed:v1`) is an advertising
+artifact served from the Cloudflare edge with `s-maxage=600, stale-while-revalidate=86400`: an
+origin-side window check cannot reach the edge copy, and the edge window dominates any Redis TTL
+change. Every selling path (cart add, order-create) re-resolves the bundle live and refuses an
+expired one. The WhatsApp catalogue calls `listPurchasableBundles` uncached, so it is exact.
+Cost if wrong: an AI shopping agent can recommend a promotional bundle for up to ~10 minutes (edge
+SWR aside) after it expired, and the shopper is refused at add-to-cart.
+
+**Ruling DRM-2 — receipt uploads keep the shared 2000px ceiling (issue 1049, declined with a
+measurement).** The finding was reasoning-only ("may degrade OCR"), so it was measured on
+2026-10-01: a synthetic 3024x4032 phone-style receipt photo (receipt ~36% of the frame width, 22
+line items with 3-decimal KWD amounts in ~22px type, then blurred σ1.6, rotated 3°, JPEG q70) and
+its `fit: inside` 2000px downscale were each sent 3 times through the exact production OCR prompt
+and model (`gemini-flash-lite-latest`, JSON mode). All 6 runs returned the exact total (154.875)
+and 22/22 exact line totals. A separate higher OCR ceiling would store ~2.5x the bytes for no
+measured gain. Cost if wrong: a real receipt with smaller or fainter print than the fixture (a
+long thermal till roll photographed whole) reads worse at 2000px, which would show as more
+null/incorrect `total` values in expense drafts — re-measure with such a photo before raising the
+ceiling.
+
+**Ruling DRM-3 — `admin_get_order` keeps `transactionId`/`invoiceId`, drops `paymentUrl`
+(PR 2301 audit).** An unpaid order's `paymentUrl` is a live hosted-checkout link, a bearer capability
+that has no place in a third-party LLM transcript. It is removed from the allowlist, and the
+integration test asserts that no payment carries it. The gateway transaction and invoice ids are
+kept: they are what a merchant quotes to the gateway's support to reconcile an order, and they
+authorise nothing on their own. Cost if wrong: a gateway that accepts a bare invoice id as a lookup
+key would let a transcript reader see that invoice's status at the gateway.
+
+**Ruling DRM-4 — a change to a cached payload's SHAPE bumps its cache key in the same commit (PR 2301
+audit).** The public bundle list (`public:bundles:v2:`), the bundle detail
+(`public:products:<id>:bundles:v2:<slug>`, still under the product prefix every invalidator
+clears) and the customers aggregation (`customers-agg:v3:`) all changed shape in this batch, and an
+old-shape entry read by the new reader would blank the bundles page or drop the export's
+truncation notices until the TTL ran out. `withinSaleWindow` also treats an absent bound as
+unbounded (`== null`). The Next data cache and the CF edge hold API RESPONSES, whose shape is
+unchanged, so they need no bump. Cost if wrong: one cache miss per store at deploy.

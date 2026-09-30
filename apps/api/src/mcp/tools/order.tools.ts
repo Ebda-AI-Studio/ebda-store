@@ -128,11 +128,39 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // Same required fields as a human guest order — OrderService.create
           // throws (EMPTY_CART / INSUFFICIENT_INVENTORY / etc.) exactly like
           // the storefront checkout path; left to propagate as an isError.
-          const order = await OrderService.create(store.id, undefined, cartId, {
-            shippingAddress,
-            paymentMethod: 'cod',
-            source: 'agent',
-          });
+          //
+          // Tenant-scoped (issue 2059's class): inside `runInTenantContext`
+          // the `withMoneyTx` in `OrderService.create` opens with the store's
+          // GUCs, where outside it ran with none. The order id is captured
+          // INSIDE the wrap so that if the wrap's own commit fails after the
+          // (separately committed) order exists, it is still rolled back
+          // rather than stranded.
+          let createdOrderId = null as string | null;
+          let order: Awaited<ReturnType<typeof OrderService.create>>;
+          try {
+            order = await runInTenantContext(store.id, async () => {
+              const created = await OrderService.create(store.id, undefined, cartId, {
+                shippingAddress,
+                paymentMethod: 'cod',
+                source: 'agent',
+              });
+              createdOrderId = created.id;
+              return created;
+            });
+          } catch (err) {
+            if (createdOrderId) {
+              const orderId = createdOrderId;
+              await runInTenantContext(store.id, () =>
+                OrderService.rollbackForPaymentFailure(store.id, orderId, cartId)
+              ).catch(rbErr =>
+                logger.error(
+                  { err: rbErr, orderId, storeId: store.id },
+                  '[MCP place_order] order rollback failed after order-create wrap failure'
+                )
+              );
+            }
+            throw err;
+          }
 
           // Same COD-fee + Payment-row bookkeeping as POST /payments/create's
           // cod branch, so an agent COD order is indistinguishable from a
@@ -174,7 +202,13 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
               });
             });
           } catch (err) {
-            await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>
+            // Its own fresh tenant wrap, like the two sibling rollbacks: the
+            // payment transaction above has rolled back, so there is no
+            // ambient scope and, under force_app, the rollback's reads would
+            // see no rows and silently do nothing (PR 2301 audit).
+            await runInTenantContext(store.id, () =>
+              OrderService.rollbackForPaymentFailure(store.id, order.id, cartId)
+            ).catch(rbErr =>
               logger.error(
                 { err: rbErr, orderId: order.id, storeId: store.id },
                 '[MCP place_order] order rollback failed after COD payment-create failure'
@@ -265,29 +299,44 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           );
         }
 
-        // #900: tenant-scoped like the COD branch above and like the human
-        // path (payment.routes.ts:230) — order-create, createPayment and the
-        // compensating rollback all run inside ONE runInTenantContext so RLS
-        // policies enforce isolation under the force_app role. Without this,
-        // every SELECT the payment provider call makes (PaymentConfig lookup,
-        // store row, etc.) silently fell through to the "current_store_id()
-        // IS NULL → see all rows" branch of the policies — latent only
-        // because production connects as the BYPASSRLS role today.
-        return await runInTenantContext(store.id, async () => {
-          const order = await OrderService.create(store.id, undefined, cartId, {
-            shippingAddress,
-            paymentMethod: 'online',
-            source: 'agent',
+        // #900 + issues 2058/2059: tenant-scoped like the human path
+        // (payment.routes.ts), in the human path's SHAPE.
+        //
+        // Order-create runs in its own `runInTenantContext`, so the
+        // `withMoneyTx` inside `OrderService.create` opens with the store's
+        // GUCs (`$transaction` carries them — `transactionWithGucs`,
+        // packages/database). The provider call + Payment write run in a
+        // SECOND, separate wrap, so that transaction spans only what the human
+        // path's does. The compensating rollback lives OUTSIDE both wraps, in
+        // a catch around them: a rollback inside the callback never ran when
+        // the wrap's own COMMIT failed (or hit its 30s timeout) AFTER the
+        // callback returned — stranding a pending order with stock taken, cart
+        // cleared, no Payment row and a live gateway invoice. `rollbackOrderId`
+        // is owned from the moment the order exists and cleared only once the
+        // payment wrap has COMMITTED (the `rollbackContext = null` of
+        // payment.routes.ts). The order is captured INSIDE the create wrap, so
+        // a commit failure of that wrap after `OrderService.create` resolved
+        // still rolls the (separately committed) order back.
+        let rollbackOrderId = null as string | null;
+        try {
+          const order = await runInTenantContext(store.id, async () => {
+            const created = await OrderService.create(store.id, undefined, cartId, {
+              shippingAddress,
+              paymentMethod: 'online',
+              source: 'agent',
+            });
+            rollbackOrderId = created.id;
+            return created;
           });
 
           const base = storefrontBaseUrl(store);
-          try {
-            // Faithfully replicates POST /payments/create's online-branch
-            // request shape (payment.routes.ts): same customer/items mapping,
-            // same callback/error URL convention, same
-            // `.../webhooks/payment/<provider>` webhook shape — provider is
-            // resolved explicitly above rather than left undefined.
-            const payment = await PaymentService.createPayment(
+          // Faithfully replicates POST /payments/create's online-branch
+          // request shape (payment.routes.ts): same customer/items mapping,
+          // same callback/error URL convention, same
+          // `.../webhooks/payment/<provider>` webhook shape — provider is
+          // resolved explicitly above rather than left undefined.
+          const payment = await runInTenantContext(store.id, () =>
+            PaymentService.createPayment(
               {
                 orderId: order.id,
                 orderNumber: order.orderNumber,
@@ -313,31 +362,40 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
               },
               provider,
               store.id
-            );
+            )
+          );
+          // The Payment row is committed: the order is paid-for-pending now,
+          // and must never be rolled back from here on.
+          rollbackOrderId = null;
 
-            return ok({
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              status: order.status,
-              paymentMethod: 'online',
-              total: order.total,
-              currency: order.currency,
-              paymentUrl: payment.paymentUrl,
-            });
-          } catch (err) {
+          return ok({
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            paymentMethod: 'online',
+            total: order.total,
+            currency: order.currency,
+            paymentUrl: payment.paymentUrl,
+          });
+        } catch (err) {
+          if (rollbackOrderId) {
             // Compensating rollback — same pattern as POST /payments/create's
-            // catch block: the order committed (cart cleared, inventory
+            // outer catch: the order committed (cart cleared, inventory
             // decremented) but the payment step failed, so undo it rather than
-            // strand an unpaid, cart-less order the agent/customer can't retry.
-            await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>
+            // strand an unpaid, cart-less order the agent/customer can't
+            // retry. Its own fresh tenant wrap — never the one that failed.
+            const orderId = rollbackOrderId;
+            await runInTenantContext(store.id, () =>
+              OrderService.rollbackForPaymentFailure(store.id, orderId, cartId)
+            ).catch(rbErr =>
               logger.error(
-                { err: rbErr, orderId: order.id, storeId: store.id },
+                { err: rbErr, orderId, storeId: store.id },
                 '[MCP place_order] order rollback failed after payment-create failure'
               )
             );
-            throw err;
           }
-        });
+          throw err;
+        }
       } catch (err) {
         // A REJECTED checkout is the signal we most want and the one nothing
         // recorded before: an agent order that failed COD availability, ran out

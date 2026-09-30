@@ -34,6 +34,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     order: { aggregate: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
     customerRfmSnapshot: { groupBy: vi.fn() },
     funnelSnapshot: { findFirst: vi.fn(), findMany: vi.fn() },
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -87,6 +88,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   for (const model of Object.values(mockPrisma)) {
+    if (typeof model === 'function') {
+      (model as ReturnType<typeof vi.fn>).mockReset(); // $queryRaw
+      continue;
+    }
     for (const fn of Object.values(model)) (fn as ReturnType<typeof vi.fn>).mockReset();
   }
 });
@@ -188,7 +193,26 @@ describe('GET /insights/dashboard — derived rates', () => {
     mockPrisma.funnelSnapshot.findFirst.mockResolvedValue(funnel);
     mockPrisma.orderItem.groupBy.mockResolvedValue([]);
     mockPrisma.product.findMany.mockResolvedValue([]);
-    mockPrisma.order.findMany.mockResolvedValue(orders);
+    // Issue 2260: the repeat rate is aggregated in Postgres now. The unit
+    // harness answers the SQL with the JS reference (`computeRepeatPurchase`,
+    // which the SQL mirrors key-for-key); the SQL itself is proven against a
+    // real database in tests/integration/insights-product-velocity.test.ts.
+    mockPrisma.$queryRaw.mockImplementation(async () => {
+      const { computeRepeatPurchase } = await import('@api/routes/insights.routes');
+      const r = computeRepeatPurchase(orders);
+      return [
+        {
+          buyers: r.identifiedBuyers,
+          repeat: Math.round((r.repeatPurchaseRate ?? 0) * r.identifiedBuyers),
+        },
+      ];
+    });
+    // Issue 2257: guestCheckout is the SAME any-guest-order probe the funnel
+    // uses, over ALL orders in the window (paid or not).
+    mockPrisma.order.findFirst.mockResolvedValue(
+      orders.some(o => o.customerId === null) ? { id: 'guest-order' } : null
+    );
+    mockPrisma.order.findMany.mockResolvedValue([]);
   }
 
   it('derives cartToOrderRate = ordersCompleted / cartsCreated', async () => {
@@ -246,6 +270,23 @@ describe('GET /insights/dashboard — derived rates', () => {
     });
     const res = await request(app).get(`/stores/${STORE}/insights/dashboard`);
     expect(res.body.data.guestCheckout).toBe(false);
+  });
+
+  it('guestCheckout comes from the unpaid-inclusive guest probe — a COD-only guest store reads true (issue 2257)', async () => {
+    stubDashboard({ funnel: null, orders: [] }); // no PAID orders at all
+    mockPrisma.order.findFirst.mockResolvedValue({ id: 'unpaid-cod-guest-order' });
+    const res = await request(app).get(`/stores/${STORE}/insights/dashboard`);
+    expect(res.body.data.guestCheckout).toBe(true);
+    const where = mockPrisma.order.findFirst.mock.calls.at(-1)?.[0].where;
+    expect(where.customerId).toBeNull();
+    expect(where).not.toHaveProperty('paymentStatus');
+  });
+
+  it('never loads the window orders into memory for the repeat rate (issue 2260)', async () => {
+    stubDashboard({ funnel: null, orders: [{ customerId: 'c1', shippingAddress: {} }] });
+    await request(app).get(`/stores/${STORE}/insights/dashboard`);
+    expect(mockPrisma.order.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it('repeatPurchaseRate is null (unknown) when no buyer is identifiable', async () => {

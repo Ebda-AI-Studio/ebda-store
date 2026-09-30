@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { couponValidateLimiter, writeLimiter, publicTenantLimiter } from '../middleware/security';
@@ -286,6 +286,10 @@ router.post(
   // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
   // against one store's endpoint regardless of source-IP spread.
   publicTenantLimiter,
+  // Issue 2066: a signed-in shopper's group is keyed off their ACCOUNT at
+  // order-create; the quote must see the same verified identity (never a
+  // body-supplied one). Guests pass through untouched.
+  optionalAuthenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -358,7 +362,14 @@ router.post(
         // Accepting a body customerId here would let an attacker probe any
         // other customer's segment/first-order status without proving they
         // are that customer.
-        const custCtx = await resolveCustomerContext(storeId, { phone, email });
+        // The customer id comes ONLY from a verified token (customerUserId),
+        // exactly the identity OrderService.create resolves the group from.
+        const signedInCustomerId = customerUserId(req);
+        const custCtx = await resolveCustomerContext(storeId, {
+          phone,
+          email,
+          customerId: signedInCustomerId ?? null,
+        });
         const ctx = {
           ...custCtx,
           // Unknown is not ineligible. The cart page quotes before the shopper
@@ -367,7 +378,16 @@ router.post(
           // very members it was made for. Checkout sends the typed phone/email,
           // and OrderService.create re-evaluates against the real identity.
           // (First-order already resolves permissively with no identity.)
-          customerGroupId: phone || email ? custCtx.customerGroupId : coupon.customerGroupId,
+          //
+          //
+          // Issue 2066 (and the PR 2301 audit): the quote resolves the group
+          // from the SAME identity order-create does — the signed-in account
+          // when there is one — so a VIP typing a recipient's phone is quoted
+          // by their account. A guest whose typed contact matches no Customer
+          // row stays refused: order-create would refuse them too (hard 400),
+          // and quoting a code that checkout then rejects is worse.
+          customerGroupId:
+            phone || email || signedInCustomerId ? custCtx.customerGroupId : coupon.customerGroupId,
           cartItems: await withCategoryIds(storeId, cartItems),
         };
         const evalResult = CouponService.evaluateForCart(coupon, ctx);

@@ -64,4 +64,30 @@ describe('refreshAccessToken iOS bail-out (#1803)', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(result).toBe('new-token');
   });
+  // Issue 2170: when the server answers the cookie FALLBACK (our stored body
+  // token was dead, the cookie session was rotated instead), the stored pair
+  // must go — the refresh token would trip reuse detection and revoke every
+  // session, and the stored Bearer outranks the fresh cookie.
+  it('drops the stored pair when the server says the stored refresh token is stale', async () => {
+    localStorage.setItem('refreshToken', 'dead-refresh');
+    localStorage.setItem('accessToken', 'dead-access');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { refreshed: true, csrfToken: 'c', staleRefreshToken: true },
+        }),
+      })
+    );
+    const { refreshAccessToken } = await import('../api');
+
+    const result = await refreshAccessToken();
+
+    expect(result).not.toBeNull();
+    expect(localStorage.getItem('refreshToken')).toBeNull();
+    expect(localStorage.getItem('accessToken')).toBeNull();
+  });
 });

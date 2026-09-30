@@ -40,6 +40,13 @@ vi.mock('@api/middleware/auth', () => ({
     (..._roles: string[]) =>
     (_req: any, _res: any, next: any) =>
       next(),
+  // Stand-in for a verified storefront token: `x-test-customer: <userId>`.
+  optionalAuthenticate: (req: any, _res: any, next: any) => {
+    const id = req.headers['x-test-customer'];
+    if (id) req.user = { userId: id, role: 'customer' };
+    next();
+  },
+  customerUserId: (req: any) => (req.user?.role === 'customer' ? req.user.userId : undefined),
 }));
 
 vi.mock('@api/middleware/store-access', () => ({
@@ -316,6 +323,40 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
     expect(res.status).toBe(200);
     // 10% of the 10000 fils line.
     expect(res.body.data.discount).toBe(1000);
+  });
+
+  it('quotes a customer-group code by the SIGNED-IN account, not the typed contact (issue 2066)', async () => {
+    // A VIP typing a recipient's phone: the typed phone matches no Customer
+    // row, but the account does — exactly what order-create keys the group on.
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
+    mockPrisma.order.count.mockResolvedValue(2);
+    mockPrisma.user.findUnique.mockResolvedValue({ phone: '+96550000001', email: 'vip@x.test' });
+    mockPrisma.customer.findFirst.mockResolvedValue({ groupId: 'vip-group' });
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .set('x-test-customer', 'user-vip')
+      .send({ code: 'VIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS, phone: '+96550000077' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.discount).toBe(1000);
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'user-vip' } })
+    );
+  });
+
+  it('still refuses a GUEST whose typed contact matches no Customer row — order-create would too', async () => {
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ customerGroupId: 'vip-group' }));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', categories: [] }]);
+    mockPrisma.customer.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'VIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS, phone: '+96550000077' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('COUPON_NOT_ELIGIBLE');
   });
 
   it('an unscoped code quotes the same discount as the whole-cart orderTotal path', async () => {

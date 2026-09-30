@@ -1783,7 +1783,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const user = (req as any).user;
+      const user = req.user;
 
       // Resolve caller role — a store viewer (super_admin / store_admin /
       // staff) is verified via checkStoreAccess (ownership for admins,

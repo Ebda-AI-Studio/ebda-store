@@ -10,6 +10,7 @@ import { invalidateCustomersCache } from '../lib/public-cache';
 import { customerKeyOf } from '../lib/customer-key';
 import {
   aggregateCustomers,
+  MAX_ZERO_ORDER_CUSTOMERS,
   getCustomerProfile,
   filterCustomersBySegment,
   parseSegmentFilter,
@@ -67,7 +68,8 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
-      const { customers, truncated, ordersScanned, orders } = await aggregateCustomers(storeId);
+      const { customers, ordersTruncated, zeroOrderTruncated, ordersScanned, orders } =
+        await aggregateCustomers(storeId);
 
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Force Website Builder';
@@ -153,9 +155,15 @@ router.get(
       // When the order scan hit the cap, append a visible notice row so the
       // merchant knows the export is partial (newest orders only) rather than
       // silently believing it's the complete customer history.
-      if (truncated) {
+      if (ordersTruncated) {
         const noticeRow = sheet.addRow({
           storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were aggregated. Contact support for a full export of larger stores.`,
+        });
+        noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
+      }
+      if (zeroOrderTruncated) {
+        const noticeRow = sheet.addRow({
+          storeName: `NOTE: export truncated — only the newest ${MAX_ZERO_ORDER_CUSTOMERS.toLocaleString()} registered customers who have not ordered yet are included.`,
         });
         noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
@@ -256,7 +264,7 @@ router.get(
       purchasesSheet.getColumn('lineTotal').numFmt = '0.000';
       purchasesSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
-      if (truncated) {
+      if (ordersTruncated) {
         const noticeRow = purchasesSheet.addRow({
           storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were included.`,
         });
@@ -390,10 +398,12 @@ router.get(
       summarySheet.getColumn(4).width = 10;
       summarySheet.getColumn(5).width = 18;
 
-      if (truncated) {
+      if (ordersTruncated || zeroOrderTruncated) {
         summarySheet.addRow([]);
         const noticeRow = summarySheet.addRow([
-          `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were included.`,
+          ordersTruncated
+            ? `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were included.`
+            : `NOTE: export truncated — only the newest ${MAX_ZERO_ORDER_CUSTOMERS.toLocaleString()} registered customers who have not ordered yet are included.`,
         ]);
         noticeRow.getCell(1).font = { bold: true, color: { argb: 'FFB91C1C' } };
       }

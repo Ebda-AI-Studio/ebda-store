@@ -183,6 +183,15 @@ export function summarizeCustomers(
 const MAX_ORDERS_SCANNED = 20000;
 
 /**
+ * Cap on registered customers with NO order unioned into the list (issue
+ * 2045). The zero-order query used to have no `take` at all, so a store with a
+ * large sign-up base (a loyalty or newsletter campaign) materialised every
+ * such user into the aggregation — and the whole result into one Redis value —
+ * on each cache miss. Overflow sets `truncated`.
+ */
+export const MAX_ZERO_ORDER_CUSTOMERS = 5000;
+
+/**
  * Hard cap on the number of orders returned for a SINGLE customer's profile
  * (`GET /customers/:customerKey`). Matches the `take: 100` convention used
  * elsewhere in the API as an "unbounded growth" guard (e.g.
@@ -236,7 +245,12 @@ export interface OrderWithItems {
 
 async function aggregateCustomersUncached(storeId: string): Promise<{
   customers: AggregatedCustomer[];
+  /** The list is partial: the order scan OR the zero-order union hit its cap. */
   truncated: boolean;
+  /** The order scan hit `MAX_ORDERS_SCANNED` (newest orders only). */
+  ordersTruncated: boolean;
+  /** More than `MAX_ZERO_ORDER_CUSTOMERS` registered customers have no order. */
+  zeroOrderTruncated: boolean;
   ordersScanned: number;
   orders: OrderWithItems[];
   summary: CustomersSummary;
@@ -287,15 +301,9 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
   const countedByKey = new Map<string, { orders: number; spent: number }>();
 
   const map = new Map<string, AggregatedCustomer>();
-  // Real user ids seen on orders — the exclusion set for the zero-order union
-  // below. NOT `map.keys()`: guest rows are keyed by email/phone, so a set of
-  // map keys never excludes a registered shopper who checked out as a guest
-  // (issue 2051 — that shopper got a second, phantom zero-order row).
-  const orderUserIds = new Set<string>();
   for (const order of orders) {
     const shipping = (order.shippingAddress ?? null) as ShippingAddressShape | null;
     const isGuest = !order.customer?.id;
-    if (order.customer?.id) orderUserIds.add(order.customer.id);
     // `customerKeyOf` is the grouping the RFM rollup also uses, so a segment's
     // members resolve to these rows. A guest order with no contact is its own
     // row, keyed by the order.
@@ -410,24 +418,33 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
   // Union in customer-role Users this store has that own no order yet.
   // `deletedAt: null` also excludes erased accounts (eraseAccount sets it).
   //
-  // Issue 2051: exclude by REAL user ids (not map keys, which are contact
-  // strings for guest rows), and skip a user whose email/phone already keys a
-  // guest row — that is the same human, who checked out without signing in,
-  // and already has a row with real history. When the scan was truncated the
-  // union is skipped: a user whose orders fell past the cap is not a
-  // zero-order customer, and "0 orders" would be stated as fact.
-  const registeredIds = Array.from(orderUserIds);
-  const zeroOrderUsers = truncated
-    ? []
-    : await prisma.user.findMany({
-        where: {
-          storeId,
-          role: 'customer',
-          deletedAt: null,
-          ...(registeredIds.length > 0 ? { id: { notIn: registeredIds } } : {}),
-        },
-        select: { id: true, email: true, firstName: true, lastName: true, phone: true },
-      });
+  // Issue 2051: skip a user whose email/phone already keys a guest row — that
+  // is the same human, who checked out without signing in, and already has a
+  // row with real history.
+  //
+  // Issue 2045: the set is selected EXACTLY — `orders: { none: ... }` is a
+  // NOT EXISTS, correct whatever the order scan's cap, so there is no
+  // up-to-20k-element `notIn` of seen user ids and no need to skip the union
+  // when the order scan was truncated (a user with orders past the cap still
+  // HAS orders, and is excluded by the database, not by what we happened to
+  // scan). It is bounded: `MAX_ZERO_ORDER_CUSTOMERS` newest sign-ups, with
+  // the overflow reported through the same `truncated` flag the page's notice
+  // reads, never silently dropped.
+  const zeroOrderFetched = await prisma.user.findMany({
+    where: {
+      storeId,
+      role: 'customer',
+      deletedAt: null,
+      orders: { none: { storeId, deletedAt: null } },
+    },
+    select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+    orderBy: { createdAt: 'desc' },
+    take: MAX_ZERO_ORDER_CUSTOMERS + 1,
+  });
+  const zeroOrderTruncated = zeroOrderFetched.length > MAX_ZERO_ORDER_CUSTOMERS;
+  const zeroOrderUsers = zeroOrderTruncated
+    ? zeroOrderFetched.slice(0, MAX_ZERO_ORDER_CUSTOMERS)
+    : zeroOrderFetched;
   for (const user of zeroOrderUsers) {
     if ((user.email && map.has(user.email.toLowerCase())) || (user.phone && map.has(user.phone))) {
       continue;
@@ -475,7 +492,9 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
   const customers = Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
   return {
     customers,
-    truncated,
+    truncated: truncated || zeroOrderTruncated,
+    ordersTruncated: truncated,
+    zeroOrderTruncated,
     ordersScanned: orders.length,
     orders: orders as OrderWithItems[],
     summary: summarizeCustomers(customers, countedByKey),
@@ -497,7 +516,12 @@ async function aggregateCustomersUncached(storeId: string): Promise<{
  */
 export async function aggregateCustomers(storeId: string): Promise<{
   customers: AggregatedCustomer[];
+  /** The list is partial: the order scan OR the zero-order union hit its cap. */
   truncated: boolean;
+  /** The order scan hit `MAX_ORDERS_SCANNED` (newest orders only). */
+  ordersTruncated: boolean;
+  /** More than `MAX_ZERO_ORDER_CUSTOMERS` registered customers have no order. */
+  zeroOrderTruncated: boolean;
   ordersScanned: number;
   orders: OrderWithItems[];
   summary: CustomersSummary;

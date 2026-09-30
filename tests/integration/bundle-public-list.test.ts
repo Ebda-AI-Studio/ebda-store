@@ -225,4 +225,64 @@ describe.skipIf(!hasDb)('public bundle list route', () => {
     const third = await cart.publicBundles().expect(200);
     expect(third.body.data.bundles.map((b: { id: string }) => b.id)).not.toContain(bundleId);
   });
+
+  // Issue 2111: both public routes are cached for 120s, and crossing
+  // `expiresAt`/`startsAt` is not a write — so nothing busts the cache at the
+  // boundary. The window is now applied per request on top of the cached
+  // payload: an expiry that passes while the cache is warm takes effect on the
+  // very next request, with no invalidation in between.
+  it('a bundle whose expiresAt passes while the cache is warm disappears on the next request', async () => {
+    const productId = await seedProduct(store.storeId, `${suffix}-expiring`, {
+      price: 500,
+      inventory: 10,
+    });
+    const bundleId = await seedBundle(store.storeId, `${suffix}-expiring`, {
+      name: `Expiring Bundle ${suffix}`,
+      pricingType: 'fixed_price',
+      pricingValue: 400,
+      items: [{ productId, quantity: 1 }],
+      expiresAt: new Date(Date.now() + 2_000),
+    });
+    const cart = cartClientFor(app, store.storeId, `session-${suffix}-expiring`);
+
+    const warm = await cart.publicBundles().expect(200);
+    expect(warm.body.data.bundles.map((b: { id: string }) => b.id)).toContain(bundleId);
+    const slug = (
+      warm.body.data.bundles.find((b: { id: string }) => b.id === bundleId) as { slug: string }
+    ).slug;
+    const detailWarm = await cart.publicBundleDetail(slug).expect(200);
+    expect(detailWarm.body.data.bundle.isPurchasable).toBe(true);
+    // The window fields are applied server-side, never leaked to the shopper.
+    expect(detailWarm.body.data.bundle).not.toHaveProperty('sellableIgnoringWindow');
+
+    await new Promise(r => setTimeout(r, 2_500)); // no cache invalidation here
+
+    const after = await cart.publicBundles().expect(200);
+    expect(after.body.data.bundles.map((b: { id: string }) => b.id)).not.toContain(bundleId);
+    const detailAfter = await cart.publicBundleDetail(slug).expect(200);
+    expect(detailAfter.body.data.bundle.isPurchasable).toBe(false);
+  });
+
+  it('a scheduled bundle appears once its startsAt passes, with the cache already warm', async () => {
+    const productId = await seedProduct(store.storeId, `${suffix}-scheduled`, {
+      price: 500,
+      inventory: 10,
+    });
+    const bundleId = await seedBundle(store.storeId, `${suffix}-scheduled`, {
+      name: `Scheduled Bundle ${suffix}`,
+      pricingType: 'fixed_price',
+      pricingValue: 400,
+      items: [{ productId, quantity: 1 }],
+      startsAt: new Date(Date.now() + 2_000),
+    });
+    const cart = cartClientFor(app, store.storeId, `session-${suffix}-scheduled`);
+
+    const before = await cart.publicBundles().expect(200);
+    expect(before.body.data.bundles.map((b: { id: string }) => b.id)).not.toContain(bundleId);
+
+    await new Promise(r => setTimeout(r, 2_500));
+
+    const after = await cart.publicBundles().expect(200);
+    expect(after.body.data.bundles.map((b: { id: string }) => b.id)).toContain(bundleId);
+  });
 });

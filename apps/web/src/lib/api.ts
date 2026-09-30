@@ -404,6 +404,21 @@ function markSessionEstablished(): void {
 }
 
 /**
+ * The iOS body-lane access token (PR 2301 audit P1): written only from a
+ * refresh response that carried the pair, read only on iOS/iPadOS WebKit by
+ * `buildHeaders`. Anywhere else a stored copy is residue and is removed.
+ * Same key the order-detail page's direct download already reads.
+ */
+const ACCESS_TOKEN_KEY = 'accessToken';
+
+function readStoredAccessToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  if (isIosWebkit()) return localStorage.getItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  return null;
+}
+
+/**
  * Drop every JS-visible trace of the session. Called when the session ends
  * (logout, or a refresh the server rejected) so a now-anonymous browser stops
  * counting as evidence. `csrfToken` goes too: with no auth cookie left,
@@ -417,6 +432,7 @@ function clearSessionEvidence(): void {
   localStorage.removeItem(SESSION_MARKER_KEY);
   localStorage.removeItem('csrfToken');
   localStorage.removeItem('refreshToken');
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
 }
 
 /**
@@ -618,6 +634,32 @@ class ApiClient {
           if (ios && typeof window !== 'undefined' && json.data.refreshToken) {
             localStorage.setItem('refreshToken', json.data.refreshToken);
           }
+          // The iOS body lane (PR 2301 audit P1). On a merchant custom domain
+          // the API rotates a body-presented token WITHOUT Set-Cookie unless
+          // that token is this browser's own cookie (issue 2217 — a
+          // cross-site page must never install a session of its choosing), so
+          // the `token` cookie can stay expired. Persist the rotated access
+          // token and send it as a Bearer (`buildHeaders`), exactly as the
+          // admin and orders clients do — otherwise the shopper loops
+          // 401 → refresh → 401 and is signed out on every account page. A
+          // response with no access token (the cookie lane, or the stale-token
+          // fallback) means the cookies are the fresh credential now, so any
+          // stored Bearer — which outranks the cookie — is dropped.
+          if (ios && typeof window !== 'undefined') {
+            if (json.data.accessToken) {
+              localStorage.setItem(ACCESS_TOKEN_KEY, json.data.accessToken);
+            } else {
+              localStorage.removeItem(ACCESS_TOKEN_KEY);
+            }
+          }
+          // The server rotated the COOKIE session because our stored token was
+          // dead (issue 2170). Re-presenting that stored token would trip
+          // reuse detection and revoke every session of the user — drop it and
+          // continue on the cookie.
+          if (typeof window !== 'undefined' && json.data.staleRefreshToken) {
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem(ACCESS_TOKEN_KEY);
+          }
           // The CSRF token is stored on EVERY platform, not just iOS. It is a
           // double-submit token: it is *meant* to be JS-readable, and the
           // request header carrying it is exactly what proves the caller is
@@ -661,6 +703,13 @@ class ApiClient {
 
     if (this.storeId) {
       headers['X-Store-ID'] = this.storeId;
+    }
+
+    // iOS body lane only — see ACCESS_TOKEN_KEY. The cookie still rides along
+    // (credentials: 'include'); the API prefers the Bearer when both exist.
+    const accessToken = readStoredAccessToken();
+    if (accessToken && !headers.Authorization) {
+      headers.Authorization = `Bearer ${accessToken}`;
     }
 
     // Include CSRF token for state-changing requests
@@ -878,6 +927,9 @@ class ApiClient {
       if (typeof window !== 'undefined' && isIosWebkit()) {
         localStorage.setItem('refreshToken', result.data.refreshToken);
       }
+      // A fresh login sets fresh cookies; a Bearer left from an earlier
+      // session would outrank them (see ACCESS_TOKEN_KEY).
+      if (typeof window !== 'undefined') localStorage.removeItem(ACCESS_TOKEN_KEY);
       // The CSRF token is stored on EVERY platform, not just iOS. It is a
       // double-submit token — it is MEANT to be JS-readable, and the header
       // carrying it is what proves the caller is our own page. Storing it only

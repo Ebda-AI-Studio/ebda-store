@@ -214,9 +214,14 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
   });
 }
 
-/** Cache key for a store's public purchasable-bundle list (`bundle.routes.ts`). */
+/**
+ * Cache key for a store's public purchasable-bundle list (`bundle.routes.ts`).
+ * v2 (PR 2301): the cached value now holds each bundle's sale window instead
+ * of a pre-applied `isPurchasable` (issue 2111). A v1 entry read by the v2
+ * reader would filter every bundle out, so the bump makes it a clean miss.
+ */
 export function bundlesCacheKey(storeId: string): string {
-  return `public:bundles:${storeId}`;
+  return `public:bundles:v2:${storeId}`;
 }
 
 /**
@@ -305,7 +310,9 @@ export function customersCacheKey(storeId: string): string {
   // v2 (2026-09-30): the cached value gained `summary` (KPI strip). A v1
   // entry has none, so reading one after deploy would show an empty strip
   // for up to the 300s TTL — the version bump makes it a clean miss instead.
-  return `customers-agg:v2:${storeId}`;
+  // v3 (PR 2301): gained `ordersTruncated`/`zeroOrderTruncated`; a v2 entry
+  // would drop the export's truncation notice rows.
+  return `customers-agg:v3:${storeId}`;
 }
 
 /**

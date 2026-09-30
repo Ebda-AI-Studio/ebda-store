@@ -75,6 +75,10 @@ const SEGMENT_ACTIONS: Record<RfmSegment, { en: string; ar: string }> = {
  * rollup also use (user id, else lowercased guest email, else guest phone).
  * Guest orders with no contact at all are skipped.
  * Returns `repeatPurchaseRate: null` when no buyer is identifiable.
+ *
+ * The in-memory REFERENCE for `repeatPurchaseInDb` below, which the dashboard
+ * calls (issue 2260). Kept exported so the unit suite can pin the grouping;
+ * change both or neither.
  */
 export function computeRepeatPurchase(
   orders: Array<{ customerId: string | null; shippingAddress: unknown }>
@@ -90,6 +94,45 @@ export function computeRepeatPurchase(
   let repeat = 0;
   for (const n of ordersPerBuyer.values()) if (n >= 2) repeat += 1;
   return { repeatPurchaseRate: repeat / identifiedBuyers, identifiedBuyers };
+}
+
+/**
+ * `computeRepeatPurchase`, computed in Postgres over paid orders since `since`
+ * (issue 2260). The grouping key is `customerKeyOf` byte-for-byte: the
+ * customer id, else the shipping email LOWERCASED (not trimmed), else the
+ * shipping phone VERBATIM — each only when it is a non-empty JSON string, the
+ * same `typeof === 'string'` test `contactOf` applies. An order with none of
+ * the three is skipped. Returns two integers, never the rows.
+ */
+export async function repeatPurchaseInDb(
+  storeId: string,
+  since: Date
+): Promise<{ repeatPurchaseRate: number | null; identifiedBuyers: number }> {
+  const rows = await prisma.$queryRaw<Array<{ repeat: number; buyers: number }>>`
+    SELECT
+      COUNT(*) FILTER (WHERE n >= 2)::int AS repeat,
+      COUNT(*)::int AS buyers
+    FROM (
+      SELECT
+        COALESCE(
+          NULLIF(o.customer_id, ''),
+          NULLIF(CASE WHEN jsonb_typeof(o.shipping_address -> 'email') = 'string'
+                      THEN lower(o.shipping_address ->> 'email') END, ''),
+          NULLIF(CASE WHEN jsonb_typeof(o.shipping_address -> 'phone') = 'string'
+                      THEN o.shipping_address ->> 'phone' END, '')
+        ) AS buyer_key,
+        COUNT(*) AS n
+      FROM orders o
+      WHERE o.store_id = ${storeId}
+        AND o.payment_status = 'paid'
+        AND o.created_at >= ${since}
+      GROUP BY 1
+    ) per_buyer
+    WHERE buyer_key IS NOT NULL
+  `;
+  const buyers = rows[0]?.buyers ?? 0;
+  if (buyers === 0) return { repeatPurchaseRate: null, identifiedBuyers: 0 };
+  return { repeatPurchaseRate: (rows[0]?.repeat ?? 0) / buyers, identifiedBuyers: buyers };
 }
 
 // ---------------------------------------------------------------------------
@@ -198,20 +241,21 @@ router.get(
       // `customerId: { not: null }` read 0% on every guest-checkout store (all
       // of pecannbee's orders are guest). `null` = unknown (no identifiable
       // buyer in the window), which the page renders as "—", never as 0%.
-      const recentBuyerOrders = await runInTenantContext(storeId, () =>
-        prisma.order.findMany({
-          where: {
-            storeId,
-            paymentStatus: 'paid',
-            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-          },
-          select: { customerId: true, shippingAddress: true },
-        })
-      );
-      const { repeatPurchaseRate, identifiedBuyers } = computeRepeatPurchase(recentBuyerOrders);
-      // Same 30d window: does this store take guest orders? (funnel
-      // "checkouts" cannot count guest carts — see lib/guest-checkout.ts)
-      const guestCheckout = recentBuyerOrders.some(o => o.customerId === null);
+      //
+      // Aggregated IN POSTGRES (issue 2260): loading every paid order of the
+      // window with its full shippingAddress JSON into memory on every page
+      // load grew linearly with a merchant's success. `repeatBuyersSql` groups
+      // by exactly `customerKeyOf`'s key (see its doc) and returns two counts.
+      const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const [{ repeatPurchaseRate, identifiedBuyers }, guestCheckout] = await Promise.all([
+        runInTenantContext(storeId, () => repeatPurchaseInDb(storeId, since30d)),
+        // Same 30d window: does this store take guest orders? Ruling AN-1's
+        // definition — ANY order with no customer, paid or not — the same
+        // probe /insights/funnel uses. Deriving it from the PAID orders read a
+        // false `false` on a store whose guest orders are unpaid COD, while
+        // the funnel page read `true` for the same days (issue 2257).
+        runInTenantContext(storeId, () => storeTakesGuestOrders(storeId, since30d)),
+      ]);
 
       // Window length used to derive a per-day velocity from the 7d unit sums.
       const TOP_SKU_WINDOW_DAYS = 7;
@@ -611,7 +655,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.userId;
 
       await inngest.send({
         name: 'insights/rollup-requested',

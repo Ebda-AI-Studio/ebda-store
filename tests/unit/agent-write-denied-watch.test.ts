@@ -198,6 +198,11 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
     expect(alert.level).toBe('p0');
     expect(alert.scope).toBe('platform');
     expect(alert.body).toContain('ENCRYPTION_KEY');
+    // Issue 2061: the p0 names the store and, with only ONE affected, points
+    // at that store's own key rather than a global env var that is fine.
+    expect(alert.body).toContain('"Acme" (store-1)');
+    expect(alert.body).toContain('/stores/store-1/agent-key');
+    expect(alert.context.storeIds).toEqual(['store-1']);
   });
 
   it('pages when a store with prior agent orders is refused for having no key', async () => {

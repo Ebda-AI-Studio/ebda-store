@@ -306,7 +306,7 @@ router.post(
           memo: body.memo,
           memoAr: body.memoAr,
           postedAt: body.postedAt ? new Date(body.postedAt) : undefined,
-          postedBy: (req as any).user?.id,
+          postedBy: req.user?.userId,
           lines: resolvedLines,
         })
       );
@@ -1095,7 +1095,7 @@ router.post(
             currency: currency.toUpperCase(),
             rate,
             rateDate: rateDateValue,
-            recordedBy: (req as any).user?.id ?? null,
+            recordedBy: req.user?.userId ?? null,
           },
           select: { id: true, currency: true, rate: true, rateDate: true, createdAt: true },
         })

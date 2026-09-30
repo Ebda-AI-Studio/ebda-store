@@ -8,7 +8,7 @@ import { OrderService } from '../../services/order.service';
 import { AnalyticsService } from '../../services/analytics.service';
 import { assertScope, MERCHANT_SCOPES } from '../merchant-auth';
 import { ok } from './tool-result';
-import { maskAddress, maskEmail } from '../../lib/pii-mask';
+import { maskAddress, maskEmail, redactFreeText } from '../../lib/pii-mask';
 
 /**
  * Phase 1 of the merchant-admin MCP surface: READ tools only.
@@ -326,7 +326,8 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
       description:
         'Full detail for one order: line items, payment records, delivery detail ' +
         '(carrier, area/governorate, shipped/delivered timestamps) and the status ' +
-        'history. Addresses are reduced to locality and contact details are MASKED. ' +
+        'history. Addresses are reduced to locality and contact details are MASKED; ' +
+        'order notes are returned with phone numbers and emails redacted. ' +
         'Throws if the id belongs to another store.',
       inputSchema: { orderId: z.string().min(1) },
     },
@@ -347,12 +348,81 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
             take: 100,
           }),
         ]);
+        // An explicit ALLOWLIST, never `...o` (issue 2244): a spread is a
+        // denylist, so every Order column rode out verbatim — including the
+        // shopper-authored `notes`/`customerNotes`, where Kuwait shoppers
+        // type street directions and a callback number — and any future
+        // column would too. This payload lands in a third-party LLM context.
         return ok({
-          ...o,
-          // Masked: this payload lands in a third-party LLM context.
+          id: o.id,
+          orderNumber: o.orderNumber,
+          status: o.status,
+          paymentStatus: o.paymentStatus,
+          source: o.source,
+          currency: o.currency,
+          subtotal: o.subtotal,
+          tax: o.tax,
+          taxIncludedInPrice: o.taxIncludedInPrice,
+          shipping: o.shipping,
+          discount: o.discount,
+          couponCode: o.couponCode,
+          couponDiscount: o.couponDiscount,
+          promotionDiscount: o.promotionDiscount,
+          appliedPromotion: o.appliedPromotion ?? null,
+          bundleDiscount: o.bundleDiscount,
+          loyaltyPointsRedeemed: o.loyaltyPointsRedeemed,
+          loyaltyDiscount: o.loyaltyDiscount,
+          walletAmount: o.walletAmount,
+          extraAmount: o.extraAmount,
+          extraAmountNote: o.extraAmountNote,
+          total: o.total,
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+          shippedAt: o.shippedAt,
+          deliveredAt: o.deliveredAt,
+          // Free text: phone- and email-shaped runs redacted, the rest kept.
+          notes: redactFreeText(o.notes),
+          customerNotes: redactFreeText(o.customerNotes),
+          items: (o.items ?? []).map((it: any) => ({
+            id: it.id,
+            productId: it.productId,
+            variantId: it.variantId,
+            productName: it.productName,
+            variantName: it.variantName,
+            sku: it.sku,
+            quantity: it.quantity,
+            price: it.price,
+            total: it.total,
+            bundleId: it.bundleId,
+            bundleName: it.bundleName,
+          })),
+          payments: (o.payments ?? []).map((p: any) => ({
+            id: p.id,
+            provider: p.provider,
+            method: p.method,
+            status: p.status,
+            amount: p.amount,
+            // Gateway references for reconciliation. `paymentUrl` is NOT
+            // returned: an unpaid order's hosted checkout link is a bearer
+            // capability, and this payload lands in a third-party LLM
+            // transcript (PR 2301 audit).
+            transactionId: p.transactionId,
+            invoiceId: p.invoiceId,
+            paidAt: p.paidAt,
+            createdAt: p.createdAt,
+          })),
+          // Masked: contact details are reduced so no shopper can be reached
+          // from a transcript.
           shippingAddress: maskAddress(o.shippingAddress),
           billingAddress: maskAddress(o.billingAddress),
-          customer: o.customer ? { ...o.customer, email: maskEmail(o.customer.email) } : null,
+          customer: o.customer
+            ? {
+                id: o.customer.id,
+                firstName: o.customer.firstName,
+                lastName: o.customer.lastName,
+                email: maskEmail(o.customer.email),
+              }
+            : null,
           delivery: deliveryOf(o, shipment ?? undefined),
           // Status timestamps: every transition from the append-only order_events trail.
           statusHistory: events.map(e => ({ from: e.fromStatus, to: e.toStatus, at: e.createdAt })),

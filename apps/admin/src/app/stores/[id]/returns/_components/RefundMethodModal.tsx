@@ -39,6 +39,8 @@ const KNOWN_GATEWAY_REASONS = new Set([
   'PARTIAL_REFUND_NOTHING_TO_REFUND',
   'EXCHANGE_CANNOT_REFUND_TO_GATEWAY',
   'REFUND_ALREADY_ISSUED',
+  // Issue 2024: the caller can complete returns but not send a gateway refund.
+  'REFUND_PERMISSION_REQUIRED',
 ]);
 
 function formatCurrency(fils: number) {

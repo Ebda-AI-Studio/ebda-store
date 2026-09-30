@@ -123,7 +123,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8 stagger-animation">
       <StatCard
         title={t('totalRevenue')}
-        value={stats?.totalRevenue || 0}
+        value={stats ? stats.totalRevenue : null}
         change={stats?.revenueChange}
         format="currency"
         iconBg="bg-primary"
@@ -141,12 +141,13 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
       />
       <StatCard
         title={t('totalProfit')}
-        value={stats ? stats.totalProfit : 0}
+        value={stats ? stats.totalProfit : null}
         change={stats?.profitChange}
         format="currency"
         iconBg="bg-emerald-600"
         vsLastPeriodLabel={vsLabel}
-        unknownLabel={t('profitUnknown')}
+        // A missing cost price is a KNOWN reason; failed stats are just unknown.
+        unknownLabel={stats ? t('profitUnknown') : undefined}
         note={profitNote}
         icon={
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -161,7 +162,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
       />
       <StatCard
         title={t('totalOrders')}
-        value={stats?.totalOrders || 0}
+        value={stats ? stats.totalOrders : null}
         change={stats?.ordersChange}
         iconBg="bg-violet-500"
         vsLastPeriodLabel={vsLabel}
@@ -169,7 +170,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
       />
       <StatCard
         title={t('totalCustomers')}
-        value={stats?.totalCustomers || 0}
+        value={stats ? stats.totalCustomers : null}
         change={stats?.customersChange}
         iconBg="bg-emerald-500"
         vsLastPeriodLabel={vsLabel}
@@ -186,7 +187,7 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
       />
       <StatCard
         title={t('avgOrderValue')}
-        value={stats?.averageOrderValue || 0}
+        value={stats ? stats.averageOrderValue : null}
         format="currency"
         iconBg="bg-info"
         vsLastPeriodLabel={vsLabel}

@@ -375,10 +375,10 @@
       "id": "tenant-mcp-online-order-context",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "place_order online branch (order-create + createPayment + compensating rollback) runs outside any tenant context, unlike the COD branch and unlike the human payment.routes.ts path — under RLS enforcement every SELECT the provider call makes would silently fall through to the current_store_id() IS NULL branch instead of being scoped",
+      "why": "place_order online branch: OrderService.create must run inside runInTenantContext so its withMoneyTx opens with the store GUCs (transactionWithGucs) — outside it the order, items, stock decrement and cart clear run with no app.current_store_id; createPayment runs in a second wrap and the compensating rollback sits outside both (issues 2058/2059)",
       "source": "apps/api/src/mcp/tools/order.tools.ts",
-      "find": "        return await runInTenantContext(store.id, async () => {",
-      "replace": "        return await (async (_s: string, fn: () => Promise<unknown>) => fn())(store.id, async () => {",
+      "find": "          const order = await runInTenantContext(store.id, async () => {",
+      "replace": "          const order = await (async (_s: string, fn: () => Promise<any>) => fn())(store.id, async () => {",
       "test": "tests/unit/mcp-order-tools-bundle-payment.test.ts"
     },
     {
@@ -417,8 +417,8 @@
       "tier": "unit",
       "why": "an agent COD order whose Payment write fails stays committed with inventory decremented and the cart cleared — an orphan the agent cannot retry (#956)",
       "source": "apps/api/src/mcp/tools/order.tools.ts",
-      "find": "            await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>\n              logger.error(\n                { err: rbErr, orderId: order.id, storeId: store.id },\n                '[MCP place_order] order rollback failed after COD payment-create failure'",
-      "replace": "            await Promise.resolve().catch(rbErr =>\n              logger.error(\n                { err: rbErr, orderId: order.id, storeId: store.id },\n                '[MCP place_order] order rollback failed after COD payment-create failure'",
+      "find": "              OrderService.rollbackForPaymentFailure(store.id, order.id, cartId)\n            ).catch(rbErr =>\n              logger.error(\n                { err: rbErr, orderId: order.id, storeId: store.id },\n                '[MCP place_order] order rollback failed after COD payment-create failure'",
+      "replace": "              Promise.resolve()\n            ).catch(rbErr =>\n              logger.error(\n                { err: rbErr, orderId: order.id, storeId: store.id },\n                '[MCP place_order] order rollback failed after COD payment-create failure'",
       "test": "tests/unit/mcp-agent-write-attribution.test.ts"
     },
     {
@@ -647,7 +647,7 @@
       "tier": "unit",
       "why": "every refused MCP write opened its OWN interactive runInTenantContext transaction, reachable by a fully unauthenticated caller at publicLimiter's 300/min/IP — a distributed prober could hold 5 interactive transactions/sec/IP on the pool the human checkout path shares and grow audit_logs at the same rate; the fix must coalesce repeats onto one row per window WITHOUT dropping the attempt count (#1644 / #1649, a first count-less attempt was reverted for exactly that)",
       "source": "apps/api/src/mcp/agent-auth.ts",
-      "find": "    if (attemptsInWindow > 1) {",
+      "find": "    if (reservation === 'held') {",
       "replace": "    if (false) {",
       "test": "tests/unit/agent-denial-coalesce.test.ts"
     },
@@ -1145,10 +1145,10 @@
       "id": "refresh-failed-body-token-keeps-cookie-session",
       "domain": "csrf / session",
       "tier": "unit",
-      "why": "a failed BODY token no longer falls back to the cookie: a cross-site form posting refreshToken=garbage (or a stale iOS localStorage token) either wipes a live cookie session or 401s it instead of rotating it (#1527)",
+      "why": "a failed BODY token no longer falls back to the caller's OWN cookie session: a stale iOS localStorage token 401s a live same-user cookie session instead of rotating it (#1527; the fallback is subject-bound since issue 1962)",
       "source": "apps/api/src/routes/auth.routes.ts",
-      "find": "        await rotateAndRespond(cookieRefreshToken, undefined);",
-      "replace": "        throw firstError;",
+      "find": "          await rotateAndRespond(cookieRefreshToken, undefined, { staleBodyToken: true });",
+      "replace": "          throw firstError;",
       "test": "tests/unit/refresh-route-failure-paths.test.ts"
     },
     {
@@ -1532,6 +1532,46 @@
       "test": "tests/integration/partial-unique-indexes.test.ts"
     },
     {
+      "id": "money-return-gateway-refund-needs-orders-refund",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "returns:write (held by staff) was the only gate on completing a return with a gateway method, which sends a real, irreversible Tap/MyFatoorah/KNET refund — the orders:refund permission staff deliberately lack (issue 2024)",
+      "source": "apps/api/src/routes/return.routes.ts",
+      "find": "        (GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) &&",
+      "replace": "        false &&",
+      "test": "tests/unit/return-complete-gateway-permission.test.ts"
+    },
+    {
+      "id": "refresh-body-token-does-not-install-cookies",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "/auth/refresh Set-Cookies whatever BODY token it rotated: a merchant-origin page (CSRF-exempt route, credentialed CORS) auto-submits the ATTACKER's refresh token and the victim's browser is silently signed into the attacker's account (issue 2217)",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "      !presentedInBody ||",
+      "replace": "      true ||",
+      "test": "tests/unit/refresh-route-failure-paths.test.ts"
+    },
+    {
+      "id": "refresh-cookie-fallback-same-subject",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "the refresh cookie fallback rotates a cookie session with no subject binding: a cross-site `refreshToken=garbage` form rotates the victim's cookie and desyncs the iOS client's stored token into a family revoke, and a different user's shared API-domain cookie is rotated for the caller (issue 1962)",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "      if (bodyClaims?.sub && cookieClaims?.sub === bodyClaims.sub) {",
+      "replace": "      if (true) {",
+      "test": "tests/unit/refresh-route-failure-paths.test.ts"
+    },
+    {
+      "id": "money-unbooked-refund-alert-survives-rollback",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "the P1 for a refund the provider already executed but nothing books (or whose ledger event could not be queued) is queued with deferAfterTenantCommit; without runOnRollback a rolled-back request drops it, so an irreversible gateway refund with no ledger entry pages nobody (PR 2301 audit P1, PR 2279)",
+      "source": "apps/api/src/services/payment-providers/unbooked-refund-alert.ts",
+      "find": "    { runOnRollback: true }",
+      "replace": "    {}",
+      "test": "tests/unit/unbooked-refund-alert.test.ts"
+    },
+    {
       "id": "rls-scoped-bypass-asserts-transaction",
       "domain": "tenant / RLS",
       "tier": "unit",
@@ -1610,6 +1650,16 @@
       "find": "import { createHmac } from 'node:crypto';",
       "replace": "import { createHash } from 'node:crypto';\nconst createHmac = (_alg: string, _key: unknown) => createHash('sha256');",
       "test": "tests/unit/customer-key-pii-mask.test.ts"
+    },
+    {
+      "id": "storefront-ios-body-lane-sends-bearer",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "on a merchant custom domain /auth/refresh rotates an iOS body token WITHOUT Set-Cookie (issue 2217); if the storefront does not send the rotated access token as a Bearer, the shopper loops 401 -> refresh -> 401 and is signed out on every account page (PR 2301 audit P1)",
+      "source": "apps/web/src/lib/api.ts",
+      "find": "      headers.Authorization = `Bearer ${accessToken}`;",
+      "replace": "      void accessToken;",
+      "test": "tests/unit/storefront-csrf-heal-refresh.test.ts"
     }
   ]
 }

@@ -59,4 +59,18 @@ describe('listSlugRedirects (real Postgres)', () => {
     const byTo = await listSlugRedirects(storeId, { q: 'NEW-0' });
     expect(byTo.rows.map(x => x.toSlug)).toEqual(['new-0']);
   });
+
+  // Issue 2255: every row is reachable by BROWSING — the cursor walks the
+  // whole set, newest first, with no gap and no duplicate.
+  it('pages through every row with nextCursor, then reports the end', async () => {
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 5; page++) {
+      const r = await listSlugRedirects(storeId, { limit: 3, cursor });
+      seen.push(...r.rows.map(x => x.fromSlug));
+      if (!r.nextCursor) break;
+      cursor = r.nextCursor;
+    }
+    expect(seen).toEqual(['old-6', 'old-5', 'old-4', 'old-3', 'old-2', 'old-1', 'Old-Linen-Shirt']);
+  });
 });

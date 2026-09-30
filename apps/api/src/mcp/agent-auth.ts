@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
+import { ipKeyGenerator } from 'express-rate-limit';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { prisma, runInTenantContext } from '@force/database';
 import type { McpStore } from './resolve-store';
@@ -399,25 +400,68 @@ function boundAuditDetails(details: Record<string, unknown>): Record<string, unk
  * row per window WITHOUT a count, which silently dropped the repeats and
  * could defeat `classifyAgentDenials`'s thresholds (a real 50-attempt flood
  * would report as ~6 rows). This version never drops the count: the FIRST
- * denial in a (store, ip, tool, credential) minute writes the row exactly as
- * before and remembers its id in Redis; every REPEAT in that same window —
- * which, `credential` being in the key, is an attempt the classifier would
- * bucket identically — costs a single
- * plain, non-transactional `UPDATE` of that row's `details.count` — never a
- * new row, never a new transaction. `agent.write.failed` (an AUTHORISED write
- * that then threw) is never coalesced: it requires credential possession, so
- * it is already bounded by who holds a key, not by an anonymous caller's
- * request rate.
+ * attempt in a (outcome, store, ip, tool, credential) minute writes the row
+ * exactly as before and remembers its id in Redis; every REPEAT in that same
+ * window — which, `credential` being in the key, is an attempt the classifier
+ * would bucket identically — costs a single plain, non-transactional `UPDATE`
+ * of that row's `details.count` — never a new row, never a new transaction.
  *
- * Fails OPEN to today's per-attempt behaviour whenever Redis cannot answer —
- * `incrementRateLimit` returns 0 when unavailable, which reads as "first" on
- * every call, so a Redis outage degrades to one row per attempt, never to a
- * dropped attempt.
+ * What gets coalesced is decided by WHO the caller is, not by the outcome
+ * (issue 2151). `agent.write.failed` (an authorised write that then threw)
+ * used to be exempt on the grounds that it "requires credential possession".
+ * That is false when the per-store `agent_checkout_open_writes` escape hatch
+ * is on: the grant is then `open_writes` with `credential: 'none'`, so a fully
+ * anonymous caller reaches `failed` trivially (`add_to_cart` with a made-up
+ * productId → 404 → audited as failed) — one interactive transaction per
+ * attempt, on the lever most likely to be flipped DURING an incident. So only
+ * a genuinely key-bearing caller (`grant === 'credential'`) gets a
+ * per-attempt `failed` row; every other `failed` is coalesced exactly like a
+ * denial, under its own `agent:failed:` key so the two never share a row.
+ *
+ * Concurrency (issue 2150): the first attempt RESERVES the row slot
+ * (`SET <key>:row pending NX`) before its insert, so a burst of concurrent
+ * repeats has something to defer to instead of each opening its own
+ * transaction. A repeat that finds the slot `pending` writes nothing — its
+ * attempt is already in the counter, and the reserving writer re-reads the
+ * counter AFTER publishing the real row id and flushes the total. (A repeat
+ * can only observe `pending` before that publish, and its INCR precedes its
+ * read, so the writer's re-read always includes it.)
+ *
+ * Fails OPEN to per-attempt rows whenever Redis cannot answer —
+ * `incrementRateLimit` returns 0 when unavailable (and a Redis error mid
+ * command is read the same way, issue 2141), which reads as "first" on every
+ * call, so a Redis outage degrades to one row per attempt, never to a dropped
+ * attempt.
  */
 export const DENIAL_COALESCE_WINDOW_SECONDS = 60;
 
 /**
- * Redis key scoping a denial-count window to exactly (store, ip, tool,
+ * Lifetime of a `pending` reservation. Longer than the whole
+ * `runInTenantContext` envelope the reserving insert runs in (`maxWait` 10s +
+ * `timeout` 30s), so a slow insert under pool contention cannot lose its slot
+ * to a second writer; short enough that a reservation orphaned by a crashed
+ * process stops suppressing rows well inside one watcher window.
+ */
+const DENIAL_ROW_PENDING_TTL_SECONDS = 45;
+
+/** Placeholder a reserving writer holds in `<key>:row` until its row exists. */
+const PENDING_ROW = 'pending';
+
+/**
+ * The address a coalescing window is keyed on. IPv6 collapses to its subnet
+ * via `ipKeyGenerator` — the exact normalisation `publicLimiter`
+ * (express-rate-limit's default key generator, /56) applies — so the window
+ * can never be finer than the rate limit that bounds it: rotating the low
+ * bits inside one prefix stays in ONE publicLimiter bucket, and must stay in
+ * ONE coalescing window too, or every request is a "first" and opens its own
+ * transaction (issue 2054).
+ */
+function denialSourceKey(ip: string | undefined): string {
+  return ip ? ipKeyGenerator(ip) : 'unknown';
+}
+
+/**
+ * Redis key scoping a coalescing window to exactly (outcome, store, ip, tool,
  * credential).
  *
  * `credential` is in the key because `classifyAgentDenials` PARTITIONS rows by
@@ -433,21 +477,54 @@ export const DENIAL_COALESCE_WINDOW_SECONDS = 60;
  * keeps every coalesced row homogeneous, so its `count` describes attempts
  * that all classify the same way.
  *
+ * `outcome` is in the key so a `denied` and a coalesced `failed` never merge
+ * into one row (they are different `action`s).
+ *
  * Cardinality stays bounded: `AgentCredentialOutcome` is a 5-value enum, so
  * this is at most a 5x fan-out of an already per-(store, ip, tool) key, and in
  * practice a single caller presents one credential shape.
  */
 function denialCoalesceKey(
+  outcome: 'denied' | 'failed',
   storeId: string,
   tool: string,
-  ip: string,
+  ip: string | undefined,
   credential: AgentCredentialOutcome
 ): string {
-  return `agent:denied:${storeId}:${ip || 'unknown'}:${tool}:${credential}`;
+  return `agent:${outcome}:${storeId}:${denialSourceKey(ip)}:${tool}:${credential}`;
 }
 
 /**
- * Remember which audit row the FIRST denial in a window landed on, so a
+ * Atomic INCR+EXPIRE — the same primitive `security.ts`'s rate limiters use.
+ * `incrementRateLimit` already returns 0 when Redis is not connected; a
+ * command that fails mid-flight (connection drop, retries exhausted) REJECTS
+ * instead, and before this guard that rejection escaped to `auditAgentWrite`'s
+ * outer catch and NO row was written — a Redis blip made refused writes
+ * vanish from `audit_logs` entirely (issue 2141). Read it as 0 ("first"), the
+ * documented fail-open.
+ */
+async function countAttempt(key: string): Promise<number> {
+  try {
+    return await redis.incrementRateLimit(key, DENIAL_COALESCE_WINDOW_SECONDS);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, '[mcp agent-auth] denial counter failed');
+    return 0;
+  }
+}
+
+/** The window counter's current value, or null when Redis cannot answer. */
+async function readAttemptCount(key: string): Promise<number | null> {
+  if (!redis.isAvailable()) return null;
+  try {
+    return await redis.getRateLimitCount(key);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, '[mcp agent-auth] denial counter read failed');
+    return null;
+  }
+}
+
+/**
+ * Remember which audit row the FIRST attempt in a window landed on, so a
  * repeat can bump ITS count instead of writing a new row. Best-effort: losing
  * this (Redis restart mid-window, a TTL race) only means the next repeat
  * falls back to writing its own fresh row — never a crash, never a dropped
@@ -487,6 +564,42 @@ async function recallDenialRow(key: string): Promise<string | null> {
   }
 }
 
+/**
+ * Claim the window's row slot before inserting. `reserved` = this call owns
+ * the insert; `held` = another writer got there first (pending or real);
+ * `unavailable` = Redis cannot arbitrate, so the caller writes its own row
+ * (fail-open, per-attempt).
+ */
+async function reserveDenialRow(key: string): Promise<'reserved' | 'held' | 'unavailable'> {
+  if (!redis.isAvailable()) return 'unavailable';
+  try {
+    const client = redis.getClient();
+    if (!client) return 'unavailable';
+    const result = await client.set(
+      `${key}:row`,
+      PENDING_ROW,
+      'EX',
+      DENIAL_ROW_PENDING_TTL_SECONDS,
+      'NX'
+    );
+    return result === 'OK' ? 'reserved' : 'held';
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, '[mcp agent-auth] denial-row reserve failed');
+    return 'unavailable';
+  }
+}
+
+/** Drop a reservation whose insert failed, so the window is not suppressed. */
+async function releaseDenialRow(key: string): Promise<void> {
+  if (!redis.isAvailable()) return;
+  try {
+    const client = redis.getClient();
+    if ((await client?.get(`${key}:row`)) === PENDING_ROW) await client?.del(`${key}:row`);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, '[mcp agent-auth] denial-row release failed');
+  }
+}
+
 function encodeDenialRow(rowId: string, base: number): string {
   return `${rowId}|${base}`;
 }
@@ -496,10 +609,11 @@ function encodeDenialRow(rowId: string, base: number): string {
  * previous deploy (bare row id) — read it as `base: 0`, i.e. exactly the old
  * behaviour, for the ≤60s such a value can still exist. Anything malformed
  * (or a negative/NaN base) is treated as no pointer at all, which self-heals
- * into a fresh row rather than corrupting a count.
+ * into a fresh row rather than corrupting a count. `pending` is handled by the
+ * caller before this is reached.
  */
 function decodeDenialRow(raw: string | null): { rowId: string; base: number } | null {
-  if (!raw) return null;
+  if (!raw || raw === PENDING_ROW) return null;
   const sep = raw.lastIndexOf('|');
   if (sep < 0) return { rowId: raw, base: 0 };
   const rowId = raw.slice(0, sep);
@@ -509,13 +623,13 @@ function decodeDenialRow(raw: string | null): { rowId: string; base: number } | 
 }
 
 /**
- * Write the FIRST denial-audit row of a coalescing window. Mirrors
- * `auditLog`'s two effects (the dev-mode `[AUDIT]` log line + the
- * `audit_logs` insert) rather than calling it directly, because this is the
- * one caller that needs the created row's id back to remember it for the
- * repeats that follow.
+ * Write the FIRST audit row of a coalescing window. Mirrors `auditLog`'s two
+ * effects (the dev-mode `[AUDIT]` log line + the `audit_logs` insert) rather
+ * than calling it directly, because this is the one caller that needs the
+ * created row's id back to remember it for the repeats that follow.
  */
-async function createDenialAuditRow(
+async function createCoalescedAuditRow(
+  action: string,
   store: McpStore,
   tool: string,
   context: McpAgentContext,
@@ -525,7 +639,7 @@ async function createDenialAuditRow(
     logger.info(
       {
         audit: {
-          action: 'agent.write.denied',
+          action,
           storeId: store.id,
           resourceType: 'mcp_tool',
           resourceId: tool,
@@ -541,7 +655,7 @@ async function createDenialAuditRow(
   await runInTenantContext(store.id, async () => {
     const row = await prisma.auditLog.create({
       data: {
-        action: 'agent.write.denied',
+        action,
         resourceType: 'mcp_tool',
         resourceId: tool,
         storeId: store.id,
@@ -553,6 +667,35 @@ async function createDenialAuditRow(
     rowId = row.id;
   });
   return rowId;
+}
+
+/**
+ * Flush a window's count onto its row. A single, non-transactional UPDATE by
+ * primary key — no `runInTenantContext`, no interactive transaction.
+ * `audit_logs`'s RLS policy (`rls_audit_logs_tenant`) admits it the same way
+ * it admits an unscoped insert: `current_store_id() IS NULL` outside any
+ * tenant transaction. Returns false when the update failed.
+ */
+async function flushCount(
+  rowId: string,
+  baseDetails: Record<string, unknown>,
+  count: number,
+  store: McpStore,
+  tool: string
+): Promise<boolean> {
+  try {
+    await prisma.auditLog.update({
+      where: { id: rowId },
+      data: { details: JSON.parse(JSON.stringify({ ...baseDetails, count })) },
+    });
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err: (err as Error).message, storeId: store.id, tool },
+      '[mcp agent-auth] denial-count flush failed — writing a fresh row instead'
+    );
+    return false;
+  }
 }
 
 /**
@@ -573,6 +716,7 @@ export async function auditAgentWrite(params: {
   details?: Record<string, unknown>;
 }): Promise<void> {
   const { store, tool, outcome, context, details } = params;
+  const action = `agent.write.${outcome}`;
   try {
     // Caller-controlled — bounded before it is persisted. Spread LAST so a
     // caller cannot overwrite the attribution fields above it, and bounded as
@@ -586,11 +730,12 @@ export async function auditAgentWrite(params: {
       ...boundAuditDetails(details ?? {}),
     };
 
-    if (outcome !== 'denied') {
-      // `agent.write.failed` — never coalesced. See DENIAL_COALESCE_WINDOW_SECONDS.
+    if (outcome === 'failed' && context.grant === 'credential') {
+      // A key-bearing caller's failed write — bounded by who holds a key, so
+      // one row per attempt. See DENIAL_COALESCE_WINDOW_SECONDS (issue 2151).
       await runInTenantContext(store.id, async () => {
         await auditLog({
-          action: `agent.write.${outcome}`,
+          action,
           resourceType: 'mcp_tool',
           resourceId: tool,
           storeId: store.id,
@@ -602,44 +747,39 @@ export async function auditAgentWrite(params: {
       return;
     }
 
-    const dedupeKey = denialCoalesceKey(store.id, tool, context.ip ?? '', context.credential);
-    // Atomic INCR+EXPIRE — the same primitive `security.ts`'s rate limiters
-    // use. Returns 0 when Redis is unavailable, which the check below reads
-    // as "first" too, so a Redis outage falls back to one row per attempt.
-    const attemptsInWindow = await redis.incrementRateLimit(
-      dedupeKey,
-      DENIAL_COALESCE_WINDOW_SECONDS
-    );
+    const dedupeKey = denialCoalesceKey(outcome, store.id, tool, context.ip, context.credential);
+    // 0 when Redis cannot answer, which the checks below read as "first" too,
+    // so a Redis outage falls back to one row per attempt.
+    const attemptsInWindow = await countAttempt(dedupeKey);
 
-    if (attemptsInWindow > 1) {
-      const cached = decodeDenialRow(await recallDenialRow(dedupeKey));
-      if (cached) {
-        // Attempts belonging to THIS row, never the raw window counter (which
-        // slides across rows — see `rememberDenialRow`). Clamped at 1 for the
-        // case where the counter expired/was evicted under the pointer, which
-        // would otherwise make the delta negative.
-        const count = Math.max(attemptsInWindow - cached.base, 1);
-        try {
-          // A single, non-transactional UPDATE by primary key — no
-          // `runInTenantContext`, no interactive transaction. `audit_logs`'s
-          // RLS policy (`rls_audit_logs_tenant`) admits it the same way it
-          // admits an unscoped insert: `current_store_id() IS NULL` outside
-          // any tenant transaction.
-          await prisma.auditLog.update({
-            where: { id: cached.rowId },
-            data: {
-              details: JSON.parse(JSON.stringify({ ...baseDetails, count })),
-            },
-          });
-          return;
-        } catch (err) {
-          logger.warn(
-            { err: (err as Error).message, storeId: store.id, tool },
-            '[mcp agent-auth] denial-count flush failed — writing a fresh row instead'
-          );
-        }
+    const reservation = await reserveDenialRow(dedupeKey);
+    // Every attempt tries to claim the window's row slot (SET NX). Only the
+    // first in a window wins; every repeat finds it HELD and joins that row.
+    if (reservation === 'held') {
+      const raw = await recallDenialRow(dedupeKey);
+      // The window's first writer is still inserting. This attempt is already
+      // in the counter, and that writer re-reads the counter after it
+      // publishes the row id — so it carries this one. Writing nothing here
+      // is what keeps a CONCURRENT burst to one transaction (issue 2150).
+      if (raw === PENDING_ROW) return;
+      const cached = decodeDenialRow(raw);
+      // Attempts belonging to THIS row, never the raw window counter (which
+      // slides across rows — see `rememberDenialRow`). Clamped at 1 for the
+      // case where the counter expired/was evicted under the pointer, which
+      // would otherwise make the delta negative.
+      if (
+        cached &&
+        (await flushCount(
+          cached.rowId,
+          baseDetails,
+          Math.max(attemptsInWindow - cached.base, 1),
+          store,
+          tool
+        ))
+      ) {
+        return;
       }
-      // No cached row id (Redis restarted mid-window, a TTL race, or the
+      // No usable row id (Redis restarted mid-window, a TTL race, or the
       // update above failed) — fall through and write a durable row rather
       // than silently dropping the attempt; it starts a new coalescing window.
     }
@@ -649,11 +789,55 @@ export async function auditAgentWrite(params: {
     // Stamping it with `attemptsInWindow` instead would re-count every attempt
     // the expired window already recorded on its own row.
     const base = Math.max(attemptsInWindow - 1, 0);
-    const rowId = await createDenialAuditRow(store, tool, context, {
-      ...baseDetails,
-      count: 1,
-    });
-    if (rowId) await rememberDenialRow(dedupeKey, encodeDenialRow(rowId, base));
+    let rowId: string | undefined;
+    let insertError: unknown;
+    try {
+      rowId = await createCoalescedAuditRow(action, store, tool, context, {
+        ...baseDetails,
+        count: 1,
+      });
+    } catch (err) {
+      insertError = err;
+    }
+    if (!rowId) {
+      if (reservation === 'reserved') await releaseDenialRow(dedupeKey);
+      // The reserving insert failed (pool timeout / P2028 — most likely DURING
+      // a flood). Every repeat that saw `pending` returned having written
+      // nothing, so without this the whole burst would be invisible to the
+      // denial watcher (PR 2301 audit). Record it on one plain,
+      // non-transactional insert — no interactive tenant transaction, the same
+      // way the repeat UPDATE runs — carrying every attempt the counter saw.
+      logger.warn(
+        { err: (insertError as Error | undefined)?.message, storeId: store.id, tool },
+        '[mcp agent-auth] coalesced audit insert failed — writing an unscoped row instead'
+      );
+      const now = reservation === 'reserved' ? await readAttemptCount(dedupeKey) : null;
+      await prisma.auditLog.create({
+        data: {
+          action,
+          resourceType: 'mcp_tool',
+          resourceId: tool,
+          storeId: store.id,
+          ipAddress: context.ip,
+          userAgent: context.userAgent,
+          details: JSON.parse(
+            JSON.stringify({ ...baseDetails, count: now !== null ? Math.max(now - base, 1) : 1 })
+          ),
+        },
+      });
+      return;
+    }
+    await rememberDenialRow(dedupeKey, encodeDenialRow(rowId, base));
+
+    // Carry every repeat that saw our reservation while we were inserting.
+    // Read AFTER the pointer is published: any attempt that observed `pending`
+    // incremented the counter before this read.
+    if (reservation === 'reserved' && attemptsInWindow > 0) {
+      const now = await readAttemptCount(dedupeKey);
+      if (now !== null && now - base > 1) {
+        await flushCount(rowId, { ...baseDetails }, now - base, store, tool);
+      }
+    }
   } catch (err) {
     logger.error(
       { err: (err as Error).message, storeId: store.id, tool },

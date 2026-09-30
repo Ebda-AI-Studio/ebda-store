@@ -24,9 +24,11 @@ interface UseAnalyticsArgs {
 }
 
 interface DashboardResponseData {
-  stats: DashboardStats;
-  gl: GlWindow;
-  stock: StockSnapshot;
+  stats: DashboardStats | null;
+  gl: GlWindow | null;
+  stock: StockSnapshot | null;
+  /** Sub-queries the API could not load (issue 2256) — a 200 can be partial. */
+  failed?: string[];
 }
 
 /**
@@ -119,6 +121,9 @@ export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs)
       // `''` (a failure with no message) is still an error: the page renders its
       // own translated fallback. Only `null` means "everything loaded".
       if (failed?.error) setError(failed.error.message ?? '');
+      // A 200 whose sub-queries failed is a load error too (issue 2256):
+      // `''` renders the page's own translated "did not load" fallback.
+      else if (dashboardResult.data?.failed?.length) setError('');
     } catch (err) {
       console.error('Failed to fetch analytics:', err);
       setError(err instanceof Error ? err.message : '');

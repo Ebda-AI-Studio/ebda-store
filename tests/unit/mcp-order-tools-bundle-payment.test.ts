@@ -232,12 +232,52 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
     );
 
     expect(vi.mocked(runInTenantContext)).toHaveBeenCalledWith(store.id, expect.any(Function));
-    // OrderService.create must run INSIDE that wrap, not before it — assert
-    // it never ran with the tenant-context mock disarmed.
     expect(OrderService.create).toHaveBeenCalled();
   });
 
-  it('runs the compensating rollback for a failed createPayment inside the same tenant context', async () => {
+  it('runs OrderService.create AND createPayment each INSIDE a tenant wrap (issue 2059)', async () => {
+    let depth = 0;
+    vi.mocked(runInTenantContext).mockImplementation((async (
+      _storeId: string,
+      fn: () => unknown
+    ) => {
+      depth += 1;
+      try {
+        return await fn();
+      } finally {
+        depth -= 1;
+      }
+    }) as never);
+    const insideAt: Record<string, number> = {};
+    vi.mocked(OrderService.create).mockImplementation((async () => {
+      insideAt.create = depth;
+      return {
+        id: 'order-3',
+        orderNumber: 'ORD-3',
+        total: 5000,
+        currency: 'KWD',
+        items: [{ id: 'oi-1', productName: 'Rug', quantity: 1, price: 5000, sku: null }],
+      };
+    }) as never);
+    vi.mocked(PaymentService.createPayment).mockImplementation((async () => {
+      insideAt.payment = depth;
+      return { paymentUrl: 'https://pay.example/abc' };
+    }) as never);
+    const { server, tools } = harness();
+    registerOrderTools(server, store as never);
+
+    await tools.place_order(
+      { cartId: 'cart-3', paymentMethod: 'online', customer },
+      authorizedAgentExtra()
+    );
+
+    // Each inside exactly one wrap — never outside, never nested in the other.
+    expect(insideAt).toEqual({ create: 1, payment: 1 });
+    vi.mocked(runInTenantContext).mockImplementation(((_s: string, fn: () => unknown) =>
+      fn()) as never);
+  });
+
+  it('runs the compensating rollback for a failed createPayment, in its own tenant context', async () => {
     vi.mocked(PaymentService.createPayment).mockRejectedValue(new Error('gateway down'));
     vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);
     const { server, tools } = harness();
@@ -256,5 +296,61 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
       'order-3',
       'cart-3'
     );
+  });
+
+  // Issue 2058: the rollback used to live INSIDE the wrap's callback, so a
+  // failure of the wrap's own COMMIT (or its 30s timeout) — which rejects
+  // AFTER the callback returned — skipped it and stranded a pending order
+  // with stock taken, cart cleared and no Payment row.
+  it('still rolls the order back when the payment wrap fails AFTER createPayment resolved (commit failure)', async () => {
+    vi.mocked(PaymentService.createPayment).mockResolvedValue({
+      paymentUrl: 'https://pay.example/abc',
+    } as never);
+    vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);
+    let call = 0;
+    vi.mocked(runInTenantContext).mockImplementation((async (
+      _storeId: string,
+      fn: () => unknown
+    ) => {
+      call += 1;
+      const out = await fn();
+      // 1st wrap = order-create (commits), 2nd = payment (its COMMIT fails).
+      if (call === 2) throw new Error('P2028 transaction commit failed');
+      return out;
+    }) as never);
+    const { server, tools } = harness();
+    registerOrderTools(server, store as never);
+
+    await expect(
+      tools.place_order(
+        { cartId: 'cart-3', paymentMethod: 'online', customer },
+        authorizedAgentExtra()
+      )
+    ).rejects.toThrow('P2028');
+
+    expect(OrderService.rollbackForPaymentFailure).toHaveBeenCalledWith(
+      store.id,
+      'order-3',
+      'cart-3'
+    );
+    vi.mocked(runInTenantContext).mockImplementation(((_s: string, fn: () => unknown) =>
+      fn()) as never);
+  });
+
+  it('never rolls back an order whose payment wrap committed', async () => {
+    vi.mocked(PaymentService.createPayment).mockResolvedValue({
+      paymentUrl: 'https://pay.example/abc',
+    } as never);
+    const { server, tools } = harness();
+    registerOrderTools(server, store as never);
+
+    await tools.place_order(
+      { cartId: 'cart-3', paymentMethod: 'online', customer },
+      authorizedAgentExtra()
+    );
+
+    expect(OrderService.rollbackForPaymentFailure).not.toHaveBeenCalled();
+    // Two separate wraps: order-create, then provider call + Payment write.
+    expect(vi.mocked(runInTenantContext)).toHaveBeenCalledTimes(2);
   });
 });

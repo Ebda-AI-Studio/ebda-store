@@ -16,6 +16,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  MAX_NAMED_STORES,
   classifyAgentDenials,
   DENIAL_THRESHOLDS,
   PROBE_DISTINCT_IPS,
@@ -308,6 +309,9 @@ describe('platform_fault — #1653: spread thinly across many stores must still 
     // Genuinely platform-scoped — no single store's field.
     expect(found[0].store).toBeUndefined();
     expect(found[0].storesAffected).toBe(5);
+    // ...but it still names WHICH stores (issue 2061), so the on-call can act.
+    expect(found[0].stores?.map(s => s.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(found[0].stores?.[0]).toEqual({ id: 'a', name: 'Store a', slug: 'a' });
     expect(found[0].count).toBe(below * 5);
   });
 
@@ -318,6 +322,19 @@ describe('platform_fault — #1653: spread thinly across many stores must still 
     expect(found).toHaveLength(1);
     expect(found[0].kind).toBe('platform_fault');
     expect(found[0].storesAffected).toBe(1);
+    expect(found[0].stores).toEqual([{ id: 'a', name: 'Store a', slug: 'a' }]);
+  });
+
+  it('names at most MAX_NAMED_STORES stores, and only stores that actually faulted', () => {
+    const faulting = Array.from({ length: MAX_NAMED_STORES + 3 }, (_, i) => `s${i}`).flatMap(
+      storeId => rows({ storeId, credential: 'error', count: 1, ips: 1 })
+    );
+    const bystander = rows({ storeId: 'clean', credential: 'none', count: 2, ips: 1 });
+    const found = classifyAgentDenials([...bystander, ...faulting]);
+    const fault = found.find(f => f.kind === 'platform_fault');
+    expect(fault?.storesAffected).toBe(MAX_NAMED_STORES + 3);
+    expect(fault?.stores).toHaveLength(MAX_NAMED_STORES);
+    expect(fault?.stores?.some(s => s.id === 'clean')).toBe(false);
   });
 
   it('does not fire when the platform-wide total is still below threshold', () => {

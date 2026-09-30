@@ -8,6 +8,7 @@ import { AuthService } from '../services/auth.service';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
 import { bustStoreCaches } from '../services/store.service';
+import { featureService } from '../services/feature.service';
 import { invalidateCached } from '../lib/public-cache';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
@@ -322,6 +323,14 @@ router.put(
       // (adversarial audit P1-7): bust the public resolve/slug/id caches +
       // fire the storefront revalidate purge on this writer too — it used
       // to write store.status with no invalidation at all.
+      //
+      // A plan change ALSO changes the resolved feature map that the public
+      // payload embeds as `enabledFeatures` — and that map is read from
+      // FeatureService's own `features:store:*` cache (300s). Busting only
+      // the public keys made the very next public request re-seed them from
+      // the STALE feature map (issue 2172), so the feature cache is dropped
+      // FIRST, exactly as `featureService.setStorePlan` does.
+      if (plan !== undefined) await featureService.invalidateCache(store.id);
       await bustStoreCaches(store.id, store.slug, store.domain);
       if (before?.slug && before.slug !== store.slug) {
         await invalidateCached(`public:store:${before.slug}`);
@@ -1401,13 +1410,26 @@ router.get(
       );
 
       // Cross-tenant by nature — withRlsBypass, same as the ai-usage summary.
-      const rows = await withRlsBypass(tx =>
-        tx.storeUsageSnapshot.findMany({
+      //
+      // Paged by PERIOD, not by a flat row budget (PR 2301 audit): the old
+      // `take: months * 200` let the newest months consume the whole budget on
+      // a platform past 200 stores, so older months came back silently partial
+      // while the viewer rendered them as complete. Pick the newest `months`
+      // distinct periods first, then read every row of those periods.
+      const rows = await withRlsBypass(async tx => {
+        const periods = await tx.storeUsageSnapshot.findMany({
+          distinct: ['periodStart'],
           orderBy: [{ periodStart: 'desc' }],
-          take: months * 200, // months x a generous store ceiling
+          take: months,
+          select: { periodStart: true },
+        });
+        if (periods.length === 0) return [];
+        return tx.storeUsageSnapshot.findMany({
+          where: { periodStart: { in: periods.map(p => p.periodStart) } },
+          orderBy: [{ periodStart: 'desc' }],
           include: { store: { select: { slug: true, name: true, plan: true } } },
-        })
-      );
+        });
+      });
 
       const byPeriod = new Map<string, Array<Record<string, unknown>>>();
       for (const r of rows) {
@@ -1427,9 +1449,9 @@ router.get(
           // #1057: revenueFils/productViews/aiCostMicros are now BigInt —
           // `res.json` (JSON.stringify) throws on a raw bigint ("Do not know
           // how to serialize a BigInt"), so these serialize as strings, the
-          // standard BigInt-at-a-JSON-boundary convention. No admin UI reads
-          // this endpoint yet (grepped apps/admin — none found), so there is
-          // no existing consumer type to keep in sync.
+          // standard BigInt-at-a-JSON-boundary convention. The super-admin
+          // viewer is apps/admin/src/app/usage-history/page.tsx (issue 1058);
+          // its `UsageStoreRow` type mirrors this shape — keep them in sync.
           revenueFils: r.revenueFils.toString(),
           customers: r.customers,
           sessionsProxy: r.sessionsProxy,

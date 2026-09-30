@@ -59,12 +59,24 @@ router.get(
         logger.error({ err: stockRes.reason, storeId }, '[ANALYTICS] stock snapshot failed');
       }
 
+      // A sub-query that failed is REPORTED, not just nulled (issue 2256): the
+      // admin detects errors by HTTP status, so a 200 with `stats: null` used
+      // to render KWD 0.000 revenue and 0 orders with no banner. `failed`
+      // names each part that did not load; the page treats a non-empty list
+      // as a load error and shows the unknown values as unknown.
+      const failed = [
+        ...(statsRes.status === 'rejected' ? ['stats'] : []),
+        ...(glRes.status === 'rejected' ? ['gl'] : []),
+        ...(stockRes.status === 'rejected' ? ['stock'] : []),
+      ];
+
       res.json({
         success: true,
         data: {
           stats: statsRes.status === 'fulfilled' ? statsRes.value : null,
           gl: glRes.status === 'fulfilled' ? glRes.value : null,
           stock: stockRes.status === 'fulfilled' ? stockRes.value : null,
+          failed,
         },
       });
     } catch (error) {

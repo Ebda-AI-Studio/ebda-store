@@ -106,6 +106,15 @@ shipping/billing address and customer email; a nameless customer's
 `customerName` in `admin_list_orders`). There is **no unmask flag**: the
 merchant has the full record on the dashboard (Ruling MCP-R2).
 
+`admin_get_order` returns an explicit field allowlist, never a spread of the
+order row, so a new Order column is NOT exposed by default. Shopper-authored
+free text (`notes`, `customerNotes`) is returned with phone-shaped digit runs
+(8+ digits, not dates or hyphen-glued references like `ORD-20260930-001`) replaced by `[phone]` and email addresses by `[email]`
+(`redactFreeText`, `lib/pii-mask.ts`) — the words of the note survive, the
+contact inside it does not (issue 2244). Payment records carry provider, method, status, amount,
+the gateway transaction/invoice ids and timestamps — never `paymentUrl`, an
+unpaid order's live hosted-checkout link (Ruling DRM-3).
+
 ### Customers: the same rows as the Customers page
 
 `admin_list_customers` groups exactly like the admin Customers page — a

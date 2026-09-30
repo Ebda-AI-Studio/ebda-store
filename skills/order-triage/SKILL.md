@@ -13,9 +13,11 @@ Answer one question: **what should the merchant do next?**
    named a period. Sorted newest first.
 2. `admin_get_order` on the ones you are going to flag — only those. The list
    payload carries each order's `delivery` block (carrier, area, shipped /
-   delivered timestamps) but no line items, street addresses, or payment
-   records; `admin_get_order` adds those plus the status history. Contact
-   details are masked in both.
+   delivered timestamps) but no line items or payment records;
+   `admin_get_order` adds those plus the status history and the order notes
+   (phone numbers and emails inside them redacted). Neither returns a street
+   address — addresses stop at area/governorate — and contact details are
+   masked in both.
 
 ## What counts as stuck
 

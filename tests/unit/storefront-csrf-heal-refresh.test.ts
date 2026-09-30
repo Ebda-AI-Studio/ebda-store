@@ -120,6 +120,110 @@ describe('iOS shopper with the refresh cookie alive and localStorage evicted (#1
   });
 });
 
+describe('issue 2170 — the cookie fallback tells the storefront its stored token is dead', () => {
+  it('drops the stored refresh token when the server answers staleRefreshToken', async () => {
+    localStorage.setItem('refreshToken', 'dead-refresh');
+    let paymentAttempts = 0;
+    const fetchMock = vi.fn(async (url: unknown) => {
+      if (String(url).includes('/auth/refresh')) {
+        return res(200, {
+          success: true,
+          data: { csrfToken: 'fresh-csrf', refreshed: true, staleRefreshToken: true },
+        });
+      }
+      paymentAttempts += 1;
+      return paymentAttempts === 1 ? res(403, CSRF_403) : res(200, { success: true, data: {} });
+    });
+    globalThis.fetch = fetchMock as never;
+    const { api } = await import('@web/lib/api');
+
+    const result = await api.post('/payments/create', { orderId: 'o1' });
+
+    expect(result.success).toBe(true);
+    // Re-presenting it would trip reuse detection and revoke every session.
+    expect(localStorage.getItem('refreshToken')).toBeNull();
+  });
+});
+
+// PR 2301 audit P1: on a merchant custom domain the API rotates the iOS body
+// token WITHOUT Set-Cookie (issue 2217), so the `token` cookie stays expired.
+// The storefront had no Bearer path, so it looped 401 → refresh → 401 and the
+// signed-in shopper was rendered signed-out. It now keeps the rotated access
+// token and sends it as a Bearer, like the admin and orders clients.
+describe('iOS body lane: a refresh that sets no cookie still signs the shopper in', () => {
+  function authed(init?: RequestInit): boolean {
+    return (
+      (init?.headers as Record<string, string> | undefined)?.Authorization === 'Bearer new-access'
+    );
+  }
+
+  it('retries /auth/me with the rotated access token as a Bearer, and keeps using it', async () => {
+    localStorage.setItem('refreshToken', 'live-refresh');
+    const fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes('/auth/refresh')) {
+        // The body pair only — no Set-Cookie reaches this browser.
+        return res(200, {
+          success: true,
+          data: {
+            accessToken: 'new-access',
+            refreshToken: 'new-refresh',
+            csrfToken: 'c',
+            refreshed: true,
+          },
+        });
+      }
+      // The expired cookie authenticates nothing; only the Bearer does.
+      return authed(init)
+        ? res(200, { success: true, data: { user: { id: 'u1', email: 'a@x.test' } } })
+        : res(401, { success: false, error: { code: 'TOKEN_EXPIRED' } });
+    });
+    globalThis.fetch = fetchMock as never;
+    const { api } = await import('@web/lib/api');
+
+    const me = await api.getProfile();
+    expect(me.success).toBe(true);
+    expect(localStorage.getItem('refreshToken')).toBe('new-refresh');
+
+    // The NEXT request authenticates on the first try — no refresh loop.
+    const again = await api.getProfile();
+    expect(again.success).toBe(true);
+    expect(calls(fetchMock).filter(u => u.includes('/auth/refresh'))).toHaveLength(1);
+  });
+
+  it('drops the stored Bearer when a refresh answers on the cookie lane (no pair in the body)', async () => {
+    localStorage.setItem('accessToken', 'old-access');
+    localStorage.setItem('refreshToken', 'r');
+    globalThis.fetch = vi.fn(async (url: unknown) =>
+      String(url).includes('/auth/refresh')
+        ? res(200, {
+            success: true,
+            data: { csrfToken: 'c', refreshed: true, staleRefreshToken: true },
+          })
+        : res(401, { success: false })
+    ) as never;
+    const { api } = await import('@web/lib/api');
+    await api.getProfile();
+    expect(localStorage.getItem('accessToken')).toBeNull();
+  });
+
+  it('never sends a stored Bearer from a non-iOS browser (it is residue, and removed)', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/120' });
+    vi.stubGlobal('window', {
+      localStorage: store,
+      navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/120' },
+    });
+    localStorage.setItem('accessToken', 'leftover');
+    const fetchMock = vi.fn(async () => res(200, { success: true, data: { user: { id: 'u1' } } }));
+    globalThis.fetch = fetchMock as never;
+    const { api } = await import('@web/lib/api');
+    await api.getProfile();
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+    expect(localStorage.getItem('accessToken')).toBeNull();
+  });
+});
+
 describe('a rejected refresh still lets the triggering checkout write through (#1528)', () => {
   it('retries a CSRF-403 once after the refresh 401 cleared the cookies', async () => {
     let paymentAttempts = 0;

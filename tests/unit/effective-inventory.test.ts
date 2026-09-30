@@ -163,6 +163,58 @@ describe('no API query re-derives variant stock blind to isActive (#1103)', () =
     expect(offenders).toEqual([]);
   });
 
+  // Issue 2077: the regexes above only matched a select of `inventory` ALONE.
+  // `variants: { where: { isActive: true }, select: { inventory, allowBackorder } }`
+  // slipped past them — and it is the worse shape: an all-disabled product
+  // filters to ZERO rows, so `effectiveInventory` reads "no variants" and
+  // falls back to the parent column. Every variants select that reads
+  // `inventory` must select `isActive` too. (The PDP picker, once the one
+  // display-only exception, now selects `isActive` too — issue 2147 — so the
+  // allowlist is empty; add a file here only with a written reason.)
+  const DISPLAY_ONLY: Record<string, number> = {};
+
+  function variantBlocks(src: string): Array<{ line: number; text: string }> {
+    const out: Array<{ line: number; text: string }> = [];
+    const re = /variants:\s*\{/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      let i = m.index + m[0].length;
+      let depth = 1;
+      while (i < src.length && depth) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') depth--;
+        i++;
+      }
+      out.push({ line: src.slice(0, m.index).split('\n').length, text: src.slice(m.index, i) });
+    }
+    return out;
+  }
+
+  function isActiveBlind(block: string): boolean {
+    const sel = block.match(/select:\s*\{([\s\S]*)\}/);
+    if (!sel) return false;
+    return /\binventory:\s*true/.test(sel[1]) && !/\bisActive:\s*true/.test(sel[1]);
+  }
+
+  it('the brace-aware check catches the where-filtered shape (positive control)', () => {
+    const bad =
+      'variants: { where: { isActive: true }, select: { inventory: true, allowBackorder: true } },';
+    const good = 'variants: { select: { inventory: true, allowBackorder: true, isActive: true } },';
+    expect(variantBlocks(bad).some(b => isActiveBlind(b.text))).toBe(true);
+    expect(variantBlocks(good).some(b => isActiveBlind(b.text))).toBe(false);
+  });
+
+  it('every variants select that reads inventory also selects isActive (issue 2077)', () => {
+    const offenders: string[] = [];
+    for (const f of files(API_SRC)) {
+      const rel = path.relative(API_SRC, f);
+      const blind = variantBlocks(fs.readFileSync(f, 'utf8')).filter(b => isActiveBlind(b.text));
+      const allowed = DISPLAY_ONLY[rel] ?? 0;
+      if (blind.length > allowed) offenders.push(...blind.map(b => `${rel}:${b.line}`));
+    }
+    expect(offenders).toEqual([]);
+  });
+
   // Issue 2147: a select that PRE-FILTERS the relation to active rows (with any
   // select after it) hands a product whose variants are all disabled to the
   // helper as variant-less, and the helper then falls back to the parent

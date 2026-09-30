@@ -270,9 +270,46 @@ describe('place_order (cod) — writes after the order commits', () => {
     );
   });
 
+  // PR 2301 audit: the COD Payment-row failure rollback was the one call site
+  // left outside a tenant wrap — under force_app it would read no rows and do
+  // nothing, stranding a pending, stock-taken order.
+  it('runs the COD payment-failure rollback INSIDE its own tenant wrap', async () => {
+    const db = await import('@force/database');
+    vi.mocked(db.withTenantContext).mockRejectedValueOnce(new Error('P2028 tx closed'));
+    let depth = 0;
+    let rollbackDepth = -1;
+    vi.mocked(db.runInTenantContext).mockImplementation((async (_s: string, fn: () => unknown) => {
+      depth += 1;
+      try {
+        return await fn();
+      } finally {
+        depth -= 1;
+      }
+    }) as never);
+    vi.mocked(OrderService.rollbackForPaymentFailure).mockImplementation((async () => {
+      rollbackDepth = depth;
+    }) as never);
+    const tools = harness(registerOrderTools);
+
+    await expect(
+      tools.place_order(
+        { cartId: 'cart-1', paymentMethod: 'cod', customer },
+        authorizedAgentExtra({ ip: '198.51.100.4', userAgent: 'claude/1' })
+      )
+    ).rejects.toThrow('P2028');
+
+    expect(rollbackDepth).toBe(1);
+    vi.mocked(db.runInTenantContext).mockImplementation(((_s: string, fn: () => unknown) =>
+      fn()) as never);
+  });
+
   it('returns the committed order (never agent.write.failed) when post-commit bookkeeping rejects', async () => {
     const db = await import('@force/database');
-    vi.mocked(db.runInTenantContext).mockRejectedValueOnce(new Error('P2024 pool timeout'));
+    // 1st wrap = the order-create (issue 2059 tenant-scopes it); the 2nd is
+    // the post-commit bookkeeping this case makes reject.
+    vi.mocked(db.runInTenantContext)
+      .mockImplementationOnce(((_s: string, fn: () => unknown) => fn()) as never)
+      .mockRejectedValueOnce(new Error('P2024 pool timeout'));
     const tools = harness(registerOrderTools);
 
     const result = await tools.place_order(

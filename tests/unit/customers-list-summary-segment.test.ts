@@ -51,7 +51,7 @@ vi.mock('@api/middleware/security', () => ({
 }));
 vi.mock('@api/lib/public-cache', () => ({
   getCached: (_key: string, _ttl: number, loader: () => Promise<unknown>) => loader(),
-  customersCacheKey: (storeId: string) => `customers-agg:v2:${storeId}`,
+  customersCacheKey: (storeId: string) => `customers-agg:v3:${storeId}`,
   invalidateCustomersCache: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('exceljs', () => ({ default: {} }));
@@ -64,6 +64,7 @@ const STORE = '11111111-1111-4111-8111-111111111111';
 // SAME helper, so this test fails if the list and the rollup ever key guests
 // differently again (analytics audit 2026-09-30 §4).
 import { rfmKeyFor } from '@api/lib/customer-key';
+import { MAX_ZERO_ORDER_CUSTOMERS } from '@api/services/customer-aggregate.service';
 const GUEST_RFM_KEY = rfmKeyFor('guest@x.test', true);
 let app: Express;
 
@@ -246,10 +247,46 @@ describe('zero-order union (issue 2051)', () => {
     expect(res.body.data.data.map((c: { id: string }) => c.id)).toEqual(['u5@x.test']);
   });
 
-  it('excludes by real user ids, not by guest contact keys', async () => {
+  // Issue 2045: the exclusion is a NOT EXISTS on the user's own orders — exact
+  // whatever the order scan's cap, and no id list at all (it used to be an
+  // up-to-20k-element NOT IN), plus a bounded `take`.
+  it('selects zero-order users exactly (NOT EXISTS), bounded, with no id list', async () => {
     await request(app).get(`/api/v1/stores/${STORE}/customers`);
-    const where = h.userFindMany.mock.calls[0][0].where;
-    expect(where.id.notIn.sort()).toEqual(['u1', 'u2', 'u3']);
+    const args = h.userFindMany.mock.calls[0][0];
+    expect(args.where.id).toBeUndefined();
+    expect(args.where.orders).toEqual({ none: { storeId: STORE, deletedAt: null } });
+    expect(args.take).toBe(MAX_ZERO_ORDER_CUSTOMERS + 1);
+  });
+
+  it('reports a capped zero-order union through meta.truncated, never silently', async () => {
+    h.orderFindMany.mockResolvedValue([]);
+    h.userFindMany.mockResolvedValue(
+      Array.from({ length: MAX_ZERO_ORDER_CUSTOMERS + 1 }, (_, i) => ({
+        id: `z${i}`,
+        email: `z${i}@x.test`,
+        firstName: 'Z',
+        lastName: `${i}`,
+        phone: null,
+      }))
+    );
+    const res = await request(app).get(`/api/v1/stores/${STORE}/customers`);
+    expect(res.body.data.meta.truncated).toBe(true);
+    expect(res.body.data.meta.total).toBe(MAX_ZERO_ORDER_CUSTOMERS);
+  });
+
+  it('still unions zero-order users when the ORDER scan was truncated (the query is exact)', async () => {
+    // 20,001 rows = the scan cap + 1, so `ordersTruncated` is true.
+    h.orderFindMany.mockResolvedValue(
+      Array.from({ length: 20001 }, (_, i) =>
+        order(`o${i}`, null, 100, 'delivered', `g${i}@x.test`)
+      )
+    );
+    h.userFindMany.mockResolvedValue([
+      { id: 'z1', email: 'z1@x.test', firstName: 'Z', lastName: '1', phone: null },
+    ]);
+    const res = await request(app).get(`/api/v1/stores/${STORE}/customers?search=z1@x.test`);
+    expect(res.body.data.meta.truncated).toBe(true);
+    expect(res.body.data.data.map((c: { id: string }) => c.id)).toContain('z1');
   });
 });
 

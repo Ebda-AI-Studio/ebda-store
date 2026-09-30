@@ -42,6 +42,7 @@ import { cartLineUnitPrice } from '../lib/cart-pricing';
 import {
   resolveBundle,
   compareBundleComponents,
+  withinSaleWindow,
   type ResolvedBundle,
 } from '../services/bundle.service';
 import { invalidateStoreProductCaches, bundlesCacheKey, getCached } from '../lib/public-cache';
@@ -756,11 +757,14 @@ router.get(
           (b): b is ResolvedBundle => b !== null
         );
 
-        // Only bundles the storefront may actually sell right now, and never
-        // `pricingType`/`pricingValue` — see the doc comment on
-        // `ResolvedBundle` in bundle.service.ts.
+        // Every bundle sellable on everything BUT the clock, with its window —
+        // never `pricingType`/`pricingValue` (see the doc comment on
+        // `ResolvedBundle` in bundle.service.ts). The window itself is applied
+        // below, per request: crossing `startsAt`/`expiresAt` is not a write,
+        // so a cached `isPurchasable` would advertise an expired bundle (or
+        // hide a just-started one) for up to the TTL (issue 2111).
         return resolved
-          .filter(b => b.isPurchasable)
+          .filter(b => b.sellableIgnoringWindow)
           .map(b => ({
             id: b.id,
             name: b.name,
@@ -770,10 +774,20 @@ router.get(
             price: b.price,
             componentSum: b.componentSum,
             available: b.available,
+            startsAt: b.startsAt,
+            expiresAt: b.expiresAt,
           }));
       });
 
-      res.json({ success: true, data: { bundles } });
+      const now = new Date();
+      res.json({
+        success: true,
+        data: {
+          bundles: bundles
+            .filter(b => withinSaleWindow(b, now))
+            .map(({ startsAt: _s, expiresAt: _e, ...publicFields }) => publicFields),
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -807,7 +821,9 @@ router.get(
       // #1565 — same fix as the list route above: cached under the same
       // `public:products:${storeId}:` prefix every bundle write already busts.
       const bundle = await getCached(
-        `public:products:${storeId}:bundles:${slug}`,
+        // v2: the value holds `sellableIgnoringWindow` + the window, not a
+        // pre-applied `isPurchasable` (issue 2111) — a v1 entry must be a miss.
+        `public:products:${storeId}:bundles:v2:${slug}`,
         120,
         async () => {
           const row = await prisma.bundle.findFirst({
@@ -840,13 +856,25 @@ router.get(
             price: resolved.price,
             componentSum: resolved.componentSum,
             available: resolved.available,
-            isPurchasable: resolved.isPurchasable,
+            // Window applied per request below (issue 2111).
+            sellableIgnoringWindow: resolved.sellableIgnoringWindow,
+            startsAt: resolved.startsAt,
+            expiresAt: resolved.expiresAt,
             componentNames: items.map(i => ({ name: i.product.name, nameAr: i.product.nameAr })),
           };
         }
       );
 
-      res.json({ success: true, data: { bundle } });
+      const { sellableIgnoringWindow, startsAt, expiresAt, ...publicFields } = bundle;
+      res.json({
+        success: true,
+        data: {
+          bundle: {
+            ...publicFields,
+            isPurchasable: sellableIgnoringWindow && withinSaleWindow({ startsAt, expiresAt }),
+          },
+        },
+      });
     } catch (error) {
       next(error);
     }

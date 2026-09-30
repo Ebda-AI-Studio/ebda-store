@@ -73,9 +73,17 @@ deps) — dated reports live in `docs/audits/`.
   because the counter re-`EXPIRE`s on every attempt and so outlives the 60s
   pointer under a continuous flood — stamping the replacement row with the raw
   counter would restate attempts the previous row already carried and inflate
-  the weighted totals the thresholds below read. `agent.write.failed` is never
-  coalesced; it requires credential possession, so it is already bounded by
-  who holds a key.
+  the weighted totals the thresholds below read. `agent.write.failed` is
+  coalesced the same way (under its own `agent:failed:` window) unless the
+  caller presented a VALID key: with the `agent_checkout_open_writes` escape
+  hatch on, an anonymous caller reaches `failed` trivially, so "requires
+  credential possession" does not hold there (issue 2151). The window's first
+  writer reserves its row slot before inserting, so a CONCURRENT burst also
+  costs one transaction — repeats that see the reservation write nothing and
+  the first writer flushes the total once its row exists (issue 2150). The
+  source address is keyed by the same IPv6 prefix `publicLimiter` uses, and a
+  Redis error on the counter falls back to a per-attempt row instead of
+  writing none (issues 2054, 2141).
 - Detection on refusals: `agent-write-denied-watch` (a 15-minute Inngest cron)
   reads the `agent.write.denied` rows and alerts through the Telegram channel.
   It classifies by what the caller PRESENTED — a lookup failure of ours (p0),

@@ -89,7 +89,7 @@ describe('invalidateStoreBundlesCache() (#1565)', () => {
   it("busts the store's public bundle-list Redis key", async () => {
     await invalidateStoreBundlesCache('store123');
     expect(redisMock.delete).toHaveBeenCalledWith(bundlesCacheKey('store123'));
-    expect(bundlesCacheKey('store123')).toBe('public:bundles:store123');
+    expect(bundlesCacheKey('store123')).toBe('public:bundles:v2:store123');
   });
 });
 

@@ -21,6 +21,7 @@ import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { formatSpend } from '@/lib/ai-spend';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -64,17 +65,6 @@ interface SummaryResponse {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
-
-/** Micros -> a readable amount. Deliberately shows 4 decimals: per-call AI
- *  spend is routinely a fraction of one currency unit, and 2 decimals would
- *  render most real months as "0.00" — the exact illusion this surface exists
- *  to remove. */
-function formatSpend(micros: number): string {
-  const units = micros / 1_000_000;
-  if (units === 0) return '0';
-  if (units < 0.0001) return '<0.0001';
-  return units.toLocaleString('en-GB', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
-}
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';

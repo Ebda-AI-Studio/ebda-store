@@ -42,7 +42,7 @@ async function assertChannelFeatureEnabled(
   if (!featureKey) return true;
 
   // Super-admin bypass — matches requireFeature's platform-staff exemption.
-  if ((req as any).user?.role === 'super_admin') return true;
+  if (req.user?.role === 'super_admin') return true;
 
   const enabled = await featureService.isFeatureEnabled(storeId, featureKey);
   if (!enabled) {

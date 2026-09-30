@@ -565,10 +565,13 @@ router.post(
       // so the customer can retry without losing their cart or seeing stock
       // drain on every attempt.
       if (rollbackContext) {
-        await OrderService.rollbackForPaymentFailure(
-          rollbackContext.storeId,
-          rollbackContext.orderId,
-          rollbackContext.sessionId
+        // Its own tenant wrap: this catch sits OUTSIDE the request's
+        // runInTenantContext (the /payments mount has no tenantContext), so
+        // under force_app the rollback would read no rows and do nothing
+        // (PR 2301 audit, same class as the MCP place_order rollbacks).
+        const rb = rollbackContext;
+        await runInTenantContext(rb.storeId, () =>
+          OrderService.rollbackForPaymentFailure(rb.storeId, rb.orderId, rb.sessionId)
         ).catch(rbErr =>
           logger.error({ err: rbErr, ...rollbackContext }, 'Order rollback failed in catch block')
         );

@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
 import { customerKeyOf, isGuestOrder, rfmKeyFor } from '@api/lib/customer-key';
-import { maskAddress, maskEmail, maskPhone } from '@api/lib/pii-mask';
+import { maskAddress, maskEmail, maskPhone, redactFreeText } from '@api/lib/pii-mask';
 import { summarizeFunnel } from '@api/services/accounting/funnel-report.service';
 import { couponState, customerRefOf } from '@api/mcp/tools/admin-read-customers-marketing.tools';
 
@@ -172,5 +172,35 @@ describe('summarizeFunnel — ruling AUD-2', () => {
     const f = summarizeFunnel([day('2026-09-28', 0, 0, 0)], 7);
     expect(f.stages.productViews).toBe(0);
     expect(f.rates.viewToCart).toBeNull();
+  });
+});
+
+describe('redactFreeText (issue 2244 — shopper-authored order notes)', () => {
+  it('redacts phone-shaped digit runs, with or without separators or a +', () => {
+    expect(redactFreeText('call 99998888 at the gate')).toBe('call [phone] at the gate');
+    expect(redactFreeText('call 9999 8888')).toBe('call [phone]');
+    expect(redactFreeText('+965-5000-1234 please')).toBe('[phone] please');
+  });
+
+  it('redacts email addresses', () => {
+    expect(redactFreeText('receipt to Sara.Ali@example.com thanks')).toBe(
+      'receipt to [email] thanks'
+    );
+  });
+
+  it('keeps dates, order references and 6-digit building numbers (PR 2301 audit)', () => {
+    expect(redactFreeText('deliver on 2026-09-30 please')).toBe('deliver on 2026-09-30 please');
+    expect(redactFreeText('re ORD-20260930-001')).toBe('re ORD-20260930-001');
+    expect(redactFreeText('building 123456')).toBe('building 123456');
+    expect(redactFreeText('2026-09-30, call 99998888')).toBe('2026-09-30, call [phone]');
+  });
+
+  it('keeps short numbers and ordinary words (block 4, house 12, 2 boxes)', () => {
+    expect(redactFreeText('Block 4, house 12, 2 boxes')).toBe('Block 4, house 12, 2 boxes');
+  });
+
+  it('is null for empty input — unknown, not ""', () => {
+    expect(redactFreeText(null)).toBeNull();
+    expect(redactFreeText('   ')).toBeNull();
   });
 });

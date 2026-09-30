@@ -106,6 +106,31 @@ describe('report hooks surface API errors', () => {
     });
   }
 
+  // Issue 2256: /dashboard answers 200 with `stats: null` when a sub-query
+  // rejects (Promise.allSettled). Detection by HTTP status alone missed it and
+  // the page rendered KWD 0.000 revenue with no banner.
+  it('useAnalytics: a 200 dashboard with failed sub-queries is an error, not zeros', async () => {
+    apiGet.mockImplementation(async (...args: unknown[]) =>
+      String(args[0]).includes('/dashboard?')
+        ? { data: { stats: null, gl: null, stock: null, failed: ['stats'] }, error: null }
+        : OK
+    );
+    const result = renderHook(() => useAnalytics({ storeId: 's1', period: 'this_month' })).result;
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBe('');
+  });
+
+  it('useAnalytics: a 200 dashboard with an empty `failed` list is not an error', async () => {
+    apiGet.mockImplementation(async (...args: unknown[]) =>
+      String(args[0]).includes('/dashboard?')
+        ? { data: { stats: null, gl: null, stock: null, failed: [] }, error: null }
+        : OK
+    );
+    const result = renderHook(() => useAnalytics({ storeId: 's1', period: 'this_month' })).result;
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+  });
+
   it('useAnalytics sends the viewer tzOffset and the range to every range-aware call', async () => {
     apiGet.mockResolvedValue(OK);
     const result = renderHook(() => useAnalytics({ storeId: 's1', period: 'this_year' })).result;

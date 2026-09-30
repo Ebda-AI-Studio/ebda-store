@@ -76,3 +76,30 @@ export function maskAddress(address: unknown): Record<string, unknown> | null {
   }
   return out;
 }
+
+/**
+ * Shopper-authored free text (order `notes` / `customerNotes`) is where Kuwait
+ * shoppers type street directions and a callback number — a field no schema
+ * constrains. Redact anything shaped like a phone number (a run of 8+ digits,
+ * spaces/dashes allowed between them, optional leading `+`) or an email
+ * address; the rest of the note (delivery-time wishes, gift messages) stays
+ * readable. Empty/nullish input returns null.
+ */
+// 8+ digits (a Kuwait mobile is 8; with +965 it is 11), spaces/hyphens
+// allowed between them — but NOT an ISO date (`2026-09-30`, 8 digits) or a
+// short order/building number, which a triage agent needs to read (PR 2301
+// audit P3). Dates are masked out before the phone pass, and a digit run
+// glued to a letter or hyphen (`ORD-20260930-001`) is a reference, not a phone.
+const PHONE_LIKE = /(?<![A-Za-z0-9-])\+?\d(?:[\s-]?\d){7,}(?![A-Za-z0-9])/g;
+const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/g;
+const EMAIL_LIKE = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
+
+export function redactFreeText(text: string | null | undefined): string | null {
+  if (typeof text !== 'string' || text.trim() === '') return null;
+  const dates: string[] = [];
+  const shielded = text.replace(ISO_DATE, d => `\u0000${dates.push(d) - 1}\u0000`);
+  return shielded
+    .replace(EMAIL_LIKE, '[email]')
+    .replace(PHONE_LIKE, '[phone]')
+    .replace(/\u0000(\d+)\u0000/g, (_m, i) => dates[Number(i)]);
+}

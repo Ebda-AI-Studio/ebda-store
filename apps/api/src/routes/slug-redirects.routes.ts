@@ -13,10 +13,17 @@ import { listSlugRedirects, deleteSlugRedirect } from '../services/slug-redirect
 // create/edit path here on purpose.
 const router = Router();
 
-const listQuerySchema = z.object({ q: z.string().max(255).optional() });
+const listQuerySchema = z.object({
+  q: z.string().max(255).optional(),
+  // Issue 2255: page through every row. `limit` is clamped to
+  // SLUG_REDIRECT_LIST_MAX by the service; `cursor` is the previous page's
+  // `nextCursor` (a row id).
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  cursor: z.string().min(1).max(64).optional(),
+});
 
 // GET /:storeId/slug-redirects?q= — list this store's redirects, newest first.
-// Responds `{ data: { rows, total, limit } }`: `total` counts every match so
+// Responds `{ data: { rows, total, limit, nextCursor } }`: `total` counts every match so
 // the admin can say "showing 200 of N" instead of silently capping (scoped
 // audit, PR 1978); `q` filters by either slug so an older row stays findable.
 router.get(
@@ -26,9 +33,9 @@ router.get(
   requireStoreAccess,
   async (req, res, next) => {
     try {
-      const { q } = listQuerySchema.parse(req.query);
+      const { q, limit, cursor } = listQuerySchema.parse(req.query);
       const data = await runInTenantContext(req.params.storeId, () =>
-        listSlugRedirects(req.params.storeId, { q })
+        listSlugRedirects(req.params.storeId, { q, limit, cursor })
       );
       res.json({ data });
     } catch (err) {

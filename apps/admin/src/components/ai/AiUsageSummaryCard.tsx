@@ -25,6 +25,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGet } from '../../lib/api';
 import { useT } from '@/i18n/useT';
+import { formatSpend } from '@/lib/ai-spend';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -35,6 +36,44 @@ export interface AiUsageSummary {
   monthlyCap: number;
   /** Daily AI calls for the last 30 days, oldest first. */
   last30Days: Array<{ day: string; total: number }>;
+  /**
+   * AI spend in micros of the store's billing currency (issues 2204/2226).
+   * `null` = nothing in the window has a configured rate — unknown, never 0.
+   * `*UnpricedCount` = calls the amount EXCLUDES, so a non-zero count makes
+   * the amount a floor, and the card says so.
+   */
+  todayCostMicros?: number | null;
+  todayUnpricedCount?: number;
+  monthCostMicros?: number | null;
+  monthUnpricedCount?: number;
+}
+
+/** Spend line: the amount (or "—" when unknown) plus the floor caveat. */
+function SpendFigure({
+  micros,
+  unpriced,
+  t,
+  size,
+}: {
+  micros: number | null | undefined;
+  unpriced: number;
+  t: ReturnType<typeof useT>;
+  size: 'sm' | 'lg';
+}) {
+  return (
+    <>
+      <p
+        className={`font-bold tabular-nums text-foreground ${size === 'lg' ? 'text-lg' : 'text-xs'}`}
+      >
+        {micros == null ? '—' : formatSpend(micros)}
+      </p>
+      {unpriced > 0 && (
+        <p className="text-[11px] text-amber-600 dark:text-amber-500">
+          {t('spendUnpriced', { count: unpriced.toLocaleString() })}
+        </p>
+      )}
+    </>
+  );
 }
 
 interface AiUsageSummaryCardProps {
@@ -258,6 +297,17 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
                 {remaining.toLocaleString()}
               </span>
             </div>
+            <div className="flex items-start justify-between gap-2 text-xs">
+              <span className="text-muted-foreground">{t('spendMonth')}</span>
+              <div className="text-end">
+                <SpendFigure
+                  micros={summary.monthCostMicros}
+                  unpriced={summary.monthUnpricedCount ?? 0}
+                  t={t}
+                  size="sm"
+                />
+              </div>
+            </div>
             {summary.last30Days.length > 0 && (
               <div className="mt-1">
                 <Sparkline
@@ -331,6 +381,28 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
           >
             {remaining.toLocaleString()}
           </p>
+        </div>
+      </div>
+
+      {/* Spend (issues 2204/2226) — the figure the log's cost column sums. */}
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <div className="rounded-lg bg-muted/40 px-3 py-2">
+          <p className="text-xs text-muted-foreground">{t('spendToday')}</p>
+          <SpendFigure
+            micros={summary.todayCostMicros}
+            unpriced={summary.todayUnpricedCount ?? 0}
+            t={t}
+            size="lg"
+          />
+        </div>
+        <div className="rounded-lg bg-muted/40 px-3 py-2">
+          <p className="text-xs text-muted-foreground">{t('spendMonth')}</p>
+          <SpendFigure
+            micros={summary.monthCostMicros}
+            unpriced={summary.monthUnpricedCount ?? 0}
+            t={t}
+            size="lg"
+          />
         </div>
       </div>
 

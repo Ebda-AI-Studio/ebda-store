@@ -20,6 +20,7 @@ import { apiGet } from '../../../../lib/api';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 import { useT } from '../../../../i18n/useT';
+import { formatSpend } from '../../../../lib/ai-spend';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -30,6 +31,12 @@ interface UsageRow {
   outputTokens: number;
   cachedHit: boolean;
   createdAt: string;
+  /** Issues 2204/2226: provenance + cost the API already returns. */
+  model: string | null;
+  /** Micros of the billing currency; null = the model has no configured rate. */
+  costMicros: number | null;
+  subjectType: string | null;
+  subjectId: string | null;
 }
 
 interface LogData {
@@ -54,6 +61,13 @@ function formatDate(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/** "Product · 1a2b3c4d" — what the call was about; "—" when not recorded. */
+function subjectLabel(row: UsageRow): string {
+  if (!row.subjectType) return '—';
+  const kind = formatFeature(row.subjectType);
+  return row.subjectId ? `${kind} · ${row.subjectId.slice(0, 8)}` : kind;
 }
 
 // ── Main page ──────────────────────────────────────────────────────────
@@ -120,6 +134,35 @@ export default function AiUsagePage() {
           {row.inputTokens + row.outputTokens > 0
             ? (row.inputTokens + row.outputTokens).toLocaleString()
             : '—'}
+        </span>
+      ),
+    },
+    {
+      header: t('table.model'),
+      hideOnMobile: true,
+      cell: row => <span className="text-muted-foreground text-xs">{row.model ?? '—'}</span>,
+    },
+    {
+      header: t('table.cost'),
+      alignEnd: true,
+      cell: row =>
+        row.costMicros == null ? (
+          <span
+            className="text-[11px] text-amber-600 dark:text-amber-500"
+            title={t('table.unpricedHint')}
+          >
+            {t('table.unpriced')}
+          </span>
+        ) : (
+          <span className="tabular-nums text-foreground">{formatSpend(row.costMicros)}</span>
+        ),
+    },
+    {
+      header: t('table.subject'),
+      hideOnMobile: true,
+      cell: row => (
+        <span className="text-muted-foreground text-xs" title={row.subjectId ?? undefined}>
+          {subjectLabel(row)}
         </span>
       ),
     },

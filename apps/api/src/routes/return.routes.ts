@@ -1,8 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, customerUserId } from '../middleware/auth';
-import { requirePermission } from '../middleware/rbac';
-import { ReturnService, REFUND_METHODS } from '../services/return.service';
+import { requirePermission, hasPermission, type Role } from '../middleware/rbac';
+import { ReturnService, REFUND_METHODS, GATEWAY_REFUND_METHODS } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -373,6 +373,16 @@ router.get(
     try {
       const { storeId, id } = req.params;
       const preview = await ReturnService.refundPreview(storeId, id);
+      // Issue 2024: a caller who may complete returns but may not send money
+      // back through a gateway (staff — no `orders:refund`) is shown the
+      // option disabled with a reason, rather than 403'd after confirming.
+      if (!hasPermission(req.user!.role as Role, 'orders:refund') && preview.gateway.available) {
+        preview.gateway = {
+          ...preview.gateway,
+          available: false,
+          unavailableReason: 'REFUND_PERMISSION_REQUIRED',
+        };
+      }
       res.json({ success: true, data: { preview } });
     } catch (error) {
       next(error);
@@ -413,6 +423,26 @@ router.post(
           error: {
             code: 'INVALID_REFUND_METHOD',
             message: `Unknown refund method '${refundMethod}'. Expected one of: ${REFUND_METHODS.join(', ')}.`,
+          },
+        });
+        return;
+      }
+
+      // Issue 2024: `returns:write` authorises COMPLETING a return, and staff
+      // hold it; a gateway method additionally sends a real, irreversible
+      // Tap/MyFatoorah/KNET refund, which is `orders:refund` — the permission
+      // staff deliberately lack (rbac.ts, and the sibling order refund route).
+      // Store credit / bank transfer / cash / manual record money only.
+      if (
+        (GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) &&
+        !hasPermission(req.user!.role as Role, 'orders:refund')
+      ) {
+        res.status(403).json({
+          success: false,
+          error: {
+            code: 'REFUND_PERMISSION_REQUIRED',
+            message:
+              'Refunding to the original payment method requires the orders:refund permission.',
           },
         });
         return;
