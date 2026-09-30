@@ -11,6 +11,7 @@ import { OneSignalService } from '../onesignal.service';
 import { redis } from '../redis.service';
 import { sendAlert } from '../alerts.service';
 import { alertUnbookedRefund } from './unbooked-refund-alert';
+import { alertOrphanedProviderInvoice } from './orphaned-invoice-alert';
 import { recordPaymentEvent } from '../payment-event.service';
 import { invalidateCustomersCache } from '../../lib/public-cache';
 import { buildPaymentLineItems } from '../../lib/payment-line-items';
@@ -734,11 +735,43 @@ export class PaymentService {
     const p = await factory.getProvider(provider, storeId);
     const response = await p.createPayment(request);
 
-    // Store payment record in database
+    // The gateway ACCEPTED: from here the invoice is live at the provider
+    // whatever happens to the writes below. If recording it throws (statement
+    // timeout, connection blip, the tenant transaction's own timeout expiring
+    // during the gateway call, a constraint error), this method rejects — so
+    // no caller ever learns an invoice was minted, and without this catch the
+    // orphan was silent (issue 2370). Raised here, for EVERY caller; the
+    // callers' own catch covers only the later COMMIT failure, and cannot
+    // double-alert this case because they arm it only after we resolve.
+    try {
+      await PaymentService.recordCreatedPayment(p.name, request, response);
+    } catch (err) {
+      await alertOrphanedProviderInvoice({
+        storeId: storeId ?? 'unknown',
+        orderId: request.orderId,
+        orderNumber: request.orderNumber,
+        provider: p.name,
+        transactionId: response.transactionId,
+        amount: request.amount,
+        currency: request.currency,
+        source: 'record',
+      });
+      throw err;
+    }
+
+    return response;
+  }
+
+  /** The Payment row + its `created` audit event for an accepted invoice. */
+  private static async recordCreatedPayment(
+    providerName: string,
+    request: CreatePaymentRequest,
+    response: PaymentResponse
+  ): Promise<void> {
     const payment = await prisma.payment.create({
       data: {
         orderId: request.orderId,
-        provider: p.name,
+        provider: providerName,
         method: null, // Will be set when payment is completed via webhook
         amount: request.amount,
         currency: request.currency,
@@ -747,7 +780,7 @@ export class PaymentService {
         invoiceId: response.invoiceId,
         paymentUrl: response.paymentUrl,
         metadata: {
-          provider: p.name,
+          provider: providerName,
           invoiceId: response.invoiceId,
           paymentUrl: response.paymentUrl,
           ...response.metadata,
@@ -763,7 +796,7 @@ export class PaymentService {
       orderId: payment.orderId,
       eventType: 'created',
       toStatus: 'pending',
-      provider: p.name,
+      provider: providerName,
       details: {
         amount: request.amount,
         currency: request.currency,
@@ -771,8 +804,6 @@ export class PaymentService {
         invoiceId: response.invoiceId,
       },
     });
-
-    return response;
   }
 
   /**

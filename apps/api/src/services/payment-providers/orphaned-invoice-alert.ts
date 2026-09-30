@@ -20,9 +20,17 @@ import logger from '../../lib/logger';
  * naming the provider and the gateway's own transaction id, so an operator
  * can void it in the provider dashboard before it is paid. Ruling PAY-ORPH-1.
  *
- * Called from the catch blocks OUTSIDE the failed wrap (payment.routes.ts
- * POST /payments/create and the MCP `place_order` tool), so it runs inline —
- * there is no request tenant transaction left to defer behind. Never throws.
+ * Two windows, three call sites. (1) The Payment row write itself throws
+ * after the gateway said yes (issue 2370): raised from INSIDE
+ * `PaymentService.createPayment`, so it covers every caller (checkout, the
+ * MCP `place_order` tool, the admin payment link, the WhatsApp payment link,
+ * the failed-payment retry) — source `record`. (2) The row was written but
+ * the wrap's COMMIT failed: raised from the catch blocks OUTSIDE the failed
+ * wrap (payment.routes.ts POST /payments/create and the MCP `place_order`
+ * tool) — source `checkout` / `agent`. The two cannot both fire for one
+ * invoice: the callers arm (2) only after `createPayment` resolves. Neither
+ * touches the database (the transaction may be aborted); it logs, then pages.
+ * Never throws.
  */
 export interface OrphanedProviderInvoice {
   storeId: string;
@@ -32,7 +40,8 @@ export interface OrphanedProviderInvoice {
   transactionId: string;
   amount: number;
   currency: string;
-  source: 'checkout' | 'agent';
+  /** `record`: the Payment row write failed (any caller). `checkout` / `agent`: the COMMIT failed. */
+  source: 'record' | 'checkout' | 'agent';
 }
 
 export async function alertOrphanedProviderInvoice(o: OrphanedProviderInvoice): Promise<void> {
@@ -47,7 +56,9 @@ export async function alertOrphanedProviderInvoice(o: OrphanedProviderInvoice): 
       title,
       body:
         `${o.provider} accepted invoice ${o.transactionId} for order ${o.orderNumber}, ` +
-        'but the transaction that records it failed to commit, so the order was rolled back. ' +
+        (o.source === 'record'
+          ? 'but writing its payment record failed, so no payment row exists for it. '
+          : 'but the transaction that records it failed to commit, so the order was rolled back. ') +
         'Void this invoice in the provider dashboard: if the customer pays it, the webhook ' +
         'matches no payment and the money is captured with nothing recorded.',
       context: { ...o },

@@ -99,9 +99,8 @@ function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
       label: t('badges.revokedByOverride'),
     },
     baseline_off: {
-      color:
-        'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
-      dot: 'bg-gray-400',
+      color: 'bg-muted text-muted-ink border-border',
+      dot: 'bg-muted-foreground',
       label: t('badges.notIn', { plan: planLabel }),
     },
   };
@@ -197,7 +196,7 @@ function CategorySection({
             {t('featureCount', { count: features.length })}
           </p>
         </div>
-        <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+        <span className="text-xs font-medium text-muted-ink bg-muted rounded-full px-2 py-0.5">
           {features.length}
         </span>
       </div>

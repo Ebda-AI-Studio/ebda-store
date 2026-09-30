@@ -144,6 +144,9 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
     );
   });
 
+  // The OTHER half — the provider ACCEPTED and the Payment row write threw —
+  // is alerted inside PaymentService.createPayment itself (issue 2370), which
+  // this file mocks out: tests/unit/payment-create-orphaned-record.test.ts.
   it('online: provider REJECTED → no orphaned-invoice alert (nothing was minted)', async () => {
     h.createPayment.mockRejectedValueOnce(new Error('gateway 400'));
     const res = await create('myfatoorah');

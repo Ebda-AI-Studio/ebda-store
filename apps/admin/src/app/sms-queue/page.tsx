@@ -37,25 +37,30 @@ export default function SmsQueuePage() {
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // Issue 2375: apiGet never throws — a 403/500/unreachable API resolves as
+  // `{ data: null, error }`. Read the error channel, or an outage renders as
+  // "No failed SMS" with "Retry all" disabled.
+  const [loadError, setLoadError] = useState(false);
 
   const fetchFailed = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await apiGet<{
+      const { data, error } = await apiGet<{
         messages: FailedSms[];
         stats: { pending: number; failed: number; corrupt?: number };
         corrupt?: Array<{ position: number; bytes: number }>;
       }>('/admin/sms-queue/failed?limit=100');
+      setLoadError(!!error);
       setMessages(data?.messages || []);
       setStats(data?.stats ?? null);
       setCorrupt(data?.corrupt ?? []);
     } catch (err) {
       console.error('Failed to fetch failed SMS:', err);
-      setMessage(t('failedToLoad'));
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     fetchFailed();
@@ -105,18 +110,20 @@ export default function SmsQueuePage() {
   const columns: DataTableColumn<FailedSms>[] = [
     {
       header: t('columns.created'),
-      cell: e => <span className="text-gray-600">{new Date(e.createdAt).toLocaleString()}</span>,
+      cell: e => (
+        <span className="text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</span>
+      ),
     },
     {
       header: t('columns.event'),
       primaryOnMobile: true,
-      cell: e => <span className="font-medium text-gray-900">{e.event || '—'}</span>,
+      cell: e => <span className="font-medium text-foreground">{e.event || '—'}</span>,
     },
     {
       header: t('columns.to'),
       hideOnMobile: true,
       cell: e => (
-        <span className="text-gray-600" dir="ltr">
+        <span className="text-muted-foreground" dir="ltr">
           {e.to || '—'}
         </span>
       ),
@@ -189,7 +196,7 @@ export default function SmsQueuePage() {
         )}
 
         {loading ? (
-          <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
+          <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
             {t('loading')}
           </div>
         ) : (
@@ -199,9 +206,18 @@ export default function SmsQueuePage() {
             rows={messages}
             rowKey={e => e.id}
             emptyState={
-              <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
-                {(stats?.failed ?? 0) > 0 ? t('emptyUnreadable') : t('empty')}
-              </div>
+              loadError ? (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-6 text-center text-destructive-ink"
+                >
+                  {t('failedToLoad')}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
+                  {(stats?.failed ?? 0) > 0 ? t('emptyUnreadable') : t('empty')}
+                </div>
+              )
             }
           />
         )}

@@ -77,7 +77,7 @@ const MATCH_BADGE: Record<MatchStatus, string> = {
   unmatched: 'bg-red-100 text-red-700',
   auto_matched: 'bg-green-100 text-green-700',
   manual_matched: 'bg-blue-100 text-blue-700',
-  ignored: 'bg-gray-100 text-gray-500',
+  ignored: 'bg-muted text-muted-ink',
 };
 
 type FilterOption = MatchStatus | 'all';
@@ -105,21 +105,21 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-        <h3 className="mb-4 text-base font-semibold text-gray-900">{t('title')}</h3>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('entryId')}</label>
+      <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-xl">
+        <h3 className="mb-4 text-base font-semibold text-foreground">{t('title')}</h3>
+        <label className="block text-sm font-medium text-foreground mb-1.5">{t('entryId')}</label>
         <input
           type="text"
           value={entryId}
           onChange={e => setEntryId(e.target.value)}
           placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
-        <p className="mt-1 text-xs text-gray-400">{t('entryIdHelp')}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t('entryIdHelp')}</p>
         <div className="mt-5 flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/50"
           >
             {t('cancel')}
           </button>
@@ -280,13 +280,13 @@ export default function StatementDetailPage() {
           <div>
             <button
               onClick={() => router.push(`/stores/${storeId}/finance/bank-reconciliation`)}
-              className="mb-2 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"
+              className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               ← {t('title')}
             </button>
-            <h1 className="text-xl font-semibold text-gray-900">{stmt?.fileName ?? '…'}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{stmt?.fileName ?? '…'}</h1>
             {stmt && (
-              <p className="mt-0.5 text-sm text-gray-500">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 {stmt.glAccount.code} — {stmt.glAccount.nameEn}
                 {stmt.periodStart && ` · ${fmt(stmt.periodStart)} – ${fmt(stmt.periodEnd)}`}
               </p>
@@ -330,10 +330,10 @@ export default function StatementDetailPage() {
             ].map(card => (
               <div
                 key={card.label}
-                className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm"
+                className="rounded-xl border border-border bg-card p-3 shadow-sm"
               >
-                <p className="text-xs text-gray-400 leading-tight">{card.label}</p>
-                <p className="mt-1 text-lg font-semibold text-gray-800">{card.value}</p>
+                <p className="text-xs text-muted-foreground leading-tight">{card.label}</p>
+                <p className="mt-1 text-lg font-semibold text-foreground">{card.value}</p>
               </div>
             ))}
           </div>
@@ -347,7 +347,7 @@ export default function StatementDetailPage() {
             }`}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-800">{t('difference.title')}</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t('difference.title')}</h2>
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   difference.isReconciled
@@ -361,18 +361,20 @@ export default function StatementDetailPage() {
 
             {/* Balance row */}
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
-                <p className="text-xs text-gray-400 leading-tight">{t('difference.bankBalance')}</p>
-                <p className="mt-1 text-lg font-semibold text-gray-800 font-mono">
+              <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
+                <p className="text-xs text-muted-foreground leading-tight">
+                  {t('difference.bankBalance')}
+                </p>
+                <p className="mt-1 text-lg font-semibold text-foreground font-mono">
                   {difference.bankBalanceFils < 0 ? '−' : ''}KWD{' '}
                   {kwd(Math.abs(difference.bankBalanceFils))}
                 </p>
               </div>
-              <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
-                <p className="text-xs text-gray-400 leading-tight">
+              <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
+                <p className="text-xs text-muted-foreground leading-tight">
                   {t('difference.ledgerBalance')}
                 </p>
-                <p className="mt-1 text-lg font-semibold text-gray-800 font-mono">
+                <p className="mt-1 text-lg font-semibold text-foreground font-mono">
                   {difference.ledgerBalanceFils < 0 ? '−' : ''}KWD{' '}
                   {kwd(Math.abs(difference.ledgerBalanceFils))}
                 </p>
@@ -384,7 +386,9 @@ export default function StatementDetailPage() {
                     : 'border-red-200 bg-red-100'
                 }`}
               >
-                <p className="text-xs text-gray-600 leading-tight">{t('difference.delta')}</p>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  {t('difference.delta')}
+                </p>
                 <p
                   className={`mt-1 text-lg font-bold font-mono ${
                     difference.isReconciled ? 'text-green-700' : 'text-red-700'
@@ -429,7 +433,7 @@ export default function StatementDetailPage() {
             <div
               className={`rounded-lg border p-3 text-sm ${
                 difference.isReconciled
-                  ? 'border-green-200 bg-white text-green-800'
+                  ? 'border-green-200 bg-card text-green-800'
                   : 'border-amber-200 bg-amber-50 text-amber-800'
               }`}
             >
@@ -451,24 +455,24 @@ export default function StatementDetailPage() {
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                 filter === opt.value
                   ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-muted text-muted-ink hover:bg-muted/80'
               }`}
             >
               {opt.label}
             </button>
           ))}
-          <span className="ml-auto text-xs text-gray-400 self-center">{txTotal} rows</span>
+          <span className="ml-auto text-xs text-muted-foreground self-center">{txTotal} rows</span>
         </div>
 
         {/* Transactions table */}
-        <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           {txs.length === 0 ? (
-            <div className="py-12 text-center text-sm text-gray-400">
+            <div className="py-12 text-center text-sm text-muted-foreground">
               {t('noTransactionsMatch')}
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-100 text-sm">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border text-sm">
+              <thead className="bg-muted/50">
                 <tr>
                   {[
                     tx_t('date'),
@@ -482,19 +486,21 @@ export default function StatementDetailPage() {
                   ].map(h => (
                     <th
                       key={h}
-                      className="whitespace-nowrap px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
+                      className="whitespace-nowrap px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border">
                 {txs.map(tx => (
-                  <tr key={tx.id} className="hover:bg-gray-50/60">
-                    <td className="whitespace-nowrap px-3 py-2.5 text-gray-600">{fmt(tx.date)}</td>
+                  <tr key={tx.id} className="hover:bg-muted/50">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
+                      {fmt(tx.date)}
+                    </td>
                     <td
-                      className="max-w-[220px] truncate px-3 py-2.5 text-gray-800"
+                      className="max-w-[220px] truncate px-3 py-2.5 text-foreground"
                       title={tx.description}
                     >
                       {tx.description}
@@ -506,10 +512,12 @@ export default function StatementDetailPage() {
                         {tx.direction === 'debit' ? tx_t('debit') : tx_t('credit')}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-mono text-sm text-gray-800">
+                    <td className="whitespace-nowrap px-3 py-2.5 font-mono text-sm text-foreground">
                       {kwd(tx.amountFils)}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-gray-400">{tx.externalRef ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                      {tx.externalRef ?? '—'}
+                    </td>
                     <td className="px-3 py-2.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${MATCH_BADGE[tx.matchStatus]}`}
@@ -520,7 +528,7 @@ export default function StatementDetailPage() {
                         )}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-gray-500">
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
                       {tx.matchedJournalEntry ? (
                         <span className="font-mono">{tx.matchedJournalEntry.entryNumber}</span>
                       ) : (
@@ -540,7 +548,7 @@ export default function StatementDetailPage() {
                             <button
                               onClick={() => handleAction(tx.id, 'ignore')}
                               disabled={actionLoading === tx.id}
-                              className="rounded px-1.5 py-0.5 text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+                              className="rounded px-1.5 py-0.5 text-xs font-medium text-muted-ink hover:bg-muted disabled:opacity-40"
                             >
                               {actionLoading === tx.id ? '…' : tx_t('ignore')}
                             </button>
@@ -560,7 +568,7 @@ export default function StatementDetailPage() {
                           <button
                             onClick={() => handleAction(tx.id, 'unmatch')}
                             disabled={actionLoading === tx.id}
-                            className="rounded px-1.5 py-0.5 text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+                            className="rounded px-1.5 py-0.5 text-xs font-medium text-muted-ink hover:bg-muted disabled:opacity-40"
                           >
                             {actionLoading === tx.id ? '…' : tx_t('unmatch')}
                           </button>

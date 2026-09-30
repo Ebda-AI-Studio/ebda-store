@@ -405,6 +405,9 @@ Inspired by Shopify Polaris + Material Design Tokens, adapted to FWB's simpler 5
 | `rounded-<scale>`           | `rounded-sm` / `rounded-md` / `rounded-2xl`      | Tailwind radii                                       |
 | `duration-<ms>`             | `duration-200` / `duration-500` / `duration-700` | Tailwind transition durations                        |
 | `text-<role>-ink` (admin)   | `bg-warning/10 text-warning-ink`                 | text on a role's own 10% tint (status pills, badges) |
+| `text-muted-ink` (admin)    | `bg-muted text-muted-ink border-border`          | text on a SOLID `bg-muted` (the neutral/grey pill)   |
+
+**Neutral text (admin + orders, issue 2372):** no raw neutral palette utility — `text-gray-900`, `bg-slate-100`, `border-gray-200` and friends do not follow the theme, and the admin switches to dark from the OS preference (the SMS queue's Event column measured ~1:1 on the dark card). Use `text-foreground` (primary), `text-muted-foreground` (secondary, on the card), `border-border`, `bg-muted` / `bg-muted/50`, and `text-muted-ink` for text on a SOLID `bg-muted` (`muted-foreground` is 4.32:1 there in light). `tests/unit/admin-tint-ink-contrast.test.ts` bans the raw form (gradient stops such as `from-neutral-800` are exempt — they paint theme-preview swatches). Ruling ADM-GREY-1.
 
 **Role-over-value:** never name a token by its color (`color-blue-500`). Always name by the role (`accent-primary`, `bg-page`). Lets us swap palettes per theme without renaming consumers.
 

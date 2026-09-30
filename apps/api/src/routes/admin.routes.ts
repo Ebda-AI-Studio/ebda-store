@@ -2063,11 +2063,14 @@ router.get(
           // Issue 2353: the unreadable set-aside entries — size only (they
           // cannot be parsed, so nothing can be masked; no payload returned).
           corrupt,
+          // `getFailedEmails` returns only entries that pass `isQueuedEmail`
+          // (issue 2374); the optional chains are the second net, so one bad
+          // row can never 500 the whole list and lock the operator out.
           emails: emails.map(e => ({
             id: e.id,
-            storeId: e.storeId,
-            to: (Array.isArray(e.options.to) ? e.options.to : [e.options.to]).map(maskEmail),
-            subject: e.options.subject,
+            storeId: e.storeId ?? null,
+            to: (Array.isArray(e.options?.to) ? e.options.to : [e.options?.to]).map(maskEmail),
+            subject: e.options?.subject ?? '',
             attempts: e.attempts,
             error: e.error ?? null,
             createdAt: e.createdAt,

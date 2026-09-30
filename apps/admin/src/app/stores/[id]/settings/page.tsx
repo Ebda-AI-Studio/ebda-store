@@ -72,9 +72,9 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
       ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
       : tone === 'amber'
         ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
-        : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
+        : 'bg-muted text-muted-ink border-border';
   const dot =
-    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-gray-400';
+    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-muted-foreground';
   const label =
     tone === 'green'
       ? t('whatsappStatus.connected')
@@ -95,7 +95,7 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
           className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
             status.waOrdering
               ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800'
-              : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+              : 'bg-muted text-muted-ink border-border'
           }`}
         >
           {t('whatsappStatus.dmOrdering')}{' '}
@@ -138,7 +138,7 @@ function AiAutopilotChip({ storeId }: { storeId: string }) {
         className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
           autopilot
             ? 'bg-primary/5 text-primary-ink border-primary/20 dark:bg-primary/10 dark:border-primary/30'
-            : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+            : 'bg-muted text-muted-ink border-border'
         }`}
       >
         ✨ {t('aiAutopilotChip.label')}{' '}
@@ -482,7 +482,7 @@ export default function StoreSettingsPage() {
       // Neutral slate, not a brand hue: `indigo` (and every other colour in
       // the eslint `no-restricted-syntax` list) is a lint warning here, and a
       // credential card reads better technical than decorative anyway.
-      color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+      color: 'bg-muted text-muted-ink',
       featureKey: 'agent_checkout',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -506,7 +506,7 @@ export default function StoreSettingsPage() {
        */
       key: 'merchantKeys',
       href: `/stores/${storeId}/merchant-keys`,
-      color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+      color: 'bg-muted text-muted-ink',
       featureKey: 'merchant_mcp',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

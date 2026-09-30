@@ -113,22 +113,24 @@ export default function ImportStatementPage() {
         <div>
           <button
             onClick={() => router.back()}
-            className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"
+            className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             ← {tc('back')}
           </button>
-          <h1 className="text-xl font-semibold text-gray-900">{ti('title')}</h1>
+          <h1 className="text-xl font-semibold text-foreground">{ti('title')}</h1>
         </div>
 
         {/* Form card */}
-        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm space-y-5">
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
           {/* GL Account select */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('account')}</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              {t('account')}
+            </label>
             <select
               value={selectedAccountId}
               onChange={e => setSelectedAccountId(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               <option value="">{ti('accountPlaceholder')}</option>
               {accounts.map(a => (
@@ -142,15 +144,15 @@ export default function ImportStatementPage() {
 
           {/* File input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-foreground mb-1.5">
               {ti('selectFile')}
             </label>
             <div
               onClick={() => fileRef.current?.click()}
-              className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-8 transition hover:bg-gray-100"
+              className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50 py-8 transition hover:bg-muted"
             >
               <svg
-                className="mb-2 h-8 w-8 text-gray-400"
+                className="mb-2 h-8 w-8 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -163,9 +165,9 @@ export default function ImportStatementPage() {
                 />
               </svg>
               {file ? (
-                <p className="text-sm font-medium text-gray-700">{file.name}</p>
+                <p className="text-sm font-medium text-foreground">{file.name}</p>
               ) : (
-                <p className="text-sm text-gray-500">{ti('fileTypesHint')}</p>
+                <p className="text-sm text-muted-foreground">{ti('fileTypesHint')}</p>
               )}
               <input
                 ref={fileRef}

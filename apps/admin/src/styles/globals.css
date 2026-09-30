@@ -50,6 +50,11 @@
     --warning-ink: 43 96% 24%;
     --info-ink: 210 100% 35%;
     --destructive-ink: 0 72% 40%;
+    /* Neutral text on a SOLID `bg-muted` fill (a grey status pill, a hover
+       row): `muted-foreground` measures 4.32:1 there in light — under AA.
+       Replaces the raw `text-gray-*` pills, which were unreadable in dark
+       mode (issue 2372). Pinned by admin-tint-ink-contrast.test.ts. */
+    --muted-ink: 20 10% 38%;
 
     /* Borders & Inputs */
     --border: 30 15% 90%;
@@ -94,6 +99,7 @@
     --warning-ink: 43 96% 62%;
     --info-ink: 210 100% 72%;
     --destructive-ink: 0 72% 70%;
+    --muted-ink: 215 20.2% 65.1%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 26 100% 55%;

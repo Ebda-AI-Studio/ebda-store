@@ -335,7 +335,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                                 : status === 'pending'
                                   ? 'bg-amber-50 text-amber-700 border-amber-200'
                                   : status === 'missing'
-                                    ? 'bg-gray-100 text-gray-600 border-gray-200'
+                                    ? 'bg-muted text-muted-ink border-border'
                                     : 'bg-red-50 text-red-700 border-red-200'
                             }`}
                           >

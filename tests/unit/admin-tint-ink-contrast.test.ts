@@ -11,7 +11,14 @@
  *  (3) no spelling Tailwind silently drops: a double opacity modifier
  *      (`/30/30`) or an off-scale step (`/8`).
  *
- * Scope (issues 2341, 2342, 2349): admin and orders get all three; the
+ *  (4) no raw neutral palette utility (`text-gray-900`, `bg-slate-100`, …):
+ *      it does not follow the theme, so dark mode rendered #111827 on the
+ *      #0b101c card at ~1:1 (issue 2372). Use the semantic tokens —
+ *      `text-foreground`, `text-muted-foreground`, `border-border`, `bg-muted`,
+ *      and `text-muted-ink` for text on a SOLID `bg-muted` (the grey pill).
+ *      Gradient stops (`from-neutral-800`) are exempt: they paint swatches.
+ *
+ * Scope (issues 2341, 2342, 2349): admin and orders get all four; the
  * storefront (apps/web) and packages/ui get (3) only — a class that emits no
  * CSS is a bug on any surface, but re-colouring storefront text is a visible
  * change the owner has not approved (pecannbee must not change; Ruling YWA-TXT-1).
@@ -104,8 +111,13 @@ function droppedForms(cls: string): string[] {
 
 /** Contrast apps only: arbitrary-value role colours bypass the token form the
  *  contrast gate measures (they do emit CSS, so the storefront is not gated). */
+const RAW_NEUTRAL =
+  /(?<![\w-])((?:[\w-]+:)*(?:text|bg|border|divide|ring|placeholder|outline|fill|stroke)-(?:gray|slate|zinc|neutral|stone)-\d+(?:\/\d+)?)(?![\w/-])/g;
+
 function bannedForms(cls: string): string[] {
   const out = droppedForms(cls);
+  for (const m of cls.matchAll(RAW_NEUTRAL))
+    out.push(`raw neutral palette utility (use a semantic token): ${m[1]}`);
   const arb = new RegExp(`\\S*\\[hsl\\(var\\(--(${ROLES.join('|')})\\)\\)\\]\\S*`, 'g');
   for (const m of cls.matchAll(arb)) out.push(`arbitrary-value role colour: ${m[0]}`);
   return out;
@@ -222,6 +234,24 @@ for (const app of APPS.filter(a => a.css)) {
       );
     }
 
+    if (app.name === 'admin') {
+      // Issue 2372: the grey pill. `muted-foreground` is 4.32:1 on a solid
+      // `bg-muted` in light, so text there uses `muted-ink`.
+      it.each(['light', 'dark'] as const)(
+        '%s: muted-ink on bg-muted and on the card is >= 4.5:1',
+        theme => {
+          const ink = rgb(token('muted-ink', theme));
+          expect(ratio(ink, rgb(token('muted', theme)))).toBeGreaterThanOrEqual(4.5);
+          expect(ratio(ink, rgb(token('card', theme)))).toBeGreaterThanOrEqual(4.5);
+        }
+      );
+      it('control: muted-foreground really does fail on a solid bg-muted in light', () => {
+        expect(
+          ratio(rgb(token('muted-foreground', 'light')), rgb(token('muted', 'light')))
+        ).toBeLessThan(4.5);
+      });
+    }
+
     it('control: the bare role colour really does fail on the light warning tint', () => {
       const card = rgb(token('card', 'light'));
       const tint = rgb(token('warning', 'light')).map((v, i) => v * 0.1 + card[i] * 0.9);
@@ -261,6 +291,11 @@ describe('the contrast detector (controls)', () => {
     ['2332 role text with opacity', `'text-xs text-destructive/80'`],
     ['2332 warning icon (under 3:1)', `'h-4 w-4 text-warning'`],
     ['2342 off-scale via stop', `'bg-gradient-to-br from-primary/15 via-primary/8 to-muted'`],
+    ['2372 raw gray text', `'font-medium text-gray-900'`],
+    ['2372 raw gray border + text', `'rounded-lg border border-gray-200 text-gray-400'`],
+    ['2372 raw gray under a dark: variant', `'bg-muted dark:bg-gray-800'`],
+    ['2372 raw slate pill', `'bg-slate-100 text-slate-600'`],
+    ['2372 raw gray hover', `'text-muted-ink hover:bg-gray-100'`],
   ])('flags %s', (_name, src) => {
     expect(problems(src).length).toBeGreaterThan(0);
   });
@@ -273,6 +308,8 @@ describe('the contrast detector (controls)', () => {
     [`'text-muted-foreground hover:text-destructive-ink hover:bg-destructive/10'`],
     [`'h-4 w-4 text-destructive'`], // icon: 4.38:1 >= 3:1
     [`'text-primary hover:underline'`], // brand links: Ruling YWA-TXT-1
+    [`'bg-muted text-muted-ink border-border'`], // the grey pill, issue 2372
+    [`'bg-gradient-to-br from-neutral-800 to-neutral-900'`], // a swatch, not text
   ])('passes %s', src => {
     expect(problems(src)).toEqual([]);
   });

@@ -169,7 +169,7 @@ function StatusBadge({ status }: { status: TemplateRow['status'] }) {
     {
       draft: {
         label: t('status.draft'),
-        cls: 'bg-gray-100 text-gray-700 border-gray-200',
+        cls: 'bg-muted text-foreground border-border',
         icon: <Icon.FileText className="h-3 w-3" />,
       },
       pending: {
@@ -194,7 +194,7 @@ function StatusBadge({ status }: { status: TemplateRow['status'] }) {
       },
       disabled: {
         label: t('status.disabled'),
-        cls: 'bg-gray-100 text-gray-500 border-gray-200',
+        cls: 'bg-muted text-muted-ink border-border',
         icon: <Icon.Pause className="h-3 w-3" />,
       },
     };

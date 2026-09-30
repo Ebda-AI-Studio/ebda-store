@@ -10,7 +10,7 @@ import { smsService, SmsConfig } from './sms.service';
 import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
-import { CORRUPT_CAP, replayDeadLetters } from '../lib/dead-letter';
+import { CORRUPT_CAP, parkCorrupt, replayDeadLetters } from '../lib/dead-letter';
 
 export interface QueuedSms {
   id: string;
@@ -32,6 +32,29 @@ const FAILED_KEY = 'sms:failed';
 const FAILED_CORRUPT_KEY = 'sms:failed:corrupt';
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5000;
+
+/**
+ * The ONE definition of a readable queued SMS (issues 2371, 2374): every field
+ * `sendSms` dereferences (`idempotencyKey` for the NotificationLog lookup,
+ * `recipientPhone` for the hash + send, `messageText`, `config`, `storeId` for
+ * the breaker key) plus the list route's `id`. Used by the live-queue
+ * processor, the dead-letter reader AND the replayer — the replayer used to
+ * accept any object, so `{}` was re-queued and then destroyed by a Prisma
+ * validation error on `idempotencyKey: undefined`.
+ */
+export function isQueuedSms(v: unknown): v is QueuedSms {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  const m = v as Partial<QueuedSms>;
+  return (
+    typeof m.id === 'string' &&
+    typeof m.storeId === 'string' &&
+    typeof m.idempotencyKey === 'string' &&
+    typeof m.recipientPhone === 'string' &&
+    typeof m.messageText === 'string' &&
+    !!m.config &&
+    typeof m.config === 'object'
+  );
+}
 
 class SmsQueueService {
   private processing = false;
@@ -114,7 +137,22 @@ class SmsQueueService {
         return;
       }
 
-      const sms: QueuedSms = JSON.parse(smsJson);
+      let sms: unknown;
+      try {
+        sms = JSON.parse(smsJson);
+      } catch {
+        sms = undefined;
+      }
+      if (!isQueuedSms(sms)) {
+        // Unreadable: sending would throw after the rpop and destroy it.
+        // Set it aside with the replay's unreadable entries (issue 2371).
+        await parkCorrupt(client, FAILED_CORRUPT_KEY, smsJson);
+        logger.error(
+          { bytes: smsJson.length, list: FAILED_CORRUPT_KEY },
+          '[SMS QUEUE] Unreadable queued SMS set aside'
+        );
+        return;
+      }
       await this.sendSms(sms);
     } catch (error) {
       logger.error({ err: error }, '[SMS QUEUE] Error processing queue');
@@ -127,25 +165,27 @@ class SmsQueueService {
    * Send SMS with idempotency check, retry logic, and NotificationLog
    */
   private async sendSms(sms: QueuedSms): Promise<void> {
-    // Idempotency check
-    const existing = await prisma.notificationLog.findUnique({
-      where: { idempotencyKey: sms.idempotencyKey },
-    });
-
-    if (existing && existing.status === 'sent') {
-      logger.info(
-        { idempotencyKey: sms.idempotencyKey, smsId: sms.id },
-        '[SMS QUEUE] Duplicate SMS skipped (idempotent)'
-      );
-      return;
-    }
-
     sms.attempts++;
     sms.lastAttempt = new Date().toISOString();
 
     const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
 
     try {
+      // Idempotency check — INSIDE the try (issue 2371): a throw here (a DB
+      // blip) used to escape to processQueue's catch after the rpop, and the
+      // SMS was gone. It now retries and, on the last attempt, dead-letters.
+      const existing = await prisma.notificationLog.findUnique({
+        where: { idempotencyKey: sms.idempotencyKey },
+      });
+
+      if (existing && existing.status === 'sent') {
+        logger.info(
+          { idempotencyKey: sms.idempotencyKey, smsId: sms.id },
+          '[SMS QUEUE] Duplicate SMS skipped (idempotent)'
+        );
+        return;
+      }
+
       // Per-store circuit breaker prevents one store's failing API key
       // from tripping the breaker for all stores
       const breakerKey = `sms:${sms.storeId}`;
@@ -295,11 +335,14 @@ class SmsQueueService {
     const client = redis.getClient();
     const messages = await client?.lrange(FAILED_KEY, 0, limit - 1);
 
+    // Same predicate as the replayer (issue 2374): a parseable-but-shapeless
+    // entry is skipped (still counted in `stats.failed`), not a phantom row.
     return (messages || []).reduce<QueuedSms[]>((acc, m) => {
       try {
-        acc.push(JSON.parse(m));
+        const parsed: unknown = JSON.parse(m);
+        if (isQueuedSms(parsed)) acc.push(parsed);
       } catch {
-        // Skip corrupted entries
+        // unparseable — same as above
       }
       return acc;
     }, []);
@@ -322,7 +365,7 @@ class SmsQueueService {
     const { retried, skipped, kept, lost } = await replayDeadLetters<QueuedSms>(
       client,
       { failed: FAILED_KEY, corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
-      (v): v is QueuedSms => !!v && typeof v === 'object',
+      isQueuedSms,
       logger
     );
 

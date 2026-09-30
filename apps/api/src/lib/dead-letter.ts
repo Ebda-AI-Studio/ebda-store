@@ -57,6 +57,12 @@ export interface ReplayResult {
  * nothing, so it ends the run and the rest are reported as `kept`. The loop is
  * bounded by the list's length when it started, and a put-back goes to the
  * head (LPUSH) while replay pops the tail, so it is never re-popped this run.
+ *
+ * `isValid` must check EVERY field the consumer dereferences (issue 2371) —
+ * an entry it admits is re-queued and then handed to the sender. Each queue
+ * exports its predicate (`isQueuedEmail`, `isQueuedSms`) and uses the same one
+ * in its dead-letter reader and live-queue processor, so reading, replaying
+ * and sending agree on what "unreadable" means (issue 2374).
  */
 export async function replayDeadLetters<T extends { attempts: number; error?: string }>(
   client: ReplayClient,

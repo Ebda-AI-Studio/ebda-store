@@ -37,25 +37,30 @@ export default function EmailQueuePage() {
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // Issue 2375: apiGet never throws — a 403/500/unreachable API resolves as
+  // `{ data: null, error }`. Read the error channel, or an outage renders as
+  // "No failed emails" with "Retry all" disabled.
+  const [loadError, setLoadError] = useState(false);
 
   const fetchFailed = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await apiGet<{
+      const { data, error } = await apiGet<{
         emails: FailedEmail[];
         stats: { pending: number; failed: number; corrupt?: number };
         corrupt?: Array<{ position: number; bytes: number }>;
       }>('/admin/email-queue/failed?limit=100');
+      setLoadError(!!error);
       setEmails(data?.emails || []);
       setStats(data?.stats ?? null);
       setCorrupt(data?.corrupt ?? []);
     } catch (err) {
       console.error('Failed to fetch failed emails:', err);
-      setMessage(t('failedToLoad'));
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     fetchFailed();
@@ -105,13 +110,18 @@ export default function EmailQueuePage() {
   const columns: DataTableColumn<FailedEmail>[] = [
     {
       header: t('columns.created'),
-      cell: e => <span className="text-gray-600">{new Date(e.createdAt).toLocaleString()}</span>,
+      cell: e => (
+        <span className="text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</span>
+      ),
     },
     {
       header: t('columns.subject'),
       primaryOnMobile: true,
       cell: e => (
-        <span className="block max-w-[260px] truncate font-medium text-gray-900" title={e.subject}>
+        <span
+          className="block max-w-[260px] truncate font-medium text-foreground"
+          title={e.subject}
+        >
           {e.subject}
         </span>
       ),
@@ -119,7 +129,9 @@ export default function EmailQueuePage() {
     {
       header: t('columns.to'),
       hideOnMobile: true,
-      cell: e => <span className="text-gray-600">{e.to.filter(Boolean).join(', ') || '—'}</span>,
+      cell: e => (
+        <span className="text-muted-foreground">{e.to.filter(Boolean).join(', ') || '—'}</span>
+      ),
     },
     {
       header: t('columns.attempts'),
@@ -189,7 +201,7 @@ export default function EmailQueuePage() {
         )}
 
         {loading ? (
-          <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
+          <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
             {t('loading')}
           </div>
         ) : (
@@ -199,9 +211,18 @@ export default function EmailQueuePage() {
             rows={emails}
             rowKey={e => e.id}
             emptyState={
-              <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
-                {(stats?.failed ?? 0) > 0 ? t('emptyUnreadable') : t('empty')}
-              </div>
+              loadError ? (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-6 text-center text-destructive-ink"
+                >
+                  {t('failedToLoad')}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
+                  {(stats?.failed ?? 0) > 0 ? t('emptyUnreadable') : t('empty')}
+                </div>
+              )
             }
           />
         )}

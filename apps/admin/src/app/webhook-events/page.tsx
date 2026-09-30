@@ -44,20 +44,26 @@ export default function WebhookEventsPage() {
   const [status, setStatus] = useState('');
   const [replaying, setReplaying] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // apiGet never throws (issue 2375's class): an outage resolves as
+  // `{ data: null, error }` and must not render as "no events".
+  const [loadError, setLoadError] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
       const qs = status ? `?status=${encodeURIComponent(status)}&limit=100` : '?limit=100';
-      const { data } = await apiGet<{ events: WebhookEvent[] }>(`/admin/webhook-events${qs}`);
+      const { data, error } = await apiGet<{ events: WebhookEvent[] }>(
+        `/admin/webhook-events${qs}`
+      );
+      setLoadError(!!error);
       setEvents(data?.events || []);
     } catch (err) {
       console.error('Failed to fetch webhook events:', err);
-      setMessage(t('failedToLoad'));
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }, [status, t]);
+  }, [status]);
 
   useEffect(() => {
     fetchEvents();
@@ -91,12 +97,14 @@ export default function WebhookEventsPage() {
   const columns: DataTableColumn<WebhookEvent>[] = [
     {
       header: t('columns.received'),
-      cell: ev => <span className="text-gray-600">{new Date(ev.receivedAt).toLocaleString()}</span>,
+      cell: ev => (
+        <span className="text-muted-foreground">{new Date(ev.receivedAt).toLocaleString()}</span>
+      ),
     },
     {
       header: t('columns.provider'),
       primaryOnMobile: true,
-      cell: ev => <span className="font-medium text-gray-900">{ev.provider}</span>,
+      cell: ev => <span className="font-medium text-foreground">{ev.provider}</span>,
     },
     {
       header: t('columns.status'),
@@ -106,18 +114,18 @@ export default function WebhookEventsPage() {
     {
       header: t('columns.attempts'),
       hideOnMobile: true,
-      cell: ev => <span className="text-gray-600">{ev.attempts}</span>,
+      cell: ev => <span className="text-muted-foreground">{ev.attempts}</span>,
     },
     {
       header: t('columns.result'),
       hideOnMobile: true,
       cell: ev =>
         ev.resultOrderId ? (
-          <span className="text-gray-600" title={ev.resultOrderId}>
+          <span className="text-muted-foreground" title={ev.resultOrderId}>
             {ev.resultStatus || t('columns.resultOk')} · {ev.resultOrderId.slice(0, 8)}
           </span>
         ) : (
-          <span className="text-gray-600">—</span>
+          <span className="text-muted-foreground">—</span>
         ),
     },
     {
@@ -166,7 +174,7 @@ export default function WebhookEventsPage() {
               key={s || 'all'}
               onClick={() => setStatus(s)}
               className={`rounded-full px-3 py-1 text-sm ${
-                status === s ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
+                status === s ? 'bg-foreground text-background' : 'bg-muted text-foreground'
               }`}
             >
               {s || t('statusAll')}
@@ -181,7 +189,7 @@ export default function WebhookEventsPage() {
         )}
 
         {loading ? (
-          <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
+          <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
             {t('loading')}
           </div>
         ) : (
@@ -191,9 +199,18 @@ export default function WebhookEventsPage() {
             rows={events}
             rowKey={ev => ev.id}
             emptyState={
-              <div className="rounded-lg border border-gray-200 px-3 py-6 text-center text-gray-400">
-                {t('empty')}
-              </div>
+              loadError ? (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-6 text-center text-destructive-ink"
+                >
+                  {t('failedToLoad')}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
+                  {t('empty')}
+                </div>
+              )
             }
           />
         )}

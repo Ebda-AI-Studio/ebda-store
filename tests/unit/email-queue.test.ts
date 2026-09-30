@@ -191,6 +191,31 @@ describe('Email Queue Service', () => {
       expect(failed[0].error).toBe('Connection timeout');
     });
 
+    // Issue 2374: the reader agrees with the replayer. An entry that parses
+    // but has no usable `options` used to reach the route mapper and 500 the
+    // whole list; it is skipped here (still counted in stats.failed).
+    it('skips entries the replayer would set aside (parseable but shapeless)', async () => {
+      const good = {
+        id: 'ok',
+        storeId: null,
+        options: { to: ['a@example.com'], subject: 'S', html: '<p/>' },
+        attempts: 3,
+        maxAttempts: 3,
+        createdAt: new Date().toISOString(),
+      };
+      mockRedisClient.lrange.mockResolvedValue([
+        '{"id":"x","attempts":3}',
+        JSON.stringify({ ...good, id: 'no-subject', options: { to: 'a@example.com', html: '' } }),
+        JSON.stringify({ ...good, id: 'to-number', options: { ...good.options, to: 42 } }),
+        '[]',
+        JSON.stringify(good),
+      ]);
+
+      const failed = await emailQueue.getFailedEmails(10);
+
+      expect(failed.map(e => e.id)).toEqual(['ok']);
+    });
+
     it('should return empty array when Redis unavailable', async () => {
       vi.mocked(redis.isAvailable).mockReturnValue(false);
 
@@ -336,7 +361,12 @@ describe('Email Queue Service', () => {
       sendAlertMock.mockClear();
       mockRedisClient.llen.mockResolvedValueOnce(1);
       mockRedisClient.rpop.mockResolvedValueOnce(
-        JSON.stringify({ id: 'e1', options: { to: 'x@example.com' }, attempts: 3 })
+        JSON.stringify({
+          id: 'e1',
+          storeId: null,
+          options: { to: 'x@example.com', subject: 'S', html: '<p/>' },
+          attempts: 3,
+        })
       );
       mockRedisClient.lpush.mockRejectedValue(new Error('down'));
 
@@ -382,6 +412,20 @@ describe('Email Queue Service', () => {
       mockRedisClient.llen.mockResolvedValueOnce(3);
       expect(await emailQueue.discardCorrupt()).toBe(3);
       expect(mockRedisClient.del).toHaveBeenCalledWith('email:failed:corrupt');
+    });
+
+    // Issue 2371's class on the email twin: the predicate now checks every
+    // field sendEmail and the list route dereference, not just `options`.
+    it('a shape-invalid entry (options without subject/html) is set aside, not re-queued', async () => {
+      const raw = JSON.stringify({ id: 'e2', options: { to: 'x@example.com' }, attempts: 3 });
+      mockRedisClient.llen.mockResolvedValueOnce(1);
+      mockRedisClient.rpop.mockResolvedValueOnce(raw);
+
+      const res = await emailQueue.retryFailed();
+
+      expect(res).toEqual({ retried: 0, skipped: 1, kept: 0 });
+      expect(mockRedisClient.lpush).toHaveBeenCalledWith('email:failed:corrupt', raw);
+      expect(mockRedisClient.lpush).not.toHaveBeenCalledWith('email:queue', expect.anything());
     });
 
     it('raises no set-aside alert when every entry was readable', async () => {

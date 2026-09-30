@@ -243,7 +243,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <p className="text-sm text-gray-600">{t('description')}</p>
+      <p className="text-sm text-muted-foreground">{t('description')}</p>
 
       <div className="rounded-lg border bg-card shadow-sm p-5 space-y-4">
         {/* Phone */}
@@ -415,9 +415,9 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
 
         {/* Total summary */}
         {totalFils > 0 && (
-          <div className="rounded-md border bg-orange-50 p-3 text-sm space-y-0.5">
+          <div className="rounded-md border bg-primary/10 p-3 text-sm space-y-0.5">
             {itemsSubtotalFils > 0 && (
-              <div className="flex justify-between text-gray-700">
+              <div className="flex justify-between text-foreground">
                 <span>{t('itemsSubtotal')}</span>
                 <span className="font-mono tabular-nums">
                   {(itemsSubtotalFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}
@@ -425,7 +425,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
               </div>
             )}
             {extraFils > 0 && (
-              <div className="flex justify-between text-gray-700">
+              <div className="flex justify-between text-foreground">
                 <span>
                   {t('customAmount')}
                   {extraAmountNote ? ` (${extraAmountNote})` : ''}
@@ -435,7 +435,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                 </span>
               </div>
             )}
-            <div className="flex justify-between font-semibold text-gray-900 pt-1 border-t border-orange-200">
+            <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-primary/30">
               <span>{t('total')}</span>
               <span className="font-mono tabular-nums">
                 {(totalFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}

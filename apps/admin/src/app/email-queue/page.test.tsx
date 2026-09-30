@@ -61,4 +61,39 @@ describe('super-admin email queue page (issue 2367)', () => {
     const button = await screen.findByRole('button', { name: 'retryAll' });
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
+
+  // Issue 2375: apiGet resolves { data: null, error } on a 403/500/outage —
+  // it never throws — so the load failure must come from the error channel,
+  // not a catch. It used to read "empty" with "Retry all" disabled.
+  it.each([
+    ['a 500', { code: 'SERVER_ERROR', message: 'boom', status: 500 }],
+    ['the API unreachable', { code: 'NETWORK_ERROR', message: 'fetch failed', status: 0 }],
+  ])('shows the load-failure state, not "empty", on %s', async (_n, error) => {
+    apiGet.mockResolvedValue({ data: null, error });
+    render(<EmailQueuePage />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('failedToLoad');
+    expect(screen.queryByText('empty')).toBeNull();
+    expect(screen.queryByText('emptyUnreadable')).toBeNull();
+  });
+
+  it('a successful load after a failure clears the error state', async () => {
+    apiGet
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: 'SERVER_ERROR', message: 'x', status: 500 },
+      })
+      .mockResolvedValue({
+        data: { emails: [], stats: { pending: 0, failed: 0, corrupt: 0 }, corrupt: [] },
+        error: null,
+      });
+    render(<EmailQueuePage />);
+    await screen.findByRole('alert');
+
+    screen.getByRole('button', { name: 'refresh' }).click();
+
+    expect(await screen.findByText('empty')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });

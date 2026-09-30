@@ -93,8 +93,8 @@ export default function BankReconciliationPage() {
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">{t('title')}</h1>
-            <p className="mt-1 text-sm text-gray-500">{t('description')}</p>
+            <h1 className="text-xl font-semibold text-foreground">{t('title')}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
           </div>
           <Link
             href={`/stores/${storeId}/finance/bank-reconciliation/import`}
@@ -133,9 +133,9 @@ export default function BankReconciliationPage() {
 
         {/* Empty */}
         {statements !== null && statements.length === 0 && (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 py-16 text-center">
+          <div className="rounded-xl border border-dashed border-border bg-muted/50 py-16 text-center">
             <svg
-              className="mx-auto mb-3 h-10 w-10 text-gray-300"
+              className="mx-auto mb-3 h-10 w-10 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -147,7 +147,7 @@ export default function BankReconciliationPage() {
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <p className="text-sm text-gray-500">{t('noStatements')}</p>
+            <p className="text-sm text-muted-foreground">{t('noStatements')}</p>
             <Link
               href={`/stores/${storeId}/finance/bank-reconciliation/import`}
               className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
@@ -162,9 +162,9 @@ export default function BankReconciliationPage() {
           /* Bank statements list — genuine accounting grid (columns are the
              point); kept as an isolated horizontal-scroll container per the
              B1 mobile-table exception rather than card-stacked. */
-          <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
-            <table className="min-w-[640px] w-full divide-y divide-gray-100 text-sm">
-              <thead className="bg-gray-50">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+            <table className="min-w-[640px] w-full divide-y divide-border text-sm">
+              <thead className="bg-muted/50">
                 <tr>
                   {[
                     t('fileName'),
@@ -177,26 +177,28 @@ export default function BankReconciliationPage() {
                   ].map(h => (
                     <th
                       key={h}
-                      className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
+                      className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border">
                 {statements.map(stmt => (
-                  <tr key={stmt.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-3 font-medium text-gray-800">{stmt.fileName}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      <span className="font-mono text-xs text-gray-400">{stmt.glAccount.code}</span>{' '}
+                  <tr key={stmt.id} className="hover:bg-muted/50">
+                    <td className="px-4 py-3 font-medium text-foreground">{stmt.fileName}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {stmt.glAccount.code}
+                      </span>{' '}
                       {stmt.glAccount.nameEn}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {fmt(stmt.periodStart)} – {fmt(stmt.periodEnd)}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{fmt(stmt.importedAt)}</td>
-                    <td className="px-4 py-3 text-center text-gray-800">
+                    <td className="px-4 py-3 text-muted-foreground">{fmt(stmt.importedAt)}</td>
+                    <td className="px-4 py-3 text-center text-foreground">
                       {stmt._count.transactions}
                     </td>
                     <td className="px-4 py-3">
@@ -227,7 +229,7 @@ export default function BankReconciliationPage() {
                 ))}
               </tbody>
             </table>
-            <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
+            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
               {total} statement{total !== 1 ? 's' : ''}
             </div>
           </div>

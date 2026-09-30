@@ -9,7 +9,7 @@ import { EmailService, EmailOptions } from './email.service';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
-import { CORRUPT_CAP, replayDeadLetters } from '../lib/dead-letter';
+import { CORRUPT_CAP, parkCorrupt, replayDeadLetters } from '../lib/dead-letter';
 
 export interface QueuedEmail {
   id: string;
@@ -28,6 +28,24 @@ const FAILED_KEY = 'email:failed';
 const FAILED_CORRUPT_KEY = 'email:failed:corrupt';
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5000;
+
+/**
+ * The ONE definition of a readable queued email (issues 2371, 2374): every
+ * field a consumer dereferences — `sendEmail` (`options.to/subject/html`), the
+ * dead-letter list route (`id`, `options.to`, `options.subject`). Used by the
+ * live-queue processor, the dead-letter reader AND the replayer, so they can
+ * never disagree about what "unreadable" means: an entry that parses but fails
+ * this is set aside (`email:failed:corrupt`), never sent, listed or 500ed on.
+ */
+export function isQueuedEmail(v: unknown): v is QueuedEmail {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  const e = v as Partial<QueuedEmail>;
+  const o = e.options as Partial<EmailOptions> | undefined;
+  if (typeof e.id !== 'string' || !o || typeof o !== 'object' || Array.isArray(o)) return false;
+  const toOk =
+    typeof o.to === 'string' || (Array.isArray(o.to) && o.to.every(t => typeof t === 'string'));
+  return toOk && typeof o.subject === 'string' && typeof o.html === 'string';
+}
 
 class EmailQueueService {
   private processing = false;
@@ -103,7 +121,22 @@ class EmailQueueService {
         return;
       }
 
-      const email: QueuedEmail = JSON.parse(emailJson);
+      let email: unknown;
+      try {
+        email = JSON.parse(emailJson);
+      } catch {
+        email = undefined;
+      }
+      if (!isQueuedEmail(email)) {
+        // Unreadable: sending would throw after the rpop and destroy it.
+        // Set it aside with the replay's unreadable entries (issue 2371).
+        await parkCorrupt(client, FAILED_CORRUPT_KEY, emailJson);
+        logger.error(
+          { bytes: emailJson.length, list: FAILED_CORRUPT_KEY },
+          '[EMAIL QUEUE] Unreadable queued email set aside'
+        );
+        return;
+      }
       await this.sendEmail(email);
     } catch (error) {
       logger.error({ err: error }, '[EMAIL QUEUE] Error processing queue');
@@ -287,11 +320,15 @@ class EmailQueueService {
     const client = redis.getClient();
     const emails = await client?.lrange(FAILED_KEY, 0, limit - 1);
 
+    // An entry that does not parse, or parses to the wrong shape, is skipped
+    // here exactly as the replayer would set it aside (issue 2374): it stays
+    // counted in `stats.failed`, so the page shows "unreadable", never a 500.
     return (emails || []).reduce<QueuedEmail[]>((acc, e) => {
       try {
-        acc.push(JSON.parse(e));
+        const parsed: unknown = JSON.parse(e);
+        if (isQueuedEmail(parsed)) acc.push(parsed);
       } catch {
-        // Skip corrupted entries
+        // unparseable — same as above
       }
       return acc;
     }, []);
@@ -319,8 +356,7 @@ class EmailQueueService {
     const { retried, skipped, kept, lost } = await replayDeadLetters<QueuedEmail>(
       client,
       { failed: FAILED_KEY, corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
-      (v): v is QueuedEmail =>
-        !!v && typeof v === 'object' && !!(v as Partial<QueuedEmail>).options,
+      isQueuedEmail,
       logger
     );
 

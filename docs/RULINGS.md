@@ -4758,3 +4758,52 @@ the email twin's surface: `GET /admin/sms-queue/failed` (number masked, text nev
 `/email-queue`. Both list routes now report stats as unknown (`null`) when Redis is down instead of
 zeros. Cost if wrong: a Redis outage that rejects two writes in a row loses the entries being
 replayed at that moment (alerted, by id).
+
+**Ruling PAY-ORPH-1a — the orphaned-invoice alert covers the failed Payment-row WRITE, for every
+caller (issue 2370; widens PAY-ORPH-1 from "failed COMMIT" to "no durable Payment row").**
+`PaymentService.createPayment` calls the gateway and then writes the Payment row; both
+`POST /payments/create` and the MCP `place_order` tool armed their alert only after `createPayment`
+RESOLVED, so a throw from `prisma.payment.create` after the gateway said yes (statement timeout,
+connection blip, the tenant transaction's timeout expiring during the gateway call) left a live
+invoice with no row and raised nothing. The post-gateway writes are now wrapped inside
+`createPayment`: on a throw it logs and raises the P1 (`payment.create.orphaned_invoice.record`)
+and rethrows. Because it lives in `createPayment`, the admin payment link, the WhatsApp payment link
+and the failed-payment retry are covered too (they had no orphan alert at all). The callers' catch
+remains the COMMIT-failure net; the two cannot both fire for one invoice, since the callers arm
+theirs only after `createPayment` resolves. Still no void call (no provider adapter has one).
+Pinned by `tests/unit/payment-create-orphaned-record.test.ts` (mutation-proven). Cost if wrong: an
+operator who misses the P1 leaves an invoice payable with nothing recorded.
+
+**Ruling BF-2b — one shape predicate per queue, shared by reader, replayer and processor (issues
+2371, 2374).** `isQueuedEmail` / `isQueuedSms` check every field the sender and the list route
+dereference. The replayer used to accept any SMS object (`{}` was re-queued, then destroyed by a
+Prisma validation error on `idempotencyKey: undefined`), and the email reader accepted anything
+`JSON.parse` returned (an entry without `options` TypeErrored the list mapper and 500ed the whole
+endpoint, which the page then showed as "No failed emails"). Now a shapeless dead letter is skipped
+by the reader (still counted in `stats.failed`, so the page says "unreadable") and set aside by
+"Retry all"; a shapeless entry on the LIVE queue is set aside by the processor instead of being
+destroyed; the SMS idempotency lookup moved inside the send `try`, so a DB blip retries and
+dead-letters rather than dropping. The list mapper also optional-chains as a second net. Cost if
+wrong: an entry the predicate wrongly rejects (a legitimate future field shape) is parked in
+`*:failed:corrupt` for 30 days instead of sent — visible on the page and alerted on replay, not lost.
+
+**Ruling ADM-LOAD-1 — the three super-admin ops lists read apiGet's error channel; the rest of the
+admin is a recorded residual (issue 2375).** `apiGet` never throws — a 403, a 500 or an unreachable
+API resolves as `{ data: null, error }` — so a `try/catch` around it is dead code and an outage
+renders as the page's empty state. On `/email-queue`, `/sms-queue` and `/webhook-events` the empty
+state is an operational claim ("No failed emails"), so they now show a `role="alert"` load-failure
+state instead. About 70 other admin call sites destructure only `data` (`grep -rn "const { data } =
+await apiGet" apps/admin/src`); most render a generic empty list, not a claim that nothing failed,
+so they were not changed in this batch. Cost if wrong: an outage on one of those pages reads as
+"no rows" until someone refreshes.
+
+**Ruling ADM-GREY-1 — no raw neutral palette in admin or orders; `muted-ink` for text on a solid
+`bg-muted` (issue 2372).** `text-gray-900` etc. do not follow the theme: in dark mode the SMS
+queue's primary column measured ~1:1 on the card. Every raw `text|bg|border|divide|…-(gray|slate|
+zinc|neutral|stone)-N` in `apps/admin` (15 files) was replaced with semantic tokens, and the
+contrast gate (`tests/unit/admin-tint-ink-contrast.test.ts`) now bans the form outright; gradient
+stops are exempt (theme-preview swatches). `--muted-ink` (light 5.63:1, dark 6.66:1 on `bg-muted`)
+is the grey-pill text, because `muted-foreground` is 4.32:1 on a solid `bg-muted` in light. The 74
+PRE-EXISTING `bg-muted … text-muted-foreground` pairs elsewhere in admin were not rewritten here and
+are not gated yet (4.32:1, a marginal AA miss in light only; fine in dark). Cost if wrong: grey
+secondary text on those pills stays just under AA in the light theme.

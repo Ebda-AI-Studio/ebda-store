@@ -33,7 +33,7 @@ interface ExpenseRow {
 const kwd = filsToKwd;
 
 const STATUS_BADGE: Record<ExpenseStatus, string> = {
-  draft: 'bg-gray-100 text-gray-700',
+  draft: 'bg-muted text-foreground',
   pending: 'bg-amber-100 text-amber-700',
   approved: 'bg-blue-100 text-blue-700',
   posted: 'bg-green-100 text-green-700',

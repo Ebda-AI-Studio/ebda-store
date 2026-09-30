@@ -6685,7 +6685,7 @@
     },
     "corrupt": {
       "title": "{count} unreadable entr(ies) set aside",
-      "body": "These dead-lettered emails could not be read during \"Retry all\", so they cannot be re-sent. The newest 200 are kept for 30 days in the Redis list email:failed:corrupt for inspection; discard them once reviewed.",
+      "body": "These queued emails could not be read — during \"Retry all\", or when the queue picked them up — so they cannot be re-sent. The newest 200 are kept for 30 days in the Redis list email:failed:corrupt for inspection; discard them once reviewed.",
       "sizes": "Sizes (bytes, newest first): {sizes}",
       "discard": "Discard",
       "discarding": "Discarding…",
@@ -6723,7 +6723,7 @@
     },
     "corrupt": {
       "title": "{count} unreadable entr(ies) set aside",
-      "body": "These dead-lettered SMS messages could not be read during \"Retry all\", so they cannot be re-sent. The newest 200 are kept for 30 days in the Redis list sms:failed:corrupt for inspection; discard them once reviewed.",
+      "body": "These queued SMS messages could not be read — during \"Retry all\", or when the queue picked them up — so they cannot be re-sent. The newest 200 are kept for 30 days in the Redis list sms:failed:corrupt for inspection; discard them once reviewed.",
       "sizes": "Sizes (bytes, newest first): {sizes}",
       "discard": "Discard",
       "discarding": "Discarding…",

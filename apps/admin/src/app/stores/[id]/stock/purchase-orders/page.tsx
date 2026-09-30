@@ -28,7 +28,7 @@ interface PurchaseOrder {
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_CLASSES: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
+  draft: 'bg-muted text-foreground',
   sent: 'bg-blue-100 text-blue-700',
   partial: 'bg-amber-100 text-amber-700',
   received: 'bg-green-100 text-green-700',
@@ -131,7 +131,7 @@ export default function PurchaseOrdersPage() {
               cell: po => (
                 <span
                   className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-foreground'
+                    STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
                   }`}
                 >
                   {t(`statuses.${po.status}`)}

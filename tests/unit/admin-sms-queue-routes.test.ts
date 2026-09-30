@@ -20,6 +20,11 @@ const h = vi.hoisted(() => ({
     retryFailed: vi.fn(),
     discardCorrupt: vi.fn(),
   },
+  email: {
+    getFailedEmails: vi.fn(),
+    getStats: vi.fn(),
+    getCorruptEntries: vi.fn(),
+  },
 }));
 
 vi.mock('@api/middleware/auth', () => ({
@@ -34,6 +39,7 @@ vi.mock('@api/middleware/require-mfa', () => ({
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: h.auditLog }));
 vi.mock('@api/services/sms-queue.service', () => ({ smsQueue: h.sms }));
+vi.mock('@api/services/email-queue.service', () => ({ emailQueue: h.email }));
 vi.mock('@api/services/redis.service', () => ({
   redis: { isAvailable: () => h.redisUp, getClient: () => null },
 }));
@@ -117,5 +123,33 @@ describe('/admin/sms-queue (issue 2363)', () => {
     expect(res.status).toBe(403);
     expect(h.sms.retryFailed).not.toHaveBeenCalled();
     expect(h.sms.discardCorrupt).not.toHaveBeenCalled();
+  });
+});
+
+// Issue 2374: a dead-lettered email that parses but has no `options` used to
+// TypeError in the list mapper and 500 the WHOLE endpoint — the page then read
+// "No failed emails" with Retry all disabled. The reader now filters such rows
+// (email-queue.test.ts); this is the second net: one bad row never 500s.
+describe('/admin/email-queue/failed — a shapeless row never 500s the list (issue 2374)', () => {
+  it('lists the good row and survives the shapeless one', async () => {
+    h.email.getFailedEmails.mockResolvedValue([
+      { id: 'bad', attempts: 3, createdAt: '2026-10-01T00:00:00Z' },
+      {
+        id: 'good',
+        storeId: 'store-1',
+        options: { to: 'buyer@example.com', subject: 'Order ORD-1', html: '<p/>' },
+        attempts: 3,
+        createdAt: '2026-10-01T00:00:00Z',
+      },
+    ]);
+    h.email.getStats.mockResolvedValue({ pending: 0, failed: 2, corrupt: 0, processing: false });
+    h.email.getCorruptEntries.mockResolvedValue([]);
+
+    const res = await request(app()).get('/admin/email-queue/failed');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.emails.map((e: { id: string }) => e.id)).toEqual(['bad', 'good']);
+    expect(res.body.data.emails[1].to).toEqual(['b***@example.com']);
+    expect(res.body.data.emails[0]).toMatchObject({ to: [null], subject: '', storeId: null });
   });
 });
