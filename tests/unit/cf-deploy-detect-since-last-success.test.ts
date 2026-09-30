@@ -78,6 +78,14 @@ describe('cf-deploy detect: static shape', () => {
   });
 });
 
+// Strip GIT_* — under the husky pre-push hook git exports GIT_DIR etc. for
+// the OUTER repo, and every child git below would then write to it (it added
+// fixture commits to a branch and set core.bare=true on 2026-09-30). Same
+// fix as ai-review-autofix-file-staging.test.ts.
+const CLEAN_GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_'))
+);
+
 describe('cf-deploy detect: behaviour (script executed against a real git repo)', () => {
   let tmp: string;
   let repo: string;
@@ -86,7 +94,7 @@ describe('cf-deploy detect: behaviour (script executed against a real git repo)'
   let script: string;
 
   const git = (...args: string[]) =>
-    execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+    execFileSync('git', args, { cwd: repo, encoding: 'utf8', env: CLEAN_GIT_ENV }).trim();
 
   function commit(name: string, file: string) {
     fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
@@ -103,7 +111,7 @@ describe('cf-deploy detect: behaviour (script executed against a real git repo)'
     bin = path.join(tmp, 'bin');
     fs.mkdirSync(repo);
     fs.mkdirSync(bin);
-    execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+    execFileSync('git', ['init', '-q', '-b', 'main', repo], { env: CLEAN_GIT_ENV });
     git('config', 'user.email', 'test@example.com');
     git('config', 'user.name', 'test');
     git('config', 'commit.gpgsign', 'false');
@@ -131,7 +139,7 @@ describe('cf-deploy detect: behaviour (script executed against a real git repo)'
       cwd: repo,
       encoding: 'utf8',
       env: {
-        ...process.env,
+        ...CLEAN_GIT_ENV,
         PATH: `${bin}${path.delimiter}${process.env.PATH}`,
         GITHUB_OUTPUT: out,
         GITHUB_REPOSITORY: 'ForceAI-KW/force-website-builder',
