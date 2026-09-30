@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildProductFeed, type FeedBundleInput } from '@api/lib/product-feed';
 
 const store = { id: 's1', name: 'Wady Aljuz', slug: 'wady-aljuz', currency: 'KWD' };
@@ -52,13 +52,17 @@ describe('buildProductFeed', () => {
   });
 
   it('produces a byte-identical feed when no bundles are passed (feature-disabled store)', () => {
-    const withoutBundlesArg = buildProductFeed(store, [product], 'https://wadyaljuz.com');
-    const withExplicitEmptyBundles = buildProductFeed(
-      store,
-      [product],
-      'https://wadyaljuz.com',
-      []
-    );
+    // Freeze the clock: both calls stamp `generated_at` from `new Date()`, and
+    // a millisecond tick between them made this equality flaky.
+    vi.useFakeTimers({ now: new Date('2026-09-30T00:00:00Z'), toFake: ['Date'] });
+    let withoutBundlesArg: ReturnType<typeof buildProductFeed>;
+    let withExplicitEmptyBundles: ReturnType<typeof buildProductFeed>;
+    try {
+      withoutBundlesArg = buildProductFeed(store, [product], 'https://wadyaljuz.com');
+      withExplicitEmptyBundles = buildProductFeed(store, [product], 'https://wadyaljuz.com', []);
+    } finally {
+      vi.useRealTimers();
+    }
     // Same product_count, same single item, no `is_bundle` key anywhere —
     // this is the safety property Task 10 depends on: a store without the
     // `bundles` override must see the pre-Task-10 shape exactly.

@@ -9,6 +9,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { invalidateCachedPrefix } from '../lib/public-cache';
+import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
 import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@force/shared';
 
@@ -179,6 +180,7 @@ export const updateProductSchema = createProductSchema.partial().superRefine(ref
  *           type: string
  *       - in: query
  *         name: featured
+ *         description: Omit for all products; 'true' or 'false' filters. Any other value is a 400.
  *         schema:
  *           type: boolean
  *     responses:
@@ -231,7 +233,9 @@ router.get(
         status: status as string,
         category: category as string,
         search: search as string,
-        featured: featured === 'true',
+        // Tri-state: absent -> undefined, so the default list does not add
+        // `WHERE featured = false` and hide featured products.
+        featured: parseOptionalBooleanQuery(featured, 'featured'),
         ids: idsParam,
         // Inventory page opts in to the per-product sold-units aggregate.
         withSalesQuantity: withSalesQuantity === 'true',
@@ -281,10 +285,10 @@ router.get(
         tags: tags ? (tags as string).split(',') : undefined,
         minPrice: minPrice ? parseInt(minPrice as string) : undefined,
         maxPrice: maxPrice ? parseInt(maxPrice as string) : undefined,
-        inStock: inStock === 'true',
-        onSale: onSale === 'true',
-        isNew: isNew === 'true',
-        featured: featured === 'true',
+        inStock: parseOptionalBooleanQuery(inStock, 'inStock'),
+        onSale: parseOptionalBooleanQuery(onSale, 'onSale'),
+        isNew: parseOptionalBooleanQuery(isNew, 'isNew'),
+        featured: parseOptionalBooleanQuery(featured, 'featured'),
         sortBy: sortBy as
           | 'newest'
           | 'oldest'

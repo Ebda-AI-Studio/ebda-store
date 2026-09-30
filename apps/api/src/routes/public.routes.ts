@@ -26,6 +26,7 @@ import { config } from '../config';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
+import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
 import { listPurchasableBundles, describeBundleContents } from '../services/bundle.service';
@@ -171,6 +172,10 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     const { page, limit, category, search, featured, sort, minPrice, maxPrice, cursor, ids } =
       req.query;
     const storeId = await getStoreIdFromRequest(req);
+    // Tri-state: absent -> undefined (no filter). `featured === 'true'` used
+    // to turn an absent param into `featured: false`, which listPublic applied
+    // as `WHERE featured = false` on every non-"Featured" listing.
+    const featuredFilter = parseOptionalBooleanQuery(featured, 'featured');
 
     // Search floor + length cap (adversarial audit P1-3, mirrors the >= 2
     // floor on /:storeId/search/suggest below). The raw term used to pass
@@ -247,7 +252,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // Cache key includes cursor + ids + option filters — different selections get distinct entries.
     const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
       effectiveSearch || ''
-    }:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
+    }:${featuredFilter ?? ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
       validCursor || ''
     }:${idsParam?.sort().join(',') ?? ''}:${optionFilterKey}`;
 
@@ -257,7 +262,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         limit: limit ? parseInt(limit as string) : undefined,
         category: category as string,
         search: effectiveSearch,
-        featured: featured === 'true',
+        featured: featuredFilter,
         sort: sortValue,
         minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
         maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
