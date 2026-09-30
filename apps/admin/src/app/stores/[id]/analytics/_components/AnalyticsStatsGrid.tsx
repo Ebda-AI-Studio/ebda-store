@@ -1,17 +1,23 @@
 'use client';
 
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@force/ui';
 import { formatCurrency, formatNumber, type DashboardStats } from './types';
 
 interface StatCardProps {
   title: string;
-  value: number;
-  change?: number;
+  /** `null` renders `unknownLabel` — a figure we cannot compute, never a 0. */
+  value: number | null;
+  change?: number | null;
   icon: React.ReactNode;
   iconBg?: string;
   format?: 'number' | 'currency' | 'percentage';
   vsLastPeriodLabel: string;
+  unknownLabel?: string;
+  /** Explanation under the figure (e.g. why profit is unknown / partial). */
+  note?: React.ReactNode;
 }
 
 function StatCard({
@@ -22,15 +28,19 @@ function StatCard({
   iconBg = 'bg-primary',
   format = 'number',
   vsLastPeriodLabel,
+  unknownLabel,
+  note,
 }: StatCardProps) {
   const displayValue =
-    format === 'currency'
-      ? formatCurrency(value)
-      : format === 'percentage'
-        ? `${value.toFixed(1)}%`
-        : formatNumber(value);
+    value === null
+      ? (unknownLabel ?? '—')
+      : format === 'currency'
+        ? formatCurrency(value)
+        : format === 'percentage'
+          ? `${value.toFixed(1)}%`
+          : formatNumber(value);
 
-  const isPositive = change !== undefined && change >= 0;
+  const isPositive = change != null && change >= 0;
 
   return (
     <div className="force-stat-card group">
@@ -38,7 +48,7 @@ function StatCard({
         <div className="flex-1">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{displayValue}</p>
-          {change !== undefined && (
+          {change != null && (
             <div className="mt-2 flex items-center gap-1">
               <span
                 className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -60,6 +70,7 @@ function StatCard({
               <span className="text-xs text-muted-foreground">{vsLastPeriodLabel}</span>
             </div>
           )}
+          {note && <div className="mt-2 text-xs text-muted-foreground">{note}</div>}
         </div>
         <div
           className={`flex h-12 w-12 items-center justify-center rounded-2xl ${iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
@@ -82,6 +93,31 @@ interface AnalyticsStatsGridProps {
 export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
   const t = useT('analytics.stats');
   const vsLabel = t('vsLastPeriod');
+  const params = useParams();
+  const storeId = params?.id as string;
+
+  // Profit needs a cost price on every sold line. Say so, and where to fix it,
+  // instead of showing 0 (unknown) or a silently partial figure.
+  const missingCost = stats?.profitItemsMissingCost ?? 0;
+  const profitNote =
+    missingCost > 0 ? (
+      <>
+        <p>
+          {stats?.totalProfit == null
+            ? t('profitMissingCost', { count: missingCost })
+            : t('profitPartial', {
+                count: missingCost,
+                amount: formatCurrency(stats?.profitRevenueMissingCost ?? 0),
+              })}
+        </p>
+        <Link
+          href={`/stores/${storeId}/products`}
+          className="mt-1 inline-block font-medium text-primary underline-offset-2 hover:underline"
+        >
+          {t('addCostPrices')}
+        </Link>
+      </>
+    ) : null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8 stagger-animation">
@@ -105,11 +141,13 @@ export function AnalyticsStatsGrid({ stats }: AnalyticsStatsGridProps) {
       />
       <StatCard
         title={t('totalProfit')}
-        value={stats?.totalProfit || 0}
+        value={stats ? stats.totalProfit : 0}
         change={stats?.profitChange}
         format="currency"
         iconBg="bg-emerald-600"
         vsLastPeriodLabel={vsLabel}
+        unknownLabel={t('profitUnknown')}
+        note={profitNote}
         icon={
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path

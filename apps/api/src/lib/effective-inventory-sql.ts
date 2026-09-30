@@ -23,3 +23,26 @@ export const ON_HAND_SQL = Prisma.sql`CASE
   )
   ELSE p.inventory
 END`;
+
+/**
+ * On-hand stock VALUE (fils) of one product row aliased `p` — the valuation
+ * twin of `ON_HAND_SQL`, using the same variant rule.
+ *
+ * A variant product is valued per ACTIVE variant at that variant's own cost,
+ * falling back to the parent's cost when the variant has none — the rule
+ * `account.service.ts` already uses for the opening-balance inventory entry
+ * (`variant.costPrice ?? product.costPrice`). The merchant enters cost per
+ * variant in the variants form, and PO receive now writes the weighted
+ * average to the variant; multiplying the variant SUM by the parent's cost
+ * alone valued those variants at 0 (or at an unrelated average).
+ */
+export const STOCK_VALUE_SQL = Prisma.sql`CASE
+  WHEN EXISTS (SELECT 1 FROM public.product_variants pv WHERE pv.product_id = p.id)
+  THEN COALESCE(
+    (SELECT SUM(pv.inventory * COALESCE(pv.cost_price, p.cost_price, 0))
+      FROM public.product_variants pv
+      WHERE pv.product_id = p.id AND pv.is_active),
+    0
+  )
+  ELSE p.inventory * COALESCE(p.cost_price, 0)
+END`;

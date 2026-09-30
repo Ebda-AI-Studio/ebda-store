@@ -2,7 +2,7 @@ import { prisma, Prisma, InventoryChangeType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { WarehouseService } from './warehouse.service';
-import { ON_HAND_SQL } from '../lib/effective-inventory-sql';
+import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 
@@ -58,7 +58,9 @@ export class InventoryService {
       ]
     >`
       WITH on_hand AS (
-        SELECT ${ON_HAND_SQL} AS qty, p.low_stock_threshold, p.cost_price
+        -- value: a variant at its own cost, falling back to the parent's
+        -- (STOCK_VALUE_SQL) — the parent cost alone valued variants wrongly.
+        SELECT ${ON_HAND_SQL} AS qty, ${STOCK_VALUE_SQL} AS value, p.low_stock_threshold
         FROM public.products p
         WHERE p.store_id = ${storeId}
           AND p.deleted_at IS NULL
@@ -69,7 +71,7 @@ export class InventoryService {
         COALESCE(SUM(qty), 0)::bigint                                            AS total_stock,
         COUNT(*) FILTER (WHERE qty > 0 AND qty <= low_stock_threshold)::bigint   AS low_stock_count,
         COUNT(*) FILTER (WHERE qty <= 0)::bigint                                 AS out_of_stock_count,
-        COALESCE(SUM(qty * COALESCE(cost_price, 0)), 0)::bigint                  AS total_value
+        COALESCE(SUM(value), 0)::bigint                                          AS total_value
       FROM on_hand
     `;
 
@@ -142,6 +144,7 @@ export class InventoryService {
           name_ar: string | null;
           sku: string | null;
           on_hand: bigint | number;
+          stock_value: bigint | number;
           low_stock_threshold: number;
           track_inventory: boolean;
           cost_price: number | null;
@@ -149,6 +152,7 @@ export class InventoryService {
         }>
       >`
         SELECT p.id, p.name, p.name_ar, p.sku, ${ON_HAND_SQL} AS on_hand,
+               ${STOCK_VALUE_SQL} AS stock_value,
                p.low_stock_threshold, p.track_inventory, p.cost_price, p.status
         FROM public.products p
         ${where}
@@ -174,7 +178,7 @@ export class InventoryService {
         costPrice: r.cost_price,
         status: r.status,
         stockStatus: this.getStockStatus(inventory, r.low_stock_threshold),
-        stockValue: inventory * (r.cost_price || 0),
+        stockValue: Number(r.stock_value),
       };
     });
 
@@ -200,6 +204,7 @@ export class InventoryService {
         name_ar: string | null;
         sku: string | null;
         inventory: number;
+        stock_value: bigint | number;
         low_stock_threshold: number;
         track_inventory: boolean;
         cost_price: number | null;
@@ -207,6 +212,7 @@ export class InventoryService {
       }>
     >`
       SELECT p.id, p.name, p.name_ar, p.sku, ${ON_HAND_SQL} AS inventory,
+             ${STOCK_VALUE_SQL} AS stock_value,
              p.low_stock_threshold, p.track_inventory, p.cost_price, p.status
       FROM public.products p
       WHERE p.store_id = ${storeId}
@@ -226,6 +232,7 @@ export class InventoryService {
         name_ar: string | null;
         sku: string | null;
         inventory: number;
+        stock_value: bigint | number;
         low_stock_threshold: number;
         track_inventory: boolean;
         cost_price: number | null;
@@ -233,6 +240,7 @@ export class InventoryService {
       }>
     >`
       SELECT p.id, p.name, p.name_ar, p.sku, ${ON_HAND_SQL} AS inventory,
+             ${STOCK_VALUE_SQL} AS stock_value,
              p.low_stock_threshold, p.track_inventory, p.cost_price, p.status
       FROM public.products p
       WHERE p.store_id = ${storeId}
@@ -257,7 +265,7 @@ export class InventoryService {
       costPrice: p.cost_price,
       status: p.status,
       stockStatus: this.getStockStatus(p.inventory, p.low_stock_threshold),
-      stockValue: p.inventory * (p.cost_price || 0),
+      stockValue: Number(p.stock_value),
     }));
   }
 

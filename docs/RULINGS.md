@@ -2499,6 +2499,126 @@ separate product decision. Cost if wrong: a cart whose every loose line is delet
 "Your cart is empty" screen rather than the refusal copy, because the summary no longer lists
 unorderable lines.
 
+## 2026-09-30 — accounting + profit batch (branch `fix/accounting-profit-batch`)
+
+Audit: `force-website-builder-audit-accounting-mcp-2026-09-30.md` findings 1–6.
+
+**Ruling AP-1 — the balance sheet's retained + current earnings row is COMPUTED,
+not posted.** The ledger has no period-closing entries, so cumulative revenue −
+expenses up to `asOf` still sits in P&L accounts; `balanceSheet()` adds it as one
+equity row (`kind: 'current_earnings'`) from the same `asOf` totals. Nothing is
+written to the ledger. A future period-close entry moves those balances into
+equity and the computed row shrinks by exactly that amount, so the two cannot
+double count. Cost if wrong: an accountant expecting a posted retained-earnings
+account sees a computed row instead, with no ledger lines behind it.
+
+**Ruling AP-2 — `order/refunded` is sent after the request transaction commits
+(`deferAfterTenantCommit`).** Evidence: wady-aljuz ORD-1781512189610-9972A710 —
+a delivered→refunded change rolled back (30 s request-tx timeout, 2026-07-09)
+while its reversal had committed and the event had been sent; the GL reversed a
+refund that never happened. Outside a request the send stays inline and a failed
+enqueue still throws. Accepted residual: inside a request, a post-commit enqueue
+failure can no longer roll the request back — it is alerted by
+`deferAfterTenantCommit`, and a WHOLE-order reversal is re-sent by
+refund-reversal-stuck-sweep (its `refundReversalRequestedAt` stamp commits with
+the request). A PARTIAL-return event has no sweep. Cost if wrong: a partial
+return whose post-commit enqueue fails keeps its returned lines' stock and GL
+unadjusted until someone replays it from the alert.
+
+**Ruling AP-3 — `postOrderPaymentJournal` books no sale for an order that is
+already `cancelled` or `refunded`.** Evidence: ORD-1778670342233-50212B65
+(refunded by status in May, `paymentStatus` left `paid`) had its sale posted on
+2026-07-09 by the order-created stuck sweep's fanout, with nothing left to
+reverse it. A paid order cancelled later is reversed by the refund path, so
+"no sale" is the same end state. Cost if wrong: a paid order whose status is
+cancelled but whose money was knowingly kept books no revenue.
+
+**Ruling AP-4 — the ledger correction for ORD-1781512189610-9972A710 reverses the
+erroneous reversal (JE-2026-000020) with the standard `reverseEntry`.** No row is
+edited or deleted. The re-booked sale carries source id `…:reversal:reversal`,
+which `postRefundJournal` does not look for. Cost if wrong: if that one order is
+ever genuinely refunded, its 9.500 KWD sale stays booked until reversed by hand.
+Script: `scripts/fix-ledger-order-mismatch-2026-09-30.ts` — NOT RUN, awaits Ahmad.
+
+**Ruling AP-5 — backorder line cancel still fires a WHOLE-order `order/refunded`
+(not changed here).** `cancelBackorder` passes `restoreInventory: false` but no
+`partial`, so the GL poster reverses the entire sale of a still-live order. It is
+not the cause of either production row (0 backorder lines in prod) and the right
+ledger shape for a single cancelled line (a pro-rata adjustment via
+`postPartialReturnJournal`?) is a semantics decision. Needs the owner. Cost if
+wrong: the first merchant to cancel a backorder line on a paid order gets the
+whole sale reversed in the ledger.
+
+**Ruling AP-6 — margin_drop is not evaluated unless BOTH windows booked COGS.**
+With no cost of goods the margin is 100% by construction; the week cost prices
+first appear it would "drop" and page. Cost if wrong: a store whose COGS stops
+posting entirely (cost data outage) no longer gets a margin alert for it —
+cost_spike and revenue_drop still run.
+
+**Ruling AP-7 — partial profit is shown WITH a note, unknown profit as null.**
+`totalProfit` is `null` only when sold lines exist and none has a cost; when some
+do, the figure covers the costed lines and `profitItemsMissingCost` /
+`profitRevenueMissingCost` travel with it (the UI says what is excluded);
+`profitChange` is `null` unless both periods are complete. Cost if wrong: a
+merchant who ignores the note reads a partial profit as the whole.
+
+**Ruling AP-8 — `conversionRate` is orders per PRODUCT VIEW (%), from the nightly
+`funnel_snapshots`, labelled `conversionRateBasis: 'orders_per_product_view'`.**
+There is no session tracking, and `checkouts_started` is 0 everywhere (it counts
+abandoned-cart rows, which guests never create — audit finding 6b/6c, not in this
+batch). No views → `null`. Cost if wrong: a consumer compares it with a
+session-based rate from another platform and reads it as low.
+
+**Ruling AP-9 — COGS posting is fed, not changed.** `order-posting.ts` already
+books DR 5000 / CR 1200 per line with a cost; it was never fed because
+`order_items.cost_price` was null (348/349 in prod). Variant cost is now
+snapshotted, so COGS posts for NEW orders only. Historical orders are not
+backfilled (that is a production write + a posting-date decision). Cost if
+wrong: P&L before this deploy keeps 0 COGS until a backfill is ruled.
+
+**Ruling AP-10 — valuation siblings fixed here vs left.** Fixed: finance
+dashboard stock value, analytics inventory snapshot (+ backorder demand value),
+inventory page stats/list/low-stock rows — all via `STOCK_VALUE_SQL`. Left:
+`deadstock-scan.service.ts` (product-level cost) — the open `fix/analytics-batch-1`
+branch rewrites its stock-value column; fixing it here would collide. Cost if
+wrong: dead-stock flags keep valuing variant products at the parent cost until
+that branch or a follow-up lands.
+
+**Ruling AP-11 — surfaces that also show profit but were not edited here:**
+the analytics GL KPI cards (`GlKpiCards.tsx`) and `insights/products` are being
+rewritten on the open `fix/analytics-batch-1` branch. The "Add cost prices to
+see profit" explanation ships on the analytics profit card, which sits directly
+above the GL cards. Cost if wrong: the GL "Gross profit" card still equals
+revenue with no explanation until those branches reconcile.
+
+**Ruling AP-12 — ONE customer key: main's `customerKeyOf` (`lib/customer-key.ts`) is canonical;
+this branch's `customerKeyForOrder` is removed.** Merging main (MCP read tools + RFM key
+unification) brought a second helper under the same path. Compared line by line, the semantics are
+identical: registered user id → shipping email lowercased (not trimmed) → shipping phone verbatim →
+nothing. The only difference was the contact-less case, which `customerKeyOf` returns as `null`
+(RFM skips it) and the Customers list maps to `guest:<orderId>`; `customerKeyForOrder` baked that
+fallback in. Analytics `totalCustomers`/`allTimeCustomers` use the SQL twin `CUSTOMER_KEY_SQL`
+(`lib/customer-key-sql.ts`), which now documents itself as `customerKeyOf(o) ?? 'guest:' || o.id` and
+is asserted equal to it in `tests/integration/analytics-customer-key.test.ts`. The list, export,
+customer detail, MCP customer tools, RFM and cohorts all group through `customerKeyOf`. Residual:
+the JS side lowercases with `toLowerCase()` and the SQL side with Postgres `LOWER()`; they agree for
+ASCII and ordinary Unicode but may differ for locale-special code points (e.g. Turkish dotted I).
+Cost if wrong: a guest whose email contains such a character is counted once by the page and twice
+(or vice versa) by analytics — an off-by-one in a KPI, not a money figure.
+
+**Ruling AP-13 — analytics customer counts and the Customers-page KPI strip measure different
+things, on purpose.** Analytics counts distinct keyed customers with an order of ANY status (as the
+list's order-derived rows do) — so `allTimeCustomers` equals the list's `summary.customers` whenever
+the store has no zero-order registered customers and the scan was not truncated. The page's
+`summary.customers` additionally includes registered customers who have never ordered (#1882 union),
+and `summary.buyers` excludes customers whose only orders are cancelled/refunded (PR 2218). Revenue and
+order counts in analytics exclude cancelled/refunded while its customer count does not — kept, because
+the card answers "who has ordered", matching the list the merchant drills into. Both relations are
+asserted in `tests/integration/analytics-customer-key.test.ts` (page == analytics on the shared
+fixture; +1 page row for a zero-order signup; `buyers` one lower for a cancelled-only customer).
+Cost if wrong: a merchant reads "Customers 6" on analytics next to "Buyers 5" on the Customers page
+and must hover the labels to see why.
+
 ## 2026-09-28 — PR 1978 scoped-audit remediation (branch `fix/p2-other-o1`)
 
 **Ruling O1-1 — the drift check alerts on a stall at 90 minutes or 10 waiting deploy-path

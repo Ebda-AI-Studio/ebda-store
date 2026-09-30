@@ -187,13 +187,28 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   // this floor stops a tiny RISE off a ~0 baseline from paging P0.)
   const REFUND_SPIKE_MIN_COUNT = 3;
   const includeRefundSpike = refunds7dCount >= REFUND_SPIKE_MIN_COUNT;
+  // margin_drop is only a measurement when BOTH windows booked COGS. With no
+  // cost of goods posted (no cost prices on the sold lines — every prod store
+  // as of 2026-09-30) the "margin" is 100% by construction, and the first week
+  // cost prices appear it would "drop" from that fake 100% and page. Unknown
+  // margin is not a margin.
+  const includeMargin = cogs7d > 0 && cogs28d > 0;
   const rawMetrics: Array<{
     metric: AnomalyMetric;
     current: number;
     baseline: number;
     direction: 'up' | 'down';
   }> = [
-    { metric: 'margin_drop', current: margin7d, baseline: margin28d, direction: 'down' },
+    ...(includeMargin
+      ? [
+          {
+            metric: 'margin_drop' as AnomalyMetric,
+            current: margin7d,
+            baseline: margin28d,
+            direction: 'down' as const,
+          },
+        ]
+      : []),
     ...(includeCostSpike
       ? [
           {

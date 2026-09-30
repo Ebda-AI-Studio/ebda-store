@@ -320,9 +320,27 @@ All errors follow this format:
             totalOrders: { type: 'integer' },
             totalRevenue: { type: 'integer' },
             totalProducts: { type: 'integer' },
-            totalCustomers: { type: 'integer' },
+            totalCustomers: {
+              type: 'integer',
+              description:
+                'Distinct customers in the period, keyed like the Customers page (user, else shipping email, else phone)',
+            },
+            allTimeCustomers: { type: 'integer' },
             ordersChange: { type: 'number', format: 'float' },
             revenueChange: { type: 'number', format: 'float' },
+            conversionRate: {
+              type: 'number',
+              format: 'float',
+              nullable: true,
+              description: 'Orders per product view (%), null when no views were recorded',
+            },
+            totalProfit: {
+              type: 'integer',
+              nullable: true,
+              description: 'Fils; null when sold lines have no cost price',
+            },
+            profitItemsMissingCost: { type: 'integer' },
+            profitRevenueMissingCost: { type: 'integer' },
           },
         },
       },

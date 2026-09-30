@@ -225,38 +225,70 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         const onHandBefore = effectiveInventory(product);
 
         if (item.variantId) {
-          // Variant inventory tracked separately; parent product.costPrice still holds the WAC.
+          // A variant line: stock AND cost land on the VARIANT. The merchant
+          // prices cost per variant, and checkout snapshots
+          // `variant.costPrice ?? product.costPrice` onto the order line — a
+          // weighted average written only to the parent never reached a sold
+          // variant that has its own cost, and averaged unrelated variants
+          // together for one that does not.
+          const variant = await tx.productVariant.findFirst({
+            where: {
+              id: item.variantId,
+              productId: item.productId,
+              product: { storeId: input.storeId },
+            },
+            select: { inventory: true, costPrice: true },
+          });
+          if (!variant) throw new Error(`Variant ${item.variantId} not found in store`);
+
+          // WAC over THIS variant's own on-hand (floored at 0 — variant rows
+          // never go negative, see docs/architecture/inventory-model.md).
+          // First receive with no cost on the variant starts from the
+          // parent's cost when it has one, else from this receipt's cost.
+          const vOldStock = Math.max(variant.inventory, 0);
+          const vOldCost = variant.costPrice ?? product.costPrice ?? item.unitCost;
+          const vDenom = vOldStock + remainingToProcess;
+          const vNewCost =
+            vDenom > 0
+              ? Math.round((vOldStock * vOldCost + remainingToProcess * item.unitCost) / vDenom)
+              : item.unitCost;
+
           const vRes = await tx.productVariant.updateMany({
             where: { id: item.variantId, product: { storeId: input.storeId } },
-            data: { inventory: { increment: remainingToProcess } },
+            data: { inventory: { increment: remainingToProcess }, costPrice: vNewCost },
           });
           if (vRes.count !== 1) throw new Error(`Variant ${item.variantId} not found in store`);
+
+          // The parent keeps no stock for a variant product; only stamp when
+          // its cost basis last moved. Its own costPrice is left alone — it
+          // is the fallback for variants that have none, not their average.
+          const pRes = await tx.product.updateMany({
+            where: { id: item.productId, storeId: input.storeId },
+            data: { lastCostUpdateAt: new Date() },
+          });
+          if (pRes.count !== 1) throw new Error(`Product ${item.productId} not found in store`);
+        } else {
+          // WAC formula: treat negative on-hand as 0 (backorder demand was consumed
+          // in the FIFO clearance phase above; only pre-existing positive stock counts).
+          const oldStock = Math.max(onHandBefore, 0);
+          const oldCost = product.costPrice ?? item.unitCost; // first-receive fallback
+          const denom = oldStock + remainingToProcess;
+          const newCost =
+            denom > 0
+              ? Math.round((oldStock * oldCost + remainingToProcess * item.unitCost) / denom)
+              : item.unitCost;
+
+          const pRes = await tx.product.updateMany({
+            where: { id: item.productId, storeId: input.storeId },
+            data: {
+              inventory: onHandBefore + remainingToProcess,
+              costPrice: newCost,
+              lastCostUpdateAt: new Date(),
+            },
+          });
+          if (pRes.count !== 1) throw new Error(`Product ${item.productId} not found in store`);
         }
-
-        // WAC formula: treat negative on-hand as 0 (backorder demand was consumed
-        // in the FIFO clearance phase above; only pre-existing positive stock counts).
-        const oldStock = Math.max(onHandBefore, 0);
-        const oldCost = product.costPrice ?? item.unitCost; // first-receive fallback
         const newStock = onHandBefore + remainingToProcess;
-        const denom = oldStock + remainingToProcess;
-        const newCost =
-          denom > 0
-            ? Math.round((oldStock * oldCost + remainingToProcess * item.unitCost) / denom)
-            : item.unitCost;
-
-        // Cost always lands on the parent (the WAC is product-level). Stock
-        // lands on the parent ONLY for a variant-less line — the variant
-        // increment above already moved it otherwise. Writing both was the
-        // receive-side half of the parent-column drift.
-        const pRes = await tx.product.updateMany({
-          where: { id: item.productId, storeId: input.storeId },
-          data: {
-            ...(item.variantId ? {} : { inventory: newStock }),
-            costPrice: newCost,
-            lastCostUpdateAt: new Date(),
-          },
-        });
-        if (pRes.count !== 1) throw new Error(`Product ${item.productId} not found in store`);
 
         // InventoryHistory row (existing FWB pattern)
         await tx.inventoryHistory.create({

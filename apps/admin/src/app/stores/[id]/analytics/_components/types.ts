@@ -7,9 +7,16 @@ export interface DashboardStats {
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
-  /** Sum of (price - costPrice) * qty across order items in the window. */
-  totalProfit: number;
-  profitChange: number;
+  /**
+   * Sum of (price - costPrice) * qty over the window's order lines that have a
+   * cost. `null` = lines were sold but none has a cost (profit unknown).
+   */
+  totalProfit: number | null;
+  /** Sold lines with no cost price — excluded from totalProfit. */
+  profitItemsMissingCost?: number;
+  /** Revenue (fils) of those lines. */
+  profitRevenueMissingCost?: number;
+  profitChange: number | null;
 }
 
 export interface SalesData {

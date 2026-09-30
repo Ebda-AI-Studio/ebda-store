@@ -97,8 +97,18 @@ Consequences worth stating explicitly:
   variant line its `previousStock`/`newStock` therefore describe the
   **variant's** movement. That is the movement that actually happened; do not
   reach for the parent column to make the ledger "product-level".
-- **Weighted average cost is product-level** and still lands on the parent, but
-  its on-hand term must be variant-aware — see `purchase-order.service.ts`.
+- **Cost follows the row that holds the stock** (2026-09-30). A PO receive for
+  a variant line writes the weighted average cost to the VARIANT, averaged over
+  that variant's own on-hand; a variant-less line writes it to the product.
+  The parent's `costPrice` on a variant product is only the fallback for a
+  variant with no cost of its own — see `purchase-order.service.ts`.
+- **Reading cost** uses the same rule everywhere: `variant.costPrice ??
+product.costPrice`. Order lines snapshot it at sale time
+  (`lib/order-line-cost.ts` — checkout, bundle components, admin manual
+  orders), and stock VALUE in SQL uses `STOCK_VALUE_SQL`
+  (`lib/effective-inventory-sql.ts`: active variants only, each at its own
+  cost) — the finance dashboard, the analytics inventory snapshot and the
+  inventory page. `null` cost means unknown, never 0.
 - **A product-scoped write aimed at a variant product must fail loud.**
   `InventoryService.adjustInventory` / `bulkAdjustInventory` return a 400
   (`VARIANT_PRODUCT`) rather than writing a column that moves no stock. The

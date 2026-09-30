@@ -1,5 +1,6 @@
 import { prisma, Prisma } from '@force/database';
-import { ON_HAND_SQL } from '../lib/effective-inventory-sql';
+import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
+import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
 
@@ -56,24 +57,40 @@ interface DateRange {
 interface DashboardStats {
   totalRevenue: number;
   totalOrders: number;
-  /** Distinct customers who ordered within the selected period. */
+  /**
+   * Distinct customers who ordered within the selected period, keyed exactly
+   * like the Customers page (registered user, else shipping email, else
+   * shipping phone — `lib/customer-key.ts`), so guest buyers count.
+   */
   totalCustomers: number;
-  /** Cumulative distinct customers across all time (period-independent). */
+  /** Cumulative distinct customers across all time (period-independent), same key. */
   allTimeCustomers: number;
   totalProducts: number;
   averageOrderValue: number;
-  conversionRate: number;
+  /**
+   * Orders completed per product view over the period, as a percentage, from
+   * the nightly `funnel_snapshots` rollup (`conversionRateBasis`). `null` when
+   * the period has no snapshot rows or no recorded views — unknown, never 0.
+   */
+  conversionRate: number | null;
+  conversionRateBasis: 'orders_per_product_view';
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
   /**
-   * Sum of (price - costPrice) * quantity across all order items in the
-   * window, where the order isn't cancelled/refunded and the item has a
-   * cost snapshot. Items without a cost snapshot are skipped from this
-   * total — they pre-date the cost-tracking feature.
+   * Sum of (price - costPrice) * quantity over the period's order lines that
+   * carry a cost snapshot (orders not cancelled/refunded). `null` when lines
+   * were sold but NONE of them has a cost — profit is unknown, not 0. When
+   * only some lines lack cost the figure covers the costed lines only and
+   * `profitItemsMissingCost` > 0 says so.
    */
-  totalProfit: number;
-  profitChange: number;
+  totalProfit: number | null;
+  /** Order lines in the period whose cost is missing (excluded from `totalProfit`). */
+  profitItemsMissingCost: number;
+  /** Revenue (fils) of those lines — the sales `totalProfit` does not cover. */
+  profitRevenueMissingCost: number;
+  /** `null` when either period's profit is unknown or incomplete. */
+  profitChange: number | null;
 }
 
 interface SalesData {
@@ -146,29 +163,19 @@ export class AnalyticsService {
     const prevEndDate = new Date(startDate.getTime() - 1);
 
     // Current period stats
-    const [currentStats, prevStats, totalCustomers, totalProducts, customerCount] =
+    const [currentStats, prevStats, totalCustomers, totalProducts, conversionRate] =
       await Promise.all([
         this.getPeriodStats(storeId, startDate, endDate),
         this.getPeriodStats(storeId, prevStartDate, prevEndDate),
-        prisma.user.count({
-          where: {
-            orders: { some: { storeId } },
-          },
-        }),
+        this.countDistinctCustomers(storeId),
         prisma.product.count({
           where: { storeId, status: 'active' },
         }),
-        prisma.user.count({
-          where: {
-            orders: {
-              some: {
-                storeId,
-                createdAt: { gte: startDate, lte: endDate },
-              },
-            },
-          },
-        }),
+        this.getViewsConversionRate(storeId, startDate, endDate),
       ]);
+    // Same population on both sides of customersChange (it compared users of
+    // ANY order status against order groups that excluded cancelled/refunded).
+    const customerCount = currentStats.customers;
 
     // Calculate changes
     const revenueChange =
@@ -192,10 +199,18 @@ export class AnalyticsService {
           ? 100
           : 0;
 
-    const profitChange =
-      prevStats.profit > 0
-        ? ((currentStats.profit - prevStats.profit) / prevStats.profit) * 100
-        : currentStats.profit > 0
+    // A change is only meaningful between two COMPLETE profit figures — a
+    // period whose lines lack cost would read as a fake drop or jump.
+    const profitComparable =
+      currentStats.profit !== null &&
+      prevStats.profit !== null &&
+      currentStats.itemsMissingCost === 0 &&
+      prevStats.itemsMissingCost === 0;
+    const profitChange = !profitComparable
+      ? null
+      : prevStats.profit! > 0
+        ? ((currentStats.profit! - prevStats.profit!) / prevStats.profit!) * 100
+        : currentStats.profit! > 0
           ? 100
           : 0;
 
@@ -211,13 +226,64 @@ export class AnalyticsService {
       allTimeCustomers: totalCustomers,
       totalProducts,
       averageOrderValue: currentStats.orders > 0 ? currentStats.revenue / currentStats.orders : 0,
-      conversionRate: 0, // Would need session tracking
+      conversionRate,
+      conversionRateBasis: 'orders_per_product_view',
       revenueChange: Math.round(revenueChange * 10) / 10,
       ordersChange: Math.round(ordersChange * 10) / 10,
       customersChange: Math.round(customersChange * 10) / 10,
       totalProfit: currentStats.profit,
-      profitChange: Math.round(profitChange * 10) / 10,
+      profitItemsMissingCost: currentStats.itemsMissingCost,
+      profitRevenueMissingCost: currentStats.revenueMissingCost,
+      profitChange: profitChange === null ? null : Math.round(profitChange * 10) / 10,
     };
+  }
+
+  /**
+   * Distinct customers with a (non-deleted) order in the store — optionally
+   * only orders created in [startDate, endDate] — keyed exactly like the
+   * Customers page (`CUSTOMER_KEY_SQL`, the SQL twin of `customerKeyOf`).
+   * Every order status counts, as the list's rows do; the page's `buyers`
+   * KPI (non-cancelled/refunded) and its zero-order registered rows are
+   * intentionally different measures — docs/RULINGS.md.
+   */
+  static async countDistinctCustomers(
+    storeId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<number> {
+    const windowSql =
+      startDate && endDate
+        ? Prisma.sql`AND o.created_at >= ${startDate} AND o.created_at <= ${endDate}`
+        : Prisma.empty;
+    const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT COUNT(DISTINCT ${CUSTOMER_KEY_SQL})::bigint AS n
+      FROM public.orders o
+      WHERE o.store_id = ${storeId}
+        AND o.deleted_at IS NULL
+        ${windowSql}
+    `;
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  /**
+   * Views-based conversion for the period: SUM(orders_completed) /
+   * SUM(product_views) × 100 from the nightly `funnel_snapshots` rollup,
+   * rounded to 2 dp. `null` (unknown) when no snapshot rows fall in the
+   * window or none recorded a view — never a fabricated 0.
+   */
+  static async getViewsConversionRate(
+    storeId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<number | null> {
+    const agg = await prisma.funnelSnapshot.aggregate({
+      where: { storeId, periodDate: { gte: startDate, lte: endDate } },
+      _sum: { productViews: true, ordersCompleted: true },
+    });
+    const views = agg._sum.productViews ?? 0;
+    if (views <= 0) return null;
+    const orders = agg._sum.ordersCompleted ?? 0;
+    return Math.round((orders / views) * 10000) / 100;
   }
 
   private static async getPeriodStats(storeId: string, startDate: Date, endDate: Date) {
@@ -233,40 +299,59 @@ export class AnalyticsService {
     };
 
     // Use aggregate for revenue and order count — avoids loading all rows into JS
-    const [aggregate, customerGroups, profitRows] = await Promise.all([
+    const [aggregate, customerCount, profitRows] = await Promise.all([
       prisma.order.aggregate({
         where,
         _sum: { total: true },
         _count: { id: true },
       }),
-      // Count distinct customers by grouping on customerId
-      prisma.order.groupBy({
-        by: ['customerId'],
-        where,
-      }),
-      // Profit per item: (price - costPrice) * quantity. We compute it in
-      // the database for consistency with the order-aggregate above and
-      // to avoid loading every line item into Node memory.
-      prisma.$queryRaw<Array<{ profit: bigint | null }>>`
-        SELECT COALESCE(SUM((oi.price - COALESCE(oi.cost_price, 0)) * oi.quantity), 0)::bigint AS profit
+      // Distinct customers who ordered in the window, keyed like the
+      // Customers page (guests included, every order status, as that page
+      // counts them) — see lib/customer-key.ts.
+      this.countDistinctCustomers(storeId, startDate, endDate),
+      // Profit per item: (price - costPrice) * quantity, over the lines that
+      // HAVE a cost snapshot — plus a count and the revenue of the lines that
+      // do not, so a store with no cost prices reads "profit unknown" rather
+      // than a false 0. Computed in the database for consistency with the
+      // order-aggregate above and to avoid loading every line into memory.
+      prisma.$queryRaw<
+        Array<{
+          profit: bigint | null;
+          costed_lines: bigint;
+          missing_lines: bigint;
+          missing_revenue: bigint | null;
+        }>
+      >`
+        SELECT
+          SUM((oi.price - oi.cost_price) * oi.quantity)
+            FILTER (WHERE oi.cost_price IS NOT NULL)::bigint AS profit,
+          COUNT(*) FILTER (WHERE oi.cost_price IS NOT NULL)::bigint AS costed_lines,
+          COUNT(*) FILTER (WHERE oi.cost_price IS NULL)::bigint AS missing_lines,
+          SUM(oi.price * oi.quantity) FILTER (WHERE oi.cost_price IS NULL)::bigint AS missing_revenue
         FROM public.order_items oi
         JOIN public.orders o ON o.id = oi.order_id
         WHERE o.store_id = ${storeId}
+          AND o.deleted_at IS NULL
           AND o.created_at >= ${startDate}
           AND o.created_at <= ${endDate}
           AND o.status NOT IN ('cancelled', 'refunded')
-          AND oi.cost_price IS NOT NULL
       `,
     ]);
 
-    const profitBig = profitRows[0]?.profit ?? null;
-    const profit = profitBig === null ? 0 : Number(profitBig);
+    const p = profitRows[0];
+    const costedLines = Number(p?.costed_lines ?? 0);
+    const itemsMissingCost = Number(p?.missing_lines ?? 0);
+    // Unknown only when something was sold and none of it has a cost; a
+    // period with no lines at all genuinely made 0 profit.
+    const profit = costedLines === 0 ? (itemsMissingCost > 0 ? null : 0) : Number(p?.profit ?? 0);
 
     return {
       revenue: aggregate._sum.total ?? 0,
       orders: aggregate._count.id,
-      customers: customerGroups.length,
+      customers: customerCount,
       profit,
+      itemsMissingCost,
+      revenueMissingCost: Number(p?.missing_revenue ?? 0),
     };
   }
 
@@ -747,20 +832,20 @@ export class AnalyticsService {
    */
   static async stockSnapshot(storeId: string) {
     const [valueRow, backorderRow, rulesCount] = await Promise.all([
-      // Variant-aware quantity — see the same fix in finance.routes.ts and
-      // lib/effective-inventory-sql.ts. (Per-variant costPrice is not used
-      // here, matching this query's existing product-level cost simplification;
-      // accounting's inventoryValue in account.service.ts is the precise one.)
+      // Variant-aware quantity AND cost (a variant at its own cost, falling
+      // back to the parent's) — STOCK_VALUE_SQL, shared with the finance
+      // dashboard's stock value.
       prisma.$queryRaw<{ total: bigint }[]>`
-        SELECT COALESCE(SUM(${ON_HAND_SQL} * COALESCE(p.cost_price, 0)), 0) AS total
+        SELECT COALESCE(SUM(${STOCK_VALUE_SQL}), 0) AS total
         FROM public.products p WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL
       `,
       prisma.$queryRaw<{ count: bigint; value: bigint }[]>`
         SELECT
           COUNT(*) AS count,
-          COALESCE(SUM(bl.qty * COALESCE(p.cost_price, 0)), 0) AS value
+          COALESCE(SUM(bl.qty * COALESCE(pv.cost_price, p.cost_price, 0)), 0) AS value
         FROM public.backorder_lines bl
         JOIN public.products p ON p.id = bl.product_id
+        LEFT JOIN public.product_variants pv ON pv.id = bl.variant_id
         WHERE bl.store_id = ${storeId}
           AND bl.fulfilled_at IS NULL
           AND bl.cancelled_at IS NULL
@@ -787,7 +872,10 @@ export class AnalyticsService {
       JOIN public.journal_entries e ON e.id = l.entry_id
       JOIN public.accounts a       ON a.id = l.account_id
       WHERE e.store_id = ${storeId}
-        AND e.status = 'posted'
+        -- 'reversed' too: a refund flips the ORIGINAL to 'reversed' and posts
+        -- the mirror as 'posted'. Counting only 'posted' kept the mirror and
+        -- dropped the original, subtracting every refund twice.
+        AND e.status IN ('posted', 'reversed')
         AND e.posted_at BETWEEN ${from} AND ${to}
         AND a.code IN ('1000','1010','1020','1030')
       GROUP BY DATE_TRUNC('day', e.posted_at)

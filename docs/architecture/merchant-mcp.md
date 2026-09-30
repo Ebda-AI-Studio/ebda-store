@@ -145,6 +145,14 @@ There is no settlement data to expose: no gateway-settlement model exists
 `payments` as payouts would be inventing a concept; a real settlement tool
 needs a MyFatoorah/Tap settlement import first (Ruling MCP-R3).
 
+`admin_get_analytics` returns `AnalyticsService.getDashboardStats` verbatim, so
+its semantics are the dashboard's (2026-09-30): customers are counted with the
+Customers page's key (registered user → shipping email → phone, guests
+included — `lib/customer-key.ts`); `totalProfit` is `null` when sold lines have
+no cost price and `profitItemsMissingCost` says how many lines a partial figure
+excludes; `conversionRate` is orders per product view (%) from
+`funnel_snapshots`, or `null` when no views were recorded — never a fabricated 0.
+
 Phases 2 and 3 (writes, then destructive ops with a `confirm_token` two-step)
 land as separate registrars — see
 `docs/superpowers/specs/2026-09-11-mcp-merchant-admin-design.md`.

@@ -38,6 +38,7 @@ export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
  * Returns silently if:
  *   - Order not found (logged as warn)
  *   - Order.paymentStatus is not 'paid' (logged as info)
+ *   - Order is already cancelled/refunded (logged as warn — no sale to book)
  *   - Order.store.accountingEnabled is false (logged as info)
  *   - Order.walletAmount > 0 (logged as warn — Ruling W-3, see below)
  *   - Order.store has no seeded COA — postEntry throws via getSystemAccountIdByCode
@@ -69,6 +70,22 @@ export async function postOrderPaymentJournal(args: {
     logger.info(
       { orderId, paymentStatus: order.paymentStatus },
       'postOrderPaymentJournal: skipping non-paid order'
+    );
+    return;
+  }
+  // An order that is ALREADY cancelled or refunded must not get a sale entry.
+  // The refund reversal (postRefundJournal) reverses whatever sale entry
+  // exists WHEN it runs; a sale posted after it has nothing left to reverse
+  // it, and books revenue for money that was handed back. Production had one:
+  // an order refunded by status in May (paymentStatus left at 'paid') was
+  // re-swept by the 2026-07-09 order-created stuck sweep, whose fanout posted
+  // its sale — revenue with no reversal (wady-aljuz, JE-2026-000018). A
+  // cancelled order that captured money is refunded on cancel the same way,
+  // so both statuses mean "no sale to book".
+  if (order.status === 'cancelled' || order.status === 'refunded') {
+    logger.warn(
+      { orderId, storeId: order.storeId, status: order.status },
+      'postOrderPaymentJournal: order already cancelled/refunded — sale NOT posted'
     );
     return;
   }

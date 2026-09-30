@@ -2022,7 +2022,11 @@
       "totalOrders": "Total Orders",
       "totalCustomers": "Total Customers",
       "avgOrderValue": "Avg Order Value",
-      "vsLastPeriod": "vs last period"
+      "vsLastPeriod": "vs last period",
+      "profitUnknown": "Unknown",
+      "profitMissingCost": "Profit unknown — cost price missing on {count} sold items",
+      "profitPartial": "Excludes {count} sold items with no cost price ({amount} in sales)",
+      "addCostPrices": "Add cost prices to see profit →"
     },
     "chart": {
       "title": "Sales Overview",
@@ -5939,7 +5943,10 @@
         "totalLiabilities": "Total Liabilities",
         "equity": "Equity",
         "totalEquity": "Total Equity",
-        "balanced": "Balance sheet verified — Assets = Liabilities + Equity"
+        "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} KWD — Assets ≠ Liabilities + Equity",
+        "currentEarnings": "Retained & current earnings",
+        "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },
       "taxReport": {
         "date": "Date",

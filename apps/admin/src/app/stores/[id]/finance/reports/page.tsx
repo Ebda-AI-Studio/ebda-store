@@ -33,7 +33,13 @@ interface PnlData {
 }
 
 interface BalanceSheetSection {
-  accounts: { code: string; nameEn: string; balance: number }[];
+  accounts: {
+    code: string;
+    nameEn: string;
+    balance: number;
+    /** The computed retained + current earnings row — not a COA account. */
+    kind?: 'current_earnings';
+  }[];
   total: number;
 }
 
@@ -498,10 +504,18 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
     rows.push([tbs('totalLiabilities'), '', kwd(data.liabilities.total)]);
     rows.push([]);
     rows.push([tbs('equity'), '', '']);
-    data.equity.accounts.forEach(a => rows.push([a.code, a.nameEn, kwd(a.balance)]));
+    data.equity.accounts.forEach(a => rows.push([a.code, accountLabel(a), kwd(a.balance)]));
     rows.push([tbs('totalEquity'), '', kwd(data.equity.total)]);
     downloadCsv(`balance-sheet-${asOf}.csv`, rows);
   }
+
+  // The earnings row is computed (the ledger has no closing entries), so it
+  // is labelled from i18n rather than from a COA account name.
+  function accountLabel(a: BalanceSheetSection['accounts'][number]): string {
+    return a.kind === 'current_earnings' ? tbs('currentEarnings') : a.nameEn;
+  }
+
+  const difference = data ? data.assets.total - (data.liabilities.total + data.equity.total) : 0;
 
   function renderSection(label: string, section: BalanceSheetSection, totalLabel: string) {
     return (
@@ -515,7 +529,14 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
                   <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
                     {a.code}
                   </td>
-                  <td className="px-3 py-2">{a.nameEn}</td>
+                  <td className="px-3 py-2">
+                    {accountLabel(a)}
+                    {a.kind === 'current_earnings' && (
+                      <span className="block text-xs text-muted-foreground">
+                        {tbs('currentEarningsHint')}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-end font-mono">{kwd(a.balance)} KWD</td>
                 </tr>
               ))}
@@ -586,7 +607,13 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
           {renderSection(tbs('assets'), data.assets, tbs('totalAssets'))}
           {renderSection(tbs('liabilities'), data.liabilities, tbs('totalLiabilities'))}
           {renderSection(tbs('equity'), data.equity, tbs('totalEquity'))}
-          {balanced && <p className="text-sm text-green-700">{tbs('balanced')}</p>}
+          {balanced ? (
+            <p className="text-sm text-green-700">{tbs('balanced')}</p>
+          ) : (
+            <p className="text-sm text-red-600">
+              {tbs('unbalanced', { amount: kwd(Math.abs(difference)) })}
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -33,6 +33,7 @@ import {
   invalidateCustomersCache,
 } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { lineUnitCost } from '../lib/order-line-cost';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -358,6 +359,13 @@ export class OrderService {
     //   "delete product" button sets `deletedAt`), so a soft-deleted product
     //   still resolved here, passed the guard, and was ordered — with an
     //   inventory decrement against a row the storefront no longer sells.
+    // The variants the cart actually holds, for their COST: a variant product's
+    // cost is entered per variant (SimpleVariantsForm), so snapshotting only
+    // the parent's `costPrice` left every variant line without a cost — no
+    // COGS journal, profit reported as 0.
+    const cartVariantIds = cart.items
+      .map(i => (i as { variantId?: string | null }).variantId)
+      .filter((v): v is string => !!v);
     const productInternals = await prisma.product.findMany({
       where: {
         id: { in: cart.items.map(i => i.productId) },
@@ -369,6 +377,10 @@ export class OrderService {
         trackInventory: true,
         costPrice: true,
         categories: { select: { categoryId: true } },
+        variants: {
+          where: { id: { in: cartVariantIds } },
+          select: { id: true, costPrice: true },
+        },
       },
     });
     const productInternalsById = new Map(productInternals.map(p => [p.id, p]));
@@ -454,6 +466,8 @@ export class OrderService {
               variantId: true,
               quantity: true,
               product: { select: { name: true, sku: true, costPrice: true, trackInventory: true } },
+              // The component variant's own cost — see lineUnitCost.
+              variant: { select: { costPrice: true } },
             },
           })
         : [];
@@ -866,7 +880,7 @@ export class OrderService {
               variantId: bi.variantId,
               productName: bi.product.name,
               sku: bi.product.sku,
-              costPrice: bi.product.costPrice,
+              costPrice: bi.variant?.costPrice ?? bi.product.costPrice ?? null,
               trackInventory: bi.product.trackInventory,
               quantity: bi.quantity,
               price: line.unitAllocated,
@@ -1174,7 +1188,13 @@ export class OrderService {
                 price: cartLineUnitPrice(item),
                 // Snapshot cost-of-goods at sale time so profit reports
                 // stay correct even if the product's cost changes later.
-                costPrice: productInternalsById.get(item.productId)?.costPrice ?? null,
+                // A variant line takes the variant's own cost, falling back
+                // to the parent product's (same rule as account.service's
+                // inventory valuation and lib/order-line-cost.ts).
+                costPrice: lineUnitCost(
+                  productInternalsById.get(item.productId),
+                  (item as { variantId?: string | null }).variantId
+                ),
                 total: cartLineUnitPrice(item) * item.quantity,
               })),
               // Every bundle box's components, appended to the SAME array the
@@ -1920,23 +1940,41 @@ export class OrderService {
       });
     }
 
-    // Let a failed enqueue propagate — every call site already handles
-    // applyRefundEffects failures (catch-and-log, or a deliberate
-    // let-it-propagate for Inngest-step retry semantics). Swallowing it
-    // here would silently drop the ONLY signal that fires the reversals
-    // (inventory/coupon/affiliate/loyalty/backorder), which is exactly the
-    // silent money-loss failure mode this redesign removes.
-    await inngest.send({
-      name: 'order/refunded',
-      data: {
-        orderId,
-        storeId,
-        restoreInventory,
-        notify,
-        partial: options.partial,
-        reverseWallet: options.reverseWallet ?? true,
-      },
-    });
+    // The event is sent only AFTER the caller's request transaction commits
+    // (`deferAfterTenantCommit`); a rolled-back request drops it.
+    //
+    // Sending it inline, before COMMIT, let a status change that then rolled
+    // back still reverse the ledger and restore stock: production has a
+    // delivered + paid order whose sale entry was reversed "refund applied"
+    // while the order itself never left `delivered` (wady-aljuz, order
+    // ORD-1781512189610-9972A710, 2026-07-09 — the 30s request transaction
+    // timed out, the status flip rolled back, the reversal had already
+    // committed and the event had already been sent). The `order/refunded`
+    // consumers — including the GL reversal — cannot tell a committed refund
+    // from an uncommitted one, so the event must not exist until the refund
+    // does.
+    //
+    // Outside a request (Inngest steps such as the payment-webhook refund
+    // path, crons, scripts) there is no transaction to wait for: the send
+    // runs inline and a failed enqueue still PROPAGATES, keeping the
+    // let-it-throw retry semantics those callers rely on. Inside a request a
+    // post-commit enqueue failure is alerted loudly by deferAfterTenantCommit,
+    // and for a whole-order reversal the `refundReversalRequestedAt` stamp
+    // written above (in the same transaction) lets
+    // refund-reversal-stuck-sweep re-send it.
+    await deferAfterTenantCommit('order.applyRefundEffects.sendOrderRefunded', () =>
+      inngest.send({
+        name: 'order/refunded',
+        data: {
+          orderId,
+          storeId,
+          restoreInventory,
+          notify,
+          partial: options.partial,
+          reverseWallet: options.reverseWallet ?? true,
+        },
+      })
+    );
   }
 
   static async getCustomerOrders(
@@ -2085,6 +2123,9 @@ export class OrderService {
         variantId: it.variantId,
         variantTitle,
         unitPrice,
+        // Admin manual orders never snapshotted cost at all, so every line
+        // they created had no COGS and no profit. Same rule as checkout.
+        costPrice: lineUnitCost(product, it.variantId),
         quantity,
         lineTotal,
       };
@@ -2269,8 +2310,13 @@ export class OrderService {
               productName: r.productName,
               sku: r.sku,
               variantId: r.variantId,
-              variantTitle: r.variantTitle,
+              // OrderItem's column is `variantName`. Writing `variantTitle`
+              // (no such field) made Prisma reject the whole create, so every
+              // admin manual order with a variant line failed since the
+              // phone-order MVP (2ba38332) — found by the cost-snapshot test.
+              variantName: r.variantTitle,
               price: r.unitPrice,
+              costPrice: r.costPrice,
               quantity: r.quantity,
               total: r.lineTotal,
             })),

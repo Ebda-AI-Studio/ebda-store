@@ -368,7 +368,11 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
       description:
         'Dashboard figures for this store: revenue, order count, average order ' +
         'value, top products, and low-stock items. The numbers behind the admin ' +
-        'dashboard, without opening it.',
+        'dashboard, without opening it. Customers are counted like the Customers ' +
+        'page (registered user, else shipping email, else phone — guests count). ' +
+        'totalProfit is null when sold lines have no cost price (unknown, not 0); ' +
+        'profitItemsMissingCost says how many lines it excludes. conversionRate is ' +
+        'orders per product view (%) or null when no views were recorded.',
       inputSchema: {
         from: z.string().optional().describe('ISO date; defaults to the service default window'),
         to: z.string().optional(),

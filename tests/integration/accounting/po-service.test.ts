@@ -81,3 +81,59 @@ describe('PO receive — WAC recompute', () => {
     expect(product?.lastCostUpdateAt).not.toBeNull();
   });
 });
+
+describe('PO receive — a variant line writes its cost to the VARIANT', () => {
+  it('weighted-averages against the variant own stock + cost and leaves the parent cost alone', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const vp = await prisma.product.create({
+      data: {
+        storeId,
+        name: 'Variant WAC Test',
+        slug: `variant-wac-${suffix}`,
+        price: 5000,
+        costPrice: 3000, // parent: only the fallback for variants with no cost
+        inventory: 0,
+        hasVariants: true,
+        status: 'active',
+        variants: {
+          create: [
+            { title: 'Costed', costPrice: 1000, inventory: 10 },
+            { title: 'Uncosted', costPrice: null, inventory: 0 },
+          ],
+        },
+      },
+      include: { variants: true },
+    });
+    const costed = vp.variants.find(v => v.title === 'Costed')!;
+    const uncosted = vp.variants.find(v => v.title === 'Uncosted')!;
+
+    const po = await createPurchaseOrder({
+      storeId,
+      supplierId,
+      items: [
+        { productId: vp.id, variantId: costed.id, qty: 10, unitCost: 2000 },
+        { productId: vp.id, variantId: uncosted.id, qty: 5, unitCost: 4000 },
+      ],
+    });
+    await receivePurchaseOrder({
+      storeId,
+      poId: po.id,
+      receipts: po.items.map(i => ({ poItemId: i.id, qtyReceived: i.qty })),
+    });
+
+    const after = await prisma.productVariant.findMany({ where: { productId: vp.id } });
+    const a = after.find(v => v.id === costed.id)!;
+    const b = after.find(v => v.id === uncosted.id)!;
+    // (10 × 1000 + 10 × 2000) / 20
+    expect(a.costPrice).toBe(1500);
+    expect(a.inventory).toBe(20);
+    // No stock and no cost of its own → this receipt's cost.
+    expect(b.costPrice).toBe(4000);
+    expect(b.inventory).toBe(5);
+
+    const parent = await prisma.product.findUniqueOrThrow({ where: { id: vp.id } });
+    expect(parent.costPrice).toBe(3000);
+    expect(parent.inventory).toBe(0);
+    expect(parent.lastCostUpdateAt).not.toBeNull();
+  });
+});

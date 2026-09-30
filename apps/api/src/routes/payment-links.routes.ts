@@ -307,7 +307,8 @@ router.post(
                 price: p.price,
                 total: p.price * it.quantity,
                 sku: p.sku || null,
-                costPrice: p.costPrice || null,
+                // `??`, not `||`: a genuine 0 cost is a known cost.
+                costPrice: p.costPrice ?? null,
               };
             }),
           },
