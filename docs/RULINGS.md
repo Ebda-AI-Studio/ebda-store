@@ -3210,7 +3210,7 @@ Context: 49 `audit-followup` P2 findings on the storefront (`apps/web`) and the 
 ### Cluster A — auth/session (orders, admin, storefront)
 
 **Ruling EWO-A1 — issues 2096 / 2161 / 2165: the admin + orders session check reports five outcomes, and
-only `signed-out` changes state.** `checkSession` now returns `unavailable` for a non-401, non-429
+only `signed-out` changes state.** _(Amended by Ruling YWA-2: an API-bodied 404 on `/auth/me` is `signed-out`.)_ `checkSession` now returns `unavailable` for a non-401, non-429
 answer on `/auth/me` (5xx during a deploy, a mis-routed 404) and `throttled` for a 429 there (so the
 mount ladder retries it); `checkAuth` leaves `user` untouched on both. A module-level session
 generation, bumped by every `storeSession` (login/MFA) and every logout, is re-checked before each
@@ -4154,3 +4154,43 @@ old-shape entry read by the new reader would blank the bundles page or drop the 
 truncation notices until the TTL ran out. `withinSaleWindow` also treats an absent bound as
 unbounded (`== null`). The Next data cache and the CF edge hold API RESPONSES, whose shape is
 unchanged, so they need no bump. Cost if wrong: one cache miss per store at deploy.
+
+## Backlog batch y-web-admin (2026-10-01)
+
+**Ruling YWA-1: the tinted-pill gate measures resolved pairs per theme. Bare role text on a plain
+surface and `hover:` tints stay outside it (issues 2313 / 2322 / 2323, follow-up issue 2332).**
+`tests/unit/admin-tint-ink-contrast.test.ts` now works out, for each class string, which tint
+alpha (up to 40%) and which text class apply in light and in `dark:`. It then measures that pair
+from globals.css. It also bans two spellings that the check could not see or that Tailwind 3
+silently drops: arbitrary-value role colours (`bg-[hsl(var(--success))]/10`) and off-scale or
+double opacity modifiers (`/30/30`, `/8`). The compiled probe emitted no rule for either
+`bg-destructive/30/30` or `bg-primary/8`. As a result, the sidebar's active item
+(`bg-primary/8 text-primary`) had no tint at all, and it now renders `bg-primary/10
+text-primary-ink`. The gate does not measure two shapes:
+
+- `text-<role>` on a plain surface: 243 uses, measured on white at success 3.05, warning 1.80,
+  info 3.81 and destructive 4.38 to 1.
+- `hover:bg-<role>/N` under bare text: 66 strings.
+
+Converting those changes the resting look of most admin screens, not just the pills. Issue 2332
+tracks them. The storefront has the same shapes and is excluded, because storefront visual changes
+need owner sign-off. Cost if wrong: warning-coloured admin text stays at 1.8:1 until issue 2332
+lands.
+
+**Ruling YWA-2: amends EWO-A1. A 404 from `/auth/me` carrying the API's own
+`{ error: { code: 'NOT_FOUND' } }` body is `signed-out` (issue 2283).**
+`authenticate` lets a validly-signed token through when its user row is gone (tokenVersion
+falls back to 0 and `blocked` to false), so `AuthService.getProfile` is what answers, with 404. Admin and orders now clear the stored session on that answer, on the first read and on the
+post-refresh retry. A 404 without the API envelope, such as an edge or platform page, is still
+`unavailable`. That preserves EWO-A1's "mis-routed 404" case, and a test pins it. Cost if wrong:
+if the API ever loses the `/auth/me` route itself, its catch-all also answers `NOT_FOUND`, and
+every admin/orders session would sign out instead of waiting. That is a deploy that has already
+broken login.
+
+**Ruling YWA-3: the iOS "no stored refresh token" bail-out yields to session evidence (issue
+2320).** The `staleRefreshToken` heal drops the stored pair and continues on the rotated cookie.
+The bail-out then returned `null` on the next expiry and signed a live session out. Admin and
+orders now bail only when there is no stored token AND no `hasSessionEvidence()`, and the heal
+records evidence. A signed-out iOS client still skips the call, because `clearStoredSession()`
+removes the evidence. Cost if wrong: an iOS client whose cookie also died spends one `/auth/refresh`
+(400), then signs out as before.

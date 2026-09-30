@@ -54,7 +54,7 @@ function StatCard({
                 className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
                   isPositive
                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                    : 'bg-destructive/5 text-destructive-ink dark:bg-destructive/30/20 dark:text-destructive'
+                    : 'bg-destructive/5 text-destructive-ink dark:bg-destructive/20 dark:text-destructive-ink'
                 }`}
               >
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

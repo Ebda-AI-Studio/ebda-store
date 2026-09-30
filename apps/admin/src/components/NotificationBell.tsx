@@ -17,13 +17,13 @@ const iconMap: Record<string, string> = {
 };
 
 const colorMap: Record<string, string> = {
-  new_order: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success',
-  new_review: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning',
-  new_return: 'bg-primary/10 text-primary-ink dark:bg-primary/30 dark:text-primary',
+  new_order: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink',
+  new_review: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink',
+  new_return: 'bg-primary/10 text-primary-ink dark:bg-primary/30 dark:text-primary-ink',
   low_stock:
-    'bg-destructive/10 text-destructive-ink dark:bg-destructive/30/30 dark:text-destructive',
-  order_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
-  return_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
+    'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
+  order_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
+  return_status: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
 };
 
 export function NotificationBell() {
@@ -253,7 +253,7 @@ export function NotificationBell() {
             {/* Footer — only after the 3s grace window (see showReconnecting) */}
             {!isConnected && showReconnecting && (
               <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30 dark:border-yellow-800">
-                <p className="text-xs text-warning dark:text-warning flex items-center gap-1">
+                <p className="text-xs text-warning-ink dark:text-warning-ink flex items-center gap-1">
                   <span className="w-2 h-2 bg-warning rounded-full animate-pulse" />
                   {t('reconnecting')}
                 </p>

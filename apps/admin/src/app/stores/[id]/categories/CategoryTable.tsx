@@ -162,7 +162,7 @@ function SortableCategoryRow({
         <span
           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
             cat.isActive
-              ? 'bg-success/10 text-success-ink dark:bg-success/20 dark:text-success'
+              ? 'bg-success/10 text-success-ink dark:bg-success/20 dark:text-success-ink'
               : 'bg-muted text-muted-foreground'
           }`}
         >

@@ -64,7 +64,7 @@ export default function PWASettingsPage() {
             disabled={saving}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               pwaEnabled
-                ? 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success hover:bg-success/20'
+                ? 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink hover:bg-success/20'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >

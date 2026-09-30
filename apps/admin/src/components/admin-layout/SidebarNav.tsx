@@ -36,7 +36,7 @@ export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: Sid
                 onClick={onNavigate}
                 className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-primary/8 text-primary'
+                    ? 'bg-primary/10 text-primary-ink'
                     : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                 }`}
                 aria-current={isActive ? 'page' : undefined}

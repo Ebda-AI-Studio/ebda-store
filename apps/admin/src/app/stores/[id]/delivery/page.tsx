@@ -364,7 +364,7 @@ export default function CheckoutDeliveryPage() {
           <div
             className={`rounded-xl p-4 text-sm ${
               message.type === 'success'
-                ? 'bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 text-[hsl(var(--success))]'
+                ? 'bg-success/10 border border-success/20 text-success-ink'
                 : 'bg-destructive/10 border border-destructive/20 text-destructive-ink'
             }`}
           >

@@ -27,25 +27,25 @@ function getCouponStatus(coupon: Coupon): CouponStatus {
   if (coupon.startsAt && new Date(coupon.startsAt) > now) {
     return {
       labelKey: 'scheduled',
-      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
+      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
     };
   }
   if (coupon.expiresAt && new Date(coupon.expiresAt) < now) {
     return {
       labelKey: 'expired',
       color:
-        'bg-destructive/10 text-destructive-ink dark:bg-destructive/30/30 dark:text-destructive',
+        'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
     };
   }
   if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
     return {
       labelKey: 'exhausted',
-      color: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning',
+      color: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink',
     };
   }
   return {
     labelKey: 'active',
-    color: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success',
+    color: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink',
   };
 }
 

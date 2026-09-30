@@ -219,7 +219,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
                 {tNew('csvStatusError')}
               </span>
             ) : (
-              <span className="text-[hsl(var(--success))]">{tNew('csvStatusOk')}</span>
+              <span className="text-success">{tNew('csvStatusOk')}</span>
             );
           },
         },
@@ -335,9 +335,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         {parseResult && (
           <p className="mt-1 text-xs text-muted-foreground">
             {tNew('csvParsedTotal', { count: parseResult.totalRows })}{' '}
-            <span className="text-[hsl(var(--success))]">
-              {tNew('csvParsedValid', { count: validRowCount })}
-            </span>
+            <span className="text-success">{tNew('csvParsedValid', { count: validRowCount })}</span>
             {errorRowCount > 0 && (
               <span className="text-destructive">
                 {tNew('csvParsedErrors', { count: errorRowCount })}
@@ -395,9 +393,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             </li>
             <li>
               {tNew('csvImported')}{' '}
-              <span className="text-[hsl(var(--success))] font-medium">
-                {importResult.importedRows}
-              </span>
+              <span className="text-success font-medium">{importResult.importedRows}</span>
             </li>
             {importResult.skippedRows > 0 && (
               <li>

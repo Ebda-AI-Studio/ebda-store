@@ -129,10 +129,7 @@ export default function ProductDetailPage() {
     switch (status) {
       case 'active':
         return (
-          <Badge
-            variant="default"
-            className="bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]"
-          >
+          <Badge variant="default" className="bg-success/10 text-success-ink">
             {tStatus('active')}
           </Badge>
         );

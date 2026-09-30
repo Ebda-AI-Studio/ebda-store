@@ -90,4 +90,30 @@ describe('refreshAccessToken iOS bail-out (#1803)', () => {
     expect(localStorage.getItem('refreshToken')).toBeNull();
     expect(localStorage.getItem('accessToken')).toBeNull();
   });
+  // Issue 2320: the stale-token heal continues on the COOKIE. The NEXT refresh
+  // (the 30-minute access-token expiry) must still reach /auth/refresh — the
+  // iOS bail-out used to return null because no token was stored, and the
+  // session check then signed a live session out.
+  it('after the stale-token heal, a SECOND refresh still calls /auth/refresh', async () => {
+    localStorage.setItem('refreshToken', 'dead-refresh');
+    localStorage.setItem('accessToken', 'dead-access');
+    const fetchSpy = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ success: true, data: { refreshed: true, staleRefreshToken: true } }),
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    const { refreshAccessToken } = await import('../api');
+
+    expect(await refreshAccessToken()).not.toBeNull();
+    expect(localStorage.getItem('refreshToken')).toBeNull();
+
+    fetchSpy.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({ success: true, data: { refreshed: true } }),
+    });
+    expect(await refreshAccessToken()).not.toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
 });

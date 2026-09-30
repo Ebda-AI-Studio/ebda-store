@@ -309,7 +309,7 @@ export default function StoreSettingsPage() {
     {
       key: 'seo',
       href: `/stores/${storeId}/seo`,
-      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
+      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
       featureKey: 'seo',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -325,7 +325,7 @@ export default function StoreSettingsPage() {
     {
       key: 'domain',
       href: `/stores/${storeId}/domain`,
-      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info',
+      color: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path

@@ -13,7 +13,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     case 'active':
       return (
         <span
-          className={`${base} bg-success/10 text-success-ink dark:bg-success/20 dark:text-success`}
+          className={`${base} bg-success/10 text-success-ink dark:bg-success/20 dark:text-success-ink`}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-success" />
           {t('active')}
@@ -22,7 +22,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     case 'draft':
       return (
         <span
-          className={`${base} bg-warning/10 text-warning-ink dark:bg-warning/20 dark:text-warning`}
+          className={`${base} bg-warning/10 text-warning-ink dark:bg-warning/20 dark:text-warning-ink`}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-warning" />
           {t('draft')}

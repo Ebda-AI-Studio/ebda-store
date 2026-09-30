@@ -152,7 +152,7 @@ export function ProductInfoSections({
                   ? 'text-destructive'
                   : onHand <= product.lowStockThreshold
                     ? 'text-warning'
-                    : 'text-[hsl(var(--success))]'
+                    : 'text-success'
               }`}
             >
               {tFields('stockInStock', { count: onHand })}

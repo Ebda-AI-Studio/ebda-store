@@ -25,8 +25,8 @@ export function BulkImportResults({ result, onViewProducts }: BulkImportResultsP
           <p className="text-2xl font-bold text-foreground">{result.total}</p>
           <p className="text-xs text-muted-foreground">{t('totalRows')}</p>
         </div>
-        <div className="text-center p-4 bg-[hsl(var(--success))]/10 rounded-lg">
-          <p className="text-2xl font-bold text-[hsl(var(--success))]">{result.created}</p>
+        <div className="text-center p-4 bg-success/10 rounded-lg">
+          <p className="text-2xl font-bold text-success-ink">{result.created}</p>
           <p className="text-xs text-muted-foreground">{t('created')}</p>
         </div>
         <div className="text-center p-4 bg-info/5 rounded-lg">
@@ -59,8 +59,8 @@ export function BulkImportResults({ result, onViewProducts }: BulkImportResultsP
       )}
 
       {hasChanges && (
-        <div className="mt-4 p-3 bg-[hsl(var(--success))]/10 rounded-lg text-center">
-          <p className="text-sm text-[hsl(var(--success))]">
+        <div className="mt-4 p-3 bg-success/10 rounded-lg text-center">
+          <p className="text-sm text-success-ink">
             {t.rich('successMessage', {
               link: chunks => (
                 <button

@@ -73,7 +73,7 @@ export function TaxRatesTable({
     {
       header: t('columns.type'),
       cell: rate => (
-        <span className="px-2 py-1 rounded text-xs font-medium bg-info/10 text-info-ink dark:bg-info/30 dark:text-info">
+        <span className="px-2 py-1 rounded text-xs font-medium bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink">
           {rate.isCompound ? t('types.compound') : t('types.standard')}
         </span>
       ),
@@ -86,9 +86,7 @@ export function TaxRatesTable({
           type="button"
           onClick={() => onToggle(rate)}
           className={`px-2 py-1 rounded-full text-xs font-medium ${
-            rate.isActive
-              ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
-              : 'bg-muted text-muted-foreground'
+            rate.isActive ? 'bg-success/10 text-success-ink' : 'bg-muted text-muted-foreground'
           }`}
         >
           {rate.isActive ? t('status.active') : t('status.inactive')}

@@ -171,14 +171,14 @@ export function BulkImportWizard({
               {selectedFileName ? t('fileLoaded', { name: selectedFileName }) : t('uploadPrompt')}
             </p>
             {fileKind === 'csv' && csvContent && (
-              <p className="mt-1 text-xs text-[hsl(var(--success))]">
+              <p className="mt-1 text-xs text-success">
                 {t('csvReady', {
                   count: csvContent.split('\n').filter(l => l.trim()).length - 1,
                 })}
               </p>
             )}
             {fileKind === 'xlsx' && xlsxBase64 && (
-              <p className="mt-1 text-xs text-[hsl(var(--success))]">{t('xlsxReady')}</p>
+              <p className="mt-1 text-xs text-success">{t('xlsxReady')}</p>
             )}
           </div>
 

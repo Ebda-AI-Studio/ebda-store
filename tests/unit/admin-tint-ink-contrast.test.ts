@@ -72,22 +72,94 @@ describe('tinted-pill ink contrast (issue 2233)', () => {
 describe('no admin source pairs a tint with its bare role colour', () => {
   // Per class STRING, not adjacency: `bg-destructive/10 p-4 text-sm
   // text-destructive` is the same unreadable pair as the adjacent form.
-  const ROLE_LIST = ['primary', 'success', 'warning', 'info', 'destructive'];
-  const offendingPairs = (src: string): string[] => {
+  //
+  // Issues 2313 / 2322 / 2323 — the first version of this gate only saw the
+  // un-prefixed token form at alphas 5/10/15, so three spellings of the same
+  // defect passed it: a `dark:` pair (`dark:bg-info/30 dark:text-info`, 3.4:1),
+  // the arbitrary-value form (`bg-[hsl(var(--success))]/10 …
+  // text-[hsl(var(--success))]`, 2.8:1) and a double opacity modifier
+  // (`dark:bg-destructive/30/30`, which Tailwind drops, so the pill had no
+  // dark background). The gate now RESOLVES each pill per theme — the text
+  // class and tint alpha that actually apply in light and in dark — and
+  // measures that pair against globals.css, at whatever alpha the source uses.
+  const ROLE_LIST = ['primary', 'success', 'warning', 'info', 'destructive'] as const;
+  type Role = (typeof ROLE_LIST)[number];
+  const TINT_MAX = 40; // above this the class is a solid fill, not a tint
+  const OPACITY_SCALE = new Set(Array.from({ length: 21 }, (_, i) => i * 5));
+  const COLOUR_OPACITY =
+    /(?<![\w/-])((?:[\w-]+:)*(?:bg|text|border|ring|from|via|to|fill|stroke|outline|divide|shadow|decoration|placeholder)-[a-z][\w-]*)\/(\d+)(?![\w/.])/g;
+
+  const classStrings = (src: string): string[] =>
+    [...src.matchAll(/(["'`])([^"'`\n]*)\1/g)].map(m => m[2]);
+
+  /** Every problem in one class string: a bare role colour on its tint, an
+   *  -ink under 4.5:1 on the tint it actually sits on, per theme. */
+  const pillProblems = (cls: string): string[] => {
     const out: string[] = [];
-    for (const m of src.matchAll(/(["'`])([^"'`\n]*)\1/g)) {
-      const cls = m[2];
-      for (const r of ROLE_LIST) {
-        if (
-          new RegExp(`(?<![\\w:-])bg-${r}/(5|10|15)\\b`).test(cls) &&
-          new RegExp(`(?<![\\w:-])text-${r}(?![-\\w/])`).test(cls)
-        ) {
-          out.push(`${r}: ${cls}`);
-        }
+    const tokens = cls.split(/\s+/);
+    const alpha = (variant: '' | 'dark:', r: Role): number | undefined => {
+      for (const t of tokens) {
+        const m = new RegExp(`^${variant}bg-${r}/(\\d+)$`).exec(t);
+        if (m && Number(m[1]) <= TINT_MAX) return Number(m[1]);
       }
+      return undefined;
+    };
+    const text = (variant: '' | 'dark:', r: Role): 'bare' | 'ink' | undefined => {
+      if (tokens.includes(`${variant}text-${r}-ink`)) return 'ink';
+      if (tokens.includes(`${variant}text-${r}`)) return 'bare';
+      return undefined;
+    };
+    for (const r of ROLE_LIST) {
+      const baseText = text('', r);
+      const darkText = text('dark:', r) ?? baseText;
+      // `hover:` tints are out of scope: at rest that text sits on the plain
+      // surface (see Ruling YWA-1).
+      const lightTints = [alpha('', r)].filter((a): a is number => a !== undefined);
+      const darkTints = [alpha('dark:', r) ?? alpha('', r)].filter(
+        (a): a is number => a !== undefined
+      );
+      const check = (theme: 'light' | 'dark', t: 'bare' | 'ink' | undefined, tints: number[]) => {
+        if (!t) return;
+        for (const a of tints) {
+          if (t === 'bare') {
+            out.push(`${theme}: bare text-${r} on its ${a}% tint`);
+            continue;
+          }
+          const card = rgb(token('card', theme));
+          const tint = rgb(token(r, theme)).map((v, i) => (v * a) / 100 + card[i] * (1 - a / 100));
+          const c = ratio(rgb(token(`${r}-ink`, theme)), tint);
+          if (c < 4.5) out.push(`${theme}: ${r}-ink on ${a}% tint = ${c.toFixed(2)}:1`);
+        }
+      };
+      check('light', baseText, lightTints);
+      check('dark', darkText, darkTints);
     }
     return out;
   };
+
+  /** Spellings the resolver cannot see, banned outright. */
+  const bannedForms = (cls: string): string[] => {
+    const out: string[] = [];
+    // `bg-x/30/30` matches no utility — Tailwind emits nothing for it.
+    for (const m of cls.matchAll(/\S*-[\w-]+\/\d+\/\d+/g))
+      out.push(`double opacity modifier: ${m[0]}`);
+    // An opacity step outside Tailwind 3's scale (`bg-primary/8`) also emits
+    // nothing, silently: the sidebar's active item had no tint at all.
+    for (const m of cls.matchAll(COLOUR_OPACITY)) {
+      if (!OPACITY_SCALE.has(Number(m[2]))) out.push(`off-scale opacity: ${m[1]}/${m[2]}`);
+    }
+    // Arbitrary-value role colours bypass the token form this gate measures;
+    // the tokens (`bg-success/10`, `text-success-ink`) render the same hsl().
+    const arb = new RegExp(`\\S*\\[hsl\\(var\\(--(${ROLE_LIST.join('|')})\\)\\)\\]\\S*`, 'g');
+    for (const m of cls.matchAll(arb)) out.push(`arbitrary-value role colour: ${m[0]}`);
+    return out;
+  };
+
+  const problems = (src: string): string[] =>
+    classStrings(src).flatMap(cls =>
+      [...pillProblems(cls), ...bannedForms(cls)].map(p => `${p} — ${cls}`)
+    );
+
   const files: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
@@ -101,13 +173,41 @@ describe('no admin source pairs a tint with its bare role colour', () => {
   it('finds files to scan (control)', () => expect(files.length).toBeGreaterThan(100));
 
   it('control: the detector flags a non-adjacent pair and passes the ink form', () => {
-    expect(offendingPairs(`'bg-warning/10 p-4 text-sm text-warning'`)).toHaveLength(1);
-    expect(offendingPairs(`'bg-warning/10 p-4 text-warning-ink hover:text-warning'`)).toEqual([]);
+    expect(problems(`'bg-warning/10 p-4 text-sm text-warning'`)).toHaveLength(2); // light + dark
+    expect(problems(`'bg-warning/10 p-4 text-warning-ink hover:text-warning'`)).toEqual([]);
   });
 
-  it('every tinted pill uses the -ink text token', () => {
+  // Known-bad fixtures: the exact strings the three issues found in source.
+  it.each([
+    ['2323 dark: pair', `'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info'`],
+    [
+      '2323 success dark pair',
+      `'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success'`,
+    ],
+    [
+      '2322 arbitrary-value pair',
+      `'bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 text-[hsl(var(--success))]'`,
+    ],
+    ['2313 double modifier', `'bg-destructive/10 text-destructive-ink dark:bg-destructive/30/30'`],
+    ['alpha outside 5/10/15', `'bg-info/20 text-info dark:bg-info/40 dark:text-info'`],
+    ['off-scale opacity', `'bg-primary/8 text-primary-ink'`],
+    ['bare text on an off-scale tint', `'bg-primary/8 text-primary'`],
+  ])('control: flags %s', (_name, src) => {
+    expect(problems(src).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    [`'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink'`],
+    [`'bg-destructive/10 text-destructive-ink dark:bg-destructive/30'`],
+    [`'bg-primary text-primary-foreground hover:bg-primary/90'`],
+    [`'w-1/2 text-success border hover:bg-success/10'`],
+  ])('control: passes %s', src => {
+    expect(problems(src)).toEqual([]);
+  });
+
+  it('every tinted pill resolves to a readable -ink pair in both themes', () => {
     const offenders = files.flatMap(f =>
-      offendingPairs(readFileSync(f, 'utf8')).map(o => `${f.slice(ADMIN.length + 1)} — ${o}`)
+      problems(readFileSync(f, 'utf8')).map(o => `${f.slice(ADMIN.length + 1)} — ${o}`)
     );
     expect(offenders).toEqual([]);
   });

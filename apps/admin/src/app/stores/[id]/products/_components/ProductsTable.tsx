@@ -197,11 +197,7 @@ export function ProductsTable({
         const margin = product.price - product.costPrice;
         const profitable = margin > 0;
         return (
-          <span
-            className={`font-medium ${
-              profitable ? 'text-[hsl(var(--success))]' : 'text-destructive'
-            }`}
-          >
+          <span className={`font-medium ${profitable ? 'text-success' : 'text-destructive'}`}>
             {formatPrice(margin)}
           </span>
         );
@@ -223,7 +219,7 @@ export function ProductsTable({
                 ? 'text-destructive'
                 : resolvedInventory < 10
                   ? 'text-warning'
-                  : 'text-[hsl(var(--success))]'
+                  : 'text-success'
             }`}
           >
             {resolvedInventory}

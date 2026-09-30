@@ -94,10 +94,10 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
               <span
                 className={`px-2 py-1 text-xs font-semibold rounded shrink-0 ${
                   product.inventory === 0
-                    ? 'bg-destructive/10 text-destructive-ink dark:bg-destructive/30/30 dark:text-destructive'
+                    ? 'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink'
                     : product.inventory <= 5
                       ? 'bg-primary/10 text-primary-ink'
-                      : 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning'
+                      : 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink'
                 }`}
               >
                 {t('unitsLeft', { count: product.inventory })}

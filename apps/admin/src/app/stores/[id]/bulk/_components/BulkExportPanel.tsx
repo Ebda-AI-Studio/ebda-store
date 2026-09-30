@@ -155,7 +155,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
           {INFO_KEYS.map(key => (
             <li key={key} className="flex items-start gap-2">
               <svg
-                className="h-5 w-5 text-[hsl(var(--success))] flex-shrink-0"
+                className="h-5 w-5 text-success flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

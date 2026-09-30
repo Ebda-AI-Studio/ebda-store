@@ -72,15 +72,19 @@ export interface CarrierConfigApiRow {
  */
 export const SHIPMENT_COLORS = {
   created: { className: 'bg-muted text-foreground' },
-  picked_up: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info' },
-  in_transit: { className: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning' },
+  picked_up: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink' },
+  in_transit: {
+    className: 'bg-warning/10 text-warning-ink dark:bg-warning/30 dark:text-warning-ink',
+  },
   out_for_delivery: { className: 'bg-primary/10 text-primary-ink' },
-  delivered: { className: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success' },
+  delivered: {
+    className: 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink',
+  },
   failed: {
     className:
-      'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive',
+      'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
   },
-  returned: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info' },
+  returned: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink' },
   cancelled: { className: 'bg-muted text-muted-foreground' },
 } as const;
 

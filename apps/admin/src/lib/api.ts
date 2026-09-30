@@ -215,7 +215,15 @@ export function refreshAccessToken(): Promise<string | null> {
     // network round-trip instead of hitting /auth/refresh only to be
     // rejected. This was previously checked only inside the unused
     // refreshToken() callback, so checkAuth's own refresh path missed it.
-    if (ios && !localStorage.getItem('refreshToken')) return null;
+    //
+    // …unless this browser holds a session (#2320). The `staleRefreshToken`
+    // heal below drops the stored token and continues on the rotated COOKIE;
+    // bailing on the missing token then skipped every later refresh, so the
+    // next access-token expiry signed the user out of a live session. With
+    // session evidence the cookie lane is tried (apps/web never bails);
+    // a dead cookie answers 400 → `rejected` → clearStoredSession(), which
+    // removes the evidence, so a signed-out iOS client still skips the call.
+    if (ios && !localStorage.getItem('refreshToken') && !hasSessionEvidence()) return null;
     const storedRefreshToken = readStoredRefreshToken(ios);
 
     try {
@@ -245,6 +253,9 @@ export function refreshAccessToken(): Promise<string | null> {
         if (json.data.staleRefreshToken) {
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('accessToken');
+          // The session lives on in the cookie: record it, so the iOS bail-out
+          // above lets the next refresh through (#2320).
+          markSessionEvidence();
         }
         // On the cookie path the server rotates the httpOnly cookies but
         // deliberately withholds the token pair from the body (a merchant
@@ -456,6 +467,21 @@ async function retryPendingLogout(apiUrl: string): Promise<void> {
   if (await postLogout(apiUrl, token || null)) clearPendingLogout();
 }
 
+/**
+ * A 404 on `/auth/me` that our API itself sent (`{ error: { code: 'NOT_FOUND' } }`):
+ * the authenticated user no longer exists (#2283). Any other 404 — an edge or
+ * platform page with no API envelope — says nothing about the identity.
+ */
+async function isAccountGone(res: Response): Promise<boolean> {
+  if (res.status !== 404) return false;
+  try {
+    const body = (await res.json()) as { error?: { code?: unknown } } | null;
+    return body?.error?.code === 'NOT_FOUND';
+  } catch {
+    return false;
+  }
+}
+
 async function fetchMe(apiUrl: string): Promise<Response> {
   const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
   const headers: Record<string, string> = {};
@@ -470,7 +496,8 @@ async function fetchMe(apiUrl: string): Promise<Response> {
  * decision logic is unit-testable without rendering `AuthProvider`: this repo
  * has no jsdom (Ruling P2-B2-2 / P2-B2-7).
  *
- * Only a 401 followed by a REJECTED refresh is `signed-out`. A 429 on
+ * Only a 401 followed by a REJECTED refresh, or a 404 (the user row is
+ * gone, #2283), is `signed-out`. A 429 on
  * `/auth/me` is `throttled` (the mount ladder retries it); any other non-ok
  * answer is `unavailable` and leaves the caller's state alone (#2096). Every
  * destructive step re-checks the generation first (#2161).
@@ -500,6 +527,14 @@ export async function checkSession(
   if (first.status === 429) {
     return hasSessionEvidence() ? { status: 'throttled' } : { status: 'signed-out' };
   }
+  // Our API answering 404 is AuthService.getProfile saying the user row is
+  // gone — a definitive answer about the identity, not an outage (#2283).
+  // Nothing is left to refresh, so the session ends here. A mis-routed 404
+  // from the edge carries no API error body and stays `unavailable`.
+  if (await isAccountGone(first)) {
+    clearStoredSession();
+    return { status: 'signed-out' };
+  }
   if (first.status !== 401) return { status: 'unavailable' };
   if (!hasSessionEvidence() && !claimSessionProbe()) return { status: 'signed-out' };
 
@@ -514,7 +549,7 @@ export async function checkSession(
       return { status: 'authenticated', user: data.data.user };
     }
     if (retry.status === 429) return { status: 'throttled' };
-    if (retry.status !== 401) return { status: 'unavailable' };
+    if (retry.status !== 401 && !(await isAccountGone(retry))) return { status: 'unavailable' };
     clearStoredSession();
     return { status: 'signed-out' };
   }

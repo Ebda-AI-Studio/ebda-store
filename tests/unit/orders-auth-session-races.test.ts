@@ -52,6 +52,8 @@ function res(status: number, body: unknown = {}) {
 }
 
 const API = 'http://test/api/v1';
+// What AuthService.getProfile's AppError(404) serialises to.
+const GONE = { success: false, error: { code: 'NOT_FOUND', message: 'User not found' } };
 const urlOf = (u: unknown) => String(u);
 
 beforeEach(() => {
@@ -73,7 +75,7 @@ describe.each([
 ])('%s client — session-check races', (_name, load) => {
   describe('#2096 — only 401-then-rejected ends a session', () => {
     it.each([500, 502, 503, 404])(
-      'a %i on /auth/me is "unavailable", not "signed-out", and posts no refresh',
+      'a %i on /auth/me with no API error body is "unavailable", not "signed-out", and posts no refresh',
       async status => {
         globalThis.fetch = vi.fn(async () => res(status)) as never;
         const { checkSession } = await load();
@@ -83,6 +85,34 @@ describe.each([
         expect(localStorage.getItem('refreshToken')).toBe('old-refresh');
       }
     );
+
+    // #2283: 404 is AuthService.getProfile saying the user row is gone — an
+    // answer about the identity, not an outage. The shell must not survive it.
+    it('a 404 on /auth/me (account deleted) is "signed-out" and clears the session', async () => {
+      globalThis.fetch = vi.fn(async () => res(404, GONE)) as never;
+      const { checkSession } = await load();
+
+      await expect(checkSession(API)).resolves.toEqual({ status: 'signed-out' });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1); // nothing left to refresh
+      expect(localStorage.getItem('refreshToken')).toBeNull();
+      expect(localStorage.getItem('accessToken')).toBeNull();
+    });
+
+    it('a 404 on the post-refresh /auth/me retry is "signed-out" too', async () => {
+      let meCalls = 0;
+      globalThis.fetch = vi.fn(async (url: unknown) => {
+        if (urlOf(url).includes('/auth/refresh')) {
+          return res(200, { success: true, data: { refreshed: true } });
+        }
+        meCalls += 1;
+        return meCalls === 1 ? res(401) : res(404, GONE);
+      }) as never;
+      const { checkSession } = await load();
+
+      await expect(checkSession(API)).resolves.toEqual({ status: 'signed-out' });
+      expect(meCalls).toBe(2);
+      expect(localStorage.getItem('refreshToken')).toBeNull();
+    });
 
     it('a 429 on /auth/me is "throttled", so the mount ladder retries it', async () => {
       globalThis.fetch = vi.fn(async () => res(429)) as never;

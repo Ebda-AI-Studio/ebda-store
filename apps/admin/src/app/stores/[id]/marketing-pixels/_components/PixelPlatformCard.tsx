@@ -65,7 +65,7 @@ export function PixelPlatformCard({
           <span
             className={`px-2 py-1 text-xs font-medium rounded-full ${
               isEnabled
-                ? 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success'
+                ? 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink'
                 : 'bg-muted text-muted-foreground'
             }`}
           >
