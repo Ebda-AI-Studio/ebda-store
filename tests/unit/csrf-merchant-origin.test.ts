@@ -21,7 +21,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { csrfProtection, generateCsrfToken } from '@api/middleware/security';
+import { csrfProtection, generateCsrfToken, isCsrfExemptAuthPath } from '@api/middleware/security';
 import { config } from '@api/config';
 
 const MERCHANT_ORIGIN = 'https://merchant-owned-shop.example';
@@ -116,7 +116,7 @@ describe('csrfProtection — merchant origins are no longer exempt', () => {
     }
   });
 
-  it('still exempts /auth/ and Bearer-authenticated requests', () => {
+  it('still exempts the credential-less /auth/ entry points and Bearer-authenticated requests', () => {
     const res1 = makeRes();
     const n1 = vi.fn();
     csrfProtection(
@@ -286,5 +286,123 @@ describe('csrfProtection — the cookieless short-circuit fails CLOSED', () => {
     );
     expect(next).toHaveBeenCalled();
     expect(res.statusCode).toBe(0);
+  });
+});
+
+/**
+ * Issue 2425 — `/auth/` is no longer a blanket CSRF exemption.
+ *
+ * The blanket `req.path.includes('/auth/')` skip was justified as "auth
+ * endpoints use JWT tokens (not session cookies)", which is false for every
+ * route behind `authenticate`: they ride the same SameSite=None cookie as any
+ * store write, and a merchant custom domain is CORS-allowlisted. A page on a
+ * host the merchant controls could flip a visiting shopper's SMS consent,
+ * change their profile, or delete their account with the victim's cookie.
+ */
+describe('csrfProtection — only the credential-less /auth/ routes are exempt (issue 2425)', () => {
+  const VICTIM = 'victim-shopper-id';
+  const SESSION = 'victim-session-id';
+
+  function runCsrf(req: Request) {
+    const res = makeRes();
+    const next = vi.fn();
+    return new Promise<{ res: typeof res; next: typeof next }>(resolve => {
+      const done = () => resolve({ res, next });
+      next.mockImplementation(done);
+      const originalJson = res.json.bind(res);
+      (res as unknown as { json: (p: unknown) => unknown }).json = (payload: unknown) => {
+        const out = originalJson(payload);
+        done();
+        return out;
+      };
+      csrfProtection(req, res, next as unknown as NextFunction);
+    });
+  }
+
+  // Every state-changing route behind `authenticate` under /auth/.
+  const AUTHENTICATED_WRITES: Array<[string, string]> = [
+    ['PUT', '/api/v1/auth/me/sms-consent'],
+    ['PUT', '/api/v1/auth/me'],
+    ['DELETE', '/api/v1/auth/me'],
+    ['POST', '/api/v1/auth/me/erase'],
+    ['POST', '/api/v1/auth/change-password'],
+    ['POST', '/api/v1/auth/logout-all'],
+    ['POST', '/api/v1/auth/mfa/enroll/begin'],
+    ['POST', '/api/v1/auth/mfa/enroll/verify'],
+    ['POST', '/api/v1/auth/mfa/disable'],
+  ];
+
+  it.each(AUTHENTICATED_WRITES)(
+    'refuses a forged cross-site %s %s riding the victim cookie',
+    async (method, path) => {
+      const { res, next } = await runCsrf(
+        makeReq(path, {
+          method,
+          origin: MERCHANT_ORIGIN,
+          cookies: { token: accessCookieFor(VICTIM) },
+        })
+      );
+      expect(next).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(403);
+      expect(res.body.error?.code).toBe('CSRF_MISSING_SESSION');
+    }
+  );
+
+  it('still lets the signed-in shopper on a custom domain through with their own token', async () => {
+    const token = await generateCsrfToken(SESSION, VICTIM);
+    const { next } = await runCsrf(
+      makeReq('/api/v1/auth/me/sms-consent', {
+        method: 'PUT',
+        origin: MERCHANT_ORIGIN,
+        headers: { 'x-session-id': SESSION, 'x-csrf-token': token },
+        cookies: { token: accessCookieFor(VICTIM) },
+      })
+    );
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  const EXEMPT = [
+    '/api/v1/auth/register',
+    '/api/v1/auth/login',
+    '/api/v1/auth/refresh',
+    '/api/v1/auth/logout',
+    '/api/v1/auth/forgot-password',
+    '/api/v1/auth/reset-password',
+    '/api/v1/auth/verify-email',
+    '/api/v1/auth/resend-verification',
+    '/api/v1/auth/mfa/verify',
+  ];
+
+  it.each(EXEMPT)('keeps %s exempt, even with a cookie present', async path => {
+    for (const spelling of [path, `${path}/`, path.toUpperCase()]) {
+      const { next } = await runCsrf(
+        makeReq(spelling, { origin: MERCHANT_ORIGIN, cookies: { token: accessCookieFor(VICTIM) } })
+      );
+      expect(next, spelling).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('matches whole paths, not substrings', () => {
+    for (const p of [
+      '/api/v1/auth/login/extra',
+      '/api/v1/auth/me',
+      '/api/v1/stores/x/auth/login',
+      '/api/v1/auth/',
+      '/api/v1/auth/loginx',
+    ]) {
+      expect(isCsrfExemptAuthPath(p), p).toBe(false);
+    }
+  });
+
+  it('exempts exactly the routes the storefront treats as credential-less (no drift)', async () => {
+    const { endpointMayRefresh } = await import('@web/lib/api');
+    for (const p of EXEMPT) {
+      expect(isCsrfExemptAuthPath(p), p).toBe(true);
+      expect(endpointMayRefresh(p.replace('/api/v1', '')), p).toBe(false);
+    }
+    for (const [, p] of AUTHENTICATED_WRITES) {
+      expect(isCsrfExemptAuthPath(p), p).toBe(false);
+      expect(endpointMayRefresh(p.replace('/api/v1', '')), p).toBe(true);
+    }
   });
 });

@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { config } from '../config';
+import { derivedSecret } from './derived-secret';
 
 /**
  * HMAC-SHA256 token for review deep-links.
@@ -11,18 +12,32 @@ import { config } from '../config';
  * have passed at verification time. This avoids storing an expiry in
  * the DB and keeps the token compact (64 hex chars).
  *
- * Key precedence: REVIEW_TOKEN_SECRET → JWT_SECRET. Operators who want
- * rotation isolation should set REVIEW_TOKEN_SECRET separately; most
- * won't bother and JWT_SECRET is fine.
+ * Signing key: REVIEW_TOKEN_SECRET when set, else a purpose-bound key derived
+ * from ENCRYPTION_KEY (`lib/derived-secret.ts`, issue 2424). It used to fall
+ * back to JWT_SECRET, so rotating the SESSION secret silently killed every
+ * review link still inside its 90-day window.
+ *
+ * Verify keys: the signing key, plus — only when no dedicated secret is set —
+ * JWT_SECRET, for links signed before issue 2424 (they age out within 90 days).
  */
-const SECRET = () => process.env.REVIEW_TOKEN_SECRET || config.jwtSecret;
+function signingKey(): string | Buffer {
+  return process.env.REVIEW_TOKEN_SECRET || derivedSecret('fwb:review-link-mac:v1');
+}
+
+function verifyKeys(): Array<string | Buffer> {
+  const dedicated = process.env.REVIEW_TOKEN_SECRET;
+  return dedicated ? [dedicated] : [derivedSecret('fwb:review-link-mac:v1'), config.jwtSecret];
+}
+
+function macHex(key: string | Buffer, orderId: string, productId: string): string {
+  return createHmac('sha256', key).update(`${orderId}:${productId}`).digest('hex');
+}
 
 /** 90 days in milliseconds */
 const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 export function signReviewToken(orderId: string, productId: string): string {
-  const data = `${orderId}:${productId}`;
-  return createHmac('sha256', SECRET()).update(data).digest('hex');
+  return macHex(signingKey(), orderId, productId);
 }
 
 /**
@@ -42,12 +57,13 @@ export function verifyReviewToken(
   // 90-day expiry from when the email was sent
   if (Date.now() - sentAt.getTime() > MAX_AGE_MS) return false;
 
-  const expected = signReviewToken(orderId, productId);
+  // 64 hex chars, what macHex emits. Buffer.from(…, 'hex') silently stops at
+  // the first non-hex character, so the shape is checked first rather than
+  // trusted to the decoder.
+  if (typeof token !== 'string' || !/^[0-9a-f]{64}$/i.test(token)) return false;
+  const given = Buffer.from(token, 'hex');
   // Constant-time comparison to prevent timing attacks
-  if (expected.length !== token.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(token, 'hex'));
-  } catch {
-    return false;
-  }
+  return verifyKeys().some(key =>
+    timingSafeEqual(given, Buffer.from(macHex(key, orderId, productId), 'hex'))
+  );
 }

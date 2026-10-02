@@ -14,6 +14,12 @@
  *     store's consent does not count" goes red.
  *  M4 order create: drop the `recordGrant` call → "a ticked checkout box
  *     records consent" goes red.
+ *  M5 `consentScope` (issue 2423): drop the phone from the read → "a guest
+ *     opt-in shows on the account the same phone registers later" goes red.
+ *  M6 `statusForKeys` (issue 2423): drop the phoneKey branch → the admin-list
+ *     half of the same test goes red.
+ *  M7 `storefrontBase` (issue 2426): skip the cache → "the opt-out link reads
+ *     the store once per fan-out" goes red.
  *
  * Fixtures are per-CALL unique (retry-safe).
  */
@@ -38,14 +44,18 @@ vi.mock('@api/middleware/auth', async importOriginal => {
 
 import { accountRouter, publicRouter } from '@api/routes/sms-consent.routes';
 import { errorHandler } from '@api/middleware/error-handler';
-import { notificationDispatcher } from '@api/services/notification-dispatcher.service';
+import {
+  notificationDispatcher,
+  __clearOptOutBaseCacheForTests,
+} from '@api/services/notification-dispatcher.service';
 import { notificationConfigService } from '@api/services/notification-config.service';
 import { smsQueue } from '@api/services/sms-queue.service';
 import { SmsConsentService } from '@api/services/sms-consent.service';
 import { AuthService } from '@api/services/auth.service';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
-import { verifySmsOptOutToken } from '@api/lib/sms-consent';
+import { verifySmsOptOutToken, SMS_OPT_OUT_TOKEN_LENGTH } from '@api/lib/sms-consent';
+import { config } from '@api/config';
 import { cartSessionId } from '../helpers/bundle-fixtures';
 
 const hasDb =
@@ -183,6 +193,14 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     const text: string = (sent[0][0] as any).messageText;
     const m = text.match(/\/sms-unsubscribe\?t=([A-Za-z0-9_.-]+)/);
     expect(m).not.toBeNull();
+    // Issue 2426: the fixed-size suffix, on the platform-path base.
+    expect(m![1]).toHaveLength(SMS_OPT_OUT_TOKEN_LENGTH);
+    const slug = (await withRlsBypass(tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { slug: true } })
+    ))!.slug;
+    expect(text.endsWith(` Stop offers: ${config.webUrl}/${slug}/sms-unsubscribe?t=${m![1]}`)).toBe(
+      true
+    );
     const consentId = verifySmsOptOutToken(m![1]);
     expect(consentId).not.toBeNull();
 
@@ -460,11 +478,132 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     const view = await SmsConsentService.getForCustomerKey(storeId, key);
     expect(view).toMatchObject({ status: 'granted', grantedSource: 'checkout' });
     expect(view.grantedAt).toBeInstanceOf(Date);
-    const map = await SmsConsentService.statusForKeys(storeId, [key, 'nobody']);
+    const map = await SmsConsentService.statusForKeys(storeId, [
+      { key, phone },
+      { key: 'nobody', phone: null },
+    ]);
     expect(map.get(key)).toBe('granted');
     expect(map.get('nobody')).toBeUndefined();
     // The same key in another store is a different customer.
     expect((await SmsConsentService.getForCustomerKey(await seedStore(), key)).status).toBe('none');
     expect(await prisma.smsMarketingConsent.count({ where: { storeId } })).toBe(1);
+  });
+
+  it('a guest opt-in shows on the account the same phone registers later, and its withdraw button works (issue 2423)', async () => {
+    const storeId = await seedStore();
+    const phone = kwMobile();
+    // Checkout as a guest: the row is keyed by the guest's email.
+    const guestKey = `guest-${uid()}@example.test`;
+    await SmsConsentService.recordGrant(storeId, {
+      customerKey: guestKey,
+      phone: `+965${phone}`,
+      source: 'checkout',
+    });
+    // The same person registers: customerKeyOf is now the user id.
+    const shopper = await seedCustomer(storeId, phone);
+    const app = buildApp();
+    const as = { 'x-test-user': shopper.id, 'x-store-id': storeId };
+
+    // The gate sends to this phone…
+    await notificationDispatcher.dispatch(storeId, 'cart_abandoned_step1', {
+      ...cartData(phone),
+      storeId,
+    });
+    expect(promoSentTo(phone)).toHaveLength(1);
+
+    // …so every surface must say so: the account page (which renders the
+    // "Stop SMS offers" button only for `granted`), the admin profile and the
+    // admin list row.
+    const page = await request(app).get('/api/v1/auth/me/sms-consent').set(as);
+    expect(page.body.data.consent).toMatchObject({ status: 'granted', grantedSource: 'checkout' });
+    expect((await SmsConsentService.getForCustomerKey(storeId, shopper.id, phone)).status).toBe(
+      'granted'
+    );
+    const list = await SmsConsentService.statusForKeys(storeId, [{ key: shopper.id, phone }]);
+    expect(list.get(shopper.id)).toBe('granted');
+
+    // The button withdraws what the gate reads.
+    const stop = await request(app)
+      .put('/api/v1/auth/me/sms-consent')
+      .set(as)
+      .send({ optIn: false });
+    expect(stop.body.data.consent).toMatchObject({ status: 'revoked', revokedSource: 'account' });
+    enqueue.mockClear();
+    await notificationDispatcher.dispatch(storeId, 'cart_abandoned_step2', {
+      ...cartData(phone),
+      storeId,
+    });
+    expect(promoSentTo(phone)).toHaveLength(0);
+    expect(
+      (await SmsConsentService.statusForKeys(storeId, [{ key: shopper.id, phone }])).get(shopper.id)
+    ).toBe('revoked');
+  });
+
+  it("a later grant on another key for the same phone outranks the account's own withdrawn row", async () => {
+    const storeId = await seedStore();
+    const phone = kwMobile();
+    const shopper = await seedCustomer(storeId, phone);
+    await SmsConsentService.recordGrant(storeId, {
+      customerKey: shopper.id,
+      userId: shopper.id,
+      phone,
+      source: 'account',
+    });
+    await SmsConsentService.revoke(storeId, { phone, userId: shopper.id }, 'account');
+    // Ticks the box again at a guest checkout with the same number.
+    await SmsConsentService.recordGrant(storeId, {
+      customerKey: `again-${uid()}@example.test`,
+      phone,
+      source: 'checkout',
+    });
+    expect(await SmsConsentService.findActiveForPhone(storeId, phone)).not.toBeNull();
+    expect((await SmsConsentService.getForCustomerKey(storeId, shopper.id, phone)).status).toBe(
+      'granted'
+    );
+    // Without the phone the read is the key row alone — what it used to be.
+    expect((await SmsConsentService.getForCustomerKey(storeId, shopper.id)).status).toBe('revoked');
+  });
+
+  it('the opt-out link reads the store once per fan-out, not once per recipient (issue 2426)', async () => {
+    __clearOptOutBaseCacheForTests();
+    const storeId = await seedStore();
+    const [p1, p2] = [kwMobile(), kwMobile()];
+    for (const p of [p1, p2]) {
+      await SmsConsentService.recordGrant(storeId, {
+        customerKey: p,
+        phone: p,
+        source: 'checkout',
+      });
+    }
+    await notificationDispatcher.dispatch(storeId, 'cart_abandoned_step1', {
+      ...cartData(p1),
+      storeId,
+    });
+    // The store moves to a custom domain between two sends of one sweep: the
+    // second link still uses the base read for the first (bounded-stale, 120s).
+    const domain = `smsc-${uid()}.example.test`;
+    await withRlsBypass(tx => tx.store.update({ where: { id: storeId }, data: { domain } }));
+    await notificationDispatcher.dispatch(storeId, 'cart_abandoned_step1', {
+      ...cartData(p2),
+      storeId,
+    });
+    const link = (p: string) => (promoSentTo(p)[0][0] as any).messageText as string;
+    expect(link(p1)).toContain(`${config.webUrl}/`);
+    expect(link(p2)).toContain(`${config.webUrl}/`);
+    expect(link(p2)).not.toContain(domain);
+
+    // Once the cache is cold, the new domain is used.
+    __clearOptOutBaseCacheForTests();
+    const p3 = kwMobile();
+    await SmsConsentService.recordGrant(storeId, {
+      customerKey: p3,
+      phone: p3,
+      source: 'checkout',
+    });
+    await notificationDispatcher.dispatch(storeId, 'cart_abandoned_step1', {
+      ...cartData(p3),
+      storeId,
+    });
+    expect(link(p3)).toContain(`https://${domain}/sms-unsubscribe?t=`);
   });
 });

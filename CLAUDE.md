@@ -63,7 +63,7 @@ Refuse: "ship on wadyaljuz first, roll out later", "setting for store X only", "
 
 **Route authorization:** every admin route = `authenticate → authorize('store_admin','super_admin') → requireStoreAccess → handler`. Use `authorize()` (not `requireRole`); every endpoint with a storeId param gets `requireStoreAccess`; public endpoints don't get it.
 
-**Code standards:** API: relaxed strict mode, `errorHandler` middleware, CSRF skips `/auth/`, auth rate limit 5/15min/IP+email. Admin: `middleware.ts` stays a passthrough; `StoreProvider`/`NotificationProvider` only mount when authenticated; SVG `<Image>` needs `unoptimized`. Web: store resolved via domain/slug in middleware; theme applied via CSS vars in `StoreContext`. `@force/database` build runs `prisma generate` first.
+**Code standards:** API: relaxed strict mode, `errorHandler` middleware, CSRF skips only the credential-less `/auth/` entry points (`isCsrfExemptAuthPath` — every authenticated `/auth/` write is checked, issue 2425), auth rate limit 5/15min/IP+email. Admin: `middleware.ts` stays a passthrough; `StoreProvider`/`NotificationProvider` only mount when authenticated; SVG `<Image>` needs `unoptimized`. Web: store resolved via domain/slug in middleware; theme applied via CSS vars in `StoreContext`. `@force/database` build runs `prisma generate` first.
 
 ## Inventory model
 

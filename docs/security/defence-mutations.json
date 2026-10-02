@@ -1710,6 +1710,86 @@
       "find": "      headers.Authorization = `Bearer ${accessToken}`;",
       "replace": "      void accessToken;",
       "test": "tests/unit/storefront-csrf-heal-refresh.test.ts"
+    },
+    {
+      "id": "csrf-auth-exemption-credential-less-only",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "the CSRF exemption widens back to every path containing /auth/, so a merchant-controlled custom domain (CORS-allowlisted) forges credentialed writes to the authenticated /auth/ routes on a visiting shopper's cookie: flips their SMS-marketing consent, edits their profile, deletes their account (issue 2425)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  if (isCsrfExemptAuthPath(req.path)) {",
+      "replace": "  if (req.path.includes('/auth/')) {",
+      "test": "tests/unit/csrf-merchant-origin.test.ts"
+    },
+    {
+      "id": "sms-optout-mac-not-session-secret",
+      "domain": "consent",
+      "tier": "unit",
+      "why": "the SMS opt-out link is MAC'd with JWT_SECRET again, so rotating the session secret permanently kills every delivered opt-out link — a guest's only login-free way to stop marketing SMS (issue 2424)",
+      "source": "apps/api/src/lib/sms-consent.ts",
+      "find": "createHmac('sha256', derivedSecret('fwb:sms-optout-mac:v2'))",
+      "replace": "createHmac('sha256', process.env.JWT_SECRET!)",
+      "test": "tests/unit/sms-consent-lib.test.ts"
+    },
+    {
+      "id": "sms-optout-token-canonical-only",
+      "domain": "consent",
+      "tier": "unit",
+      "why": "a non-canonical base64url spelling of the opt-out token verifies, so one consent link has several valid spellings (the last character's padding bits are ignored by the decoder)",
+      "source": "apps/api/src/lib/sms-consent.ts",
+      "find": "bytes.length === 16 && bytes.toString('base64url') === part ? bytes : null",
+      "replace": "bytes.length === 16 ? bytes : null",
+      "test": "tests/unit/sms-consent-lib.test.ts"
+    },
+    {
+      "id": "derived-secret-refuses-empty-key",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "with ENCRYPTION_KEY unset (possible outside production) the derived link keys are HKDF of an empty string, so anyone can forge an opt-out, unsubscribe or review link instead of the API failing loud",
+      "source": "apps/api/src/lib/derived-secret.ts",
+      "find": "  if (!config.encryptionKey) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/sms-consent-lib.test.ts"
+    },
+    {
+      "id": "campaign-unsubscribe-mac-not-session-secret",
+      "domain": "consent",
+      "tier": "unit",
+      "why": "new campaign unsubscribe links fall back to JWT_SECRET again, so a session-secret rotation kills the one-click unsubscribe in every campaign email sent from then on (issue 2424 class)",
+      "source": "apps/api/src/lib/campaign-unsubscribe-token.ts",
+      "find": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || derivedSecret('fwb:campaign-unsubscribe-mac:v1')\n  );",
+      "replace": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || config.jwtSecret\n  );",
+      "test": "tests/unit/campaign-unsubscribe-token.test.ts"
+    },
+    {
+      "id": "review-link-mac-not-session-secret",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "new review-request links fall back to JWT_SECRET again, so a session-secret rotation kills every review link still inside its 90-day window (issue 2424 class)",
+      "source": "apps/api/src/lib/review-token.ts",
+      "find": "return process.env.REVIEW_TOKEN_SECRET || derivedSecret('fwb:review-link-mac:v1');",
+      "replace": "return process.env.REVIEW_TOKEN_SECRET || config.jwtSecret;",
+      "test": "tests/unit/review-token.test.ts"
+    },
+    {
+      "id": "sms-consent-read-phone-wide",
+      "domain": "consent",
+      "tier": "integration",
+      "why": "the account page and admin profile read consent by customer key alone while the send gate matches the phone, so a guest opt-in the gate honours shows as no consent on the account the same phone registers — and the 'Stop SMS offers' button never renders (issue 2423)",
+      "source": "apps/api/src/services/sms-consent.service.ts",
+      "find": "[{ customerKey }];\n  if (phoneKey) or.push({ phoneKey });",
+      "replace": "[{ customerKey }];",
+      "test": "tests/integration/sms-marketing-consent.test.ts"
+    },
+    {
+      "id": "sms-consent-list-phone-wide",
+      "domain": "consent",
+      "tier": "integration",
+      "why": "the admin Customers list reads consent by row key alone while the send gate matches the phone, so a customer the gate texts is listed without consent (issue 2423)",
+      "source": "apps/api/src/services/sms-consent.service.ts",
+      "find": "          ...(phoneKeys.length > 0 ? [{ phoneKey: { in: phoneKeys } }] : []),",
+      "replace": "",
+      "test": "tests/integration/sms-marketing-consent.test.ts"
     }
   ]
 }

@@ -19,7 +19,12 @@ import logger from '../lib/logger';
  *
  *   GET → { available, phone, consent }
  *   PUT { optIn: boolean } → grant (needs a phone on the profile and a store
- *       that can send promotional SMS) or withdraw (always allowed).
+ *       that can send promotional SMS) or withdraw (always allowed). CSRF-
+ *       checked like any cookie-authenticated write (issue 2425).
+ *
+ *   `consent` covers the shopper's own row AND every row of the store for
+ *   their profile phone — the same rows the send gate and the withdrawal act
+ *   on (issue 2423).
  *
  * `publicRouter` — mounted at `/public/sms-consent`: the login-free opt-out
  * link in every promotional SMS (`?t=<signed token>`).
@@ -63,7 +68,7 @@ accountRouter.get('/', authenticate, async (req: Request, res: Response, next: N
       notificationDispatcher.isSmsMarketingAvailable(ctx.storeId),
       runInTenantContext(
         ctx.storeId,
-        () => SmsConsentService.getForCustomerKey(ctx.storeId, ctx.userId),
+        () => SmsConsentService.getForCustomerKey(ctx.storeId, ctx.userId, ctx.phone),
         ctx.userId
       ),
     ]);
@@ -135,7 +140,7 @@ accountRouter.put(
 
       const consent = await runInTenantContext(
         ctx.storeId,
-        () => SmsConsentService.getForCustomerKey(ctx.storeId, ctx.userId),
+        () => SmsConsentService.getForCustomerKey(ctx.storeId, ctx.userId, ctx.phone),
         ctx.userId
       );
       logger.info({ storeId: ctx.storeId, optIn }, '[SMS-CONSENT] account change');

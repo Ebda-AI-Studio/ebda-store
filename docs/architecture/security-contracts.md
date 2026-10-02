@@ -50,6 +50,25 @@ The fix (T0-11): the JSON skip is gated through `isPlatformOrigin()`
 in `apps/api/src/lib/cors-cache.ts`. Custom domains pass CORS but
 must still send the CSRF token explicitly.
 
+### `/auth/` is not a blanket exemption (issue 2425)
+
+Only the credential-less auth entry points skip the check by path:
+`register`, `login`, `refresh`, `logout`, `forgot-password`,
+`reset-password`, `verify-email`, `resend-verification` and `mfa/verify`
+(`CSRF_EXEMPT_AUTH_PATHS` / `isCsrfExemptAuthPath`, an exact match on the
+whole path). They run before a session exists, mint the CSRF token itself,
+or must work for a session that lost it. The same set is the storefront's
+`NO_REFRESH_AUTH_ROUTES`; a unit test fails if the two drift.
+
+Every other `/auth/` write sits behind `authenticate` and rides the same
+SameSite=None cookie as any store write — `PUT /auth/me`,
+`PUT /auth/me/sms-consent`, `DELETE /auth/me`, `POST /auth/me/erase`,
+`POST /auth/change-password`, `POST /auth/logout-all` and the MFA
+enroll/disable routes — so it goes through the full check above. The old
+`req.path.includes('/auth/')` skip let a merchant custom domain forge any of
+them on a visiting shopper's cookie. A new `/auth/...` route is checked
+until someone adds it to the exempt list on purpose.
+
 ### Where this lives
 
 - `apps/api/src/middleware/security.ts` — `csrfProtection` middleware

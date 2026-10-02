@@ -46,6 +46,10 @@ type ConsentRow = {
   revokedSource: SmsConsentSource | null;
 };
 
+function statusOf(row: { granted: boolean; revokedAt: Date | null }): SmsConsentView['status'] {
+  return row.granted ? 'granted' : row.revokedAt ? 'revoked' : 'none';
+}
+
 export function toConsentView(row: ConsentRow | null | undefined): SmsConsentView {
   if (!row) {
     return {
@@ -58,7 +62,7 @@ export function toConsentView(row: ConsentRow | null | undefined): SmsConsentVie
     };
   }
   return {
-    status: row.granted ? 'granted' : row.revokedAt ? 'revoked' : 'none',
+    status: statusOf(row),
     phone: row.phone,
     grantedAt: row.grantedAt,
     grantedSource: row.grantedSource,
@@ -150,28 +154,93 @@ export class SmsConsentService {
     );
   }
 
-  /** The consent row for a Customers-page key (admin views). */
-  static async getForCustomerKey(storeId: string, customerKey: string): Promise<SmsConsentView> {
-    const row = await prisma.smsMarketingConsent.findUnique({
-      where: { storeId_customerKey: { storeId, customerKey } },
-      select: VIEW_SELECT,
+  /**
+   * What every consent SURFACE shows for one customer: the account page, the
+   * admin profile, the merchant MCP profile (issue 2423).
+   *
+   * It reads the same set of rows the gate and the withdrawal act on: the
+   * customer's own key row, plus every row of this store for the phone the
+   * surface already knows. A granted row among them wins (that is what the
+   * gate would send on); otherwise the most recently changed row decides
+   * revoked/none. Reading the key row alone hid a consent the gate honours —
+   * a guest who opted in at checkout and then registered resolves to a
+   * DIFFERENT key (`customerKeyOf` is the user id once signed in), so the
+   * account page showed no consent and no "Stop SMS offers" button while the
+   * shopper kept receiving offers.
+   */
+  static async getForCustomerKey(
+    storeId: string,
+    customerKey: string,
+    phone?: string | null
+  ): Promise<SmsConsentView> {
+    const rows = await prisma.smsMarketingConsent.findMany({
+      where: { storeId, OR: consentScope(customerKey, phone) },
+      select: { ...VIEW_SELECT, updatedAt: true },
     });
-    return toConsentView(row);
+    return toConsentView(pickConsentRow(rows));
   }
 
-  /** Consent status for many Customers-page keys at once (list view). */
+  /**
+   * Consent status for many Customers-page rows at once (list view), by the
+   * same rule as `getForCustomerKey`: each row's own key plus its phone.
+   */
   static async statusForKeys(
     storeId: string,
-    keys: string[]
+    customers: Array<{ key: string; phone?: string | null }>
   ): Promise<Map<string, SmsConsentView['status']>> {
     const out = new Map<string, SmsConsentView['status']>();
-    if (keys.length === 0) return out;
+    if (customers.length === 0) return out;
+    const keys = customers.map(c => c.key);
+    const phoneKeys = customers
+      .map(c => smsConsentPhoneKey(c.phone))
+      .filter((k): k is string => k !== null);
     const rows = await prisma.smsMarketingConsent.findMany({
-      where: { storeId, customerKey: { in: keys } },
-      select: { customerKey: true, granted: true, revokedAt: true },
+      where: {
+        storeId,
+        OR: [
+          { customerKey: { in: keys } },
+          ...(phoneKeys.length > 0 ? [{ phoneKey: { in: phoneKeys } }] : []),
+        ],
+      },
+      select: {
+        customerKey: true,
+        phoneKey: true,
+        granted: true,
+        revokedAt: true,
+        updatedAt: true,
+      },
     });
-    for (const r of rows)
-      out.set(r.customerKey, r.granted ? 'granted' : r.revokedAt ? 'revoked' : 'none');
+    for (const c of customers) {
+      const phoneKey = smsConsentPhoneKey(c.phone);
+      const mine = rows.filter(
+        r => r.customerKey === c.key || (phoneKey !== null && r.phoneKey === phoneKey)
+      );
+      const row = pickConsentRow(mine);
+      if (row) out.set(c.key, statusOf(row));
+    }
     return out;
   }
+}
+
+/** The rows a customer's consent is made of: their key row + their phone's rows. */
+function consentScope(customerKey: string, phone: string | null | undefined) {
+  const phoneKey = smsConsentPhoneKey(phone);
+  const or: Array<{ customerKey: string } | { phoneKey: string }> = [{ customerKey }];
+  if (phoneKey) or.push({ phoneKey });
+  return or;
+}
+
+/**
+ * The row that decides what a customer's consent IS: a granted row if there is
+ * one (the newest grant), else the most recently changed row.
+ */
+export function pickConsentRow<
+  T extends { granted: boolean; updatedAt: Date; grantedAt?: Date | null },
+>(rows: T[]): T | null {
+  const outranks = (a: T, b: T): boolean => {
+    if (a.granted !== b.granted) return a.granted;
+    if (a.granted) return (a.grantedAt?.getTime() ?? 0) > (b.grantedAt?.getTime() ?? 0);
+    return a.updatedAt.getTime() > b.updatedAt.getTime();
+  };
+  return rows.reduce<T | null>((best, r) => (best === null || outranks(r, best) ? r : best), null);
 }

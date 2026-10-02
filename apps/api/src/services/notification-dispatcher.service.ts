@@ -20,6 +20,8 @@ import logger from '../lib/logger';
 import { config } from '../config';
 import { SmsConsentService } from './sms-consent.service';
 import { signSmsOptOutToken } from '../lib/sms-consent';
+import { smsSegments } from '../lib/sms-segments';
+import { BoundedMap } from '../lib/bounded-map';
 import {
   NotificationEvent,
   NotificationData,
@@ -283,7 +285,10 @@ class NotificationDispatcherService {
           idempotencyKey: `sms_${storeId}_${event}_${data.dedupeKey ?? data.orderNumber}`,
         });
 
-        logger.info({ storeId, event }, '[NotificationDispatcher] SMS queued');
+        // Billed segments, so the cost of a template or of the opt-out link
+        // is a number in the logs rather than a surprise on the bill (issue 2426).
+        const { segments, encoding } = smsSegments(messageText);
+        logger.info({ storeId, event, segments, encoding }, '[NotificationDispatcher] SMS queued');
       } catch (err) {
         logger.error({ err, storeId, event }, '[NotificationDispatcher] SMS dispatch failed');
       }
@@ -325,16 +330,44 @@ class NotificationDispatcherService {
 const SMS_OPT_OUT_LABEL = { en: 'Stop offers', ar: 'إيقاف العروض' } as const;
 
 /**
- * The storefront opt-out page for a consent row: the store's own domain when
- * it has one, else the platform storefront under its slug (the same base the
- * abandoned-cart and back-in-stock links use).
+ * Storefront base per store, cached in memory so a fan-out (one back-in-stock
+ * sweep is one dispatch per subscriber) reads the store once, not once per
+ * recipient (issue 2426).
+ *
+ * Staleness class: BOUNDED-stale, 120s per API instance. The residual is a
+ * store that changes its custom domain: for up to 120s its new promotional
+ * SMS carry an opt-out link on the old domain. The token itself is
+ * store-independent, so the link still works wherever that domain is served.
  */
-async function smsOptOutUrl(storeId: string, consentId: string): Promise<string> {
+const OPT_OUT_BASE_TTL_MS = 120_000;
+const optOutBaseCache = new BoundedMap<string, { base: string; expiresAt: number }>(2000);
+
+async function storefrontBase(storeId: string): Promise<string> {
+  const hit = optOutBaseCache.get(storeId);
+  if (hit && hit.expiresAt > Date.now()) return hit.base;
   const store = await withRlsBypass(tx =>
     tx.store.findUnique({ where: { id: storeId }, select: { domain: true, slug: true } })
   );
   const base = store?.domain ? `https://${store.domain}` : `${config.webUrl}/${store?.slug ?? ''}`;
-  return `${base}/sms-unsubscribe?t=${signSmsOptOutToken(consentId)}`;
+  if (store) optOutBaseCache.set(storeId, { base, expiresAt: Date.now() + OPT_OUT_BASE_TTL_MS });
+  return base;
+}
+
+/** Test hook: forget cached storefront bases. */
+export function __clearOptOutBaseCacheForTests(): void {
+  optOutBaseCache.clear();
+}
+
+/**
+ * The storefront opt-out page for a consent row: the store's own domain when
+ * it has one, else the platform storefront under its slug (the same base the
+ * abandoned-cart and back-in-stock links use). The token is a fixed
+ * SMS_OPT_OUT_TOKEN_LENGTH (45) characters, so the appended
+ * ` Stop offers: <base>/sms-unsubscribe?t=<token>` costs 78 characters plus
+ * the base, and nothing that varies per recipient. It was 92 plus the base.
+ */
+async function smsOptOutUrl(storeId: string, consentId: string): Promise<string> {
+  return `${await storefrontBase(storeId)}/sms-unsubscribe?t=${signSmsOptOutToken(consentId)}`;
 }
 
 /**

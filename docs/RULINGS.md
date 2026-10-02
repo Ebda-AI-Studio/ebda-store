@@ -5192,6 +5192,81 @@ middleware has no time or random source, so it is recorded here rather than dism
 a store reachable under a custom domain AND a platform slug needs both spellings listed, and an operator
 who lists a slug expecting it to cover the custom domain sees that domain unchanged until its hostname is added.
 
+## 2026-10-02 — SMS consent follow-ups (branch `fix/backlog-followups10`, issues 2423–2426)
+
+**Ruling SMS-5 — every consent surface reads the same rows the gate and the withdrawal act on
+(issue 2423; refines SMS-1 and SMS-3).** The account page, the admin profile (and the merchant MCP
+profile through it) and the admin list now read the customer's own key row PLUS every row of the store
+for the phone the surface already knows (profile phone, order phone). A granted row wins, newest grant
+first; otherwise the most recently changed row decides revoked/none (`SmsConsentService.getForCustomerKey`
+/ `statusForKeys`, `pickConsentRow`). Before, they read the key row alone while the gate matched the
+phone, so a guest who opted in at checkout and then registered (a different `customerKeyOf` key) kept
+receiving offers with no consent shown and no "Stop SMS offers" button. Evidence: integration tests
+"a guest opt-in shows on the account the same phone registers later…" and "a later grant on another key
+… outranks the account's own withdrawn row"; mutants dropping the phone from the profile read (2 red)
+and from the list read (1 red), restored byte-identical; both pinned in the defence-mutation record.
+Accepted residual: two people sharing one number see each other's consent state on their account pages
+(grant time and source, never another contact detail; the phone shown is their own). That is the same
+sharing SMS-3 already accepts for withdrawal. Cost if wrong: a shopper sees "subscribed" for a consent
+someone else gave on the same number, and withdrawing stops it for both, which fails closed.
+
+**Ruling SMS-6 — opt-out links are keyed on a purpose-bound key derived from ENCRYPTION_KEY, with no
+new env var, and the two sibling link MACs move with them (issue 2424).** `lib/derived-secret.ts`
+derives an HKDF-SHA256 key per labelled purpose from `ENCRYPTION_KEY`. Production refuses to boot
+without that variable, so the Railway env does not change and no deploy step exists. Outside production
+an empty key throws instead of signing with a reproducible value. `JWT_SECRET` signs sessions, and
+rotating it is a routine way to sign everyone out. It must not also void the only login-free way a guest
+has to stop marketing SMS. `ENCRYPTION_KEY` is never rotated casually, because rotating it means
+re-encrypting stored TOTP secrets, payment configs and agent keys. Doing that now also voids the
+links, and docs/ENVIRONMENT.md says so. Class sweep: the campaign unsubscribe link
+(`CAMPAIGN_UNSUBSCRIBE_SECRET` → derived) and the review link (`REVIEW_TOKEN_SECRET` → derived) had
+the same `JWT_SECRET` fallback. They sign with the derived key now. When no dedicated secret is set,
+they still VERIFY against `JWT_SECRET`, so links already in inboxes keep working until the next rotation.
+SMS v1 tokens (`<uuid>.<mac>` on `JWT_SECRET`) are NOT accepted: per the owner, promotional SMS sending
+is gated off today, so none should exist. I did not verify that against production (no prod access in
+this batch). Settle it with a read-only `SELECT count(*) FROM sms_marketing_consents WHERE granted` and
+the SMS provider's send log for promotional events since PR 2421. Evidence: unit tests for all three
+links (survives a `JWT_SECRET` rotation, a different `ENCRYPTION_KEY` cannot verify, legacy links still
+verify, a dedicated secret excludes the fallback); four mutants KILLED and recorded. Cost if wrong: if a
+promotional SMS did go out between PR 2421 and this change, its opt-out link now answers INVALID_TOKEN,
+and that shopper must reply STOP or ask the merchant.
+
+**Ruling SMS-7 — the opt-out text has a fixed length budget; the dispatcher owns it, and every SMS
+logs its billed segments (issue 2426).** The token is now 45 characters (consent uuid as 16 raw bytes
+plus a 128-bit MAC, both canonical base64url; it was 59). The appended
+` Stop offers: <base>/sms-unsubscribe?t=<token>` costs 78 characters plus the storefront base, and it
+was 92. Measured with `smsSegments` (GSM-7 160/153, UCS-2 70/67): every promotional English template
+with realistic links is one segment on its own and two with the opt-out. No length of link keeps it at
+one, so a promotional SMS costs two segments. `tests/unit/sms-segments.test.ts` pins that it stays
+within two. The opt-out link is not dropped or shortened past usefulness, because it is the consent
+record's withdrawal path. `[NotificationDispatcher] SMS queued` now logs `segments` and `encoding` for
+every SMS, so a longer template is visible in the logs before it shows up on a bill. The storefront base
+is cached in memory per API instance (120s, BOUNDED-stale, documented at the cache site), so a fan-out
+reads the store once, not once per recipient. Residual: for up to 120s after a store changes its custom
+domain, new opt-out links use the old domain. Cost if wrong: Arabic templates (UCS-2) would cost
+3–4 segments if a locale switch is ever added. That PR must re-run this budget against the Arabic text.
+
+**Ruling CSRF-AUTH-1 — `/auth/` is no longer a blanket CSRF exemption; only the credential-less
+entry points are exempt, by exact path (issue 2425).** The exemption was
+`req.path.includes('/auth/')`, justified as "auth endpoints use JWT tokens (not session cookies)". That
+was false for every route behind `authenticate`. A merchant custom domain is CORS-allowlisted, so a
+page on it could forge a credentialed `PUT /auth/me/sms-consent` on a visiting shopper's cookie, as the
+issue reported. The same held for `PUT /auth/me`, `DELETE /auth/me`, `POST /auth/me/erase`,
+`POST /auth/change-password`, `POST /auth/logout-all` and the MFA enroll/disable routes. The fix
+narrows the exemption instead of moving one route, which closes the class. `CSRF_EXEMPT_AUTH_PATHS`
+holds register, login, refresh, logout, forgot/reset-password, verify-email, resend-verification and
+mfa/verify, the same set as the storefront's `NO_REFRESH_AUTH_ROUTES`, and a unit test fails on drift.
+Every client already sends `X-Session-ID` + `X-CSRF-Token` through its request helper (web, admin,
+orders). A JSON request from a platform origin and a Bearer request still skip by their own rules, and a
+CSRF-403 heals through a refresh on the storefront. Evidence:
+`tests/unit/csrf-merchant-origin.test.ts` covers 9 forged writes refused, the legitimate token-bearing
+write accepted, the exempt paths in three spellings, substring non-matches and the parity check. The
+mutant restoring `includes('/auth/')` turned 18 tests red and was restored byte-identical. It is
+recorded as `csrf-auth-exemption-credential-less-only`. Not verified live: a custom-domain shopper
+changing their profile after deploy. That path has to mint a token at login or refresh, as every
+`/stores/*` write there already does. Cost if wrong: if some client calls an authenticated `/auth/`
+write from a merchant custom domain without the CSRF headers, that call now 403s CSRF_MISSING_SESSION
+instead of succeeding.
 **Ruling TRC-7 — a cookie-less visitor to an Arabic-default store gets the store default in the
 route/cache key, declared on the store token (issue 2419, 2026-10-02).** The rewrite used to key a
 visitor with no `force-language` cookie as `en`, while the root layout renders the store's

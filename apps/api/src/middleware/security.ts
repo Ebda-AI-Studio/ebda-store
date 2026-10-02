@@ -451,6 +451,31 @@ function refuseNonPlatformOrigin(req: Request, res: Response, origin: string, ga
   });
 }
 
+/**
+ * The `/auth/` routes exempt from CSRF: exactly the credential-less entry
+ * points (the same set the storefront never refreshes on, `NO_REFRESH_AUTH_ROUTES`
+ * in apps/web/src/lib/api.ts). Login/register/forgot/reset/verify/resend and
+ * the MFA challenge run before a session exists; refresh mints the CSRF token
+ * the rest of the API is checked against; logout must work for a session that
+ * has lost its token. An exact match on the whole path, not a substring: a new
+ * `/auth/...` route is CSRF-checked until someone adds it here on purpose.
+ */
+const CSRF_EXEMPT_AUTH_PATHS: ReadonlySet<string> = new Set([
+  '/api/v1/auth/register',
+  '/api/v1/auth/login',
+  '/api/v1/auth/refresh',
+  '/api/v1/auth/logout',
+  '/api/v1/auth/forgot-password',
+  '/api/v1/auth/reset-password',
+  '/api/v1/auth/verify-email',
+  '/api/v1/auth/resend-verification',
+  '/api/v1/auth/mfa/verify',
+]);
+
+export function isCsrfExemptAuthPath(path: string): boolean {
+  return CSRF_EXEMPT_AUTH_PATHS.has(path.toLowerCase().replace(/\/+$/, ''));
+}
+
 export function csrfProtection(req: Request, res: Response, next: NextFunction) {
   // Skip for safe methods
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
@@ -462,10 +487,20 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  // Skip for all auth routes. Auth endpoints use JWT tokens (not session
-  // cookies), so they are not vulnerable to CSRF. This covers login,
-  // register, refresh, logout, password reset, verify-email, etc.
-  if (req.path.includes('/auth/')) {
+  // Skip for the CREDENTIAL-LESS auth entry points only — the routes a caller
+  // reaches before it holds a session, or that mint/clear the CSRF token
+  // itself (see CSRF_EXEMPT_AUTH_PATHS). Every other `/auth/` write sits
+  // behind `authenticate`, rides the same SameSite=None cookie as any store
+  // write, and goes through the full check below.
+  //
+  // This used to be `req.path.includes('/auth/')`, justified as "auth
+  // endpoints use JWT tokens (not session cookies)". That was false for every
+  // authenticated one: a merchant custom domain is CORS-allowlisted, so a page
+  // on a host the merchant controls could forge a credentialed PUT
+  // /auth/me/sms-consent (flip a signed-in shopper's marketing consent), PUT
+  // /auth/me, POST /auth/change-password, DELETE /auth/me or POST
+  // /auth/logout-all with the victim's cookie (issue 2425).
+  if (isCsrfExemptAuthPath(req.path)) {
     return next();
   }
 

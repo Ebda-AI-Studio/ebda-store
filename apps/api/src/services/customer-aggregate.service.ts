@@ -705,7 +705,11 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
           },
           orders: [],
           truncated: false,
-          smsMarketingConsent: await SmsConsentService.getForCustomerKey(storeId, zeroOrderUser.id),
+          smsMarketingConsent: await SmsConsentService.getForCustomerKey(
+            storeId,
+            zeroOrderUser.id,
+            zeroOrderUser.phone
+          ),
         };
       }
     }
@@ -805,11 +809,13 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
     }
   }
 
-  // SMS-marketing consent (issue 206), keyed exactly like this profile:
-  // the user id for a registered shopper, else the guest key clicked.
+  // SMS-marketing consent (issue 206): this profile's own key (the user id
+  // for a registered shopper, else the guest key clicked) plus its phone, the
+  // same rows the send gate matches (issue 2423).
   const smsMarketingConsent = await SmsConsentService.getForCustomerKey(
     storeId,
-    newest.customer?.id ?? decodedKey
+    newest.customer?.id ?? decodedKey,
+    customer.phone
   );
 
   return { customer: { ...customer, groupId, group }, orders, truncated, smsMarketingConsent };

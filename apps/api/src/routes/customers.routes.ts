@@ -555,9 +555,10 @@ router.get(
         : new Map<string, RfmSegment>();
       // SMS-marketing consent per row (issue 206) — this page's rows only,
       // read live (never from the cached aggregate) so a withdrawal shows at once.
+      // Each row's key AND phone, the same rows the send gate matches (issue 2423).
       const smsConsentOf = await SmsConsentService.statusForKeys(
         storeId,
-        pageSlice.map(c => c.id)
+        pageSlice.map(c => ({ key: c.id, phone: c.phone }))
       );
       const pageItems = pageSlice.map(c => {
         const smsMarketingConsent = smsConsentOf.get(c.id) ?? 'none';

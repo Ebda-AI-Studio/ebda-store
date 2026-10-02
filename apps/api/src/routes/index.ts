@@ -93,7 +93,9 @@ router.use('/public', publicStoreLayoutRoutes);
 router.use('/mcp/admin', mcpAdminRoutes);
 router.use('/mcp', mcpRoutes);
 // SMS-marketing consent (issue 206): the shopper's own opt-in on the account
-// page. Mounted before '/auth' so the auth router never sees the path.
+// page. Mounted before '/auth' so the auth router never sees the path. The
+// `/auth/` prefix does NOT exempt its PUT from CSRF: only the credential-less
+// auth entry points are exempt (`isCsrfExemptAuthPath`, issue 2425).
 router.use('/auth/me/sms-consent', smsConsentAccountRoutes);
 router.use('/auth', authRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.

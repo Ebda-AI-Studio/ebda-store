@@ -126,6 +126,14 @@ on:
       - 'apps/api/src/lib/store-scoped-read.ts'
       - 'apps/api/src/index.ts'
       - 'apps/api/src/lib/customer-key.ts'
+      # Issues 2423-2425: the SMS opt-out token and its derived key, the two
+      # sibling link MACs moved off JWT_SECRET with it, and the phone-wide
+      # consent reads.
+      - 'apps/api/src/lib/sms-consent.ts'
+      - 'apps/api/src/lib/derived-secret.ts'
+      - 'apps/api/src/lib/campaign-unsubscribe-token.ts'
+      - 'apps/api/src/lib/review-token.ts'
+      - 'apps/api/src/services/sms-consent.service.ts'
       - 'tests/unit/**'
       # --tier=all runs the integration-tier defences too (issues 2175/2188):
       # their verdicts rest on tests/integration/*.test.ts files, so a PR that
@@ -254,10 +262,11 @@ jobs:
     # to 20) even after the postgres service + --tier=all integration-tier
     # defence below were added, since those only add work, not headroom.
     timeout-minutes: 30
-    # Postgres only, no Redis, no API server. The spec has SIX
+    # Postgres only, no Redis, no API server. The spec has EIGHT
     # integration-tier defences (issues 2184/2187 — this comment used to say
     # "the one"; the three admin-coupon entries were added for issues
-    # 2304/2317); tests/unit/mutation-gate-trigger-coverage.test.ts fails if
+    # 2304/2317, the two SMS-consent entries for issue 2423);
+    # tests/unit/mutation-gate-trigger-coverage.test.ts fails if
     # an integration-tier id is added to docs/security/defence-mutations.json
     # without being named and reasoned about here:
     #   - password-reset-bumps-token-version (tests/integration/refresh-token-
@@ -281,6 +290,15 @@ jobs:
     #     reservation test stubs the rules pre-check with vi.spyOn, not Redis.
     #     Measured KILLED against a migrated Postgres 16 with REDIS_URL unset
     #     (2026-10-01, batch z-ci-other).
+    #   - sms-consent-read-phone-wide, sms-consent-list-phone-wide (both:
+    #     tests/integration/sms-marketing-consent.test.ts): drive
+    #     SmsConsentService, the notification dispatcher and the consent
+    #     routers IN-PROCESS (supertest on a bare express app, authenticate
+    #     stubbed) against Prisma; the SMS queue is spied, nothing is sent; the
+    #     dispatcher's rate limiter uses redis.service's in-memory fallback.
+    #     Signing the opt-out link needs ENCRYPTION_KEY, which the run step
+    #     below sets. Measured KILLED against a migrated Postgres 16 with
+    #     REDIS_URL unset (2026-10-02, batch followups10).
     # Measured, not assumed: run 36667422016 (2026-09-30) scored the first
     # three KILLED in this exact environment. If one ever scores ERROR here, the
     # environment is short a dependency — provision it; do not drop the tier.
