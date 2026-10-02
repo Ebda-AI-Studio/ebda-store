@@ -144,7 +144,12 @@ export function pageSurfaceStyle(
   // 'dark' needs a parseable colour to derive the palette from.
   const wantDark = scheme === 'dark' ? !!hsl : scheme === 'light' ? false : !!hsl && isDark(hsl);
   if (!hsl || !wantDark) {
-    // Light page colour: the text sits on it and on the theme's card.
+    // Light branch: the text sits on the page colour AND the theme's card. A
+    // merchant who forces 'light' on a dark page colour hands contradictory
+    // grounds (dark page, light card) — no ink reads on both, so the derivation
+    // yields the `var(--<role>)` pass-through: the bare role colour, exactly as
+    // before the ink (issue 2402). Dropping the page, or setting no ink and
+    // inheriting the root's card-measured (dark) ink, would be darker still.
     if (hsl) {
       const card = theme?.cardColor ? colorToHslTriplet(theme.cardColor, theme) : '0 0% 100%';
       Object.assign(style, pageInkVars(theme, [triplet(hsl.h, hsl.s, hsl.l), card]));

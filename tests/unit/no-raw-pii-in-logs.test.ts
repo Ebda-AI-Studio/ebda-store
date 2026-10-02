@@ -25,10 +25,13 @@
  *     `*mobile`) or its VALUE is an identifier / member ending in one
  *     (`{ id: user.email }`). It passes only when the value is a `mask*` /
  *     `redact*` / `hash*` call, a literal, a `.length`, or a boolean.
- *   - spreads (`{ ...ctx }`): their content is not visible to a syntax walk, so
- *     every spread in a log object must be listed in REVIEWED_SPREADS with the
- *     reason it carries no contact. A new spread fails until someone reads it;
- *     a listed spread that no longer exists fails too, so the list stays exact.
+ *   - spreads (`{ ...ctx }`) and an opaque FIRST argument (`logger.info(ctx,
+ *     'x')` — pino's merge object, written key by key exactly like a spread;
+ *     issue 2396): their content is not visible to a syntax walk, so each must
+ *     be listed in REVIEWED_SPREADS with the reason it carries no contact. A new
+ *     one fails until someone reads it; a listed one that no longer exists
+ *     fails too, so the list stays exact.
+ *   - array literals are walked element by element (`{ items: [{ email }] }`).
  *   - template / concatenated messages: every interpolated expression is held
  *     to the same rule (`` `sent to ${email}` `` fails).
  *   - bare positional values (`console.log('x', user.email)`).
@@ -82,8 +85,14 @@ const REVIEWED_SPREADS: Record<string, string> = {
     'DeadstockScanResult → scanned / flagged / expiredCount',
   'apps/api/src/lib/inngest/functions/stock-reorder-scan.ts|result':
     'ReorderScanResult → scanned / suggested / expiredCount',
+  'apps/api/src/lib/inngest/functions/r2-orphan-sweep.ts|summary':
+    'bare first arg: { totalKeys; totalBytes; orphanCount; orphanBytes; skippedYoung; applyDeletes } — counts and a flag',
   'apps/api/src/lib/inngest/functions/warehouse-reconcile-sweep.ts|result':
-    'backfillReconcileAll → { skusReconciled; skusFailed }',
+    'spread: backfillReconcileAll → { skusReconciled; skusFailed }; bare first arg: WarehouseSweepResult → store / SKU counts',
+  'apps/api/src/services/gmail-alert-poller.service.ts|result':
+    'bare first arg: PollResult → { scanned; forwarded; failed; skipped } counts',
+  'apps/api/src/services/onesignal.service.ts|meta':
+    'bare first arg ×4: { audience | storeId; notificationId; recipients: number; errors } — errors is the OneSignal response field (opaque provider body, Ruling LOG-PII-1)',
   'apps/api/src/middleware/request-transaction.ts|logContext':
     'Record<string, unknown>; its only caller (tenant-context.ts) passes { storeId, userId } / { userId, storeId, middleware }',
   'apps/api/src/routes/payment.routes.ts|rollbackContext': '{ orderId; storeId; sessionId } | null',
@@ -92,6 +101,12 @@ const REVIEWED_SPREADS: Record<string, string> = {
     'OrphanedProviderInvoice → storeId, orderId, orderNumber, provider, transactionId, amount, currency, source',
   'apps/api/src/services/payment-providers/unbooked-refund-alert.ts|a.context':
     'Record<string, unknown>; the four callers in payment.factory.ts pass payment / order / claim / refund ids and fils amounts only',
+  'packages/database/prisma/clone-demo-stores.ts|e':
+    'bare first arg: `.catch(e => console.error(e))` — the Error from a local dev CLI, never deployed',
+  'packages/database/prisma/flip-card-frame-primary.ts|e':
+    'bare first arg: `.catch(e => console.error(e))` — the Error from a local dev CLI, never deployed',
+  'packages/database/prisma/seed.ts|e':
+    'bare first arg: `.catch(e => console.error(e))` — the Error from a local dev CLI, never deployed',
 };
 
 function walk(dir: string): string[] {
@@ -264,6 +279,12 @@ export function scanLogCalls(
         checkObject(unwrap(value) as ts.ObjectLiteralExpression);
         continue;
       }
+      // Issue 2396: `{ items: [{ email }] }` — an array under a non-contact key
+      // is walked element by element, not dropped.
+      if (!PII_KEY.test(key) && ts.isArrayLiteralExpression(unwrap(value))) {
+        checkArray(unwrap(value) as ts.ArrayLiteralExpression);
+        continue;
+      }
       const leaf = leafName(value);
       const piiShaped = PII_KEY.test(key) || (leaf !== null && PII_LEAF.test(leaf));
       if (piiShaped && !isSafeValue(value)) flag(p, `${key}: ${value.getText(sf)}`);
@@ -287,11 +308,36 @@ export function scanLogCalls(
     }
   };
 
-  const checkArg = (a: ts.Expression) => {
+  const checkArray = (arr: ts.ArrayLiteralExpression) => {
+    for (const el of arr.elements) {
+      if (ts.isSpreadElement(el)) spreads.push(`${file}|${el.expression.getText(sf)}`);
+      else checkArg(el, 1);
+    }
+  };
+
+  /**
+   * `index` is the argument position. Argument 0 of a pino call IS the merge
+   * object: `logger.info(scanResult, 'done')` writes every own key of
+   * `scanResult` to the drain exactly as `{ ...scanResult }` does (issue 2396),
+   * and `console.*` prints it whole. So an opaque first argument (a name, a
+   * member, a call) is held to the spread rule: listed in REVIEWED_SPREADS or
+   * the gate fails. Later positional arguments are format values, not merged.
+   */
+  const checkArg = (a: ts.Expression, index: number) => {
     const u = unwrap(a);
     if (ts.isObjectLiteralExpression(u)) checkObject(u);
+    else if (ts.isArrayLiteralExpression(u)) checkArray(u);
     else if (ts.isTemplateExpression(u) || ts.isBinaryExpression(u)) checkMessage(u);
     else if (piiNamed(u) && !isSafeValue(u)) flag(u, u.getText(sf));
+    else if (
+      index === 0 &&
+      !isSafeValue(u) &&
+      (ts.isIdentifier(u) ||
+        ts.isPropertyAccessExpression(u) ||
+        ts.isElementAccessExpression(u) ||
+        ts.isCallExpression(u))
+    )
+      spreads.push(`${file}|${u.getText(sf)}`);
   };
 
   const isLogCall = (n: ts.CallExpression): boolean => {
@@ -307,7 +353,7 @@ export function scanLogCalls(
   };
 
   const visit = (n: ts.Node) => {
-    if (ts.isCallExpression(n) && isLogCall(n)) n.arguments.forEach(checkArg);
+    if (ts.isCallExpression(n) && isLogCall(n)) n.arguments.forEach((a, i) => checkArg(a, i));
     ts.forEachChild(n, visit);
   };
   visit(sf);
@@ -319,7 +365,7 @@ export function findRawPiiLogFields(source: string, file = 'input.ts'): string[]
   return [...violations, ...spreads.map(s => `unreviewed spread ${s}`)];
 }
 
-describe('no raw email / phone in any log call (issues 2390, 2392, 2394)', () => {
+describe('no raw email / phone in any log call (issues 2390, 2392, 2394, 2396)', () => {
   const files = ROOTS.flatMap(r => walk(join(REPO, r)));
   const results = files.map(f => scanLogCalls(readFileSync(f, 'utf8'), relative(REPO, f)));
 
@@ -385,6 +431,14 @@ describe('no raw email / phone in any log call (issues 2390, 2392, 2394)', () =>
     [`console.warn('x', user.email)`],
     [`logger.info({ msg: \`to \${to}\` })`],
     [`logger.info({ id, ...(dup ? { email } : {}) }, 'x')`],
+    // issue 2396: a bare merge object is as opaque as a spread; arrays are walked
+    [`logger.info(scanResult, 'done')`],
+    [`logger.warn(job.data, 'x')`],
+    [`logger.info(buildMeta(order), 'x')`],
+    [`console.error(e)`],
+    [`logger.info({ items: [{ email }] }, 'x')`],
+    [`logger.info({ items: [{ id }, user.phone] }, 'x')`],
+    [`logger.info({ items: [...list] }, 'x')`],
   ])('flags %s', src => {
     expect(findRawPiiLogFields(src)).toHaveLength(1);
   });
@@ -405,6 +459,10 @@ describe('no raw email / phone in any log call (issues 2390, 2392, 2394)', () =>
     [`const logFn = logger.info.bind(logger); logFn({ storeId }, 'request')`],
     [`toast.error(\`\${email} is taken\`)`],
     [`logger.info({ id, ...(dup ? { spent: n } : {}) }, 'x')`],
+    // issue 2396: only argument 0 is merged; later ones are format values
+    [`logger.info({ storeId }, message)`],
+    [`logger.info(maskEmail(email))`],
+    [`logger.info({ items: [{ id }, 3] }, 'x')`],
   ])('passes %s', src => {
     expect(findRawPiiLogFields(src)).toEqual([]);
   });

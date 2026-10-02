@@ -13,6 +13,12 @@
  * survive every emitter: the shared themeToCssVars, the SSR style tag
  * sanitizer, the client StoreContext mirror, and the per-page surface wrapper.
  *
+ * Where no lightness of the role hue reads on BOTH surfaces (they sit on
+ * opposite sides of the lightness range — issues 2399-2402), a non-legacy store
+ * gets the same `var(--<role>)` pass-through: the old colour, never black or
+ * white. That is accepted only where an independent sweep proves no lightness
+ * reads, and no ink may ever measure below the bare role colour it replaced.
+ *
  * Contrast is re-computed here independently (floating point, no rounding)
  * rather than through the helpers under test.
  */
@@ -21,6 +27,7 @@ import { join, resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_THEME,
+  deriveCoreBrandTokens,
   getTemplateTheme,
   themeToCssVars,
   statusInkVars,
@@ -54,15 +61,24 @@ const ratio = (a: number[], b: number[]) => {
   const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 };
-/** Worst contrast of `ink` over the role's tints on every surface. */
+/** Worst contrast of `ink` over the role's tints on every surface. An ink of
+ *  `var(--<role>)` (the pass-through) IS the role colour and is measured as it. */
 function worst(ink: string, role: string, surfaces: string[]): number {
+  const inkRgb = rgb(PASS.test(ink) ? role : ink);
   let min = Infinity;
   for (const s of surfaces)
     for (const a of TINTS) {
       const bg = rgb(role).map((v, i) => v * a + rgb(s)[i] * (1 - a));
-      min = Math.min(min, ratio(rgb(ink), bg));
+      min = Math.min(min, ratio(inkRgb, bg));
     }
   return min;
+}
+const PASS = /^var\(--(success|warning|info|destructive)\)$/;
+/** Independent sweep: does ANY lightness of the role's hue read on every surface? */
+function hueHasSolution(role: string, surfaces: string[]): boolean {
+  const [h, S] = role.split(' ');
+  for (let l = 0; l <= 100; l++) if (worst(`${h} ${S} ${l}%`, role, surfaces) >= 4.5) return true;
+  return false;
 }
 const INFO = '199 89% 48%'; // not a theme field: the storefront default
 
@@ -83,6 +99,18 @@ const HOSTILE: Array<[string, Partial<StoreTheme>]> = [
   // A role saved as hex (older editor) and a token reference.
   ['hex + token roles', { destructiveColor: '#e11d48', successColor: 'token:primary' }],
   ['warm-sand page rhythm', { backgroundPreset: 'warmSand' }],
+  // Issues 2399-2401: surfaces on OPPOSITE sides of the lightness range have no
+  // single readable ink. Black/white would vanish on one of them (1.13:1).
+  ['light card on a dark page', { cardColor: '0 0% 100%', backgroundColor: '220 20% 8%' }],
+  ['dark card on a light page', { cardColor: '220 20% 10%', backgroundColor: '0 0% 100%' }],
+  // Reachable from the editor: the legacy Smart Palette derives the card
+  // DARKER than the page, so a mid neutral seed straddles the threshold.
+  [
+    'smart palette, mid neutral seed',
+    (({ cardColor, backgroundColor }) => ({ cardColor, backgroundColor }))(
+      deriveCoreBrandTokens({ primary: '#7c3aed', neutral: '#333333' })
+    ),
+  ],
 ];
 
 const PALETTES: Array<[string, StoreTheme]> = [
@@ -102,9 +130,40 @@ describe('per-store inks read at >= 4.5:1 (default, issue 2349)', () => {
       // section-rhythm tokens, which stay white on a dark store).
       const surfaces = [v['--card'], v['--background']];
       const roleColor = role === 'info' ? INFO : v[`--${role}`];
-      expect(worst(v[`--${role}-ink`], roleColor, surfaces)).toBeGreaterThanOrEqual(4.5);
+      const ink = v[`--${role}-ink`];
+      if (PASS.test(ink)) {
+        // The pass-through is taken ONLY when no lightness of the hue reads on
+        // every surface — and then the text is exactly the pre-ink role colour.
+        expect(ink).toBe(`var(--${role})`);
+        expect(hueHasSolution(roleColor, surfaces)).toBe(false);
+      } else {
+        expect(worst(ink, roleColor, surfaces)).toBeGreaterThanOrEqual(4.5);
+        // Keeps the role's hue and saturation (a darker amber, not a new colour).
+        expect(ink.split(' ').slice(0, 2)).toEqual(roleColor.split(' ').slice(0, 2));
+      }
+      // Never worse than the bare role colour the ink replaced.
+      expect(worst(ink, roleColor, surfaces)).toBeGreaterThanOrEqual(
+        Math.min(4.5, worst(roleColor, roleColor, surfaces))
+      );
     });
   }
+
+  it.each([
+    ['light card on a dark page', 4],
+    ['dark card on a light page', 4],
+    ['smart palette, mid neutral seed', 4],
+  ] as const)(
+    'control: %s really has no single readable ink (the fallback is exercised)',
+    (name, passThroughs) => {
+      const theme = { ...DEFAULT_THEME, ...HOSTILE.find(([n]) => n === name)![1] } as StoreTheme;
+      const v = themeToCssVars(theme);
+      const inks = STATUS_INK_ROLES.map(r => v[`--${r}-ink`]);
+      expect(inks.filter(i => PASS.test(i))).toHaveLength(passThroughs);
+      // Not black or white: those read on one surface and vanish on the other.
+      expect(inks).not.toContain('0 0% 0%');
+      expect(inks).not.toContain('0 0% 100%');
+    }
+  );
 
   it('control: the bare role colour really fails where the ink passes', () => {
     const v = themeToCssVars(DEFAULT_THEME);
@@ -117,6 +176,16 @@ describe('per-store inks read at >= 4.5:1 (default, issue 2349)', () => {
     const v = themeToCssVars(DEFAULT_THEME);
     for (const role of ['success', 'warning', 'destructive'] as const)
       expect(v[`--${role}-ink`].split(' ')[0]).toBe(v[`--${role}`].split(' ')[0]);
+  });
+
+  it('a non-legacy store that falls back keeps var(--<role>) through the SSR sanitizer', () => {
+    const tag = buildThemeStyleTag({
+      ...DEFAULT_THEME,
+      cardColor: '0 0% 100%',
+      backgroundColor: '220 20% 8%',
+    } as StoreTheme);
+    for (const role of STATUS_INK_ROLES) expect(tag).toContain(`--${role}-ink: var(--${role})`);
+    expect(tag).not.toMatch(/-ink: 0 0% (0|100)%/);
   });
 
   it('a dark store gets a LIGHTER ink than its role colour', () => {
@@ -195,6 +264,29 @@ describe('page surface wrapper (merchant page colour on cart / checkout / PDP / 
       worst(style['--warning-ink'], v['--warning'], ['40 63% 90%', v['--card']])
     ).toBeGreaterThanOrEqual(4.5);
   });
+
+  it.each([
+    ['#1a1a1a', '0 0% 10.2%'],
+    ['#3d3d3d', '0 0% 23.9%'],
+    ['#000000', '0 0% 0%'],
+  ])(
+    "colorScheme 'light' on a dark page %s: never darker than the bare role colour (issue 2402)",
+    (bg, page) => {
+      const style = pageSurfaceStyle(bg, DEFAULT_THEME, 'light') as Record<string, string>;
+      const v = themeToCssVars(DEFAULT_THEME);
+      // The light branch leaves the palette light: text sits on the dark page
+      // colour itself and on the theme's (white) card.
+      const surfaces = [page, v['--card']];
+      for (const role of STATUS_INK_ROLES) {
+        const roleColor = role === 'info' ? INFO : v[`--${role}`];
+        const ink = style[`--${role}-ink`];
+        expect(ink, role).not.toMatch(/^0 0% (0|100)%$/);
+        expect(worst(ink, roleColor, surfaces), role).toBeGreaterThanOrEqual(
+          Math.min(4.5, worst(roleColor, roleColor, surfaces))
+        );
+      }
+    }
+  );
 
   it.each(['#1a1a1a', '#f5ecd7'])(
     'legacy: page %s sets no ink (it inherits the root pass-through, as before)',

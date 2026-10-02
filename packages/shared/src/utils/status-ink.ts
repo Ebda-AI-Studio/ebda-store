@@ -36,7 +36,8 @@ export const STATUS_ROLE_DEFAULTS: Record<StatusInkRole, readonly string[]> = {
   destructive: ['0 84.2% 60.2%'],
 };
 
-/** The only non-triplet value an ink var may hold: the legacy pass-through. */
+/** The only non-triplet value an ink var may hold: the pass-through (a legacy
+ *  store, or a palette with no readable ink — deriveStatusInk returns null). */
 export const LEGACY_STATUS_INK_VALUE = /^var\(--(success|warning|info|destructive)\)$/;
 
 interface Hsl {
@@ -67,16 +68,25 @@ const blend = (fg: Rgb, bg: Rgb, a: number): Rgb => ({
  * The ink for one role: the role's own hue and saturation at the lightness
  * closest to the role's that reads at >= 4.5:1 on EVERY given surface, bare
  * and under every tint in STATUS_INK_TINTS. Lighter surfaces push it darker,
- * dark ones lighter. Returns a bare `H S% L%` triplet.
+ * dark ones lighter. Returns a bare `H S% L%` triplet, or `null` when no
+ * lightness of the hue reads on every surface.
+ *
+ * `null` is not exotic (issues 2399-2402): a dark ink needs a surface at
+ * relative luminance >= ~0.18, a light ink one below it, so a light card on a
+ * dark page (or the reverse) has no single answer. Black or white would then
+ * read on one surface and vanish on the other (1.13:1 measured) — worse than
+ * the bare role colour the ink replaced. The caller falls back to that role
+ * colour instead, so a contradictory palette renders exactly as it did before
+ * the ink existed, never worse.
  */
 export function deriveStatusInk(
   roleColors: readonly string[],
   surfaces: readonly string[]
-): string {
+): string | null {
   const roles = roleColors.map(v => parseColorToRgb(v)).filter((c): c is Rgb => c !== null);
   const grounds = surfaces.map(v => parseColorToRgb(v)).filter((c): c is Rgb => c !== null);
   const base = toHsl(roleColors.find(v => parseColorToRgb(v)));
-  if (!base || roles.length === 0) return '0 0% 0%';
+  if (!base || roles.length === 0) return null;
   if (grounds.length === 0) grounds.push({ r: 255, g: 255, b: 255 });
   const backdrops = grounds.flatMap(g =>
     roles.flatMap(r => STATUS_INK_TINTS.map(a => blend(r, g, a)))
@@ -92,10 +102,8 @@ export function deriveStatusInk(
       if (l >= 0 && l <= 100 && reads(l)) return `${base.h} ${base.s}% ${l}%`;
     }
   }
-  // No hue survives every backdrop (a mid-grey card): the stronger extreme.
-  const black = backdrops.reduce((m, b) => Math.min(m, ratio({ r: 0, g: 0, b: 0 }, b)), 99);
-  const white = backdrops.reduce((m, b) => Math.min(m, ratio({ r: 255, g: 255, b: 255 }, b)), 99);
-  return black >= white ? '0 0% 0%' : '0 0% 100%';
+  // l = 0 and l = 100 (black, white) were in the sweep: nothing reads everywhere.
+  return null;
 }
 
 /**
@@ -104,7 +112,9 @@ export function deriveStatusInk(
  *    the role colour itself, so every `text-<role>-ink` renders exactly as the
  *    `text-<role>` it replaced.
  *  - otherwise: derived per role from the given role colours (unset → the
- *    storefront default) against every given surface.
+ *    storefront default) against every given surface; where no lightness of
+ *    the hue reads on every surface, the same `var(--<role>)` pass-through
+ *    (never worse than before the ink — see deriveStatusInk).
  */
 export function statusInkVars(
   roleColors: Partial<Record<StatusInkRole, string | undefined>>,
@@ -119,10 +129,11 @@ export function statusInkVars(
     }
     const own = roleColors[role];
     const colors = own && parseColorToRgb(own) ? [own] : [...STATUS_ROLE_DEFAULTS[role]];
-    out[`--${role}-ink`] = deriveStatusInk(
-      colors,
-      surfaces.filter((s): s is string => !!s)
-    );
+    out[`--${role}-ink`] =
+      deriveStatusInk(
+        colors,
+        surfaces.filter((s): s is string => !!s)
+      ) ?? `var(--${role})`;
   }
   return out;
 }
