@@ -178,9 +178,78 @@ export interface OrderListWhere {
   confirmedOnly?: boolean;
 }
 
+/**
+ * Most customer ids the order search resolves up front. Above this the term
+ * is too broad for an id list to be worth binding, and the search falls back
+ * to the relation filter (same rows, unindexed plan). 1000 bind parameters is
+ * nowhere near Postgres' 65535 ceiling.
+ */
+export const ORDER_SEARCH_CUSTOMER_ID_CAP = 1000;
+
+/**
+ * The OR arms of the order-list search: order number, or the registered
+ * customer's first name / last name / email / phone (issue 2405).
+ *
+ * WHY two steps. The obvious shape — `customer: { is: { firstName: contains } }`
+ * per field — is compiled by Prisma into four LEFT JOINs onto `users` with an
+ * OR spanning both tables. No index can serve an OR whose arms live on
+ * different sides of a join, so every keystroke walked the store's whole
+ * order history (measured: 150-270 ms per query at 50k orders, twice per
+ * search because the list also counts). Resolving the matching customers
+ * first turns every arm into a predicate on `orders` itself —
+ * `order_number ILIKE` (trigram GIN) OR `customer_id IN (...)` (btree) —
+ * which Postgres answers with a BitmapOr (measured: under 1 ms). The customer
+ * lookup is itself a BitmapOr over the four `users` trigram indexes. Both
+ * sets of indexes: migration 20261002090000_order_search_trgm_and_fk_indexes.
+ *
+ * Same rows as the relation filter, by construction: an order matches iff its
+ * number matches or its customer matches on one of the four fields. The
+ * customer lookup is restricted to users with an order in THIS store (a
+ * semi-join, bounded by the store's own customers), not by `users.store_id` —
+ * a registered customer's `store_id` is not necessarily the order's store.
+ *
+ * Falls back to the relation filter when the term is shorter than a trigram
+ * (3 chars — the indexes cannot serve it, so the lookup would only add a
+ * scan) or matches more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers.
+ */
+export async function orderSearchWhere(
+  storeId: string,
+  search: string
+): Promise<Prisma.OrderWhereInput[]> {
+  const contains = { contains: search, mode: 'insensitive' as const };
+  const customerMatch: Prisma.UserWhereInput[] = [
+    { firstName: contains },
+    { lastName: contains },
+    { email: contains },
+    { phone: contains },
+  ];
+  const relationFallback: Prisma.OrderWhereInput[] = [
+    { orderNumber: contains },
+    { customer: { is: { OR: customerMatch } } },
+  ];
+  if (search.length < 3) return relationFallback;
+
+  const customers = await prisma.user.findMany({
+    where: { OR: customerMatch, orders: { some: { storeId } } },
+    select: { id: true },
+    take: ORDER_SEARCH_CUSTOMER_ID_CAP + 1,
+  });
+  if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) return relationFallback;
+
+  const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
+  if (customers.length > 0) arms.push({ customerId: { in: customers.map(c => c.id) } });
+  return arms;
+}
+
 export class OrderService {
-  /** WHERE clause for the order list and its export. */
-  static listWhere(storeId: string, filters: OrderListWhere): Prisma.OrderWhereInput {
+  /**
+   * WHERE clause for the order list and its export. Async because a search
+   * first resolves the matching customers (see `orderSearchWhere`).
+   */
+  static async listWhere(
+    storeId: string,
+    filters: OrderListWhere
+  ): Promise<Prisma.OrderWhereInput> {
     const { status, paymentStatus, customerId, from, to, confirmedOnly } = filters;
     // Defensive deletedAt filter. The schema marks Order as soft-deletable
     // but no code path currently sets `deletedAt`, so this is a no-op
@@ -212,16 +281,7 @@ export class OrderService {
       if (to) (where.createdAt as any).lte = to;
     }
     const search = filters.search?.trim();
-    if (search) {
-      const contains = { contains: search, mode: 'insensitive' as const };
-      where.OR = [
-        { orderNumber: contains },
-        { customer: { is: { firstName: contains } } },
-        { customer: { is: { lastName: contains } } },
-        { customer: { is: { email: contains } } },
-        { customer: { is: { phone: contains } } },
-      ];
-    }
+    if (search) where.OR = await orderSearchWhere(storeId, search);
     return where;
   }
 
@@ -265,7 +325,7 @@ export class OrderService {
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where = OrderService.listWhere(storeId, options);
+    const where = await OrderService.listWhere(storeId, options);
 
     const baseFindManyArgs = {
       where,

@@ -5053,6 +5053,44 @@ Force AI account. It is still live: a plain GET on 2026-10-01 returned the harne
 must be one of …"), so anyone who sends that header gets the 3 live stores rendered by a stale
 2026-09-25 build with the flag on. Cost if wrong: that stale public copy keeps serving until deleted.
 
+## 2026-10-01 — Missing indexes / order search (`perf/missing-indexes`, issue #2405)
+
+Evidence: production `pg_stat_user_tables` / `pg_stat_user_indexes` / `pg_constraint` (read-only,
+2026-10-01) plus EXPLAIN ANALYZE on a scratch DB at 50k orders/store. Detail:
+`docs/perf/index-audit-2026-10.md`.
+
+**Ruling IDX-0 — the order search is fixed by a query rewrite plus trigram indexes, not by indexes
+alone.** Prisma compiles the four `customer: { is }` filters into LEFT JOINs with an OR spanning
+`orders` and `users`. With all five trigram indexes built and the query unchanged, the plan did not
+change (153–167 ms at 50k). `orderSearchWhere` resolves the matching customers first, restricted to
+customers with an order in this store (not `users.store_id`: 13 of 14 customer-linked production
+orders point at a user registered elsewhere), and then filters `orders` on `order_number` OR
+`customer_id IN`. That runs in < 1 ms. It returns the same rows as the relation-join shape, pinned
+by `tests/integration/order-search-indexes.test.ts`. Terms under 3 characters and terms matching
+more than 1,000 customers fall back to the relation filter. Cost if wrong: a merchant searching a
+very common name (> 1,000 matching customers) gets the old, unindexed plan for that search.
+
+**Ruling IDX-1 — no `orders (store_id, status, created_at DESC)` composite.** At 50k orders/store
+the status-filtered page is 0.5–4.5 ms (backward scan on `orders_created_at_idx`), the status count
+is 28 ms, and production is 0.10 ms. Adding it would be speculative. Cost if wrong: a store with a
+very rare status deep in a large history pays a longer backward walk until this is revisited.
+
+**Ruling IDX-2 — no `carts (store_id, created_at)` index.** The only query that needs it is the
+funnel rollup's per-day cart count: 13 ms in production, 7 calls per store from the daily 02:00
+cron. Cost if wrong: that nightly job slows linearly with cart volume.
+
+**Ruling IDX-3 — unused and redundant indexes are listed, not dropped.** There are 37 left-prefix
+duplicate btrees and 7 zero-scan non-unique indexes on tables of 300 or more rows. The audit gives
+a verdict for each. A drop needs its own migration and lock plan (`docs/DB-INDEX-MIGRATIONS.md`),
+and was out of scope for the owner's request. Cost if wrong: a few hundred kB of indexes and their
+write amplification remain until a follow-up drops them.
+
+**Ruling IDX-4 — plain `CREATE INDEX` in the migration, no CONCURRENTLY pre-build.** Production on
+2026-10-01 holds orders 188 rows, users 15, ai_usage 25k and cart_bundles 0. The builds take
+milliseconds (0.7 s even at 100k orders), so the SHARE lock is negligible, and every statement is
+`IF NOT EXISTS`. Cost if wrong: writes to `orders`/`users`/`ai_usage` wait for the build during
+the pre-deploy step, a sub-second window at today's sizes.
+
 ## 2026-10-02 — SMS marketing consent (branch `feat/sms-marketing-consent`, issue 206)
 
 **Ruling SMS-1 — consent is a per-store row keyed by `customerKeyOf`, not a flag on the caller's data.** `sms_marketing_consents` holds one row per (store, customer key); the promotional-SMS gate reads it for the recipient's phone and no producer passes a consent field. Orders keep `smsOptIn` only as a record of the tick. Cost if wrong: a producer that should have its own consent source (a future non-order channel) must add a row, not a flag.

@@ -103,6 +103,11 @@ model User {
   @@index([role])
   @@index([status])
   @@index([createdAt])
+  // Order search (OrderService.orderSearchWhere) resolves customers by name /
+  // email / phone through four pg_trgm GIN indexes —
+  // `users_{first_name,last_name,email,phone}_trgm_idx`. Raw SQL only
+  // (20261002090000_order_search_trgm_and_fk_indexes); a `migrate diff` will
+  // offer to drop them. NEVER accept that drop.
   @@map("users")
 }
 
@@ -1274,6 +1279,9 @@ model CartBundle {
 
   @@unique([cartId, bundleId])
   @@index([cartId])
+  // FK-only index for the Bundle delete cascade (the unique above has
+  // bundleId second, which the RI trigger cannot use). 20261001140000.
+  @@index([bundleId])
   @@map("cart_bundles")
 }
 
@@ -1458,6 +1466,9 @@ model Order {
   // `applied_promotion_id` alone. `orders` is the largest table in the schema,
   // so the unindexed variant of this scan is the worst of the five.
   @@index([appliedPromotionId])
+  // Order search (OrderService.orderSearchWhere): `orders_order_number_trgm_idx`,
+  // a pg_trgm GIN on order_number, lives in raw SQL only
+  // (20261002090000_order_search_trgm_and_fk_indexes) — not declared here.
   @@map("orders")
 }
 
@@ -3201,6 +3212,10 @@ model AiUsage {
   @@index([storeId, createdAt(sort: Desc)])
   @@index([feature])
   @@index([model, createdAt])
+  // Platform-wide quota counts (lib/ai-quota.ts, the super-admin AI
+  // dashboard): created_at range + cached_hit, across every store.
+  // 20261001140000.
+  @@index([createdAt, cachedHit])
   @@map("ai_usage")
 }
 

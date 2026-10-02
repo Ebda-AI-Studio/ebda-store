@@ -163,7 +163,7 @@ router.get(
       // Fetch up to cap+1 to detect truncation. Include items + first payment
       // for the Line Items sheet and the payment provider/method columns.
       const fetched = await prisma.order.findMany({
-        where: OrderService.listWhere(storeId, filters),
+        where: await OrderService.listWhere(storeId, filters),
         select: {
           id: true,
           orderNumber: true,
