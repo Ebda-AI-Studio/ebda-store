@@ -55,13 +55,17 @@ export default function ExpensesPage() {
   const t = useT('finance.expenses');
   const tc = useT('common');
 
-  // `?status=draft` deep links (finance dashboard → "Pending OCR drafts" →
-  // View all) land filtered; the page used to ignore the query string.
+  // `?status=draft&hasOcr=true` deep links (finance dashboard → "Pending receipt
+  // drafts (any date)" → View all) land on the SAME slice the card counted: the
+  // receipt-upload drafts over ALL dates, not this month's. The receipt filter
+  // is visible (a chip with a way out) and, while on, replaces the date window.
   const searchParams = useSearchParams();
   const initialStatus = searchParams?.get('status') ?? null;
   const [statusFilter, setStatusFilter] = useState<ExpenseStatus | 'all'>(
     isExpenseStatus(initialStatus) ? initialStatus : 'all'
   );
+
+  const [receiptOnly, setReceiptOnly] = useState(searchParams?.get('hasOcr') === 'true');
 
   const [period, setPeriod] = useState<Period>('this_month');
   const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
@@ -83,13 +87,15 @@ export default function ExpensesPage() {
   const fetchExpenses = useCallback(() => {
     if (!storeId) return;
     const isLatest = beginRequest();
-    const resolved = resolveDateRange(period, customRange);
-    // Calendar days: `expenseDate` is a date, not an instant (see the route).
-    const qs = new URLSearchParams({
-      perPage: '50',
-      from: toDateStr(resolved.startDate),
-      to: toDateStr(resolved.endDate),
-    });
+    const qs = new URLSearchParams({ perPage: '50' });
+    if (receiptOnly) {
+      qs.set('hasOcr', 'true'); // any date, like the dashboard card
+    } else {
+      const resolved = resolveDateRange(period, customRange);
+      // Calendar days: `expenseDate` is a date, not an instant (see the route).
+      qs.set('from', toDateStr(resolved.startDate));
+      qs.set('to', toDateStr(resolved.endDate));
+    }
     if (statusFilter !== 'all') qs.set('status', statusFilter);
     setError(null);
     apiGet<ExpenseRow[]>(`/api/v1/stores/${storeId}/expenses?${qs}`)
@@ -107,7 +113,7 @@ export default function ExpensesPage() {
         setExpenses(null);
         setError('Failed to load expenses');
       });
-  }, [storeId, period, customRange, statusFilter, beginRequest]);
+  }, [storeId, period, customRange, statusFilter, receiptOnly, beginRequest]);
 
   useEffect(() => {
     fetchExpenses();
@@ -239,14 +245,27 @@ export default function ExpensesPage() {
         </button>
       }
     >
-      <DateRangePicker
-        period={period}
-        custom={customRange}
-        onChange={(p, c) => {
-          setPeriod(p);
-          if (c) setCustomRange(c);
-        }}
-      />
+      {receiptOnly ? (
+        <div className="mb-3 flex w-fit items-center gap-2 rounded-lg border border-border bg-muted px-3 py-1.5 text-sm">
+          <span>{t('receiptOnly')}</span>
+          <button
+            type="button"
+            onClick={() => setReceiptOnly(false)}
+            className="text-xs text-primary hover:underline"
+          >
+            {t('receiptOnlyClear')}
+          </button>
+        </div>
+      ) : (
+        <DateRangePicker
+          period={period}
+          custom={customRange}
+          onChange={(p, c) => {
+            setPeriod(p);
+            if (c) setCustomRange(c);
+          }}
+        />
+      )}
 
       <label className="mb-4 flex w-fit items-center gap-2 text-sm">
         <span className="text-muted-foreground">{t('status')}</span>

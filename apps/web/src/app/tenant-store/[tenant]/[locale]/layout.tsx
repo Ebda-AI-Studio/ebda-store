@@ -57,6 +57,16 @@ export async function generateMetadata({
 }: {
   params: Promise<StoreLayoutParams>;
 }): Promise<Metadata> {
+  // While the root layout owns the store chrome it also owns the document
+  // metadata, and Next lets a nested layout's metadata REPLACE the root's.
+  // This tree's `[locale]` segment is baked by middleware from the cookie alone
+  // (cookie-less visitors and crawlers get `en`), whereas the root resolves
+  // cookie -> store defaultLanguage -> en. On an Arabic-default store that gave
+  // an English <title>/og:locale over an Arabic <html lang> (issue 2407). Emit
+  // nothing so the root's metadata is the only writer, identical flag on/off.
+  // Guarded by tests/unit/web-tenant-tree-store-chrome-render.test.tsx.
+  if (ROOT_LAYOUT_OWNS_STORE_CHROME) return {};
+
   const { tenant, locale } = await params;
   const store = await getStoreByTenantParam(tenant);
 

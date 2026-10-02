@@ -105,9 +105,12 @@ describe('detail pages thread the resolved locale into their JSON-LD (#2196)', (
   });
   it('both PDP pages and the bundle page hand the body a locale', () => {
     expect(read('products/[slug]/page.tsx')).toMatch(/locale=\{locale\}/);
-    expect(read('tenant-store/[tenant]/[locale]/products/[slug]/page.tsx')).toMatch(
-      /locale=\{localeFromRouteParam\(localeParam\)\}/
-    );
+    // Not the `[locale]` route segment: it is cookie-only, so a cookie-less crawler
+    // on an Arabic-default store got `en` (issue 2407).
+    const tenantPdp = read('tenant-store/[tenant]/[locale]/products/[slug]/page.tsx');
+    expect(tenantPdp).toMatch(/locale=\{locale\}/);
+    expect(tenantPdp).toMatch(/resolveStorefrontLocale/);
+    expect(tenantPdp).not.toMatch(/localeFromRouteParam/);
     expect(read('bundles/[slug]/page.tsx')).toMatch(/locale=\{locale\}/);
     expect(read('bundles/[slug]/BundleDetailBody.tsx')).toMatch(
       /bundleJsonLd\(initialBundle, store, locale\)/

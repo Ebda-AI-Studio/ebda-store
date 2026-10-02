@@ -530,7 +530,9 @@ export default function FinanceDashboardPage() {
                 <h2 className="text-base font-semibold">{t('pendingOcrDrafts')}</h2>
                 <button
                   type="button"
-                  onClick={() => router.push(`/stores/${storeId}/finance/expenses?status=draft`)}
+                  onClick={() =>
+                    router.push(`/stores/${storeId}/finance/expenses?status=draft&hasOcr=true`)
+                  }
                   className="text-xs text-primary hover:underline"
                 >
                   {t('viewAll')}

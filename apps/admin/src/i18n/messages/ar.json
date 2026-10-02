@@ -5887,6 +5887,8 @@
       "total": "الإجمالي (د.ك)",
       "status": "الحالة",
       "allStatuses": "كل الحالات",
+      "receiptOnly": "مسودات الإيصالات فقط (أي تاريخ)",
+      "receiptOnlyClear": "عرض كل المصروفات",
       "emptyState": "لا توجد مصروفات بعد.",
       "statuses": {
         "draft": "مسودة",

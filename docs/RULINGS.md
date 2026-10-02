@@ -5053,6 +5053,21 @@ Force AI account. It is still live: a plain GET on 2026-10-01 returned the harne
 must be one of …"), so anyone who sends that header gets the 3 live stores rendered by a stale
 2026-09-25 build with the flag on. Cost if wrong: that stale public copy keeps serving until deleted.
 
+**Ruling TRC-5 — issue 2407: while the root layout owns the store chrome, it also owns the document
+metadata; the tenant tree resolves locale the way the root does, not from its `[locale]` segment.**
+The tenant-store layout's `generateMetadata` returns `{}` while `ROOT_LAYOUT_OWNS_STORE_CHROME` is
+true (Next lets a nested layout's metadata replace the root's, and the segment is cookie-only: a
+cookie-less crawler got `en` on an Arabic-default store, so an English title and `og:locale` sat over
+`<html lang="ar">`). The tenant product page's metadata and body use `resolveStorefrontLocale`
+(cookie, then store default) for the same reason. The middleware is unchanged and the main flag is
+still off in prod, so nothing renders differently today; with it on, the merged metadata is proven
+equal to flag-off for no cookie, `en` and `ar` in
+`tests/unit/web-tenant-tree-store-chrome-render.test.tsx` (removing the early return reddens the
+cookie-less case, restored byte-identical). Accepted residual: the tree stays dynamic for metadata
+until the root-layout decomposition; the Phase 4 cache-key blocker (no-cookie visitor shares the `en`
+key) in the plan is unchanged and still has to be fixed in middleware before pages cache. Cost if wrong:
+a later change that reads the route segment for metadata again re-opens the English-over-Arabic
+index for cookie-less crawlers.
 **Ruling TRC-5 — the single-store canary on palora was NOT started: the routing switch cannot
 be scoped to one store (2026-10-01).** The owner asked for the production canary on palora only
 (store.force-ai.co/palora), never pecannbee, and to stop rather than flip globally if the switch had

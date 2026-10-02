@@ -5887,6 +5887,8 @@
       "total": "Total (KWD)",
       "status": "Status",
       "allStatuses": "All statuses",
+      "receiptOnly": "Receipt drafts only (any date)",
+      "receiptOnlyClear": "Show all expenses",
       "emptyState": "No expenses yet.",
       "statuses": {
         "draft": "Draft",

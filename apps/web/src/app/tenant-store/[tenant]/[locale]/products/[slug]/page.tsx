@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { API_URL } from '@/lib/api';
 import { decodeRouteParam } from '@/lib/route-params';
-import { localeFromRouteParam } from '@/lib/seo/resolve-locale';
+import { resolveStorefrontLocale } from '@/lib/seo/resolve-locale';
 import { buildProductMetadata, ProductDetailBody } from '@/app/products/[slug]/ProductDetailBody';
 
 // NOTE: no `generateStaticParams` here — see the parent layout's
@@ -16,14 +16,18 @@ export async function generateMetadata({
   // `decodeRouteParam` — Next hands the page component the RAW segment while
   // generateMetadata gets the decoded one; see lib/route-params.ts.
   // (`tenant` is decoded inside `getStoreByTenantParam`.)
-  const { tenant, locale: localeParam, slug: rawSlug } = await params;
+  const { tenant, slug: rawSlug } = await params;
   const slug = decodeRouteParam(rawSlug);
   const store = await getStoreByTenantParam(tenant);
-  // The `[locale]` segment is already resolved by `middleware.ts` from the
-  // `force-language` cookie before the rewrite (see the parent layout's doc
-  // comment) — read it from the route param, never `cookies()`, or this
-  // route loses the whole point of the tenant-cacheable tree.
-  const locale = localeFromRouteParam(localeParam);
+  // Same cookie -> store defaultLanguage -> en decision the root layout makes for
+  // <html lang> (issue 2407). The `[locale]` route segment is cookie-only (a
+  // cookie-less crawler gets `en`), so using it put an English title/og:locale
+  // on an Arabic-default store's page. The root layout already reads the cookie
+  // for this tree, so this adds no dynamic-render cost; revisit when the
+  // root-layout decomposition makes the tree cacheable.
+  const locale = await resolveStorefrontLocale(
+    (store.settings as Record<string, unknown> | undefined)?.defaultLanguage as string | undefined
+  );
 
   try {
     const storeId = store.id !== 'demo' ? store.id : null;
@@ -55,16 +59,13 @@ export default async function StoreProductDetailPage({
 }: {
   params: Promise<{ tenant: string; locale: string; slug: string }>;
 }) {
-  const { tenant, locale: localeParam, slug: rawSlug } = await params;
+  const { tenant, slug: rawSlug } = await params;
   const slug = decodeRouteParam(rawSlug);
   const store = await getStoreByTenantParam(tenant);
-
-  return (
-    <ProductDetailBody
-      store={store}
-      slug={slug}
-      draftToken={undefined}
-      locale={localeFromRouteParam(localeParam)}
-    />
+  // Same locale generateMetadata resolves (issue 2407).
+  const locale = await resolveStorefrontLocale(
+    (store.settings as Record<string, unknown> | undefined)?.defaultLanguage as string | undefined
   );
+
+  return <ProductDetailBody store={store} slug={slug} draftToken={undefined} locale={locale} />;
 }

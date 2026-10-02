@@ -44,12 +44,16 @@ const STORE = {
   enabledFeatures: [],
 };
 
+// Mutable so the metadata parity cases can vary the language cookie.
+const languageCookie: { value?: string } = {};
+
 vi.mock('next/headers', () => ({
   cookies: async () => {
     const jar: Record<string, string> = {
       'force-cookie-consent': encodeURIComponent(
         JSON.stringify({ v: 1, necessary: true, analytics: true, marketing: true })
       ),
+      ...(languageCookie.value ? { 'force-language': languageCookie.value } : {}),
     };
     return { get: (name: string) => (name in jar ? { name, value: jar[name] } : undefined) };
   },
@@ -113,6 +117,11 @@ vi.mock(
 
 const { default: RootLayout } = await import(`${WEB}/app/layout`);
 const { default: TenantStoreLayout } = await import(
+  `${WEB}/app/tenant-store/[tenant]/[locale]/layout`
+);
+
+const { generateMetadata: rootMetadata } = await import(`${WEB}/app/layout`);
+const { generateMetadata: tenantLayoutMetadata } = await import(
   `${WEB}/app/tenant-store/[tenant]/[locale]/layout`
 );
 
@@ -180,5 +189,40 @@ describe('store chrome renders exactly once, flag off and flag on (#709)', () =>
     const on = await renderFlagOn();
     const head = (html: string) => html.slice(html.indexOf('<head>'), html.indexOf('</head>'));
     expect(head(on)).toBe(head(off));
+  });
+});
+
+/**
+ * Issue 2407. Next merges metadata root -> nested layout, the deeper segment
+ * winning per key, so flag on the document metadata is {...root, ...tenant}.
+ * Middleware bakes `[locale]` from the cookie alone (`en` when absent), so the
+ * route segment for a cookie-less visitor is `en` on an Arabic-default store
+ * even though the root resolves `ar`. The merged metadata must equal the flag-off
+ * (root only) metadata for every cookie state, or crawlers index English
+ * titles / og:locale over an Arabic <html lang>.
+ */
+describe('document metadata is identical flag off and flag on (issue 2407)', () => {
+  afterEach(() => {
+    languageCookie.value = undefined;
+  });
+
+  const middlewareSegment = (cookie: string | undefined) => (cookie === 'ar' ? 'ar' : 'en');
+
+  for (const cookie of [undefined, 'en', 'ar']) {
+    it(`force-language=${cookie ?? '(none)'} on an Arabic-default store`, async () => {
+      languageCookie.value = cookie;
+      const off = await rootMetadata();
+      const nested = await tenantLayoutMetadata({
+        params: Promise.resolve({ tenant: 'wadyaljuz.com', locale: middlewareSegment(cookie) }),
+      });
+      const on = { ...off, ...nested };
+      expect(on).toEqual(off);
+    });
+  }
+
+  it('the root resolves ar for a cookie-less visitor (the case the route segment gets wrong)', async () => {
+    languageCookie.value = undefined;
+    const md = await rootMetadata();
+    expect(JSON.stringify(md)).toContain('ar_KW');
   });
 });

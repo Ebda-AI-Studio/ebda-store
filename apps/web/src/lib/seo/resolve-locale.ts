@@ -24,11 +24,13 @@ export type StorefrontLocale = 'en' | 'ar';
  * all.
  *
  * Calls `next/headers` `cookies()`, which opts the calling route out of the
- * Full Route Cache — fine for the legacy header-based tree, which is
- * already fully dynamic. The dark-launched `tenant-store/[tenant]/[locale]`
- * tree must NOT call this (it would defeat the whole point of that tree);
- * use `localeFromRouteParam` there instead, since the middleware already
- * baked the cookie's value into the `[locale]` route segment.
+ * Full Route Cache. The dark-launched `tenant-store/[tenant]/[locale]` tree
+ * is nested inside the root layout, which already calls it, so while the root
+ * layout owns the store chrome that tree's metadata and body locale MUST come
+ * from here too: its `[locale]` route segment is baked by middleware from the
+ * cookie alone (`en` when absent), so it disagrees with the root for a
+ * cookie-less visitor on an Arabic-default store (issue 2407). Use
+ * `localeFromRouteParam` there only once the root stops resolving locale.
  */
 export async function resolveStorefrontLocale(
   storeDefaultLanguage: string | null | undefined
@@ -40,12 +42,11 @@ export async function resolveStorefrontLocale(
 }
 
 /**
- * Same resolution as `resolveStorefrontLocale`, but for callers in the
- * dark-launched `tenant-store/[tenant]/[locale]` tree, which already have
- * the resolved locale as a route param (baked in by `middleware.ts` from
- * the `force-language` cookie before the rewrite — see that tree's
- * `layout.tsx` doc comment). No `cookies()` call, so it stays
- * cache-friendly.
+ * The locale a `tenant-store/[tenant]/[locale]` route segment carries, WITHOUT
+ * calling `cookies()`. Cookie-only: it does not know the store's default
+ * language, so it is NOT equivalent to `resolveStorefrontLocale` for a
+ * cookie-less request. Safe only where the root layout no longer resolves
+ * locale for this tree.
  */
 export function localeFromRouteParam(param: string | undefined): StorefrontLocale {
   return param === 'ar' ? 'ar' : 'en';
