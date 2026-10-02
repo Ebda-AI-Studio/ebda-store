@@ -12,6 +12,11 @@ import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-testing';
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-jwt-refresh-secret-key';
+// Purpose-bound HMAC keys (unsubscribe, review links, SMS opt-out) are derived
+// from ENCRYPTION_KEY and throw without it (issue 2433). CI's test-unit job has
+// no .env, so default it here like the JWT secrets above.
+process.env.ENCRYPTION_KEY =
+  process.env.ENCRYPTION_KEY || 'test-encryption-key-0123456789abcdef0123456789';
 process.env.DATABASE_URL =
   process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db';
 
