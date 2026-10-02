@@ -40,6 +40,8 @@ import {
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
+import { customerKeyOf } from '../lib/customer-key';
+import { SmsConsentService } from './sms-consent.service';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -1456,6 +1458,32 @@ export class OrderService {
       await affiliateService
         .linkOrderToReferral(storeId, order.id, referralCode)
         .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
+    }
+
+    // SMS-marketing consent (issue 206). Only an explicit tick records
+    // anything; an unticked box is not a withdrawal. Keyed by `customerKeyOf`
+    // (user id, else lowercased email, else phone) so a guest's consent sits
+    // on the same key the Customers page shows. Inside a savepoint and
+    // non-fatal: a failed consent write must never fail the order, and the
+    // gate fails closed (no row → no promotional SMS).
+    const consentPhone = data.shippingAddress?.phone;
+    if (data.smsOptIn === true && typeof consentPhone === 'string' && consentPhone.trim()) {
+      const customerKey = customerKeyOf({
+        customerId,
+        shippingAddress: data.shippingAddress,
+      });
+      if (customerKey) {
+        await withSavepoint(() =>
+          SmsConsentService.recordGrant(storeId, {
+            customerKey,
+            userId: customerId ?? null,
+            phone: consentPhone,
+            source: 'checkout',
+          })
+        ).catch(err =>
+          logger.error({ err, orderId: order.id, storeId }, '[Order] SMS consent write failed')
+        );
+      }
     }
 
     // Notifications: only fire NOW for COD orders. For online-payment orders

@@ -394,6 +394,10 @@ export default function CheckoutClient() {
   const { wallet, refresh: refreshWallet } = useWallet();
   const walletSpendable = !!wallet && wallet.checkoutAvailable && wallet.balance > 0;
   const [useWalletBalance, setUseWalletBalance] = useState(false);
+  // "Send me offers by SMS" (issue 206): unticked by default, rendered only
+  // when the store can actually send promotional SMS (store.smsMarketingOptIn).
+  const [smsOptIn, setSmsOptIn] = useState(false);
+  const showSmsOptIn = store?.smsMarketingOptIn === true;
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -1293,6 +1297,8 @@ export default function CheckoutClient() {
         // Only sent when the customer ticked "Use wallet balance" on a store
         // where the API reports wallet checkout as available.
         useWallet: walletApplied > 0 ? true : undefined,
+        // Only an explicit tick on a rendered box is sent; omitted otherwise.
+        smsOptIn: showSmsOptIn && smsOptIn ? true : undefined,
       });
 
       if (!orderResult.success || !orderResult.data?.order) {
@@ -1876,6 +1882,32 @@ export default function CheckoutClient() {
                           <p role="alert" className="mt-1 text-sm text-destructive-ink">
                             {formErrors.phone}
                           </p>
+                        )}
+                        {showSmsOptIn && (
+                          <label
+                            data-sms-marketing-optin
+                            className="mt-2 flex cursor-pointer items-start gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={smsOptIn}
+                              onChange={e => setSmsOptIn(e.target.checked)}
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                              <span className="text-sm text-foreground">
+                                {t('Send me offers by SMS', translations['Send me offers by SMS'])}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {t(
+                                  'Promotional messages only. You can stop them anytime.',
+                                  translations[
+                                    'Promotional messages only. You can stop them anytime.'
+                                  ]
+                                )}
+                              </span>
+                            </span>
+                          </label>
                         )}
                       </div>
 

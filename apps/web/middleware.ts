@@ -59,6 +59,9 @@ const KNOWN_APP_ROUTES = new Set([
   // Campaign-email unsubscribe landing page (D2) — linked from every campaign
   // email as <storefront>/unsubscribe?token=…, including platform-path stores.
   'unsubscribe',
+  // Promotional-SMS opt-out landing page (issue 206) — linked from every
+  // promotional SMS as <storefront>/sms-unsubscribe?t=…, incl. platform-path stores.
+  'sms-unsubscribe',
   '_next',
   'api',
   'manifest',

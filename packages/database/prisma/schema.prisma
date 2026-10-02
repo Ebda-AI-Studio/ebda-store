@@ -80,6 +80,7 @@ model User {
   pushSubscriptions        PushSubscription[]      @relation("UserPushSubscriptions")
   onesignalSubscriptions   OneSignalSubscription[] @relation("UserOneSignalSubscriptions")
   abandonedCarts           AbandonedCart[]         @relation("AbandonedCartCustomer")
+  smsMarketingConsents     SmsMarketingConsent[]
   triggeredPaymentEvents   PaymentEvent[]
   triggeredAffiliateEvents AffiliateEvent[]        @relation("AffiliateEventTriggeredBy")
   triggeredOrderEvents     OrderEvent[]            @relation("OrderEventActor")
@@ -422,6 +423,7 @@ model Store {
   auditLogs                AuditLog[]
   features                 StoreFeature[]
   merchantApiKeys          MerchantApiKey[]
+  smsMarketingConsents     SmsMarketingConsent[]
   notificationConfigs      NotificationConfig[]
   notificationEventConfigs NotificationEventConfig[]
   pushSubscriptions        PushSubscription[]
@@ -1353,11 +1355,12 @@ model Order {
   // email service falls back to store.settings.defaultLanguage.
   locale String?
 
-  // Customer SMS marketing consent captured at checkout. When true the
-  // customer has explicitly opted in to receiving promotional SMS messages
-  // (e.g. offers, campaigns). Transactional notifications (order shipped,
-  // delivered, cancelled, refunded) are unaffected by this flag.
-  // Defaults to false — never opt customers in silently.
+  // Customer SMS marketing consent captured at checkout, frozen on the order
+  // as a record of what was ticked. The promotional-SMS gate does NOT read
+  // it: consent lives per customer per store in `sms_marketing_consents`
+  // (issue 206), which the order create path writes when this is true.
+  // Transactional notifications are unaffected. Defaults to false — never
+  // opt customers in silently.
   smsOptIn Boolean @default(false) @map("sms_opt_in")
 
   // Webhook idempotency - prevents duplicate processing
@@ -2857,6 +2860,48 @@ model NewsletterSubscriber {
 // Nothing here sends by itself: a row only reaches Resend after a merchant
 // creates a campaign AND presses send (POST /stores/:id/campaigns/:id/send).
 // Plan: docs/plans/2026-09-25-email-campaigns.md.
+
+/// Where an SMS-marketing consent was given or withdrawn (issue 206).
+enum SmsConsentSource {
+  checkout
+  account
+  unsubscribe
+}
+
+/// Promotional-SMS (marketing) consent, one row per customer per store
+/// (issue 206). Written by the checkout opt-in and the account page, withdrawn
+/// by the account page and the signed unsubscribe link. The promotional-SMS
+/// gate (`notification-dispatcher.service.ts`) sends only when a row for the
+/// recipient's phone is `granted`. Transactional SMS never reads it.
+model SmsMarketingConsent {
+  id            String            @id @default(uuid())
+  storeId       String            @map("store_id")
+  /// `customerKeyOf` value: the registered user id, else the guest's
+  /// lowercased email, else the guest's phone — the Customers-page key.
+  customerKey   String            @map("customer_key")
+  /// Set when `customerKey` is a registered shopper's user id.
+  userId        String?           @map("user_id")
+  /// The phone the consent covers, as entered.
+  phone         String
+  /// Digits-only canonical form of `phone` (`smsConsentPhoneKey`); the gate
+  /// and the phone-wide withdrawal match on this.
+  phoneKey      String            @map("phone_key")
+  granted       Boolean           @default(false)
+  grantedAt     DateTime?         @map("granted_at")
+  grantedSource SmsConsentSource? @map("granted_source")
+  revokedAt     DateTime?         @map("revoked_at")
+  revokedSource SmsConsentSource? @map("revoked_source")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, customerKey])
+  @@index([storeId, phoneKey])
+  @@index([userId])
+  @@map("sms_marketing_consents")
+}
 
 enum CampaignStatus {
   draft

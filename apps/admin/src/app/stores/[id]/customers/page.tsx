@@ -43,6 +43,8 @@ interface CustomerRow {
   /** RFM segment resolved server-side (guests included); null = no snapshot.
    *  Absent for staff, who do not receive segments. */
   segment?: string | null;
+  /** Promotional-SMS consent (issue 206): 'granted' | 'revoked' | 'none'. */
+  smsMarketingConsent?: 'granted' | 'revoked' | 'none';
   // The API row also carries the latest address and payment status; the list
   // no longer shows them — they live on the customer detail page, which has
   // the full address block and per-order payment status (audit 2026-09-30 §10).
@@ -292,6 +294,15 @@ export default function StoreCustomersPage() {
                 >
                   {t(`badges.${badgeKey}`)}
                 </span>
+                {customer.smsMarketingConsent === 'granted' && (
+                  <span
+                    data-sms-consent-badge
+                    className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success-ink"
+                    title={t('smsConsentBadgeTitle')}
+                  >
+                    {t('smsConsentBadge')}
+                  </span>
+                )}
               </div>
               {customer.phone && (
                 <p className="text-xs text-muted-foreground" dir="ltr">

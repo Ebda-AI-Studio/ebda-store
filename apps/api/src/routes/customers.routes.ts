@@ -13,6 +13,7 @@ import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { customerKeyOf } from '../lib/customer-key';
+import { SmsConsentService } from '../services/sms-consent.service';
 import {
   aggregateCustomers,
   MAX_ZERO_ORDER_CUSTOMERS,
@@ -552,9 +553,18 @@ router.get(
       const segmentOf = canSeeSegments
         ? await segmentsForCustomers(storeId, pageSlice)
         : new Map<string, RfmSegment>();
-      const pageItems = pageSlice.map(c =>
-        canSeeSegments ? { ...c, segment: segmentOf.get(c.id) ?? null } : c
+      // SMS-marketing consent per row (issue 206) — this page's rows only,
+      // read live (never from the cached aggregate) so a withdrawal shows at once.
+      const smsConsentOf = await SmsConsentService.statusForKeys(
+        storeId,
+        pageSlice.map(c => c.id)
       );
+      const pageItems = pageSlice.map(c => {
+        const smsMarketingConsent = smsConsentOf.get(c.id) ?? 'none';
+        return canSeeSegments
+          ? { ...c, segment: segmentOf.get(c.id) ?? null, smsMarketingConsent }
+          : { ...c, smsMarketingConsent };
+      });
       // Segments present anywhere in the store (not just this page) — the
       // page's filter pills. Canonical order; omitted for staff.
       const segments = canSeeSegments ? await presentRfmSegments(storeId) : undefined;

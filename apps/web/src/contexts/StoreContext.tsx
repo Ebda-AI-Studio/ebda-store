@@ -154,6 +154,8 @@ export interface StoreData {
   /** The store's active VAT rate as a percentage (e.g. 5 for 5%). See
    *  `ResolvedStore.taxRatePercent` in lib/store-resolver.ts. */
   taxRatePercent?: number;
+  /** Issue 206 — see `ResolvedStore.smsMarketingOptIn` in lib/store-resolver.ts. */
+  smsMarketingOptIn?: boolean;
   enabledFeatures?: string[];
   /**
    * Slugs of CMS pages the merchant has explicitly disabled

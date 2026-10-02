@@ -25,6 +25,7 @@ import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
+import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import { getCached } from '../lib/public-cache';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
@@ -1549,6 +1550,13 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         // old TaxRate rows are still `isActive: true`.
         taxRatePercent: (await resolveActiveTaxRate(store.id)).ratePercent,
         ...(await fetchStoreFaqsAndHowtos(store.id)),
+        // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
+        // this is true (sms feature on + provider configured + a promotional
+        // event enabled), so a store without SMS marketing shows no new UI.
+        // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 /
+        // SWR 600; a provider switched on/off shows up within that window.
+        // It is display-only — the send gate re-checks everything live.
+        smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
       };
 
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
@@ -1742,6 +1750,8 @@ router.get(
           // Keep in lock-step with the /stores/:slugOrId select above.
           taxRatePercent: (await resolveActiveTaxRate(store.id)).ratePercent,
           ...(await fetchStoreFaqsAndHowtos(store.id)),
+          // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
+          smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
         };
 
         const locations = await fetchFooterLocations(store);

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input, useToast } from '@force/ui';
-import { api } from '@/lib/api';
-import { useLanguage } from '../../../contexts/LanguageContext';
+import { api, type SmsConsentResponse } from '@/lib/api';
+import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 
 interface User {
@@ -27,6 +27,11 @@ export default function SettingsClient() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const { success: toastSuccess, error: toastError } = useToast();
+  // SMS offers (issue 206). Null until loaded; the card renders only when the
+  // store can send promotional SMS, or while consent is still active (so it
+  // can always be withdrawn). A store without SMS marketing shows nothing.
+  const [smsConsent, setSmsConsent] = useState<SmsConsentResponse | null>(null);
+  const [isSavingSms, setIsSavingSms] = useState(false);
 
   const [profileData, setProfileData] = useState({
     firstName: '',
@@ -43,7 +48,36 @@ export default function SettingsClient() {
 
   useEffect(() => {
     fetchProfile();
+    fetchSmsConsent();
   }, []);
+
+  async function fetchSmsConsent() {
+    try {
+      const result = await api.getSmsConsent();
+      if (result.success && result.data) setSmsConsent(result.data);
+    } catch {
+      // No card on failure — never a wrong state.
+    }
+  }
+
+  async function handleSmsConsentChange(optIn: boolean) {
+    setIsSavingSms(true);
+    try {
+      const result = await api.setSmsConsent(optIn);
+      if (result.success && result.data) {
+        setSmsConsent(prev => (prev ? { ...prev, consent: result.data!.consent } : prev));
+      } else {
+        toastError(
+          t('SMS offers', translations['SMS offers']),
+          result.error?.message || 'Failed to update'
+        );
+      }
+    } catch {
+      toastError(t('SMS offers', translations['SMS offers']), 'Failed to update');
+    } finally {
+      setIsSavingSms(false);
+    }
+  }
 
   async function fetchProfile() {
     try {
@@ -78,6 +112,8 @@ export default function SettingsClient() {
 
       if (result.success && result.data) {
         setUser(result.data.user);
+        // The SMS-offers card shows the profile phone; re-read it.
+        fetchSmsConsent();
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         toastSuccess('Profile saved', 'Your profile has been updated.');
       } else {
@@ -418,6 +454,78 @@ export default function SettingsClient() {
           </div>
         </form>
       </div>
+
+      {/* SMS offers (issue 206) */}
+      {smsConsent && (smsConsent.available || smsConsent.consent.status === 'granted') && (
+        <div className="rounded-xl border bg-card shadow-sm" data-sms-consent-card>
+          <div className="border-b p-4">
+            <h2 className="font-semibold text-foreground">
+              {t('SMS offers', translations['SMS offers'])}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {t(
+                'Get offers and reminders from this store by SMS.',
+                translations['Get offers and reminders from this store by SMS.']
+              )}{' '}
+              {t(
+                'Order updates are not affected.',
+                translations['Order updates are not affected.']
+              )}
+            </p>
+          </div>
+          <div className="p-6">
+            {smsConsent.consent.status === 'granted' ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-foreground">
+                  {t(
+                    'You are receiving SMS offers.',
+                    translations['You are receiving SMS offers.']
+                  )}
+                  {smsConsent.consent.phone && (
+                    <span className="block text-xs text-muted-foreground">
+                      {t('Offers will be sent to', translations['Offers will be sent to'])}{' '}
+                      <span dir="ltr">{smsConsent.consent.phone}</span>
+                    </span>
+                  )}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => handleSmsConsentChange(false)}
+                  isLoading={isSavingSms}
+                >
+                  {t('Stop SMS offers', translations['Stop SMS offers'])}
+                </Button>
+              </div>
+            ) : smsConsent.phone ? (
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={false}
+                  disabled={isSavingSms}
+                  onChange={e => e.target.checked && handleSmsConsentChange(true)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-foreground">
+                    {t('Send me offers by SMS', translations['Send me offers by SMS'])}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {t('Offers will be sent to', translations['Offers will be sent to'])}{' '}
+                    <span dir="ltr">{smsConsent.phone}</span>
+                  </span>
+                </span>
+              </label>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  'Add a phone number to your profile to get SMS offers.',
+                  translations['Add a phone number to your profile to get SMS offers.']
+                )}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Privacy & data \u2014 GDPR Art. 20 / applicable GCC data-protection law portability right (see docs/legal/gcc-data-protection.md) */}
       <div className="rounded-xl border border-border bg-card shadow-sm">

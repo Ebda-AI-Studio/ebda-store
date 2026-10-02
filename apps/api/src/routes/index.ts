@@ -43,6 +43,10 @@ import affiliateRoutes, { publicAffiliateRoutes } from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
 import campaignRoutes, { campaignTestSendRouter } from './campaign.routes';
 import campaignPublicRoutes from './campaign-public.routes';
+import {
+  accountRouter as smsConsentAccountRoutes,
+  publicRouter as smsConsentPublicRoutes,
+} from './sms-consent.routes';
 import onesignalRoutes from './onesignal.routes';
 import storeLayoutRoutes from './store-layout.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
@@ -88,6 +92,9 @@ router.use('/public', publicStoreLayoutRoutes);
 // registration order; this line's position is load-bearing.
 router.use('/mcp/admin', mcpAdminRoutes);
 router.use('/mcp', mcpRoutes);
+// SMS-marketing consent (issue 206): the shopper's own opt-in on the account
+// page. Mounted before '/auth' so the auth router never sees the path.
+router.use('/auth/me/sms-consent', smsConsentAccountRoutes);
 router.use('/auth', authRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
@@ -331,6 +338,8 @@ router.use('/stores', tenantContext, newsletterRoutes);
 router.use('/stores/:storeId/campaigns', campaignTestSendRouter);
 router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);
 router.use('/public/campaigns', campaignPublicRoutes);
+// Login-free opt-out link carried by every promotional SMS (issue 206).
+router.use('/public/sms-consent', smsConsentPublicRoutes);
 
 // WBS integration routes (Force AI Store ↔ WBS bridge config).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): handlers

@@ -345,6 +345,23 @@ interface OrderAddress {
   email?: string;
 }
 
+export interface SmsConsentView {
+  status: 'granted' | 'revoked' | 'none';
+  phone: string | null;
+  grantedAt: string | null;
+  grantedSource: 'checkout' | 'account' | 'unsubscribe' | null;
+  revokedAt: string | null;
+  revokedSource: 'checkout' | 'account' | 'unsubscribe' | null;
+}
+
+export interface SmsConsentResponse {
+  /** The store can send promotional SMS; the account toggle shows only then
+   *  (or while consent is still active, so it can always be withdrawn). */
+  available: boolean;
+  phone: string | null;
+  consent: SmsConsentView;
+}
+
 interface CreateOrderData {
   shippingAddress: OrderAddress;
   billingAddress?: OrderAddress;
@@ -357,6 +374,9 @@ interface CreateOrderData {
   /** Pay from the customer wallet (D1). A request — the server spends
    *  min(balance, total) only when the store's wallet checkout is on. */
   useWallet?: boolean;
+  /** Explicit "Send me offers by SMS" tick (issue 206). Sent only when the
+   *  box was rendered AND ticked; never a withdrawal. */
+  smsOptIn?: boolean;
 }
 
 /**
@@ -976,6 +996,18 @@ class ApiClient {
     return this.request<{ user: User }>('/auth/me', {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  /** The signed-in shopper's SMS-offers consent for this store (issue 206). */
+  async getSmsConsent() {
+    return this.request<SmsConsentResponse>('/auth/me/sms-consent');
+  }
+
+  async setSmsConsent(optIn: boolean) {
+    return this.request<{ consent: SmsConsentView }>('/auth/me/sms-consent', {
+      method: 'PUT',
+      body: JSON.stringify({ optIn }),
     });
   }
 

@@ -255,6 +255,25 @@ export const translations = {
   'This unsubscribe link is invalid.': 'رابط إلغاء الاشتراك هذا غير صالح.',
   'Something went wrong. Please try again later.': 'حدث خطأ ما. يرجى المحاولة مرة أخرى لاحقاً.',
 
+  // SMS-marketing consent (issue 206) — checkout opt-in, account settings, opt-out page.
+  'Send me offers by SMS': 'أرسلوا لي العروض عبر الرسائل القصيرة',
+  'Promotional messages only. You can stop them anytime.':
+    'رسائل ترويجية فقط. يمكنك إيقافها في أي وقت.',
+  'SMS offers': 'عروض الرسائل القصيرة',
+  'Get offers and reminders from this store by SMS.':
+    'استلم العروض والتذكيرات من هذا المتجر عبر الرسائل القصيرة.',
+  'Order updates are not affected.': 'لن تتأثر تحديثات الطلبات.',
+  'Offers will be sent to': 'ستُرسل العروض إلى',
+  'Add a phone number to your profile to get SMS offers.':
+    'أضف رقم هاتف إلى ملفك الشخصي لاستلام عروض الرسائل القصيرة.',
+  'You are receiving SMS offers.': 'أنت مشترك في عروض الرسائل القصيرة.',
+  'Stop SMS offers': 'إيقاف عروض الرسائل القصيرة',
+  'SMS preferences': 'تفضيلات الرسائل القصيرة',
+  'Stop receiving SMS offers at': 'إيقاف استلام عروض الرسائل القصيرة على',
+  'Order and delivery messages are not affected.': 'لن تتأثر رسائل الطلبات والتوصيل.',
+  'You will not receive SMS offers from us.': 'لن تصلك عروض عبر الرسائل القصيرة منا بعد الآن.',
+  'This link is invalid.': 'هذا الرابط غير صالح.',
+
   // Platform-host 404 (PlatformNotFound — store.force-ai.co/<unknown>).
   'This page doesn’t exist': 'هذه الصفحة غير موجودة',
   'The store you’re looking for may have moved, or the link may be wrong.':

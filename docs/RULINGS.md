@@ -5053,6 +5053,16 @@ Force AI account. It is still live: a plain GET on 2026-10-01 returned the harne
 must be one of …"), so anyone who sends that header gets the 3 live stores rendered by a stale
 2026-09-25 build with the flag on. Cost if wrong: that stale public copy keeps serving until deleted.
 
+## 2026-10-02 — SMS marketing consent (branch `feat/sms-marketing-consent`, issue 206)
+
+**Ruling SMS-1 — consent is a per-store row keyed by `customerKeyOf`, not a flag on the caller's data.** `sms_marketing_consents` holds one row per (store, customer key); the promotional-SMS gate reads it for the recipient's phone and no producer passes a consent field. Orders keep `smsOptIn` only as a record of the tick. Cost if wrong: a producer that should have its own consent source (a future non-order channel) must add a row, not a flag.
+
+**Ruling SMS-2 — guests record nothing new (AUD-2).** A guest tick stores the order's own phone under the order's `customerKeyOf` key; no extra contact detail is collected. An unticked box writes nothing and is never a withdrawal. Cost if wrong: a guest who ticks and later orders under another email has two rows; withdrawal is phone-wide so it still stops.
+
+**Ruling SMS-3 — withdrawal is phone-wide per store.** Revoking clears every granted row of the store for that phone, so an older guest row cannot revive consent. Cost if wrong: two people sharing one number lose each other's consent, which fails closed.
+
+**Ruling SMS-4 — the checkbox renders only when the store can send promotional SMS** (sms feature on, provider configured with credentials, a promotional event enabled), via `smsMarketingOptIn` on the public store payload. Any other store renders nothing, so Pecannbee's checkout is pixel-identical. The value is BOUNDED-stale (rides the 120s store cache); the send gate re-checks live. Cost if wrong: a provider switched on shows the box up to about 12 minutes late (edge SWR), never early.
+
 **Ruling TRC-5 — issue 2407: while the root layout owns the store chrome, it also owns the document
 metadata; the tenant tree resolves locale the way the root does, not from its `[locale]` segment.**
 The tenant-store layout's `generateMetadata` returns `{}` while `ROOT_LAYOUT_OWNS_STORE_CHROME` is

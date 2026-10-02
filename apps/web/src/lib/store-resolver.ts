@@ -113,6 +113,13 @@ export interface ResolvedStore {
    * 0/undefined for a store with no active tax rate.
    */
   taxRatePercent?: number;
+  /**
+   * Issue 206: render the "Send me offers by SMS" opt-in (checkout + account)
+   * ONLY when true. The API sets it when the store has the sms feature on, an
+   * SMS provider configured and a promotional SMS event enabled; anything
+   * else (including an older API that omits it) is false → nothing renders.
+   */
+  smsMarketingOptIn?: boolean;
 
   // Return policy — powers hasMerchantReturnPolicy in Product JSON-LD.
   // NULL/undefined means the merchant never declared one, and the storefront
@@ -412,6 +419,7 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
           : undefined,
       taxRatePercent:
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
+      smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -573,6 +581,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
           : undefined,
       taxRatePercent:
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
+      smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       enabledFeatures,
       disabledCmsSlugs,
       heroTitle: storeData.heroTitle ?? null,
@@ -911,6 +920,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
           : undefined,
       taxRatePercent:
         typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
+      smsMarketingOptIn: storeData.smsMarketingOptIn === true,
       heroTitle: storeData.heroTitle ?? null,
       heroTitleAr: storeData.heroTitleAr ?? null,
       heroSubtitle: storeData.heroSubtitle ?? null,

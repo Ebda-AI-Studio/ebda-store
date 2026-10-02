@@ -941,6 +941,9 @@ export class InventoryService {
           customerName,
           customerPhone: user.phone ?? undefined,
           orderNumber: '', // not applicable
+          // One SMS per shopper per product per restock day. Without it every
+          // back-in-stock SMS of the store shared ONE idempotency key.
+          dedupeKey: `${productId}_${user.id}_${new Date().toISOString().slice(0, 10)}`,
           storeId,
           storeName: store.name,
           productName,

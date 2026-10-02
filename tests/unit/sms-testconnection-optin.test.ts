@@ -4,8 +4,8 @@
  * Covers:
  *  1. SmsService.verifyCredentials — mocks the Unifonic Account/info endpoint.
  *     No real SMS is sent, no real network call is made.
- *  2. NotificationDispatcherService — promotional events are blocked when
- *     smsOptIn is false; transactional events always pass the gate.
+ *  2. The promotional/transactional event split. The consent gate itself is
+ *     tested against Postgres in tests/integration/sms-marketing-consent.test.ts.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -175,53 +175,11 @@ describe('PROMOTIONAL_SMS_EVENTS classification', () => {
   });
 });
 
-// ─── Opt-in gate logic (pure unit — no Prisma, no Redis) ─────────────────────
-
-/**
- * The dispatcher's opt-in check is: if isPromotionalSmsEvent && !data.smsOptIn → skip.
- * We test the SAME predicate in isolation to verify the gate logic without
- * spinning up the full dispatcher (which needs Redis + Prisma + feature flags).
- */
-function shouldSkipSmsForOptin(event: string, smsOptIn: boolean | undefined): boolean {
-  const isPromotional = PROMOTIONAL_SMS_EVENTS.has(event as never);
-  return isPromotional && !smsOptIn;
-}
-
-describe('SMS opt-in gate predicate', () => {
-  it('skips promotional SMS when smsOptIn is false', () => {
-    expect(shouldSkipSmsForOptin('cart_abandoned_step1', false)).toBe(true);
-    expect(shouldSkipSmsForOptin('back_in_stock', false)).toBe(true);
-  });
-
-  it('skips promotional SMS when smsOptIn is undefined (default/omitted)', () => {
-    expect(shouldSkipSmsForOptin('cart_abandoned_step2', undefined)).toBe(true);
-  });
-
-  it('does NOT skip promotional SMS when smsOptIn is true', () => {
-    expect(shouldSkipSmsForOptin('cart_abandoned_step3', true)).toBe(false);
-    expect(shouldSkipSmsForOptin('back_in_stock', true)).toBe(false);
-  });
-
-  it('does NOT skip transactional events even when smsOptIn is false', () => {
-    const transactional = [
-      'order_confirmed',
-      'payment_success',
-      'order_shipped',
-      'order_delivered',
-      'order_cancelled',
-      'refund_processed',
-    ];
-
-    for (const event of transactional) {
-      expect(shouldSkipSmsForOptin(event, false)).toBe(
-        false,
-        `Transactional event ${event} should NOT be gated on smsOptIn`
-      );
-    }
-  });
-
-  it('does NOT skip transactional events when smsOptIn is undefined', () => {
-    expect(shouldSkipSmsForOptin('order_shipped', undefined)).toBe(false);
-    expect(shouldSkipSmsForOptin('order_confirmed', undefined)).toBe(false);
-  });
-});
+// ─── Opt-in gate ─────────────────────────────────────────────────────────────
+//
+// The promotional-SMS gate no longer reads a `smsOptIn` flag from the caller
+// (no producer ever set one, issue 206). It reads the per-store consent row
+// for the recipient's phone. The real gate — dispatcher + Postgres — is
+// covered, and mutation-proven, in tests/integration/sms-marketing-consent.test.ts.
+// The local re-implementation of the predicate that used to live here tested
+// a copy of the code, not the code, so it is gone.

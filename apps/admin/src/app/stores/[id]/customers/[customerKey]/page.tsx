@@ -53,6 +53,16 @@ interface CustomerDetail {
   statuses: string[];
 }
 
+/** Promotional-SMS consent for this customer in this store (issue 206). */
+interface SmsMarketingConsent {
+  status: 'granted' | 'revoked' | 'none';
+  phone: string | null;
+  grantedAt: string | null;
+  grantedSource: 'checkout' | 'account' | 'unsubscribe' | null;
+  revokedAt: string | null;
+  revokedSource: 'checkout' | 'account' | 'unsubscribe' | null;
+}
+
 interface OrderItemRow {
   id: string;
   productName: string;
@@ -117,6 +127,7 @@ export default function CustomerDetailPage() {
 
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [smsConsent, setSmsConsent] = useState<SmsMarketingConsent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [groups, setGroups] = useState<CustomerGroupOption[]>([]);
@@ -149,12 +160,14 @@ export default function CustomerDetailPage() {
       const { data, error: apiError } = await apiGet<{
         customer: CustomerDetail;
         orders: OrderRow[];
+        smsMarketingConsent?: SmsMarketingConsent;
       }>(`/api/v1/stores/${storeId}/customers/${encodeURIComponent(customerKey)}`);
       if (apiError) {
         setError(apiError.message || t('fetchFailed'));
       } else if (data) {
         setCustomer(data.customer);
         setOrders(data.orders);
+        setSmsConsent(data.smsMarketingConsent ?? null);
       }
     } catch {
       setError(t('fetchFailed'));
@@ -537,6 +550,47 @@ export default function CustomerDetailPage() {
                     {groupError && (
                       <p className="text-end text-xs text-destructive-ink">{groupError}</p>
                     )}
+                    {/* SMS offers consent (issue 206): status, when and where it
+                        was given or withdrawn. Read-only — only the shopper
+                        can give consent. */}
+                    <div
+                      className="flex items-baseline justify-between gap-4"
+                      data-sms-consent-status={smsConsent?.status ?? 'none'}
+                    >
+                      <dt className="text-muted-foreground">{t('fieldSmsConsent')}</dt>
+                      <dd className="text-end text-sm">
+                        {smsConsent?.status === 'granted' ? (
+                          <>
+                            <span className="font-medium text-success-ink">
+                              {t('smsConsentGranted')}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {formatDate(smsConsent.grantedAt)}
+                              {smsConsent.grantedSource
+                                ? ` · ${t(`smsConsentSource.${smsConsent.grantedSource}`)}`
+                                : ''}
+                              {smsConsent.phone ? (
+                                <span dir="ltr">{` · ${smsConsent.phone}`}</span>
+                              ) : null}
+                            </span>
+                          </>
+                        ) : smsConsent?.status === 'revoked' ? (
+                          <>
+                            <span className="font-medium text-foreground">
+                              {t('smsConsentRevoked')}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {formatDate(smsConsent.revokedAt)}
+                              {smsConsent.revokedSource
+                                ? ` · ${t(`smsConsentSource.${smsConsent.revokedSource}`)}`
+                                : ''}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">{t('smsConsentNone')}</span>
+                        )}
+                      </dd>
+                    </div>
                   </dl>
                 </div>
 

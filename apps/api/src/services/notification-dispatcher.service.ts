@@ -17,6 +17,9 @@ import { pushService } from './push.service';
 import { redis } from './redis.service';
 import { withRlsBypass } from '@force/database';
 import logger from '../lib/logger';
+import { config } from '../config';
+import { SmsConsentService } from './sms-consent.service';
+import { signSmsOptOutToken } from '../lib/sms-consent';
 import {
   NotificationEvent,
   NotificationData,
@@ -38,12 +41,13 @@ const RATE_LIMIT_MAX_PER_WINDOW = 100; // 100 notifications per hour per store p
 // ==========================================
 
 /**
- * Events classified as PROMOTIONAL — sent only to customers who have
- * explicitly opted in to SMS marketing (data.smsOptIn === true).
+ * Events classified as PROMOTIONAL — sent only to a phone with an active
+ * SMS-marketing consent row in `sms_marketing_consents` (issue 206; the gate
+ * in `_dispatch` reads it via `SmsConsentService.findActiveForPhone`).
  *
  * Transactional events (order_confirmed, order_shipped, order_delivered,
  * order_cancelled, refund_processed, payment_success) are NOT in this set
- * and may send regardless of smsOptIn as long as the channel is configured.
+ * and send whenever the channel is configured — no consent read.
  */
 export const PROMOTIONAL_SMS_EVENTS: ReadonlySet<NotificationEvent> = new Set([
   'cart_abandoned_step1',
@@ -90,15 +94,15 @@ class NotificationDispatcherService {
    * Returns true if credentials appear configured, false otherwise.
    */
   private hasValidCredentials(
-    config: { credentials: Record<string, unknown>; enabled: boolean } | null,
+    channelConfig: { credentials: Record<string, unknown>; enabled: boolean } | null,
     channel: string,
     storeId: string
   ): boolean {
-    if (!config || !config.enabled) {
+    if (!channelConfig || !channelConfig.enabled) {
       return false;
     }
 
-    const creds = config.credentials;
+    const creds = channelConfig.credentials;
     if (!creds || typeof creds !== 'object' || Object.keys(creds).length === 0) {
       logger.warn(
         { storeId, channel },
@@ -140,6 +144,32 @@ class NotificationDispatcherService {
         { err, storeId, event },
         '[NotificationDispatcher] Unexpected error in dispatch'
       );
+    }
+  }
+
+  /**
+   * Can this store send promotional SMS at all? True only when the `sms`
+   * feature is on, an SMS provider is configured with usable credentials,
+   * and at least one promotional event has SMS enabled. The storefront
+   * renders the SMS-marketing opt-in ONLY when this is true (issue 206), so
+   * a store that has not set SMS marketing up shows no new UI. Never throws:
+   * any failure reads as "not available" (the checkbox stays hidden).
+   */
+  async isSmsMarketingAvailable(storeId: string): Promise<boolean> {
+    try {
+      if (!(await featureService.isFeatureEnabled(storeId, 'sms'))) return false;
+      const smsConfig = await notificationConfigService.getConfig(storeId, 'sms');
+      if (!this.hasValidCredentials(smsConfig, 'sms', storeId)) return false;
+      for (const event of PROMOTIONAL_SMS_EVENTS) {
+        if ((await this.getEventConfig(storeId, event)).sms) return true;
+      }
+      return false;
+    } catch (err) {
+      logger.warn(
+        { err, storeId },
+        '[NotificationDispatcher] SMS-marketing availability check failed'
+      );
+      return false;
     }
   }
 
@@ -207,6 +237,7 @@ class NotificationDispatcherService {
     // order_shipped, order_delivered, order_cancelled, refund_processed) send
     // whenever the channel is configured — no opt-in gate.
     const isPromotionalSmsEvent = PROMOTIONAL_SMS_EVENTS.has(event);
+    let consentId: string | null = null;
     if (!smsEnabled) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: feature_disabled');
     } else if (!eventConfig.sms) {
@@ -215,10 +246,17 @@ class NotificationDispatcherService {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: not_configured');
     } else if (!data.customerPhone) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: no_phone');
-    } else if (isPromotionalSmsEvent && !data.smsOptIn) {
+    } else if (
+      isPromotionalSmsEvent &&
+      !(consentId =
+        (await SmsConsentService.findActiveForPhone(storeId, data.customerPhone))?.id ?? null)
+    ) {
+      // Issue 206: consent is the per-store row for this phone, not a flag the
+      // caller passes in (no producer ever set one, so every promotional SMS
+      // was skipped). No granted row → no send.
       logger.debug(
         { storeId, event },
-        '[NotificationDispatcher] SMS skipped: promotional_no_optin'
+        '[NotificationDispatcher] SMS skipped: promotional_no_consent'
       );
     } else if (!(await this.checkRateLimit(storeId, 'sms'))) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: rate_limited');
@@ -226,7 +264,11 @@ class NotificationDispatcherService {
       try {
         const smsTemplate = SMS_TEMPLATES[event];
         // Default to English; locale selection can be extended later
-        const messageText = renderSmsTemplate(smsTemplate.en, data);
+        let messageText = renderSmsTemplate(smsTemplate.en, data);
+        // Every promotional SMS carries its own opt-out link (issue 206).
+        if (consentId) {
+          messageText += ` ${SMS_OPT_OUT_LABEL.en}: ${await smsOptOutUrl(storeId, consentId)}`;
+        }
         const smsCredentials = smsConfig!.credentials as unknown as SmsConfig;
 
         await smsQueue.enqueue({
@@ -235,7 +277,10 @@ class NotificationDispatcherService {
           recipientPhone: data.customerPhone,
           messageText,
           config: smsCredentials,
-          idempotencyKey: `sms_${storeId}_${event}_${data.orderNumber}`,
+          // `dedupeKey` when the producer has no per-recipient order number:
+          // back-in-stock passes '' as orderNumber, which collapsed every
+          // back-in-stock SMS of a store onto ONE key (only the first ever sent).
+          idempotencyKey: `sms_${storeId}_${event}_${data.dedupeKey ?? data.orderNumber}`,
         });
 
         logger.info({ storeId, event }, '[NotificationDispatcher] SMS queued');
@@ -276,6 +321,21 @@ class NotificationDispatcherService {
 // ==========================================
 // Helpers
 // ==========================================
+
+const SMS_OPT_OUT_LABEL = { en: 'Stop offers', ar: 'إيقاف العروض' } as const;
+
+/**
+ * The storefront opt-out page for a consent row: the store's own domain when
+ * it has one, else the platform storefront under its slug (the same base the
+ * abandoned-cart and back-in-stock links use).
+ */
+async function smsOptOutUrl(storeId: string, consentId: string): Promise<string> {
+  const store = await withRlsBypass(tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { domain: true, slug: true } })
+  );
+  const base = store?.domain ? `https://${store.domain}` : `${config.webUrl}/${store?.slug ?? ''}`;
+  return `${base}/sms-unsubscribe?t=${signSmsOptOutToken(consentId)}`;
+}
 
 /**
  * Renders a push body template with the same variable substitution used by SMS.

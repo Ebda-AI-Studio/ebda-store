@@ -8,6 +8,7 @@ import { EmailService } from './email.service';
 import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
+import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { redis } from './redis.service';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -1808,6 +1809,32 @@ export class AuthService {
         });
       }
 
+      // SMS-marketing consent (issue 206). Every row of the shopper's own
+      // (customerKey = user id), plus — in the account's store — the rows a
+      // guest checkout left under the same lowercased email or the same phone.
+      // Deleting consent can only ever STOP promotional SMS (no row = no send),
+      // so matching broadly here is the safe direction, unlike the CRM scrub.
+      const smsConsentOr: Prisma.SmsMarketingConsentWhereInput[] = [
+        { userId },
+        { customerKey: userId },
+      ];
+      if (user.storeId) {
+        if (user.email) {
+          smsConsentOr.push({
+            storeId: user.storeId,
+            customerKey: user.email.trim().toLowerCase(),
+          });
+        }
+        const phoneKey = smsConsentPhoneKey(user.phone);
+        if (phoneKey) smsConsentOr.push({ storeId: user.storeId, phoneKey });
+      }
+      await tx.smsMarketingConsent.deleteMany({
+        where: {
+          ...(opts.scopeStoreId !== undefined ? { storeId: opts.scopeStoreId } : {}),
+          OR: smsConsentOr,
+        },
+      });
+
       // Finally rewrite the user row itself. Password hash is regenerated
       // from random bytes so a stolen DB snapshot can't be cracked back
       // into the original credential. Email is rewritten (not nulled) so
@@ -1961,6 +1988,7 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      smsMarketingConsents,
     ] = await Promise.all([
       // Same user-scoped RLS policy as the erase path above: on the
       // merchant-initiated export `current_user_id()` is the MERCHANT, so a
@@ -2008,6 +2036,22 @@ export class AuthService {
         where: { userId },
         select: { id: true, playerId: true, createdAt: true },
       }),
+      // SMS-marketing consent (issue 206): what was given, when, where, and
+      // any withdrawal. Keyed by the user id (the shopper's own rows).
+      prisma.smsMarketingConsent.findMany({
+        where: { OR: [{ userId }, { customerKey: userId }] },
+        select: {
+          storeId: true,
+          phone: true,
+          granted: true,
+          grantedAt: true,
+          grantedSource: true,
+          revokedAt: true,
+          revokedSource: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
     ]);
 
     return {
@@ -2025,6 +2069,7 @@ export class AuthService {
       walletTransactions,
       pushSubscriptions,
       onesignalSubscriptions,
+      smsMarketingConsents,
     };
   }
 

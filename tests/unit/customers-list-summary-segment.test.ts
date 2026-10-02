@@ -29,6 +29,7 @@ vi.mock('@force/database', async importOriginal => {
       user: { findMany: h.userFindMany, findUnique: vi.fn() },
       customerRfmSnapshot: { findMany: h.rfmFindMany, groupBy: h.rfmGroupBy },
       store: { findUnique: vi.fn() },
+      smsMarketingConsent: { findMany: vi.fn().mockResolvedValue([]) },
     },
   };
 });

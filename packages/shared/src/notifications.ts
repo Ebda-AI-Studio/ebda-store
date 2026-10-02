@@ -37,13 +37,14 @@ export interface NotificationData {
   productName?: string;
   productUrl?: string;
   /**
-   * Customer SMS marketing opt-in consent captured at checkout.
-   * When false (or undefined), PROMOTIONAL SMS events (cart_abandoned_*,
-   * back_in_stock) are skipped. Transactional events (order_confirmed,
-   * order_shipped, order_delivered, order_cancelled, refund_processed)
-   * are unaffected — they require channel config but not explicit opt-in.
+   * Per-recipient idempotency suffix for events with no order number
+   * (back_in_stock). The SMS idempotency key falls back to `orderNumber`.
+   *
+   * There is deliberately no consent field here: promotional SMS consent is
+   * read by the dispatcher from `sms_marketing_consents` for the recipient's
+   * phone (issue 206), never trusted from the caller.
    */
-  smsOptIn?: boolean;
+  dedupeKey?: string;
 }
 
 // ─── SMS Templates ────────────────────────────────────────────────────────────
