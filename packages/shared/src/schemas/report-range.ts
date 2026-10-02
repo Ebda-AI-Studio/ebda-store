@@ -111,3 +111,110 @@ export function localDayRange(fromDay?: string, toDay?: string): ReportRange | u
   if (!start && !end) return undefined;
   return { startDate: start ?? OPEN_START(), endDate: end ?? OPEN_END() };
 }
+
+// ─── Store-local days (finance reports) ─────────────────────────────────────
+//
+// Owner decision 2026-10-01: Finance Reports (P&L, trial balance, balance
+// sheet, tax report and their exports) count days in the STORE's time zone,
+// the same days the finance dashboard shows a Kuwait merchant. A date-only
+// `YYYY-MM-DD` bound is resolved here, on the server, from the store's
+// `timezone` column — never from the server's own TZ and never as a UTC day.
+
+/** Used when a store has no usable `timezone` (Ruling FRT-2). */
+export const DEFAULT_STORE_TIME_ZONE = 'Asia/Kuwait';
+
+const dtfCache = new Map<string, Intl.DateTimeFormat>();
+
+function partsFormatter(timeZone: string): Intl.DateTimeFormat {
+  let f = dtfCache.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    dtfCache.set(timeZone, f);
+  }
+  return f;
+}
+
+/** True when `timeZone` is an IANA zone this runtime can format in. */
+export function isValidTimeZone(timeZone: unknown): timeZone is string {
+  if (typeof timeZone !== 'string' || timeZone.trim() === '') return false;
+  try {
+    partsFormatter(timeZone);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The store's zone when it is a usable IANA name, else `DEFAULT_STORE_TIME_ZONE`. */
+export function resolveStoreTimeZone(timeZone: unknown): string {
+  return isValidTimeZone(timeZone) ? timeZone : DEFAULT_STORE_TIME_ZONE;
+}
+
+/** Wall-clock fields of an instant in `timeZone`. */
+function wallClock(d: Date, timeZone: string) {
+  const p: Record<string, number> = {};
+  for (const { type, value } of partsFormatter(timeZone).formatToParts(d)) {
+    if (type !== 'literal') p[type] = Number(value);
+  }
+  return p as {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+  };
+}
+
+/** Offset (ms, east-positive) of `timeZone` at instant `d`. */
+function offsetAt(d: Date, timeZone: string): number {
+  const w = wallClock(d, timeZone);
+  const asUtc = Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second);
+  return asUtc - Math.floor(d.getTime() / 1000) * 1000;
+}
+
+/** `YYYY-MM-DD` of an instant as a calendar day in `timeZone`. */
+export function zonedIsoDay(d: Date, timeZone: string): string {
+  const w = wallClock(d, timeZone);
+  return `${w.year}-${String(w.month).padStart(2, '0')}-${String(w.day).padStart(2, '0')}`;
+}
+
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** The instant `YYYY-MM-DD 00:00:00.000` happens in `timeZone`; undefined if not a day. */
+export function zonedDayStart(day: string, timeZone: string): Date | undefined {
+  const m = DAY_RE.exec(day);
+  if (!m) return undefined;
+  const wall = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(wall) || new Date(wall).toISOString().slice(0, 10) !== day) return undefined;
+  // Two passes: the offset at the first guess can differ from the offset at
+  // the answer when a DST change falls within the offset's width.
+  let t = wall - offsetAt(new Date(wall), timeZone);
+  t = wall - offsetAt(new Date(t), timeZone);
+  return new Date(t);
+}
+
+/** The last millisecond of `YYYY-MM-DD` in `timeZone` (next day's start − 1ms). */
+export function zonedDayEnd(day: string, timeZone: string): Date | undefined {
+  const start = zonedDayStart(day, timeZone);
+  if (!start) return undefined;
+  const next = new Date(
+    Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)) + 1)
+  );
+  const nextStart = zonedDayStart(next.toISOString().slice(0, 10), timeZone);
+  return nextStart ? new Date(nextStart.getTime() - 1) : undefined;
+}
+
+/** First day (`YYYY-MM-01`) of the month `d` falls in, in `timeZone`. */
+export function zonedMonthStartDay(d: Date, timeZone: string): string {
+  return `${zonedIsoDay(d, timeZone).slice(0, 8)}01`;
+}

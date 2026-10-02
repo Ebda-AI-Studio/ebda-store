@@ -1,4 +1,5 @@
-import { parseReportRange, type ReportRange } from '@force/shared';
+import { prisma } from '@force/database';
+import { parseReportRange, resolveStoreTimeZone, type ReportRange } from '@force/shared';
 
 export type RangeOrLegacyResult =
   | { ok: true; from: Date | undefined; to: Date | undefined }
@@ -30,3 +31,16 @@ function legacyDay(v: unknown, edge: 'start' | 'end'): Date | undefined {
 }
 
 export type { ReportRange };
+
+/**
+ * The time zone a store's finance reports count days in: the store's
+ * `timezone` column when it is a usable IANA zone, else Asia/Kuwait
+ * (Ruling FRT-2). Read under the caller's tenant context.
+ */
+export async function storeTimeZone(storeId: string): Promise<string> {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { timezone: true },
+  });
+  return resolveStoreTimeZone(store?.timezone);
+}

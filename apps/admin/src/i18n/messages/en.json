@@ -5952,6 +5952,7 @@
         "balanceSheet": "Balance Sheet",
         "taxReport": "Tax Report"
       },
+      "timeZoneNote": "Days are counted in the store's time zone ({timeZone}).",
       "asOf": "As of",
       "from": "From",
       "to": "To",

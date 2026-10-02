@@ -262,18 +262,32 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(sql).toMatch(/\(e\.source_id = o\.id\) AS is_sale/);
   });
 
-  it('date boundaries are preserved in the row.date field', async () => {
-    const startOfMonth = new Date('2026-01-01T00:00:00.000Z');
-    const endOfMonth = new Date('2026-01-31T23:59:59.999Z');
+  it('row.date is the posting day in the store time zone (Ruling FRT-1)', async () => {
+    // Kuwait (UTC+3): Jan 1 00:00 local = Dec 31 21:00Z; Jan 31 23:59 local = Jan 31 20:59Z.
+    const startOfMonth = new Date('2025-12-31T21:00:00.000Z');
+    const endOfMonth = new Date('2026-01-31T20:59:59.999Z');
+    const nextMonthKw = new Date('2026-01-31T22:30:00.000Z'); // 01:30 Feb 1 in Kuwait
     mockQueryRawUnsafe.mockResolvedValueOnce([
       makeRow({ posted_at: startOfMonth, order_number: 'ORD-START' }),
       makeRow({ posted_at: endOfMonth, order_number: 'ORD-END' }),
+      makeRow({ posted_at: nextMonthKw, order_number: 'ORD-NEXT' }),
     ]);
 
-    const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
+    const result = await generateTaxReport(STORE_ID, {
+      from: FROM,
+      to: TO,
+      timeZone: 'Asia/Kuwait',
+    });
 
-    expect(result.rows[0].date).toBe('2026-01-01');
-    expect(result.rows[1].date).toBe('2026-01-31');
+    expect(result.rows.map(r => r.date)).toEqual(['2026-01-01', '2026-01-31', '2026-02-01']);
+  });
+
+  it('row.date defaults to Asia/Kuwait when no zone is passed', async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      makeRow({ posted_at: new Date('2026-01-31T22:30:00.000Z') }),
+    ]);
+    const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
+    expect(result.rows[0].date).toBe('2026-02-01');
   });
 
   it('passes storeId + ISO-string from/to as positional params to queryRawUnsafe', async () => {

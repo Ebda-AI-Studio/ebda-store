@@ -25,7 +25,16 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { ALLOWED_CURRENCIES, convertToKwd, requiresFxRate, localIsoDay } from '@force/shared';
+import {
+  ALLOWED_CURRENCIES,
+  convertToKwd,
+  requiresFxRate,
+  zonedDayEnd,
+  zonedDayStart,
+  zonedIsoDay,
+  zonedMonthStartDay,
+} from '@force/shared';
+import { storeTimeZone } from '../lib/report-range';
 import {
   listAccountsTree,
   createChildAccount,
@@ -53,8 +62,14 @@ const router = Router({ mergeParams: true });
  *
  * Accepts both shapes callers actually send: date-only `YYYY-MM-DD` and full
  * ISO timestamps (the admin client sends `Date.toISOString()`, e.g.
- * `2026-06-01T00:00:00.000Z`). For date-only values it pins the requested day
- * boundary; full ISO values are used as-is.
+ * `2026-06-01T00:00:00.000Z`). A date-only value is a calendar day in the
+ * STORE's time zone (`timeZone`, from `storeTimeZone`), pinned to that day's
+ * first or last millisecond; full ISO values are instants and used as-is.
+ * Owner decision 2026-10-01 (Ruling FRT-1): Finance Reports count days in the
+ * store's time zone, like the finance dashboard — before this a date-only
+ * value was a SERVER-local day (UTC on Railway), so a Kuwait posting between
+ * 00:00 and 03:00 landed on the previous day, and on the last day of a month
+ * in the previous month.
  *
  * Crucially it never returns an Invalid Date: an absent / unparseable value
  * falls back to `fallback`. This guards the whole finance surface — an invalid
@@ -67,14 +82,17 @@ const router = Router({ mergeParams: true });
 export function parseFinanceDate(
   value: unknown,
   fallback: Date,
-  boundary: 'start' | 'end' = 'start'
+  boundary: 'start' | 'end',
+  timeZone: string
 ): Date {
   if (value === undefined || value === null || value === '') return fallback;
   const s = String(value);
   const d = /^\d{4}-\d{2}-\d{2}$/.test(s)
-    ? new Date(`${s}T${boundary === 'end' ? '23:59:59.999' : '00:00:00.000'}`)
+    ? boundary === 'end'
+      ? zonedDayEnd(s, timeZone)
+      : zonedDayStart(s, timeZone)
     : new Date(s);
-  return Number.isNaN(d.getTime()) ? fallback : d;
+  return !d || Number.isNaN(d.getTime()) ? fallback : d;
 }
 
 // ─── GET /:storeId/finance/accounts ──────────────────────────────────────────
@@ -448,7 +466,12 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = req.query.asOf ? parseFinanceDate(req.query.asOf, new Date(), 'end') : undefined;
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
+      const asOf = req.query.asOf
+        ? parseFinanceDate(req.query.asOf, new Date(), 'end', tz)
+        : undefined;
       const data = await runInTenantContext(req.params.storeId, () =>
         trialBalance(req.params.storeId, asOf)
       );
@@ -474,12 +497,16 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
       const from = parseFinanceDate(
         req.query.from,
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-        'start'
+        'start',
+        tz
       );
-      const to = parseFinanceDate(req.query.to, new Date(), 'end');
+      const to = parseFinanceDate(req.query.to, new Date(), 'end', tz);
       const raw = await runInTenantContext(req.params.storeId, () =>
         profitAndLoss(req.params.storeId, from, to)
       );
@@ -531,7 +558,10 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end');
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
+      const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end', tz);
       const raw = await runInTenantContext(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
       );
@@ -594,13 +624,16 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
+      const monthStart = zonedDayStart(zonedMonthStartDay(now, tz), tz) ?? now;
 
       // Allow caller to override the P&L window via from/to query params.
-      // Both are expected as YYYY-MM-DD strings (date-only, local midnight).
-      // When omitted, the endpoint falls back to current-month behaviour.
-      const from = parseFinanceDate(req.query.from, monthStart, 'start');
-      const to = parseFinanceDate(req.query.to, now, 'end');
+      // The admin sends ISO instants (used as-is); a date-only value is a
+      // store-local day. When omitted, the window is the store's current month.
+      const from = parseFinanceDate(req.query.from, monthStart, 'start', tz);
+      const to = parseFinanceDate(req.query.to, now, 'end', tz);
 
       const data = await runInTenantContext(req.params.storeId, async () => {
         const [pnl, bs, stockValue, disabledValueRows] = await Promise.all([
@@ -660,11 +693,16 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = req.query.asOf ? parseFinanceDate(req.query.asOf, new Date(), 'end') : undefined;
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
+      const asOf = req.query.asOf
+        ? parseFinanceDate(req.query.asOf, new Date(), 'end', tz)
+        : undefined;
       const rows = await runInTenantContext(req.params.storeId, () =>
         trialBalance(req.params.storeId, asOf)
       );
-      const date = localIsoDay(asOf ?? new Date());
+      const date = zonedIsoDay(asOf ?? new Date(), tz);
       await streamXlsxResponse(res, {
         filename: `trial-balance-as-of-${date}.xlsx`,
         sheetName: 'Trial Balance',
@@ -702,12 +740,16 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
       const from = parseFinanceDate(
         req.query.from,
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-        'start'
+        'start',
+        tz
       );
-      const to = parseFinanceDate(req.query.to, new Date(), 'end');
+      const to = parseFinanceDate(req.query.to, new Date(), 'end', tz);
       const raw = await runInTenantContext(req.params.storeId, () =>
         profitAndLoss(req.params.storeId, from, to)
       );
@@ -737,11 +779,10 @@ router.get(
         { type: 'Net', code: '', name: 'Net Income', amount: raw.netIncome / 1000 },
       ];
 
-      // parseFinanceDate reads a date-only value as a SERVER-LOCAL day, so
-      // name it in the same timezone (toISOString shifted it a day on any
-      // server east of UTC).
-      const fromStr = localIsoDay(from);
-      const toStr = localIsoDay(to);
+      // Name the days in the store's zone — the zone parseFinanceDate
+      // resolved them in.
+      const fromStr = zonedIsoDay(from, tz);
+      const toStr = zonedIsoDay(to, tz);
       await streamXlsxResponse(res, {
         filename: `pnl-${fromStr}_to_${toStr}.xlsx`,
         sheetName: 'P&L',
@@ -770,7 +811,10 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end');
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
+      const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end', tz);
       const raw = await runInTenantContext(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
       );
@@ -804,7 +848,7 @@ router.get(
         ...buildSection('Equity', 'Total Equity', raw.equity, -1),
       ];
 
-      const date = localIsoDay(asOf);
+      const date = zonedIsoDay(asOf, tz);
       await streamXlsxResponse(res, {
         filename: `balance-sheet-as-of-${date}.xlsx`,
         sheetName: 'Balance Sheet',
@@ -862,9 +906,13 @@ router.get(
         });
         return;
       }
-      const from = new Date(parsed.data.from + 'T00:00:00.000Z');
-      const to = new Date(parsed.data.to + 'T23:59:59.999Z');
-      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      // `from`/`to` are calendar days in the store's time zone (Ruling FRT-1).
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
+      const from = zonedDayStart(parsed.data.from, tz);
+      const to = zonedDayEnd(parsed.data.to, tz);
+      if (!from || !to) {
         res.status(422).json({
           success: false,
           error: { code: 'invalid_date', message: 'from and to must be valid dates' },
@@ -872,7 +920,7 @@ router.get(
         return;
       }
       const data = await runInTenantContext(req.params.storeId, () =>
-        generateTaxReport(req.params.storeId, { from, to })
+        generateTaxReport(req.params.storeId, { from, to, timeZone: tz })
       );
       res.json({ data });
     } catch (err) {
@@ -910,9 +958,13 @@ router.get(
         });
         return;
       }
-      const from = new Date(parsed.data.from + 'T00:00:00.000Z');
-      const to = new Date(parsed.data.to + 'T23:59:59.999Z');
-      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      // `from`/`to` are calendar days in the store's time zone (Ruling FRT-1).
+      const tz = await runInTenantContext(req.params.storeId, () =>
+        storeTimeZone(req.params.storeId)
+      );
+      const from = zonedDayStart(parsed.data.from, tz);
+      const to = zonedDayEnd(parsed.data.to, tz);
+      if (!from || !to) {
         res.status(422).json({
           success: false,
           error: { code: 'invalid_date', message: 'from and to must be valid dates' },
@@ -920,7 +972,7 @@ router.get(
         return;
       }
       const report = await runInTenantContext(req.params.storeId, () =>
-        generateTaxReport(req.params.storeId, { from, to })
+        generateTaxReport(req.params.storeId, { from, to, timeZone: tz })
       );
 
       type XlsxRow = {
@@ -995,8 +1047,8 @@ router.get(
         });
       }
 
-      const fromStr = from.toISOString().slice(0, 10);
-      const toStr = to.toISOString().slice(0, 10);
+      const fromStr = zonedIsoDay(from, tz);
+      const toStr = zonedIsoDay(to, tz);
       await streamXlsxResponse(res, {
         filename: `tax-report-${fromStr}_to_${toStr}.xlsx`,
         sheetName: 'Tax Report',

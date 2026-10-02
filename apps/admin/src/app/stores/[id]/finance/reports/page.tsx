@@ -8,6 +8,8 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiFetch } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
+import { useCurrentStore } from '@/hooks/useCurrentStore';
+import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,14 +89,15 @@ interface TaxReportData {
 
 const kwd = filsToKwd;
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+// Default pickers name the STORE's today / month start — the days the API
+// resolves `YYYY-MM-DD` in (Ruling FRT-1). `toISOString()` gave the UTC day,
+// so before 03:00 Kuwait time "today" was still yesterday.
+function todayIso(timeZone: string): string {
+  return zonedIsoDay(new Date(), timeZone);
 }
 
-function firstOfMonth(): string {
-  const d = new Date();
-  d.setDate(1);
-  return d.toISOString().slice(0, 10);
+function firstOfMonth(timeZone: string): string {
+  return zonedMonthStartDay(new Date(), timeZone);
 }
 
 function downloadCsv(filename: string, rows: string[][]): void {
@@ -126,11 +129,11 @@ async function downloadXlsx(endpoint: string, filename: string): Promise<void> {
 
 // ─── Sub-views ───────────────────────────────────────────────────────────────
 
-function TrialBalanceTab({ storeId }: { storeId: string }) {
+function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
   const t = useT('finance.reports');
   const tb = useT('finance.reports.trialBalance');
   const tc = useT('common');
-  const [asOf, setAsOf] = useState(todayIso());
+  const [asOf, setAsOf] = useState(() => todayIso(timeZone));
   const [rows, setRows] = useState<TrialBalanceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -309,12 +312,12 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
   );
 }
 
-function PnlTab({ storeId }: { storeId: string }) {
+function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
   const t = useT('finance.reports');
   const tp = useT('finance.reports.pnl');
   const tc = useT('common');
-  const [from, setFrom] = useState(firstOfMonth());
-  const [to, setTo] = useState(todayIso());
+  const [from, setFrom] = useState(() => firstOfMonth(timeZone));
+  const [to, setTo] = useState(() => todayIso(timeZone));
   const [data, setData] = useState<PnlData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -499,11 +502,11 @@ function PnlTab({ storeId }: { storeId: string }) {
   );
 }
 
-function BalanceSheetTab({ storeId }: { storeId: string }) {
+function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
   const t = useT('finance.reports');
   const tbs = useT('finance.reports.balanceSheet');
   const tc = useT('common');
-  const [asOf, setAsOf] = useState(todayIso());
+  const [asOf, setAsOf] = useState(() => todayIso(timeZone));
   const [data, setData] = useState<BalanceSheetData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -670,12 +673,12 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
   );
 }
 
-function TaxReportTab({ storeId }: { storeId: string }) {
+function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
   const t = useT('finance.reports');
   const tt = useT('finance.reports.taxReport');
   const tc = useT('common');
-  const [from, setFrom] = useState(firstOfMonth());
-  const [to, setTo] = useState(todayIso());
+  const [from, setFrom] = useState(() => firstOfMonth(timeZone));
+  const [to, setTo] = useState(() => todayIso(timeZone));
   const [data, setData] = useState<TaxReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -959,6 +962,10 @@ export default function FinanceReportsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('finance.reports');
+  // Report days are the store's calendar days; wait for its zone so the
+  // default pickers do not start on the wrong day and then jump.
+  const { store, isLoading: storeLoading } = useCurrentStore(storeId);
+  const timeZone = resolveStoreTimeZone(store?.timezone);
 
   const [tab, setTab] = useState<TabKey>('trialBalance');
 
@@ -991,12 +998,13 @@ export default function FinanceReportsPage() {
         </div>
 
         {/* Tab content */}
-        {storeId && (
+        {storeId && !storeLoading && (
           <>
-            {tab === 'trialBalance' && <TrialBalanceTab storeId={storeId} />}
-            {tab === 'pnl' && <PnlTab storeId={storeId} />}
-            {tab === 'balanceSheet' && <BalanceSheetTab storeId={storeId} />}
-            {tab === 'taxReport' && <TaxReportTab storeId={storeId} />}
+            <p className="text-xs text-muted-foreground">{t('timeZoneNote', { timeZone })}</p>
+            {tab === 'trialBalance' && <TrialBalanceTab storeId={storeId} timeZone={timeZone} />}
+            {tab === 'pnl' && <PnlTab storeId={storeId} timeZone={timeZone} />}
+            {tab === 'balanceSheet' && <BalanceSheetTab storeId={storeId} timeZone={timeZone} />}
+            {tab === 'taxReport' && <TaxReportTab storeId={storeId} timeZone={timeZone} />}
           </>
         )}
       </div>

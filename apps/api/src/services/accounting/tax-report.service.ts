@@ -1,4 +1,5 @@
 import { prisma } from '@force/database';
+import { DEFAULT_STORE_TIME_ZONE, zonedIsoDay } from '@force/shared';
 
 /**
  * One transaction-level tax row — one row per order-source journal entry
@@ -15,7 +16,11 @@ export interface TaxReportRow {
    * several rows with the same order number; this says which is which (#1253).
    */
   kind: 'sale' | 'reversal';
-  /** ISO date string of the journal posting (= order payment / reversal date) */
+  /**
+   * `YYYY-MM-DD` of the journal posting (= order payment / reversal date) as a
+   * calendar day in the STORE's time zone — the same day the period bounds
+   * were resolved in (owner decision 2026-10-01).
+   */
   date: string;
   orderNumber: string;
   /** Customer display name, or null for guest orders */
@@ -112,7 +117,11 @@ export interface TaxReportResult {
  */
 export async function generateTaxReport(
   storeId: string,
-  { from, to }: { from: Date; to: Date }
+  {
+    from,
+    to,
+    timeZone = DEFAULT_STORE_TIME_ZONE,
+  }: { from: Date; to: Date; /** IANA zone row dates are labelled in */ timeZone?: string }
 ): Promise<TaxReportResult> {
   /**
    * The query:
@@ -192,7 +201,7 @@ export async function generateTaxReport(
 
     return {
       kind: r.is_sale ? 'sale' : 'reversal',
-      date: r.posted_at.toISOString().slice(0, 10),
+      date: zonedIsoDay(r.posted_at, timeZone),
       orderNumber: r.order_number,
       customerName: r.customer_name ?? null,
       subtotal: taxableBase,

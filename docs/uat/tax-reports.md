@@ -81,10 +81,15 @@
 1. Ensure some orders were charged at 5% VAT and others at 10% (or any two distinct rates)
 2. **Expect:** By-rate table shows two rows; each row's count + totals are correct; combined totals match summary cards
 
-### E3 — Date boundary (first and last day of month inclusive)
+### E3 — Date boundary (first and last day of month inclusive, in the store's time zone)
+
+Days are calendar days in the **store's time zone** (`stores.timezone`, Asia/Kuwait for every
+store today; a store with no usable zone falls back to Asia/Kuwait — Rulings FRT-1/FRT-2 in
+`docs/RULINGS.md`). The page shows the zone under the tabs.
 
 1. Set **From** = 2026-01-01, **To** = 2026-01-31
-2. **Expect:** Orders paid on 2026-01-01 AND 2026-01-31 both appear; orders from 2026-01-15 appear; orders before 2026-01-01 or after 2026-01-31 do not appear
+2. **Expect:** Orders paid on 2026-01-01 AND 2026-01-31 (Kuwait time) both appear; orders from 2026-01-15 appear; orders before 2026-01-01 or after 2026-01-31 do not appear
+3. **Expect:** An order paid at 01:30 Kuwait time on 2026-02-01 (22:30 UTC on 2026-01-31) is NOT in January — it is in February, and its row is dated 2026-02-01
 
 ### E4 — Guest orders
 
@@ -130,12 +135,12 @@ Feature: accounting.tax_reports (Enterprise)
 200 response shape:
 {
   "data": {
-    "from": "2026-03-01T00:00:00.000Z",
-    "to": "2026-03-31T23:59:59.999Z",
+    "from": "2026-02-28T21:00:00.000Z",   ← 2026-03-01 00:00 in the store's zone (Kuwait, UTC+3)
+    "to": "2026-03-31T20:59:59.999Z",     ← 2026-03-31 23:59:59.999 in the store's zone
     "rows": [
       {
         "kind": "sale",             ← "sale" | "reversal" (a refund/return entry)
-        "date": "2026-03-15",
+        "date": "2026-03-15",       ← posting day in the store's time zone
         "orderNumber": "ORD-1001",
         "customerName": "Ahmad Sharaf",
         "subtotal": 10000,          ← fils integer (taxable base = subtotal - discount)
