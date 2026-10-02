@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
@@ -157,11 +157,13 @@ export default function FinanceDashboardPage() {
       if (!stale && ad?.data && Array.isArray(ad.data)) setRecentAnomalies(ad.data);
     });
 
-    // Pending OCR drafts count — defensive against missing `meta` field.
-    apiGet<{ meta?: { total: number } }>(
+    // Pending OCR drafts count. `apiGet` drops the route's sibling `meta`
+    // (so `ed.meta.total` was always undefined and the card never left
+    // "loading"); `apiGetPage` keeps it.
+    apiGetPage<unknown>(
       `/api/v1/stores/${storeId}/expenses?status=draft&hasOcr=true&perPage=1&page=1`
-    ).then(({ data: ed }) => {
-      if (!stale && ed?.meta?.total !== undefined) setPendingOcrCount(ed.meta.total);
+    ).then(({ meta: em }) => {
+      if (!stale && em?.total !== undefined) setPendingOcrCount(em.total);
     });
     return () => {
       stale = true;

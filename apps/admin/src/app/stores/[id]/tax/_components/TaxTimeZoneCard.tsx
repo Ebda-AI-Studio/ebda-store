@@ -1,0 +1,91 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useToast } from '@force/ui';
+import { useT } from '@/i18n/useT';
+import { apiPut } from '@/lib/api';
+import { useCurrentStore } from '@/hooks/useCurrentStore';
+
+/**
+ * IANA zones offered in the picker: the GCC markets plus the neighbours the
+ * platform sells into. A store whose saved zone is not listed still shows it
+ * (see `options`), so opening this card never silently rewrites a valid zone.
+ */
+const TIME_ZONES = [
+  'Asia/Kuwait',
+  'Asia/Riyadh',
+  'Asia/Dubai',
+  'Asia/Qatar',
+  'Asia/Bahrain',
+  'Asia/Muscat',
+  'Asia/Baghdad',
+  'Asia/Amman',
+  'Asia/Beirut',
+  'Africa/Cairo',
+  'Europe/Istanbul',
+  'Europe/London',
+  'UTC',
+] as const;
+
+/**
+ * The zone a store's finance reports, P&L, trial balance, balance sheet and
+ * filed VAT periods count days in (Ruling FRT-2). It was settable by nothing
+ * but a SQL UPDATE (issue 2411). Saves through `PUT /stores/:id`, which
+ * rejects a name that is not a real IANA zone, then refetches the cached store
+ * so the Reports pickers pick the new zone up.
+ */
+export function TaxTimeZoneCard({ storeId }: { storeId: string }) {
+  const t = useT('tax.timeZone');
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { store, refetch } = useCurrentStore(storeId);
+  const [value, setValue] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (store?.timezone) setValue(store.timezone);
+  }, [store?.timezone]);
+
+  if (!store) return null;
+
+  const saved = store.timezone;
+  const options: string[] = [...TIME_ZONES];
+  if (saved && !options.includes(saved)) options.unshift(saved);
+
+  async function save(next: string) {
+    const previous = value;
+    setValue(next);
+    setSaving(true);
+    const { error } = await apiPut(`/api/v1/stores/${storeId}`, { timezone: next });
+    setSaving(false);
+    if (error) {
+      setValue(previous);
+      toastError(error.message);
+      return;
+    }
+    toastSuccess(t('saved'));
+    await refetch();
+  }
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-6 mb-6">
+      <h2 className="text-lg font-semibold text-foreground mb-1">{t('title')}</h2>
+      <p className="text-sm text-muted-foreground mb-4">{t('description')}</p>
+      <label className="flex w-fit items-center gap-2 text-sm">
+        <span className="text-muted-foreground">{t('label')}</span>
+        <select
+          value={value}
+          disabled={saving}
+          onChange={e => void save(e.target.value)}
+          dir="ltr"
+          className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+        >
+          {options.map(z => (
+            <option key={z} value={z}>
+              {z}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}

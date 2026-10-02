@@ -6,13 +6,15 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiGetPage, apiPost, type PageMeta } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+const PER_PAGE = 50;
 
 const EXPENSE_STATUSES = ['draft', 'pending', 'approved', 'posted', 'rejected'] as const;
 type ExpenseStatus = (typeof EXPENSE_STATUSES)[number];
@@ -71,6 +73,10 @@ export default function ExpensesPage() {
   const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
 
   const [expenses, setExpenses] = useState<ExpenseRow[] | null>(null);
+  // `meta` from the route: without it a list capped at PER_PAGE rows says
+  // nothing about the rows beyond it (issue 2417).
+  const [meta, setMeta] = useState<PageMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -87,7 +93,7 @@ export default function ExpensesPage() {
   const fetchExpenses = useCallback(() => {
     if (!storeId) return;
     const isLatest = beginRequest();
-    const qs = new URLSearchParams({ perPage: '50' });
+    const qs = new URLSearchParams({ perPage: String(PER_PAGE), page: String(page) });
     if (receiptOnly) {
       qs.set('hasOcr', 'true'); // any date, like the dashboard card
     } else {
@@ -98,14 +104,16 @@ export default function ExpensesPage() {
     }
     if (statusFilter !== 'all') qs.set('status', statusFilter);
     setError(null);
-    apiGet<ExpenseRow[]>(`/api/v1/stores/${storeId}/expenses?${qs}`)
-      .then(({ data, error: apiError }) => {
+    apiGetPage<ExpenseRow>(`/api/v1/stores/${storeId}/expenses?${qs}`)
+      .then(({ data, meta: pageMeta, error: apiError }) => {
         if (!isLatest()) return;
         if (apiError) {
           setExpenses(null);
+          setMeta(null);
           setError(apiError.message);
         } else {
           setExpenses(data ?? []);
+          setMeta(pageMeta);
         }
       })
       .catch(() => {
@@ -113,7 +121,12 @@ export default function ExpensesPage() {
         setExpenses(null);
         setError('Failed to load expenses');
       });
-  }, [storeId, period, customRange, statusFilter, receiptOnly, beginRequest]);
+  }, [storeId, period, customRange, statusFilter, receiptOnly, page, beginRequest]);
+
+  // A new filter is a new list: start it on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [period, customRange, statusFilter, receiptOnly]);
 
   useEffect(() => {
     fetchExpenses();
@@ -298,12 +311,48 @@ export default function ExpensesPage() {
           {expenses.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('emptyState')}</p>
           ) : (
-            <DataTable<ExpenseRow>
-              ariaLabel={t('title')}
-              columns={columns}
-              rows={expenses}
-              rowKey={exp => exp.id}
-            />
+            <>
+              {meta && (
+                <p className="mb-2 text-sm text-muted-foreground" data-testid="expenses-total">
+                  {t('totalCount', { total: meta.total.toLocaleString() })}
+                </p>
+              )}
+              <DataTable<ExpenseRow>
+                ariaLabel={t('title')}
+                columns={columns}
+                rows={expenses}
+                rowKey={exp => exp.id}
+              />
+              {meta && meta.totalPages > 1 && (
+                <div className="mt-4 flex items-center gap-2 text-sm">
+                  <button
+                    type="button"
+                    disabled={meta.page <= 1}
+                    onClick={() => setPage(meta.page - 1)}
+                    aria-label={t('pager.previous')}
+                    className="px-3 py-1 rounded border border-border disabled:opacity-40"
+                  >
+                    <span aria-hidden="true" className="inline-block rtl:rotate-180">
+                      ←
+                    </span>
+                  </button>
+                  <span className="text-muted-foreground">
+                    {t('pager.pageOf', { page: meta.page, totalPages: meta.totalPages })}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={meta.page >= meta.totalPages}
+                    onClick={() => setPage(meta.page + 1)}
+                    aria-label={t('pager.next')}
+                    className="px-3 py-1 rounded border border-border disabled:opacity-40"
+                  >
+                    <span aria-hidden="true" className="inline-block rtl:rotate-180">
+                      →
+                    </span>
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
 import { textFieldValue } from '../../../../lib/form-text';
 import { TaxGeneralSettings } from './_components/TaxGeneralSettings';
+import { TaxTimeZoneCard } from './_components/TaxTimeZoneCard';
 import { TaxRatesTable } from './_components/TaxRatesTable';
 import { TaxRateFormModal } from './_components/TaxRateFormModal';
 import { TaxInfoBox } from './_components/TaxInfoBox';
@@ -208,6 +209,7 @@ export default function TaxSettingsPage() {
               onSettingsChange={setSettings}
               onSaveSettings={handleSaveSettings}
             />
+            <TaxTimeZoneCard storeId={storeId} />
             <TaxRatesTable
               rates={rates}
               filter={filter}

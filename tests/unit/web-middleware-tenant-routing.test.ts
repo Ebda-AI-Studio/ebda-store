@@ -471,3 +471,87 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
     );
   });
 });
+
+/**
+ * Issue 2419 / Ruling TRC-7. The rewrite bakes the locale into the route (and
+ * so into the cache key). It used to be cookie -> `en`, so a cookie-less visitor
+ * to an Arabic-default store shared the English key. A store token may now
+ * declare its default language (`palora:ar`), and the cookie still wins.
+ */
+describe('middleware — store default locale in the route key (issue 2419)', () => {
+  const localeOf = (res: Response) => {
+    const rewrite = res.headers.get('x-middleware-rewrite') ?? '';
+    return new URL(rewrite).pathname.split('/')[3];
+  };
+
+  beforeEach(() => {
+    process.env.STOREFRONT_TENANT_ROUTING = 'true';
+    process.env.STOREFRONT_TENANT_ROUTING_ROUTES = 'about,faq';
+  });
+
+  it('AR-default store, no cookie: the route carries ar (platform path)', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar';
+    expect(localeOf(middleware(platformSlugRequest('/palora/about')))).toBe('ar');
+  });
+
+  it('AR-default store, no cookie: the route carries ar (custom domain)', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'wadyaljuz.com:ar';
+    expect(localeOf(middleware(customDomainRequest('/about')))).toBe('ar');
+  });
+
+  it('AR-default store, no cookie: the route carries ar (x-store-slug cookie path)', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar';
+    expect(
+      localeOf(middleware(platformSlugRequest('/faq', { cookie: 'x-store-slug=palora' })))
+    ).toBe('ar');
+  });
+
+  it('AR-default store, force-language=en: the cookie wins, the route carries en', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'wadyaljuz.com:ar';
+    expect(
+      localeOf(middleware(customDomainRequest('/about', { cookie: 'force-language=en' })))
+    ).toBe('en');
+  });
+
+  it('AR-default store, force-language=ar: the route carries ar', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'wadyaljuz.com:ar';
+    expect(
+      localeOf(middleware(customDomainRequest('/about', { cookie: 'force-language=ar' })))
+    ).toBe('ar');
+  });
+
+  it('EN-default store (bare token), no cookie: the route carries en', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'wadyaljuz.com';
+    expect(localeOf(middleware(customDomainRequest('/about')))).toBe('en');
+  });
+
+  it('a junk language cookie falls back to the store default, like the root layout', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'wadyaljuz.com:ar';
+    expect(
+      localeOf(middleware(customDomainRequest('/about', { cookie: 'force-language=fr' })))
+    ).toBe('ar');
+  });
+
+  it('the default belongs to ITS store: another listed store keeps en', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar,wadyaljuz.com';
+    expect(localeOf(middleware(customDomainRequest('/about')))).toBe('en');
+    expect(localeOf(middleware(platformSlugRequest('/palora/about')))).toBe('ar');
+  });
+
+  it.each(['palora:fr', 'palora:ar:en', 'palora:', 'all:ar', 'palora:AR ,pecannbee.com.kw:xx'])(
+    'a bad language suffix makes the WHOLE list unparseable: %s routes no store',
+    raw => {
+      process.env.STOREFRONT_TENANT_ROUTING_STORES = raw;
+      expect(
+        middleware(platformSlugRequest('/palora/about')).headers.get('x-middleware-rewrite')
+      ).not.toContain('/tenant-store/');
+    }
+  );
+
+  it('main flag off: a store declared :ar rewrites nothing (parity with no declaration)', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar';
+    delete process.env.STOREFRONT_TENANT_ROUTING;
+    const res = middleware(platformSlugRequest('/palora/about'));
+    expect(res.headers.get('x-middleware-rewrite') ?? '').not.toContain('/tenant-store/');
+  });
+});

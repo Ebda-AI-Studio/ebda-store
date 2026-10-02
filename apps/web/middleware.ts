@@ -210,29 +210,45 @@ function tenantRoutingRouteAllowed(pathname: string): boolean {
  *  makes the whole list unparseable. */
 const STORE_TOKEN_PATTERN = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
 
+/** The two render locales a store token may declare as its default. */
+type TrackALocale = 'en' | 'ar';
+
 /**
- * Parse `STOREFRONT_TENANT_ROUTING_STORES` into the set of stores the rewrite
- * may apply to, or `null` for "no store". There is deliberately NO `all`
- * shortcut (Ruling TRC-6): the literal token `all` is rejected like any other
- * unparseable value, so the list can only ever name stores one by one.
+ * Parse `STOREFRONT_TENANT_ROUTING_STORES` into the stores the rewrite may
+ * apply to (store -> its DEFAULT locale), or `null` for "no store". There is
+ * deliberately NO `all` shortcut (Ruling TRC-6): the literal token `all` is
+ * rejected like any other unparseable value, so the list can only ever name
+ * stores one by one.
+ *
+ * A token may carry the store's default language after a colon, `palora:ar`
+ * or `wadyaljuz.com:ar`; a bare token means `en`. Middleware is synchronous and
+ * cannot read `settings.defaultLanguage`, but a cookie-less visitor to an
+ * Arabic-default store must get Arabic in the route/cache key (issue 2419,
+ * Ruling TRC-7). The suffix must be `en` or `ar`; anything else, or a second
+ * colon, makes the WHOLE list unparseable (fail-closed).
  *
  * FAIL-CLOSED on every bad state, like the route list (#1980): MISSING, EMPTY
- * (or only commas/whitespace) and UNPARSEABLE (any token failing
- * `STORE_TOKEN_PATTERN`, or the reserved `all`) all route NO store, even with
+ * (or only commas/whitespace) and UNPARSEABLE all route NO store, even with
  * the main flag on and a valid route list. Losing this variable turns the
  * canary off; it never widens it.
  */
-function parseTenantRoutingStores(raw: string | undefined): Set<string> | null {
+function parseTenantRoutingStores(raw: string | undefined): Map<string, TrackALocale> | null {
   if (raw === undefined) return null;
   const tokens = raw
     .split(',')
     .map(token => token.trim().toLowerCase())
     .filter(Boolean);
   if (tokens.length === 0) return null;
-  const valid = tokens.every(
-    token => token !== ALL_ROUTES_TOKEN && STORE_TOKEN_PATTERN.test(token)
-  );
-  return valid ? new Set(tokens) : null;
+  const stores = new Map<string, TrackALocale>();
+  for (const token of tokens) {
+    const parts = token.split(':');
+    if (parts.length > 2) return null;
+    const [store, lang = 'en'] = parts;
+    if (store === ALL_ROUTES_TOKEN || !STORE_TOKEN_PATTERN.test(store)) return null;
+    if (lang !== 'en' && lang !== 'ar') return null;
+    stores.set(store, lang);
+  }
+  return stores;
 }
 
 /**
@@ -246,30 +262,49 @@ function parseTenantRoutingStores(raw: string | undefined): Set<string> | null {
  * token never matches a custom domain. Read INSIDE the request handler.
  */
 function tenantRoutingStoreAllowed(storeKey: string): boolean {
-  const allowed = parseTenantRoutingStores(process.env.STOREFRONT_TENANT_ROUTING_STORES);
-  if (allowed === null) return false;
-  return allowed.has(storeKey.toLowerCase());
+  return (
+    parseTenantRoutingStores(process.env.STOREFRONT_TENANT_ROUTING_STORES)?.has(
+      storeKey.toLowerCase()
+    ) ?? false
+  );
+}
+
+/** The default locale an allowlisted store declared (`en` when none). */
+function tenantRoutingStoreDefaultLocale(storeKey: string): TrackALocale {
+  return (
+    parseTenantRoutingStores(process.env.STOREFRONT_TENANT_ROUTING_STORES)?.get(
+      storeKey.toLowerCase()
+    ) ?? 'en'
+  );
 }
 
 /** Resolve the locale that gets baked into the `/tenant-store/[tenant]/[locale]`
- *  rewrite target. Mirrors the cookie read in `app/layout.tsx` (`force-
- *  language`), but — unlike the layout — this runs in middleware, so it
- *  can decide the CACHE KEY itself instead of forcing dynamic rendering to
- *  read the cookie at render time (plan §7). Falls back to `en` when the
- *  cookie is absent; a store's own `defaultLanguage` preference isn't
- *  available here without an extra store fetch, so honoring it is deferred
- *  to a later phase (see PR notes) — inert either way while the flag is off. */
-function resolveTrackALocale(request: NextRequest): 'en' | 'ar' {
-  return request.cookies.get('force-language')?.value === 'ar' ? 'ar' : 'en';
+ *  rewrite target. Mirrors the root layout's decision (`app/layout.tsx`): the
+ *  `force-language` cookie when it is `en` or `ar`, otherwise the store's
+ *  default language. Runs in middleware, so it decides the CACHE KEY itself
+ *  instead of forcing dynamic rendering to read the cookie at render time
+ *  (plan §7). A cookie-less visitor therefore no longer shares the `en` key on
+ *  an Arabic-default store (issue 2419, Ruling TRC-7). `storeKey` is the
+ *  allowlist identity; the default comes from its `:ar` / `:en` suffix. */
+function resolveTrackALocale(request: NextRequest, storeKey: string): TrackALocale {
+  const cookie = request.cookies.get('force-language')?.value;
+  if (cookie === 'ar' || cookie === 'en') return cookie;
+  return tenantRoutingStoreDefaultLocale(storeKey);
 }
 
 /** Build the internal (never customer-visible) rewrite target for the
  *  tenant-cacheable Track-A tree. `tenantKey` is either a normalized custom
  *  domain or `slug:<slug>` for platform-path stores (plan §3.3);
  *  `encodeURIComponent` keeps the `slug:` colon path-segment-safe — Next
- *  decodes it back on the way into `params.tenant`. */
-function buildStoreTreeUrl(request: NextRequest, tenantKey: string, pathname: string): URL {
-  const locale = resolveTrackALocale(request);
+ *  decodes it back on the way into `params.tenant`. `storeKey` is the
+ *  allowlist identity (the bare slug / hostname). */
+function buildStoreTreeUrl(
+  request: NextRequest,
+  tenantKey: string,
+  pathname: string,
+  storeKey: string
+): URL {
+  const locale = resolveTrackALocale(request, storeKey);
   const url = request.nextUrl.clone();
   const suffix = pathname === '/' ? '' : pathname;
   url.pathname = `/tenant-store/${encodeURIComponent(tenantKey)}/${locale}${suffix}`;
@@ -425,7 +460,12 @@ function handleCustomDomain(
   }
 
   if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, storeIdentifier)) {
-    const storeTreeUrl = buildStoreTreeUrl(request, storeIdentifier, request.nextUrl.pathname);
+    const storeTreeUrl = buildStoreTreeUrl(
+      request,
+      storeIdentifier,
+      request.nextUrl.pathname,
+      storeIdentifier
+    );
     const response = NextResponse.rewrite(storeTreeUrl, {
       request: { headers: requestHeaders },
     });
@@ -462,7 +502,7 @@ function handlePlatformDomain(
       slugInfo.slug
     );
     const url = storeTreeEligible
-      ? buildStoreTreeUrl(request, `slug:${slugInfo.slug}`, slugInfo.rewrittenPath)
+      ? buildStoreTreeUrl(request, `slug:${slugInfo.slug}`, slugInfo.rewrittenPath, slugInfo.slug)
       : request.nextUrl.clone();
     if (!storeTreeEligible) {
       url.pathname = slugInfo.rewrittenPath;
@@ -527,7 +567,8 @@ function handlePlatformDomain(
       const storeTreeUrl = buildStoreTreeUrl(
         request,
         `slug:${cookieSlug}`,
-        request.nextUrl.pathname
+        request.nextUrl.pathname,
+        cookieSlug
       );
       return NextResponse.rewrite(storeTreeUrl, { request: { headers: requestHeaders } });
     }

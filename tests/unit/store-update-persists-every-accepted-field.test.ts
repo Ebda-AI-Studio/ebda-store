@@ -43,6 +43,17 @@ vi.mock('@force/shared', () => ({
   // the write whitelist, not URL-safety validation (that has its own
   // coverage elsewhere).
   isSafeUrl: (_url: unknown): _url is string => true,
+  // issue 2411: updateStoreSchema validates `timezone` with isValidTimeZone.
+  // Same contract as the real one (an IANA name the runtime can format in).
+  isValidTimeZone: (z: unknown): z is string => {
+    if (typeof z !== 'string' || z.trim() === '') return false;
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: z });
+      return true;
+    } catch {
+      return false;
+    }
+  },
 }));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   // #1518: `getClient` was added when importing `updateStoreSchema` pulled in
@@ -102,6 +113,7 @@ const EVERY_ACCEPTED_FIELD = {
   heroImage: 'https://example.com/a.png',
   blogEnabled: true,
   locationsEnabled: true,
+  timezone: 'Asia/Dubai',
   returnWindowDays: 14,
   returnFeesPaidBy: 'merchant',
 } as const;
@@ -138,6 +150,16 @@ describe('the write reaches the database for every accepted field', () => {
     for (const [field, value] of Object.entries(EVERY_ACCEPTED_FIELD)) {
       expect(written()).toHaveProperty(field, value);
     }
+  });
+});
+
+describe('timezone is validated at the edge (issue 2411)', () => {
+  it('accepts an IANA zone', () => {
+    expect(updateStoreSchema.safeParse({ timezone: 'Asia/Dubai' }).success).toBe(true);
+  });
+
+  it.each(['Mars/Olympus', 'not a zone', ''])('rejects %j instead of coercing it', bad => {
+    expect(updateStoreSchema.safeParse({ timezone: bad }).success).toBe(false);
   });
 });
 

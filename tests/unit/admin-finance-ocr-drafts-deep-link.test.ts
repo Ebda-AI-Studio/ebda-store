@@ -52,3 +52,34 @@ describe('pending receipt drafts card and its View-all link agree (issue 2404)',
     expect(expenses).toMatch(/\{receiptOnly \? \(/); // visible chip, not hidden state
   });
 });
+
+/**
+ * Issue 2417: receipt-only mode removes the date window, so the list can hold
+ * every receipt draft the store ever made, but the page fetched 50 and showed
+ * no total or pager. `apiGet` drops the route's `meta`, so the page (and the
+ * card, whose count read `meta.total` through `apiGet` and never got one) must
+ * use the meta-preserving `apiGetPage`.
+ */
+describe('the destination surfaces the total it was sent (issue 2417)', () => {
+  it('the expenses page reads meta through apiGetPage, not apiGet', () => {
+    expect(expenses).toMatch(/apiGetPage<ExpenseRow>/);
+    expect(expenses).not.toMatch(/\bapiGet</);
+  });
+
+  it('shows the total and a pager driven by meta.totalPages', () => {
+    expect(expenses).toMatch(/data-testid="expenses-total"/);
+    expect(expenses).toMatch(/\{meta && meta\.totalPages > 1 && \(/);
+    expect(expenses).toMatch(/setPage\(meta\.page \+ 1\)/);
+  });
+
+  it('sends the page it is showing and resets to page 1 when a filter changes', () => {
+    expect(expenses).toMatch(/page: String\(page\)/);
+    expect(expenses).toMatch(
+      /setPage\(1\);\s*\}, \[period, customRange, statusFilter, receiptOnly\]\)/
+    );
+  });
+
+  it('the dashboard card takes its count from apiGetPage meta', () => {
+    expect(dashboard).toMatch(/apiGetPage<unknown>\(\s*`[^`]*hasOcr=true/);
+  });
+});

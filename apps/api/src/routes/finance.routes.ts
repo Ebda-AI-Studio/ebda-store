@@ -466,9 +466,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const asOf = req.query.asOf
         ? parseFinanceDate(req.query.asOf, new Date(), 'end', tz)
         : undefined;
@@ -497,9 +495,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const from = parseFinanceDate(
         req.query.from,
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
@@ -558,9 +554,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end', tz);
       const raw = await runInTenantContext(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
@@ -624,9 +618,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const now = new Date();
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const monthStart = zonedDayStart(zonedMonthStartDay(now, tz), tz) ?? now;
 
       // Allow caller to override the P&L window via from/to query params.
@@ -693,9 +685,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const asOf = req.query.asOf
         ? parseFinanceDate(req.query.asOf, new Date(), 'end', tz)
         : undefined;
@@ -740,9 +730,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const from = parseFinanceDate(
         req.query.from,
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
@@ -811,9 +799,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end', tz);
       const raw = await runInTenantContext(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
@@ -907,9 +893,7 @@ router.get(
         return;
       }
       // `from`/`to` are calendar days in the store's time zone (Ruling FRT-1).
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const from = zonedDayStart(parsed.data.from, tz);
       const to = zonedDayEnd(parsed.data.to, tz);
       if (!from || !to) {
@@ -959,9 +943,7 @@ router.get(
         return;
       }
       // `from`/`to` are calendar days in the store's time zone (Ruling FRT-1).
-      const tz = await runInTenantContext(req.params.storeId, () =>
-        storeTimeZone(req.params.storeId)
-      );
+      const tz = await storeTimeZone(req.params.storeId);
       const from = zonedDayStart(parsed.data.from, tz);
       const to = zonedDayEnd(parsed.data.to, tz);
       if (!from || !to) {

@@ -807,6 +807,66 @@ export async function apiGet<T = unknown>(endpoint: string) {
   return apiRequest<T>(endpoint, { method: 'GET' });
 }
 
+/** The `meta` block list routes return beside `data` (see expenses.routes.ts). */
+export interface PageMeta {
+  page: number;
+  perPage: number;
+  total: number;
+  totalPages: number;
+}
+
+/**
+ * GET a list route that answers `{ data: items, meta }` and KEEP `meta`.
+ * `apiGet` unwraps one layer and drops the sibling `meta`, so a page built on it
+ * can show 50 rows with no way to know a 51st exists (issue 2417) — use this
+ * wherever the total or page count is shown. Same auth/refresh path as
+ * `apiGet` (it rides on `apiFetch`); `meta` is null when the route sent none.
+ */
+export async function apiGetPage<T = unknown>(
+  endpoint: string
+): Promise<{ data: T[] | null; meta: PageMeta | null; error: ApiError | null }> {
+  try {
+    const response = await apiFetch(endpoint, { method: 'GET' });
+    let body: {
+      data?: T[];
+      meta?: PageMeta;
+      error?: { code?: string; message?: string; details?: Record<string, unknown> };
+    } | null = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    if (!response.ok || !body) {
+      return {
+        data: null,
+        meta: null,
+        error: {
+          code: body?.error?.code || 'SERVER_ERROR',
+          message: body?.error?.message || `Request failed with status ${response.status}`,
+          status: response.status,
+          details: body?.error?.details,
+        },
+      };
+    }
+    return {
+      data: Array.isArray(body.data) ? body.data : [],
+      meta: body.meta ?? null,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      data: null,
+      meta: null,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: error instanceof Error ? error.message : 'Network request failed',
+        status: 0,
+      },
+    };
+  }
+}
+
 /**
  * POST request helper
  */

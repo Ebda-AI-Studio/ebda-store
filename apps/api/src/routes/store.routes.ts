@@ -17,7 +17,7 @@ import { featureService } from '../services/feature.service';
 import { bustCorsCache } from '../lib/cors-cache';
 import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
-import { isSafeUrl } from '@force/shared';
+import { isSafeUrl, isValidTimeZone } from '@force/shared';
 import {
   maskMarketingPixelSecrets,
   preserveMaskedPixelSecrets,
@@ -75,6 +75,13 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
   heroImage: heroNullableStr(1000),
   blogEnabled: z.boolean().optional(),
   locationsEnabled: z.boolean().optional(),
+  // The zone the store's finance reports / tax periods count days in
+  // (Ruling FRT-2). A name the runtime cannot resolve is REJECTED, not
+  // silently coerced to Kuwait days (issue 2411).
+  timezone: z
+    .string()
+    .refine(isValidTimeZone, { message: 'timezone must be a valid IANA time zone' })
+    .optional(),
   // Return policy -> Product JSON-LD hasMerchantReturnPolicy.
   // `.nullable()` is load-bearing: the admin sends null to CLEAR a declared
   // policy, and null must persist as "not declared" rather than being dropped.

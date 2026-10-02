@@ -90,6 +90,8 @@ type UpdateStoreData = Partial<CreateStoreData> & {
   heroImage?: string | null;
   /** Bucket E1 (2026-05-17): opt-in blog feature toggle. */
   blogEnabled?: boolean;
+  /** IANA zone governing finance-report / tax-period days (validated at the route). */
+  timezone?: string;
   /**
    * Gate for the store-locations feature. Accepted by updateStoreSchema and
    * PUT by the admin's LocationsTab, but it was absent from BOTH this type and
@@ -294,7 +296,6 @@ export class StoreService {
         ownerId,
         settings: data.settings || {
           currency: 'KWD',
-          timezone: 'Asia/Kuwait',
           locale: 'en-KW',
         },
         // 2026-07-12 design structural batch: new stores get the persona-chrome
@@ -382,6 +383,7 @@ export class StoreService {
         ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
         ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
         ...(data.blogEnabled !== undefined && { blogEnabled: data.blogEnabled }),
+        ...(data.timezone !== undefined && { timezone: data.timezone }),
         // These three were accepted by updateStoreSchema and dropped here. The
         // route validated them, the service typed them, and this object — the
         // only thing that actually writes — never mentioned them. So the admin

@@ -5006,10 +5006,26 @@ whose boundary had a 00:00–03:00 Kuwait posting — none exists in prod today.
 **Ruling FRT-2 — a store with no usable time zone falls back to Asia/Kuwait.** `stores.timezone` is
 `NOT NULL DEFAULT 'Asia/Kuwait'`, so "no setting" means an empty string or a name the runtime
 cannot resolve (`resolveStoreTimeZone`, `DEFAULT_STORE_TIME_ZONE`). Asia/Kuwait is the platform's
-market and matches the invoice renderer's existing fallback (`invoice.service.ts`). Note:
-`provisioning.service.ts` writes `settings.timezone = 'UTC'` into the `settings` JSON for stores it
-provisions without one; that JSON key is NOT read by the reports (only the column is). Cost if
-wrong: a future non-Kuwait store with a blank zone sees Kuwait days until its zone is set.
+market and matches the invoice renderer's existing fallback (`invoice.service.ts`). The column is
+now settable (issue 2411, 2412): `PUT /stores/:id` takes `timezone` (rejected unless
+`isValidTimeZone`, so a typo is a 422, never a silent Kuwait fallback), the Tax page has a time-zone
+card that sends it, and `POST /admin/stores` writes `settings.timezone` to the COLUMN (validated, else
+the column default). The old `settings.timezone` JSON key had zero readers and is no longer written
+by provisioning or by `StoreService.create`; rows written before this change may still carry it, and
+nothing reads it. Pinned by `tests/unit/provisioning-store-timezone.test.ts` and
+`tests/unit/store-update-persists-every-accepted-field.test.ts`. Cost if wrong: a future non-Kuwait
+store whose owner never opens the Tax page still counts Kuwait days; a time-zone change applies to
+reports run afterwards, so a period already filed under the old zone does not re-run identically.
+
+**Ruling FRT-3 — the store time-zone lookup is a bare read, not its own tenant transaction (issue
+2410).** `runInTenantContext` never joins an ambient transaction, so wrapping `storeTimeZone` in it
+took each finance report request from 2 interactive Postgres transactions to 3, on the pgbouncer
+slots the `index.ts` comment says are already contended. `stores` has RLS disabled
+(migration `20260609000000_complete_force_rls_coverage`, no later migration re-enables it; grepped
+every migration), so the read needs no tenant GUC. All 9 call sites now `await storeTimeZone(id)`.
+Pinned by `tests/unit/finance-tz-lookup-no-extra-tx.test.ts` (reintroducing the wrapper at any call
+site reddens it). Cost if wrong: if RLS is ever re-enabled on `stores`, the bare read returns no row
+and every report silently counts Kuwait days; the guard to add then is a `stores` policy test.
 
 ## Tenant routing canary (2026-10-01, branch `feat/tenant-routing-canary`, PR 1979)
 
@@ -5111,7 +5127,10 @@ cookie-less crawler got `en` on an Arabic-default store, so an English title and
 still off in prod, so nothing renders differently today; with it on, the merged metadata is proven
 equal to flag-off for no cookie, `en` and `ar` in
 `tests/unit/web-tenant-tree-store-chrome-render.test.tsx` (removing the early return reddens the
-cookie-less case, restored byte-identical). Accepted residual: the tree stays dynamic for metadata
+cookie-less case, restored byte-identical). That proof is LAYOUT-level only; page-level parity (title,
+description, canonical, robots per route, tenant page vs its legacy twin) is
+`tests/unit/web-tenant-tree-page-metadata-parity.test.tsx` (issue 2418: the tenant categories page had
+dropped the legacy store-aware canonical; reverting the fix reddens `/categories`). Accepted residual: the tree stays dynamic for metadata
 until the root-layout decomposition; the Phase 4 cache-key blocker (no-cookie visitor shares the `en`
 key) in the plan is unchanged and still has to be fixed in middleware before pages cache. Cost if wrong:
 a later change that reads the route segment for metadata again re-opens the English-over-Arabic
@@ -5172,3 +5191,28 @@ parity run reported 1 unexplained difference on the all-unset check and did not 
 middleware has no time or random source, so it is recorded here rather than dismissed. Cost if wrong:
 a store reachable under a custom domain AND a platform slug needs both spellings listed, and an operator
 who lists a slug expecting it to cover the custom domain sees that domain unchanged until its hostname is added.
+
+**Ruling TRC-7 — a cookie-less visitor to an Arabic-default store gets the store default in the
+route/cache key, declared on the store token (issue 2419, 2026-10-02).** The rewrite used to key a
+visitor with no `force-language` cookie as `en`, while the root layout renders the store's
+`defaultLanguage`. Middleware is synchronous and has no store lookup (TRC-6), so the default is
+declared where the store is already named: `STOREFRONT_TENANT_ROUTING_STORES` accepts an optional
+`:en` or `:ar` suffix per token (`palora:ar`, `wadyaljuz.com:ar`); a bare token means `en`. The
+locale baked into the rewrite is now: cookie when it is `en` or `ar` (as the root layout does), else
+the token's default. Any other suffix, or a second colon, makes the WHOLE list unparseable, so a
+typo routes no store (fail-closed, as TRC-6). Document metadata was already correct on an
+Arabic-default store (TRC-5: the tenant layout emits none, the root resolves cookie then store
+default); this closes the remaining half, the cache key, which Phase 4 needed. Evidence: 11 middleware
+cases in `tests/unit/web-middleware-tenant-routing.test.ts` and the three required metadata cases in
+`tests/unit/web-tenant-tree-store-chrome-render.test.tsx` (AR-default no cookie: key `ar`, Arabic
+`og:locale`; AR-default `en` cookie: key `en`, English; EN-default no cookie: key `en`, English).
+Mutants, both restored byte-identical: default ignored (6 red), cookie ignored (4 red). Parity of the
+new middleware against `origin/main`'s, 960 host x path x cookie cases per environment: main flag unset,
+`false`, on with no store list, and on with bare tokens all identical in 960 of 960; with `:ar` tokens
+108 differ, every one only in the locale segment (`en` to `ar`) of a rewrite for a cookie-less (or
+junk-cookie) request. Not verified: nothing was set or deployed; no live request was made. Accepted
+residual: the declared default can drift from the store's real `settings.defaultLanguage`; the runbook
+reads the store's language into the step-2 baseline and requires a cookie-less request in Verify, which
+is the check that catches a drift. Cost if wrong: if an operator declares `palora:ar` for a store whose
+default is `en`, cookie-less visitors get Arabic cache keys over English content until the token is
+corrected.

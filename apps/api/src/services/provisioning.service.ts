@@ -8,7 +8,7 @@ import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
-import { slugifyWithFallback } from '@force/shared';
+import { isValidTimeZone, slugifyWithFallback } from '@force/shared';
 
 // ==========================================
 // Store Provisioning Service
@@ -163,7 +163,11 @@ export class ProvisioningService {
           });
         }
 
-        // Create the store
+        // `timezone` governs the store's tax periods (Ruling FRT-2), so it goes
+        // to the `stores.timezone` COLUMN — validated, else the column default.
+        // It is deliberately NOT copied into the `settings` JSON, where no
+        // code reads it (issue 2412).
+        const { timezone: requestedZone, ...settingsRest } = settings ?? {};
         const store = await tx.store.create({
           data: {
             name: storeName,
@@ -173,11 +177,11 @@ export class ProvisioningService {
             ownerId: owner.id,
             status: 'active',
             plan,
+            ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
             settings: {
-              theme: settings?.theme || 'default',
-              currency: settings?.currency || 'USD',
-              timezone: settings?.timezone || 'UTC',
-              ...(settings || {}),
+              theme: settingsRest.theme || 'default',
+              currency: settingsRest.currency || 'USD',
+              ...settingsRest,
             },
           },
         });

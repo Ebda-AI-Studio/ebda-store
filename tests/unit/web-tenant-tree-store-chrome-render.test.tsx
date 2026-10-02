@@ -26,6 +26,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { NextRequest } from 'next/server';
+import { middleware } from '../../apps/web/middleware';
 
 const WEB = '../../apps/web/src';
 
@@ -38,7 +40,7 @@ const STORE = {
   description: 'Nuts and dates',
   theme: { primaryColor: '#123456' },
   typography: null,
-  settings: { defaultLanguage: 'ar' },
+  settings: { defaultLanguage: 'ar' as 'ar' | 'en' },
   marketingPixels: { meta: { pixelId: '1234567890' } },
   pwaEnabled: false,
   enabledFeatures: [],
@@ -224,5 +226,90 @@ describe('document metadata is identical flag off and flag on (issue 2407)', () 
     languageCookie.value = undefined;
     const md = await rootMetadata();
     expect(JSON.stringify(md)).toContain('ar_KW');
+  });
+});
+
+/**
+ * Issue 2419 / Ruling TRC-7, end to end through the allowlist. The rewrite
+ * (real middleware) picks the `[locale]` segment; the merged document metadata
+ * is {...root, ...tenant layout} for THAT segment. With routing on for a store
+ * in the allowlist, the document language must be the one the visitor gets with
+ * routing off: cookie, else the store's default.
+ */
+describe('allowlisted store: route segment and metadata agree with the store default (issue 2419)', () => {
+  const ENV_KEYS = [
+    'STOREFRONT_TENANT_ROUTING',
+    'STOREFRONT_TENANT_ROUTING_ROUTES',
+    'STOREFRONT_TENANT_ROUTING_STORES',
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const k of ENV_KEYS) saved[k] = process.env[k];
+    process.env.STOREFRONT_TENANT_ROUTING = 'true';
+    process.env.STOREFRONT_TENANT_ROUTING_ROUTES = 'about';
+  });
+
+  afterEach(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+    languageCookie.value = undefined;
+    STORE.settings.defaultLanguage = 'ar';
+  });
+
+  /** The `[locale]` the real middleware bakes for a visit to /about. */
+  function routeSegment(storesToken: string, cookie: string | undefined): string {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = storesToken;
+    const res = middleware(
+      new NextRequest('https://wadyaljuz.com/about', {
+        headers: {
+          host: 'wadyaljuz.com',
+          ...(cookie ? { cookie: `force-language=${cookie}` } : {}),
+        },
+      })
+    );
+    const rewrite = res.headers.get('x-middleware-rewrite') ?? '';
+    expect(rewrite, 'the allowlisted store must be rewritten').toContain('/tenant-store/');
+    return new URL(rewrite).pathname.split('/')[3];
+  }
+
+  const ogLocale = (md: any): string | undefined => md.openGraph?.locale;
+
+  async function mergedMetadata(segment: string) {
+    const off = await rootMetadata();
+    const nested = await tenantLayoutMetadata({
+      params: Promise.resolve({ tenant: 'wadyaljuz.com', locale: segment }),
+    });
+    return { off, on: { ...off, ...nested } };
+  }
+
+  it('AR-default store, no cookie: the route key is ar and the metadata is Arabic', async () => {
+    STORE.settings.defaultLanguage = 'ar';
+    const segment = routeSegment('wadyaljuz.com:ar', undefined);
+    expect(segment).toBe('ar');
+    const { off, on } = await mergedMetadata(segment);
+    expect(ogLocale(on)).toBe('ar_KW');
+    expect(on).toEqual(off);
+  });
+
+  it('AR-default store, en cookie: the route key is en and the metadata is English', async () => {
+    STORE.settings.defaultLanguage = 'ar';
+    languageCookie.value = 'en';
+    const segment = routeSegment('wadyaljuz.com:ar', 'en');
+    expect(segment).toBe('en');
+    const { off, on } = await mergedMetadata(segment);
+    expect(ogLocale(on)).toBe('en_KW');
+    expect(on).toEqual(off);
+  });
+
+  it('EN-default store, no cookie: the route key is en and the metadata is English', async () => {
+    STORE.settings.defaultLanguage = 'en';
+    const segment = routeSegment('wadyaljuz.com', undefined);
+    expect(segment).toBe('en');
+    const { off, on } = await mergedMetadata(segment);
+    expect(ogLocale(on)).toBe('en_KW');
+    expect(on).toEqual(off);
   });
 });

@@ -3119,6 +3119,12 @@
         "description": "Product prices already include tax (tax will be calculated backwards)"
       }
     },
+    "timeZone": {
+      "title": "Reporting time zone",
+      "description": "Decides which calendar day each sale, expense and tax period belongs to. A sale just after midnight in your country counts on that day in your reports and VAT figures.",
+      "label": "Time zone",
+      "saved": "Time zone saved"
+    },
     "rates": {
       "title": "Tax Rates",
       "subtitle": "Every active rate applies to every order, added together",
@@ -5901,6 +5907,12 @@
       "receiptOnly": "Receipt drafts only (any date)",
       "receiptOnlyClear": "Show all expenses",
       "emptyState": "No expenses yet.",
+      "totalCount": "{total} expenses",
+      "pager": {
+        "previous": "Previous page",
+        "next": "Next page",
+        "pageOf": "Page {page} of {totalPages}"
+      },
       "statuses": {
         "draft": "Draft",
         "pending": "Pending Approval",

@@ -30,7 +30,7 @@ import {
   OrderStatus,
   OrderPaymentStatus,
 } from '@force/database';
-import { csvField } from '@force/shared';
+import { csvField, isValidTimeZone } from '@force/shared';
 
 const router = Router();
 
@@ -93,7 +93,12 @@ const provisionStoreSchema = z.object({
     .object({
       theme: z.string().optional(),
       currency: z.string().optional(),
-      timezone: z.string().optional(),
+      // Governs the store's tax periods — reject a non-IANA name rather than
+      // silently falling back to Kuwait days (issue 2412).
+      timezone: z
+        .string()
+        .refine(isValidTimeZone, { message: 'timezone must be a valid IANA time zone' })
+        .optional(),
     })
     .optional(),
 });

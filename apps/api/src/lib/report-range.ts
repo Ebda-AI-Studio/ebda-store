@@ -35,7 +35,10 @@ export type { ReportRange };
 /**
  * The time zone a store's finance reports count days in: the store's
  * `timezone` column when it is a usable IANA zone, else Asia/Kuwait
- * (Ruling FRT-2). Read under the caller's tenant context.
+ * (Ruling FRT-2). Call it bare, NOT inside its own `runInTenantContext`:
+ * `stores` has RLS disabled (migration 20260609000000), so the read needs no
+ * tenant GUC, and `runInTenantContext` never joins an ambient tx — wrapping
+ * it opens an extra interactive Postgres transaction per request (issue 2410).
  */
 export async function storeTimeZone(storeId: string): Promise<string> {
   const store = await prisma.store.findUnique({
