@@ -334,24 +334,50 @@ const SMS_OPT_OUT_LABEL = { en: 'Stop offers', ar: 'إيقاف العروض' } a
  * sweep is one dispatch per subscriber) reads the store once, not once per
  * recipient (issue 2426).
  *
+ * The cache holds the in-flight PROMISE, not the resolved value (issue 2434):
+ * the back-in-stock loop calls `dispatch` for every subscriber WITHOUT awaiting
+ * between them, so every recipient reaches this function before the first read
+ * resolves. A value cache misses for all N; a promise cache lets recipients 2..N
+ * join recipient 1's read. An entry is dropped if its read rejects or the store
+ * does not exist, so neither a failure nor a missing store is cached.
+ *
  * Staleness class: BOUNDED-stale, 120s per API instance. The residual is a
  * store that changes its custom domain: for up to 120s its new promotional
  * SMS carry an opt-out link on the old domain. The token itself is
  * store-independent, so the link still works wherever that domain is served.
  */
 const OPT_OUT_BASE_TTL_MS = 120_000;
-const optOutBaseCache = new BoundedMap<string, { base: string; expiresAt: number }>(2000);
+const optOutBaseCache = new BoundedMap<string, { base: Promise<string>; expiresAt: number }>(2000);
 
-async function storefrontBase(storeId: string): Promise<string> {
-  const hit = optOutBaseCache.get(storeId);
-  if (hit && hit.expiresAt > Date.now()) return hit.base;
+async function readStorefrontBase(storeId: string): Promise<{ base: string; found: boolean }> {
   const store = await withRlsBypass(tx =>
     tx.store.findUnique({ where: { id: storeId }, select: { domain: true, slug: true } })
   );
   const base = store?.domain ? `https://${store.domain}` : `${config.webUrl}/${store?.slug ?? ''}`;
-  if (store) optOutBaseCache.set(storeId, { base, expiresAt: Date.now() + OPT_OUT_BASE_TTL_MS });
-  return base;
+  return { base, found: !!store };
 }
+
+function storefrontBase(storeId: string): Promise<string> {
+  const hit = optOutBaseCache.get(storeId);
+  if (hit && hit.expiresAt > Date.now()) return hit.base;
+  const entry = { expiresAt: Date.now() + OPT_OUT_BASE_TTL_MS } as {
+    base: Promise<string>;
+    expiresAt: number;
+  };
+  const evict = () => {
+    if (optOutBaseCache.get(storeId) === entry) optOutBaseCache.delete(storeId);
+  };
+  entry.base = readStorefrontBase(storeId).then(({ base, found }) => {
+    if (!found) evict();
+    return base;
+  });
+  entry.base.catch(evict);
+  optOutBaseCache.set(storeId, entry);
+  return entry.base;
+}
+
+/** Test hook: the cached storefront-base read, for asserting how many store reads a fan-out costs. */
+export const __storefrontBaseForTests = storefrontBase;
 
 /** Test hook: forget cached storefront bases. */
 export function __clearOptOutBaseCacheForTests(): void {

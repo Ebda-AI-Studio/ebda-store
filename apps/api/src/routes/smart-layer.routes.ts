@@ -82,7 +82,7 @@ router.get(
               variant: { select: { id: true, title: true, titleAr: true, sku: true } },
               supplier: { select: { id: true, name: true } },
             },
-            orderBy: { urgencyDays: 'asc' },
+            orderBy: [{ urgencyDays: 'asc' }, { id: 'asc' }],
             skip: (page - 1) * perPage,
             take: perPage,
           }),

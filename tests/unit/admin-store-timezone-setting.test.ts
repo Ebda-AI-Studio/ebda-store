@@ -43,4 +43,19 @@ describe('the admin can set the store time zone (issue 2411)', () => {
       }
     });
   }
+
+  // Issue 2431: `stores.timezone` is the ONE store zone, not a report-only knob. The storefront
+  // reads it for checkout delivery-window cutoffs and for every date a customer sees, so the card
+  // must say so (Ruling FRT-2). Owner decision 2026-10-03: one zone, honest copy.
+  const SCOPE = {
+    en: [/delivery-window/i, /checkout/i, /customers see/i, /VAT/],
+    ar: [/التوصيل/, /الدفع/, /العملاء/, /القيمة المضافة/],
+  } as const;
+  for (const locale of ['en', 'ar'] as const) {
+    it(`${locale} card copy names everything the zone governs, not only reports (issue 2431)`, () => {
+      const tz = JSON.parse(readFileSync(resolve(MSG, `${locale}.json`), 'utf8')).tax.timeZone;
+      for (const re of SCOPE[locale]) expect(tz.description, `${locale} ${re}`).toMatch(re);
+      expect(tz.title).not.toMatch(/report|للتقارير/i);
+    });
+  }
 });

@@ -469,17 +469,23 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
 
 export async function listPurchaseOrders(
   storeId: string,
-  opts: { status?: string; page?: number; perPage?: number } = {}
+  opts: { status?: string; page?: number; perPage?: number; q?: string } = {}
 ) {
   const page = opts.page ?? 1;
   const perPage = Math.min(opts.perPage ?? 50, 200);
   const where: Prisma.PurchaseOrderWhereInput = { storeId };
   if (opts.status) where.status = opts.status as any;
+  if (opts.q) {
+    where.OR = [
+      { poNumber: { contains: opts.q, mode: 'insensitive' } },
+      { supplier: { name: { contains: opts.q, mode: 'insensitive' } } },
+    ];
+  }
   const [items, total] = await Promise.all([
     prisma.purchaseOrder.findMany({
       where,
       include: { supplier: { select: { name: true } }, items: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * perPage,
       take: perPage,
     }),

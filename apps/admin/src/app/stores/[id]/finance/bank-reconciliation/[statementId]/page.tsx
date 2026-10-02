@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPost, apiPatch } from '@/lib/api';
+import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
+import { PageControls } from '@/components/PageControls';
 import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -148,7 +149,8 @@ export default function StatementDetailPage() {
 
   const [stmt, setStmt] = useState<StatementDetail | null>(null);
   const [txs, setTxs] = useState<BankTx[]>([]);
-  const [txTotal, setTxTotal] = useState(0);
+  const [txMeta, setTxMeta] = useState<PageMeta | null>(null);
+  const [txPage, setTxPage] = useState(1);
   const [filter, setFilter] = useState<FilterOption>('all');
   const [error, setError] = useState<string | null>(null);
   const [autoMatchLoading, setAutoMatchLoading] = useState(false);
@@ -177,22 +179,22 @@ export default function StatementDetailPage() {
   const fetchTxs = useCallback(async () => {
     if (!storeId || !statementId) return;
     const qs = filter !== 'all' ? `&matchStatus=${filter}` : '';
-    // Same double-unwrap: `data` IS the transaction array. `meta.total` is
-    // not recoverable through apiGet (it drops the sibling), so the count
-    // falls back to the fetched-page length — correct as long as the
-    // statement has ≤200 transactions (the requested perPage); beyond that
-    // it undercounts. A true fix needs a raw-response variant of apiGet
-    // that preserves `meta`.
-    const { data, error: err } = await apiGet<BankTx[]>(
-      `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}/transactions?perPage=200${qs}`
+    // `apiGetPage` keeps the route's `meta`, so the row count is the statement's REAL total and a
+    // pager reaches every transaction past the 200-row page (issue 2430).
+    const {
+      data,
+      meta,
+      error: err,
+    } = await apiGetPage<BankTx>(
+      `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}/transactions?perPage=200&page=${txPage}${qs}`
     );
     if (err) {
       setError(err.message ?? t('errors.loadTransactions'));
       return;
     }
     setTxs(data ?? []);
-    setTxTotal(data?.length ?? 0);
-  }, [storeId, statementId, filter]);
+    setTxMeta(meta);
+  }, [storeId, statementId, filter, txPage]);
 
   useEffect(() => {
     fetchStmt();
@@ -459,7 +461,10 @@ export default function StatementDetailPage() {
           {FILTER_OPTIONS.map(opt => (
             <button
               key={opt.value}
-              onClick={() => setFilter(opt.value)}
+              onClick={() => {
+                setFilter(opt.value);
+                setTxPage(1); // a new filter is a new list
+              }}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                 filter === opt.value
                   ? 'bg-primary text-primary-foreground shadow-sm'
@@ -469,7 +474,9 @@ export default function StatementDetailPage() {
               {opt.label}
             </button>
           ))}
-          <span className="ml-auto text-xs text-muted-foreground self-center">{txTotal} rows</span>
+          <span className="ml-auto text-xs text-muted-foreground self-center">
+            {tx_t('totalCount', { total: (txMeta?.total ?? txs.length).toLocaleString() })}
+          </span>
         </div>
 
         {/* Transactions table */}
@@ -589,6 +596,7 @@ export default function StatementDetailPage() {
             </table>
           )}
         </div>
+        <PageControls meta={txMeta} onPageChange={setTxPage} />
       </div>
 
       {/* Manual match modal */}

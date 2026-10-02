@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../../components/DateRangePicker';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGetPage, type PageMeta } from '@/lib/api';
+import { PageControls } from '../../../../../components/PageControls';
 import { filsToKwd } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -34,6 +35,8 @@ interface JournalEntry {
   lines: JournalLine[];
 }
 
+const PER_PAGE = 100;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function JournalListPage() {
@@ -52,6 +55,10 @@ export default function JournalListPage() {
   const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
 
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
+  // `meta` from the route: without it a list capped at PER_PAGE rows silently drops the rest of the
+  // audit trail (issue 2430).
+  const [meta, setMeta] = useState<PageMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   // Increment to trigger a refetch without resetting entries to null (avoids flicker)
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,6 +82,11 @@ export default function JournalListPage() {
     useCallback(() => setRefreshKey(k => k + 1), [])
   );
 
+  // A new date window is a new list: start it on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [period, customRange]);
+
   useEffect(() => {
     if (!storeId) return;
 
@@ -83,18 +95,20 @@ export default function JournalListPage() {
     const from = resolved.startDate.toISOString();
     const to = resolved.endDate.toISOString();
 
-    apiGet<JournalEntry[]>(
-      `/api/v1/stores/${storeId}/finance/journal?perPage=100&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    apiGetPage<JournalEntry>(
+      `/api/v1/stores/${storeId}/finance/journal?perPage=${PER_PAGE}&page=${page}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
     )
-      .then(({ data, error: apiError }) => {
+      .then(({ data, meta: pageMeta, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);
         } else {
+          setError(null);
           setEntries(data ?? []);
+          setMeta(pageMeta);
         }
       })
       .catch(() => setError('Failed to load journal entries'));
-  }, [storeId, refreshKey, period, customRange]);
+  }, [storeId, refreshKey, period, customRange, page]);
 
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
@@ -134,74 +148,82 @@ export default function JournalListPage() {
           {entries.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('noEntries')}</p>
           ) : (
-            /* Journal entries list — genuine accounting ledger (columns are
+            <>
+              {meta && (
+                <p className="text-sm text-muted-foreground" data-testid="journal-total">
+                  {t('totalCount', { total: meta.total.toLocaleString() })}
+                </p>
+              )}
+              {/* Journal entries list — genuine accounting ledger (columns are
                the point); kept as an isolated horizontal-scroll container
-               per the B1 mobile-table exception rather than card-stacked. */
-            <div className="rounded-xl border border-border overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                      {t('entryNumber')}
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-40">
-                      {t('postedAt')}
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-32">
-                      {t('source')}
-                    </th>
-                    <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                      {t('memo')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                      {t('debit')}
-                    </th>
-                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                      {t('credit')}
-                    </th>
-                    <th className="px-3 py-2 w-16" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map(entry => {
-                    const dr = entry.lines.reduce((s, l) => s + l.debit, 0);
-                    const cr = entry.lines.reduce((s, l) => s + l.credit, 0);
-                    const isReversed = entry.status === 'reversed';
-                    return (
-                      <tr
-                        key={entry.id}
-                        className={`border-t border-border/40 ${isReversed ? 'opacity-60' : ''}`}
-                      >
-                        <td
-                          className={`px-3 py-2 font-mono text-xs ${isReversed ? 'line-through' : ''}`}
+               per the B1 mobile-table exception rather than card-stacked. */}
+              <div className="rounded-xl border border-border overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
+                        {t('entryNumber')}
+                      </th>
+                      <th className="text-start px-3 py-2 font-medium text-muted-foreground w-40">
+                        {t('postedAt')}
+                      </th>
+                      <th className="text-start px-3 py-2 font-medium text-muted-foreground w-32">
+                        {t('source')}
+                      </th>
+                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                        {t('memo')}
+                      </th>
+                      <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
+                        {t('debit')}
+                      </th>
+                      <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
+                        {t('credit')}
+                      </th>
+                      <th className="px-3 py-2 w-16" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map(entry => {
+                      const dr = entry.lines.reduce((s, l) => s + l.debit, 0);
+                      const cr = entry.lines.reduce((s, l) => s + l.credit, 0);
+                      const isReversed = entry.status === 'reversed';
+                      return (
+                        <tr
+                          key={entry.id}
+                          className={`border-t border-border/40 ${isReversed ? 'opacity-60' : ''}`}
                         >
-                          {entry.entryNumber}
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {new Date(entry.postedAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground capitalize">
-                          {entry.source.replace(/_/g, ' ')}
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground truncate max-w-[12rem]">
-                          {entry.memo ?? '—'}
-                        </td>
-                        <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(dr)}</td>
-                        <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(cr)}</td>
-                        <td className="px-3 py-2 text-end">
-                          <Link
-                            href={`/stores/${storeId}/finance/journal/${entry.id}`}
-                            className="text-primary text-xs underline underline-offset-2"
+                          <td
+                            className={`px-3 py-2 font-mono text-xs ${isReversed ? 'line-through' : ''}`}
                           >
-                            {t('viewDetail')}
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            {entry.entryNumber}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {new Date(entry.postedAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground capitalize">
+                            {entry.source.replace(/_/g, ' ')}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground truncate max-w-[12rem]">
+                            {entry.memo ?? '—'}
+                          </td>
+                          <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(dr)}</td>
+                          <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(cr)}</td>
+                          <td className="px-3 py-2 text-end">
+                            <Link
+                              href={`/stores/${storeId}/finance/journal/${entry.id}`}
+                              className="text-primary text-xs underline underline-offset-2"
+                            >
+                              {t('viewDetail')}
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <PageControls meta={meta} onPageChange={setPage} />
+            </>
           )}
         </div>
       )}

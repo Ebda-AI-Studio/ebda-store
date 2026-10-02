@@ -28,8 +28,10 @@ const TIME_ZONES = [
 ] as const;
 
 /**
- * The zone a store's finance reports, P&L, trial balance, balance sheet and
- * filed VAT periods count days in (Ruling FRT-2). It was settable by nothing
+ * The store's ONE time zone (Ruling FRT-2): finance reports, P&L, trial balance,
+ * balance sheet and filed VAT periods count days in it, AND the storefront uses it
+ * for checkout delivery-window cutoffs and the dates customers see (issue 2431 -
+ * the copy says all of that). It was settable by nothing
  * but a SQL UPDATE (issue 2411). Saves through `PUT /stores/:id`, which
  * rejects a name that is not a real IANA zone, then refetches the cached store
  * so the Reports pickers pick the new zone up.

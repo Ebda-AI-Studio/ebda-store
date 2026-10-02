@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGetPage, type PageMeta } from '@/lib/api';
+import { PageControls } from '@/components/PageControls';
 import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,6 +36,8 @@ const STATUS_CLASSES: Record<string, string> = {
   cancelled: 'bg-destructive/10 text-destructive-ink',
 };
 
+const PER_PAGE = 50;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PurchaseOrdersPage() {
@@ -46,35 +49,41 @@ export default function PurchaseOrdersPage() {
 
   const [orders, setOrders] = useState<PurchaseOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Debounced search term — client-side filter over PO number and supplier name.
+  // Debounced search term — matched SERVER-side over PO number and supplier name, so it reaches
+  // every PO and not just the first page (issue 2430).
   const [search, setSearch] = useState('');
+  const [meta, setMeta] = useState<PageMeta | null>(null);
+  const [page, setPage] = useState(1);
+
+  // A new search is a new list: start it on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   useEffect(() => {
     if (!storeId) return;
-    // apiGet already unwraps the API's `{ success, data }` envelope, so
-    // `data` IS the PO array — reading `data?.data` double-unwrapped to
-    // undefined and the page always rendered empty (#831 sweep).
-    apiGet<PurchaseOrder[]>(`/api/v1/stores/${storeId}/purchase-orders?perPage=50`)
-      .then(({ data, error: apiError }) => {
+    let stale = false;
+    const qs = new URLSearchParams({ perPage: String(PER_PAGE), page: String(page) });
+    if (search.trim()) qs.set('q', search.trim());
+    // `apiGetPage` keeps the route's `meta` (total + pages) that `apiGet` drops.
+    apiGetPage<PurchaseOrder>(`/api/v1/stores/${storeId}/purchase-orders?${qs}`)
+      .then(({ data, meta: pageMeta, error: apiError }) => {
+        if (stale) return; // a slower response for the previous search must not repaint
         if (apiError) {
           setError(apiError.message);
         } else {
+          setError(null);
           setOrders(data ?? []);
+          setMeta(pageMeta);
         }
       })
-      .catch(() => setError('Failed to load purchase orders'));
-  }, [storeId]);
-
-  // Client-side filter: match PO number or supplier name (case-insensitive).
-  // Must be declared before early returns so hooks run unconditionally.
-  const filteredOrders = useMemo(() => {
-    if (!orders) return null;
-    if (!search.trim()) return orders;
-    const q = search.toLowerCase();
-    return orders.filter(
-      po => po.poNumber.toLowerCase().includes(q) || po.supplier.name.toLowerCase().includes(q)
-    );
-  }, [orders, search]);
+      .catch(() => {
+        if (!stale) setError('Failed to load purchase orders');
+      });
+    return () => {
+      stale = true;
+    };
+  }, [storeId, page, search]);
 
   if (error) {
     return (
@@ -110,6 +119,12 @@ export default function PurchaseOrdersPage() {
             {t('newButton')}
           </button>
         </div>
+
+        {meta && (
+          <p className="text-sm text-muted-foreground" data-testid="po-total">
+            {t('totalCount', { total: meta.total.toLocaleString() })}
+          </p>
+        )}
 
         <DataTable<PurchaseOrder>
           ariaLabel={t('title')}
@@ -166,11 +181,12 @@ export default function PurchaseOrdersPage() {
               ),
             },
           ]}
-          rows={filteredOrders ?? []}
+          rows={orders}
           rowKey={po => po.id}
           onRowClick={po => router.push(`/stores/${storeId}/stock/purchase-orders/${po.id}`)}
           emptyState={<p className="text-muted-foreground text-sm">{t('emptyState')}</p>}
         />
+        <PageControls meta={meta} onPageChange={setPage} />
       </div>
     </AdminLayout>
   );

@@ -1143,7 +1143,7 @@ export class LoyaltyService {
     const [members, total] = await Promise.all([
       prisma.loyaltyPoints.findMany({
         where,
-        orderBy: { totalEarned: 'desc' },
+        orderBy: [{ totalEarned: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
         include: {

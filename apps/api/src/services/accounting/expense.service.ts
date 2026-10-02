@@ -325,7 +325,9 @@ export async function listExpenses(
   const [items, total] = await Promise.all([
     prisma.expense.findMany({
       where,
-      orderBy: { expenseDate: 'desc' },
+      // `expenseDate` is a calendar day (UTC midnight), so same-day rows tie byte-for-byte; `id`
+      // makes the order total so page N+1 never repeats or skips a row of page N (issue 2429).
+      orderBy: [{ expenseDate: 'desc' }, { id: 'desc' }],
       skip,
       take: perPage,
       include,

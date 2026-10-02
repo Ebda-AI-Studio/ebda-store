@@ -5016,6 +5016,15 @@ nothing reads it. Pinned by `tests/unit/provisioning-store-timezone.test.ts` and
 `tests/unit/store-update-persists-every-accepted-field.test.ts`. Cost if wrong: a future non-Kuwait
 store whose owner never opens the Tax page still counts Kuwait days; a time-zone change applies to
 reports run afterwards, so a period already filed under the old zone does not re-run identically.
+Amended 2026-10-03 (issues 2431, 2432; owner decision: the store time zone governs reports and tax
+periods). `stores.timezone` is the store's ONE zone, not a report-only knob: the storefront also reads
+it for checkout delivery-window cutoffs and for every date a customer sees on an order, invoice,
+loyalty or wallet screen. The Tax-page card is therefore titled "Store time zone" and its copy (en +
+ar) names all of that; no second column was added. Every change through `PUT /stores/:id` that alters
+the zone writes a `STORE_TIMEZONE_CHANGED` audit row (`details: { from, to }`, actor, store), so a VAT
+period that no longer reproduces can be explained: that row is the mitigation for the cost above.
+Pinned by `tests/unit/store-timezone-change-audit.test.ts` and
+`tests/unit/admin-store-timezone-setting.test.ts`.
 
 **Ruling FRT-3 — the store time-zone lookup is a bare read, not its own tenant transaction (issue
 2410).** `runInTenantContext` never joins an ambient transaction, so wrapping `storeTimeZone` in it
@@ -5242,7 +5251,11 @@ within two. The opt-out link is not dropped or shortened past usefulness, becaus
 record's withdrawal path. `[NotificationDispatcher] SMS queued` now logs `segments` and `encoding` for
 every SMS, so a longer template is visible in the logs before it shows up on a bill. The storefront base
 is cached in memory per API instance (120s, BOUNDED-stale, documented at the cache site), so a fan-out
-reads the store once, not once per recipient. Residual: for up to 120s after a store changes its custom
+reads the store once, not once per recipient. Amended 2026-10-03 (issue 2434): that claim was FALSE as
+first shipped, because the cache held the resolved value and the back-in-stock loop dispatches every
+subscriber without awaiting, so all N recipients missed. The cache now holds the in-flight promise
+(dropped on rejection or an unknown store); `tests/unit/sms-opt-out-base-dedupes-in-flight-reads.test.ts`
+asserts ONE store read for 25 concurrent recipients and fails against the value cache. Residual: for up to 120s after a store changes its custom
 domain, new opt-out links use the old domain. Cost if wrong: Arabic templates (UCS-2) would cost
 3–4 segments if a locale switch is ever added. That PR must re-run this budget against the Arabic text.
 
@@ -5291,3 +5304,38 @@ reads the store's language into the step-2 baseline and requires a cookie-less r
 is the check that catches a drift. Cost if wrong: if an operator declares `palora:ar` for a store whose
 default is `en`, cookie-less visitors get Arabic cache keys over English content until the token is
 corrected.
+
+## 2026-10-03 — scoped-audit follow-ups (branch `fix/backlog-followups11`, issues 2427, 2429-2432, 2434)
+
+**Ruling PG-1 — a paged list ends its sort with a unique key (issue 2429).** `skip`/`take` over a
+non-unique sort key is not a stable pager: each page is an independent top-N sort, so rows that tie
+can repeat or vanish between pages. `expenses.expenseDate` is a calendar day, so every same-day
+expense ties exactly. Fixed with an `id` tiebreaker on the lists that sort by a date or a small
+number: expenses, journal entries, bank statements, bank transactions, purchase orders, reorder
+suggestions and loyalty members. Pinned by `tests/unit/paged-lists-total-order.test.ts`. Accepted
+residual: about 35 other `skip`/`take` lists sort by `createdAt` alone (a millisecond timestamp, tied
+only by a bulk insert in one statement) and were not touched; a tie there can still shuffle two rows
+across a page boundary. Cost if wrong: an admin list of rows created in one batch can show one row
+twice and miss another when paged; the fix is the same one-line `id` tiebreaker.
+
+**Ruling PG-2 — the `{ data, meta }` list routes are read with `apiGetPage` everywhere (issue 2430,
+closes the class opened by 2417).** `/finance/journal`, `/finance/bank-statements`,
+`/finance/bank-statements/:sid/transactions` and `/purchase-orders` now show the real total and a
+pager (`PageControls`, en + ar, `common.pager.*`). The journal list used to stop at 100 rows with no
+sign of the rest. The purchase-order search moved server-side (`q`, over PO number and supplier name,
+Zod-validated with the other list params) so it reaches every PO and not only the first 50.
+`tests/unit/admin-sibling-meta-lists-use-apigetpage.test.ts` fails if any admin source reads one of
+these routes through `apiGet`. The one allowed exception is the OCR upload poll
+(`finance/expenses/new`), which reads a single row (`perPage=1`) and never shows a count. Cost if
+wrong: a sixth `{ data, meta }` route read through `apiGet` is not caught until it is added to the
+guard's route list.
+
+**Ruling TST-1 — the over-cap order-search fixtures are unique per attempt, not per file (issue 2427).**
+CI runs the integration tier with `--retry=1`; a retry re-runs the test body against the same database
+but not `beforeAll`. The over-cap case built 1,001 users and orders from the per-file `suffix`, so a
+retry collided with attempt 1's rows (unique email, unique order number) and reported attempt 2's
+P2002 instead of the real failure. The body now draws a per-call `run` id used in the emails, order
+numbers and search term. Not swept: other integration tests that create unique-keyed rows inside a
+test body; the named sibling, `product-search-floor`, creates its fixtures in `beforeAll`, which a
+retry does not re-run, so it is not exposed. Cost if wrong: test-only; a dead attempt's rows are
+removed by `afterAll` (users by id, orders by store).

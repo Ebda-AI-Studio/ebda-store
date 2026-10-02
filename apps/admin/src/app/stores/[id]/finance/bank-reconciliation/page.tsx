@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiDelete } from '@/lib/api';
+import { apiGetPage, apiDelete, type PageMeta } from '@/lib/api';
+import { PageControls } from '@/components/PageControls';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,8 @@ const STATUS_CLASS: Record<StatementStatus, string> = {
   reconciled: 'bg-green-100 text-green-700',
 };
 
+const PER_PAGE = 50;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BankReconciliationPage() {
@@ -43,30 +46,41 @@ export default function BankReconciliationPage() {
   const t = useT('finance.bankRec');
 
   const [statements, setStatements] = useState<BankStatementRow[] | null>(null);
-  const [total, setTotal] = useState(0);
+  const [meta, setMeta] = useState<PageMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchStatements = useCallback(async () => {
     if (!storeId) return;
-    // GET /finance/bank-statements returns `{ data: items, meta }` — apiGet
-    // unwraps one layer AND drops the sibling `meta`, so `data` IS the
-    // statement array; reading `data?.data` double-unwrapped to undefined
-    // and this page always rendered empty (#831 sweep). `meta.total` is not
-    // recoverable through apiGet (it drops the sibling), so the footer count
-    // falls back to the fetched-page length — correct as long as a store has
-    // ≤50 statements (the requested perPage); beyond that it undercounts.
-    // A true fix needs a raw-response variant of apiGet that preserves `meta`.
-    const { data, error: err } = await apiGet<BankStatementRow[]>(
-      `/api/v1/stores/${storeId}/finance/bank-statements?perPage=50`
+    // GET /finance/bank-statements returns `{ data: items, meta }`. `apiGetPage` keeps the
+    // sibling `meta` that `apiGet` drops, so the footer shows the store's REAL statement count
+    // and a pager reaches every statement beyond the page (issue 2430).
+    const {
+      data,
+      meta: pageMeta,
+      error: err,
+    } = await apiGetPage<BankStatementRow>(
+      `/api/v1/stores/${storeId}/finance/bank-statements?perPage=${PER_PAGE}&page=${page}`
     );
     if (err) {
       setError(err.message ?? 'Failed to load statements');
       return;
     }
+    // Deleting the last statement of the last page leaves an empty page with no pager: step back.
+    if (
+      (data ?? []).length === 0 &&
+      pageMeta &&
+      pageMeta.totalPages > 0 &&
+      page > pageMeta.totalPages
+    ) {
+      setPage(pageMeta.totalPages);
+      return;
+    }
+    setError(null);
     setStatements(data ?? []);
-    setTotal(data?.length ?? 0);
-  }, [storeId]);
+    setMeta(pageMeta);
+  }, [storeId, page]);
 
   useEffect(() => {
     fetchStatements();
@@ -229,11 +243,15 @@ export default function BankReconciliationPage() {
                 ))}
               </tbody>
             </table>
-            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-              {total} statement{total !== 1 ? 's' : ''}
+            <div
+              className="border-t border-border px-4 py-3 text-xs text-muted-foreground"
+              data-testid="statements-total"
+            >
+              {t('totalCount', { total: (meta?.total ?? statements.length).toLocaleString() })}
             </div>
           </div>
         )}
+        <PageControls meta={meta} onPageChange={setPage} />
       </div>
     </AdminLayout>
   );

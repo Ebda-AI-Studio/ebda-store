@@ -554,11 +554,35 @@ router.put(
     try {
       const { id } = req.params;
       const data = updateStoreSchema.parse(req.body);
+      const user = getAuthUser(req);
+
+      // The time zone decides which day a sale / expense / VAT period belongs to (Ruling FRT-2), so
+      // a change is filing-affecting: a period filed under the old zone no longer re-runs
+      // identically. Read the stored value first so the audit row can say from what (issue 2432).
+      // `stores` has RLS disabled (Ruling FRT-3), so the bare read needs no tenant context.
+      const previousTimezone =
+        data.timezone !== undefined
+          ? ((await prisma.store.findUnique({ where: { id }, select: { timezone: true } }))
+              ?.timezone ?? null)
+          : null;
 
       const store = await StoreService.update(id, {
         ...data,
         settings: data.settings as Prisma.InputJsonValue,
       });
+
+      if (data.timezone !== undefined && data.timezone !== previousTimezone) {
+        await auditLog({
+          action: 'STORE_TIMEZONE_CHANGED',
+          userId: user.userId,
+          storeId: id,
+          resourceType: 'store',
+          resourceId: id,
+          details: { from: previousTimezone, to: data.timezone },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
 
       res.json({
         success: true,

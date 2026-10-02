@@ -150,7 +150,7 @@ Most e-commerce platforms make you connect QuickBooks or Xero for proper account
 
 - **Chart of Accounts** — A real double-entry bookkeeping system organized by account categories (27 default accounts seeded on onboarding; system accounts are read-only — merchants may add custom child accounts under them).
 - **Journal Entries** — Double-entry journal auto-posted on every paid order (sales revenue, cost of goods, refunds). Manual journal entry UI for non-order financial events.
-- **Profit & Loss** — A live P&L report that reflects your actual store activity over any date range. Like the trial balance, balance sheet and tax report (and their CSV/XLSX exports), it counts days in the store's own time zone (Kuwait time for Kuwait stores), the same days the finance dashboard shows.
+- **Profit & Loss** — A live P&L report that reflects your actual store activity over any date range. Like the trial balance, balance sheet and tax report (and their CSV/XLSX exports), it counts days in the store's own time zone (Kuwait time for Kuwait stores), the same days the finance dashboard shows. The zone is one setting per store (Tax page, "Store time zone"): it also sets the storefront's checkout delivery-window cutoffs and the dates customers see on their orders and invoices, and every change to it is recorded in the audit log.
 - **Expense Tracking** — Log operating expenses with category tagging and receipt attachment. Monthly summary by expense category. (`accounting.expenses`)
 - **Invoicing** — Kuwait-compliant invoice generation: tax line, bilingual Arabic/English layout, PDF export. (`accounting.invoicing`)
 

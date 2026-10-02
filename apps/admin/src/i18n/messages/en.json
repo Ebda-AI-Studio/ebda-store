@@ -49,7 +49,12 @@
     "loadingEllipsis": "Loading...",
     "skipToMainContent": "Skip to main content",
     "actions": "Actions",
-    "deactivate": "Deactivate"
+    "deactivate": "Deactivate",
+    "pager": {
+      "previous": "Previous page",
+      "next": "Next page",
+      "pageOf": "Page {page} of {totalPages}"
+    }
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -3120,8 +3125,8 @@
       }
     },
     "timeZone": {
-      "title": "Reporting time zone",
-      "description": "Decides which calendar day each sale, expense and tax period belongs to. A sale just after midnight in your country counts on that day in your reports and VAT figures.",
+      "title": "Store time zone",
+      "description": "Your store's one time zone. It decides which calendar day each sale, expense and tax period belongs to in your reports and VAT figures, and it is also the clock your storefront uses: delivery-window cutoffs at checkout and the dates customers see on orders and invoices.",
       "label": "Time zone",
       "saved": "Time zone saved"
     },
@@ -5818,7 +5823,8 @@
       "viewDetail": "View",
       "account": "Account",
       "noEntries": "No journal entries yet — they will appear here as orders complete.",
-      "totalLabel": "Total"
+      "totalLabel": "Total",
+      "totalCount": "{total} entries"
     },
     "newEntry": {
       "title": "New Manual Journal Entry",
@@ -6100,7 +6106,8 @@
           "auto_matched": "Auto-matched",
           "manual_matched": "Manual-matched",
           "ignored": "Ignored"
-        }
+        },
+        "totalCount": "{total} rows"
       },
       "autoMatch": "Run Auto-match",
       "autoMatching": "Running…",
@@ -6134,7 +6141,8 @@
         "action": "Action failed",
         "match": "Match failed"
       },
-      "filterAll": "All"
+      "filterAll": "All",
+      "totalCount": "{total} statements"
     },
     "fxRates": {
       "title": "FX Rate Registry",
@@ -6454,7 +6462,8 @@
         "VARIANT_PRODUCT_MISMATCH": "A purchase order line names a variant that does not belong to its product.",
         "VARIANT_REQUIRED_RECEIVE": "This line names no variant, but its product has variants, so it cannot be received. Cancel this purchase order and draft it again per variant."
       },
-      "emptyState": "No purchase orders yet. Create one with the button above."
+      "emptyState": "No purchase orders yet. Create one with the button above.",
+      "totalCount": "{total} purchase orders"
     },
     "backorders": {
       "title": "Open Backorders",

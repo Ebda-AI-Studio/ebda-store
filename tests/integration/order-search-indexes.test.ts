@@ -188,10 +188,17 @@ describe.skipIf(!hasDb)('order search indexes (issue 2405)', () => {
   });
 
   it(`more than ${ORDER_SEARCH_CUSTOMER_ID_CAP} matching customers falls back to the relation filter, same rows`, async () => {
-    const crowd = `crowd${tag}`;
+    // Unique per ATTEMPT, not per file: CI runs this with `--retry=1`, which re-runs the test body
+    // against the same database while `beforeAll` is not re-run. The per-file `suffix`/`tag` made
+    // attempt 2 collide with attempt 1's users (partial unique email) and orders (unique
+    // orderNumber), so the failure reported was attempt 2's P2002, not attempt 1's real one
+    // (issue 2427). `run` is in the emails, the order numbers and the search term, so a retry
+    // neither collides with nor matches a dead attempt's rows.
+    const run = Math.random().toString(36).slice(2, 8);
+    const crowd = `crowd${tag}${run}`;
     const created = await prisma.user.createManyAndReturn({
       data: Array.from({ length: ORDER_SEARCH_CUSTOMER_ID_CAP + 1 }, (_, i) => ({
-        email: `${crowd}-${i}-${suffix}@x.test`,
+        email: `${crowd}-${i}@x.test`,
         passwordHash: 'x',
         firstName: crowd,
         lastName: `c${i}`,
@@ -203,7 +210,7 @@ describe.skipIf(!hasDb)('order search indexes (issue 2405)', () => {
     await prisma.order.createMany({
       data: created.map((u, i) => ({
         storeId,
-        orderNumber: `OSC-${tag}-${i}`,
+        orderNumber: `OSC-${tag}-${run}-${i}`,
         subtotal: 1,
         total: 1,
         customerId: u.id,

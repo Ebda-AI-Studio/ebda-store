@@ -86,6 +86,9 @@
 Days are calendar days in the **store's time zone** (`stores.timezone`, Asia/Kuwait for every
 store today; a store with no usable zone falls back to Asia/Kuwait — Rulings FRT-1/FRT-2 in
 `docs/RULINGS.md`). The page shows the zone under the tabs.
+The zone is set on the Tax page (card "Store time zone"). It is the store's ONE zone, so it also moves
+checkout delivery-window cutoffs and the dates customers see; changing it writes a
+`STORE_TIMEZONE_CHANGED` audit row with the old and new zone.
 
 1. Set **From** = 2026-01-01, **To** = 2026-01-31
 2. **Expect:** Orders paid on 2026-01-01 AND 2026-01-31 (Kuwait time) both appear; orders from 2026-01-15 appear; orders before 2026-01-01 or after 2026-01-31 do not appear

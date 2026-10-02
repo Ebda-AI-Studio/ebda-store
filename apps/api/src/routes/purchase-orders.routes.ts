@@ -35,6 +35,21 @@ const createSchema = z.object({
     .min(1),
 });
 
+// Zod at the edge (it was `Number(req.query.page)` unchecked: `?page=abc` reached Prisma as NaN).
+// `q` filters by PO number or supplier name SERVER-side so a search reaches every PO, not just the
+// first page the admin happened to load (issue 2430).
+const listQuerySchema = z.object({
+  status: z.enum(['draft', 'sent', 'partial', 'received', 'cancelled']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(200).default(50),
+  q: z
+    .string()
+    .trim()
+    .max(100)
+    .optional()
+    .transform(v => v || undefined),
+});
+
 const receiveSchema = z.object({
   receipts: z
     .array(
@@ -54,11 +69,9 @@ router.get(
   requireFeature('inventory.purchase_orders'),
   async (req, res, next) => {
     try {
-      const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-      const page = Number(req.query.page ?? 1);
-      const perPage = Number(req.query.perPage ?? 50);
+      const { status, page, perPage, q } = listQuerySchema.parse(req.query);
       const data = await runInTenantContext(req.params.storeId, () =>
-        listPurchaseOrders(req.params.storeId, { status, page, perPage })
+        listPurchaseOrders(req.params.storeId, { status, page, perPage, q })
       );
       res.json({
         data: data.items,
