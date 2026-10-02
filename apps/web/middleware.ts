@@ -201,6 +201,53 @@ function tenantRoutingRouteAllowed(pathname: string): boolean {
   return allowed.has(firstSegment === '' ? HOME_ROUTE_TOKEN : firstSegment);
 }
 
+/** A store token in `STOREFRONT_TENANT_ROUTING_STORES`: a platform slug, a
+ *  store id, or a custom-domain hostname. Lowercase letters/digits, with `.`
+ *  and `-` only between them. Anything else (`slug:x`, spaces, `*`, `/`)
+ *  makes the whole list unparseable. */
+const STORE_TOKEN_PATTERN = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
+
+/**
+ * Parse `STOREFRONT_TENANT_ROUTING_STORES` into the set of stores the rewrite
+ * may apply to, or `null` for "no store". There is deliberately NO `all`
+ * shortcut (Ruling TRC-6): the literal token `all` is rejected like any other
+ * unparseable value, so the list can only ever name stores one by one.
+ *
+ * FAIL-CLOSED on every bad state, like the route list (#1980): MISSING, EMPTY
+ * (or only commas/whitespace) and UNPARSEABLE (any token failing
+ * `STORE_TOKEN_PATTERN`, or the reserved `all`) all route NO store, even with
+ * the main flag on and a valid route list. Losing this variable turns the
+ * canary off; it never widens it.
+ */
+function parseTenantRoutingStores(raw: string | undefined): Set<string> | null {
+  if (raw === undefined) return null;
+  const tokens = raw
+    .split(',')
+    .map(token => token.trim().toLowerCase())
+    .filter(Boolean);
+  if (tokens.length === 0) return null;
+  const valid = tokens.every(
+    token => token !== ALL_ROUTES_TOKEN && STORE_TOKEN_PATTERN.test(token)
+  );
+  return valid ? new Set(tokens) : null;
+}
+
+/**
+ * Per-store scope for the rewrite. One Worker serves every store, so the two
+ * flags above are Worker-wide; this list is what lets a canary target one
+ * store (Ruling TRC-6). `storeKey` is the same identity the rewrite target
+ * carries (`buildStoreTreeUrl`'s `tenantKey`): the path/cookie slug on a
+ * platform host, or the normalized custom-domain hostname. Middleware is
+ * synchronous and cannot look a custom domain up to find its slug, so a custom
+ * domain is allowlisted by its HOSTNAME (`pecannbee.com.kw`); a bare slug
+ * token never matches a custom domain. Read INSIDE the request handler.
+ */
+function tenantRoutingStoreAllowed(storeKey: string): boolean {
+  const allowed = parseTenantRoutingStores(process.env.STOREFRONT_TENANT_ROUTING_STORES);
+  if (allowed === null) return false;
+  return allowed.has(storeKey.toLowerCase());
+}
+
 /** Resolve the locale that gets baked into the `/tenant-store/[tenant]/[locale]`
  *  rewrite target. Mirrors the cookie read in `app/layout.tsx` (`force-
  *  language`), but — unlike the layout — this runs in middleware, so it
@@ -327,15 +374,21 @@ function propagateDraftHeader(
  * Inert unless STOREFRONT_TENANT_ROUTING=true, never applied to the admin preview
  * iframe, and only for Track-A allowlisted routes that the
  * STOREFRONT_TENANT_ROUTING_ROUTES canary list names (missing/empty/unparseable
- * list = no route).
+ * list = no route), and only for a store that STOREFRONT_TENANT_ROUTING_STORES
+ * names (missing/empty/unparseable list = no store, Ruling TRC-6).
  * See docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
  */
-function isTenantTreeEligible(pathname: string, isPreviewIframe: boolean): boolean {
+function isTenantTreeEligible(
+  pathname: string,
+  isPreviewIframe: boolean,
+  storeKey: string
+): boolean {
   return (
     storefrontTenantRoutingEnabled() &&
     !isPreviewIframe &&
     isCacheableTrackARoute(pathname) &&
-    tenantRoutingRouteAllowed(pathname)
+    tenantRoutingRouteAllowed(pathname) &&
+    tenantRoutingStoreAllowed(storeKey)
   );
 }
 
@@ -368,7 +421,7 @@ function handleCustomDomain(
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 
-  if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe)) {
+  if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, storeIdentifier)) {
     const storeTreeUrl = buildStoreTreeUrl(request, storeIdentifier, request.nextUrl.pathname);
     const response = NextResponse.rewrite(storeTreeUrl, {
       request: { headers: requestHeaders },
@@ -400,7 +453,11 @@ function handlePlatformDomain(
   if (slugInfo) {
     requestHeaders.set('x-store-slug', slugInfo.slug);
 
-    const storeTreeEligible = isTenantTreeEligible(slugInfo.rewrittenPath, isPreviewIframe);
+    const storeTreeEligible = isTenantTreeEligible(
+      slugInfo.rewrittenPath,
+      isPreviewIframe,
+      slugInfo.slug
+    );
     const url = storeTreeEligible
       ? buildStoreTreeUrl(request, `slug:${slugInfo.slug}`, slugInfo.rewrittenPath)
       : request.nextUrl.clone();
@@ -463,7 +520,7 @@ function handlePlatformDomain(
     // (scoped-audit P2 on PR #1942).
     requestHeaders.set('x-store-slug-source', 'cookie');
 
-    if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe)) {
+    if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, cookieSlug)) {
       const storeTreeUrl = buildStoreTreeUrl(
         request,
         `slug:${cookieSlug}`,

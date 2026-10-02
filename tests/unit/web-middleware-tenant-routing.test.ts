@@ -13,6 +13,7 @@ import { middleware } from '../../apps/web/middleware';
 
 const ORIGINAL_ENV = process.env.STOREFRONT_TENANT_ROUTING;
 const ORIGINAL_ROUTES_ENV = process.env.STOREFRONT_TENANT_ROUTING_ROUTES;
+const ORIGINAL_STORES_ENV = process.env.STOREFRONT_TENANT_ROUTING_STORES;
 
 afterEach(() => {
   if (ORIGINAL_ENV === undefined) {
@@ -25,18 +26,31 @@ afterEach(() => {
   } else {
     process.env.STOREFRONT_TENANT_ROUTING_ROUTES = ORIGINAL_ROUTES_ENV;
   }
+  if (ORIGINAL_STORES_ENV === undefined) {
+    delete process.env.STOREFRONT_TENANT_ROUTING_STORES;
+  } else {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = ORIGINAL_STORES_ENV;
+  }
 });
 
 beforeEach(() => {
   delete process.env.STOREFRONT_TENANT_ROUTING;
   delete process.env.STOREFRONT_TENANT_ROUTING_ROUTES;
+  delete process.env.STOREFRONT_TENANT_ROUTING_STORES;
 });
 
-/** Main flag on with the explicit full-rollout list (`all`). A missing list
- *  routes nothing (#1980), so the Phase-1 contract below needs both. */
+/** Stores the Phase-1 fixtures below use: the platform slug and both custom
+ *  domains. A missing store list routes nothing (TRC-6), so every test that
+ *  expects a rewrite names its store. */
+const FIXTURE_STORES = 'palora,wadyaljuz.com,pecannbee.com.kw';
+
+/** Main flag on with the explicit full-rollout route list (`all`) and the
+ *  fixture stores. A missing route or store list routes nothing (#1980,
+ *  TRC-6), so the Phase-1 contract below needs all three. */
 function enableAllTrackARoutes() {
   process.env.STOREFRONT_TENANT_ROUTING = 'true';
   process.env.STOREFRONT_TENANT_ROUTING_ROUTES = 'all';
+  process.env.STOREFRONT_TENANT_ROUTING_STORES = FIXTURE_STORES;
 }
 
 function customDomainRequest(pathname: string, init?: { cookie?: string }) {
@@ -151,6 +165,9 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
 
   beforeEach(() => {
     delete process.env.STOREFRONT_TENANT_ROUTING_ROUTES;
+    // This block tests the ROUTE list; the store gate is satisfied here and
+    // exercised on its own in the STORES block below.
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = FIXTURE_STORES;
   });
 
   afterEach(() => {
@@ -310,6 +327,146 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
     process.env.STOREFRONT_TENANT_ROUTING = 'true';
     process.env.STOREFRONT_TENANT_ROUTING_ROUTES = 'about';
     expect(rewriteOf(middleware(customDomainRequest('/about?_preview=1')))).not.toContain(
+      '/tenant-store/'
+    );
+  });
+});
+
+/**
+ * Ruling TRC-6: `STOREFRONT_TENANT_ROUTING_STORES` is the per-store scope. The
+ * rewrite needs the main flag AND a listed route AND a listed store. One Worker
+ * serves palora (platform slug), pecannbee.com.kw and wadyaljuz.com (custom
+ * domains), so these tests drive all three through one allowlist.
+ */
+describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', () => {
+  const rewriteOf = (res: Response) => res.headers.get('x-middleware-rewrite') ?? '';
+  const PALORA_KEY = encodeURIComponent('slug:palora');
+
+  const pecannbeeRequest = (pathname: string) =>
+    new NextRequest(`https://pecannbee.com.kw${pathname}`, {
+      headers: { host: 'pecannbee.com.kw' },
+    });
+  const wwwPecannbeeRequest = (pathname: string) =>
+    new NextRequest(`https://www.pecannbee.com.kw${pathname}`, {
+      headers: { host: 'www.pecannbee.com.kw' },
+    });
+
+  const paloraRewrites = () =>
+    rewriteOf(middleware(platformSlugRequest('/palora/about'))).includes(
+      `/tenant-store/${PALORA_KEY}/`
+    );
+  const pecannbeeRewrites = () =>
+    rewriteOf(middleware(pecannbeeRequest('/about'))).includes('/tenant-store/');
+  const wadyaljuzRewrites = () =>
+    rewriteOf(middleware(customDomainRequest('/about'))).includes('/tenant-store/');
+  const paloraCookieRewrites = () =>
+    rewriteOf(middleware(platformSlugRequest('/faq', { cookie: 'x-store-slug=palora' }))).includes(
+      '/tenant-store/'
+    );
+
+  beforeEach(() => {
+    process.env.STOREFRONT_TENANT_ROUTING = 'true';
+    process.env.STOREFRONT_TENANT_ROUTING_ROUTES = 'about,faq';
+  });
+
+  const expectNoStoreRewrites = () => {
+    expect(paloraRewrites()).toBe(false);
+    expect(paloraCookieRewrites()).toBe(false);
+    expect(pecannbeeRewrites()).toBe(false);
+    expect(wadyaljuzRewrites()).toBe(false);
+  };
+
+  it('store list MISSING: no store rewrites (fail-closed)', () => {
+    expect(process.env.STOREFRONT_TENANT_ROUTING_STORES).toBeUndefined();
+    expectNoStoreRewrites();
+  });
+
+  it('store list EMPTY: no store rewrites (fail-closed)', () => {
+    for (const value of ['', '   ', ',', ' , ,']) {
+      process.env.STOREFRONT_TENANT_ROUTING_STORES = value;
+      expectNoStoreRewrites();
+    }
+  });
+
+  it('store list GARBAGE: no store rewrites, even for a valid token inside it (fail-closed)', () => {
+    for (const value of [
+      'palora,,,%%%',
+      'palora;pecannbee',
+      'palora pecannbee',
+      'palora,*',
+      '*',
+      'all',
+      'palora,all',
+      'ALL',
+      'slug:palora',
+      '["palora"]',
+      'palora/',
+      '.palora',
+      '-palora',
+      'palora.',
+    ]) {
+      process.env.STOREFRONT_TENANT_ROUTING_STORES = value;
+      expectNoStoreRewrites();
+    }
+  });
+
+  it('store list "palora": palora rewrites on the path and cookie paths (positive control)', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
+    expect(rewriteOf(middleware(platformSlugRequest('/palora/about')))).toContain(
+      `/tenant-store/${PALORA_KEY}/en/about`
+    );
+    expect(paloraCookieRewrites()).toBe(true);
+  });
+
+  it('store list "palora": pecannbee.com.kw and wadyaljuz.com do NOT rewrite', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
+    expect(pecannbeeRewrites()).toBe(false);
+    expect(wadyaljuzRewrites()).toBe(false);
+    expect(rewriteOf(middleware(wwwPecannbeeRequest('/about')))).not.toContain('/tenant-store/');
+  });
+
+  it('store list "palora": other platform slugs do NOT rewrite', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
+    expect(rewriteOf(middleware(platformSlugRequest('/someoneelse/about')))).not.toContain(
+      '/tenant-store/'
+    );
+    expect(
+      rewriteOf(middleware(platformSlugRequest('/faq', { cookie: 'x-store-slug=someoneelse' })))
+    ).not.toContain('/tenant-store/');
+  });
+
+  it('a custom domain is allowlisted by its hostname, case normalized', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'PecannBee.com.kw';
+    expect(rewriteOf(middleware(pecannbeeRequest('/about')))).toContain(
+      '/tenant-store/pecannbee.com.kw/en/about'
+    );
+    // www never reaches the rewrite: it 301s to the apex, which then matches.
+    expect(middleware(wwwPecannbeeRequest('/about')).status).toBe(301);
+    expect(paloraRewrites()).toBe(false);
+    expect(wadyaljuzRewrites()).toBe(false);
+  });
+
+  it('a bare slug token never matches a custom domain whose host merely contains it', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'pecannbee';
+    expect(pecannbeeRewrites()).toBe(false);
+  });
+
+  it('the store list cannot widen the route list: an unlisted route stays unrewritten', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
+    expect(rewriteOf(middleware(platformSlugRequest('/palora/products')))).not.toContain(
+      '/tenant-store/'
+    );
+  });
+
+  it('main flag off: a listed store still rewrites nothing', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
+    delete process.env.STOREFRONT_TENANT_ROUTING;
+    expectNoStoreRewrites();
+  });
+
+  it('the preview iframe still bypasses a listed store', () => {
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
+    expect(rewriteOf(middleware(platformSlugRequest('/palora/about?_preview=1')))).not.toContain(
       '/tenant-store/'
     );
   });
