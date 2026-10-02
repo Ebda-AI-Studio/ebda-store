@@ -5014,3 +5014,30 @@ secrets. They are left for the owner to delete because deletion is a production 
 Force AI account. It is still live: a plain GET on 2026-10-01 returned the harness's 400 ("x-canary-host
 must be one of …"), so anyone who sends that header gets the 3 live stores rendered by a stale
 2026-09-25 build with the flag on. Cost if wrong: that stale public copy keeps serving until deleted.
+
+**Ruling TRC-5 — the single-store canary on palora was NOT started: the routing switch cannot
+be scoped to one store (2026-10-01).** The owner asked for the production canary on palora only
+(store.force-ai.co/palora), never pecannbee, and to stop rather than flip globally if the switch had
+no per-store scope. It has none. The rewrite is gated by exactly two Worker-wide values,
+`STOREFRONT_TENANT_ROUTING` (`=== 'true'`) and `STOREFRONT_TENANT_ROUTING_ROUTES` (a ROUTE list),
+both read from `process.env` in `apps/web/middleware.ts` (`isTenantTreeEligible`). No input to that
+gate identifies a store, and one Worker, `force-web-cf-preview`, serves every store:
+`scripts/cf-setup-local.sh` routes `store.force-ai.co` (palora), `pecannbee.com.kw/*` and the
+`*/*` SaaS fallback (wadyaljuz.com) to it. Live check 2026-10-01: all three return 200 from
+Cloudflare, with `x-store-domain` set to `pecannbee.com.kw` and `wadyaljuz.com` on the custom
+domains. So `about,faq` would rewrite pecannbee's and wadyaljuz's `/about` and `/faq` in the same
+instant as palora's. Current state, read from an empty directory with
+`CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 wrangler secret list --name force-web-cf-preview`
+(exit 0): the only secret is `REVALIDATE_SECRET`. Both routing variables are unset, which is
+consistent with TRC-3. Nothing was set, deployed or deleted, and no baseline was captured,
+because no change followed. `cf-deploy.yml` never sets either variable. They are secrets only.
+Unblock options, for the owner to choose between: (a) a code PR that adds a fail-closed store
+allowlist (e.g. `STOREFRONT_TENANT_ROUTING_STORES`, matched on `slug:<slug>` or the custom domain,
+missing or empty meaning no store, as TRC-1 does for routes), then the palora canary as asked; or
+(b) accept a route-scoped canary on every store at once, which the owner's "never pecannbee" rules
+out today. The rollback, once any canary is set, is to delete the main flag, from an empty
+directory:
+`CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 npx wrangler secret delete STOREFRONT_TENANT_ROUTING --name force-web-cf-preview`.
+Deleting it makes the flag unset, which is inert, and no redeploy is needed. Cost if wrong: if a
+store scope exists outside `middleware.ts`, the canary was held back one PR for nothing. The grep
+across `apps/`, `docs/` and `.github/` for a store-scoped routing variable found none.
