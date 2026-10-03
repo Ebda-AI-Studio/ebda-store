@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'crypto';
+import { z } from 'zod';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 
@@ -41,16 +42,81 @@ function requireToken(req: Request, res: Response): boolean {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Payload schemas. These are third-party webhook bodies (Sentry, Axiom,
+// PostHog, Railway) we do not control, and a rejected alert is a LOST alert —
+// so every field is optional and a wrongly-typed field degrades to `undefined`
+// (`.catch`) instead of failing the request. What the schema buys is that a
+// field is a string/number/object before the handler touches it: `title: 123`
+// used to reach `.slice()` and 500, and a non-object body crashed the property
+// reads. Never tighten these to `.strict()`/required fields without checking
+// the provider's real payload.
+// ---------------------------------------------------------------------------
+const optStr = z.string().optional().catch(undefined);
+const optNum = z.number().optional().catch(undefined);
+const optObj = <T extends z.ZodRawShape>(shape: T) => z.object(shape).optional().catch(undefined);
+
+const sentryBodySchema = z
+  .object({
+    action: optStr,
+    data: optObj({
+      issue: optObj({
+        title: optStr,
+        web_url: optStr,
+        level: optStr,
+        project: optObj({ slug: optStr }),
+      }),
+    }),
+    event: optObj({ title: optStr, web_url: optStr, level: optStr, environment: optStr }),
+  })
+  .catch({});
+
+const axiomBodySchema = z
+  .object({
+    monitor: optObj({ name: optStr, type: optStr, description: optStr }),
+    match: optObj({ count: optNum, value: optNum }),
+    description: optStr,
+    url: optStr,
+    timestamp: optStr,
+  })
+  .catch({});
+
+const posthogBodySchema = z
+  .object({
+    insight: optObj({ name: optStr, short_id: optStr }),
+    alert: optObj({ name: optStr }),
+    matches: z.array(z.unknown()).optional().catch(undefined),
+  })
+  .catch({});
+
+const railwayBodySchema = z
+  .object({
+    type: optStr,
+    timestamp: optStr,
+    project: optObj({ id: optStr, name: optStr }),
+    environment: optObj({ id: optStr, name: optStr }),
+    deployment: optObj({
+      id: optStr,
+      status: optStr,
+      creator: optObj({ name: optStr }),
+      meta: optObj({ commitMessage: optStr, commitAuthor: optStr }),
+    }),
+  })
+  .catch({});
+
+const genericBodySchema = z
+  .object({
+    title: optStr,
+    body: optStr,
+    level: z.enum(['p0', 'p1', 'info']).optional().catch(undefined),
+    source: optStr,
+  })
+  .catch({});
+
 router.post('/sentry', async (req, res, next) => {
   try {
     if (!requireToken(req, res)) return;
-    const body = (req.body ?? {}) as {
-      action?: string;
-      data?: {
-        issue?: { title?: string; web_url?: string; level?: string; project?: { slug?: string } };
-      };
-      event?: { title?: string; web_url?: string; level?: string; environment?: string };
-    };
+    const body = sentryBodySchema.parse(req.body);
     const issue = body.data?.issue ?? body.event ?? {};
     const title = ((issue as { title?: string }).title ?? 'sentry alert').slice(0, 200);
     const url = (issue as { web_url?: string }).web_url ?? '';
@@ -80,13 +146,7 @@ router.post('/axiom', async (req, res, next) => {
     //     description, url, ... }
     // We pull the monitor name as the title, description+count as the body,
     // and pass the dashboard url so the operator can drill in from Telegram.
-    const body = (req.body ?? {}) as {
-      monitor?: { name?: string; type?: string; description?: string };
-      match?: { count?: number; value?: number };
-      description?: string;
-      url?: string;
-      timestamp?: string;
-    };
+    const body = axiomBodySchema.parse(req.body);
     const title = body.monitor?.name ?? 'axiom alert';
     const description = body.description ?? body.monitor?.description ?? '';
     const matchInfo =
@@ -114,11 +174,7 @@ router.post('/axiom', async (req, res, next) => {
 router.post('/posthog', async (req, res, next) => {
   try {
     if (!requireToken(req, res)) return;
-    const body = (req.body ?? {}) as {
-      insight?: { name?: string; short_id?: string };
-      alert?: { name?: string };
-      matches?: unknown[];
-    };
+    const body = posthogBodySchema.parse(req.body);
     const title = body.alert?.name ?? body.insight?.name ?? 'posthog alert';
     await sendAlert({
       level: 'p1',
@@ -147,18 +203,7 @@ router.post('/railway', async (req, res, next) => {
     // Silent build failures (P1-8 in 2026-05-22 audit) become loud Telegram
     // pings — the old container keeps serving the previous deploy while
     // routes added in the failed commit 404 silently otherwise.
-    const body = (req.body ?? {}) as {
-      type?: string;
-      timestamp?: string;
-      project?: { id?: string; name?: string };
-      environment?: { id?: string; name?: string };
-      deployment?: {
-        id?: string;
-        status?: string;
-        creator?: { name?: string };
-        meta?: { commitMessage?: string; commitAuthor?: string };
-      };
-    };
+    const body = railwayBodySchema.parse(req.body);
     const type = body.type ?? 'unknown';
     // P0 for crashes + failures, info for everything else (started / building /
     // succeeded). Filter at Railway's side too — only subscribe to FAILED +
@@ -199,12 +244,7 @@ router.post('/railway', async (req, res, next) => {
 router.post('/generic', async (req, res, next) => {
   try {
     if (!requireToken(req, res)) return;
-    const body = (req.body ?? {}) as {
-      title?: string;
-      body?: string;
-      level?: 'p0' | 'p1' | 'info';
-      source?: string;
-    };
+    const body = genericBodySchema.parse(req.body);
     if (!body.title) {
       res.status(400).json({
         ok: false,

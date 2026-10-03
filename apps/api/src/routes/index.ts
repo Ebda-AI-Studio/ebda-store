@@ -41,7 +41,7 @@ import recommendationRoutes, { publicRecommendationRoutes } from './recommendati
 import shippingCarrierRoutes from './shipping-carrier.routes';
 import affiliateRoutes, { publicAffiliateRoutes } from './affiliate.routes';
 import newsletterRoutes from './newsletter.routes';
-import campaignRoutes, { campaignTestSendRouter } from './campaign.routes';
+import campaignRoutes, { campaignTestSendRouter, campaignAiDraftRouter } from './campaign.routes';
 import campaignPublicRoutes from './campaign-public.routes';
 import {
   accountRouter as smsConsentAccountRoutes,
@@ -72,7 +72,7 @@ import staffRoutes from './staff.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
-import { tenantContext } from '../middleware/tenant-context';
+import { tenantContext, aiRouteContext } from '../middleware/tenant-context';
 
 const router = Router();
 
@@ -181,11 +181,40 @@ router.use('/stores', tenantContext, featureRoutes);
 // the domain endpoints need per-route (not per-router) context wiring.
 router.use('/stores', tenantContext, storeRoutes);
 
+// D2 campaign routes that make a SLOW EXTERNAL CALL (Resend test send #1954,
+// Gemini ai-draft FORCE-API-2G) and therefore must run with NO request
+// transaction open.
+//
+// THEIR POSITION HERE IS LOAD-BEARING — they MUST stay above
+// `router.use('/stores/:storeId', tenantContext, customersRoutes)` below.
+// An Express `use` mount is a PREFIX match, so that mount matches every
+// `/stores/<uuid>/*` request including these two: `tenantContext` would open
+// the per-request interactive transaction, customersRoutes would match none of
+// its own `/customers/*` routes, and the request would fall through to these
+// mounts STILL INSIDE that transaction (the #1602 fall-through documented in
+// middleware/tenant-context.ts). `storeScopeContext` cannot undo it — the
+// prisma proxy checks `tenantStorage` BEFORE `storeScope`
+// (`const scope = tx ? undefined : storeScope.getStore()`, packages/database/
+// src/index.ts), so every query would route back onto the open tx and the
+// 30s-timeout failure these mounts exist to prevent would happen anyway.
+// Pinned by tests/unit/ai-routes-no-request-transaction.test.ts.
+router.use('/stores/:storeId/campaigns', campaignTestSendRouter);
+router.use('/stores/:storeId/campaigns', campaignAiDraftRouter);
+
 // Store-scoped routes — tenantContext wraps all downstream handlers in an RLS transaction
 router.use('/admin/stores/:storeId/layout', tenantContext, storeLayoutRoutes);
 router.use('/stores/:storeId/products', tenantContext, productRoutes);
 router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
-router.use('/stores/:storeId/ai', tenantContext, aiRoutes);
+// Context chosen PER REQUEST, not per router (FORCE-API-2G): the WRITES here
+// await Gemini and the request transaction expires 30s after BEGIN — a slow
+// model call made the COMMIT fail on a request whose work was already done, so
+// they run under store scope (one short transaction per query). The GETs
+// (`/usage/*`, `/results/*`, `/bulk*`) touch no third party and stay on
+// `tenantContext`: under store scope each query in their `Promise.all` fan-outs
+// would take its own pooled connection, and the admin AI-tools page fires 9 of
+// the `/results/*` endpoints at once — enough to exhaust `connection_limit=15`
+// and make unrelated requests on the pod fail P2024. See `aiRouteContext`.
+router.use('/stores/:storeId/ai', aiRouteContext, aiRoutes);
 router.use('/stores/:storeId/typography', tenantContext, typographyRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 router.use('/stores/:storeId/orders', tenantContext, orderRoutes);
@@ -333,11 +362,11 @@ router.use('/stores', tenantContext, newsletterRoutes);
 // really sets the RLS GUCs (unlike the bare '/stores' mounts above); every
 // route inside also requires the `email_campaigns` feature. The public router
 // is the login-free unsubscribe endpoint (store comes from the signed token).
-// The test send (#1954) is the one campaign route mounted WITHOUT
-// tenantContext, and BEFORE it: it awaits Resend, so it reads in its own short
-// tenant transaction and sends after that commits. It carries the full auth +
-// feature chain on the route; every other path falls through to the next mount.
-router.use('/stores/:storeId/campaigns', campaignTestSendRouter);
+// The two campaign routers that await a third party (test send #1954, ai-draft
+// FORCE-API-2G) are mounted WITHOUT tenantContext, far above this line and
+// above the prefix-capturing '/stores/:storeId' mount — see the comment there
+// for why that position is load-bearing. They carry the full auth + feature
+// chain on the route; every other path falls through to this mount.
 router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);
 router.use('/public/campaigns', campaignPublicRoutes);
 // Login-free opt-out link carried by every promotional SMS (issue 206).

@@ -57,6 +57,8 @@ vi.mock('@force/database', () => ({
       holder.txDepth--;
     }
   },
+  // `storeScopeContext` (ai-draft) — passthrough; no transaction is opened.
+  runInStoreScope: (_s: string, fn: () => unknown) => fn(),
   onClosedTenantTxAccess: () => undefined,
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
@@ -110,8 +112,11 @@ let db: FakeDb;
 const BASE = `/api/v1/stores/${STORE_A}/campaigns`;
 
 beforeAll(async () => {
-  const { default: campaignRoutes, campaignTestSendRouter } =
-    await import('@api/routes/campaign.routes');
+  const {
+    default: campaignRoutes,
+    campaignTestSendRouter,
+    campaignAiDraftRouter,
+  } = await import('@api/routes/campaign.routes');
   const { tenantContext } = await import('@api/middleware/tenant-context');
   const { default: publicRoutes } = await import('@api/routes/campaign-public.routes');
   const { errorHandler } = await import('@api/middleware/error-handler');
@@ -121,6 +126,7 @@ beforeAll(async () => {
   // Mirrors routes/index.ts: the test send is mounted BEFORE, and WITHOUT,
   // the tenant transaction every other campaign route runs in.
   server.use('/api/v1/stores/:storeId/campaigns', campaignTestSendRouter);
+  server.use('/api/v1/stores/:storeId/campaigns', campaignAiDraftRouter);
   server.use('/api/v1/stores/:storeId/campaigns', tenantContext, campaignRoutes);
   server.use('/api/v1/public/campaigns', publicRoutes);
   server.use(errorHandler);

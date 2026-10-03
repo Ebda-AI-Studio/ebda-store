@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { runInTenantContext } from '@force/database';
+import { runInStoreScope, runInTenantContext } from '@force/database';
 import { withDeferredWork } from '../lib/after-tenant-commit';
 import { runRequestInTransaction } from './request-transaction';
 
@@ -139,6 +139,89 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
       ),
     { storeId, middleware: 'tenantContext' }
   );
+}
+
+/**
+ * Store scope for routes that make a SLOW EXTERNAL CALL (an LLM, a payment or
+ * domain API) — the alternative to `tenantContext` for them.
+ *
+ * `tenantContext` holds ONE interactive transaction open from BEGIN until the
+ * response is committed, and Prisma expires that transaction 30s after BEGIN
+ * no matter what the handler is doing. A handler that awaits a 40-70s Gemini
+ * call inside it therefore does its `aiUsage.create` on an expired transaction
+ * and its COMMIT fails — FORCE-API-2G: "Transaction already closed … timeout
+ * was 30000 ms, however 66772 ms passed", on a request that had already done
+ * the work. It also pins a pooled connection idle for the whole call (and
+ * `assertAiQuota`'s `withRlsBypass` takes a second one).
+ *
+ * `runInStoreScope` keeps the RLS scoping and drops the long transaction: every
+ * model call / raw query in the handler runs in its OWN short
+ * `runInTenantContext(storeId, …)` — the mechanism the bulk-AI Inngest jobs have
+ * used since #461. The trade-off is explicit: the request is no longer ONE
+ * atomic unit, so only mount this on a router whose handlers do not need
+ * all-or-nothing across statements (read, call out, record usage / queue a job).
+ *
+ * Like `tenantContext`, a request with no usable store id passes straight through.
+ */
+export function storeScopeContext(req: Request, _res: Response, next: NextFunction): void {
+  const storeId = req.params.storeId || req.params.id;
+  if (!storeId || !UUID_RE.test(storeId)) {
+    next();
+    return;
+  }
+  // `runInStoreScope` types its callback as a Promise. `next()` runs
+  // synchronously inside the scope, so every downstream handler (and the async
+  // work it starts) inherits it; Express catches a handler's own throw.
+  void runInStoreScope(storeId, async () => {
+    next();
+  });
+}
+
+/**
+ * The AI router's context, chosen PER REQUEST rather than per router.
+ *
+ * `/stores/:storeId/ai` holds ~45 routes and only the WRITES await Gemini.
+ * Every model call in `routes/ai.routes.ts` sits in a `router.post` handler
+ * (`AIService.*`, `generateProductFaqs`, `generateProductMetaAeo`,
+ * `fillProductFields`, `balanceProductLanguages`, `revertProductBalance`);
+ * every `router.get` there — `/usage/*`, `/results/*`, `/bulk*` — is a pure DB
+ * read that touches no third party. So:
+ *
+ *   - safe method (GET/HEAD) → `tenantContext`: ONE request transaction on ONE
+ *     pooled connection, as before.
+ *   - everything else → `storeScopeContext`: no long transaction to expire
+ *     under a 40-70s model call (FORCE-API-2G, see above).
+ *
+ * WHY NOT just put the whole router on `storeScopeContext`: under a store scope
+ * each awaited query opens its OWN short transaction (`scopedOp` →
+ * `runInTenantContext` → `basePrisma.$transaction`, packages/database/src/
+ * index.ts), so a read handler's `Promise.all` takes one pooled connection PER
+ * QUERY instead of one for the request. `GET /ai/results/seo` fans out 6 queries
+ * and the admin AI-tools page fires 9 of those `/results/*` endpoints in a
+ * single `Promise.allSettled` on mount — ~30 concurrent transactions against
+ * `connection_limit=15` / `pool_timeout=20`. One merchant opening that page
+ * would saturate the pod's pool and make unrelated in-flight requests
+ * (storefront, checkout, webhooks) queue 20s and fail P2024.
+ *
+ * WHY NOT a second `router.use('/stores/:storeId/ai', tenantContext, …)` mount
+ * for the read paths: an Express `use` mount is a PREFIX match, so it would
+ * open the request transaction for the write paths too and they would reach
+ * their own mount already inside it — the #1602 fall-through, which
+ * `storeScopeContext` cannot undo (the prisma proxy resolves `tenantStorage`
+ * before `storeScope`). Dispatching inside the single mount avoids that
+ * entirely.
+ *
+ * Pinned by tests/unit/ai-routes-no-request-transaction.test.ts, which also
+ * fails if a GET handler in ai.routes.ts ever reaches a model call.
+ */
+const SAFE_METHODS = new Set(['GET', 'HEAD']);
+
+export function aiRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (SAFE_METHODS.has(req.method)) {
+    tenantContext(req, res, next);
+    return;
+  }
+  storeScopeContext(req, res, next);
 }
 
 /**

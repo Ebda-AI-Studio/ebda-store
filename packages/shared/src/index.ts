@@ -8,6 +8,7 @@ export * from './features';
 export * from './plan-baselines';
 export * from './notifications';
 export * from './schemas/location';
+export * from './schemas/revalidate';
 export * from './schemas/campaign';
 export * from './schemas/analytics';
 export * from './schemas/report-range';

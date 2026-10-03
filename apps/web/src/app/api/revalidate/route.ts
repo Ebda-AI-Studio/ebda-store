@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
+import { revalidateRequestSchema } from '@force/shared';
 
 /**
  * On-demand storefront cache purge. The API (Railway) calls this after a
@@ -28,12 +29,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { secret?: string; tags?: unknown };
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 });
   }
+  // Valid JSON that is not an object (`null`, `[]`, `42`) used to throw a
+  // TypeError on `body.secret` below and 500.
+  const parsedBody = revalidateRequestSchema.safeParse(raw);
+  if (!parsedBody.success) {
+    return NextResponse.json({ ok: false, error: 'invalid body' }, { status: 400 });
+  }
+  const body = parsedBody.data;
 
   if (body.secret !== secret) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });

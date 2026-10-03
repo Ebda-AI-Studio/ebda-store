@@ -1,6 +1,7 @@
 import { redis } from '../services/redis.service';
 import { BoundedMap } from './bounded-map';
 import { revalidateStorefront } from './revalidate-storefront';
+import { retryTransientRead } from './db-retry';
 
 /**
  * Public-route response cache. Used by the storefront-facing endpoints
@@ -59,7 +60,12 @@ export async function getCached<T>(
   if (existing) return existing;
 
   const pending = (async () => {
-    const data = await fetchFn();
+    // A cache fill is a read by construction, so a dropped pooler connection
+    // (Neon idling a socket — FORCE-API-2D/2E/2F) is re-run a bounded number of
+    // times instead of 500ing the storefront. `fetchFn` MUST stay a pure read.
+    const data = await retryTransientRead(fetchFn, {
+      label: `getCached:${key.split(':')[1] ?? key}`,
+    });
     try {
       await redis.set(key, JSON.stringify(data), ttlSeconds);
     } catch {

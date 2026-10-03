@@ -14,6 +14,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { auditLog, writeLimiter } from '../middleware/security';
+import { storeScopeContext } from '../middleware/tenant-context';
 import { AppError } from '../middleware/error-handler';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { inngest } from '../lib/inngest/client';
@@ -180,40 +181,9 @@ router.post('/', writeLimiter, async (req: Request, res: Response, next: NextFun
   }
 });
 
-// POST /stores/:storeId/campaigns/ai-draft — Gemini writes subject + body in
-// EN and AR from a short brief. Returns text only; persists nothing.
-router.post('/ai-draft', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { brief } = campaignAiDraftSchema.parse(req.body);
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, nameAr: true, description: true, descriptionAr: true },
-    });
-    if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
-    const result = await AIService.suggestCampaignDraft({
-      storeId,
-      brief,
-      storeName: store.name,
-      storeNameAr: store.nameAr,
-      storeDescription: store.description,
-      storeDescriptionAr: store.descriptionAr,
-    });
-    res.json({
-      success: true,
-      data: {
-        ...result,
-        suggestion: {
-          ...result.suggestion,
-          bodyHtml: sanitizeNewsletterHtml(result.suggestion.bodyHtml),
-          bodyHtmlAr: sanitizeNewsletterHtml(result.suggestion.bodyHtmlAr),
-        },
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+// POST /stores/:storeId/campaigns/ai-draft — moved to `campaignAiDraftRouter`
+// below (FORCE-API-2G): it awaits Gemini and must not hold the request
+// transaction (30s expiry) open while it does.
 
 // GET /stores/:storeId/campaigns/:campaignId — detail + live status counts.
 router.get('/:campaignId', async (req: Request, res: Response, next: NextFunction) => {
@@ -520,7 +490,10 @@ export default router;
  * a third-party round-trip (a hung Resend → a 30s transaction timeout 500).
  * So the three reads run in their own short `runInTenantContext` transaction,
  * which COMMITS before the first send; the sends then run with no
- * transaction open. The response is still only sent after every send
+ * transaction open — which also requires the mount to sit ABOVE the
+ * prefix-capturing `/stores/:storeId` mount, or the request arrives already
+ * inside the per-request transaction (see the mount comment in routes/index.ts).
+ * The response is still only sent after every send
  * returned, so `{ sentTo, locales }` remains an honest report of what Resend
  * accepted, and a failed send still surfaces as the error the merchant sees.
  *
@@ -583,6 +556,70 @@ campaignTestSendRouter.post(
         });
       }
       res.json({ success: true, data: { sentTo: user.email, locales } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * `POST /:storeId/campaigns/ai-draft` — Gemini writes a draft from a brief.
+ *
+ * Mounted WITHOUT `tenantContext` for the reason #1954 gave the test send: a
+ * slow third-party call inside the per-request interactive transaction. Prisma
+ * expires that transaction 30s after BEGIN, and a Gemini call that ran long
+ * made `recordUsage`'s `aiUsage.create` and the COMMIT fail on an expired
+ * transaction (FORCE-API-2G, 66772ms against a 30000ms timeout). Here every
+ * query runs in its own short tenant transaction (`storeScopeContext`), so
+ * nothing is held open across the model call — but ONLY if no earlier mount
+ * already opened one: the prisma proxy prefers an open transaction over a
+ * store scope, so this router must stay above the prefix-capturing
+ * `/stores/:storeId` mount (see the mount comment in routes/index.ts).
+ *
+ * Same chain as every campaign route (authenticate → authorize →
+ * requireStoreAccess → requireFeature('email_campaigns')) on the route itself,
+ * so it adds nothing to any other `/campaigns` request passing through.
+ */
+export const campaignAiDraftRouter = Router({ mergeParams: true });
+
+// POST /stores/:storeId/campaigns/ai-draft — Gemini writes subject + body in
+// EN and AR from a short brief. Returns text only; persists nothing.
+campaignAiDraftRouter.post(
+  '/ai-draft',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('email_campaigns'),
+  storeScopeContext,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { brief } = campaignAiDraftSchema.parse(req.body);
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, nameAr: true, description: true, descriptionAr: true },
+      });
+      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+      const result = await AIService.suggestCampaignDraft({
+        storeId,
+        brief,
+        storeName: store.name,
+        storeNameAr: store.nameAr,
+        storeDescription: store.description,
+        storeDescriptionAr: store.descriptionAr,
+      });
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          suggestion: {
+            ...result.suggestion,
+            bodyHtml: sanitizeNewsletterHtml(result.suggestion.bodyHtml),
+            bodyHtmlAr: sanitizeNewsletterHtml(result.suggestion.bodyHtmlAr),
+          },
+        },
+      });
     } catch (error) {
       next(error);
     }

@@ -106,3 +106,73 @@ export async function retryOnWriteConflict<T>(
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Idempotent READS — transient connection drops
+// ---------------------------------------------------------------------------
+
+/** Prisma connection-level codes: P1001 can't reach, P1002 timed out, P1017 server closed. */
+const TRANSIENT_CONNECTION_CODES = new Set(['P1001', 'P1002', 'P1017']);
+
+/**
+ * The same failures arrive without a usable code when Prisma wraps them as a
+ * `PrismaClientUnknownRequestError` (FORCE-API-2E surfaced as "Server has
+ * closed the connection."). Matched on the message as a fallback only.
+ */
+const TRANSIENT_CONNECTION_MESSAGE =
+  /can't reach database server|server has closed the connection|connection terminated|econnreset/i;
+
+/**
+ * Is `err` a connection that dropped or never opened — the Neon pooler idling
+ * out a socket or a compute blip (FORCE-API-2D / 2E / 2F)? NOT a statement
+ * error: nothing the query said was wrong, so re-running it is safe.
+ */
+export function isTransientConnectionError(err: unknown): boolean {
+  if (extractRetryCodes(err).some(code => TRANSIENT_CONNECTION_CODES.has(code))) return true;
+  const message = err instanceof Error ? err.message : '';
+  return TRANSIENT_CONNECTION_MESSAGE.test(message);
+}
+
+interface RetryReadOpts {
+  retries?: number; // retry attempts after the first try (default 2)
+  baseDelayMs?: number; // backoff unit (default 40ms → ~40–80ms, then ~80–120ms)
+  label?: string;
+}
+
+/**
+ * Re-run an IDEMPOTENT READ after a transient connection error: at most
+ * `retries` extra attempts (default 2) with a short jittered backoff, and only
+ * for {@link isTransientConnectionError}. Anything else propagates at once.
+ *
+ * READS ONLY. A write that died mid-flight may or may not have committed;
+ * re-running it can double-apply. Writes that need retrying go through
+ * {@link retryOnWriteConflict}, which retries only errors a re-run provably
+ * resolves. `getCached`'s fetcher is the one caller — a cache fill is a read by
+ * construction.
+ */
+export async function retryTransientRead<T>(
+  fn: () => Promise<T>,
+  opts: RetryReadOpts = {}
+): Promise<T> {
+  const retries = opts.retries ?? 2;
+  const base = opts.baseDelayMs ?? 40;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= retries || !isTransientConnectionError(err)) throw err;
+      const delay = base * 2 ** attempt + Math.floor(Math.random() * base);
+      logger.warn(
+        {
+          code: extractRetryCodes(err)[0],
+          attempt: attempt + 1,
+          retries,
+          delay,
+          label: opts.label,
+        },
+        'transient db connection error on read — retrying'
+      );
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}

@@ -327,6 +327,10 @@ router.post(
           filename: z.string().min(1),
           contentType: z.string().min(1),
           folder: z.string().optional(),
+          // Read below as a store-id candidate; was cast from `req.body`
+          // unvalidated, so a non-string reached checkStoreAccess. `nullish`
+          // keeps a client that sends `storeId: null` working.
+          storeId: z.string().nullish(),
         })
         .safeParse(req.body);
       if (!parsed.success) {
@@ -336,7 +340,7 @@ router.post(
         });
         return;
       }
-      const { filename, contentType, folder } = parsed.data;
+      const { filename, contentType, folder, storeId: parsedBodyStoreId } = parsed.data;
 
       // Validate content type against allowed types
       const allowedContentTypes = [
@@ -370,7 +374,7 @@ router.post(
         return;
       }
       const queryStoreId = (req.query.storeId as string | undefined) || undefined;
-      const bodyStoreId = (req.body?.storeId as string | undefined) || undefined;
+      const bodyStoreId = parsedBodyStoreId || undefined;
       const headerStoreId = (req.headers['x-store-id'] as string | undefined) || undefined;
       const presignedStoreId =
         queryStoreId || bodyStoreId || headerStoreId || req.user?.storeId || null;

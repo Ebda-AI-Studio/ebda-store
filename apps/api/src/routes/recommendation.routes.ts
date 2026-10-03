@@ -30,6 +30,13 @@ const setRelationsSchema = z.object({
   ),
 });
 
+// Single-relation body (POST). `position` matches the bulk schema above.
+const addRelationSchema = z.object({
+  targetProductId: z.string().min(1),
+  type: z.string().min(1),
+  position: z.number().int().optional(),
+});
+
 // ==========================================
 // Admin Routes
 // authenticate + authorize + requireStoreAccess + requireFeature
@@ -96,15 +103,15 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
-      const { targetProductId, type, position } = req.body;
-
-      if (!targetProductId || !type) {
+      const parsed = addRelationSchema.safeParse(req.body);
+      if (!parsed.success) {
         res.status(400).json({
           success: false,
           error: { code: 'MISSING_FIELDS', message: 'targetProductId and type are required' },
         });
         return;
       }
+      const { targetProductId, type, position } = parsed.data;
 
       const relation = await recommendationService.addRelation(storeId, productId, {
         targetProductId,

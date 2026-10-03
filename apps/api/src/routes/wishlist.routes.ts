@@ -350,14 +350,15 @@ router.put('/visibility', async (req: Request, res: Response, next: NextFunction
       return;
     }
 
-    const { isPublic } = req.body;
-    if (typeof isPublic !== 'boolean') {
+    const parsedBody = z.object({ isPublic: z.boolean() }).safeParse(req.body);
+    if (!parsedBody.success) {
       res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'isPublic must be a boolean' },
       });
       return;
     }
+    const { isPublic } = parsedBody.data;
 
     // Find or create the wishlist and update visibility
     let wishlist = await prisma.wishlist.findFirst({
