@@ -69,7 +69,7 @@ bash scripts/cf-build.sh web && (cd apps/web && npx wrangler deploy)
 
 ```bash
 # 1. devDeps (local only)
-npm i -D @opennextjs/cloudflare@1.19.11 wrangler@^4.86.0 -w @force/<app>
+npm i -D @opennextjs/cloudflare@1.19.11 wrangler@4.116.0 -w @force/<app>
 #    @force/admin for admin; @force/orders for orders. web had them in the spike.
 
 # 2. open-next.config.ts (apps/<app>/open-next.config.ts)

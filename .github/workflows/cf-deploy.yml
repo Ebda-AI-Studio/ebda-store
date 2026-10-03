@@ -305,7 +305,13 @@ jobs:
           # Verify on a preview deploy before enabling — see
           # docs/migration/cf-opennext-hardening-plan.md.
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
+          # Build from the committed, audited lockfile: `npm ci` already installed
+          # the pinned adapter + wrangler. Without this the setup script runs
+          # `npm i -D` and re-resolves package-lock.json mid-deploy.
+          CF_SETUP_SKIP_DEPS: '1'
         run: bash scripts/cf-setup-local.sh web
+      - name: Assert setup did not mutate package.json / package-lock.json
+        run: git diff --exit-code -- package.json package-lock.json apps/web/package.json
       - name: Assert the generated worker config matches OPENNEXT_CACHE
         env:
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
@@ -444,7 +450,12 @@ jobs:
       - name: Build workspace packages (database → shared → ui)
         run: npm run build -w @force/database -w @force/shared -w @force/ui
       - name: Setup Cloudflare build tooling (admin)
+        env:
+          # Lockfile-only (see the web setup step): no deploy-time re-resolution.
+          CF_SETUP_SKIP_DEPS: '1'
         run: bash scripts/cf-setup-local.sh admin
+      - name: Assert setup did not mutate package.json / package-lock.json
+        run: git diff --exit-code -- package.json package-lock.json apps/admin/package.json
       - name: Write admin public env (.env.production.local)
         # admin's NEXT_PUBLIC_API_URL has NO /api/v1 suffix (the admin apiClient
         # appends it) — distinct from web. APP_NAME also differs ("Force Admin").
@@ -542,7 +553,12 @@ jobs:
       - name: Build workspace packages (database → shared → ui)
         run: npm run build -w @force/database -w @force/shared -w @force/ui
       - name: Setup Cloudflare build tooling (orders)
+        env:
+          # Lockfile-only (see the web setup step): no deploy-time re-resolution.
+          CF_SETUP_SKIP_DEPS: '1'
         run: bash scripts/cf-setup-local.sh orders
+      - name: Assert setup did not mutate package.json / package-lock.json
+        run: git diff --exit-code -- package.json package-lock.json apps/orders/package.json
       - name: Write orders public env (.env.production.local)
         env:
           V_ONESIGNAL_ORDERS: ${{ vars.NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID }}

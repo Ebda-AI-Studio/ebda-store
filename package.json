@@ -120,29 +120,30 @@
     "postcss": "^8.5.23",
     "protobufjs": "8.7.1",
     "@hono/node-server": "^2.0.5",
-    "brace-expansion": "5.0.9",
+    "brace-expansion": "5.0.12",
     "ws": "^8.20.1",
+    "@grpc/grpc-js": "^1.14.5",
     "tmp": "0.2.7",
     "uuid": "^11.1.1",
     "js-yaml": "4.3.2",
     "nodemailer": "9.0.1",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.16",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "sharp": "^0.35.3",
-    "fast-uri": "3.1.7",
+    "fast-uri": "3.1.8",
     "miniflare": {
-      "undici": "7.29.0"
+      "undici": "7.29.1"
     },
     "nanoid": "3.3.18",
     "hono": "4.13.7",
-    "ip-address": "10.3.1",
+    "ip-address": "10.7.3",
     "@opentelemetry/propagator-jaeger": "2.9.0",
     "rimraf": {
-      "brace-expansion": "5.0.9"
+      "brace-expansion": "5.0.12"
     },
     "readdir-glob": {
-      "brace-expansion": "5.0.9"
+      "brace-expansion": "5.0.12"
     },
     "exceljs": {
       "uuid": "^11.1.1",
@@ -161,7 +162,7 @@
     "minimatch": "^10.0.3",
     "deepmerge-ts": "^8.0.0",
     "qs": "6.16.0",
-    "wrangler": "4.113.0"
+    "wrangler": "4.116.0"
   },
   "dependencies": {
     "@emnapi/core": "^1.10.0",

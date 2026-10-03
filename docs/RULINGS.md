@@ -5401,6 +5401,13 @@ Decision: `USE_SELF_HOSTED=false` (cloud) for push, PR and dispatch; every `sche
 Evidence: cloud bills each job at a 1-minute floor; the drift check (every 30 min), hourly railway probe and 2-hourly watchdog come to ~2,500 min/month before nightlies, against the plan's included minutes. The audit on #2453 (P0) showed a hard pin would make crons un-movable during a runner outage, so the pin has its own switch, and `workflow-runner-selector.test.ts` asserts every schedule-triggered job reads it (mutation-checked: reverting db-backup.yml reddens it).
 Cost if wrong: during a runner outage, crons (incl. daily db-backup and both drift monitors) queue silently until someone flips `SCHEDULED_ON_CLOUD=true`; the runbook's outage section documents the flip.
 
+## Ruling DEP-WRANGLER-1 — wrangler 4.116.0 + miniflare undici override; no prerelease miniflare in the prod tree (2026-10-03)
+
+Decision: wrangler is pinned exactly at `4.116.0` (root `overrides.wrangler` and all three apps). It is the newest wrangler whose `miniflare` dependency is a STABLE release (`4.20260730.0`); wrangler 4.117.0 and every later 4.x pin a `5.x-alpha` miniflare (verified with `npm view wrangler@<v> dependencies.miniflare` for 4.100.0 through 4.147.0). miniflare 4.20260730.0 declares `undici: 7.28.0` exactly, which is inside the advisory range, so `overrides.miniflare.undici = 7.29.1` is REQUIRED again (it was a no-op only while the alpha miniflare declared 7.29.1 itself; #2461). Remove it once a stable miniflare declares undici >= 7.29.1.
+Residual: wrangler 4.116.0 depends on `unenv@2.0.0-rc.24` (upstream, the same on every wrangler 4.x including the previous 4.86.0). It is a dev/optional tool dependency, not a runtime dependency of the shipped Worker bundle.
+Also: `@opennextjs/cloudflare` is exact-pinned `1.19.11` in all three apps again (#2462/#2464), and cf-deploy.yml sets `CF_SETUP_SKIP_DEPS=1` and asserts no package.json/lockfile mutation, so the deployed tree is the audited lockfile (#2463).
+Cost if wrong: wrangler 4.116.0 is ~30 minors behind latest; a Workers platform feature that needs a newer wrangler would be blocked until miniflare 5 ships stable.
+
 ## Ruling CI-CRON-2 — the ~2,500 min/month estimate covers the crons only (issue 2458, 2026-10-03)
 
 Decision: restate the CI-CRON-1 evidence rather than change it. The ~2,500 min/month figure counts the scheduled jobs alone; with `USE_SELF_HOSTED=false`, every push/PR/dispatch run (the full `ci.yml` matrix and the six `cf-deploy.yml` jobs) also bills cloud minutes and is NOT in that figure. `docs/migration/cloudflare-ci-deploy.md` now says so and no longer tells a reader to set `USE_SELF_HOSTED=true`.

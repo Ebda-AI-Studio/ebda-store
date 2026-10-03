@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Default to all three apps when no args; otherwise honor the given list.
 if [ "$#" -eq 0 ]; then APPS=(web admin orders); else APPS=("$@"); fi
 CF_DEP="@opennextjs/cloudflare@1.19.11"
-WRANGLER="wrangler@^4.86.0"
+WRANGLER="wrangler@4.116.0"
 
 # 1. devDeps. Already declared in each app's package.json at these pins, so this
 #    is a no-op reinstall on a fresh `npm ci`; kept for a checkout that predates
