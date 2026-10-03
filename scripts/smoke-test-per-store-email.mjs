@@ -32,10 +32,10 @@ if (!process.env.RESEND_API_KEY) {
 
 // Lazy import after env is loaded — ResendService reads config at module
 // init, so dotenv must have populated process.env first.
-const { PrismaClient } = await import('@prisma/client');
+const { createPrismaClient } = await import('@force/database');
 const { Resend } = await import('resend');
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 try {
   const store = await prisma.store.findFirst({
