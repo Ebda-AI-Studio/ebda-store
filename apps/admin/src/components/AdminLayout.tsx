@@ -112,6 +112,7 @@ export function AdminLayout({
     auditLogs: t('navAuditLogs'),
     platformAiUsage: t('navPlatformAiUsage'),
     platformUsageHistory: t('navPlatformUsageHistory'),
+    platformPlans: t('navPlatformPlans'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
   };
@@ -299,6 +300,7 @@ export function AdminLayout({
     announcement: tcp('pages.announcement'),
     agentKey: tcp('pages.agentKey'),
     merchantKeys: tcp('pages.merchantKeys'),
+    billing: tcp('pages.billing'),
   };
   const paletteItems: PaletteItem[] =
     mode === 'store_admin' && navStoreId

@@ -37,6 +37,8 @@ const PAGE_KEYWORDS: Record<string, string> = {
   language: 'translation arabic english locale rtl لغة ترجمة عربي انجليزي اتجاه',
   staff: 'team members roles permissions users access موظفين فريق صلاحيات أدوار مستخدمين وصول',
   announcement: 'banner bar top message strip إعلان شريط رسالة علوي',
+  billing:
+    'plan subscription upgrade usage limits invoice باقة اشتراك ترقية استخدام حدود فاتورة فوترة',
   'page-builder':
     'design layout sections hero homepage builder تصميم تخطيط أقسام الصفحة الرئيسية بانر منشئ',
   products: 'catalog items inventory skus goods منتجات سلع بضائع كتالوج',
@@ -98,6 +100,7 @@ export interface SettingsPaletteLabels {
   announcement: string;
   agentKey: string;
   merchantKeys: string;
+  billing: string;
 }
 
 /**
@@ -160,6 +163,7 @@ export function buildStorePaletteItems(
       [settings.staff, `/stores/${storeId}/staff`],
       [settings.agentKey, `/stores/${storeId}/agent-key`],
       [settings.merchantKeys, `/stores/${storeId}/merchant-keys`],
+      [settings.billing, `/stores/${storeId}/billing`],
     ];
     for (const [name, href] of pages)
       items.push({ name, href, group: settingsGroup, keywords: keywordsForHref(href) });
