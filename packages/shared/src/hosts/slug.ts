@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isReservedSlug } from './reserved-slugs';
+import { isProtectedSlug } from '../abuse/protected-slugs';
 
 export const STORE_SLUG_MIN_LENGTH = 3;
 export const STORE_SLUG_MAX_LENGTH = 40;
@@ -10,7 +11,8 @@ export type StoreSlugErrorCode =
   | 'SLUG_TOO_LONG'
   | 'SLUG_INVALID_CHARS'
   | 'SLUG_INVALID_HYPHEN'
-  | 'SLUG_RESERVED';
+  | 'SLUG_RESERVED'
+  | 'SLUG_PROTECTED';
 
 export type StoreSlugValidation =
   | { ok: true; slug: string }
@@ -26,6 +28,8 @@ export const STORE_SLUG_ERROR_MESSAGES: Record<StoreSlugErrorCode, string> = {
   SLUG_INVALID_HYPHEN:
     'Store address cannot start or end with a hyphen or contain two hyphens in a row',
   SLUG_RESERVED: 'This store address is reserved. Please choose another one',
+  SLUG_PROTECTED:
+    'This store address matches a protected brand name. Contact support to claim it, or choose another one',
 };
 
 /**
@@ -50,12 +54,27 @@ export function validateStoreSlugFormat(raw: string): StoreSlugValidation {
   return { ok: true, slug };
 }
 
-/** Full validation: format, then the reserved list. */
-export function validateStoreSlug(raw: string): StoreSlugValidation {
+/**
+ * Full validation: format, the reserved list (our own labels — never
+ * overridable), then the protected brand list (`SLUG_PROTECTED`, normalised:
+ * hyphens/digits stripped, leetspeak folded). `allowProtected` is the
+ * super-admin support-claim override and skips ONLY the brand list.
+ */
+export function validateStoreSlug(
+  raw: string,
+  opts: { allowProtected?: boolean } = {}
+): StoreSlugValidation {
   const format = validateStoreSlugFormat(raw);
   if (!format.ok) return format;
   if (isReservedSlug(format.slug)) {
     return { ok: false, code: 'SLUG_RESERVED', message: STORE_SLUG_ERROR_MESSAGES.SLUG_RESERVED };
+  }
+  if (!opts.allowProtected && isProtectedSlug(format.slug)) {
+    return {
+      ok: false,
+      code: 'SLUG_PROTECTED',
+      message: STORE_SLUG_ERROR_MESSAGES.SLUG_PROTECTED,
+    };
   }
   return format;
 }
@@ -66,7 +85,10 @@ export function validateStoreSlug(raw: string): StoreSlugValidation {
  * error code instead of a generic VALIDATION_ERROR — see `storeSlugIssueCode`.
  */
 export const storeSlugSchema = z.string().superRefine((value, ctx) => {
-  const result = validateStoreSlug(value);
+  // Protected brand names are enforced where the actor is known (the API's
+  // `assertStoreSlug` / onboarding), so a super_admin can override; this schema
+  // has no actor and checks format + reserved only.
+  const result = validateStoreSlug(value, { allowProtected: true });
   if (!result.ok) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
