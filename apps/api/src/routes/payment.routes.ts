@@ -312,7 +312,7 @@ router.post(
       // From here on every Prisma write touches tenant-scoped tables
       // (Order, Payment, AuditLog with storeId). Wrap in a single
       // runInTenantContext so RLS policies enforce isolation under the
-      // force_app role — without this the SELECTs the provider call
+      // ebda_app role — without this the SELECTs the provider call
       // makes (e.g. PaymentConfig lookup, store row) silently fall
       // through to the "current_store_id() IS NULL → see all rows"
       // branch of the policies, which works but defeats the purpose
@@ -595,7 +595,7 @@ router.post(
       if (rollbackContext) {
         // Its own tenant wrap: this catch sits OUTSIDE the request's
         // runInTenantContext (the /payments mount has no tenantContext), so
-        // under force_app the rollback would read no rows and do nothing
+        // under ebda_app the rollback would read no rows and do nothing
         // (PR 2301 audit, same class as the MCP place_order rollbacks).
         const rb = rollbackContext;
         await runInTenantContext(rb.storeId, () =>

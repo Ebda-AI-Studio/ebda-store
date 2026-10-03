@@ -2,7 +2,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { storefrontOrigin } from '@force/shared';
 import express from 'express';
 import crypto from 'crypto';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { runInTenantContext, withStore } from '@force/database';
+import {
+  findOrderByIdempotencyKey,
+  getOrderStoreId,
+  getStorefrontForPaymentRef,
+  resolveStoreFromWebhookRef,
+  webhookInbox,
+} from '../lib/definer';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider } from '../services/payment-providers/types';
 import { config } from '../config';
@@ -58,27 +65,22 @@ function verifyWebhookSignature(req: Request, res: Response, next: NextFunction)
 /**
  * Check if a webhook has already been processed (idempotency check).
  *
- * Runs inside withRlsBypass because the storeId is not known yet at this point
- * (we haven't resolved which store this webhook belongs to). The query is
- * read-only and cross-tenant by nature — we're matching on an idempotency key
- * that may span any store.
+ * Runs through a SECURITY DEFINER lookup because the storeId is not known yet
+ * at this point (we haven't resolved which store this webhook belongs to). The
+ * query is read-only and cross-tenant by nature — we're matching on an
+ * idempotency key that may span any store.
  */
 async function checkIdempotency(idempotencyKey: string): Promise<{
   alreadyProcessed: boolean;
   orderId?: string;
 }> {
-  return withRlsBypass(async tx => {
-    const order = await tx.order.findUnique({
-      where: { idempotencyKey },
-      select: { id: true, webhookProcessedAt: true },
-    });
-
-    if (order && order.webhookProcessedAt) {
-      return { alreadyProcessed: true, orderId: order.id };
-    }
-
-    return { alreadyProcessed: false, orderId: order?.id };
-  });
+  // The store is not known yet, so this exact-key lookup is a definer
+  // (`ebda_webhook_order_by_idempotency`), not a store-scoped read.
+  const order = await findOrderByIdempotencyKey(idempotencyKey);
+  if (order && order.webhookProcessedAt) {
+    return { alreadyProcessed: true, orderId: order.orderId };
+  }
+  return { alreadyProcessed: false, orderId: order?.orderId };
 }
 
 /**
@@ -94,21 +96,17 @@ async function markWebhookProcessed(
   idempotencyKey: string,
   storeId?: string
 ): Promise<void> {
-  if (storeId) {
-    await runInTenantContext(storeId, () =>
-      prisma.order.update({
-        where: { id: orderId },
-        data: { idempotencyKey, webhookProcessedAt: new Date() },
-      })
-    );
-  } else {
-    await withRlsBypass(tx =>
-      tx.order.update({
-        where: { id: orderId },
-        data: { idempotencyKey, webhookProcessedAt: new Date() },
-      })
-    );
-  }
+  // storeId is required so the write runs inside a store scope. When it is
+  // unavailable (an orderId with no storeId) the order's own store is looked up
+  // by primary key through a definer — never a bypass.
+  const scopeStoreId = storeId ?? (await getOrderStoreId(orderId));
+  if (!scopeStoreId) return;
+  await withStore(scopeStoreId, tx =>
+    tx.order.update({
+      where: { id: orderId },
+      data: { idempotencyKey, webhookProcessedAt: new Date() },
+    })
+  );
 }
 
 /**
@@ -125,10 +123,11 @@ async function markWebhookProcessed(
  * a second one (idempotency layer 2). We never overwrite a row that has already
  * been processed.
  *
- * Runs in withRlsBypass: webhook_events is a cross-tenant inbox (storeId may be
- * null on the platform path, and the Inngest consumer must read the row before
- * it can enter tenant context). Mirrors checkIdempotency /
- * resolveStoreIdFromWebhookPayload, which also run cross-tenant.
+ * Goes through SECURITY DEFINER functions: webhook_events is a cross-tenant
+ * inbox (storeId may be null on the platform path, and the Inngest consumer
+ * must read the row before it can enter tenant context). Mirrors
+ * checkIdempotency / resolveStoreIdFromWebhookPayload, which also run
+ * cross-tenant.
  */
 async function recordInboundWebhook(input: {
   provider: PaymentProvider;
@@ -138,68 +137,26 @@ async function recordInboundWebhook(input: {
   rawBody: string;
   signature: string;
 }): Promise<string> {
-  try {
-    return await withRlsBypass(async tx => {
-      // First delivery: create the row. On the unique-key conflict (a
-      // re-delivery), refresh the volatile fields — but ONLY for a row that has
-      // NOT already been processed. This preserves the stored audit bytes
-      // (rawBody/signature/payload) of a 'processed' row so a late re-delivery
-      // can't corrupt the record of what we actually acted on. `status` is never
-      // touched here: a non-terminal row stays reprocessable, a 'processed' row
-      // stays a consumer no-op (shouldProcessInboxRow). The fresh inngest.send
-      // below re-enqueues regardless.
-      const existing = await tx.webhookEvent.findUnique({
-        where: { idempotencyKey: input.idempotencyKey },
-        select: { id: true, status: true },
-      });
-
-      if (!existing) {
-        const created = await tx.webhookEvent.create({
-          data: {
-            provider: input.provider,
-            idempotencyKey: input.idempotencyKey,
-            storeId: input.storeId ?? null,
-            payload: input.payload as object,
-            rawBody: input.rawBody,
-            signature: input.signature,
-            status: 'received',
-          },
-          select: { id: true },
-        });
-        return created.id;
-      }
-
-      if (existing.status !== 'processed') {
-        await tx.webhookEvent.update({
-          where: { id: existing.id },
-          data: {
-            payload: input.payload as object,
-            rawBody: input.rawBody,
-            signature: input.signature,
-            storeId: input.storeId ?? null,
-          },
-        });
-      }
-      return existing.id;
-    });
-  } catch (err) {
-    // Two near-simultaneous deliveries of the same txn both passed the
-    // findUnique (saw no row) and both tried to create → the second hits a
-    // P2002 on the unique idempotency_key. The aborted tx can't recover
-    // in-place, so re-read the row the winner just created in a FRESH tx and
-    // return its id. Without this the route 500s and the provider retries — the
-    // exact "5xx → provider retry loop" the inbox exists to avoid.
-    if ((err as { code?: string } | null)?.code === 'P2002') {
-      const row = (await withRlsBypass(tx =>
-        tx.webhookEvent.findUnique({
-          where: { idempotencyKey: input.idempotencyKey },
-          select: { id: true },
-        })
-      )) as { id: string } | null;
-      if (row) return row.id;
-    }
-    throw err;
-  }
+  // First delivery: create the row. On the unique-key conflict (a
+  // re-delivery), refresh the volatile fields — but ONLY for a row that has
+  // NOT already been processed. This preserves the stored audit bytes
+  // (rawBody/signature/payload) of a 'processed' row so a late re-delivery
+  // can't corrupt the record of what we actually acted on. `status` is never
+  // touched here: a non-terminal row stays reprocessable, a 'processed' row
+  // stays a consumer no-op (shouldProcessInboxRow). The fresh inngest.send
+  // below re-enqueues regardless.
+  //
+  // One definer call (`ebda_webhook_inbox_record`, INSERT ... ON CONFLICT), so
+  // two near-simultaneous deliveries of the same txn cannot race into a P2002
+  // and a 500 / provider retry loop.
+  return webhookInbox.record({
+    provider: input.provider,
+    idempotencyKey: input.idempotencyKey,
+    storeId: input.storeId ?? null,
+    payload: input.payload,
+    rawBody: input.rawBody,
+    signature: input.signature,
+  });
 }
 
 /**
@@ -266,17 +223,15 @@ async function enqueueOrProcessWebhook(args: {
       signature,
     });
     // Mark the inbox row processed so a later replay sweep doesn't re-run it.
-    await withRlsBypass(tx =>
-      tx.webhookEvent.update({
-        where: { id: webhookEventId },
-        data: {
-          status: 'processed',
-          processedAt: new Date(),
+    await webhookInbox
+      .update(webhookEventId, {
+        status: 'processed',
+        markProcessed: {
           resultOrderId: result.orderId ?? null,
           resultStatus: result.status ?? null,
         },
       })
-    ).catch(() => undefined);
+      .catch(() => undefined);
     return { enqueued: false, result };
   }
 }
@@ -303,17 +258,11 @@ async function processWebhookInline(args: {
       PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody)
     );
   } else {
-    // No storeId (platform-level path): call handleWebhook directly rather
-    // than through withRlsBypass. withRlsBypass opens its OWN
-    // basePrisma.$transaction and calls fn(tx) directly — it never runs fn
-    // inside tenantStorage.run(tx, ...), so a discarded `_tx` param (as this
-    // call previously had) means the SET LOCAL app.bypass_rls='true' it
-    // issues is scoped to a transaction handleWebhook's ambient
-    // ALS-proxied `prisma` export never touches — a no-op. This mirrors the
-    // documented OLD-idiom escape (20260609000000_complete_force_rls_coverage):
-    // orders/payments policies already allow-contextless when
-    // current_store_id() IS NULL, which is exactly this branch's state, so
-    // no wrapper is needed at all.
+    // No storeId: the payload could not be matched to a payment, so there is no
+    // store scope to enter. handleWebhook then runs contextless, which under
+    // strict RLS can only find nothing and answers "no matching payment" — the
+    // same outcome the platform-only (env-var) path always had for an unknown
+    // reference. It must never be given a bypass.
     result = await PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody);
   }
   if (result.orderId) {
@@ -386,9 +335,9 @@ function generateIdempotencyKey(
  * handleWebhook will then take its env-var path, which is correct
  * behaviour for the platform-only test stores (currently none in prod).
  *
- * Runs inside withRlsBypass because the storeId is unknown at this point —
- * we're doing a cross-tenant payment lookup to discover which store owns the
- * incoming webhook. Once storeId is known the caller switches to
+ * Runs through a SECURITY DEFINER lookup because the storeId is unknown at
+ * this point — we're doing a cross-tenant payment lookup to discover which
+ * store owns the incoming webhook. Once storeId is known the caller switches to
  * runInTenantContext for all subsequent writes.
  */
 async function resolveStoreIdFromWebhookPayload(
@@ -423,16 +372,9 @@ async function resolveStoreIdFromWebhookPayload(
 
   if (!transactionId && !invoiceId) return undefined;
 
-  // Cross-tenant read — storeId not known yet, so use withRlsBypass.
-  return withRlsBypass(async tx => {
-    const payment = await tx.payment.findFirst({
-      where: {
-        OR: [...(transactionId ? [{ transactionId }] : []), ...(invoiceId ? [{ invoiceId }] : [])],
-      },
-      select: { order: { select: { storeId: true } } },
-    });
-    return payment?.order?.storeId;
-  });
+  // Cross-tenant read — storeId not known yet, so the provider reference is
+  // resolved by the `ebda_webhook_resolve_store` definer (exact match, store id only).
+  return (await resolveStoreFromWebhookRef({ transactionId, invoiceId })) ?? undefined;
 }
 
 // ==========================================
@@ -744,13 +686,10 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
   async function getStorefrontUrl(): Promise<string> {
     try {
       if (!transactionId) return config.webUrl;
-      const order = await prisma.order.findFirst({
-        where: {
-          OR: [{ idempotencyKey: { contains: transactionId } }, { id: transactionId }],
-        },
-        select: { store: { select: { domain: true, slug: true } } },
-      });
-      if (order?.store) return storefrontOrigin(order.store);
+      // The store is not known yet: a definer maps the provider's transaction id
+      // to the owning store's slug/domain (`ebda_storefront_for_payment_ref`).
+      const store = await getStorefrontForPaymentRef(transactionId);
+      if (store) return storefrontOrigin(store);
       return config.webUrl;
     } catch {
       return config.webUrl;
@@ -799,16 +738,8 @@ router.get('/payment/error', async (req: Request, res: Response) => {
   let baseUrl = config.webUrl;
   if (transaction_id) {
     try {
-      const order = await prisma.order.findFirst({
-        where: {
-          OR: [
-            { idempotencyKey: { contains: String(transaction_id) } },
-            { id: String(transaction_id) },
-          ],
-        },
-        select: { store: { select: { domain: true, slug: true } } },
-      });
-      if (order?.store) baseUrl = storefrontOrigin(order.store);
+      const store = await getStorefrontForPaymentRef(String(transaction_id));
+      if (store) baseUrl = storefrontOrigin(store);
     } catch {
       // Fall back to platform URL
     }

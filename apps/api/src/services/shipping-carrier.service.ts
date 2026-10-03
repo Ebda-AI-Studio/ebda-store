@@ -3,7 +3,8 @@
 // Orchestrates carrier integrations: shipment creation, tracking, webhooks
 // ==========================================
 
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, runInTenantContext, withMoneyTx } from '@force/database';
+import { getShipmentStoreIdByTracking } from '../lib/definer';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
@@ -646,19 +647,11 @@ class ShippingCarrierService {
       return null;
     }
 
-    // Find the shipment by tracking number
-    const shipment = await prisma.shipment.findFirst({
-      where: { trackingNumber: result.trackingNumber },
-      include: {
-        order: {
-          include: {
-            customer: { select: { email: true, firstName: true, lastName: true } },
-          },
-        },
-      },
-    });
-
-    if (!shipment) {
+    // The carrier names the parcel by tracking number only, so the owning store
+    // is resolved first by a definer (`ebda_shipment_store_id_by_tracking`) and
+    // the rest runs inside that store's scope.
+    const webhookStoreId = await getShipmentStoreIdByTracking(result.trackingNumber);
+    if (!webhookStoreId) {
       logger.warn(
         { trackingNumber: result.trackingNumber, carrier },
         '[ShippingCarrierService] No shipment found for webhook tracking number'
@@ -666,76 +659,100 @@ class ShippingCarrierService {
       return null;
     }
 
-    const history = Array.isArray(shipment.statusHistory) ? (shipment.statusHistory as any[]) : [];
-    const newEntry = {
-      status: result.status,
-      timestamp: result.timestamp.toISOString(),
-      location: result.location,
-      description: result.description,
-    };
-
-    const prevWebhookStatus = shipment.status;
-    const updatedShipment = await prisma.shipment.update({
-      where: { id: shipment.id },
-      data: {
-        status: result.status,
-        statusHistory: [...history, newEntry],
-      },
-    });
-
-    if (prevWebhookStatus !== result.status) {
-      await auditLog({
-        action: 'shipment.status_changed',
-        storeId: shipment.storeId,
-        resourceType: 'shipment',
-        resourceId: shipment.id,
-        details: {
-          orderId: shipment.orderId,
-          carrier: shipment.carrier,
-          fromStatus: prevWebhookStatus,
-          toStatus: result.status,
-          source: 'carrier_webhook',
-          location: result.location ?? null,
+    return runInTenantContext(webhookStoreId, async () => {
+      // Find the shipment by tracking number
+      const shipment = await prisma.shipment.findFirst({
+        where: { trackingNumber: result.trackingNumber },
+        include: {
+          order: {
+            include: {
+              customer: { select: { email: true, firstName: true, lastName: true } },
+            },
+          },
         },
       });
-    }
 
-    // If delivered → update Order + notify
-    if (result.status === 'delivered' && shipment.status !== 'delivered') {
-      await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'delivered');
-
-      const store = await prisma.store
-        .findUnique({
-          where: { id: shipment.storeId },
-          select: { name: true },
-        })
-        .catch(() => null);
-
-      const order = shipment.order;
-      const shippingAddr = order.shippingAddress as { phone?: string } | null;
-
-      notificationDispatcher
-        .dispatch(shipment.storeId, 'order_delivered', {
-          customerName:
-            `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`.trim() ||
-            order.customer?.email ||
-            'Customer',
-          customerPhone: shippingAddr?.phone ?? undefined,
-          orderNumber: order.orderNumber,
-          total: order.total,
-          storeId: shipment.storeId,
-          storeName: store?.name ?? shipment.storeId,
-        })
-        .catch(err =>
-          logger.error({ err }, '[ShippingCarrierService] Webhook delivery notification failed')
+      if (!shipment) {
+        logger.warn(
+          { trackingNumber: result.trackingNumber, carrier },
+          '[ShippingCarrierService] No shipment found for webhook tracking number'
         );
-    }
+        return null;
+      }
 
-    logger.info(
-      { shipmentId: shipment.id, status: result.status },
-      '[ShippingCarrierService] Webhook processed'
-    );
-    return updatedShipment;
+      const history = Array.isArray(shipment.statusHistory)
+        ? (shipment.statusHistory as any[])
+        : [];
+      const newEntry = {
+        status: result.status,
+        timestamp: result.timestamp.toISOString(),
+        location: result.location,
+        description: result.description,
+      };
+
+      const prevWebhookStatus = shipment.status;
+      const updatedShipment = await prisma.shipment.update({
+        where: { id: shipment.id },
+        data: {
+          status: result.status,
+          statusHistory: [...history, newEntry],
+        },
+      });
+
+      if (prevWebhookStatus !== result.status) {
+        await auditLog({
+          action: 'shipment.status_changed',
+          storeId: shipment.storeId,
+          resourceType: 'shipment',
+          resourceId: shipment.id,
+          details: {
+            orderId: shipment.orderId,
+            carrier: shipment.carrier,
+            fromStatus: prevWebhookStatus,
+            toStatus: result.status,
+            source: 'carrier_webhook',
+            location: result.location ?? null,
+          },
+        });
+      }
+
+      // If delivered → update Order + notify
+      if (result.status === 'delivered' && shipment.status !== 'delivered') {
+        await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'delivered');
+
+        const store = await prisma.store
+          .findUnique({
+            where: { id: shipment.storeId },
+            select: { name: true },
+          })
+          .catch(() => null);
+
+        const order = shipment.order;
+        const shippingAddr = order.shippingAddress as { phone?: string } | null;
+
+        notificationDispatcher
+          .dispatch(shipment.storeId, 'order_delivered', {
+            customerName:
+              `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`.trim() ||
+              order.customer?.email ||
+              'Customer',
+            customerPhone: shippingAddr?.phone ?? undefined,
+            orderNumber: order.orderNumber,
+            total: order.total,
+            storeId: shipment.storeId,
+            storeName: store?.name ?? shipment.storeId,
+          })
+          .catch(err =>
+            logger.error({ err }, '[ShippingCarrierService] Webhook delivery notification failed')
+          );
+      }
+
+      logger.info(
+        { shipmentId: shipment.id, status: result.status },
+        '[ShippingCarrierService] Webhook processed'
+      );
+      return updatedShipment;
+    });
   }
 
   // ==========================================
