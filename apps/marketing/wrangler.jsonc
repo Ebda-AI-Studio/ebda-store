@@ -1,0 +1,13 @@
+// Static-assets-only Worker for the marketing site. `next build` (output: 'export')
+// writes ./out; Cloudflare serves it directly — no OpenNext, no server code.
+// Deploy wiring is intentionally NOT in CI yet (SP9 part 1 builds the site only).
+{
+  "name": "ebda-marketing",
+  "compatibility_date": "2025-08-16",
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash",
+  },
+  "routes": [{ "pattern": "ebda.app", "custom_domain": true }],
+}
