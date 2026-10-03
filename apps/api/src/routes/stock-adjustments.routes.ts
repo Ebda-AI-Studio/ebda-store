@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
 import { runInTenantContext, prisma } from '@force/database';
+import { uniqueViolationTarget } from '../lib/prisma-errors';
 import {
   createAdjustment,
   postAdjustment,
@@ -177,10 +178,9 @@ const csvImportBodySchema = z.object({
 
 function isImportKeyConflict(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false;
-  const { code, meta } = err as { code?: unknown; meta?: { target?: unknown } };
+  const { code } = err as { code?: unknown };
   if (code !== 'P2002') return false;
-  const target = meta?.target;
-  const fields = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+  const fields = uniqueViolationTarget(err);
   return fields.some(f => f.includes('import_key') || f.includes('importKey'));
 }
 

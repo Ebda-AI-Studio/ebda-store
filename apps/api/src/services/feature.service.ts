@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx, withRlsBypass } from '@force/database';
+import { prisma, Prisma, withMoneyTx, withStore } from '@force/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
 import { bustStoreCaches } from './store.service';
@@ -25,7 +25,7 @@ const CACHE_TTL = 300; // 5 minutes
 // pooler these are transient — a dropped idle connection or a compute blip —
 // and FORCE-API-2D / 2E were each a single one of them 500ing
 // `GET /public/store/resolve` from inside `readFromDb`. One retry on a FRESH
-// transaction (`withRlsBypass` opens its own, so a dead connection is not
+// transaction (`withStore` opens its own when there is no ambient one, so a dead connection is not
 // reused) absorbs them. Deliberately NOT a stale-value fallback: this map gates
 // paid features, so a second failure still throws (fail closed) instead of
 // serving a map that might say ON for something that was turned off.
@@ -157,7 +157,7 @@ class FeatureService {
     // enabled/disabled by override would be mis-resolved (and the wrong value
     // Redis-cached). `stores` itself has RLS disabled, but read both inside one
     // bypass tx — trusted internal read already scoped by `where: { storeId }`.
-    const [store, rows] = await withRlsBypass(tx =>
+    const [store, rows] = await withStore(storeId, tx =>
       Promise.all([
         tx.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
         tx.storeFeature.findMany({
@@ -206,9 +206,11 @@ class FeatureService {
    */
   private async bustPublicStoreCache(storeId: string): Promise<void> {
     try {
-      const store = await withRlsBypass(tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
-      );
+      // `stores` carries no RLS: a plain read.
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { slug: true, domain: true },
+      });
       if (!store) return;
       await bustStoreCaches(storeId, store.slug, store.domain);
     } catch (err) {

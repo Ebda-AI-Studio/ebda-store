@@ -1373,7 +1373,7 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
  * `store_faqs` / `store_howtos` carry STRICT RLS policies — `store_id =
  * app.current_store_id OR app.bypass_rls` — with no allowance for a query that
  * sets no context. These public routes run outside `tenantContext`, so under
- * the non-bypass `force_app` role a nested `store.faqs` select silently
+ * the non-bypass `ebda_app` role a nested `store.faqs` select silently
  * returned `[]` for every store. That is what emptied pecannbee's 24 FAQs and
  * 9 how-tos during the 2026-09-25 cutover attempt, with no error anywhere.
  *

@@ -1,4 +1,14 @@
-import { prisma, Prisma, withMoneyTx, StoreStatus } from '@force/database';
+import {
+  prisma,
+  Prisma,
+  setTenantGucs,
+  acrossStores,
+  withStore,
+  withUser,
+  withMoneyTx,
+  StoreStatus,
+} from '@force/database';
+import { detachStoreAuditLogs, unlinkUserAuditLogs } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { slugify, slugifyWithFallback, isReservedSlug, storeHost } from '@force/shared';
@@ -113,6 +123,27 @@ type UpdateStoreData = Partial<CreateStoreData> & {
   locationsEnabled?: boolean;
 };
 
+/**
+ * Row counts the store payloads carry (`_count`). `products`, `orders` and `categories` are
+ * store-scoped under strict RLS, so a relation count taken from the `stores` query would silently
+ * read 0 outside a tenant context: each count is taken inside the store's own scope instead.
+ */
+async function countStoreRows(
+  storeId: string,
+  opts: { orders?: boolean } = {}
+): Promise<{ products: number; categories: number; orders?: number }> {
+  return withStore(storeId, async tx => {
+    const [products, categories, orders] = await Promise.all([
+      tx.product.count(),
+      tx.category.count(),
+      opts.orders ? tx.order.count() : Promise.resolve(undefined),
+    ]);
+    return opts.orders
+      ? { products, categories, orders: orders as number }
+      : { products, categories };
+  });
+}
+
 export class StoreService {
   /**
    * Invalidate all Redis cache keys for a store.
@@ -156,15 +187,32 @@ export class StoreService {
           owner: {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
-          _count: { select: { products: true, orders: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.store.count({ where }),
     ]);
 
+    // `products` / `orders` are store-scoped under strict RLS, so a relation count taken
+    // from the `stores` query would see nothing. Count each listed store inside its own scope.
+    const counts = new Map(
+      (
+        await acrossStores(
+          async () => ({
+            products: await prisma.product.count(),
+            orders: await prisma.order.count(),
+          }),
+          { storeIds: stores.map(st => st.id) }
+        )
+      ).map(r => [r.storeId, r.value])
+    );
+    const withCounts = stores.map(st => ({
+      ...st,
+      _count: counts.get(st.id) ?? { products: 0, orders: 0 },
+    }));
+
     return {
-      stores,
+      stores: withCounts,
       meta: {
         page,
         limit,
@@ -198,27 +246,30 @@ export class StoreService {
   }
 
   static async getById(storeId: string) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
-      // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
-      // own explicit select), so it is omitted at the service boundary rather
-      // than left to every caller to remember to strip. Same reasoning as
-      // `maskMarketingPixelSecrets` on `GET /stores/:id`.
-      omit: { agentApiKey: true },
-      include: {
-        owner: {
-          select: { id: true, email: true, firstName: true, lastName: true },
+    // Inside the store's own scope: the payload names the owner, whose `users` row is visible from
+    // there (owner of the current store) and from nowhere else under strict RLS.
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
+        // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
+        // own explicit select), so it is omitted at the service boundary rather
+        // than left to every caller to remember to strip. Same reasoning as
+        // `maskMarketingPixelSecrets` on `GET /stores/:id`.
+        omit: { agentApiKey: true },
+        include: {
+          owner: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
         },
-        _count: { select: { products: true, orders: true, categories: true } },
-      },
-    });
+      })
+    );
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    return store;
+    return { ...store, _count: await countStoreRows(store.id, { orders: true }) };
   }
 
   static async getBySlug(slug: string) {
@@ -244,20 +295,18 @@ export class StoreService {
       // than left to every caller to remember to strip. Same reasoning as
       // `maskMarketingPixelSecrets` on `GET /stores/:id`.
       omit: { agentApiKey: true },
-      include: {
-        _count: { select: { products: true, categories: true } },
-      },
     });
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
+    const storeWithCounts = { ...store, _count: await countStoreRows(store.id) };
 
     // Write to cache (best-effort, 120s TTL — invalidated explicitly
     // on every store update so admin edits land within seconds, not
     // minutes).
     try {
-      await redis.set(`store:slug:${slug}`, JSON.stringify(store), 120);
+      await redis.set(`store:slug:${slug}`, JSON.stringify(storeWithCounts), 120);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown' },
@@ -265,7 +314,7 @@ export class StoreService {
       );
     }
 
-    return store;
+    return storeWithCounts;
   }
 
   static async create(ownerId: string, data: CreateStoreData) {
@@ -331,18 +380,22 @@ export class StoreService {
           rtlPolish: true,
         },
       },
-      include: {
-        owner: {
-          select: { id: true, email: true, firstName: true, lastName: true },
-        },
-      },
     });
 
     // Seed Chart of Accounts (Kuwait retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.
     await seedCoaForStore(store.id);
 
-    return store;
+    // The owner row is identity-scoped under strict RLS (`users`), and no store scope exists
+    // yet when the store is created: read it as the owner (the acting user), after the fact.
+    const owner = await withUser(ownerId, tx =>
+      tx.user.findUnique({
+        where: { id: ownerId },
+        select: { id: true, email: true, firstName: true, lastName: true },
+      })
+    );
+
+    return { ...store, owner };
   }
 
   static async update(storeId: string, data: UpdateStoreData) {
@@ -385,47 +438,49 @@ export class StoreService {
       } as Prisma.InputJsonValue;
     }
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        name: data.name,
-        slug: data.slug,
-        domain: data.domain,
-        settings: mergedSettings,
-        ...(data.heroTitle !== undefined && { heroTitle: data.heroTitle }),
-        ...(data.heroTitleAr !== undefined && { heroTitleAr: data.heroTitleAr }),
-        ...(data.heroSubtitle !== undefined && { heroSubtitle: data.heroSubtitle }),
-        ...(data.heroSubtitleAr !== undefined && { heroSubtitleAr: data.heroSubtitleAr }),
-        ...(data.heroCtaText !== undefined && { heroCtaText: data.heroCtaText }),
-        ...(data.heroCtaTextAr !== undefined && { heroCtaTextAr: data.heroCtaTextAr }),
-        ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
-        ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
-        ...(data.blogEnabled !== undefined && { blogEnabled: data.blogEnabled }),
-        ...(data.timezone !== undefined && { timezone: data.timezone }),
-        // These three were accepted by updateStoreSchema and dropped here. The
-        // route validated them, the service typed them, and this object — the
-        // only thing that actually writes — never mentioned them. So the admin
-        // got "Saved", the column stayed NULL, and the value reappeared blank on
-        // reload. Store locations could not be enabled by any merchant that was
-        // not seeded, and the whole return-policy feature was dead: with the
-        // column NULL, merchantReturnPolicyJsonLd() returns null forever and
-        // hasMerchantReturnPolicy is never emitted.
-        //
-        // `!== undefined` rather than a truthiness check is load-bearing on all
-        // three. null is a MEANINGFUL value the admin sends to clear a declared
-        // policy, and 0 is a meaningful returnWindowDays ("returns not
-        // accepted") — both would be dropped by a falsy guard, reintroducing the
-        // same silent no-op for the two values that most need to persist.
-        ...(data.locationsEnabled !== undefined && { locationsEnabled: data.locationsEnabled }),
-        ...(data.returnWindowDays !== undefined && { returnWindowDays: data.returnWindowDays }),
-        ...(data.returnFeesPaidBy !== undefined && { returnFeesPaidBy: data.returnFeesPaidBy }),
-      },
-      include: {
-        owner: {
-          select: { id: true, email: true, firstName: true, lastName: true },
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          name: data.name,
+          slug: data.slug,
+          domain: data.domain,
+          settings: mergedSettings,
+          ...(data.heroTitle !== undefined && { heroTitle: data.heroTitle }),
+          ...(data.heroTitleAr !== undefined && { heroTitleAr: data.heroTitleAr }),
+          ...(data.heroSubtitle !== undefined && { heroSubtitle: data.heroSubtitle }),
+          ...(data.heroSubtitleAr !== undefined && { heroSubtitleAr: data.heroSubtitleAr }),
+          ...(data.heroCtaText !== undefined && { heroCtaText: data.heroCtaText }),
+          ...(data.heroCtaTextAr !== undefined && { heroCtaTextAr: data.heroCtaTextAr }),
+          ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
+          ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
+          ...(data.blogEnabled !== undefined && { blogEnabled: data.blogEnabled }),
+          ...(data.timezone !== undefined && { timezone: data.timezone }),
+          // These three were accepted by updateStoreSchema and dropped here. The
+          // route validated them, the service typed them, and this object — the
+          // only thing that actually writes — never mentioned them. So the admin
+          // got "Saved", the column stayed NULL, and the value reappeared blank on
+          // reload. Store locations could not be enabled by any merchant that was
+          // not seeded, and the whole return-policy feature was dead: with the
+          // column NULL, merchantReturnPolicyJsonLd() returns null forever and
+          // hasMerchantReturnPolicy is never emitted.
+          //
+          // `!== undefined` rather than a truthiness check is load-bearing on all
+          // three. null is a MEANINGFUL value the admin sends to clear a declared
+          // policy, and 0 is a meaningful returnWindowDays ("returns not
+          // accepted") — both would be dropped by a falsy guard, reintroducing the
+          // same silent no-op for the two values that most need to persist.
+          ...(data.locationsEnabled !== undefined && { locationsEnabled: data.locationsEnabled }),
+          ...(data.returnWindowDays !== undefined && { returnWindowDays: data.returnWindowDays }),
+          ...(data.returnFeesPaidBy !== undefined && { returnFeesPaidBy: data.returnFeesPaidBy }),
         },
-      },
-    });
+        include: {
+          owner: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+        },
+      })
+    );
 
     // Invalidate store cache (best-effort)
     try {
@@ -504,19 +559,17 @@ export class StoreService {
       // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
       // to zero rows. The accounting tables (journal_entries, expenses,
       // stock_adjustments, accounts, sequences) have row-level-security
-      // policies that require either app.current_store_id GUC to match
-      // OR app.bypass_rls = 'true'. Inside this transaction neither
-      // was set, so DELETE matched 0 rows even though rows existed.
-      // The FK violation at store.delete then fired because the
+      // policies that match only the transaction's store, and this
+      // transaction had none set, so DELETE matched 0 rows even though rows
+      // existed. The FK violation at store.delete then fired because the
       // journal_entries rows were never actually touched.
       //
-      // Set the bypass GUC for the duration of THIS transaction only —
-      // SET LOCAL scoping means it dies on commit/rollback. This is a
-      // super-admin-only code path (route gates with super_admin role
-      // check) so bypass is appropriate here.
-      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+      // The transaction is scoped to THIS store with a transaction-local
+      // set_config (no bypass flag exists any more). It dies on commit/rollback,
+      // and this is a super-admin-only code path (the route gates on role).
+      await setTenantGucs(tx, { storeId });
 
-      logger.info({ storeId }, '[STORE_DELETE] start (raw sql, rls bypassed)');
+      logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
 
       const reviewCount =
         await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
@@ -551,8 +604,9 @@ export class StoreService {
       logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
 
       // Detach historical audit logs by nulling their storeId (preserves trail).
-      const auditCount =
-        await tx.$executeRaw`UPDATE public.audit_logs SET store_id = NULL WHERE store_id = ${storeId}`;
+      // A definer: nulling store_id leaves the store scope, which the policy's
+      // WITH CHECK would reject.
+      const auditCount = await detachStoreAuditLogs(storeId, tx);
       logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
 
       // Verification: count any rows that would still block the store delete.
@@ -585,7 +639,7 @@ export class StoreService {
         select: { id: true, role: true, _count: { select: { stores: true } } },
       });
       if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
-        await tx.auditLog.updateMany({ where: { userId: owner.id }, data: { userId: null } });
+        await unlinkUserAuditLogs(owner.id, tx);
         await tx.refreshToken.deleteMany({ where: { userId: owner.id } });
         await tx.verificationToken.deleteMany({ where: { userId: owner.id } });
         await tx.oneSignalSubscription.deleteMany({ where: { userId: owner.id } });
@@ -700,16 +754,12 @@ export class StoreService {
       );
     }
 
-    const store = await prisma.store.findUnique({
-      where: { domain },
-      include: {
-        _count: { select: { products: true, categories: true } },
-      },
-    });
+    const found = await prisma.store.findUnique({ where: { domain } });
 
-    if (!store) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
+    const store = { ...found, _count: await countStoreRows(found.id) };
 
     // Write to cache (best-effort, 120s TTL — invalidated on store updates).
     try {
