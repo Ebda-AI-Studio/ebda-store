@@ -4,9 +4,11 @@
  * Merchant Billing — /stores/:id/billing (SP5 task 1).
  *
  * Shows the store's plan and subscription state, usage against every limit as
- * bars, what the plan includes, and an upgrade call-to-action (a placeholder
- * until task 3 wires EGP checkout). Super-admins also get a plan picker here
- * (e.g. to comp a store), backed by PUT /admin/stores/:id/subscription.
+ * bars, what the plan includes, EGP subscription checkout (hosted card page),
+ * plan changes (upgrade now / downgrade at period end), cancel + resume, the
+ * dunning banner and the list of charges (SP5 task 3). Super-admins also get a
+ * plan picker here (e.g. to comp a store), backed by
+ * PUT /admin/stores/:id/subscription.
  *
  * Orders never block checkout: past the monthly cap the store is flagged and
  * this page shows a banner instead (see PlanLimitService.noteOrderCreated).
@@ -18,7 +20,7 @@ import { useLocale } from 'next-intl';
 import { Badge, Button, Select, useToast } from '@force/ui';
 import { formatMoney, type PlanLimits } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPut } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
 
@@ -49,6 +51,26 @@ interface BillingData {
   };
   ordersOverLimitMonth: string | null;
   availablePlans: PlanSummary[];
+  billing?: {
+    billingInterval: 'monthly' | 'yearly';
+    pendingPlanCode: string | null;
+    nextRetryAt: string | null;
+    dunningAttempts: number;
+    hasPaymentMethod: boolean;
+    billedByPlatform: boolean;
+  };
+  provider?: 'kashier' | 'stub';
+}
+
+interface Charge {
+  id: string;
+  type: 'checkout' | 'renewal' | 'upgrade' | 'refund';
+  planCode: string | null;
+  amountMinor: number;
+  status: 'pending' | 'succeeded' | 'failed' | 'refunded';
+  failureReason: string | null;
+  attempt: number;
+  createdAt: string;
 }
 
 const BAR_KEYS = ['maxProducts', 'maxStaff', 'maxOrdersPerMonth'] as const;
@@ -111,6 +133,12 @@ export default function StoreBillingPage() {
   const [allPlans, setAllPlans] = useState<PlanSummary[]>([]);
   const [selectedPlan, setSelectedPlan] = useState('');
   const [assigning, setAssigning] = useState(false);
+  const [charges, setCharges] = useState<Charge[]>([]);
+  const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [returnState, setReturnState] = useState<'idle' | 'pending' | 'ok' | 'failed' | 'later'>(
+    'idle'
+  );
   const isSuperAdmin = user?.role === 'super_admin';
 
   const load = useCallback(async () => {
@@ -124,9 +152,51 @@ export default function StoreBillingPage() {
     setSelectedPlan(d.plan.subscribedPlanCode);
   }, [storeId]);
 
+  const loadCharges = useCallback(async () => {
+    const { data: d } = await apiGet<{ charges: Charge[] }>(
+      `/api/v1/stores/${storeId}/billing/invoices`
+    );
+    if (d) setCharges(d.charges ?? []);
+  }, [storeId]);
+
   useEffect(() => {
-    if (storeId) load();
-  }, [load, storeId]);
+    if (storeId) {
+      load();
+      loadCharges();
+    }
+  }, [load, loadCharges, storeId]);
+
+  // Back from the hosted card page: the browser's word is only a hint, so ask
+  // the API for the ledger status (updated by the signed webhook) and poll briefly.
+  useEffect(() => {
+    if (!storeId || typeof window === 'undefined') return;
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get('checkout') !== 'return') return;
+    let cancelled = false;
+    setReturnState('pending');
+    (async () => {
+      for (let i = 0; i < 6 && !cancelled; i++) {
+        const { data: r } = await apiGet<{ hint: string; status: string | null }>(
+          `/api/v1/stores/${storeId}/billing/checkout/return?${qs.toString()}`
+        );
+        if (r?.status === 'succeeded') {
+          setReturnState('ok');
+          await Promise.all([load(), loadCharges()]);
+          return;
+        }
+        if (r?.status === 'failed') {
+          setReturnState('failed');
+          await loadCharges();
+          return;
+        }
+        await new Promise(res => setTimeout(res, 3000));
+      }
+      if (!cancelled) setReturnState('later');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, load, loadCharges]);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -152,6 +222,87 @@ export default function StoreBillingPage() {
     }
   }
 
+  async function subscribe(planCode: string) {
+    setBusy(planCode);
+    try {
+      const { data: d, error: e } = await apiPost<{ redirectUrl: string }>(
+        `/api/v1/stores/${storeId}/billing/checkout`,
+        { planCode, interval }
+      );
+      if (e || !d) {
+        toastError(t('checkoutError'), e?.message);
+        return;
+      }
+      window.location.href = d.redirectUrl;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function switchPlan(planCode: string) {
+    setBusy(planCode);
+    try {
+      const { data: d, error: e } = await apiPost<{
+        mode: 'upgraded' | 'scheduled';
+        status?: 'succeeded' | 'failed' | 'pending';
+      }>(`/api/v1/stores/${storeId}/billing/change-plan`, { planCode });
+      if (e || !d) {
+        toastError(t('changeError'), e?.message);
+        return;
+      }
+      if (d.mode === 'scheduled') toastSuccess(t('scheduledToast'));
+      else if (d.status === 'succeeded') toastSuccess(t('upgradedToast'));
+      else if (d.status === 'pending') toastSuccess(t('upgradePending'));
+      else toastError(t('changeError'), t('upgradeDeclined'));
+      await Promise.all([load(), loadCharges()]);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function cancelPlan() {
+    if (!window.confirm(t('confirmCancel'))) return;
+    setBusy('cancel');
+    try {
+      const { data: d, error: e } = await apiPost<{ mode: 'at_period_end' | 'immediate' }>(
+        `/api/v1/stores/${storeId}/billing/cancel`
+      );
+      if (e || !d) {
+        toastError(t('changeError'), e?.message);
+        return;
+      }
+      toastSuccess(d.mode === 'immediate' ? t('canceledNowToast') : t('canceledToast'));
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function resumePlan() {
+    setBusy('resume');
+    try {
+      const { error: e } = await apiPost(`/api/v1/stores/${storeId}/billing/resume`);
+      if (e) {
+        toastError(t('changeError'), e.message);
+        return;
+      }
+      toastSuccess(t('resumedToast'));
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function stubConfirm(merchantOrderId: string, outcome: 'success' | 'failure') {
+    setBusy(merchantOrderId);
+    await apiPost(`/api/v1/stores/${storeId}/billing/checkout/stub-confirm`, {
+      merchantOrderId,
+      outcome,
+    });
+    setBusy(null);
+    await Promise.all([load(), loadCharges()]);
+  }
+
   const planName = (p: { nameEn: string; nameAr: string }) =>
     locale === 'ar' ? p.nameAr : p.nameEn;
   const fmtDate = (iso: string | null) =>
@@ -164,6 +315,8 @@ export default function StoreBillingPage() {
       : null;
   const fmtPrice = (minor: number | null) =>
     minor === null ? t('priceTbd') : formatMoney(minor, locale);
+  const planPrice = (p: PlanSummary) =>
+    interval === 'yearly' ? p.priceYearlyMinor : p.priceMonthlyMinor;
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const overOrders = data?.ordersOverLimitMonth?.startsWith(currentMonth) ?? false;
@@ -199,6 +352,34 @@ export default function StoreBillingPage() {
             </div>
           )}
 
+          {returnState !== 'idle' && (
+            <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+              {returnState === 'pending' && t('checkoutReturnPending')}
+              {returnState === 'ok' && t('checkoutReturnOk')}
+              {returnState === 'failed' && t('checkoutReturnFailed')}
+              {returnState === 'later' && t('checkoutReturnLater')}
+            </div>
+          )}
+
+          {data.subscription.status === 'past_due' && (
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-ink"
+            >
+              <p className="font-semibold">{t('pastDueTitle')}</p>
+              <p className="mt-1">
+                {t('pastDueBody', { date: fmtDate(data.billing?.nextRetryAt ?? null) ?? '' })}
+              </p>
+            </div>
+          )}
+
+          {data.subscription.status === 'canceled' && (
+            <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+              <p className="font-semibold">{t('canceledTitle')}</p>
+              <p className="mt-1 text-muted-foreground">{t('canceledBody')}</p>
+            </div>
+          )}
+
           <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -230,6 +411,24 @@ export default function StoreBillingPage() {
                     {data.subscription.cancelAtPeriodEnd ? t('endsOn') : t('renewsOn')}
                   </dt>
                   <dd>{fmtDate(data.subscription.currentPeriodEnd)}</dd>
+                </div>
+              )}
+              {data.billing?.pendingPlanCode && (
+                <div className="flex justify-between gap-2 sm:col-span-2">
+                  <dt className="text-muted-foreground">
+                    {t('pendingPlan', {
+                      plan:
+                        data.availablePlans.find(p => p.code === data.billing?.pendingPlanCode) !==
+                        undefined
+                          ? planName(
+                              data.availablePlans.find(
+                                p => p.code === data.billing?.pendingPlanCode
+                              )!
+                            )
+                          : data.billing.pendingPlanCode,
+                      date: fmtDate(data.subscription.currentPeriodEnd) ?? '',
+                    })}
+                  </dt>
                 </div>
               )}
               <div className="flex justify-between gap-2">
@@ -295,27 +494,187 @@ export default function StoreBillingPage() {
           </section>
 
           <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-            <h2 className="mb-1 text-base font-semibold">{t('upgradeTitle')}</h2>
-            <p className="mb-3 text-sm text-muted-foreground">{t('upgradeBody')}</p>
-            <div className="mb-4 grid gap-3 sm:grid-cols-3">
-              {data.availablePlans.map(p => (
-                <div
-                  key={p.code}
-                  className={`rounded-lg border p-3 text-sm ${p.code === data.plan.code ? 'border-primary' : ''}`}
+            <h2 className="mb-1 text-base font-semibold">{t('subscribeTitle')}</h2>
+            <p className="mb-3 text-sm text-muted-foreground">{t('subscribeBody')}</p>
+            <div className="mb-3 inline-flex rounded-full bg-muted p-1 text-sm" role="group">
+              {(['monthly', 'yearly'] as const).map(k => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={interval === k}
+                  onClick={() => setInterval(k)}
+                  className={`rounded-full px-3 py-1 ${interval === k ? 'bg-foreground text-background' : ''}`}
                 >
-                  <p className="font-medium">{planName(p)}</p>
-                  <p className="tabular-nums text-muted-foreground">
-                    {fmtPrice(p.priceMonthlyMinor)}
-                    {p.priceMonthlyMinor !== null && <span> {t('perMonth')}</span>}
-                  </p>
-                </div>
+                  {t(k === 'monthly' ? 'intervalMonthly' : 'intervalYearly')}
+                </button>
               ))}
             </div>
-            {/* Placeholder until SP5 task 3 (EGP subscription billing) wires checkout. */}
-            <Button disabled aria-disabled="true" className="max-md:min-h-11">
-              {t('upgradeCta')}
-            </Button>
-            <p className="mt-2 text-xs text-muted-foreground">{t('upgradeSoon')}</p>
+            <div className="mb-4 grid gap-3 sm:grid-cols-3">
+              {data.availablePlans.map(p => {
+                const price = planPrice(p);
+                const isCurrent = p.code === data.plan.subscribedPlanCode;
+                const paid = p.code !== 'free' && p.code !== 'comped';
+                const hasCard =
+                  !!data.billing?.hasPaymentMethod && data.subscription.status === 'active';
+                return (
+                  <div
+                    key={p.code}
+                    className={`rounded-lg border p-3 text-sm ${isCurrent ? 'border-primary' : ''}`}
+                  >
+                    <p className="font-medium">{planName(p)}</p>
+                    <p className="mb-2 tabular-nums text-muted-foreground">
+                      {fmtPrice(price)}
+                      {price !== null && (
+                        <span> {interval === 'yearly' ? t('perYear') : t('perMonth')}</span>
+                      )}
+                    </p>
+                    {isCurrent && <Badge variant="info">{t('currentBadge')}</Badge>}
+                    {!isCurrent && paid && data.subscription.status !== 'comped' && (
+                      <Button
+                        size="sm"
+                        className="max-md:min-h-11"
+                        disabled={price === null || busy !== null}
+                        onClick={() => (hasCard ? switchPlan(p.code) : subscribe(p.code))}
+                      >
+                        {price === null
+                          ? t('priceUnset')
+                          : hasCard
+                            ? t('switchTo')
+                            : t('subscribe')}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {data.billing?.hasPaymentMethod &&
+              ['active', 'trialing'].includes(data.subscription.status) &&
+              (data.subscription.cancelAtPeriodEnd || data.billing.pendingPlanCode ? (
+                <Button
+                  variant="outline"
+                  className="max-md:min-h-11"
+                  disabled={busy !== null}
+                  onClick={resumePlan}
+                >
+                  {t('resumePlan')}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="max-md:min-h-11"
+                  disabled={busy !== null}
+                  onClick={cancelPlan}
+                >
+                  {t('cancelPlan')}
+                </Button>
+              ))}
+            {data.billing?.hasPaymentMethod && data.subscription.status === 'past_due' && (
+              <Button
+                variant="outline"
+                className="max-md:min-h-11"
+                disabled={busy !== null}
+                onClick={cancelPlan}
+              >
+                {t('cancelPlan')}
+              </Button>
+            )}
+            {data.subscription.cancelAtPeriodEnd && data.subscription.currentPeriodEnd && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t('cancelsOn')} {fmtDate(data.subscription.currentPeriodEnd)}
+              </p>
+            )}
+          </section>
+
+          {data.provider === 'stub' &&
+            charges.some(c => c.type === 'checkout' && c.status === 'pending') && (
+              <section className="rounded-xl border border-dashed bg-card p-4 sm:p-6">
+                <h2 className="mb-1 text-base font-semibold">{t('stubTitle')}</h2>
+                <p className="mb-3 text-sm text-muted-foreground">{t('stubBody')}</p>
+                {charges
+                  .filter(c => c.type === 'checkout' && c.status === 'pending')
+                  .map(c => (
+                    <div key={c.id} className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={busy !== null}
+                        onClick={() => stubConfirm(c.id, 'success')}
+                      >
+                        {t('stubPay')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy !== null}
+                        onClick={() => stubConfirm(c.id, 'failure')}
+                      >
+                        {t('stubDecline')}
+                      </Button>
+                    </div>
+                  ))}
+              </section>
+            )}
+
+          <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+            <h2 className="mb-3 text-base font-semibold">{t('invoicesTitle')}</h2>
+            {charges.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('invoicesEmpty')}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-start text-xs text-muted-foreground">
+                      <th className="py-2 pe-3 text-start font-medium">{t('invoiceCols.date')}</th>
+                      <th className="py-2 pe-3 text-start font-medium">
+                        {t('invoiceCols.description')}
+                      </th>
+                      <th className="py-2 pe-3 text-start font-medium">
+                        {t('invoiceCols.amount')}
+                      </th>
+                      <th className="py-2 pe-3 text-start font-medium">
+                        {t('invoiceCols.status')}
+                      </th>
+                      <th className="hidden py-2 text-start font-medium sm:table-cell">
+                        {t('invoiceCols.reason')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {charges.map(c => (
+                      <tr key={c.id} className="border-b last:border-0">
+                        <td className="py-2 pe-3 text-muted-foreground">{fmtDate(c.createdAt)}</td>
+                        <td className="py-2 pe-3">
+                          {t(`invoiceTypes.${c.type}`)}
+                          {c.planCode ? ` · ${c.planCode}` : ''}
+                          {c.type === 'renewal' && c.attempt > 0
+                            ? ` · ${t('retryN', { n: c.attempt })}`
+                            : ''}
+                        </td>
+                        <td className="py-2 pe-3 tabular-nums">
+                          {c.type === 'refund' ? '−' : ''}
+                          {formatMoney(c.amountMinor, locale)}
+                        </td>
+                        <td className="py-2 pe-3">
+                          <Badge
+                            variant={
+                              c.status === 'succeeded'
+                                ? 'success'
+                                : c.status === 'failed'
+                                  ? 'destructive'
+                                  : 'secondary'
+                            }
+                          >
+                            {t(`invoiceStatuses.${c.status}`)}
+                          </Badge>
+                        </td>
+                        <td className="hidden py-2 text-muted-foreground sm:table-cell">
+                          {c.failureReason ?? '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           {isSuperAdmin && (
