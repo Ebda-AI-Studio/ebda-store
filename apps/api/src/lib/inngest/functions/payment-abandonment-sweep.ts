@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import { OneSignalService } from '../../../services/onesignal.service';
+import { sweepAcrossStores } from '../../cross-store';
 
 /**
  * Payment-gateway abandonment sweep — runs every 30 min (Enterprise only).
@@ -68,41 +69,45 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
 
     // Cross-tenant sweep — bypass RLS (no HTTP tenant GUC on a cron).
     const candidates = (await step.run('find-gateway-abandoners', () =>
-      withRlsBypass(tx =>
-        tx.order.findMany({
-          where: {
-            status: 'pending',
-            paymentStatus: 'unpaid',
-            paymentGatewayAbandonedAt: null,
-            deletedAt: null,
-            createdAt: { lt: threshold },
-            // Must have at least one Payment with a paymentUrl (gateway link
-            // was generated — customer was redirected or saw the URL).
-            payments: {
-              some: {
-                paymentUrl: { not: null },
-                // Exclude cash/COD providers even if they somehow have a URL.
-                provider: { notIn: [...CASH_PROVIDERS] },
+      sweepAcrossStores({
+        fetch: () =>
+          prisma.order.findMany({
+            where: {
+              status: 'pending',
+              paymentStatus: 'unpaid',
+              paymentGatewayAbandonedAt: null,
+              deletedAt: null,
+              createdAt: { lt: threshold },
+              // Must have at least one Payment with a paymentUrl (gateway link
+              // was generated — customer was redirected or saw the URL).
+              payments: {
+                some: {
+                  paymentUrl: { not: null },
+                  // Exclude cash/COD providers even if they somehow have a URL.
+                  provider: { notIn: [...CASH_PROVIDERS] },
+                },
               },
             },
-          },
-          select: {
-            id: true,
-            storeId: true,
-            orderNumber: true,
-            total: true,
-            currency: true,
-            store: { select: { name: true } },
-            payments: {
-              where: { paymentUrl: { not: null } },
-              select: { provider: true },
-              take: 1,
+            select: {
+              createdAt: true,
+              id: true,
+              storeId: true,
+              orderNumber: true,
+              total: true,
+              currency: true,
+              store: { select: { name: true } },
+              payments: {
+                where: { paymentUrl: { not: null } },
+                select: { provider: true },
+                take: 1,
+              },
             },
-          },
-          orderBy: { createdAt: 'asc' },
-          take: SWEEP_CAP,
-        })
-      )
+            orderBy: { createdAt: 'asc' },
+            take: SWEEP_CAP,
+          }),
+        orderKey: r => r.createdAt,
+        take: SWEEP_CAP,
+      })
     )) as AbandonCandidate[];
 
     if (candidates.length === 0) {

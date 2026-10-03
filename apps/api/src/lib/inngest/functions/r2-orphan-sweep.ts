@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, isOwnerRole, withOwnerTx } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -92,14 +92,15 @@ async function listAllObjects(client: S3Client, bucket: string): Promise<R2Obj[]
  * longer drift. (They did: none of the three hand-written lists read
  * `Store.pwaSettings`, so every live PWA icon looked like an orphan.)
  *
- * Each page of each table runs in its own withRlsBypass call so a slow table
+ * Each page of each table runs in its own withOwnerTx call so a slow table
  * doesn't hold a single massive transaction open across the whole sweep.
- * withRlsBypass is required on a cron path (no HTTP tenant context) so
- * FORCE RLS policies don't filter cross-tenant rows to zero.
+ * withOwnerTx (an OWNER-ROLE connection) is required: this scans every store's
+ * rows plus the store-less admin accounts, which the strict-RLS app role cannot
+ * see — see the owner-role gate at the top of the handler.
  */
 async function collectReferencedKeys(): Promise<Set<string>> {
   return collectReferencedR2Keys({
-    run: fn => withRlsBypass(tx => fn(tx)),
+    run: fn => withOwnerTx(tx => fn(tx)),
     toKey: urlToR2Key,
   });
 }
@@ -117,6 +118,21 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
     if (!config.storageEndpoint || !config.storageAccessKey || !config.storageSecretKey) {
       logger.info('r2-orphan-sweep: storage not configured — skipping');
       return { skipped: true, reason: 'storage not configured' };
+    }
+
+    // ── Guard: this job needs an OWNER-ROLE connection ───────────────────
+    // It decides which R2 objects are unreferenced by reading EVERY store's rows
+    // plus the store-less admin accounts (`users.store_id` NULL). The strict-RLS
+    // app role (`ebda_app`) cannot see all of them, and a partial reference set
+    // would call live images orphans. So on the app role the sweep does not run
+    // at all (no read, no delete, no alert): it needs a privileged job runner
+    // (SP5). The per-URL check on replace/delete (`r2-cleanup.service`) is a
+    // different, store-by-store path and is unaffected.
+    if (!(await isOwnerRole())) {
+      logger.warn(
+        'r2-orphan-sweep: skipped — needs an owner-role DB connection; the strict-RLS app role cannot see every reference'
+      );
+      return { skipped: true, reason: 'requires owner-role connection' };
     }
 
     const bucket = config.storageBucket || 'uploads';
@@ -218,7 +234,7 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
     if (orphans.length > 0) {
       visibilityError = await step.run('assert-strict-tables-visible', async () => {
         try {
-          await assertStrictTablesVisible(fn => withRlsBypass(tx => fn(tx)), prisma);
+          await assertStrictTablesVisible(fn => withOwnerTx(tx => fn(tx)), prisma);
           return null;
         } catch (err) {
           return err instanceof Error ? err.message : String(err);

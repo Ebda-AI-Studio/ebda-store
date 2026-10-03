@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@force/database';
 import { BulkService } from '../../../services/bulk.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { getEntityStoreId } from '../../definer';
 
 /**
  * True when a bulk import actually wrote/changed products and the public
@@ -54,9 +55,13 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    // BulkImportJob is a cross-tenant job queue table — use withRlsBypass to
-    // load it (no storeId GUC set yet at this point).
-    const job = await withRlsBypass(tx => tx.bulkImportJob.findUnique({ where: { id: jobId } }));
+    // BulkImportJob is a store-scoped job table: the event names the store (a
+    // replayed event without one is resolved by primary key through a definer)
+    // and the job is read inside that store's scope.
+    const jobStoreId = event.data.storeId ?? (await getEntityStoreId('bulk_import_job', jobId));
+    const job = jobStoreId
+      ? await withStore(jobStoreId, tx => tx.bulkImportJob.findUnique({ where: { id: jobId } }))
+      : null;
     if (!job) {
       logger.warn({ jobId }, 'bulk-import/started fired for missing job');
       return;

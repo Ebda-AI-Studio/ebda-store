@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma, withStore, acrossStores } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -88,11 +88,12 @@ const queueDepthWatchFn = inngest.createFunction(
     const runningThreshold = new Date(now - 60 * 60 * 1000); // 60 min ago
 
     // Cross-tenant cron — BulkAiJob is an RLS table. No tenant GUC is set in
-    // Inngest workers, so plain prisma reads return 0 rows. Use withRlsBypass
-    // to see all stores' jobs for the health check.
-    const [stuckQueued, stuckRunning] = await withRlsBypass(tx =>
+    // Inngest workers, so plain prisma reads return 0 rows. Each store is read
+    // in its own scope and the per-store partials are merged to the same
+    // global 20-row ceilings.
+    const perStore = await acrossStores(() =>
       Promise.all([
-        tx.bulkAiJob.findMany({
+        prisma.bulkAiJob.findMany({
           where: { status: 'queued', createdAt: { lt: queuedThreshold } },
           select: {
             id: true,
@@ -101,9 +102,10 @@ const queueDepthWatchFn = inngest.createFunction(
             createdAt: true,
             store: { select: { name: true, slug: true } },
           },
+          orderBy: { createdAt: 'asc' },
           take: 20,
         }),
-        tx.bulkAiJob.findMany({
+        prisma.bulkAiJob.findMany({
           where: { status: 'running', startedAt: { lt: runningThreshold } },
           select: {
             id: true,
@@ -117,10 +119,19 @@ const queueDepthWatchFn = inngest.createFunction(
             autoResumeCount: true,
             store: { select: { name: true, slug: true } },
           },
+          orderBy: { startedAt: 'asc' },
           take: 20,
         }),
       ])
     );
+    const stuckQueued = perStore
+      .flatMap(r => r.value[0])
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, 20);
+    const stuckRunning = perStore
+      .flatMap(r => r.value[1])
+      .sort((a, b) => (a.startedAt?.getTime() ?? 0) - (b.startedAt?.getTime() ?? 0))
+      .slice(0, 20);
 
     const stuckCount = stuckQueued.length + stuckRunning.length;
 
@@ -170,7 +181,7 @@ const queueDepthWatchFn = inngest.createFunction(
         // scan (and the next one) doesn't re-flag it while it's just
         // waiting to be picked up again.
         try {
-          await withRlsBypass(tx =>
+          await withStore(job.storeId, tx =>
             tx.bulkAiJob.update({
               where: { id: job.id },
               data: { status: 'queued', autoResumeCount: { increment: 1 } },
@@ -233,7 +244,7 @@ const queueDepthWatchFn = inngest.createFunction(
             ? 'AI quota exhausted for today'
             : 're-enqueue attempt failed';
       try {
-        await withRlsBypass(tx =>
+        await withStore(job.storeId, tx =>
           tx.bulkAiJob.update({
             where: { id: job.id },
             data: {

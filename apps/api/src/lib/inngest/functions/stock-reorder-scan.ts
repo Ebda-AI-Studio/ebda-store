@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
@@ -31,18 +31,16 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     // runReorderScan already calls withRlsBypass internally for its per-store reads.
     const stores = await step.run('list-stores', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: {
-            accountingEnabled: true,
-            aiFeaturesEnabled: true,
-            deletedAt: null,
-            // free (lapsed-payment / demo) plans are excluded from AI spend.
-            ...aiEligiblePlanFilter,
-          },
-          select: { id: true },
-        })
-      )
+      prisma.store.findMany({
+        where: {
+          accountingEnabled: true,
+          aiFeaturesEnabled: true,
+          deletedAt: null,
+          // free (lapsed-payment / demo) plans are excluded from AI spend.
+          ...aiEligiblePlanFilter,
+        },
+        select: { id: true },
+      })
     );
 
     let totalSuggested = 0;
@@ -107,9 +105,7 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     // Plan gate — inventory.basic is in the `free` baseline so a lapsed
     // merchant can still see their stock; it must not buy them AI spend.
-    const store = await withRlsBypass(tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

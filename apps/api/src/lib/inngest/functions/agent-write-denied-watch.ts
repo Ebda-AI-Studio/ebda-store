@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma, withStore, acrossStores } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -189,19 +189,17 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
   // Which stores had ANY denial in the window — cheap, indexed aggregate, not
   // the rows themselves. See MAX_ROWS_PER_STORE above for why this replaced a
   // single global `take`.
-  const activeStores = await withRlsBypass(tx =>
-    tx.auditLog.groupBy({
-      by: ['storeId'],
-      where: { action: 'agent.write.denied', createdAt: { gte: since } },
-      _count: { _all: true },
-    })
-  );
-  const ranked = activeStores
-    .filter(
-      (g): g is typeof g & { storeId: string } =>
-        typeof g.storeId === 'string' && g.storeId.length > 0
+  // Per store (each in its own tenant scope): `audit_logs` is store-scoped.
+  const activeStores = (
+    await acrossStores(() =>
+      prisma.auditLog.count({
+        where: { action: 'agent.write.denied', createdAt: { gte: since } },
+      })
     )
-    .sort((a, b) => (b._count?._all ?? 0) - (a._count?._all ?? 0));
+  )
+    .filter(r => r.value > 0)
+    .map(r => ({ storeId: r.storeId, _count: { _all: r.value } }));
+  const ranked = activeStores.sort((a, b) => b._count._all - a._count._all);
   const storeIds = ranked.slice(0, MAX_STORES_PER_TICK).map(g => g.storeId);
   const droppedStores = ranked.length - storeIds.length;
   if (droppedStores > 0) {
@@ -221,9 +219,9 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
   > = [];
   for (let i = 0; i < storeIds.length; i += STORE_READ_BATCH) {
     const batch = storeIds.slice(i, i + STORE_READ_BATCH);
-    const slices = await withRlsBypass(tx =>
-      Promise.all(
-        batch.map(storeId =>
+    const slices = await Promise.all(
+      batch.map(storeId =>
+        withStore(storeId, tx =>
           tx.auditLog.findMany({
             where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
             select: {
@@ -273,20 +271,17 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
 
   // Which of the stores in this window have EVER completed an agent-sourced
   // order. Bounded by the stores actually present in the window, not the whole
-  // table, so this stays one small indexed query per tick. `withRlsBypass` for
-  // the same reason the read above needs it: this cron is cross-tenant.
+  // table, so this stays one small indexed query per tick. Read per store for
+  // the same reason as above: this cron is cross-tenant.
   const storeIdsInWindow = [...new Set(denials.map(d => d.storeId))];
   const priorAgentStores = new Set<string>();
   if (storeIdsInWindow.length > 0) {
-    const prior = await withRlsBypass(tx =>
-      tx.order.findMany({
-        where: { source: 'agent', storeId: { in: storeIdsInWindow } },
-        select: { storeId: true },
-        distinct: ['storeId'],
-      })
+    const prior = await acrossStores(
+      () => prisma.order.findFirst({ where: { source: 'agent' }, select: { storeId: true } }),
+      { storeIds: storeIdsInWindow }
     );
     for (const row of prior) {
-      if (row.storeId) priorAgentStores.add(row.storeId);
+      if (row.value?.storeId) priorAgentStores.add(row.value.storeId);
     }
   }
 

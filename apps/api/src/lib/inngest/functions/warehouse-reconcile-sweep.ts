@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { runInStoreScope, withRlsBypass } from '@force/database';
+import { prisma, runInStoreScope, acrossStores } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
@@ -81,15 +81,12 @@ export interface WarehouseSweepResult {
  * cron/on-demand pair.
  */
 export async function sweepAllWarehouseStores(step: FanoutStep): Promise<WarehouseSweepResult> {
-  // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate every
-  // store that has at least one warehouse row (distinct storeId).
-  const stores = await step.run('list-stores-with-warehouses', () =>
-    withRlsBypass(tx =>
-      tx.warehouse.findMany({
-        distinct: ['storeId'],
-        select: { storeId: true },
-      })
-    )
+  // FORCE RLS: cron has no storeId — visit every store and keep the ones that
+  // have at least one warehouse row.
+  const stores = await step.run('list-stores-with-warehouses', async () =>
+    (await acrossStores(() => prisma.warehouse.findFirst({ select: { storeId: true } })))
+      .filter(r => r.value !== null)
+      .map(r => ({ storeId: r.storeId }))
   );
 
   let storesSwept = 0;

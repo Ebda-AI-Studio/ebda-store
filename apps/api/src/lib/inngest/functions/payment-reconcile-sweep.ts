@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma, withStore, acrossStoresFlat } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -47,8 +47,10 @@ export async function handlePaymentReconcileSweep(
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const mismatches = await step.run('find-captured-on-cancelled', () =>
-    withRlsBypass(tx =>
-      tx.payment.findMany({
+    // `payments` is scoped through its order, so the scan runs store by store
+    // (each in its own tenant scope) and is cut to the same global ceiling.
+    acrossStoresFlat(() =>
+      prisma.payment.findMany({
         where: {
           status: 'completed',
           order: { status: 'cancelled' },
@@ -64,7 +66,7 @@ export async function handlePaymentReconcileSweep(
         },
         take: SWEEP_TAKE,
       })
-    )
+    ).then(rows => rows.slice(0, SWEEP_TAKE))
   );
 
   if (mismatches.length === 0) return { scanned: 0, alerted: 0 };
@@ -75,7 +77,7 @@ export async function handlePaymentReconcileSweep(
       try {
         // Durable alert-once dedupe: the reconciliation PaymentEvent written
         // below marks this payment as already reported.
-        const alreadyReported = await withRlsBypass(tx =>
+        const alreadyReported = await withStore(p.order.storeId, tx =>
           tx.paymentEvent.findFirst({
             where: {
               paymentId: p.id,
@@ -108,16 +110,18 @@ export async function handlePaymentReconcileSweep(
             amountFils: p.amount,
           },
         });
-        await recordPaymentEvent({
-          paymentId: p.id,
-          storeId: p.order?.storeId ?? '',
-          orderId: p.orderId,
-          eventType: 'reconciliation',
-          fromStatus: 'completed',
-          toStatus: null,
-          provider: p.provider,
-          details: { reason: MISMATCH_REASON },
-        });
+        await withStore(p.order.storeId, () =>
+          recordPaymentEvent({
+            paymentId: p.id,
+            storeId: p.order?.storeId ?? '',
+            orderId: p.orderId,
+            eventType: 'reconciliation',
+            fromStatus: 'completed',
+            toStatus: null,
+            provider: p.provider,
+            details: { reason: MISMATCH_REASON },
+          })
+        );
         alerted += 1;
       } catch (err) {
         logger.error(

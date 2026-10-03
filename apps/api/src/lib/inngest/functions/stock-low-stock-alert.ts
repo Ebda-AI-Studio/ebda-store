@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma } from '@force/database';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
@@ -43,12 +43,10 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
   async ({ step }) => {
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: { deletedAt: null },
-          select: { id: true },
-        })
-      )
+      prisma.store.findMany({
+        where: { deletedAt: null },
+        select: { id: true },
+      })
     );
 
     let totalAlerted = 0;
@@ -105,12 +103,10 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
           await step.run(`send-email-${store.id}`, async () => {
             // Load the store name for the email subject/body.
             // withRlsBypass is needed here too because we're outside HTTP context.
-            const storeRow = await withRlsBypass(tx =>
-              tx.store.findUnique({
-                where: { id: store.id },
-                select: { name: true },
-              })
-            );
+            const storeRow = await prisma.store.findUnique({
+              where: { id: store.id },
+              select: { name: true },
+            });
 
             await EmailService.sendLowStockAlert(store.id, {
               to: scan.recipientEmail!,
@@ -195,12 +191,10 @@ export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFun
     let emailed = false;
     if (scanResult.alertedProducts.length > 0 && scanResult.recipientEmail) {
       await step.run('send-email', async () => {
-        const storeRow = await withRlsBypass(tx =>
-          tx.store.findUnique({
-            where: { id: storeId },
-            select: { name: true },
-          })
-        );
+        const storeRow = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { name: true },
+        });
 
         await EmailService.sendLowStockAlert(storeId, {
           to: scanResult.recipientEmail!,

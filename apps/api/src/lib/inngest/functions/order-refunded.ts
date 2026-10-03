@@ -1,11 +1,5 @@
 import { NonRetriableError, type InngestFunction } from 'inngest';
-import {
-  prisma,
-  runInTenantContext,
-  withMoneyTx,
-  withRlsBypass,
-  type Prisma,
-} from '@force/database';
+import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@force/database';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -19,6 +13,7 @@ import { BACKORDER_CANCEL_MARKER } from '../../../services/accounting/posting/pr
 import { healBackorderStockDebt } from '../../../services/accounting/backorder-stock-heal';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { auditLogExists } from '../../definer';
 
 interface FanoutStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
@@ -409,21 +404,18 @@ export async function handleOrderRefunded(
   // incremented `usageCount`; decrementing on its cancel handed a live
   // redemption back to the merchant's limit (issue 2303, ruling M-OVR-1a).
   // The `order.admin_created` audit row is the durable record of an
-  // admin-created order (cross-store actor row, so read bypassed). Looked up
-  // in its OWN step, BEFORE the coupon transaction opens (issue 2359):
-  // `withRlsBypass` is a fresh `$transaction` on a second pool connection, and
-  // taking one while `withMoneyTx` holds another is the double-nest pool
-  // hazard (assert-store-owns.ts). The row is immutable history, so reading it
+  // admin-created order (an actor row with no store, so it is read through a
+  // definer). Looked up in its OWN step, BEFORE the coupon transaction opens
+  // (issue 2359): it is a second pool connection, and taking one while
+  // `withMoneyTx` holds another is the double-nest pool hazard
+  // (assert-store-owns.ts). The row is immutable history, so reading it
   // outside the transaction loses nothing.
   const adminOrderNeverReserved =
     !isPartial && !!order.couponCode && new Date(order.createdAt) < ADMIN_COUPON_RESERVE_CUTOVER
       ? await step.run('admin-created-lookup', async () => {
-          const row = await withRlsBypass(b =>
-            b.auditLog.findFirst({
-              where: { action: 'order.admin_created', resourceType: 'order', resourceId: orderId },
-              select: { id: true },
-            })
-          );
+          // The row carries NO store (an actor row), so a store-scoped read cannot
+          // see it: a definer answers the existence question.
+          const row = await auditLogExists('order.admin_created', 'order', orderId);
           return !!row;
         })
       : false;

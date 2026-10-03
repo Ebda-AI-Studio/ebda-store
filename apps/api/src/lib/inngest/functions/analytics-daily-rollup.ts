@@ -27,7 +27,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {
@@ -86,13 +86,11 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set). Ids only.
     const stores = await step.run('list-stores', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: { accountingEnabled: true, deletedAt: null },
-          select: { id: true },
-          orderBy: { id: 'asc' },
-        })
-      )
+      prisma.store.findMany({
+        where: { accountingEnabled: true, deletedAt: null },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      })
     );
 
     // One event per store, sent in bounded batches: the per-store work runs in
