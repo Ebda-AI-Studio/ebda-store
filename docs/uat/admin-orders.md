@@ -43,6 +43,7 @@ updated: 2026-05-24
 
 - [ ] **Filter by status** — use status dropdown to filter `pending` only → list shows only pending orders; URL query param updates (for shareable filter links)
 - [ ] **Search by order number** — type partial order number in search box → matching order appears within 500ms
+- [ ] **Search a guest order by contact** — type part of a guest's first name, last name, phone or email (as entered at checkout) → that guest's orders appear; a registered customer's order is found by their account name, not by the checkout snapshot; a soft-deleted or other-store order never appears
 - [ ] **Mark paid twice** — click "Mark as Paid" on an already-paid order → button is disabled or returns a clear "already paid" error; no double state change
 - [ ] **Refund more than order total** — attempt to refund KWD 9999 on a KWD 5 order → validation error shown inline, no API call sent
 - [ ] **Large order list pagination** — if >50 orders exist, verify pagination/cursor works; page 2 loads distinct orders

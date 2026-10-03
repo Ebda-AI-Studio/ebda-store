@@ -16,7 +16,7 @@ Manage orders from **Admin → Sales → Orders**, or from the dedicated **Order
 
 The list supports:
 
-- **Search** — find an order by number, or by a registered customer's name, email or phone. It searches **all** your orders, not just the page on screen.
+- **Search** — find an order by number, by a registered customer's name, email or phone, or by the name, email or phone a **guest** entered at checkout. It searches **all** your orders, not just the page on screen. Type at least 3 characters for the fast path; shorter searches still work, they just take longer on a large store.
 - **Date filter** — narrow the list to any time period. Days are your own calendar days (a Kuwait order at 01:00 belongs to that day, not the previous one).
 - **Export** — downloads **exactly the filtered list**: the same dates, status and search. The file name carries the date range (e.g. `orders-2026-09-01_to_2026-09-30.xlsx`) and a **Filters** sheet says what was applied.
 - **Bulk "mark paid"** — select multiple orders and mark them paid in one action (useful for cash-on-delivery batches).

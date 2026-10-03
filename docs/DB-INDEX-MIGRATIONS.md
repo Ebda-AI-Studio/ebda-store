@@ -80,6 +80,8 @@ with a comment on the owning model. As a result, `prisma migrate diff` and `migr
 - `products_{name,name_ar,description,description_ar}_trgm_idx`
 - `orders_order_number_trgm_idx`
 - `users_{first_name,last_name,email,phone}_trgm_idx`
+- `orders_guest_{first_name,last_name,email,phone}_trgm_idx` (partial, on the `shipping_address ->> '<key>'`
+  expression; Prisma cannot declare either)
 
 **Never accept that drop.** Each one backs a leading-wildcard ILIKE search. A BitmapOr needs every
 arm of an OR indexed, so dropping any one of them returns its whole search to a sequential scan.

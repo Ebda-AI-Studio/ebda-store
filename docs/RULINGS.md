@@ -5116,6 +5116,21 @@ milliseconds (0.7 s even at 100k orders), so the SHARE lock is negligible, and e
 `IF NOT EXISTS`. Cost if wrong: writes to `orders`/`users`/`ai_usage` wait for the build during
 the pre-deploy step, a sub-second window at today's sizes.
 
+**Ruling IDX-5 — guest orders are searched through the `shipping_address` JSON, with partial
+expression trigram indexes, and only when `customer_id IS NULL`.** A guest has no `users` row; the
+only contact record is the checkout snapshot, the same one `customerKeyOf` and `/customers/search`
+read. The index predicate is `customer_id IS NULL` and the query repeats it, so a registered
+customer's order is never matched through its shipping JSON and the registered results do not change.
+The four indexes are separate rather than one concatenated expression, so each field matches exactly
+as the registered arm does (no cross-field match). A concatenated index would be one index instead of
+four but could match a term spanning two fields. Terms under 3 characters and terms matching more
+than 1,000 guest orders take an unindexed JSON path filter with the same rows. Pinned by
+`tests/integration/order-search-guest-contact.test.ts`, mutation-checked (guest arm removed, a
+different JSON expression, `customer_id IS NULL` dropped, LIKE escaping removed, fallback guard
+removed: each turns a test red). Cost if wrong: a store with a very common guest name or phone
+fragment (more than 1,000 guest orders) gets the old sequential plan for that one search; four more
+GIN indexes on `orders` add about 3 ms per 5,000 inserts.
+
 ## 2026-10-02 — SMS marketing consent (branch `feat/sms-marketing-consent`, issue 206)
 
 **Ruling SMS-1 — consent is a per-store row keyed by `customerKeyOf`, not a flag on the caller's data.** `sms_marketing_consents` holds one row per (store, customer key); the promotional-SMS gate reads it for the recipient's phone and no producer passes a consent field. Orders keep `smsOptIn` only as a record of the tick. Cost if wrong: a producer that should have its own consent source (a future non-order channel) must add a row, not a flag.

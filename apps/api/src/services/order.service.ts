@@ -186,6 +186,9 @@ export interface OrderListWhere {
  */
 export const ORDER_SEARCH_CUSTOMER_ID_CAP = 1000;
 
+/** The `shipping_address` keys a guest's contact lives under (see `contactOf`, lib/customer-key.ts). */
+const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as const;
+
 /**
  * The OR arms of the order-list search: order number, or the registered
  * customer's first name / last name / email / phone (issue 2405).
@@ -208,9 +211,15 @@ export const ORDER_SEARCH_CUSTOMER_ID_CAP = 1000;
  * semi-join, bounded by the store's own customers), not by `users.store_id` —
  * a registered customer's `store_id` is not necessarily the order's store.
  *
+ * GUEST orders (`customer_id IS NULL`, contact only in the `shipping_address`
+ * JSON) are matched by the same term on first name, last name, email and phone
+ * through `guestOrderIdsMatching`, served by the partial expression trigram
+ * indexes of migration 20261003100000_order_search_guest_contact_trgm_idx.
+ *
  * Falls back to the relation filter when the term is shorter than a trigram
  * (3 chars — the indexes cannot serve it, so the lookup would only add a
- * scan) or matches more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers.
+ * scan) or matches more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers or
+ * guest orders.
  */
 export async function orderSearchWhere(
   storeId: string,
@@ -223,22 +232,85 @@ export async function orderSearchWhere(
     { email: contains },
     { phone: contains },
   ];
+  // GUEST orders (no `customer_id`) carry the buyer's contact only in the
+  // `shipping_address` JSON snapshot — the same place `customerKeyOf` reads
+  // email/phone from. 174 of 188 production orders are guest orders. The JSON
+  // path filter is the unindexed twin of `guestOrderIdsMatching` below.
+  const guestJsonMatch: Prisma.OrderWhereInput = {
+    customerId: null,
+    OR: GUEST_CONTACT_FIELDS.map(field => ({
+      shippingAddress: { path: [field], string_contains: search, mode: 'insensitive' as const },
+    })),
+  };
   const relationFallback: Prisma.OrderWhereInput[] = [
     { orderNumber: contains },
     { customer: { is: { OR: customerMatch } } },
+    guestJsonMatch,
   ];
   if (search.length < 3) return relationFallback;
 
-  const customers = await prisma.user.findMany({
-    where: { OR: customerMatch, orders: { some: { storeId } } },
-    select: { id: true },
-    take: ORDER_SEARCH_CUSTOMER_ID_CAP + 1,
-  });
+  const [customers, guestOrderIds] = await Promise.all([
+    prisma.user.findMany({
+      where: { OR: customerMatch, orders: { some: { storeId } } },
+      select: { id: true },
+      take: ORDER_SEARCH_CUSTOMER_ID_CAP + 1,
+    }),
+    guestOrderIdsMatching(storeId, search),
+  ]);
   if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) return relationFallback;
+  if (guestOrderIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) return relationFallback;
 
   const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
   if (customers.length > 0) arms.push({ customerId: { in: customers.map(c => c.id) } });
+  if (guestOrderIds.length > 0) arms.push({ id: { in: guestOrderIds } });
   return arms;
+}
+
+/** `%term%` with LIKE metacharacters escaped, so the term is matched literally. */
+function likeContains(term: string): string {
+  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
+/**
+ * Ids of this store's live GUEST orders whose shipping contact (first name,
+ * last name, email or phone) contains `search`, capped at
+ * `ORDER_SEARCH_CUSTOMER_ID_CAP + 1` so the caller can tell "too many".
+ *
+ * The WHERE is shaped to match the partial expression GIN indexes of
+ * migration 20261003100000_order_search_guest_contact_trgm_idx exactly:
+ * `customer_id IS NULL` is the index predicate and each ILIKE reads the same
+ * `shipping_address ->> '<key>'` expression the index was built on, so
+ * Postgres answers the four-way OR with a BitmapOr of the four trigram
+ * indexes (then `store_id` filters the few hits) instead of walking every
+ * order. Do not rewrite these to `#>>`, `jsonb_extract_path_text` or
+ * `LOWER(...) LIKE` — a different expression cannot use the index.
+ *
+ * Registered customers' orders are excluded on purpose (`customer_id IS NULL`):
+ * they keep matching through the customer's own account fields, exactly as
+ * before, so a registered customer's results do not change. The search term is
+ * PII (a phone or an email): it is only ever a bound parameter, never logged.
+ */
+export async function guestOrderIdsMatching(storeId: string, search: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>(guestOrderIdsSql(storeId, search));
+  return rows.map(r => r.id);
+}
+
+/** The statement behind `guestOrderIdsMatching`; exported so the plan test EXPLAINs the real SQL. */
+export function guestOrderIdsSql(storeId: string, search: string): Prisma.Sql {
+  const like = likeContains(search);
+  return Prisma.sql`
+    SELECT id FROM public.orders
+    WHERE store_id = ${storeId}
+      AND customer_id IS NULL
+      AND deleted_at IS NULL
+      AND (
+            shipping_address ->> 'firstName' ILIKE ${like}
+         OR shipping_address ->> 'lastName'  ILIKE ${like}
+         OR shipping_address ->> 'email'     ILIKE ${like}
+         OR shipping_address ->> 'phone'     ILIKE ${like}
+      )
+    LIMIT ${ORDER_SEARCH_CUSTOMER_ID_CAP + 1}
+  `;
 }
 
 export class OrderService {

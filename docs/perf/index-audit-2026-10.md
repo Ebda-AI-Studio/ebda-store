@@ -51,6 +51,31 @@ this PR.
 | `ai_usage_created_at_cached_hit_idx` (btree)                             | #1 table by seq-scan tuples in production. `lib/ai-quota.ts` counts `created_at >= day/month start AND cached_hit = false` across **all** stores before every AI call. The super-admin AI dashboard adds a `cached_hit = true` count. The existing indexes lead with `store_id`, `feature` or `model`, so every count is a seq scan (prod EXPLAIN: `Seq Scan … Rows Removed by Filter: 25045`, 501 buffers) | Day count 2.07 → **0.14 ms** and month count 2.09 → 1.34 ms (index-only). The seq scan grows with the table (~8k rows/month, no retention); the index scan grows only with the window |
 | `cart_bundles_bundle_id_idx` (btree)                                     | The **only** one of 203 production FKs with no index leading on its column (`pg_constraint` vs `pg_index`; positive control: 202 of 203 matched). `ON DELETE CASCADE` from `bundles`. The `(cart_id, bundle_id)` unique has it second                                                                                                                                                                       | Bundle delete: seq scan of `cart_bundles` under the parent lock → index probe                                                                                                         |
 
+## Added — `20261003100000_order_search_guest_contact_trgm_idx` (guest contact search)
+
+`orders_guest_{first_name,last_name,email,phone}_trgm_idx`: partial (`WHERE customer_id IS NULL`)
+expression GIN trigram indexes on `shipping_address ->> '<key>'`, the keys `customerKeyOf` reads.
+`orderSearchWhere` resolves the matching guest order ids with one statement shaped to those indexes
+(`guestOrderIdsSql`) and adds an `id IN (…)` arm to the same OR as the order number and the
+registered customers. Registered customers' results are unchanged: a registered order is never
+matched through its shipping JSON, only through the account, as before. Terms under 3 characters and
+terms matching more than 1,000 guest orders fall back to an unindexed `shipping_address` JSON path
+filter with the same rows.
+
+Scratch PG 16, 2 stores × 25,000 orders (91.7 % guest, like production's 92.6 %), `ANALYZE`d:
+
+| Statement (store-scoped, `LIMIT 1001`)      | Before (no index)                                       | After                          |
+| ------------------------------------------- | ------------------------------------------------------- | ------------------------------ |
+| rare first name `zubaidaneedle`             | 39.2 ms, 22,918 guest rows read and 22,916 filtered out | **0.62 ms**, BitmapOr of 4 GIN |
+| phone fragment `51234567`                   | 30.7 ms                                                 | **0.42 ms**                    |
+| email fragment `needle.guest`               | 31.9 ms                                                 | **1.12 ms**                    |
+| rare last name `qurainneedle` (other store) | 32.4 ms                                                 | **0.12 ms**                    |
+
+End to end through `OrderService.list` (customer lookup + guest lookup + page + count), warm:
+38–45 ms → 9.5–14 ms for a rare term. The 4 indexes total 7.6 MB at 50k orders, build in 0.34 s,
+and add no measurable insert cost (5,000 guest-order inserts: 171 ms → 174 ms). Production holds 188
+orders today, so this is headroom for the first store that reaches 10⁴–10⁵ orders.
+
 ### Why the order search needed a query change, not just an index
 
 Prisma 6.19 compiles `customer: { is: { firstName: contains } }` (one per field) into **four LEFT
@@ -145,10 +170,9 @@ The other 29 are 8–16 kB each on tables with ≤ 80 rows (`warehouses_store_id
    approval). Without it the `carts` / `cart_items` seq scans cannot be attributed to a statement.
 2. The per-request reads of empty or near-constant tables (`reviews`, `store_faqs`, `store_howtos`,
    `store_pages`, `warehouses`) belong to a caching pass, not an index pass.
-3. The order search matches **registered** customers only (as `docs/merchant/orders.md` says). In
-   production, 174 of 188 orders are guest orders, whose name/phone live in `shipping_address`. The
-   `/customers/search` typeahead already searches that JSON. Whether the order search should too is
-   a product decision.
+3. ~~The order search matches **registered** customers only.~~ Done 2026-10-03 (owner-approved): it
+   also matches guest orders by the guest's name, email and phone, which live in `shipping_address`
+   (174 of 188 production orders are guests). See "Added — guest contact search" above.
 
 ## Re-run
 
