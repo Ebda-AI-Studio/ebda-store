@@ -544,7 +544,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          # Must match cf-deploy.yml's NODE_VERSION: the deploy runs wrangler there,
+          # and wrangler enforces its own Node floor at startup.
+          node-version: '22'
 
       - name: Install dependencies
         run: npm ci
@@ -572,6 +574,14 @@ jobs:
 
       - name: Build ${{ matrix.app }} for Cloudflare (OpenNext adapter)
         run: bash scripts/cf-build.sh ${{ matrix.app }}
+
+      # The build above never starts wrangler, so it passed while every real
+      # deploy died at `wrangler deploy` on the Node version (2026-10-03, run
+      # 37113844110). A dry run starts the same binary with the same config on
+      # the same Node, without uploading anything.
+      - name: Dry-run the ${{ matrix.app }} deploy (wrangler starts on the deploy's Node)
+        working-directory: apps/${{ matrix.app }}
+        run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/wrangler-dry-${{ matrix.app }}"
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 

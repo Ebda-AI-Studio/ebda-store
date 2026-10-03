@@ -54,7 +54,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  # wrangler >= 4.110 refuses to start below Node 22 ("Wrangler requires at least
+  # Node.js v22.0.0") — the 4.116.0 pin from #2459 failed all three deploys on 20.
+  # ci.yml's cf-build-check runs `wrangler deploy --dry-run` on this same version.
+  NODE_VERSION: '22'
 
 permissions:
   contents: read
