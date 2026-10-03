@@ -96,7 +96,7 @@ function scopedOp(storeId: string, exec: () => Promise<unknown>): ScopedOp & Pro
  * STRICT policy (store_id = app.current_store_id, no contextless allowance)
  * then read as empty and rejected writes, while allow-contextless tables
  * silently lost their tenant scoping. Measured on 2026-09-25 under a real
- * `force_app` login: inside `runInTenantContext`, a direct count of
+ * `ebda_app` login: inside `runInTenantContext`, a direct count of
  * `ai_recommendation` returned 2 rows, the same count through `withMoneyTx`
  * or a batch `$transaction([...])` returned 0.
  *
@@ -585,7 +585,7 @@ export async function withTenantContext<T>(
  * expired mid-sweep (#461), so the wrapper was removed on the belief that the
  * jobs touch no RLS-protected table. They do: `bulk_ai_jobs`, `ai_usage`,
  * `ai_recommendation`, `store_faqs` and `store_howtos` all carry STRICT
- * policies, so under `force_app` every one of those jobs would read nothing
+ * policies, so under `ebda_app` every one of those jobs would read nothing
  * and fail its first `bulkAiJob.update` (P2025).
  *
  * Inside the scope, each model call / raw query runs in its own short
@@ -746,6 +746,31 @@ export async function acrossStoresFlat<T>(
 
 const ownerRoleChecked = new WeakMap<object, Promise<boolean>>();
 
+async function connectionBypassesRls(client: AppPrismaClient): Promise<boolean> {
+  let check = ownerRoleChecked.get(client);
+  if (!check) {
+    check = client.$queryRaw<
+      Array<{ ok: boolean }>
+    >`SELECT (rolsuper OR rolbypassrls) AS ok FROM pg_roles WHERE rolname = current_user`.then(
+      rows => rows[0]?.ok === true
+    );
+    ownerRoleChecked.set(client, check);
+  }
+  const ok = await check;
+  if (!ok) ownerRoleChecked.delete(client);
+  return ok;
+}
+
+/**
+ * Whether the current connection bypasses RLS BY ITSELF (a superuser or
+ * BYPASSRLS owner role). False on the strict-RLS app role. A job that is only
+ * correct with an owner-role connection (the destructive R2 orphan sweep) checks
+ * this first and skips cleanly instead of reading zero rows.
+ */
+export async function isOwnerRole(): Promise<boolean> {
+  return connectionBypassesRls(basePrisma());
+}
+
 /**
  * Run `fn` in a plain transaction on a connection whose role bypasses RLS BY
  * ITSELF (a superuser or BYPASSRLS owner: the `DIRECT_URL` role that runs
@@ -761,17 +786,7 @@ const ownerRoleChecked = new WeakMap<object, Promise<boolean>>();
  */
 export async function withOwnerTx<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T> {
   const client = basePrisma();
-  let check = ownerRoleChecked.get(client);
-  if (!check) {
-    check = client.$queryRaw<
-      Array<{ ok: boolean }>
-    >`SELECT (rolsuper OR rolbypassrls) AS ok FROM pg_roles WHERE rolname = current_user`.then(
-      rows => rows[0]?.ok === true
-    );
-    ownerRoleChecked.set(client, check);
-  }
-  if (!(await check)) {
-    ownerRoleChecked.delete(client);
+  if (!(await connectionBypassesRls(client))) {
     throw new Error(
       'withOwnerTx/withRlsBypass: this connection is the strict-RLS app role, which has no ' +
         'bypass. Use withStore(), withUser(), acrossStores() or a SECURITY DEFINER function.'

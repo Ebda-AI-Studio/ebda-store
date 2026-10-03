@@ -14,6 +14,7 @@
 // is what makes a client-per-request cheap (spikes/workers-api/README.md).
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 
 // Options are extracted so the client's TYPE can be derived from them. A global
 // `omit` narrows PrismaClient's generic, so a plain `PrismaClient` annotation
@@ -131,6 +132,65 @@ export function resolvePoolConfig(
 }
 
 /**
+ * Column types the driver adapter can map (Postgres type OIDs, from
+ * `@prisma/adapter-pg` 6.19: scalar and array types). Anything ELSE with a
+ * built-in (< 16384) OID makes the adapter throw `UnsupportedNativeDataType` for
+ * the whole `$queryRaw`: `name` (`current_user`, `pg_class.relname`,
+ * `pg_indexes.indexname`, every `information_schema` identifier), `"char"`,
+ * `regclass`, `interval`, `xid`, ... The Rust engine tolerated them, ~160 raw SQL
+ * call sites and the catalog queries in tests/ops scripts rely on that, and
+ * spikes/workers-api/README.md recorded the quirk.
+ */
+const ADAPTER_SUPPORTED_OIDS = new Set([
+  // scalars
+  16, 17, 20, 21, 23, 25, 26, 114, 142, 650, 700, 701, 790, 869, 1042, 1043, 1082, 1083, 1114, 1184,
+  1266, 1560, 1562, 1700, 2950, 3802,
+  // arrays
+  199, 143, 651, 791, 1000, 1001, 1002, 1005, 1007, 1009, 1014, 1015, 1016, 1021, 1022, 1028, 1041,
+  1115, 1182, 1183, 1185, 1231, 1561, 1563, 2951, 3807,
+]);
+const FIRST_NORMAL_OBJECT_ID = 16384;
+const TEXT_OID = 25;
+
+/**
+ * A pg Client that reports unsupported built-in column types as `text`. pg's
+ * default parser already returns such values as strings, so only the type tag the
+ * adapter reads from `result.fields` needs to change. Nothing else is touched.
+ */
+function retypeUnsupportedFields(r: pg.QueryResult | undefined): void {
+  for (const f of r?.fields ?? []) {
+    if (f.dataTypeID < FIRST_NORMAL_OBJECT_ID && !ADAPTER_SUPPORTED_OIDS.has(f.dataTypeID)) {
+      f.dataTypeID = TEXT_OID;
+    }
+  }
+}
+
+class TextFallbackClient extends pg.Client {
+  // pg-pool calls `client.query(text, values, callback)` for `pool.query`, while a
+  // pooled client's `query` (interactive transactions) returns a promise: both
+  // shapes are covered.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  override query(...args: any[]): any {
+    const last = args[args.length - 1];
+    if (typeof last === 'function') {
+      args[args.length - 1] = (err: Error | null, res: pg.QueryResult | undefined) => {
+        retypeUnsupportedFields(res);
+        last(err, res);
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (super.query as any)(...args);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = (super.query as any)(...args);
+    if (typeof result?.then !== 'function') return result; // a submittable (cursor, ...)
+    return result.then((r: pg.QueryResult | undefined) => {
+      retypeUnsupportedFields(r);
+      return r;
+    });
+  }
+}
+
+/**
  * Build the app's Prisma client over `@prisma/adapter-pg`.
  *
  * Works unchanged under Node and workerd: it only needs `pg` (which workerd
@@ -138,8 +198,11 @@ export function resolvePoolConfig(
  * `@prisma/client` resolves per runtime.
  */
 export function createPrismaClient(opts: CreatePrismaClientOptions): AppPrismaClient {
-  const pool = resolvePoolConfig(opts.connectionString, opts.max);
+  const poolConfig = resolvePoolConfig(opts.connectionString, opts.max);
+  const pool = new pg.Pool({ ...poolConfig, Client: TextFallbackClient });
   const adapter = new PrismaPg(pool, {
+    // `$disconnect()` ends the pool (a request-bound client must not leak sockets).
+    disposeExternalPool: true,
     // The adapter attaches an 'error' listener to idle pool clients; without a
     // sink here a dropped idle socket would be swallowed with no trace.
     onPoolError: err => {
