@@ -1,7 +1,7 @@
 /**
  * Subscription lifecycle (SP5 task 3) — Ebda's own EGP billing engine.
  *
- * RULES (also documented in docs/ebda/research/sp5-billing-lifecycle.md):
+ * RULES (this header is the lifecycle spec; env in docs/ENVIRONMENT.md):
  *  - Every provider call happens OUTSIDE any DB transaction. The pattern is
  *    always: (1) short tx claims a `billing_events` row (UNIQUE idempotency key)
  *    -> (2) provider call -> (3) fresh short tx settles the row + subscription.
@@ -1061,7 +1061,7 @@ const PUBLIC_FIELDS = {
 
 /** Merchant view: their own charges/invoices, newest first (no provider payloads). */
 export async function listStoreCharges(storeId: string, limit = 50) {
-  return withRlsBypass(tx =>
+  const rows = await withRlsBypass(tx =>
     tx.billingEvent.findMany({
       where: { storeId },
       orderBy: { createdAt: 'desc' },
@@ -1069,6 +1069,15 @@ export async function listStoreCharges(storeId: string, limit = 50) {
       select: PUBLIC_FIELDS,
     })
   );
+  // Internal failure codes (provider/config errors) are for operators only.
+  return rows.map(r => ({
+    ...r,
+    failureReason: /^(provider_error|checkout_error|payment_method_unreadable)/.test(
+      r.failureReason ?? ''
+    )
+      ? 'payment_not_completed'
+      : r.failureReason,
+  }));
 }
 
 /** Super-admin ledger, filterable, with store names and provider references. */

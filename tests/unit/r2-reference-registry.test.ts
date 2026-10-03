@@ -90,6 +90,7 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'Payment.metadata': 'gateway response metadata',
   'PaymentEvent.providerPayload': 'raw gateway payload',
   'PaymentEvent.details': 'payment audit details',
+  'BillingEvent.raw': 'subscription-billing gateway response payload (card tokens stripped)',
   'WebhookEvent.payload': 'inbound gateway webhook payload',
   'WebhookEvent.rawBody': 'inbound gateway webhook body',
   'NotificationLog.metadata': 'delivery log metadata',
