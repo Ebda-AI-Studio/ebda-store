@@ -21,13 +21,13 @@
  *      open flag, not on scannedAt: keying on the per-run timestamp inserted a
  *      new open flag every weekly run (5 open cards for 1 product in prod).
  *
- * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
+ * RLS note (2026-06-01): the entire scan body runs inside withStore so
  * Inngest jobs (no tenant GUC in context) can read deadstock_flags, products,
  * and order_items without being filtered to an empty result set by the
  * direct-compare RLS policies.
  */
 
-import { prisma, withRlsBypass, Prisma } from '@force/database';
+import { prisma, withStore, Prisma } from '@force/database';
 import { activeVariants, effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
@@ -211,7 +211,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   // as reorder-scan.service.ts (the prior single-tx-around-everything design
   // timed out at ~112s on stores with many candidates + the 2.5s throttle).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { expiredCount, candidates, scanned } = await withRlsBypass(async (tx: any) => {
+  const { expiredCount, candidates, scanned } = await withStore(storeId, async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Expire old open flags (>30 days)
     // -------------------------------------------------------------------------
@@ -369,7 +369,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   // SAVEPOINT so one failed write rolls back only itself instead of aborting
   // the whole transaction (every later statement would otherwise fail 25P02).
   //
-  // Chunked (issue 2259): one withRlsBypass per PHASE3_CHUNK_SIZE candidates,
+  // Chunked (issue 2259): one withStore per PHASE3_CHUNK_SIZE candidates,
   // the way phase 1 chunks its scan. The candidate set is uncapped (every
   // uncosted store's whole stale catalogue can qualify) and each candidate
   // costs ~5 round-trips with its savepoint, so a single transaction could
@@ -381,7 +381,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   for (let chunkStart = 0; chunkStart < candidates.length; chunkStart += PHASE3_CHUNK_SIZE) {
     const slice = candidates.slice(chunkStart, chunkStart + PHASE3_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rowsUpserted += await withRlsBypass(async (tx: any) => {
+    rowsUpserted += await withStore(storeId, async (tx: any) => {
       let upserted = 0;
 
       for (const candidate of slice) {

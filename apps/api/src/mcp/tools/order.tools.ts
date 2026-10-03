@@ -209,7 +209,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           } catch (err) {
             // Its own fresh tenant wrap, like the two sibling rollbacks: the
             // payment transaction above has rolled back, so there is no
-            // ambient scope and, under force_app, the rollback's reads would
+            // ambient scope and, under ebda_app, the rollback's reads would
             // see no rows and silently do nothing (PR 2301 audit).
             await runInTenantContext(store.id, () =>
               OrderService.rollbackForPaymentFailure(store.id, order.id, cartId)

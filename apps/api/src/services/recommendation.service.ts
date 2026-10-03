@@ -94,7 +94,7 @@ class RecommendationService {
       // `ai_recommendation` has a STRICT RLS policy and the public
       // `/public/:storeId/products/:productId/recommendations` route runs
       // with no tenant context (recommendation.routes.ts is deliberately
-      // context-less, see routes/index.ts) — so under `force_app` this read
+      // context-less, see routes/index.ts) — so under `ebda_app` this read
       // returned [] and the storefront silently fell back to FBT.
       const aiRecRows = await readInStoreContext(storeId, () =>
         prisma.aiRecommendation.findMany({

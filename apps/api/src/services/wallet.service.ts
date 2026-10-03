@@ -9,7 +9,7 @@ import {
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';
-import { withScopedRlsBypass } from '../lib/scoped-rls-bypass';
+import { insertAuditLog } from '../lib/definer';
 import { RETURN_WALLET_SHARE_KEY_PREFIX, returnWalletShareKey } from '../lib/refund-methods';
 
 /**
@@ -503,14 +503,15 @@ export class WalletService {
    * SCOPE (owner decision 2026-09-26, Ruling W-7): a store deletes ONLY its
    * own data.
    *   - `scope.storeId` set (merchant-initiated erase): only THAT store's
-   *     wallet and ledger rows are touched. No RLS bypass — the ambient tenant
-   *     GUC already names that store, and the explicit `storeId` filter keeps
-   *     it true under a BYPASSRLS connection too.
+   *     wallet and ledger rows are touched. The ambient tenant GUC already names
+   *     that store, and the explicit `storeId` filter keeps it true on an
+   *     owner-role connection too.
    *   - `scope.storeId` null (the shopper's own account erasure, the retention
-   *     cron): every store the customer holds a wallet in. Wallets are
-   *     store-scoped under RLS, so this runs inside `withScopedRlsBypass`
-   *     (#1957/#2037), and each store whose balance this run forfeited gets
-   *     its OWN `audit_logs` row naming the actor. A store with nothing to
+   *     cron): every wallet the customer holds that the transaction can see.
+   *     The erasure runs under the shopper's own store scope (a customer
+   *     account belongs to exactly one store), and each store whose balance
+   *     this run forfeited gets its OWN `audit_logs` row naming the actor,
+   *     written through the append-only audit definer. A store with nothing to
    *     forfeit, or a re-run, writes no row. NOTE (issue 2126): the only
    *     audit-log viewer is the super-admin `/audit-logs` page, so today that
    *     row explains the change to the PLATFORM, not to the store — no
@@ -596,7 +597,7 @@ export class WalletService {
       return;
     }
 
-    await withScopedRlsBypass(client, async () => {
+    {
       const { forfeited, notesScrubbedStores } = await run();
       // One row per store whose liability THIS run changed, written with THAT
       // store's id (issues 2122 / 2125). Driven by `forfeited`, not by every
@@ -608,22 +609,22 @@ export class WalletService {
       const touched = new Set<string>([...forfeited.keys(), ...notesScrubbedStores]);
       for (const storeId of touched) {
         const forfeitedFils = forfeited.get(storeId) ?? 0;
-        await client.auditLog.create({
-          data: {
-            action: 'customer.wallet.erased',
-            userId: actorIsUser ? scope.actorId : null,
-            storeId,
-            resourceType: 'user',
-            resourceId: customerId,
-            details: {
-              actor: scope.actorId,
-              reason: 'account_erasure',
-              forfeitedFils,
-              notesScrubbed: notesScrubbedStores.has(storeId),
-            },
+        // Through the append-only audit definer: the row carries ITS store's id,
+        // which may differ from the transaction's store scope.
+        await insertAuditLog({
+          action: 'customer.wallet.erased',
+          userId: actorIsUser ? scope.actorId : null,
+          storeId,
+          resourceType: 'user',
+          resourceId: customerId,
+          details: {
+            actor: scope.actorId,
+            reason: 'account_erasure',
+            forfeitedFils,
+            notesScrubbed: notesScrubbedStores.has(storeId),
           },
         });
       }
-    });
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
@@ -58,23 +58,35 @@ export function urlToR2Key(url: string | null | undefined): string | null {
  *
  * One statement, not one query per column: it ORs an EXISTS per table.
  *
- * Under `withRlsBypass`, because "is this URL referenced ANYWHERE" is a
- * cross-store question (cloned demo stores share image URLs). Callers run
- * this inside a store's tenant transaction (deferred work) or with no
- * context at all; under `force_app` the first hid every other store's rows
- * and the second hid EVERY `blog_posts` row (strict policy), so a still-used
- * image read as orphaned and was deleted from R2.
+ * Read store by store (see the body), because "is this URL referenced ANYWHERE"
+ * is a cross-store question (cloned demo stores share image URLs) and every
+ * registered column is store-scoped under strict RLS. Callers run this inside a
+ * store's tenant transaction (deferred work) or with no context at all; a
+ * contextless read of a strict table sees NOTHING, so a still-used image would
+ * read as orphaned and be deleted from R2. KNOWN GAP: `users.avatar` of an
+ * admin-namespace account (store_id NULL) is visible in no store scope; an admin
+ * avatar is never shared between accounts, so the per-URL check cannot be fooled
+ * by it, but the bulk orphan sweep (owner-role only) does read it.
  */
 async function isStillReferenced(url: string, key: string): Promise<boolean> {
-  return withRlsBypass(async tx => {
-    // issue 2249: the substring half of the check is a full scan of the
-    // JSON/HTML columns. Bound how long it may hold its connection; a timeout
-    // (57014) throws, and the caller's catch then KEEPS the object — the safe
-    // direction (a leaked file, never a deleted live one).
-    // set_config(…, true) is SET LOCAL with a bound parameter.
-    await tx.$executeRaw`SELECT set_config('statement_timeout', ${String(ORPHAN_CHECK_STATEMENT_TIMEOUT_MS)}, true)`;
-    return isR2UrlReferenced(tx, url, key);
-  });
+  // Store by store: each registered column is store-scoped under strict RLS, so
+  // "referenced ANYWHERE" is the OR over every store's own view (`stores` itself
+  // carries no RLS, so every scope also sees every store's brand columns). Stops
+  // at the first store that still references it.
+  const stores = await prisma.store.findMany({ select: { id: true }, orderBy: { id: 'asc' } });
+  for (const { id } of stores) {
+    const referenced = await withStore(id, async tx => {
+      // issue 2249: the substring half of the check is a full scan of the
+      // JSON/HTML columns. Bound how long it may hold its connection; a timeout
+      // (57014) throws, and the caller's catch then KEEPS the object — the safe
+      // direction (a leaked file, never a deleted live one).
+      // set_config(…, true) is SET LOCAL with a bound parameter.
+      await tx.$executeRaw`SELECT set_config('statement_timeout', ${String(ORPHAN_CHECK_STATEMENT_TIMEOUT_MS)}, true)`;
+      return isR2UrlReferenced(tx, url, key);
+    });
+    if (referenced) return true;
+  }
+  return false;
 }
 
 /** Per-statement ceiling for the orphan check (ms). See isStillReferenced. */

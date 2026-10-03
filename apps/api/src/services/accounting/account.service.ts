@@ -1,4 +1,4 @@
-import { prisma, withRlsBypass, DbClient } from '@force/database';
+import { prisma, withStore, DbClient } from '@force/database';
 import type { AccountType, Prisma } from '@prisma/client';
 import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';
@@ -46,12 +46,12 @@ export async function seedCoaForStore(
     return toCreate.length;
   };
   if (tx) return run(tx);
-  // No caller tx → wrap in withRlsBypass. seedCoaForStore is called by
+  // No caller tx → run in the store's scope. seedCoaForStore is called by
   // StoreService.create (super-admin) and by the accounting-enable
   // toggle path; neither sets app.current_store_id in their outer
-  // transaction. Without bypass, accounts.findMany returns empty (RLS
+  // transaction. Without a store scope, accounts.findMany returns empty (RLS
   // filter), createMany throws WITH CHECK violation.
-  return withRlsBypass(run);
+  return withStore(storeId, run);
 }
 
 /**
@@ -155,14 +155,14 @@ export async function getSystemAccountIdByCode(
   // policy (accounting_foundations migration) requires either the GUC
   // OR app.bypass_rls = 'true', so without the wrap account.findUnique
   // silently returns null → throws "seed COA first" even though the COA
-  // exists. Wrap in withRlsBypass when standalone; tx callers are
+  // exists. Wrap in withStore when standalone; tx callers are
   // assumed to have set up the GUC already.
   const findIt = (client: Prisma.TransactionClient | typeof prisma) =>
     client.account.findUnique({
       where: { storeId_code: { storeId, code } },
       select: { id: true },
     });
-  const acct = tx ? await findIt(tx) : await withRlsBypass(findIt);
+  const acct = tx ? await findIt(tx) : await withStore(storeId, findIt);
   if (acct) return acct.id;
 
   // Self-heal chart-of-accounts template drift. A system code that exists in
@@ -191,7 +191,7 @@ export async function getSystemAccountIdByCode(
       update: {},
       select: { id: true },
     });
-  const healed = tx ? await healOne(tx) : await withRlsBypass(healOne);
+  const healed = tx ? await healOne(tx) : await withStore(storeId, healOne);
   return healed.id;
 }
 

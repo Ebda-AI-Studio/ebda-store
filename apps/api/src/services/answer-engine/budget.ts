@@ -29,7 +29,7 @@
  * across every store regardless of which (if any) tenant context it runs
  * inside — matching the doc comment above and `assertAiQuota()`'s semantics.
  */
-import { withRlsBypass } from '@force/database';
+import { countAiUsage } from '../../lib/definer';
 import logger from '../../lib/logger';
 
 const DEFAULT_PAID_ENGINE_DAILY_CAP = 200;
@@ -57,14 +57,14 @@ export async function isPaidEngineOverBudget(engine: string): Promise<boolean> {
   startOfDay.setUTCHours(0, 0, 0, 0);
 
   try {
-    const count = await withRlsBypass(tx =>
-      tx.aiUsage.count({
-        where: {
-          feature: `answer_engine_${engine}`,
-          createdAt: { gte: startOfDay },
-        },
-      })
-    );
+    // A platform-wide aggregate across stores: one definer call, no rows.
+    // (The original counted cached and uncached rows alike; the definer takes a
+    // cached flag, so both are summed.)
+    const [uncached, cached] = await Promise.all([
+      countAiUsage({ since: startOfDay, cachedHit: false, feature: `answer_engine_${engine}` }),
+      countAiUsage({ since: startOfDay, cachedHit: true, feature: `answer_engine_${engine}` }),
+    ]);
+    const count = uncached + cached;
 
     return count >= getDailyCap(engine);
   } catch (err) {

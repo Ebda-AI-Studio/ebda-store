@@ -1,4 +1,4 @@
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { smsService } from './sms.service';
@@ -77,9 +77,9 @@ class NotificationConfigService {
     // fan-out (order-created / abandoned-cart Inngest jobs) which do NOT — and
     // without the GUC the policy returns 0 rows, so the result would be an empty
     // (and Redis-cached) config map: storefront push/SMS silently disabled. This
-    // is a trusted internal read already scoped by `where: { storeId }`, so run
-    // it under withRlsBypass to make it context-independent.
-    const rows = await withRlsBypass(tx =>
+    // is a trusted internal read already scoped by `where: { storeId }`, so it
+    // enters the store's scope itself (withStore) to be context-independent.
+    const rows = await withStore(storeId, tx =>
       tx.notificationConfig.findMany({
         where: { storeId },
         select: { channel: true, provider: true, credentials: true, enabled: true },

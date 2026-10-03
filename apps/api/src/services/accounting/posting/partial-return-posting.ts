@@ -1,4 +1,4 @@
-import { withRlsBypass } from '@force/database';
+import { withScopedToOrderStore } from './order-scope';
 import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';
 import { postEntry, type JournalLineInput } from '../journal.service';
@@ -94,7 +94,10 @@ export async function postPartialReturnJournal(
   args: PartialReturnJournalArgs
 ): Promise<{ posted: number; skipped?: string }> {
   if (!args.tx) {
-    return withRlsBypass(tx => postPartialReturnJournal({ ...args, tx }));
+    return withScopedToOrderStore(args, tx => postPartialReturnJournal({ ...args, tx }), {
+      posted: 0,
+      skipped: 'order-not-found',
+    });
   }
   const { orderId, refundKey, items, tx } = args;
 
@@ -486,7 +489,10 @@ export async function postAmountOnlyRefundJournal(args: {
   tx?: Prisma.TransactionClient;
 }): Promise<{ posted: number; skipped?: string }> {
   if (!args.tx) {
-    return withRlsBypass(tx => postAmountOnlyRefundJournal({ ...args, tx }));
+    return withScopedToOrderStore(args, tx => postAmountOnlyRefundJournal({ ...args, tx }), {
+      posted: 0,
+      skipped: 'order-not-found',
+    });
   }
   const { orderId, refundKey, amount, tx } = args;
   if (!Number.isSafeInteger(amount) || amount <= 0) {

@@ -21,7 +21,7 @@
  * re-matched to a second row (enforced by the exclusion query).
  */
 
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@force/database';
 import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
 import { assertStoreOwns } from './assert-store-owns';
@@ -139,7 +139,7 @@ export async function importBankStatement(
   let statementId: string;
   let imported = 0;
 
-  await withRlsBypass(async tx => {
+  await withStore(storeId, async tx => {
     // glAccountId comes from the request body and is written onto the
     // BankStatement unchecked, then read back with the account's code and
     // name. #1241: this used to run BEFORE this block, on the bare `prisma`
@@ -214,7 +214,7 @@ function buildBankTxCreateData(
 /**
  * Bounded chunk size for the auto-match loop below. Mirrors the
  * `SCAN_CHUNK_SIZE` pattern in `reorder-scan.service.ts` — each chunk runs
- * inside its OWN short `withRlsBypass` transaction so a large statement
+ * inside its OWN short `withStore` transaction so a large statement
  * (500+ rows) can never blow the 30s interactive-tx timeout regardless of
  * total row count.
  */
@@ -231,7 +231,7 @@ const MATCH_CHUNK_SIZE = 50;
  *
  * Execution shape (fixed 2026-07-02 — same defect class as the low-stock-scan
  * / reorder-scan 30s interactive-tx timeout, P1 2026-06-27/30): the original
- * version held the ENTIRE per-bank-tx-row loop inside one `withRlsBypass`
+ * version held the ENTIRE per-bank-tx-row loop inside one `withStore`
  * transaction, and re-fetched the full store-wide "already matched" entry
  * list from scratch on EVERY iteration (redundant — that baseline never
  * changes during a pass; only the in-memory `claimedEntries` set does). On a
@@ -240,7 +240,7 @@ const MATCH_CHUNK_SIZE = 50;
  *
  * Fix: fetch the already-matched baseline ONCE (not per row), then chunk the
  * per-row candidate-lookup + write loop into bounded `MATCH_CHUNK_SIZE`
- * batches, each its own short `withRlsBypass` transaction, so no single
+ * batches, each its own short `withStore` transaction, so no single
  * transaction's duration scales with the statement's row count. The
  * candidate-matching logic and per-row confidence math are unchanged.
  */
@@ -254,7 +254,7 @@ export async function runAutoMatch(
   // iteration before; that baseline is invariant for the duration of this
   // pass — only `claimedEntries`, tracked in memory below, changes).
   // -------------------------------------------------------------------------
-  const { bankTxs, alreadyMatchedIds } = await withRlsBypass(async tx => {
+  const { bankTxs, alreadyMatchedIds } = await withStore(storeId, async tx => {
     // Reset prior auto_matches so re-runs are idempotent
     await tx.bankTransaction.updateMany({
       where: { statementId, storeId, matchStatus: 'auto_matched' },
@@ -303,7 +303,7 @@ export async function runAutoMatch(
   for (let chunkStart = 0; chunkStart < bankTxs.length; chunkStart += MATCH_CHUNK_SIZE) {
     const chunk = bankTxs.slice(chunkStart, chunkStart + MATCH_CHUNK_SIZE);
 
-    await withRlsBypass(async tx => {
+    await withStore(storeId, async tx => {
       for (const btx of chunk) {
         const from = new Date(btx.date.getTime() - DATE_TOLERANCE_MS);
         const to = new Date(btx.date.getTime() + DATE_TOLERANCE_MS);
@@ -370,7 +370,7 @@ export async function runAutoMatch(
   // -------------------------------------------------------------------------
   // Step 3: recompute + persist statement status in its own short tx.
   // -------------------------------------------------------------------------
-  await withRlsBypass(async tx => {
+  await withStore(storeId, async tx => {
     const totalTx = await tx.bankTransaction.count({ where: { statementId, storeId } });
     const matchedTotal = await tx.bankTransaction.count({
       where: {
@@ -423,7 +423,7 @@ export interface ManualMatchInput {
 export async function applyManualMatch(input: ManualMatchInput): Promise<BankTransaction> {
   const { storeId, transactionId, action, journalEntryId } = input;
 
-  return withRlsBypass(async tx => {
+  return withStore(storeId, async tx => {
     // Verify the bank transaction belongs to this store
     const btx = await tx.bankTransaction.findUnique({
       where: { id: transactionId },
@@ -610,7 +610,7 @@ export async function getReconciliationDifference(
   statementId: string,
   storeId: string
 ): Promise<ReconciliationDifference> {
-  return withRlsBypass(async tx => {
+  return withStore(storeId, async tx => {
     // Fetch statement meta (linked GL account + period)
     const stmt = await tx.bankStatement.findFirst({
       where: { id: statementId, storeId },

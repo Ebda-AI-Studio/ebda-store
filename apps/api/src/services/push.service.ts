@@ -7,7 +7,7 @@
  */
 
 import webpush from 'web-push';
-import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
+import { prisma, withStore, runInTenantContext } from '@force/database';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { notificationConfigService } from './notification-config.service';
@@ -82,10 +82,10 @@ class PushService {
     // called from background fan-out (order-created / abandoned-cart Inngest
     // jobs) with NO tenant GUC, where the policy would return 0 rows → "no
     // subscriptions, skipping" → storefront order push silently broken. Trusted
-    // internal read already scoped by `where: { storeId }`, so use withRlsBypass.
+    // internal read already scoped by `where: { storeId }`, so it enters the store scope with withStore.
     // Only the DB read is wrapped — the webpush network sends below stay OUTSIDE
     // any transaction so we never hold a Neon connection open across HTTP I/O.
-    const subscriptions = await withRlsBypass(tx =>
+    const subscriptions = await withStore(storeId, tx =>
       tx.pushSubscription.findMany({
         where: { storeId },
         select: { id: true, endpoint: true, p256dh: true, auth: true },
@@ -142,7 +142,7 @@ class PushService {
     // 7. Clean up expired subscriptions (RLS-bypass: same FORCE-RLS table, called
     // from non-tenant-context fan-out — without bypass the delete would match 0 rows).
     if (expiredEndpoints.length > 0) {
-      await withRlsBypass(tx =>
+      await withStore(storeId, tx =>
         tx.pushSubscription.deleteMany({
           where: { storeId, endpoint: { in: expiredEndpoints } },
         })
@@ -161,7 +161,7 @@ class PushService {
 
     // notification_logs is under FORCE-RLS too — bypass so the write succeeds
     // from non-tenant-context fan-out.
-    await withRlsBypass(tx =>
+    await withStore(storeId, tx =>
       tx.notificationLog.create({
         data: {
           storeId,
