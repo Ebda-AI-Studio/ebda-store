@@ -45,6 +45,15 @@ regexes = [
   # (every squash-merge); this regex is commit-independent. CI-only, not a
   # real credential.
   '''test-encryption-key-at-least-32-characters-long''',
+  # SMS-consent / review link-key fixtures (#2428: campaign-unsubscribe-token.test.ts,
+  # review-token.test.ts) and the tests/setup.ts ENCRYPTION_KEY default (#2437,
+  # which extends this literal) — CI-only, not a real credential.
+  '''test-encryption-key-0123456789abcdef''',
+  # Two-key rotation fixtures (sms-consent-lib.test.ts, #2428) — CI-only, not real creds.
+  '''encryption-key-A-0123456789abcdef012''',
+  '''encryption-key-B-0123456789abcdef012''',
+  # Fake Inngest signing key (inngest-serve-rejects-unsigned.test.ts, #2294) — CI-only.
+  '''signkey-prod-0123456789abcdef0123456789abcdef''',
   # Throwaway RSA key generated for the GSC service-account client test (8B) — CI-only,
   # never a real credential (distinctive middle-of-body substring). CORRECTED 2026-09-02:
   # the previous entry here (`ItsSCX8UKLL5pB6IGJ0EOrC6PNjAEw0q`) was missing the `+` the
