@@ -6,11 +6,12 @@ import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
 import { apiDelete } from '../../../lib/api';
-import { getStoreDisplayUrl } from '../../../lib/store-url';
+import { getStoreDisplayUrl, getStoreHref } from '../../../lib/store-url';
 import { useT } from '@/i18n/useT';
 import { useDashboardData } from './_hooks/useDashboardData';
-// OnboardingChecklist removed per merchant feedback — the file lives in
-// _components/ for future use but is unmounted from the dashboard.
+// The setup guide (SetupGuideCard) replaces the old static OnboardingChecklist:
+// every row derives from real store data and the merchant can hide it.
+import { SetupGuideCard } from './_components/SetupGuideCard';
 import { StatsGrid } from './_components/StatsGrid';
 import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
@@ -124,6 +125,8 @@ export default function StoreDetailPage() {
         </div>
       }
     >
+      <SetupGuideCard storeId={store.id} storeUrl={getStoreHref(store)} />
+
       <StatsGrid storeId={store.id} />
 
       <div className="mt-8">
