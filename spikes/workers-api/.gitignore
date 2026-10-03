@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+src/generated/
+pgbouncer/*.pid
+pgbouncer/*.log
+*.log
+.mutation-*
