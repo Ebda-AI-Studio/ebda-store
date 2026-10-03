@@ -271,7 +271,7 @@ describe('place_order (cod) — writes after the order commits', () => {
   });
 
   // PR 2301 audit: the COD Payment-row failure rollback was the one call site
-  // left outside a tenant wrap — under force_app it would read no rows and do
+  // left outside a tenant wrap — under ebda_app it would read no rows and do
   // nothing, stranding a pending, stock-taken order.
   it('runs the COD payment-failure rollback INSIDE its own tenant wrap', async () => {
     const db = await import('@force/database');

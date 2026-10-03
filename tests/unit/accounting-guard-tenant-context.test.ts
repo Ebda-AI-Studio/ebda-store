@@ -9,13 +9,13 @@
  * context at all: their routers are mounted CONTEXT-LESS (bare `/stores`,
  * `routes/index.ts` — "services already self-manage tenant context
  * per-query"), so under the RLS-ENFORCED posture planned for the
- * force_app cutover, a read with no GUC set returns zero rows and the guard
+ * ebda_app cutover, a read with no GUC set returns zero rows and the guard
  * 404s every legitimately-owned id.
  *
  * These tests prove each call site now runs the guard in the SAME RLS
  * posture as the writes it protects: wrapped in its own
  * `runInTenantContext(storeId, …)` for the three `withMoneyTx` services, or
- * against the `withRlsBypass` transaction client for bank-reconcile.
+ * against the `withStore` transaction client for bank-reconcile.
  *
  * Each test makes `assertStoreOwns` throw a sentinel the instant it is
  * called, so execution never reaches the real (unmocked) Prisma calls further
@@ -65,12 +65,16 @@ const mockWithRlsBypass = vi.fn(async (fn: (tx: typeof mockTx) => unknown) => {
 });
 
 const ambient = { value: true };
-vi.mock('@force/database', () => ({
+vi.mock('@force/database', async () => ({
+  ...(await import('./helpers/database-mock')).databaseMock({ prisma: {} }),
   prisma: {},
   hasTenantContext: () => ambient.value,
   Prisma: {},
   withMoneyTx: vi.fn(),
-  withRlsBypass: (...args: unknown[]) => mockWithRlsBypass(...(args as [(tx: unknown) => unknown])),
+  // bank-reconcile scopes its writes with `withStore(storeId, ...)`; the stand-in keeps the
+  // enter/exit bookkeeping this test orders against the guard.
+  withStore: (_storeId: string, fn: (tx: unknown) => unknown) =>
+    mockWithRlsBypass(fn as (tx: typeof mockTx) => unknown),
   runInTenantContext: (...args: unknown[]) =>
     mockRunInTenantContext(...(args as [string, () => Promise<unknown>])),
 }));

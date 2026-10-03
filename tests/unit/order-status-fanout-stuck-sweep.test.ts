@@ -17,9 +17,9 @@ const { mockOrderFindMany, mockFailedFindMany, mockUpdateMany, mockSend, mockSen
     locks: new Set<string>(),
   }));
 
-vi.mock('@force/database', () => ({
-  withRlsBypass: (fn: (tx: unknown) => unknown) =>
-    fn({
+vi.mock('@force/database', async () =>
+  (await import('./helpers/database-mock')).databaseMock({
+    prisma: {
       order: {
         findMany: (args: { where: { statusFanoutClaimedAt: unknown } }) =>
           args.where.statusFanoutClaimedAt === null
@@ -27,8 +27,10 @@ vi.mock('@force/database', () => ({
             : mockFailedFindMany(args),
         updateMany: mockUpdateMany,
       },
-    }),
-}));
+    },
+  })
+);
+
 vi.mock('@api/services/redis.service', () => ({
   redis: {
     acquireLock: async (k: string) => (locks.has(k) ? false : (locks.add(k), true)),

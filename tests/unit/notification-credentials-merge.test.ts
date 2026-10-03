@@ -26,7 +26,7 @@ vi.mock('@force/database', () => {
   };
   return {
     prisma: client,
-    withRlsBypass: (fn: (c: unknown) => unknown) => Promise.resolve(fn(client)),
+    withStore: (_id: string, fn: (c: unknown) => unknown) => Promise.resolve(fn(client)),
   };
 });
 

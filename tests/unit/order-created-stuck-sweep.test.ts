@@ -18,9 +18,11 @@ const { mockOrderFindMany, mockSend, mockSendAlert } = vi.hoisted(() => ({
   mockSendAlert: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
-  withRlsBypass: (fn: (tx: unknown) => unknown) => fn({ order: { findMany: mockOrderFindMany } }),
-}));
+vi.mock('@force/database', async () =>
+  (await import('./helpers/database-mock')).databaseMock({
+    prisma: { order: { findMany: mockOrderFindMany } },
+  })
+);
 vi.mock('@api/lib/inngest/client', () => ({
   // createFunction is invoked at module load for the wrapper export; stub it.
   inngest: { send: mockSend, createFunction: vi.fn(() => ({})) },

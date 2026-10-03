@@ -45,6 +45,12 @@ vi.mock('@force/database', () => ({
   prisma: { user: { findUnique: (...a: unknown[]) => findUnique(...(a as [])) } },
 }));
 
+// `authenticate` is not scoped to anyone yet, so the user's current state comes from the
+// `ebda_user_state` definer (`getUserState`); `findUnique` stays the simulated `users` row.
+vi.mock('../../apps/api/src/lib/definer', () => ({
+  getUserState: async () => findUnique(),
+}));
+
 const { authenticate } = await import('../../apps/api/src/middleware/auth');
 const { config } = await import('../../apps/api/src/config');
 

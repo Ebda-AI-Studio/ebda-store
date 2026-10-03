@@ -22,11 +22,11 @@ const h = vi.hoisted(() => ({
   recordPaymentEvent: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
-  prisma: {},
-  withRlsBypass: (fn: (tx: unknown) => unknown) => fn({ order: { findMany: h.findMany } }),
-  runInTenantContext: (_s: string, fn: () => unknown) => fn(),
-}));
+vi.mock('@force/database', async () =>
+  (await import('./helpers/database-mock')).databaseMock({
+    prisma: { order: { findMany: h.findMany } },
+  })
+);
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: {
     createFunction: vi.fn((_cfg: unknown, fn: typeof h.handler) => {

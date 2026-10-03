@@ -10,7 +10,7 @@ import {
   LockoutConfig,
 } from '@api/services/account-lockout.service';
 import { redis } from '@api/services/redis.service';
-import { prisma } from '@force/database';
+import { insertAuditLog } from '@api/lib/definer';
 
 // Mock dependencies
 vi.mock('@api/services/redis.service', () => ({
@@ -20,13 +20,11 @@ vi.mock('@api/services/redis.service', () => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
-  prisma: {
-    auditLog: {
-      create: vi.fn().mockResolvedValue({}),
-    },
-  },
-}));
+vi.mock('@force/database', () => ({ prisma: {} }));
+
+// A login attempt has no store and may have no user yet: the audit row is written by the
+// `ebda_audit_log_insert` SECURITY DEFINER function (`insertAuditLog`).
+vi.mock('@api/lib/definer', () => ({ insertAuditLog: vi.fn().mockResolvedValue(undefined) }));
 
 describe('Account Lockout Service', () => {
   let service: AccountLockoutService;
@@ -131,14 +129,14 @@ describe('Account Lockout Service', () => {
     it('should log failed attempt to audit log', async () => {
       await service.recordFailedAttempt('test@example.com', '192.168.1.1');
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      expect(insertAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
           action: 'LOGIN_FAILED',
           resourceType: 'auth',
           details: { email: 'test@example.com' },
-          ipAddress: '192.168.1.1',
-        }),
-      });
+          ip: '192.168.1.1',
+        })
+      );
     });
   });
 
@@ -153,14 +151,14 @@ describe('Account Lockout Service', () => {
     it('should log successful login to audit log', async () => {
       await service.recordSuccessfulLogin('test@example.com', '192.168.1.1');
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      expect(insertAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
           action: 'LOGIN_SUCCESS',
           resourceType: 'auth',
           details: { email: 'test@example.com' },
-          ipAddress: '192.168.1.1',
-        }),
-      });
+          ip: '192.168.1.1',
+        })
+      );
     });
   });
 

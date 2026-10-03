@@ -3,7 +3,7 @@
  * ("Server has closed the connection.", P1017): one transient Neon
  * connection failure inside `FeatureService.readFromDb` 500'd
  * `GET /public/store/resolve`. The read now retries ONCE on a fresh
- * `withRlsBypass` transaction — and still fails CLOSED if the retry fails
+ * `withStore` transaction — and still fails CLOSED if the retry fails
  * too, because this map gates paid features.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -18,7 +18,7 @@ const { findUnique, findMany, withRlsBypass } = vi.hoisted(() => {
   return {
     findUnique,
     findMany,
-    withRlsBypass: vi.fn(async (fn: (tx: unknown) => unknown) =>
+    withRlsBypass: vi.fn(async (_storeId: string, fn: (tx: unknown) => unknown) =>
       fn({ store: { findUnique }, storeFeature: { findMany } })
     ),
   };
@@ -28,7 +28,7 @@ vi.mock('@force/database', () => ({
   prisma: {},
   Prisma: {},
   withMoneyTx: vi.fn(),
-  withRlsBypass,
+  withStore: withRlsBypass,
 }));
 
 import { featureService } from '@api/services/feature.service';

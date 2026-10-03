@@ -19,6 +19,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request } from 'express';
 
 const findUnique = vi.fn();
+// The owning user's state comes from the `ebda_user_state` definer, not a join: the fake returns
+// the `user` the stored-row fixture carries (null = no such user).
+const userOf = vi.hoisted(() => ({ value: null as unknown }));
+const getUserState = vi.hoisted(() => vi.fn());
 const update = vi.fn().mockResolvedValue({});
 
 vi.mock('@force/database', () => {
@@ -26,19 +30,25 @@ vi.mock('@force/database', () => {
   // so a `tx` defined outside would be undefined when this runs.
   const client = {
     merchantApiKey: {
-      findUnique: (...a: unknown[]) => findUnique(...a),
+      findUnique: async (...a: unknown[]) => {
+        const row = (await findUnique(...a)) as { user?: unknown } | null;
+        userOf.value = row?.user ?? null;
+        return row;
+      },
       update: (...a: unknown[]) => update(...a),
     },
   };
   return {
     prisma: client,
-    // The real `withRlsBypass` opens a transaction with `app.bypass_rls` set;
-    // here it only has to hand the callback a client. `verifyMerchantKey` runs
-    // under it because its lookup is what DETERMINES the tenant and therefore
-    // cannot set a store GUC first.
-    withRlsBypass: (fn: (c: unknown) => unknown) => Promise.resolve(fn(client)),
+    // `verifyMerchantKey` runs inside the store's own scope: the store is already resolved by
+    // slug, and the key lookup is by hash within that store (strict RLS hides other stores' keys).
+    withStore: (_storeId: string, fn: (c: unknown) => unknown) => Promise.resolve(fn(client)),
   };
 });
+
+vi.mock('@api/lib/definer', () => ({
+  getUserState: (...a: unknown[]) => getUserState(...a),
+}));
 
 vi.mock('@api/lib/logger', () => ({
   default: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -103,6 +113,7 @@ describe('generateMerchantKey', () => {
 describe('verifyMerchantKey', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getUserState.mockImplementation(async () => userOf.value);
     update.mockResolvedValue({});
   });
 
@@ -253,9 +264,10 @@ describe('verifyMerchantKey', () => {
     const { plaintext } = generateMerchantKey();
     findUnique.mockResolvedValue(validRow(plaintext));
     await verifyMerchantKey(reqWithKey(plaintext), STORE);
-    const select = findUnique.mock.calls[0][0].select;
-    expect(select.user, 'the user must be selected or it cannot be checked').toBeTruthy();
-    expect(select.user.select).toMatchObject({ status: true, deletedAt: true });
+    // the key row names its owner, and that owner's CURRENT state is read (definer) every time
+    expect(getUserState).toHaveBeenCalledWith('user-1');
+    await verifyMerchantKey(reqWithKey(plaintext), STORE);
+    expect(getUserState).toHaveBeenCalledTimes(2);
   });
 
   it('stamps lastUsedAt without letting a failed stamp fail the request', async () => {

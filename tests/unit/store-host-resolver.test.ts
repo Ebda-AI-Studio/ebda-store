@@ -80,6 +80,17 @@ vi.mock('@force/database', () => ({
   SlugEntityType: {},
 }));
 
+// Host / slug -> store id is the `ebda_resolve_store_id` definer; `storeFindFirst` stays the
+// source of truth for "which store does this host or slug name".
+vi.mock('@api/lib/definer', () => ({
+  resolveStoreId: async (match: { slug?: string | null; domain?: string | null }) => {
+    const where: Record<string, unknown> = match.domain
+      ? { domain: match.domain, status: { in: ['active', 'suspended'] }, deletedAt: null }
+      : { slug: match.slug, status: { in: ['active', 'suspended'] }, deletedAt: null };
+    return ((await storeFindFirst({ where })) as { id: string } | null)?.id ?? null;
+  },
+}));
+
 vi.mock('@api/services/redis.service', () => ({
   redis: {
     get: async (key: string) => redisData.get(key) ?? null,

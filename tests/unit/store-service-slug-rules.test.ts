@@ -22,6 +22,9 @@ vi.mock('@force/database', () => ({
   Prisma: {},
   withMoneyTx: vi.fn(),
   StoreStatus: {},
+  // the created store is returned with its owner row, read as the owner (identity-scoped)
+  withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({ user: { findUnique: async () => ({ id: 'owner-1', email: 'o@x.com' }) } }),
 }));
 vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn(), set: vi.fn(), delete: vi.fn() },
