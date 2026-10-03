@@ -26,7 +26,7 @@
 -- the definer functions rely on that. Section 0 refuses to continue otherwise.
 --
 -- =============================================================================
--- TABLES WITH A store_id COLUMN (85 incl. users and store_staff; policy: store_id = store GUC)
+-- TABLES WITH A store_id COLUMN (86 incl. users and store_staff; policy: store_id = store GUC)
 --   enumerated from information_schema.columns on 2026-10-04 (column store_id)
 --   abandoned_cart_configs
 --   abandoned_carts
@@ -43,6 +43,7 @@
 --   backorder_lines
 --   bank_statements
 --   bank_transactions
+--   billing_events        (SP5 billing, migration 20261003150000; append-only trigger kept)
 --   blog_posts
 --   bulk_ai_jobs
 --   bulk_import_jobs
@@ -164,6 +165,8 @@
 --                           definer for every auth path. Revisit in SP5.
 --   answer_engine_provider_configs
 --                           platform-global provider credentials, no tenant.
+--   billing_webhook_events  provider-event dedupe ledger (SP5 billing): provider event
+--                           id + outcome, no store_id and no tenant data.
 --   plans                   platform-global plan catalog (SP5; config written only
 --                           by super_admin routes, no tenant data, no store_id).
 --   system_settings         platform-global key/value; policy is `true` for
@@ -281,7 +284,7 @@ $fn$;
 --       no table to ebda_app and no other function checks it.
 CREATE OR REPLACE FUNCTION public.ebda_is_system_job(p_job text)
 RETURNS boolean
-LANGUAGE sql STABLE
+LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
   SELECT coalesce(nullif(current_setting('app.system_job', true), ''), '') = p_job
@@ -317,6 +320,7 @@ BEGIN
         'backorder_lines',
         'bank_statements',
         'bank_transactions',
+        'billing_events',
         'blog_posts',
         'bulk_ai_jobs',
         'bulk_import_jobs',
@@ -495,6 +499,11 @@ CREATE POLICY ebda_tenant_isolation ON bank_statements AS PERMISSIVE FOR ALL TO 
 ALTER TABLE bank_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bank_transactions FORCE ROW LEVEL SECURITY;
 CREATE POLICY ebda_tenant_isolation ON bank_transactions AS PERMISSIVE FOR ALL TO ebda_app
+  USING (store_id = nullif(current_setting('app.current_store_id', true), ''))
+  WITH CHECK (store_id = nullif(current_setting('app.current_store_id', true), ''));
+ALTER TABLE billing_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE billing_events FORCE ROW LEVEL SECURITY;
+CREATE POLICY ebda_tenant_isolation ON billing_events AS PERMISSIVE FOR ALL TO ebda_app
   USING (store_id = nullif(current_setting('app.current_store_id', true), ''))
   WITH CHECK (store_id = nullif(current_setting('app.current_store_id', true), ''));
 ALTER TABLE blog_posts ENABLE ROW LEVEL SECURITY;
@@ -1524,7 +1533,27 @@ AS $fn$
     WHEN 'customer' THEN (SELECT c.store_id FROM public.customers c WHERE c.id = p_id)
     WHEN 'journal_entry' THEN (SELECT j.store_id FROM public.journal_entries j WHERE j.id = p_id)
     WHEN 'bulk_import_job' THEN (SELECT b.store_id FROM public.bulk_import_jobs b WHERE b.id = p_id)
+    WHEN 'billing_event' THEN (SELECT e.store_id FROM public.billing_events e WHERE e.id = p_id)
+    WHEN 'store_subscription' THEN (SELECT ss.store_id FROM public.store_subscriptions ss WHERE ss.id = p_id)
   END
+$fn$;
+
+--      (a2) subscription-billing webhook routing: a gateway callback names a
+--           provider reference, not a store. Returns the store of the PENDING
+--           refund row with that (provider, provider_ref), or NULL. UNGUARDED ON
+--           PURPOSE for the same reason as (a): no principal exists on a signed
+--           provider callback, and the answer is a store id, never row data.
+CREATE OR REPLACE FUNCTION public.ebda_billing_refund_store_id(p_provider text, p_provider_ref text)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT e.store_id
+  FROM public.billing_events e
+  WHERE p_provider IS NOT NULL AND p_provider_ref IS NOT NULL
+    AND e.type = 'refund' AND e.status = 'pending'
+    AND e.provider = p_provider AND e.provider_ref = p_provider_ref
+  LIMIT 1
 $fn$;
 
 --      (b) the audit-log viewer: store-scoped rows AND platform events that have

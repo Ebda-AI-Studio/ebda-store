@@ -76,6 +76,8 @@ const DOCUMENTED_NON_RLS: Record<string, string> = {
   onesignal_subscriptions: 'user-keyed push registrations',
   answer_engine_provider_configs: 'platform-global provider credentials',
   _prisma_migrations: 'migration bookkeeping; not granted to ebda_app',
+  plans: 'platform-global plan catalog (config; no tenant data, no store_id)',
+  billing_webhook_events: 'provider-event dedupe ledger (no store_id, no tenant data)',
 };
 
 let owner: AppPrismaClient;
@@ -1356,6 +1358,59 @@ describe('definer guards: the mutating functions check WHO is calling', () => {
       })
     );
     expect(both).toEqual(['audit-log-retention', null]);
+  });
+});
+
+describe('subscription billing under strict RLS', () => {
+  it('billing_events: store-scoped, the append-only trigger still holds, webhook routing goes through definers', async () => {
+    const key = `${PREFIX}bill-${uid()}`;
+    const mk = (storeId: string, k: string) =>
+      appTx({ storeId }, tx =>
+        tx.billingEvent.create({
+          data: {
+            storeId,
+            type: 'checkout',
+            amountMinor: 100,
+            provider: 'stub',
+            idempotencyKey: k,
+            status: 'succeeded',
+          },
+        })
+      );
+    const ev = await mk(ids.storeA, key);
+    // contextless / other store: invisible and unwritable
+    expect(await appTx({}, tx => tx.billingEvent.count({ where: { id: ev.id } }))).toBe(0);
+    expect(
+      await appTx({ storeId: ids.storeB }, tx => tx.billingEvent.count({ where: { id: ev.id } }))
+    ).toBe(0);
+    await expect(
+      appTx({ storeId: ids.storeA }, tx =>
+        tx.billingEvent.create({
+          data: {
+            storeId: ids.storeB,
+            type: 'checkout',
+            amountMinor: 1,
+            provider: 'stub',
+            idempotencyKey: `${key}-y`,
+          },
+        })
+      )
+    ).rejects.toThrow();
+    // the trigger: a settled charge cannot become failed, and a direct delete is refused
+    await expect(
+      appTx({ storeId: ids.storeA }, tx =>
+        tx.billingEvent.update({ where: { id: ev.id }, data: { status: 'failed' } })
+      )
+    ).rejects.toThrow(/succeeded charge cannot become/);
+    await expect(
+      appTx({ storeId: ids.storeA }, tx => tx.billingEvent.delete({ where: { id: ev.id } }))
+    ).rejects.toThrow(/append-only/);
+    // definers: id -> store, for ledger rows and subscriptions
+    expect(await asApp(() => getEntityStoreId('billing_event', ev.id))).toBe(ids.storeA);
+    expect(await asApp(() => getEntityStoreId('billing_event', uid()))).toBeNull();
+    await owner
+      .$executeRawUnsafe(`DELETE FROM billing_events WHERE idempotency_key LIKE '${key}%'`)
+      .catch(() => undefined);
   });
 });
 

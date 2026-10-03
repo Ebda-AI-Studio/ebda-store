@@ -412,7 +412,14 @@ export async function deleteUserAddresses(userId: string): Promise<number> {
 
 /** Which store owns a product / order / customer / journal entry id (exact primary-key match). */
 export async function getEntityStoreId(
-  kind: 'product' | 'order' | 'customer' | 'journal_entry' | 'bulk_import_job',
+  kind:
+    | 'product'
+    | 'order'
+    | 'customer'
+    | 'journal_entry'
+    | 'bulk_import_job'
+    | 'billing_event'
+    | 'store_subscription',
   id: string
 ): Promise<string | null> {
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
@@ -625,4 +632,14 @@ export async function storeIdsOnPlan(planCode: string): Promise<string[]> {
     Array<{ store_id: string }>
   >`SELECT store_id FROM public.ebda_plan_store_ids(${planCode})`;
   return rows.map(r => r.store_id);
+}
+
+/** A subscription-billing webhook's provider reference -> the store that owns the pending refund. */
+export async function getBillingRefundStoreId(
+  provider: string,
+  providerRef: string
+): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+    SELECT public.ebda_billing_refund_store_id(${provider}, ${providerRef}) AS id`;
+  return rows[0]?.id ?? null;
 }
