@@ -128,6 +128,8 @@ async function seedFixtures(db) {
         nameAr: `${f.name} AR`,
         slug: f.slug,
         domain: f.domain,
+        // Only a VERIFIED domain resolves (SP5 task 4); the parity fixtures are.
+        domainStatus: 'active',
         ownerId: owner.id,
         status: 'active',
         plan: 'enterprise',
