@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withOwnerTx } from '@force/database';
 
 // F3: prove cross-tenant isolation holds at BOTH layers:
-//  1. RLS — a query executed as the `force_app` role with storeA context must
+//  1. RLS — a query executed as the `ebda_app` role with storeA context must
 //     NOT see store B rows.
 //  2. Application scoping — OrderService.getById(storeA, orderB) must return null.
 //
@@ -13,17 +13,18 @@ import { prisma, withRlsBypass } from '@force/database';
 // CI role note: DATABASE_URL connects as the `test` superuser (table owner).
 // Postgres superusers bypass FORCE ROW LEVEL SECURITY entirely, so plain
 // `runInTenantContext` (which only sets `app.current_store_id`) would NOT
-// exercise the `rls_orders_tenant` policy — the superuser sees all rows.
-// `runAsTenantRole` below issues `SET LOCAL ROLE force_app` inside the
+// exercise the `ebda_tenant_isolation` policy — the superuser sees all rows.
+// `runAsTenantRole` below issues `SET LOCAL ROLE ebda_app` inside the
 // transaction so Postgres evaluates the policy as it would in production.
-// `force_app` is created by migration 20260404000000_add_rls_policies and is
+// `ebda_app` is created by migration 20261004000000_ebda_strict_rls and is
 // guaranteed present after `prisma migrate deploy` runs in CI.
+// (tests/integration/rls-ebda-app.test.ts does the same on a real ebda_app LOGIN.)
 
 /**
- * Execute fn inside a transaction that (a) switches to the `force_app` role
- * and (b) sets `app.current_store_id`. Both GUC changes are LOCAL (revert on
+ * Execute fn inside a transaction that (a) switches to the `ebda_app` role
+ * and (b) sets `app.current_store_id`. Both changes are LOCAL (revert on
  * COMMIT/ROLLBACK). This faithfully reproduces how the production API connects
- * for tenant-scoped queries, enabling the RLS policies scoped `TO force_app`
+ * for tenant-scoped queries, enabling the RLS policies scoped `TO ebda_app`
  * to be exercised in CI even though DATABASE_URL is a superuser connection.
  */
 async function runAsTenantRole(
@@ -33,10 +34,8 @@ async function runAsTenantRole(
   return prisma.$transaction(
     async tx => {
       // Drop to the application role — reverts on COMMIT / ROLLBACK.
-      await tx.$executeRawUnsafe(`SET LOCAL ROLE force_app`);
-      await tx.$executeRawUnsafe(
-        `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
-      );
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE ebda_app`);
+      await tx.$queryRawUnsafe(`SELECT set_config('app.current_store_id', $1, true)`, storeId);
       return fn(tx as unknown as PrismaClient);
     },
     { maxWait: 10000, timeout: 30000 }
@@ -71,7 +70,7 @@ async function makeStore(slug: string): Promise<string> {
 
 async function cleanup(): Promise<void> {
   // Run with RLS bypass so cleanup is not itself filtered by tenant context.
-  await withRlsBypass(async tx => {
+  await withOwnerTx(async tx => {
     await tx.$executeRawUnsafe(
       `DELETE FROM public.orders WHERE store_id IN (SELECT id FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%')`
     );
@@ -134,33 +133,31 @@ describe('cross-tenant isolation (integration)', () => {
   });
 });
 
-// Coverage for the 2026-06-09 "complete FORCE coverage" migration
-// (20260609000000_complete_force_rls_coverage). Proves the newly-protected
-// tables enforce isolation as the `force_app` role. We use raw SQL counts
-// through runAsTenantRole so the policy is evaluated even on the CI superuser
-// connection (the policies are scoped TO force_app + FORCE'd).
+// Coverage for the strict-RLS migration (20261004000000_ebda_strict_rls). Proves the
+// protected tables enforce isolation as the `ebda_app` role. We use raw SQL counts so the
+// policy is evaluated even on the CI superuser connection (the policies are scoped TO
+// ebda_app + FORCE'd). The auto-enumerated coverage of EVERY store_id table is in
+// tests/integration/rls-ebda-app.test.ts.
 //
 // Representative coverage:
 //   * payments         — CHILD table, tenancy via EXISTS through orders.store_id;
-//                        also read contextless by the payment webhook (must NOT
-//                        be 0-rowed when no GUC is set)
-//   * bulk_import_jobs — DIRECT store_id table, hybrid policy
+//                        the payment webhook resolves its store through a definer
+//                        first, so a contextless read is correctly 0 rows
+//   * bulk_import_jobs — DIRECT store_id table, strict policy
 async function countAs(
   storeId: string,
   sql: string,
-  bypass = false,
-  noContext = false
+  opts: { noContext?: boolean; bypassGuc?: boolean } = {}
 ): Promise<number> {
   return prisma.$transaction(
     async tx => {
-      await tx.$executeRawUnsafe(`SET LOCAL ROLE force_app`);
-      if (bypass) {
-        await tx.$executeRawUnsafe(`SET LOCAL app.bypass_rls = 'true'`);
-        await tx.$executeRawUnsafe(`SET LOCAL app.current_store_id = ''`);
-      } else if (!noContext) {
-        await tx.$executeRawUnsafe(
-          `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
-        );
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE ebda_app`);
+      if (opts.bypassGuc) {
+        // a leftover/forged setting: the policies do not read it
+        await tx.$queryRawUnsafe(`SELECT set_config('app.bypass_rls', 'true', true)`);
+      }
+      if (!opts.noContext && !opts.bypassGuc) {
+        await tx.$queryRawUnsafe(`SELECT set_config('app.current_store_id', $1, true)`, storeId);
       }
       const rows = (await tx.$queryRawUnsafe(sql)) as Array<{ n: bigint | number }>;
       return Number(rows[0]?.n ?? 0);
@@ -169,13 +166,13 @@ async function countAs(
   );
 }
 
-describe('complete FORCE RLS coverage (integration)', () => {
+describe('strict RLS coverage (integration)', () => {
   let bulkJobB = '';
   let paymentB = '';
 
   beforeAll(async () => {
-    // Seed rows on store B via RLS bypass (cross-tenant write path).
-    await withRlsBypass(async tx => {
+    // Seed rows on store B on the owner-role connection (cross-tenant write path).
+    await withOwnerTx(async tx => {
       const bj = `${TEST_PREFIX}bj-${Date.now()}`;
       const pay = `${TEST_PREFIX}pay-${Date.now()}`;
       await tx.$executeRawUnsafe(
@@ -192,7 +189,7 @@ describe('complete FORCE RLS coverage (integration)', () => {
   });
 
   afterAll(async () => {
-    await withRlsBypass(async tx => {
+    await withOwnerTx(async tx => {
       await tx.$executeRawUnsafe(
         `DELETE FROM public.bulk_import_jobs WHERE id LIKE '${TEST_PREFIX}bj-%'`
       );
@@ -224,25 +221,24 @@ describe('complete FORCE RLS coverage (integration)', () => {
     expect(n).toBe(0);
   });
 
-  it('bypass sees the store B payment (cross-tenant path works)', async () => {
+  it('a forged app.bypass_rls setting changes nothing (the policies do not read it)', async () => {
     const n = await countAs(
       storeB,
       `SELECT count(*)::int n FROM payments WHERE id = '${paymentB}'`,
-      /* bypass */ true
+      { bypassGuc: true }
     );
-    expect(n).toBe(1);
+    expect(n).toBe(0);
   });
 
-  it('contextless read (payment webhook) still sees payments — NOT 0-rowed', async () => {
-    // The /api/v1/webhooks path reads payments without a tenant GUC and without
-    // withRlsBypass. The hybrid policy's `current_store_id() IS NULL` escape
-    // must keep these rows visible, or live payment confirmation breaks.
+  it('contextless read sees NO payments (strict: no allow-contextless branch)', async () => {
+    // The /api/v1/webhooks path resolves the store through `ebda_webhook_resolve_store`
+    // (a SECURITY DEFINER function) and then reads inside that store's scope; a read with no
+    // store at all must be 0-rowed.
     const n = await countAs(
       storeB,
       `SELECT count(*)::int n FROM payments WHERE id = '${paymentB}'`,
-      /* bypass */ false,
-      /* noContext */ true
+      { noContext: true }
     );
-    expect(n).toBe(1);
+    expect(n).toBe(0);
   });
 });
