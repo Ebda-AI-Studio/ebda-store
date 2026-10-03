@@ -3,6 +3,9 @@
  * fill time, disposable-domain block, per-email-domain daily cap, and the
  * per-IP / per-/24 velocity limiters. Allowed vs blocked for each.
  *
+ * Lives in tests/integration: the one-use token claim and per-domain counter need Redis (CI's
+ * integration job has it; the unit job does not).
+ *
  * The shared limiters are skipped under vitest, so velocity is driven through
  * the limiter factories with the skip turned off (same approach as
  * merchant-signup-limits.test.ts); the gate runs through the real route.
