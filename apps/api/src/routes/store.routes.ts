@@ -17,7 +17,13 @@ import { featureService } from '../services/feature.service';
 import { bustCorsCache } from '../lib/cors-cache';
 import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
-import { isSafeUrl, isValidTimeZone, storeSlugSchema, storeSlugIssueCode } from '@force/shared';
+import {
+  isSafeUrl,
+  isValidTimeZone,
+  parseStoreHost,
+  storeSlugSchema,
+  storeSlugIssueCode,
+} from '@force/shared';
 import {
   maskMarketingPixelSecrets,
   preserveMaskedPixelSecrets,
@@ -1220,6 +1226,22 @@ router.put(
       // a customer-visible outage. With this ordering, the old domain keeps
       // serving traffic until everything else (provider add + DB update)
       // succeeds; old-domain removal moves to AFTER the DB commit below.
+      // A custom domain must be a real third-party hostname. Ebda's own hosts
+      // (the apex, `<slug>.ebda.app`, platform labels), IPs, localhost and
+      // malformed names can never be claimed: `<slug>.ebda.app` is already
+      // routed by slug, and letting a store claim one would hijack another
+      // store's (or the platform's) host (Review Focus 1).
+      if (domain && parseStoreHost(domain).kind !== 'custom') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'DOMAIN_INVALID',
+            message: 'Enter your own domain (for example mystore.com), not an Ebda address.',
+          },
+        });
+        return;
+      }
+
       if (domain && domain !== oldDomain) {
         // Check platform configuration first — domain feature is unusable
         // without the resolved provider's API credentials configured on the API

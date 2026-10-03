@@ -171,3 +171,30 @@ describe('PUT /stores/:id — slug rules', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('PUT /stores/:id/domain — a custom domain can never be an Ebda host', () => {
+  it.each([
+    'ebda.app',
+    'www.ebda.app',
+    'rival.ebda.app',
+    'RIVAL.EBDA.APP',
+    'app.ebda.app',
+    'x.y.ebda.app',
+    '127.0.0.1',
+    'localhost',
+    'not a domain',
+  ])('rejects %j with DOMAIN_INVALID before touching the provider', async domain => {
+    const res = await request(app).put(`/stores/${STORE_ID}/domain`).send({ domain });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('DOMAIN_INVALID');
+  });
+
+  it('a real third-party domain passes the check (and reaches the provider gate)', async () => {
+    const res = await request(app)
+      .put(`/stores/${STORE_ID}/domain`)
+      .send({ domain: 'ameliaaurum.com' });
+    // The provider is not configured in this test, so the next gate answers.
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('DOMAIN_FEATURE_UNAVAILABLE');
+  });
+});
