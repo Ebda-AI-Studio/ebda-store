@@ -1,0 +1,370 @@
+<title>Whisky 11 Egypt Commerce</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --ground:#0A0B0C; --panel:#121415; --raise:#181B1C; --line:#25292A;
+  --fg:#F3F5F4; --muted:#A1A9A7; --faint:#64706D;
+  --glow:#B08D57; --glow-lift:#CBA873; --glow-dim:rgba(176,141,87,.14);
+  --red:#B4243B; --warn:#E0B458;
+  --sans:"Geist",ui-sans-serif,system-ui,sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SFMono-Regular",monospace;
+  --ar:"IBM Plex Sans Arabic",ui-sans-serif,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--fg);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:20px;padding-block:0 96px}
+h1,h2,h3{text-wrap:balance;margin:0;font-weight:600;letter-spacing:-.02em}
+h2{font-size:clamp(24px,3.4vw,34px);line-height:1.15}
+h3{font-size:17px;letter-spacing:-.01em}
+p{margin:0;max-width:66ch;color:var(--muted)}
+p strong,li strong{color:var(--fg);font-weight:500}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{color:var(--fg);text-decoration-color:var(--faint);text-underline-offset:3px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--glow);outline-offset:3px}
+
+/* hero */
+.hero{position:relative;height:clamp(420px,62vh,560px);margin-inline:-20px;overflow:hidden;border-bottom:1px solid var(--line)}
+#nile{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hero-copy{position:absolute;left:20px;right:20px;bottom:36px;display:grid;gap:14px;max-width:560px}
+.hero-copy h1{font-size:clamp(34px,6vw,60px);line-height:1.02;font-weight:600;letter-spacing:-.035em}
+.hero-copy p{color:var(--muted)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font:12px/1 var(--mono);color:var(--faint)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px}
+
+section{padding-top:72px;display:grid;gap:24px}
+.lede{display:grid;gap:10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:10px;align-content:start}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:14px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 11px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--faint);background:var(--raise)}
+tr:last-child td{border-bottom:0}
+td .num{white-space:nowrap}
+.tag{display:inline-block;font:500 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:4px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag.warn{color:var(--warn);border-color:rgba(224,180,88,.35)}
+.tag.ok{color:var(--glow);border-color:rgba(176,141,87,.45)}
+.tag.no{color:#E07A8A;border-color:rgba(180,36,59,.45)}
+.ours td{background:var(--glow-dim)}
+
+/* chart */
+.chart{display:grid;gap:12px;padding:20px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.bar-row{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:14px;align-items:center}
+.bar-label{font-size:13px;color:var(--muted)}
+.bar-track{position:relative;height:26px}
+.bar{position:absolute;left:0;top:0;bottom:0;background:#3A4140;border-radius:3px}
+.bar.range{background:repeating-linear-gradient(135deg,#3A4140 0 6px,#2A302F 6px 12px)}
+.bar.ours{background:var(--glow)}
+.bar-val{position:absolute;top:50%;transform:translateY(-50%);font:12px var(--mono);color:var(--fg);white-space:nowrap;padding-left:8px}
+.axis{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:14px}
+.ticks{position:relative;height:16px;font:11px var(--mono);color:var(--faint)}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.ticks span:first-child{transform:none}
+
+/* plans */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.plan{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;display:grid;gap:12px;align-content:start}
+.plan.feature{border-color:rgba(176,141,87,.6)}
+.price{font:600 30px/1 var(--mono);letter-spacing:-.02em}
+.price small{font:400 13px var(--sans);color:var(--faint);margin-left:4px}
+ul{margin:0;padding-left:18px;color:var(--muted);display:grid;gap:6px}
+
+/* steps */
+ol.steps{margin:0;padding:0;list-style:none;display:grid;gap:0;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:44px 1fr;gap:12px;padding:16px 0;border-top:1px solid var(--line)}
+ol.steps li::before{content:counter(s,decimal-leading-zero);font:500 13px var(--mono);color:var(--glow);padding-top:2px}
+ol.steps li div{display:grid;gap:4px}
+
+/* brand */
+.swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.sw{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.sw i{display:block;height:74px}
+.sw div{padding:10px 12px;display:grid;gap:2px}
+.sw b{font-weight:500;font-size:13px}
+.sw span{font:12px var(--mono);color:var(--faint)}
+.names{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.name{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;display:grid;gap:10px;align-content:start}
+.name .word{font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.name .ar{font-family:var(--ar);color:var(--faint);font-size:14px}
+.domains{display:flex;flex-wrap:wrap;gap:6px}
+.note{font-size:13px;color:var(--faint);max-width:80ch}
+.callout{border-left:2px solid var(--glow);padding:4px 0 4px 16px;display:grid;gap:6px}
+@media (max-width:560px){ .bar-row,.axis{grid-template-columns:1fr} .axis>div:first-child{display:none} .bar-label{font-size:12px} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+
+<div class="wrap">
+
+<header class="hero" aria-label="Art direction preview: the Nile at night from orbit">
+  <canvas id="nile" aria-hidden="true"></canvas>
+  <div class="hero-copy">
+    <span class="eyebrow">Whisky 11 · commerce for Egypt · brief 25 Sep 2026</span>
+    <h1>Every light on the Nile is a shop.</h1>
+    <p>Research and brand direction for a self-serve store builder, cloned from FWB and priced in Egyptian pounds. Amelia Aurum is store number one.</p>
+    <div class="legend"><span><i class="dot" style="background:#E9EEEC"></i>a store</span><span><i class="dot" style="background:var(--glow-lift)"></i>a store opening now</span></div>
+  </div>
+</header>
+
+<!-- 1 PRICING -->
+<section id="pricing">
+  <div class="lede">
+    <span class="eyebrow">1 · Pricing</span>
+    <h2>Shopify charges Egyptian merchants twice</h2>
+    <p>Shopify Payments does not work in Egypt, so every Egyptian store pays for a local gateway such as Paymob <strong>and</strong> a Shopify surcharge of 2% on Basic. The subscription is billed in US dollars, which adds about 3% in bank FX charges on an Egyptian card.</p>
+  </div>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Shopify plan</th><th>Monthly</th><th>Paid yearly</th><th>Extra fee without Shopify Payments</th><th>Staff</th></tr></thead>
+    <tbody>
+      <tr><td>Starter</td><td class="num">$5</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>Basic</td><td class="num">$27</td><td class="num">$19/mo</td><td class="num">2%</td><td>2</td></tr>
+      <tr><td>Grow</td><td class="num">$72</td><td class="num">$54/mo</td><td class="num">1%</td><td>5</td></tr>
+      <tr><td>Advanced</td><td class="num">$399</td><td class="num">$299/mo</td><td class="num">0.6%</td><td>15</td></tr>
+      <tr><td>Plus</td><td class="num">from $2,300</td><td>custom</td><td class="num">0.2%</td><td>unlimited</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Live shopify.com/pricing, fetched 25 Sep 2026. Many blogs still quote the old $39 / $105 / $399 prices. No EGP pricing exists for subscriptions; showing prices in EGP to shoppers through Shopify Markets adds a 1.5% conversion fee.</p>
+
+  <div class="lede" style="padding-top:12px">
+    <h3>What the platform takes each month</h3>
+    <p>Example store: <strong>150 orders a month at EGP 1,000</strong> (EGP 150,000 in sales), paid by card. Each bar is the subscription plus any platform commission. The card gateway fee (about EGP 4,575 on Paymob at 2.75% + EGP 3) is the same on every platform, so it is left out.</p>
+  </div>
+  <div class="chart" id="chart" role="img" aria-label="Monthly platform cost in EGP: Shopify Basic 3,986; YouCan 3,006; EasyOrders 2,600 to 5,200 unverified; Wuilt Business 875; our Growth plan 1,500."></div>
+  <p class="note">Rate used: 1 USD = EGP 51.92 (25 Sep 2026). Shopify Basic = EGP 986 subscription + EGP 3,000 surcharge. YouCan = $29 plan + 1% online commission. Wuilt Business = EGP 10,500 a year. EasyOrders is striped because its pricing page returned 404 and aggregator figures conflict. ExpandCart's EGP prices could not be verified. Salla and Zid are Gulf-first, and their Egypt gateway support is unverified.</p>
+
+  <div class="lede" style="padding-top:12px">
+    <h3>Proposed plans <span class="tag warn">draft for you to decide</span></h3>
+    <p>Growth is EGP 1,500 a month, about Shopify Basic's $27 sticker price, but with no 2% surcharge, no dollar card and no FX risk. That still leaves the merchant about EGP 2,500 a month better off than Shopify at 150 orders. 0% commission on every plan; gateway fees passed through at cost.</p>
+  </div>
+  <div class="plans">
+    <div class="plan">
+      <span class="eyebrow">Start</span>
+      <div class="price">EGP 0<small>/ month</small></div>
+      <ul><li>Up to 30 orders a month</li><li>InstaPay and cash on delivery</li><li>A free <span class="num">name.[brand].shop</span> address</li><li>0% commission</li></ul>
+    </div>
+    <div class="plan feature">
+      <span class="eyebrow">Growth</span>
+      <div class="price">EGP 1,500<small>/ month</small></div>
+      <ul><li>Unlimited orders and products</li><li>Your own domain</li><li>Paymob, Kashier, Fawry, wallets, Meeza</li><li>3 staff accounts</li><li>EGP 15,000 a year (2 months free)</li></ul>
+    </div>
+    <div class="plan">
+      <span class="eyebrow">Pro</span>
+      <div class="price">EGP 3,500<small>/ month</small></div>
+      <ul><li>One-click import from Shopify</li><li>10 staff accounts</li><li>Reports, abandoned carts, loyalty</li><li>Priority WhatsApp support</li></ul>
+    </div>
+  </div>
+  <div class="callout">
+    <p><strong>The pitch in one line:</strong> "Shopify takes EGP 3,986 a month from a store your size and bills you in dollars. We take EGP 1,500 flat, in pounds, and 0% of your sales."</p>
+    <p class="note">Gaps no competitor fills clearly: InstaPay built into checkout, published gateway rates (Fawry and Geidea only give quotes), and true 0% commission with EGP billing.</p>
+  </div>
+</section>
+
+<!-- 2 MIGRATION -->
+<section id="migration">
+  <div class="lede">
+    <span class="eyebrow">2 · Moving stores off Shopify</span>
+    <h2>No Shopify MCP can export a store. The Admin API can.</h2>
+    <p>Shopify's MCP servers (Dev, Storefront/UCP catalog, Customer Accounts, Checkout) are built for AI shopping agents and coding help. None of them reads a merchant's whole store. The dependable route is the <strong>Admin GraphQL API with bulk operations</strong>. They export each part of the store as a file in the background, up to 5 at once per store since API 2026-01.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="box">
+      <h3>Two hard facts to plan around</h3>
+      <p><strong>Store owners can no longer create custom apps in the admin</strong> (since 1 Jan 2026). So the importer has to be our own public Shopify app, which the merchant approves with one click through OAuth.</p>
+      <p><strong>Customer names, emails and addresses need Shopify's Protected Customer Data approval.</strong> Review takes 2–4 weeks. Without it those fields come back empty. Apply early.</p>
+    </div>
+    <div class="box">
+      <h3>Day-one fallback, with no approval needed</h3>
+      <p>The Shopify admin already exports <strong>products, customers and orders as CSV</strong>. The Pro plan can accept those files on day one while the public app is in review. The public <span class="num">/products.json</span> feed can power a "preview your store here" teaser, but only with the owner's consent. Never migrate a store without it.</p>
+    </div>
+  </div>
+
+  <div class="scroll"><table>
+    <thead><tr><th>What moves</th><th>How</th><th>Permission</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Products, variants, images, metafields</td><td>Bulk query</td><td class="num">read_products</td><td><span class="tag ok">full</span></td></tr>
+      <tr><td>Collections, inventory</td><td>Bulk query</td><td class="num">read_products, read_inventory</td><td><span class="tag ok">full</span></td></tr>
+      <tr><td>Customers</td><td>Bulk query</td><td class="num">read_customers + data approval</td><td><span class="tag warn">no passwords</span></td></tr>
+      <tr><td>Order history</td><td>Bulk query</td><td class="num">read_orders + read_all_orders</td><td><span class="tag ok">full</span></td></tr>
+      <tr><td>Pages, blog posts</td><td>Bulk query</td><td class="num">read_content</td><td><span class="tag ok">full</span></td></tr>
+      <tr><td>Menus, URL redirects</td><td>GraphQL</td><td class="num">read_online_store_navigation</td><td><span class="tag ok">full</span></td></tr>
+      <tr><td>Discounts</td><td>GraphQL</td><td class="num">read_discounts</td><td><span class="tag ok">full</span></td></tr>
+      <tr><td>Gift cards</td><td>GraphQL</td><td class="num">read_gift_cards</td><td><span class="tag warn">balance only, new codes</span></td></tr>
+      <tr><td>Shipping zones, taxes, store settings</td><td>GraphQL</td><td class="num">read_shipping, read_locales</td><td><span class="tag ok">full</span></td></tr>
+      <tr><td>Theme colours, fonts, logo</td><td><span class="num">themeFiles</span> → settings_data.json</td><td class="num">read_themes</td><td><span class="tag warn">mapped, not copied</span></td></tr>
+      <tr><td>Saved cards, Shopify Payments data</td><td>—</td><td>—</td><td><span class="tag no">never</span></td></tr>
+      <tr><td>App data (reviews, loyalty, subscriptions)</td><td>each app vendor's export</td><td>—</td><td><span class="tag no">per vendor</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <ol class="steps">
+    <li><div><h3>Owner connects their store</h3><p>"Import from Shopify" opens Shopify's own approval screen. We read nothing until the owner approves.</p></div></li>
+    <li><div><h3>Export runs in the background</h3><p>One bulk export per group of data (Shopify allows up to 5 linked lists and 2 levels of nesting per query). Download links expire after 7 days, so we copy the files straight away.</p></div></li>
+    <li><div><h3>Theme is translated</h3><p>We read the theme's colours, fonts and logo and apply them to one of our themes. Shopify's Liquid template code is kept for reference, never converted automatically.</p></div></li>
+    <li><div><h3>Owner reviews anything that didn't fit</h3><p>Products with too many variants, or data owned by apps, are listed for review instead of being dropped quietly.</p></div></li>
+    <li><div><h3>Honest report, then cut-over</h3><p>A "couldn't be moved" list covers saved cards, original gift card codes and app data. Password-reset emails go to customers. The owner moves the domain themselves when they're ready.</p></div></li>
+  </ol>
+</section>
+
+<!-- 3 BRAND -->
+<section id="brand">
+  <div class="lede">
+    <span class="eyebrow">3 · Name, colour, art</span>
+    <h2>The same night as mypovonai and Whisky 11, with one light of its own</h2>
+    <p>Both of your brands are dark-first and nearly monochrome: mypovonai lights its page with a white WebGPU orb, and Whisky 11 allows exactly one cyan call to action per screen. This product keeps that restraint and adds a single signature glow: <strong>Antique Gold</strong>, the same #B08D57 as Amelia Aurum. It's also the true colour of the Nile at night from orbit, where the city lights burn gold.</p>
+  </div>
+
+  <div class="swatches">
+    <div class="sw"><i style="background:#0A0B0C"></i><div><b>Night</b><span>#0A0B0C</span></div></div>
+    <div class="sw"><i style="background:#121415"></i><div><b>Panel</b><span>#121415</span></div></div>
+    <div class="sw"><i style="background:#25292A"></i><div><b>Line</b><span>#25292A</span></div></div>
+    <div class="sw"><i style="background:#F3F5F4"></i><div><b>Light</b><span>#F3F5F4</span></div></div>
+    <div class="sw"><i style="background:#A1A9A7"></i><div><b>Muted</b><span>#A1A9A7</span></div></div>
+    <div class="sw"><i style="background:#B08D57;box-shadow:inset 0 0 40px rgba(255,255,255,.18)"></i><div><b>Antique Gold</b><span>#B08D57</span></div></div><div class="sw"><i style="background:#CBA873"></i><div><b>Gold lift</b><span>#CBA873 · small marks</span></div></div>
+  </div>
+  <p class="note">The rule carried over from Whisky 11: the glow appears once per screen (the main button, or a store "lighting up"). Everything else stays in white light on the night ground. The platform's colours never appear on a merchant's storefront. Amelia Aurum keeps her wine, cream and gold.</p>
+
+  <div class="callout">
+    <h3>The art: the Nile at night, seen from orbit</h3>
+    <p>From space at night, Egypt is total darkness crossed by one bright ribbon: the Nile valley, fanning out into the Delta. That is the real map of where Egyptians live and trade. In the hero above, each point of light is a store, and gold points are stores opening right now. On the live site this becomes a WebGPU light field in the style of mypovonai's orb, fed by real store counts. No pyramids, no hieroglyphs, and no one else has this image.</p>
+  </div>
+
+  <div class="lede" style="padding-top:12px">
+    <h3>Names, no plain Arabic words this time</h3>
+    <p>Each domain was checked against the official registry on 25 Sep 2026, with a known-registered domain as a control.</p>
+  </div>
+  <div class="names">
+    <div class="name">
+      <div class="word">Faience</div>
+      <div class="ar">فايانس</div>
+      <p>Egypt's first luxury material: sand fired into a glowing surface, which is what the product does for a shop. With the gold glow, the name no longer carries the colour.</p>
+      <div class="domains"><span class="tag ok">faience.app free</span><span class="tag ok">getfaience.com free</span><span class="tag ok">faiencehq.com free</span><span class="tag no">faience.com taken</span></div>
+      <p class="note">Watch out: in everyday Egyptian Arabic, "فايانس" also means bathroom tiles. Test it on 5 merchants before committing.</p>
+    </div>
+    <div class="name">
+      <div class="word">Nile Lights</div>
+      <p>The name is the art. It reads the same to an Egyptian merchant and a foreign investor, and the hero image explains it instantly.</p>
+      <div class="domains"><span class="tag ok">nilelights.com free</span><span class="tag ok">nightnile.com free</span></div>
+      <p class="note">Very literal and less ownable as a trademark than a coined word.</p>
+    </div>
+    <div class="name">
+      <div class="word">Hangar Eleven</div>
+      <p>A sibling to Whisky 11 in the same aviation language. A hangar is where things are built and kept safe. Reads as a clear product of the house.</p>
+      <div class="domains"><span class="tag ok">hangar-eleven.com free</span><span class="tag no">hangar11.com taken</span><span class="tag no">hangar.app taken</span></div>
+      <p class="note">Only the hyphenated .com is free, and the name says nothing about Egypt.</p>
+    </div>
+  </div>
+  <p class="note">Checked and taken: delta11, kilo11, lima11, oscar11, kemet, lumora, nuura, fanous, storelight, shoplight (.com). Before any name is final: search the Egyptian trademark register (ITIDA/IPO) and check the Instagram and Facebook handles. Neither has been checked yet.</p>
+</section>
+
+<section id="sources">
+  <div class="lede"><span class="eyebrow">Sources</span></div>
+  <p class="note">
+    <a href="https://www.shopify.com/pricing">Shopify pricing</a> ·
+    <a href="https://cartdna.com/en/shopify-payment-guide/africa/egypt">Shopify Payments in Egypt</a> ·
+    <a href="https://help.shopify.com/en/manual/international/pricing">Shopify Markets conversion fee</a> ·
+    <a href="https://wuilt.com/en/pricing">Wuilt</a> ·
+    <a href="https://youcan.shop/en/pricing">YouCan</a> ·
+    <a href="https://paymob.com/en/pricing">Paymob</a> ·
+    <a href="https://www.kashier.io/en/pricing">Kashier</a> ·
+    <a href="https://english.ahram.org.eg/UI/Front/Inner.aspx?NewsContentID=518952">Ahram: card FX markup</a> ·
+    <a href="https://www.investing.com/currencies/usd-egp-historical-data">USD/EGP rate</a> ·
+    <a href="https://shopify.dev/docs/api/usage/bulk-operations">Bulk operations</a> ·
+    <a href="https://changelog.shopify.com/posts/legacy-custom-apps-can-t-be-created-after-january-1-2026">Custom apps sunset</a> ·
+    <a href="https://shopify.dev/docs/apps/launch/protected-customer-data">Protected customer data</a> ·
+    <a href="https://shopify.engineering/UCP">Universal Commerce Protocol</a> ·
+    <a href="https://shopify.dev/docs/api/admin-graphql/latest/queries/theme">Theme API</a> ·
+    <a href="https://community.shopify.com/t/how-can-i-access-full-gift-card-data-for-platform-migration/247454">Gift card codes</a> ·
+    <a href="https://polar.sh/docs/merchant-of-record/supported-countries">Polar countries</a>
+  </p>
+</section>
+</div>
+
+<script>
+// Chart: platform take per month, EGP, one linear scale.
+(function(){
+  const rows=[
+    {l:"Shopify Basic",v:3986},
+    {l:"YouCan Solopreneur",v:3006},
+    {l:"EasyOrders (unverified)",lo:2600,v:5200,range:true},
+    {l:"Wuilt Business",v:875},
+    {l:"Our Growth plan",v:1500,ours:true}
+  ];
+  const max=6500, el=document.getElementById('chart'), f=n=>n.toLocaleString('en-US');
+  let h='';
+  rows.forEach(r=>{
+    const left=r.range? r.lo/max*100 : 0, w=r.range? (r.v-r.lo)/max*100 : r.v/max*100;
+    const label=r.range? `EGP ${f(r.lo)}–${f(r.v)}` : `EGP ${f(r.v)}`;
+    h+=`<div class="bar-row"><div class="bar-label">${r.l}</div><div class="bar-track">
+      <div class="bar ${r.range?'range':''} ${r.ours?'ours':''}" style="left:${left}%;width:${w}%"></div>
+      <span class="bar-val" style="left:${left+w}%">${label}</span></div></div>`;
+  });
+  h+=`<div class="axis"><div></div><div class="ticks">${[0,2000,4000,6000].map(t=>`<span style="left:${t/max*100}%">${f(t)}</span>`).join('')}</div></div>`;
+  el.innerHTML=h;
+  // keep the last tick inside the box
+  const last=el.querySelector('.ticks span:last-child'); if(last){last.style.transform='translateX(-100%)';}
+})();
+
+// Hero: the Nile valley and Delta at night, points of light; turquoise = a store opening.
+(function(){
+  const c=document.getElementById('nile'), x=c.getContext('2d');
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W,H,pts=[],dpr=Math.min(devicePixelRatio||1,2);
+  function rnd(a,b){return a+Math.random()*(b-a)}
+  function gauss(){return (Math.random()+Math.random()+Math.random()-1.5)/1.5}
+  function build(){
+    W=c.clientWidth;H=c.clientHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0);
+    pts=[];
+    const cx=W*(W>700?0.7:0.62), top=H*0.05, deltaY=H*0.4, bottom=H*1.05;
+    const n=Math.round(Math.min(2600,W*H/180));
+    for(let i=0;i<n;i++){
+      let px,py;
+      if(Math.random()<0.46){ // the Delta fan
+        const t=Math.pow(Math.random(),0.8), ang=gauss()*0.62;
+        const r=t*(deltaY-top);
+        px=cx+Math.sin(ang)*r*2.1; py=deltaY-Math.cos(ang)*r*0.95;
+      }else{ // the valley ribbon, gently meandering
+        py=rnd(deltaY,bottom);
+        const k=(py-deltaY)/(bottom-deltaY);
+        const bend=Math.sin(k*5.2)*W*0.035+Math.sin(k*13)*W*0.008 - k*W*0.03;
+        px=cx+bend+gauss()*(10+k*5);
+      }
+      // cities: denser, brighter clusters
+      const b=Math.random();
+      pts.push({x:px,y:py,s:b<0.03?rnd(1.4,2.2):rnd(0.4,1.1),a:rnd(0.25,0.95),p:rnd(0,6.28),g:0});
+    }
+    // Cairo and Alexandria glow
+    pts.push({x:cx,y:deltaY+4,s:0,a:0,p:0,g:0,city:28});
+    pts.push({x:cx-(deltaY-top)*0.72,y:top+(deltaY-top)*0.12,s:0,a:0,p:0,g:0,city:18});
+  }
+  function frame(t){
+    x.fillStyle='#0A0B0C';x.fillRect(0,0,W,H);
+    for(const p of pts){
+      if(p.city){const gr=x.createRadialGradient(p.x,p.y,0,p.x,p.y,p.city);gr.addColorStop(0,'rgba(243,245,244,.22)');gr.addColorStop(1,'rgba(243,245,244,0)');x.fillStyle=gr;x.beginPath();x.arc(p.x,p.y,p.city,0,6.28);x.fill();continue;}
+      const tw=reduce?1:0.75+0.25*Math.sin(t*0.0012+p.p);
+      if(p.g>0){ // a store opening
+        const k=p.g; x.fillStyle=`rgba(203,168,115,${Math.min(1,k)})`;
+        x.beginPath();x.arc(p.x,p.y,p.s+1.2,0,6.28);x.fill();
+        x.fillStyle=`rgba(203,168,115,${k*0.2})`;x.beginPath();x.arc(p.x,p.y,6+ (1-k)*10,0,6.28);x.fill();
+        if(!reduce)p.g-=0.006;
+      }else{
+        x.fillStyle=`rgba(233,238,236,${p.a*tw})`;x.fillRect(p.x,p.y,p.s,p.s);
+      }
+    }
+    if(!reduce && Math.random()<0.05){const p=pts[(Math.random()*(pts.length-2))|0]; if(!p.city)p.g=1;}
+    // fade the left side so the copy stays readable
+    const fade=x.createLinearGradient(0,0,W*0.75,0);fade.addColorStop(0,'rgba(10,11,12,.92)');fade.addColorStop(1,'rgba(10,11,12,0)');
+    x.fillStyle=fade;x.fillRect(0,0,W,H);
+    const fb=x.createLinearGradient(0,H*0.55,0,H);fb.addColorStop(0,'rgba(10,11,12,0)');fb.addColorStop(1,'rgba(10,11,12,.85)');
+    x.fillStyle=fb;x.fillRect(0,0,W,H);
+    if(!reduce)requestAnimationFrame(frame);
+  }
+  build();
+  if(reduce){ for(let i=0;i<14;i++){const p=pts[(Math.random()*(pts.length-2))|0]; if(!p.city)p.g=1;} }
+  requestAnimationFrame(frame);
+  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{build();if(reduce)requestAnimationFrame(frame)},150)});
+})();
+</script>
