@@ -51,6 +51,8 @@ vi.mock('@force/database', () => ({
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
 
+vi.mock('@api/services/plan-limit.service', () => ({ assertWithinLimit: vi.fn() }));
+
 const create = vi.fn();
 const update = vi.fn();
 vi.mock('@api/services/store.service', () => ({

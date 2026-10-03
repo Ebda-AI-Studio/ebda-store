@@ -20,6 +20,7 @@ vi.mock('@force/database', () => {
       create: vi.fn(async () => ({ id: 'u1', email: 'o@x.com' })),
     },
     store: { create: storeCreate },
+    storeSubscription: { upsert: vi.fn() },
     category: { create: vi.fn() },
     taxRate: { create: taxRateCreate },
     paymentConfig: { create: vi.fn() },

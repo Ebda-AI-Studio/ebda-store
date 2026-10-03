@@ -77,9 +77,17 @@ async function loadPlan(tx: Tx, code: string) {
   return tx.plan.findUnique({ where: { code } });
 }
 
-export async function getEntitlements(storeId: string, tx?: Tx): Promise<Entitlements | null> {
+export async function getEntitlements(
+  storeId: string,
+  tx?: Tx,
+  /** The caller already read `stores.plan` (FeatureService does) — skips the second read. */
+  known?: { legacyPlan: keyof typeof LEGACY_STORE_PLAN_TO_PLAN_CODE }
+): Promise<Entitlements | null> {
   const run = async (db: Tx): Promise<Entitlements | null> => {
-    const store = await db.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+    const store =
+      known !== undefined
+        ? { plan: known.legacyPlan }
+        : await db.store.findUnique({ where: { id: storeId }, select: { plan: true } });
     if (!store) return null;
     const sub = await db.storeSubscription.findUnique({ where: { storeId } });
 
@@ -113,9 +121,10 @@ export async function getEntitlements(storeId: string, tx?: Tx): Promise<Entitle
  */
 export async function getAutomationFlags(
   storeId: string,
-  tx?: Tx
+  tx?: Tx,
+  known?: { legacyPlan: keyof typeof LEGACY_STORE_PLAN_TO_PLAN_CODE }
 ): Promise<Pick<PlanLimits, 'abandonedCartAutomation' | 'whatsappAutomation'> | null> {
-  const e = await getEntitlements(storeId, tx);
+  const e = await getEntitlements(storeId, tx, known);
   if (!e) return null;
   return {
     abandonedCartAutomation: e.limits.abandonedCartAutomation,

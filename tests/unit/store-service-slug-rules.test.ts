@@ -23,6 +23,10 @@ vi.mock('@force/database', () => ({
   },
   Prisma: {},
   withMoneyTx: vi.fn(),
+  // StoreService.create writes the store's subscription row (SP5 plans engine).
+  withRlsBypass: vi.fn(async (fn: (tx: unknown) => unknown) =>
+    fn({ storeSubscription: { upsert: vi.fn().mockResolvedValue({}) } })
+  ),
   StoreStatus: {},
 }));
 vi.mock('@api/services/redis.service', () => ({

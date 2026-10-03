@@ -168,15 +168,21 @@ class FeatureService {
     // enabled/disabled by override would be mis-resolved (and the wrong value
     // Redis-cached). `stores` itself has RLS disabled, but read both inside one
     // bypass tx — trusted internal read already scoped by `where: { storeId }`.
-    const [store, rows] = await withRlsBypass(tx =>
-      Promise.all([
+    const [store, rows, flags] = await withRlsBypass(async tx => {
+      const [storeRow, featureRows] = await Promise.all([
         tx.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
         tx.storeFeature.findMany({
           where: { storeId },
           select: { featureKey: true, enabled: true },
         }),
-      ])
-    );
+      ]);
+      // The plans engine's automation flags, read in the SAME bypass tx (one
+      // connection; a transient failure retries and fails closed together).
+      const planFlags = storeRow
+        ? await getAutomationFlags(storeId, tx, { legacyPlan: storeRow.plan })
+        : null;
+      return [storeRow, featureRows, planFlags] as const;
+    });
     // If the store doesn't exist, return all-false (safe default; callers
     // already handle missing stores at the route level via requireStoreAccess).
     if (!store) {
@@ -185,14 +191,6 @@ class FeatureService {
         boolean
       >;
     }
-    // Automation flags come from the plans engine (read-only, bypass tx).
-    const flags = await getAutomationFlags(storeId).catch(err => {
-      logger.error(
-        { err, storeId },
-        '[FeatureService] plan flags unavailable — plan baseline only'
-      );
-      return null;
-    });
     return this.rowsToMap(store.plan as StorePlan, rows, flags);
   }
 
@@ -355,7 +353,7 @@ class FeatureService {
         where: { storeId },
         select: { featureKey: true, enabled: true },
       });
-      const flags = await getAutomationFlags(storeId, tx).catch(() => null);
+      const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
       return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
     });
 
