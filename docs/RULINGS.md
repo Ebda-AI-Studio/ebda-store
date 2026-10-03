@@ -5344,6 +5344,7 @@ table until the barcode and bulk-stock features have run and the count is re-rea
 preloads the library and offers version 1.11, and the migration role is in `pg_read_all_stats`, so
 `CREATE EXTENSION IF NOT EXISTS` is the whole change. Cost if wrong: nothing to undo beyond a view
 and a few functions (`rollback.sql` drops the extension and the accumulated counters).
+
 ## 2026-10-03 — scoped-audit follow-ups (branch `fix/backlog-followups11`, issues 2427, 2429-2432, 2434)
 
 **Ruling PG-1 — a paged list ends its sort with a unique key (issue 2429).** `skip`/`take` over a
