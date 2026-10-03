@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { EditorialLanding } from '@/components/landing/EditorialLanding';
+import { BRAND } from '@force/shared';
 
 /**
  * Preview alias of the editorial platform landing (now also the live landing at
@@ -7,7 +8,7 @@ import { EditorialLanding } from '@/components/landing/EditorialLanding';
  * competes with the canonical root for indexing.
  */
 export const metadata: Metadata = {
-  title: 'Force AI — Landing Preview',
+  title: `${BRAND.name} — Landing Preview`,
   robots: { index: false, follow: false },
 };
 

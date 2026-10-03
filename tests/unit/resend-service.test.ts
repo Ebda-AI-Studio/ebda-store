@@ -273,7 +273,7 @@ describe('ResendService.sendBrandedEmail', () => {
     });
 
     expect(mockEmailsSend).toHaveBeenCalledWith(
-      expect.objectContaining({ from: 'Palora <noreply@force-ai.co>' })
+      expect.objectContaining({ from: 'Palora <noreply@ebda.app>' })
     );
   });
 

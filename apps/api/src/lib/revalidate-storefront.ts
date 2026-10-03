@@ -11,7 +11,7 @@ import logger from './logger';
  * reach it via its custom domain or the platform slug path.
  *
  * Config — this is a TWO-SIDED contract and both sides must agree:
- *  - STOREFRONT_REVALIDATE_URL (API): storefront base, e.g. https://store.force-ai.co
+ *  - STOREFRONT_REVALIDATE_URL (API): storefront base, e.g. https://ebda.app
  *  - REVALIDATE_SECRET (API **and** the storefront Worker): shared secret.
  *
  * If the secret is missing on the STOREFRONT, this endpoint answers 503 and

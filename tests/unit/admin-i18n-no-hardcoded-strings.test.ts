@@ -341,10 +341,6 @@ const WIDENED_FILE_ALLOWLIST: Record<string, string[]> = {
     '[prop] Locations',
   ],
   'components/FooterLinksEditor.tsx': ['[prop] Contact', '[prop] Wishlist', '[prop] Locations'],
-  // The installed-app product name. It must equal app/manifest.ts `name`, and
-  // a browser fetches the manifest without the locale cookie, so it cannot be
-  // localized — a product name, kept identical in both locales (Ruling I18N-G2).
-  'app/layout.tsx': ['[prop] Force AI Store Admin'],
 };
 
 describe('admin i18n: widened-shape ratchet over the 81 files (issue 2182)', () => {

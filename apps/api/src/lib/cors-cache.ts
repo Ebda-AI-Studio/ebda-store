@@ -1,6 +1,7 @@
 // Shared CORS domain cache — extracted to avoid circular imports between
 // index.ts (which sets up CORS) and store.routes.ts (which needs to bust the cache).
 import { BoundedMap } from './bounded-map';
+import { BRAND, brandUrl } from '@force/shared';
 
 // Capped so a pathological stream of unknown domains (e.g. bot traffic
 // probing random hostnames) can never grow the Map without limit.
@@ -185,18 +186,13 @@ export function isPlatformOrigin(
 
   // Hardcoded prod fallbacks — kept in sync with the CORS handler in
   // index.ts so a missing/forgotten env var doesn't downgrade trust.
-  if (origin === 'https://store.forcemediakw.com') return true;
-  if (origin === 'https://app.forcemediakw.com') return true;
-  // Orders PWA (staff order-management app) — a distinct origin from admin.
-  if (origin === 'https://orders.forcemediakw.com') return true;
-
-  // force-ai.co platform origins — the 2026-06 domain rebrand (Vercel→Cloudflare
-  // migration, completed 2026-07; Vercel is fully decommissioned). Mirror of the
-  // forcemediakw.com platform origins above. (whatsapp[-api].force-ai.co belong
-  // to the WhatsApp Bulk Sender — a different API — so they are NOT listed here.)
-  if (origin === 'https://store.force-ai.co') return true;
-  if (origin === 'https://admin.force-ai.co') return true;
-  if (origin === 'https://orders.force-ai.co') return true;
+  // Marketing site, merchant dashboard and the Orders PWA (staff
+  // order-management app — a distinct origin from admin). Store origins
+  // (`<slug>.ebda.app`) and custom domains are validated separately.
+  // (The post-launch WhatsApp platform host is NOT listed here.)
+  if (origin === brandUrl(BRAND.domains.marketing)) return true;
+  if (origin === brandUrl(BRAND.domains.app)) return true;
+  if (origin === brandUrl(BRAND.domains.orders)) return true;
 
   // Cloudflare Workers preview deploys for the project (OpenNext migration).
   // SCOPED to OUR account subdomain + our worker names — NOT any *.workers.dev,

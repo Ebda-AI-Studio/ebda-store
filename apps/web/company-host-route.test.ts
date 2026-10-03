@@ -3,21 +3,21 @@ import { companyHostRoute, COMPANY_ORIGIN } from './company-host-route';
 
 describe('companyHostRoute', () => {
   describe('company hosts', () => {
-    it('301-redirects www.force-ai.co to the bare apex, preserving path + query', () => {
-      expect(companyHostRoute('www.force-ai.co', '/', '')).toEqual({
+    it('301-redirects www.ebda.app to the bare apex, preserving path + query', () => {
+      expect(companyHostRoute('www.ebda.app', '/', '')).toEqual({
         kind: 'redirect',
-        location: 'https://force-ai.co/',
+        location: 'https://ebda.app/',
         status: 301,
       });
-      expect(companyHostRoute('www.force-ai.co', '/privacy', '?ref=x')).toEqual({
+      expect(companyHostRoute('www.ebda.app', '/privacy', '?ref=x')).toEqual({
         kind: 'redirect',
-        location: 'https://force-ai.co/privacy?ref=x',
+        location: 'https://ebda.app/privacy?ref=x',
         status: 301,
       });
     });
 
-    it('reverse-proxies the bare apex force-ai.co to the Pages origin', () => {
-      expect(companyHostRoute('force-ai.co', '/', '')).toEqual({
+    it('reverse-proxies the bare apex ebda.app to the Pages origin', () => {
+      expect(companyHostRoute('ebda.app', '/', '')).toEqual({
         kind: 'proxy',
         origin: COMPANY_ORIGIN,
       });
@@ -33,23 +33,24 @@ describe('companyHostRoute', () => {
       'www.pecannbee.com',
       'wadyaljuz.com',
       'www.wadyaljuz.com',
-      // Platform subdomains.
-      'store.force-ai.co',
-      'admin.force-ai.co',
-      'orders.force-ai.co',
+      // Platform subdomains and store subdomains.
+      'app.ebda.app',
+      'orders.ebda.app',
+      'api.ebda.app',
+      'demo.ebda.app',
       // Look-alikes that must NOT be treated as the company host.
-      'foo.force-ai.co',
-      'notforce-ai.co',
-      'force-ai.co.evil.com',
-      'wwwforce-ai.co',
+      'foo.ebda.app',
+      'notebda.app',
+      'ebda.app.evil.com',
+      'wwwebda.app',
     ];
 
     it.each(passthroughHosts)('%s → next', host => {
       expect(companyHostRoute(host, '/', '')).toEqual({ kind: 'next' });
     });
 
-    it('a merchant path on store.force-ai.co is untouched', () => {
-      expect(companyHostRoute('store.force-ai.co', '/pecannbee', '')).toEqual({
+    it('a merchant path on a store subdomain is untouched', () => {
+      expect(companyHostRoute('pecannbee.ebda.app', '/products', '')).toEqual({
         kind: 'next',
       });
     });

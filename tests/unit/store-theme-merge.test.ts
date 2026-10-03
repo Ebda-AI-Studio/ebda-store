@@ -33,7 +33,8 @@ vi.mock('@force/database', () => ({
   withMoneyTx: vi.fn(),
 }));
 
-vi.mock('@force/shared', () => ({
+vi.mock('@force/shared', async importOriginal => ({
+  ...(await importOriginal<typeof import('@force/shared')>()),
   slugify: (s: string) => s,
 }));
 

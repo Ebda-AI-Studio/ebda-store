@@ -17,7 +17,7 @@ import path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { IncrementalCache } = require('next/dist/server/lib/incremental-cache');
 
-const URL_ = 'https://api.force-ai.co/api/v1/public/products/shoes';
+const URL_ = 'https://api.ebda.app/api/v1/public/products/shoes';
 
 function keyFor(storeId: string, tags: string[] = ['products:fixed']): Promise<string> {
   return IncrementalCache.prototype.generateCacheKey.call({ fetchCacheKeyPrefix: '' }, URL_, {

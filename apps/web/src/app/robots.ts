@@ -7,7 +7,7 @@ import { getSiteUrl } from '../lib/structured-data';
  * sitemap rooted in the SAME host the visitor is currently on:
  *
  *   - on `wadyaljuz.com` → https://wadyaljuz.com/sitemap.xml
- *   - on `store.forcemediakw.com` → https://store.forcemediakw.com/sitemap.xml
+ *   - on `ebda.app` → https://ebda.app/sitemap.xml
  *
  * Without this, robots.txt on the custom domain would advertise
  * the platform sitemap, telling Google to index platform URLs even

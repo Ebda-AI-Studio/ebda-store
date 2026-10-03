@@ -29,9 +29,9 @@ function captureForwarded(res: Response) {
 }
 
 function platformRequest(path: string) {
-  return new NextRequest(`https://store.force-ai.co${path}`, {
+  return new NextRequest(`https://ebda.app${path}`, {
     headers: {
-      host: 'store.force-ai.co',
+      host: 'ebda.app',
       cookie: 'x-store-slug=palora',
       // A client cannot forge the signal either.
       'x-store-slug-source': 'cookie',
@@ -84,7 +84,7 @@ describe('agent-discovery documents on the real middleware path (#2174)', () => 
     const res = await GET();
     const body = await res.text();
     expect(body).not.toContain('Palora');
-    expect(body).toContain('# Force AI Store');
+    expect(body).toContain('# Ebda');
     expect(res.headers.get('cache-control')).toMatch(/^public, s-maxage=/);
   });
 

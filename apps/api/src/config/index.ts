@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { BRAND, brandUrl } from '@force/shared';
 
 dotenv.config();
 
@@ -44,7 +45,7 @@ export const config = {
   adminUrl: process.env.ADMIN_URL || 'http://localhost:3001',
   apiUrl: process.env.API_URL || 'http://localhost:4000',
   // Orders PWA base URL — used to build OneSignal deep-links to the order
-  // detail page (orders.forcemediakw.com/orders/:id?store=:storeId). Dev
+  // detail page (orders.ebda.app/orders/:id?store=:storeId). Dev
   // default matches the orders app's dev port (next dev -p 3002).
   ordersUrl: process.env.ORDERS_URL || 'http://localhost:3002',
 
@@ -133,13 +134,13 @@ export const config = {
   // Web Push (VAPID) - platform-wide keys for standards-based Web Push (RFC 8030)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
-  vapidSubject: process.env.VAPID_SUBJECT || 'mailto:contact@force-ai.co',
+  vapidSubject: process.env.VAPID_SUBJECT || `mailto:${BRAND.supportEmail}`,
 
   // OneSignal — admin-side push notifications. Tags are scoped per-user with
   // (role, store_id) so notifyAdminsOfOrder() can filter to the order's store
   // admins plus all super_admins, never bleeding to other tenants' admins.
   // Storefront OneSignal app — push notifications to shoppers. The app's
-  // `chrome_web_origin` is locked to https://store.forcemediakw.com and
+  // `chrome_web_origin` is locked to https://ebda.app and
   // OneSignal does not allow multiple origins per app, so the admin uses
   // a SEPARATE app (variables below) when configured. When the admin
   // variables are unset we fall back to the storefront app id so legacy
@@ -148,7 +149,7 @@ export const config = {
   onesignalAppId: process.env.ONESIGNAL_APP_ID || '',
   onesignalRestApiKey: process.env.ONESIGNAL_REST_API_KEY || '',
   // Admin OneSignal app — push notifications to store admins about new
-  // orders, etc. Origin must match https://app.forcemediakw.com. When
+  // orders, etc. Origin must match https://app.ebda.app. When
   // unset, falls back to the storefront app (admin pushes won't actually
   // deliver because the origin won't match — operator should create a
   // dedicated admin OneSignal app and set these).
@@ -156,9 +157,9 @@ export const config = {
   onesignalAdminRestApiKey:
     process.env.ONESIGNAL_ADMIN_REST_API_KEY || process.env.ONESIGNAL_REST_API_KEY || '',
   // Orders PWA OneSignal app — push notifications to store staff about new
-  // orders on the Orders PWA (origin orders.forcemediakw.com). OneSignal locks
+  // orders on the Orders PWA (origin orders.ebda.app). OneSignal locks
   // each app to a single chrome_web_origin, so the Orders app needs its OWN
-  // OneSignal app distinct from the admin one (app.forcemediakw.com). No
+  // OneSignal app distinct from the admin one (app.ebda.app). No
   // fallback to the admin app id — an origin mismatch would silently fail to
   // subscribe Orders devices, so we leave it empty and skip sends when unset.
   onesignalOrdersAppId: process.env.ONESIGNAL_ORDERS_APP_ID || '',
@@ -192,8 +193,8 @@ export const config = {
   smtpPort: parseInt(process.env.SMTP_PORT || '1025', 10),
   smtpUser: process.env.SMTP_USER || '',
   smtpPassword: process.env.SMTP_PASSWORD || '',
-  smtpFromName: process.env.SMTP_FROM_NAME || 'Force Media',
-  smtpFromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@force-ai.co',
+  smtpFromName: process.env.SMTP_FROM_NAME || BRAND.name,
+  smtpFromEmail: process.env.SMTP_FROM_EMAIL || BRAND.noReplyEmail,
 
   // Resend SDK key (single platform-wide account; all merchant domains live
   // under it). Falls back to SMTP_PASSWORD because the pre-existing setup
@@ -205,7 +206,7 @@ export const config = {
   resendApiKey: process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD || '',
 
   // Public origin Inngest Cloud must call to reach our serve endpoint
-  // (scheme+host only, e.g. https://store-api.forcemediakw.com — servePath
+  // (scheme+host only, e.g. https://api.ebda.app — servePath
   // is added separately). CRITICAL: without this the SDK infers its public
   // URL from the Host header of whatever request triggers registration. Our
   // post-boot self-register PUT hits 127.0.0.1, so the SDK registered
@@ -235,10 +236,10 @@ export const config = {
   cfApiToken: process.env.CF_API_TOKEN || '',
   cfZoneId: process.env.CF_ZONE_ID || '',
   // The CNAME target a merchant points their hostname at (a hostname in our CF
-  // zone that fronts the Worker / fallback origin), e.g. 'cf.forcemediakw.com'.
+  // zone that fronts the Worker / fallback origin), e.g. 'cf.ebda.app'.
   cfFallbackOrigin: process.env.CF_FALLBACK_ORIGIN || '',
 
-  // AI features — Force AI Store AI assistant uses Google Gemini 2.0 Flash
+  // AI features — Ebda AI assistant uses Google Gemini 2.0 Flash
   // for translation, SEO meta generation, and category suggestions.
   // Free tier covers 15 req/min and ~1500 req/day per project, which
   // is well above what a single store will use. `AI_FEATURES_ENABLED`
@@ -273,10 +274,10 @@ export const config = {
   icarryWebhookSecret: process.env.ICARRY_WEBHOOK_SECRET || '',
   aramexWebhookSecret: process.env.ARAMEX_WEBHOOK_SECRET || '',
 
-  // Force AI WhatsApp Business Platform bridge
-  // Base URL of the WBS backend. In production: https://whatsapp-api.force-ai.co
+  // Ebda WhatsApp Business Platform bridge
+  // Base URL of the WBS backend. In production: https://whatsapp-api.ebda.app
   // Leave unset in dev — the bridge will skip sends gracefully when store.wbsEnabled=false.
-  wbsBaseUrl: process.env.WBS_BASE_URL || 'https://whatsapp-api.force-ai.co',
+  wbsBaseUrl: process.env.WBS_BASE_URL || brandUrl(BRAND.domains.whatsapp),
 } as const;
 
 // Additional production validations (core secrets already validated above)

@@ -35,7 +35,8 @@ vi.mock('@force/database', () => ({
   Prisma: {},
   withMoneyTx: vi.fn(),
 }));
-vi.mock('@force/shared', () => ({
+vi.mock('@force/shared', async importOriginal => ({
+  ...(await importOriginal<typeof import('@force/shared')>()),
   slugify: (s: string) => s,
   // #1518: pulled in transitively by importing `updateStoreSchema`
   // (store.routes.ts's heroCtaLink/settings.contact.addressUrl validators

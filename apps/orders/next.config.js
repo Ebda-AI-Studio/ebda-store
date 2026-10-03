@@ -36,7 +36,7 @@ const nextConfig = {
             { protocol: 'http', hostname: 'localhost', port: '9000', pathname: '/**' },
           ]
         : []),
-      { protocol: 'https', hostname: 'cdn.forcemediakw.com', port: '', pathname: '/**' },
+      { protocol: 'https', hostname: 'cdn.ebda.app', port: '', pathname: '/**' },
       { protocol: 'https', hostname: '*.supabase.co', port: '', pathname: '/storage/**' },
       { protocol: 'https', hostname: '*.r2.cloudflarestorage.com', port: '', pathname: '/**' },
       { protocol: 'https', hostname: '*.r2.dev', port: '', pathname: '/**' },
@@ -83,7 +83,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://*.onesignal.com; " +
               "font-src 'self' data: https://fonts.gstatic.com; " +
               "img-src 'self' data: https: blob:; " +
-              "connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co wss://store-api.forcemediakw.com wss://api.force-ai.co https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; " +
+              "connect-src 'self' https://api.ebda.app wss://api.ebda.app https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; " +
               'frame-src https://onesignal.com https://*.onesignal.com; ' +
               "worker-src 'self' blob:; " +
               "manifest-src 'self'; " +

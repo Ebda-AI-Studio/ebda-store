@@ -5,6 +5,7 @@ import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { Providers } from './providers';
 import { intlFormats } from '../i18n/formats';
 import '../styles/globals.css';
+import { BRAND } from '@force/shared';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -49,10 +50,10 @@ export const metadata: Metadata = {
   // PWA install metadata. apple-* keys exist because iOS Safari requires
   // an installed PWA before granting Web Push permission, and the install
   // prompt picks up these tags rather than the manifest.
-  applicationName: 'Force AI Store Admin',
+  applicationName: `${BRAND.name} Admin`,
   appleWebApp: {
     capable: true,
-    title: 'Force AI Store Admin',
+    title: `${BRAND.name} Admin`,
     statusBarStyle: 'default',
   },
   formatDetection: {

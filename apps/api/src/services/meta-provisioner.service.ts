@@ -1,15 +1,15 @@
 /**
  * Meta Commerce auto-provisioner.
  *
- * Force AI holds ONE master access token at FORCE_AI_META_ADMIN_TOKEN with the
- * `business_management` + `catalog_management` scopes on the Force AI parent
+ * Ebda holds ONE master access token at FORCE_AI_META_ADMIN_TOKEN with the
+ * `business_management` + `catalog_management` scopes on the Ebda parent
  * Business Manager (FORCE_AI_META_BM_ID). This service uses those credentials
  * to create a per-merchant Commerce Catalog + assign the long-lived system
  * user, then hand the catalog id + a derived system-user token back to FWB so
  * the merchant doesn't have to navigate Meta Business Manager themselves.
  *
- * One-time Force AI setup (NOT something Ahmad does per merchant):
- *   1. Create Force AI parent Business Manager at https://business.facebook.com/
+ * One-time Ebda setup (NOT something Ahmad does per merchant):
+ *   1. Create Ebda parent Business Manager at https://business.facebook.com/
  *   2. Create a System User named `force-ai-catalog-provisioner` with admin role
  *   3. Generate a never-expires token with scopes:
  *        - business_management
@@ -51,7 +51,7 @@ function getCredentials(): { bmId: string; adminToken: string } {
   if (!bmId || !adminToken) {
     throw new MetaProvisionerError(
       'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
-        'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Force AI setup).',
+        'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda setup).',
       'config'
     );
   }
@@ -82,7 +82,7 @@ async function graph<T>(url: string, init: RequestInit, stage: string): Promise<
 }
 
 /**
- * Create a new Commerce Catalog under the Force AI parent Business Manager.
+ * Create a new Commerce Catalog under the Ebda parent Business Manager.
  * Returns the new catalog id.
  */
 async function createCatalog(name: string): Promise<string> {
@@ -111,7 +111,7 @@ async function createCatalog(name: string): Promise<string> {
 }
 
 /**
- * Grant the Force AI provisioner system user MANAGE permission on the new
+ * Grant the Ebda provisioner system user MANAGE permission on the new
  * catalog. Without this the same admin token can't subsequently call /products
  * on the catalog to publish merchandise.
  */

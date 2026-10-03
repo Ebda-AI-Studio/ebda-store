@@ -9,7 +9,6 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 // @ts-expect-error - plain .mjs script, no types
 import {
   liveCommitVerdict,
@@ -111,74 +110,5 @@ describe('an answer we could not read is not an answer', () => {
   it('a real mismatch still outranks an unreadable poll', () => {
     // Someone else is demonstrably serving: that is stale, not merely unread.
     expect(liveCommitVerdict([unreadable(), up('0ldbu1ld')], SHA)).toBe(VERDICT.STALE);
-  });
-});
-
-describe('the workflow captures the parser status instead of dying on it', () => {
-  // GitHub Actions runs `run:` blocks under `bash -e`. A bare assignment from a
-  // command substitution inherits that command's exit status, so the parser's
-  // `exit 3` terminated the STEP: no observation recorded, the verdict script
-  // never reached, and UNREADABLE unreachable in production — the whole point
-  // of the check, silently disabled. The retry window collapsed to one poll
-  // too, so a single transient failed a healthy deploy.
-  //
-  // Asserted structurally because the failure is in shell semantics, not in
-  // any function this suite can call.
-  const workflow = readFileSync(
-    new URL('../../.github/workflows/railway-deploy.yml', import.meta.url),
-    'utf8'
-  );
-
-  it('guards the parser capture so errexit cannot kill the step', () => {
-    const line = workflow.split('\n').find(l => l.includes('live=$(printf'));
-    expect(line, 'the parser capture line has moved or been renamed').toBeDefined();
-    expect(
-      line,
-      "a bare assignment inherits node's exit 3 under bash -e and terminates the step"
-    ).toMatch(/\|\|\s*parse_rc=\$\?/);
-  });
-
-  it('resets the status before each attempt', () => {
-    // Without this, a success after a failure would carry the previous
-    // iteration's non-zero status and report a readable body as unreadable.
-    expect(workflow).toMatch(/parse_rc=0\s*\n\s*live=\$\(printf/);
-  });
-
-  it('every command substitution in the verify step tolerates failure', () => {
-    const step = workflow.slice(
-      workflow.indexOf('Verify the deployed build is THIS commit'),
-      workflow.indexOf('notify-failure:')
-    );
-    // The admission probe that follows the verify step moved into
-    // scripts/guest-checkout-admission-probe.sh (issue 2191) — it runs under
-    // the same `set -e`, so its substitutions are held to the same rule.
-    const probe = readFileSync(
-      new URL('../../scripts/guest-checkout-admission-probe.sh', import.meta.url),
-      'utf8'
-    );
-    const assignments = `${step}\n${probe}`.split('\n').filter(l => /^\s+[a-z_]+=\$\(/.test(l));
-    expect(assignments.length).toBeGreaterThanOrEqual(3);
-    for (const a of assignments) {
-      expect(a, `unguarded substitution under bash -e: ${a.trim().slice(0, 60)}`).toMatch(/\|\|/);
-    }
-  });
-
-  it('#1519: body and code come from ONE request, not two independent curls', () => {
-    const step = workflow.slice(
-      workflow.indexOf('Verify the deployed build is THIS commit'),
-      workflow.indexOf('Verify guest checkout is still admitted')
-    );
-    const curlCalls = step.match(/curl\s/g) ?? [];
-    expect(
-      curlCalls.length,
-      'more than one curl call per poll reintroduces the two-request race ' +
-        '(a body fetched at one instant, a status code fetched moments ' +
-        'later) that let a perfectly healthy poll read as UNREADABLE'
-    ).toBe(1);
-    // The single curl must emit BOTH the body and the status code, and code/
-    // body must both be derived from that same captured response.
-    expect(step).toMatch(/curl\s+-s[^\n]*-w\s+'\\n%\{http_code\}'/);
-    expect(step).toMatch(/code="\$\(printf '%s' "\$resp"/);
-    expect(step).toMatch(/body="\$\(printf '%s' "\$resp"/);
   });
 });

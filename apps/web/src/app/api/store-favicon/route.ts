@@ -9,7 +9,7 @@
  *
  * `middleware.ts` now rewrites `/favicon.ico` → here, but ONLY for requests
  * whose host resolves to a custom domain (`storeIdentifier` truthy —
- * platform hosts like `store.force-ai.co` never enter that branch, so they
+ * platform hosts like `ebda.app` never enter that branch, so they
  * are completely unaffected by this route and keep serving the static file).
  *
  * We redirect rather than proxy bytes: simplest, avoids re-fetching /

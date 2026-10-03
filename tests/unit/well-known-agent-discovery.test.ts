@@ -26,7 +26,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const headerBag = {
   slug: null as string | null,
   domain: null as string | null,
-  host: 'store.force-ai.co',
+  host: 'ebda.app',
   // 'cookie' mirrors middleware.ts's x-store-slug-source signal (set only on
   // the sticky-cookie fallback branch, cleared everywhere else) — see
   // resolvedViaCookie() in apps/web/src/lib/agent-store-resolver.ts.
@@ -86,7 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   headerBag.slug = 'pecanbee';
   headerBag.domain = null;
-  headerBag.host = 'store.force-ai.co';
+  headerBag.host = 'ebda.app';
   headerBag.slugSource = null;
 });
 
@@ -165,7 +165,7 @@ describe('acp.json', () => {
   it('roots URLs under the platform path for a store with no domain', async () => {
     mockStore({ slug: 'pecanbee', domain: null });
     const b = await body(await acpGet());
-    expect(b.merchant.url).toBe('https://store.force-ai.co/pecanbee');
+    expect(b.merchant.url).toBe('https://ebda.app/pecanbee');
   });
 
   it('does not advertise returns — there is no agent-facing tool for them', async () => {

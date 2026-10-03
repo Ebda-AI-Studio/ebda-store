@@ -5,7 +5,7 @@ import { API_URL } from '../../../lib/api';
  * Public AI product feed passthrough (agent_feed; all paid plans).
  *
  * Tenant comes from middleware headers exactly like `llms.txt/route.ts`:
- * `x-store-slug` on the platform path (store.force-ai.co/<slug>/feeds/...)
+ * `x-store-slug` on the platform path (<slug>.ebda.app/feeds/...)
  * or `x-store-domain` on a merchant's custom domain. The feed itself is
  * built and gated in the API — this handler only resolves the tenant and
  * forwards. 404 in every not-available case (fail closed — a public URL

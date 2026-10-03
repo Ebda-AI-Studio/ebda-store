@@ -2,8 +2,9 @@ import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { BRAND } from '@force/shared';
 
-const ISSUER = 'Force AI Store';
+const ISSUER: string = BRAND.name;
 
 export class MfaService {
   static generateEnrollment(accountLabel: string): { secret: string; otpauthUrl: string } {

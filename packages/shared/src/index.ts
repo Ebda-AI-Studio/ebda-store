@@ -1,6 +1,7 @@
-// Force Website Builder - Shared Package
+// Ebda - Shared Package
 // Exports types, utilities, and constants used across all apps
 
+export * from './brand';
 export * from './types';
 export * from './utils';
 export * from './csv-utils';

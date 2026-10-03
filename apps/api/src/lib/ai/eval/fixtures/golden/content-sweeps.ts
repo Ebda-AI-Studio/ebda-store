@@ -72,7 +72,7 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
     // A golden fixture asserting the dead shape would let that regression
     // pass this eval gate again.
     output:
-      '# Wady Aljuz\n\n> Kuwait-based online store for handmade home goods.\n\n## Store pages\n- Home: https://store.force-ai.co/wady-aljuz\n\n## Product categories\n- Kitchen & Dining: https://store.force-ai.co/wady-aljuz/products?category=kitchen-dining\n- Home Decor: https://store.force-ai.co/wady-aljuz/products?category=home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency KWD, ships within Kuwait.',
+      '# Wady Aljuz\n\n> Kuwait-based online store for handmade home goods.\n\n## Store pages\n- Home: https://ebda.app/wady-aljuz\n\n## Product categories\n- Kitchen & Dining: https://ebda.app/wady-aljuz/products?category=kitchen-dining\n- Home Decor: https://ebda.app/wady-aljuz/products?category=home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency KWD, ships within Kuwait.',
   },
   {
     id: 'citation-copy-mug',

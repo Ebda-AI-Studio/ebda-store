@@ -1,5 +1,5 @@
 /**
- * Force AI Store AI assistant — translation, SEO meta, category suggestions.
+ * Ebda AI assistant — translation, SEO meta, category suggestions.
  *
  * Mounted at `/stores/:storeId/ai/*`. Every endpoint requires
  * `store_admin` or `super_admin` scoped to the store, plus the

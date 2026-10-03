@@ -1,4 +1,5 @@
 import { escapeHtml } from './_util';
+import { BRAND } from '@force/shared';
 
 export interface ResendVerificationData {
   email: string;
@@ -30,7 +31,7 @@ export const resendVerificationTemplate = {
     <p style="font-size: 14px; color: #666;">If you didn't request this, please contact support.</p>
     <p style="font-size: 12px; color: #999; margin-top: 24px;">
       If the button above doesn't work, copy and paste this link into your browser:<br>
-      <a href="${urlEsc}" style="color: #ff6e00; word-break: break-all;">${urlEsc}</a>
+      <a href="${urlEsc}" style="color: ${BRAND.colors.gold}; word-break: break-all;">${urlEsc}</a>
     </p>
   `;
   },
@@ -48,7 +49,7 @@ export const resendVerificationTemplate = {
     <p style="font-size: 14px; color: #666;">إذا لم تطلب ذلك، يُرجى التواصل مع الدعم.</p>
     <p style="font-size: 12px; color: #999; margin-top: 24px;">
       إذا لم يعمل الزر أعلاه، انسخ هذا الرابط والصقه في متصفحك:<br>
-      <a href="${urlEsc}" style="color: #ff6e00; word-break: break-all;">${urlEsc}</a>
+      <a href="${urlEsc}" style="color: ${BRAND.colors.gold}; word-break: break-all;">${urlEsc}</a>
     </p>
   `;
   },

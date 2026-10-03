@@ -279,9 +279,9 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           paymentMethod,
         });
       }),
-      // Orders-PWA (orders.forcemediakw.com) staff push via OneSignal.
+      // Orders-PWA (orders.ebda.app) staff push via OneSignal.
       // Targets ONLY the Orders OneSignal app — a different device set + a
-      // different origin from the OneSignal admin app (app.forcemediakw.com),
+      // different origin from the OneSignal admin app (app.ebda.app),
       // so the two never double-send. Tag-based: only devices tagged with
       // this store's `store_id` (set when staff enable notifications) receive
       // it. Replaces the old VAPID web-push path (server 403 + iOS-unreliable).

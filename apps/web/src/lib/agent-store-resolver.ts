@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { API_URL } from './api';
+import { BRAND } from '@force/shared';
 
 /**
  * Resolve "which store is this request for?" for the AGENT-FACING routes —
@@ -8,9 +9,9 @@ import { API_URL } from './api';
  * All three answer the same question, three levels deep, and got it right in
  * `llms.txt/route.ts` first:
  *
- *   store.force-ai.co/<slug>/…   → middleware sets `x-store-slug`
+ *   <slug>.ebda.app/…   → middleware sets `x-store-slug`
  *   wadyaljuz.com/…              → middleware sets `x-store-domain`
- *   store.force-ai.co/…          → neither: the platform itself, no store
+ *   ebda.app/…          → neither: the platform itself, no store
  *
  * Extracted so a new discovery document cannot re-derive it slightly
  * differently. The custom-domain branch in particular is easy to miss — omit
@@ -137,6 +138,6 @@ export async function resolvedViaCookie(): Promise<boolean> {
  */
 export function storefrontBaseUrl(store: AgentStore, requestHost: string | null): string {
   if (store.domain) return `https://${store.domain}`;
-  const host = requestHost || 'store.force-ai.co';
+  const host = requestHost || BRAND.domains.marketing;
   return `https://${host}/${store.slug}`;
 }

@@ -138,10 +138,8 @@ describe('workflow runner selection honours the kill switch', () => {
         /^\s+schedule:/m.test(fs.readFileSync(path.join(WORKFLOWS, f), 'utf-8'))
       )
     );
-    expect(
-      scheduled.size,
-      'no schedule-triggered workflows found — walk is broken'
-    ).toBeGreaterThan(3);
+    // The Ebda fork has no cron workflows yet (the FWB ones were dropped), so
+    // `scheduled` may be empty; the rule below applies as soon as one returns.
     const stuck = runsOnValues().filter(
       r =>
         scheduled.has(r.file) &&
@@ -157,8 +155,8 @@ describe('workflow runner selection honours the kill switch', () => {
   it('actually reads the workflows — the walk is not silently empty', () => {
     // Without this, a renamed directory or a broken regex would make every
     // assertion above vacuous forever.
-    expect(workflowFiles().length).toBeGreaterThan(10);
-    expect(runsOnValues().length).toBeGreaterThan(20);
+    expect(workflowFiles().length).toBeGreaterThanOrEqual(3);
+    expect(runsOnValues().length).toBeGreaterThan(5);
   });
 
   it('gitleaks notify-failure is on the toggle — it is the one that was pinned', () => {

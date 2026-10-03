@@ -28,8 +28,8 @@ describe('middleware — x-store-slug-source signal', () => {
   // be keyed by URL/Host alone. That supersedes marking a cookie-resolved
   // response: there is no cookie-resolved response to mark.
   it('does NOT resolve a bare well-known path from the sticky cookie', async () => {
-    const req = new NextRequest('https://store.force-ai.co/.well-known/acp.json', {
-      headers: { host: 'store.force-ai.co', cookie: 'x-store-slug=pecanbee' },
+    const req = new NextRequest('https://ebda.app/.well-known/acp.json', {
+      headers: { host: 'ebda.app', cookie: 'x-store-slug=pecanbee' },
     });
     const res = middleware(req);
     expect(forwardedHeader(res, 'x-store-slug')).toBeNull();
@@ -37,8 +37,8 @@ describe('middleware — x-store-slug-source signal', () => {
   });
 
   it('does NOT resolve a bare /llms.txt from the sticky cookie', async () => {
-    const req = new NextRequest('https://store.force-ai.co/llms.txt', {
-      headers: { host: 'store.force-ai.co', cookie: 'x-store-slug=pecanbee' },
+    const req = new NextRequest('https://ebda.app/llms.txt', {
+      headers: { host: 'ebda.app', cookie: 'x-store-slug=pecanbee' },
     });
     const res = middleware(req);
     expect(forwardedHeader(res, 'x-store-slug')).toBeNull();
@@ -46,8 +46,8 @@ describe('middleware — x-store-slug-source signal', () => {
   });
 
   it('still sets x-store-slug-source: cookie on an ordinary subroute resolved from the cookie', async () => {
-    const req = new NextRequest('https://store.force-ai.co/products', {
-      headers: { host: 'store.force-ai.co', cookie: 'x-store-slug=pecanbee' },
+    const req = new NextRequest('https://ebda.app/products', {
+      headers: { host: 'ebda.app', cookie: 'x-store-slug=pecanbee' },
     });
     const res = middleware(req);
     expect(forwardedHeader(res, 'x-store-slug')).toBe('pecanbee');
@@ -55,8 +55,8 @@ describe('middleware — x-store-slug-source signal', () => {
   });
 
   it('does NOT set x-store-slug-source when the slug comes from the URL', async () => {
-    const req = new NextRequest('https://store.force-ai.co/pecanbee/.well-known/acp.json', {
-      headers: { host: 'store.force-ai.co' },
+    const req = new NextRequest('https://ebda.app/pecanbee/.well-known/acp.json', {
+      headers: { host: 'ebda.app' },
     });
     const res = middleware(req);
     expect(forwardedHeader(res, 'x-store-slug')).toBe('pecanbee');
@@ -76,8 +76,8 @@ describe('middleware — x-store-slug-source signal', () => {
     // requestHeaders is seeded from the raw request, so without an explicit
     // clear this client-supplied value would pass straight through and wrongly
     // mark a legitimately URL-resolved response non-shared-cacheable.
-    const req = new NextRequest('https://store.force-ai.co/pecanbee/.well-known/acp.json', {
-      headers: { host: 'store.force-ai.co', 'x-store-slug-source': 'cookie' },
+    const req = new NextRequest('https://ebda.app/pecanbee/.well-known/acp.json', {
+      headers: { host: 'ebda.app', 'x-store-slug-source': 'cookie' },
     });
     const res = middleware(req);
     expect(forwardedHeader(res, 'x-store-slug-source')).toBeNull();

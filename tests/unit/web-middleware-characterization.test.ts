@@ -55,7 +55,7 @@ describe('middleware — internal rewrite target is not externally addressable',
   });
 
   it('404s /tenant-store/* on a platform host too', () => {
-    const res = middleware(req('https://store.force-ai.co/tenant-store/x/en', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/tenant-store/x/en', 'ebda.app'));
     expect(res.status).toBe(404);
   });
 });
@@ -71,8 +71,8 @@ describe('middleware — www→apex canonicalisation', () => {
   });
 
   it('does NOT redirect a www PLATFORM host', () => {
-    // www.force-ai.co is a real platform host, not a merchant's www alias.
-    const res = middleware(req('https://www.force-ai.co/', 'www.force-ai.co'));
+    // ebda.app is a real platform host, not a merchant's www alias.
+    const res = middleware(req('https://ebda.app/', 'ebda.app'));
     expect(res.status).not.toBe(301);
   });
 });
@@ -94,14 +94,14 @@ describe('middleware — custom domain store binding', () => {
   });
 
   it('leaves /favicon.ico alone on a platform host', () => {
-    const res = middleware(req('https://store.force-ai.co/favicon.ico', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/favicon.ico', 'ebda.app'));
     expect(rewriteOf(res) ?? '').not.toContain('/api/store-favicon');
   });
 });
 
 describe('middleware — platform domain slug handling', () => {
   it('rewrites a slug-prefixed path and strips the slug', () => {
-    const res = middleware(req('https://store.force-ai.co/palora/products', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/palora/products', 'ebda.app'));
     const rw = rewriteOf(res) as string;
     expect(rw).toBeTruthy();
     expect(new URL(rw).pathname).toBe('/products');
@@ -110,7 +110,7 @@ describe('middleware — platform domain slug handling', () => {
   it('persists the slug cookie with a 30d maxAge, not as a session cookie', () => {
     // Without maxAge this dies on browser close, and a next-day deep-link on a
     // platform host has neither slug nor cookie — the CF-migration regression.
-    const res = middleware(req('https://store.force-ai.co/palora/products', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/palora/products', 'ebda.app'));
     const setCookie = res.headers.get('set-cookie') ?? '';
     expect(setCookie).toContain('x-store-slug=palora');
     expect(setCookie).toMatch(/Max-Age=2592000/i);
@@ -118,7 +118,7 @@ describe('middleware — platform domain slug handling', () => {
 
   it('does not re-set the slug cookie when it already matches (keeps responses cacheable)', () => {
     const res = middleware(
-      req('https://store.force-ai.co/palora/products', 'store.force-ai.co', {
+      req('https://ebda.app/palora/products', 'ebda.app', {
         cookie: 'x-store-slug=palora',
       })
     );
@@ -126,16 +126,14 @@ describe('middleware — platform domain slug handling', () => {
   });
 
   it('treats a known app route as an app route, not a store slug', () => {
-    const res = middleware(req('https://store.force-ai.co/cart', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/cart', 'ebda.app'));
     const rw = rewriteOf(res);
     // /cart must not be mistaken for a store named "cart"
     if (rw) expect(new URL(rw).pathname).not.toBe('/');
   });
 
   it('clears a sticky slug cookie at the bare platform root', () => {
-    const res = middleware(
-      req('https://store.force-ai.co/', 'store.force-ai.co', { cookie: 'x-store-slug=palora' })
-    );
+    const res = middleware(req('https://ebda.app/', 'ebda.app', { cookie: 'x-store-slug=palora' }));
     expect(res.headers.get('set-cookie') ?? '').toContain('x-store-slug=');
   });
 });
@@ -181,7 +179,7 @@ describe('middleware — agent/feed documents never resolve the store from the s
     '/feeds/products.json',
   ])('platform-host %s with an x-store-slug cookie carries NO store context', p => {
     const res = middleware(
-      req(`https://store.force-ai.co${p}`, 'store.force-ai.co', { cookie: 'x-store-slug=palora' })
+      req(`https://ebda.app${p}`, 'ebda.app', { cookie: 'x-store-slug=palora' })
     );
     expect(forwardedSlug(res)).toBeNull();
     expect(rewriteOf(res)).toBeNull();
@@ -189,7 +187,7 @@ describe('middleware — agent/feed documents never resolve the store from the s
 
   it('a normal subroute still carries the sticky store (control)', () => {
     const res = middleware(
-      req('https://store.force-ai.co/products', 'store.force-ai.co', {
+      req('https://ebda.app/products', 'ebda.app', {
         cookie: 'x-store-slug=palora',
       })
     );
@@ -197,7 +195,7 @@ describe('middleware — agent/feed documents never resolve the store from the s
   });
 
   it('the URL-slug form still resolves the store (/<slug>/llms.txt)', () => {
-    const res = middleware(req('https://store.force-ai.co/palora/llms.txt', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/palora/llms.txt', 'ebda.app'));
     expect(forwardedSlug(res)).toBe('palora');
   });
 });
@@ -234,7 +232,7 @@ describe('middleware — client-supplied store-context headers never reach the r
   });
 
   it('platform host: a spoofed x-store-domain cannot make /llms.txt answer as another store', () => {
-    const res = middleware(req('https://store.force-ai.co/llms.txt', 'store.force-ai.co', SPOOF));
+    const res = middleware(req('https://ebda.app/llms.txt', 'ebda.app', SPOOF));
     expect(forwarded(res, 'x-store-domain')).toBeNull();
     expect(forwarded(res, 'x-store-identifier')).toBeNull();
     expect(forwarded(res, 'x-store-slug')).toBeNull();
@@ -282,7 +280,7 @@ describe('middleware — /manifest.webmanifest gets the same store context as a 
 
   it('platform host: the manifest is not mistaken for a store slug', () => {
     const res = middleware(
-      req('https://store.force-ai.co/manifest.webmanifest', 'store.force-ai.co', {
+      req('https://ebda.app/manifest.webmanifest', 'ebda.app', {
         cookie: 'x-store-slug=palora',
       })
     );

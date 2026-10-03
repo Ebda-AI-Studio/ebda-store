@@ -161,25 +161,21 @@ const PROJECT_MARKERS: Array<{ tag: string; patterns: RegExp[] }> = [
   // FWB sub-projects — match BEFORE plain FWB so the most specific tag wins
   {
     tag: 'FWB-API',
-    patterns: [
-      /force-website-builder.*api/i,
-      /store-api\.forcemediakw\.com/i,
-      /api-production-c058/i,
-    ],
+    patterns: [/force-website-builder.*api/i, /api\.ebda\.app/i, /api-production-c058/i],
   },
-  { tag: 'FWB-Admin', patterns: [/force-admin/i, /\bapp\.forcemediakw\.com/i] },
+  { tag: 'FWB-Admin', patterns: [/force-admin/i, /\bapp\.ebda\.app/i] },
   {
     tag: 'FWB-Web',
-    patterns: [/force-web\b/i, /wadyaljuz/i, /store\.forcemediakw\.com/i, /force-web-sigma/i],
+    patterns: [/force-web\b/i, /wadyaljuz/i, /\bebda\.app/i, /force-web-sigma/i],
   },
   { tag: 'FWB', patterns: [/force-website-builder/i, /\bfwb\b/i] },
   // Other Force projects
   {
     tag: 'WBS',
-    patterns: [/whatsapp.?saas/i, /whatsapp.?bulk/i, /\bws\.forcemediakw\.com/i, /\bwbs\b/i],
+    patterns: [/whatsapp.?saas/i, /whatsapp.?bulk/i, /\bwhatsapp\.ebda\.app/i, /\bwbs\b/i],
   },
-  { tag: 'CRM', patterns: [/force.media.crm/i, /\bcrm\.forcemediakw\.com/i] },
-  { tag: 'Landing', patterns: [/force.media.landing/i, /^www\.forcemediakw\.com/i] },
+  { tag: 'CRM', patterns: [/force.media.crm/i, /\bcrm\.ebda\.app/i] },
+  { tag: 'Landing', patterns: [/force.media.landing/i, /^www\.ebda\.app/i] },
   { tag: 'OmHassan', patterns: [/om.?hassan/i] },
 ];
 
@@ -198,7 +194,7 @@ const PROJECT_MARKERS: Array<{ tag: string; patterns: RegExp[] }> = [
 function extractProject(subject: string, body: string): string | null {
   // 1. Bracketed-prefix path. Sentry: `[force-website-builder/api] ...`
   //    Vercel:  `[force-web] Build failed`
-  //    PostHog: `[Force Website Builder] Insight...`
+  //    PostHog: `[Ebda] Insight...`
   const bracketMatch = subject.match(/^\s*\[([^\]]+)\]/);
   if (bracketMatch) {
     const inBracket = bracketMatch[1];

@@ -214,7 +214,7 @@ describe('the lenient resolver still never throws into the layout', () => {
     await expect(getStore()).resolves.toMatchObject({ id: 'demo' });
 
     // ...and it must MARK the fallback as transient. `layout.tsx` keys on the
-    // `id === 'demo'` sentinel to emit `title: 'Page not found — Force AI'`, so
+    // `id === 'demo'` sentinel to emit `title: 'Page not found — Ebda'`, so
     // without this flag the retry BODY renders inside a document whose TITLE
     // says the store does not exist — the same claim, relocated to the head.
     await expect(getStore()).resolves.toMatchObject({ transientResolveFailure: true });

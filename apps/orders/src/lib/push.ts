@@ -9,8 +9,8 @@
  * the VAPID flow hit).
  *
  * OneSignal locks each app to a single `chrome_web_origin`, so the Orders PWA
- * (orders.forcemediakw.com) uses its OWN OneSignal app, distinct from the admin
- * (app.forcemediakw.com) and storefront (store.forcemediakw.com) ones. The app
+ * (orders.ebda.app) uses its OWN OneSignal app, distinct from the admin
+ * (app.ebda.app) and storefront (ebda.app) ones. The app
  * id comes from NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID (Vercel env).
  *
  * SDK init runs once (idempotent) in OneSignalInit; this module owns the

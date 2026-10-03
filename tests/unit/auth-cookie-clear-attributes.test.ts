@@ -3,14 +3,14 @@
  *
  * The session cookies are written with `SameSite=None; Secure` in production
  * (AUTH_COOKIE_OPTIONS / REFRESH_COOKIE_OPTIONS) because the storefront lives
- * on a merchant domain and the API on api.force-ai.co. Per RFC6265bis §5.5 —
+ * on a merchant domain and the API on api.ebda.app. Per RFC6265bis §5.5 —
  * and as implemented by Chrome/Firefox/Safari — a `Set-Cookie` whose same-site
  * flag is not `None` is IGNORED on a cross-site request. Clearing with a bare
  * `{ path: '/' }` was therefore a no-op for exactly the population it exists
  * for: the shopper on pecannbee.com.kw whose /auth/refresh just 401'd keeps
  * the dead `token`/`refresh_token` cookies, the cookieless guest branch in
  * csrfProtection never fires, and POST /payments/create 403s permanently. It
- * only ever worked for same-site callers (admin.force-ai.co), who were never
+ * only ever worked for same-site callers (app.ebda.app), who were never
  * stuck.
  *
  * The opposite trap is maxAge: these cookies carry a 365-day maxAge, and

@@ -63,9 +63,9 @@ function customDomainRequest(pathname: string, init?: { cookie?: string }) {
 }
 
 function platformSlugRequest(pathname: string, init?: { cookie?: string }) {
-  return new NextRequest(`https://store.force-ai.co${pathname}`, {
+  return new NextRequest(`https://ebda.app${pathname}`, {
     headers: {
-      host: 'store.force-ai.co',
+      host: 'ebda.app',
       ...(init?.cookie ? { cookie: init.cookie } : {}),
     },
   });

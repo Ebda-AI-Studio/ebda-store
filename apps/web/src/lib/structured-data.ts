@@ -1,6 +1,7 @@
 import type { ResolvedStore } from './store-resolver';
 import { pickMetaDescription } from './seo/meta-description';
 import type { StorefrontLocale } from './seo/resolve-locale';
+import { BRAND_MARKETING_URL } from '@force/shared';
 
 /**
  * The name/description a JSON-LD node publishes for `locale` (#2196): the
@@ -482,7 +483,7 @@ export function storeJsonLd(s: StoreSchemaData): object {
           address: {
             '@type': 'PostalAddress',
             streetAddress: s.address,
-            addressCountry: 'KW', // Kuwait — platform-wide default for Force AI Store
+            addressCountry: 'KW', // Kuwait — platform-wide default for Ebda
           },
         }
       : {}),
@@ -588,12 +589,12 @@ export function getSiteUrl(store?: Pick<ResolvedStore, 'domain'>): string {
   // over the platform-wide NEXT_PUBLIC_SITE_URL.
   //
   // This order used to be reversed, and because NEXT_PUBLIC_SITE_URL is always
-  // set in production (`https://store.force-ai.co`, inlined at build time), the
+  // set in production (`https://ebda.app`, inlined at build time), the
   // `store.domain` branch below was DEAD — every custom-domain store advertised
   // `rel=canonical`, `og:url` and every JSON-LD `url` on the platform host. Worse,
   // `storeAbsoluteUrl` only adds the `/<slug>` prefix when `domain` is falsy, so
   // pecannbee.com.kw/products/X claimed a canonical of
-  // store.force-ai.co/products/X — a URL that resolves to the DEMO store
+  // ebda.app/products/X — a URL that resolves to the DEMO store
   // (verified live 2026-07-29). That tells Google every real merchant page is a
   // duplicate of a demo page. Platform-path stores are unaffected: no domain →
   // still the env var → still prefixed with `/<slug>`.
@@ -608,10 +609,10 @@ export function getSiteUrl(store?: Pick<ResolvedStore, 'domain'>): string {
   // Canonical platform host after the 2026-06 Cloudflare rebrand. Fallback for
   // platform-path stores (no custom domain); drives master sitemap URLs, the
   // robots `Sitemap:` directive, OG `og:url`/`og:image`, and `rel=canonical`.
-  // It MUST be the live canonical domain — it was still `store.forcemediakw.com`
+  // It MUST be the live canonical domain — it was still `ebda.app`
   // after the CF cutover, so sitemap + OG advertised the old domain on
-  // store.force-ai.co (regression fixed 2026-06-27).
-  return 'https://store.force-ai.co';
+  // ebda.app (regression fixed 2026-06-27).
+  return BRAND_MARKETING_URL;
 }
 
 /**

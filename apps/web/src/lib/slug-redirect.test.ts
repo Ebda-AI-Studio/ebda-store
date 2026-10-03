@@ -99,7 +99,7 @@ describe('storeRedirectUrl', () => {
 
     const url = storeRedirectUrl(store, '/products/new-handle');
 
-    expect(url).toBe('https://store.force-ai.co/my-store/products/new-handle');
+    expect(url).toBe('https://ebda.app/my-store/products/new-handle');
   });
 
   it('omits the slug prefix for a custom-domain store', () => {

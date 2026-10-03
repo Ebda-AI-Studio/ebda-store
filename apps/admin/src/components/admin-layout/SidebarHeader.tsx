@@ -59,7 +59,7 @@ export function SidebarHeader({
             </div>
           </>
         ) : (
-          // Force Media Branding (default)
+          // Ebda Branding (default)
           <>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/90 shadow-lg shadow-primary/25">
               <Image

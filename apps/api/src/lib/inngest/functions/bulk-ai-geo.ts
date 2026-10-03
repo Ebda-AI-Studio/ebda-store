@@ -14,6 +14,7 @@ import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
+import { storeOrigin } from '@force/shared';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -178,9 +179,7 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
             return { notFound: false, filled, skipped, failed, errors };
           }
 
-          const storeUrl = store.domain
-            ? `https://${store.domain}`
-            : `https://store.force-ai.co/${store.slug}`;
+          const storeUrl = store.domain ? `https://${store.domain}` : storeOrigin(store.slug);
 
           // `/products?category=<slug>` is the storefront's real
           // category-browse URL — there is no `/categories/[slug]` route in

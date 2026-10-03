@@ -4,8 +4,9 @@
 // Why a standalone module: this is a pure function (no I/O, no DB) so it
 // gets the cheapest possible unit tests — feed it a plain object, assert
 // the from-line. The full ResendService composes this helper.
+import { BRAND } from '@force/shared';
 
-const PLATFORM_EMAIL_DOMAIN = 'force-ai.co';
+const PLATFORM_EMAIL_DOMAIN: string = BRAND.domains.marketing;
 
 export interface StoreSenderShape {
   name: string;
@@ -32,13 +33,16 @@ function sanitizeDisplayName(name: string): string {
 
 export function resolveSender(store: StoreSenderShape): ResolvedSender {
   const displayName = sanitizeDisplayName(store.name);
+  const useCustomDomain =
+    store.emailDomainStatus === 'verified' && !!store.domain && store.domain.length > 0;
+
+  // Merchant domains keep the conventional `noreply`; the platform domain
+  // uses the brand's own no-reply mailbox (no-reply@ebda.app).
+  const defaultLocalPart = useCustomDomain ? 'noreply' : BRAND.noReplyEmail.split('@')[0];
   const localPart =
     store.emailSenderLocalPart && store.emailSenderLocalPart.trim().length > 0
       ? store.emailSenderLocalPart.trim()
-      : 'noreply';
-
-  const useCustomDomain =
-    store.emailDomainStatus === 'verified' && !!store.domain && store.domain.length > 0;
+      : defaultLocalPart;
 
   const host = useCustomDomain ? (store.domain as string) : PLATFORM_EMAIL_DOMAIN;
 

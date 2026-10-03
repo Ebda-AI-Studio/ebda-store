@@ -5,6 +5,7 @@
  * localStorage-persisted locale is the right fit — no server round-trip,
  * works offline.
  */
+import { BRAND } from '@force/shared';
 
 export type Locale = 'en' | 'ar';
 
@@ -215,9 +216,9 @@ export interface Messages {
 
 export const MESSAGES: Record<Locale, Messages> = {
   en: {
-    appName: 'Force AI Store Orders',
+    appName: `${BRAND.name} Orders`,
     login: {
-      title: 'Force AI Store Orders',
+      title: `${BRAND.name} Orders`,
       subtitle: 'Sign in to manage your orders.',
       email: 'Email',
       password: 'Password',
@@ -436,9 +437,9 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
   },
   ar: {
-    appName: 'طلبات متجر Force AI',
+    appName: `طلبات متجر ${BRAND.nameAr}`,
     login: {
-      title: 'طلبات متجر Force AI',
+      title: `طلبات متجر ${BRAND.nameAr}`,
       subtitle: 'سجّل الدخول لإدارة طلباتك.',
       email: 'البريد الإلكتروني',
       password: 'كلمة المرور',

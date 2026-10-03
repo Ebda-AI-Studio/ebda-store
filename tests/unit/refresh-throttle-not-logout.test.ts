@@ -151,7 +151,7 @@ describe('admin client — a throttled refresh keeps the credentials', () => {
  * The first version of this fix landed on admin and web and left
  * `apps/orders` byte-identical to the bug — same `if (!res.ok) return null`,
  * same blanket catch, same `localStorage.removeItem` pair in its checkAuth.
- * orders is a deployed PWA (orders.force-ai.co) that asks for persistent
+ * orders is a deployed PWA (orders.ebda.app) that asks for persistent
  * storage precisely to keep the one copy of that credential alive, and the
  * refresh bucket is per USER — so the orders PWA, the admin PWA and every
  * browser tab for the same merchant share ONE budget. When it is exhausted,

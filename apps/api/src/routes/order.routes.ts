@@ -20,6 +20,7 @@ import {
   exportFilename,
   dayInOffset,
   parseTzOffset,
+  BRAND,
 } from '@force/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
@@ -216,7 +217,7 @@ router.get(
 
       // ---- Build workbook ----
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'Force Website Builder';
+      workbook.creator = BRAND.name;
       workbook.created = new Date();
 
       const headerStyle: Partial<ExcelJS.Style> = {

@@ -11,7 +11,7 @@ import { isPlatformHost } from './src/lib/platform-host';
  * Check if a hostname is a platform domain (not a custom store domain).
  * Delegates to the shared `isPlatformHost` so the server (this middleware) and
  * the client (`useStoreUrl` in StoreContext) can never drift — drift is exactly
- * what broke store.force-ai.co (see `lib/platform-host.ts`).
+ * what broke ebda.app (see `lib/platform-host.ts`).
  */
 function isPlatformDomain(hostname: string): boolean {
   return isPlatformHost(hostname);
@@ -78,7 +78,7 @@ const KNOWN_APP_ROUTES = new Set([
   'sitemap',
   'robots',
   // Platform-level routes (not store-scoped) — must never be read as a store
-  // slug on the platform domain, or store.forcemediakw.com/<route> resolves to a
+  // slug on the platform domain, or ebda.app/<route> resolves to a
   // nonexistent store and 404s. `og` is the store-aware OG-card route
   // (GET /og?slug=…) used by social link previews; `landing-preview` is the
   // redesigned-landing preview page.
@@ -92,7 +92,7 @@ const KNOWN_APP_ROUTES = new Set([
   // The file extension is on the 2nd segment, so the `firstSegment.includes('.')`
   // check below doesn't catch it — without this the platform domain reads
   // `social-icons` as a store slug and 404s the footer/widget brand icons (they
-  // worked on custom domains but broke on store.forcemediakw.com/<slug>).
+  // worked on custom domains but broke on <slug>.ebda.app).
   'social-icons',
   // /feeds/products.json — the agent_feed storefront route. The file
   // extension is on the 2nd segment (products.json), so the
@@ -348,7 +348,7 @@ function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: stri
  * a real storefront visitor who previewed in the same browser (2026-05-28).
  *
  * SameSite=None + Secure so it survives the cross-site iframe context
- * (admin.forcemediakw.com framing wadyaljuz.com). TTL 1h matches Redis.
+ * (app.ebda.app framing wadyaljuz.com). TTL 1h matches Redis.
  */
 function applyDraftCookie(
   request: NextRequest,
@@ -630,7 +630,7 @@ export function middleware(request: NextRequest) {
   }
 
   // www → apex canonical 301 for CUSTOM store domains only. Platform www hosts
-  // (www.forcemediakw.com / www.force-ai.co) are real platform hosts and are
+  // (ebda.app / ebda.app) are real platform hosts and are
   // skipped via isPlatformDomain. The www custom hostname is enrolled in
   // Cloudflare-for-SaaS (CloudflareDomainService.addDomain) so TLS terminates
   // before we reach here; we then send visitors to the single canonical apex.
@@ -652,8 +652,8 @@ export function middleware(request: NextRequest) {
   requestHeaders.set('x-original-host', hostname);
   propagateDraftHeader(requestHeaders, request, draftToken, isPreviewIframe);
 
-  // Bare root on `store.forcemediakw.com` deliberately does NOT redirect to
-  // forcemediakw.com: the homepage serves the Force Store Builder landing page
+  // Bare root on `ebda.app` deliberately does NOT redirect to
+  // ebda.app: the homepage serves the Ebda landing page
   // (apps/web/src/components/PlatformLanding.tsx) and unknown slugs render the
   // same component via app/not-found.tsx. The old redirect was lossy — visitors
   // learning about the store builder were dumped on a site pitching another service.
@@ -703,7 +703,7 @@ export const config = {
      * favicon.ico is intentionally NOT excluded here (removed 2026-07-02) so
      * custom-domain stores can get a per-store favicon (see the
      * `x-store-domain` branch above). This does NOT change platform-domain
-     * (store.force-ai.co etc) behavior: getStoreIdentifier() returns null for
+     * (ebda.app etc) behavior: getStoreIdentifier() returns null for
      * platform hosts, so those requests fall through this middleware to
      * NextResponse.next() with no rewrite, and Next serves the static
      * /public/favicon.ico exactly as before.

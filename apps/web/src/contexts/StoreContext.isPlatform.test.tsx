@@ -3,7 +3,7 @@
  * Issue #1544 — `useStoreUrl`'s `isPlatform` used to start `false` on every
  * render and only correct itself in a `useEffect` via
  * `isPlatformHost(window.location.hostname)`. That means the server-rendered
- * HTML on a platform host (`store.force-ai.co/<slug>`) always shipped a bare
+ * HTML on a platform host (`<slug>.ebda.app`) always shipped a bare
  * `/` home href — a pre-hydration click, or a crawler following the raw
  * href, landed a merchant's shopper on the platform root instead of their
  * store.

@@ -8,12 +8,12 @@ import { getStore } from '../lib/store-resolver';
  * route is hit.
  *
  * HARD multi-tenant rule: a store (a custom domain, or a real platform
- * `/<slug>` path) must NEVER show the Force AI platform landing or redirect to
- * `store.force-ai.co` — it shows its OWN branded "page not available" so a
+ * `/<slug>` path) must NEVER show the Ebda platform landing or redirect to
+ * `ebda.app` — it shows its OWN branded "page not available" so a
  * merchant's customer is never dumped onto the platform pitch / competitor
- * links. Only the bare platform host (`store.force-ai.co` root, or an unknown
+ * links. Only the bare platform host (`ebda.app` root, or an unknown
  * slug that no merchant owns) gets the platform 404, which links out to
- * force-ai.co. The platform landing itself no longer lives on this host.
+ * ebda.app. The platform landing itself no longer lives on this host.
  */
 export default async function NotFound() {
   const h = await headers();

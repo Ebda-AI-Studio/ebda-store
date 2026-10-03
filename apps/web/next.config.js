@@ -56,7 +56,7 @@ const nextConfig = {
         : []),
       {
         protocol: 'https',
-        hostname: 'cdn.forcemediakw.com',
+        hostname: 'cdn.ebda.app',
         port: '',
         pathname: '/**',
       },
@@ -96,7 +96,7 @@ const nextConfig = {
           // still showing "This content is blocked" because some browsers
           // (notably Safari and older Chrome variants) honor X-Frame-Options
           // OVER CSP frame-ancestors when both are present. SAMEORIGIN
-          // blocked admin.forcemediakw.com → wadyaljuz.com framing even
+          // blocked app.ebda.app → wadyaljuz.com framing even
           // though CSP frame-ancestors allowed it. CSP frame-ancestors below
           // is the canonical gate. Modern browsers ignore the absence of
           // X-Frame-Options; legacy browsers (IE) just allow framing.
@@ -135,12 +135,12 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: https: blob:",
               // OneSignal subscriptions + websocket telemetry: *.onesignal.com.
-              // forcemediakw.com is the marketing-site origin: storefront's
+              // ebda.app is the marketing-site origin: storefront's
               // maintenance page + bare-root redirect can trigger a browser
               // preconnect to it. googleadservices / googleads.g.doubleclick /
               // www.google.com: Google Ads conversion beacons (fetch/sendBeacon
               // transport), see script-src above.
-              "connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://store-api.forcemediakw.com wss://api.force-ai.co wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://forcemediakw.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
+              "connect-src 'self' https://api.ebda.app https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
               // Required so /OneSignalSDKWorker.js can register as a service
               // worker — Push API mandates same-origin worker scripts.
               "worker-src 'self' blob:",
@@ -161,10 +161,10 @@ const nextConfig = {
               // non-frameable so clickjacking via other origins stays blocked.
               `frame-ancestors 'self' ${
                 process.env.STOREFRONT_FRAME_ANCESTORS ??
-                // admin.force-ai.co is the Cloudflare admin host — without it
+                // app.ebda.app is the Cloudflare admin host — without it
                 // the page-builder live-preview iframe is CSP-blocked on CF
                 // (the storefront refuses to be framed). Kept alongside the
-                // legacy app.forcemediakw.com (Vercel admin) during cutover.
+                // (no legacy admin host in Ebda).
                 //
                 // S1-1 (2026-09-22 security audit): localhost:3000/3001 is
                 // dev-server scope and does not belong in a PRODUCTION
@@ -173,10 +173,10 @@ const nextConfig = {
                 // entry), so this fallback IS the live prod value. Only
                 // include the dev origins when NOT building for production;
                 // the prod value is unchanged otherwise (still 'self'
-                // https://admin.force-ai.co https://app.forcemediakw.com).
+                // https://app.ebda.app).
                 (process.env.NODE_ENV === 'production'
-                  ? 'https://admin.force-ai.co https://app.forcemediakw.com'
-                  : 'https://admin.force-ai.co https://app.forcemediakw.com http://localhost:3001 http://localhost:3000')
+                  ? 'https://app.ebda.app'
+                  : 'https://app.ebda.app http://localhost:3001 http://localhost:3000')
               }`,
             ].join('; '),
           },

@@ -3,7 +3,7 @@ import { getStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import { pickMetaDescription } from '../lib/seo/meta-description';
 import { resolveStorefrontLocale } from '../lib/seo/resolve-locale';
-import { hslToHex } from '@force/shared';
+import { hslToHex, BRAND } from '@force/shared';
 
 /**
  * Shape of the per-store manifest returned by the API. Mirrors what
@@ -83,7 +83,7 @@ async function fetchStoreManifest(storeId: string): Promise<ApiManifest | null> 
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const store = await getStore();
-  const primaryColor = store.theme?.primaryColor || '#ff6e00';
+  const primaryColor = store.theme?.primaryColor || BRAND.colors.gold;
   const fallbackThemeColor = hslToHex(primaryColor);
   const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
     ?.defaultLanguage as string | undefined;

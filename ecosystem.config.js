@@ -1,6 +1,6 @@
 /**
  * PM2 Ecosystem Configuration
- * Production process management for Force Website Builder
+ * Production process management for Ebda
  *
  * Usage:
  *   pm2 start ecosystem.config.js
@@ -95,7 +95,7 @@ module.exports = {
       user: 'deploy',
       host: ['server1.example.com'],
       ref: 'origin/main',
-      repo: 'git@github.com:ForceAI-KW/force-website-builder.git',
+      repo: 'git@github.com:Ebda-KW/force-website-builder.git',
       path: '/var/www/force-website-builder',
       'pre-deploy-local': '',
       'post-deploy':
@@ -109,7 +109,7 @@ module.exports = {
       user: 'deploy',
       host: ['staging.example.com'],
       ref: 'origin/develop',
-      repo: 'git@github.com:ForceAI-KW/force-website-builder.git',
+      repo: 'git@github.com:Ebda-KW/force-website-builder.git',
       path: '/var/www/force-website-builder-staging',
       'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env staging',
       env: {

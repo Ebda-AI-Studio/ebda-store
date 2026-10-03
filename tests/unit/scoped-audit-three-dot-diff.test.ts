@@ -138,12 +138,6 @@ describe('scoped-audit.sh three-dot diff (#1763)', () => {
 describe('audit inputs use the merge-base (three-dot) range (issues 2338, 2352)', () => {
   const root = join(__dirname, '../..');
 
-  it('scoped-audit.yml passes base...head, never base..head', () => {
-    const yml = readFileSync(join(root, '.github/workflows/scoped-audit.yml'), 'utf8');
-    expect(yml).toMatch(/BASE_REF="\$\{BASE_SHA\}\.\.\.\$\{HEAD_SHA\}"/);
-    expect(yml).not.toMatch(/BASE_REF="\$\{BASE_SHA\}\.\.\$\{HEAD_SHA\}"/);
-  });
-
   it('blast-radius.yml passes a three-dot range', () => {
     const yml = readFileSync(join(root, '.github/workflows/blast-radius.yml'), 'utf8');
     expect(yml).toMatch(

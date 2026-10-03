@@ -1,15 +1,16 @@
 import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
 import { resolvedViaCookie } from '../../lib/agent-store-resolver';
+import { storeOrigin, BRAND } from '@force/shared';
 
 /**
  * Dynamic /llms.txt — served at three levels:
  *
- *   store.force-ai.co/llms.txt
+ *   ebda.app/llms.txt
  *     → platform-level index: lists every active merchant with a one-liner
  *       + a structure map for AI crawlers. No store context in headers.
  *
- *   store.force-ai.co/<slug>/llms.txt
+ *   <slug>.ebda.app/llms.txt
  *     → middleware rewrites to /llms.txt + sets x-store-slug header.
  *       Route detects the slug, fetches that store's categories + products
  *       + contact info, renders a per-store markdown index.
@@ -219,15 +220,15 @@ async function fetchProducts(storeId: string): Promise<PublicProduct[] | null> {
 export function buildPlatformBody(stores: PublicStore[]): string {
   const storeLines = stores
     .map(s => {
-      const desc = s.description?.trim() || 'Kuwait-based merchant on Force AI Store.';
-      return `- [${s.name}](https://store.force-ai.co/${s.slug}): ${desc}`;
+      const desc = s.description?.trim() || 'Kuwait-based merchant on Ebda.';
+      return `- [${s.name}](${storeOrigin(s.slug)}): ${desc}`;
     })
     .join('\n');
 
-  return `# Force AI Store — Multi-tenant Storefront Platform
+  return `# ${BRAND.name} — Multi-tenant Storefront Platform
 
-> Force AI Store is the per-merchant e-commerce platform by Force AI.
-> Each merchant gets a path-based storefront at \`store.force-ai.co/<slug>\`
+> ${BRAND.name} is the per-merchant e-commerce platform by ${BRAND.company}.
+> Each merchant gets a storefront at \`<slug>${BRAND.domains.storeSuffix}\`
 > with their own products, branding, and contact info. Customers in Kuwait,
 > Saudi Arabia, and Qatar can browse + buy across multiple merchants from one
 > platform.
@@ -252,7 +253,7 @@ Every store follows the same URL pattern:
 ## For AI agents
 
 - Schema.org structured data on every page (JSON-LD blocks in <head>)
-- Sitemap: https://store.force-ai.co/sitemap.xml (lists every URL for every active store)
+- Sitemap: https://ebda.app/sitemap.xml (lists every URL for every active store)
 - Languages: bilingual (English + Arabic). Store default in \`Store.inLanguage\`. Customer can browse either.
 - Currency: KWD (Kuwaiti Dinar) unless individual store overrides
 - Real-time inventory in \`Product.offers.availability\` (InStock / OutOfStock)
@@ -261,7 +262,7 @@ Every store follows the same URL pattern:
 
 ## Sitemap
 
-https://store.force-ai.co/sitemap.xml
+https://ebda.app/sitemap.xml
 `;
 }
 
@@ -285,7 +286,7 @@ export function buildPerStoreBody(
   const contactLines = storeContactLines(store, base);
 
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
-  const storeDesc = store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`;
+  const storeDesc = store.description || `${store.name} on Ebda — Kuwait-based merchant.`;
 
   return `# ${storeTitle}
 
@@ -312,8 +313,8 @@ ${prodLines || '_No active products._'}${buildAgentSections(store, base)}
 
 ## Platform
 
-This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
-Force AI. See https://store.force-ai.co/llms.txt for the
+This store is hosted on Ebda, a multi-tenant e-commerce platform by
+Whisky 11. See https://ebda.app/llms.txt for the
 platform-wide index.
 `;
 }
@@ -346,7 +347,7 @@ function storeContactLines(store: PublicStore, base: string): string {
 
 /** Public origin the store's links are rooted at (custom domain or platform path). */
 function storeBaseUrl(store: PublicStore): string {
-  return store.domain ? `https://${store.domain}` : `https://store.force-ai.co/${store.slug}`;
+  return store.domain ? `https://${store.domain}` : storeOrigin(store.slug);
 }
 
 /**
@@ -579,7 +580,7 @@ export async function GET() {
   const storeDomain = headersList.get('x-store-domain');
   const viaCookie = await resolvedViaCookie();
 
-  // ── Per-store mode (platform path: store.force-ai.co/<slug>/llms.txt) ───────
+  // ── Per-store mode (platform path: <slug>.ebda.app/llms.txt) ───────
   if (storeSlug) {
     const store = await fetchStore(storeSlug);
     if (!store || store.status !== 'active') {
@@ -603,7 +604,7 @@ export async function GET() {
     }
   }
 
-  // ── Platform mode (store.force-ai.co/llms.txt + the Force AI landing) ───────
+  // ── Platform mode (ebda.app/llms.txt + the Ebda landing) ───────
   // The generic multi-tenant index — only the platform host reaches here.
   const stores = await fetchAllStores();
   const body = buildPlatformBody(stores);
