@@ -6,15 +6,17 @@ and diffs the outcome field by field. Identical output means the change does not
 influence ordering or payment. Any difference is printed as a field path with the
 base and head values.
 
-The default baseline is `96814545`, the code real customers bought on
-(pecannbee MyFatoorah orders, 2026-09-18..24, all completed).
+There is no default baseline (the old FWB Kuwait commit `96814545` is irrelevant for
+Ebda): in ref mode `--base <ref>` is required (use `origin/main` for "current
+main"); `--head` defaults to `HEAD`. See the **Ebda** section below for Linux usage
+and the runtime (api-url) mode.
 
 ```bash
 npm ci                                                  # once, for this checkout
-node scripts/buy-flow-parity/run.mjs --head <ref>       # base defaults to 96814545
+node scripts/buy-flow-parity/run.mjs --base origin/main --head <ref>
 node scripts/buy-flow-parity/run.mjs --base <ref> --head <ref>
 node scripts/buy-flow-parity/run.mjs --list             # scenario ids
-node scripts/buy-flow-parity/run.mjs --head pr-1234 --only guest-cod-fee-fixed-coupon,cod-cancel-restock
+node scripts/buy-flow-parity/run.mjs --base origin/main --head pr-1234 --only guest-cod-fee-fixed-coupon,cod-cancel-restock
 ```
 
 Exit code: `0` all PASS · `1` any DIFF / ERROR / SKIPPED · `2` the harness itself
@@ -121,7 +123,7 @@ reported as **SKIPPED** and fails the run. It is never counted as PASS.
 ## Accepting an intended change
 
 ```bash
-node scripts/buy-flow-parity/run.mjs --head pr-1234 \
+node scripts/buy-flow-parity/run.mjs --base origin/main --head pr-1234 \
   --allow "paid-cancel-then-refund:db.orders=owner approved: cancelled paid orders are refundable (#1897)"
 ```
 
@@ -135,3 +137,84 @@ allowed reports `PASS (allowed diffs)`.
 skips install and build (about 40s per ref). `--keep-db` keeps the per-ref
 databases for inspection. `--api-port` (4610) and `--stub-port` (4690) change
 the ports, and `--out <dir>` changes where reports go.
+
+## Ebda
+
+Ebda is EGP (piastres), so the fixture is too: stores are `currency 'EGP'`, prices,
+the COD fee (500 = 5.00 EGP), delivery rates (Cairo / Nasr City 1500, free over
+40000; Giza / Dokki 2000), coupons and the VAT store (14%) are all integer
+piastres, addresses are Egyptian (`country: 'Egypt'`, `+20` mobile) and the stub
+speaks EGP. Scenario ids are unchanged.
+
+### Linux (no Apple `container`)
+
+Pass your own loopback Postgres 16 and Redis; the harness then never touches
+`container`. The Postgres role needs `CREATEDB` (superuser is simplest):
+
+```bash
+su postgres -c "psql -c \"CREATE ROLE parity SUPERUSER LOGIN PASSWORD 'parity'\""
+redis-server --daemonize yes --port 56379
+node scripts/buy-flow-parity/run.mjs --base origin/main --head HEAD \
+  --pg-url postgresql://parity:parity@127.0.0.1:5432/postgres --redis-url redis://127.0.0.1:56379
+```
+
+### api-url mode: same code on two runtimes
+
+`--api-url-base <url>` / `--api-url-head <url>` (either or both) skip worktree,
+build and spawn for that side: the scenarios run over HTTP against an API that is
+already running (Node-Express, a Cloudflare Worker, ...). Sides may be mixed (one
+ref, one URL).
+
+**DB seeding per side.** An external API is already connected to its database, so
+the harness cannot drop and recreate it. Each side therefore gets its own
+`--pg-url-base` / `--pg-url-head` (owner/superuser URL of the database that side's
+API uses, **already migrated**; `--pg-url` is the fallback for both, in which case
+one database is simply re-seeded between the two sequential sides). Before a side
+runs, every public table except `_prisma_migrations` is `TRUNCATE ... CASCADE`d and
+the plain-SQL fixture is seeded, so a side can be re-run any number of times.
+Redis is `FLUSHALL`ed per side when `--redis-url-base/-head` (or `--redis-url`) is
+given. All URLs must be loopback.
+
+The API under test must be started by you with the harness environment (the
+harness cannot inject it):
+
+| env var                                               | value                                                     |
+| ----------------------------------------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`                                        | the side's DB as the `force_app` RLS role (like prod/CI)  |
+| `ENCRYPTION_KEY`                                      | harness key (default in `run.mjs`; or `--encryption-key`) |
+| `LOAD_TEST_BYPASS_TOKEN`                              | `bfp-parity-load-test-token`                              |
+| `INNGEST_BASE_URL` and `INNGEST_DEV`                  | `http://127.0.0.1:4690` (the harness stub)                |
+| `MYFATOORAH_BASE_URL`                                 | `http://127.0.0.1:4690/mf`                                |
+| `NODE_ENV=development` (or `PAYMENT_PROVIDER_STUB=1`) | required for the override to be honoured                  |
+
+`MYFATOORAH_BASE_URL` (documented in `docs/ENVIRONMENT.md`) is the runtime-agnostic
+replacement for the `node --import` preload: the provider calls the stub directly,
+so it works on a Worker. The harness runs the stub (`lib/stub.mjs`) as a loopback
+HTTP server in its own process (`--stub-port`, 4690) and records the same requests
+in both modes. The preload is kept for ref mode (old refs have no override), so
+both modes record identical gateway requests. Unlike the preload, api-url mode does
+NOT block other outbound calls: the API under test must be configured so that no
+real email/push/analytics credential exists.
+
+```bash
+P=postgresql://parity:parity@127.0.0.1:5432
+node scripts/buy-flow-parity/run.mjs \
+  --api-url-base http://127.0.0.1:4611 --api-url-head http://127.0.0.1:4612 \
+  --pg-url-base $P/bfp_a --pg-url-head $P/bfp_b --redis-url redis://127.0.0.1:56379
+```
+
+Always read `out/<stamp>/result.json` (`rows[].verdict`), not just the exit code.
+
+### Results (2026-10-03, Linux, Postgres 16 + Redis 7)
+
+- Both sides = the Node-Express API built from the same commit, two instances
+  (:4611 / :4612), two databases (`bfp_a` / `bfp_b`): **16/16 PASS**.
+- Negative control: head instance with the COD fixed fee raised by 1 EGP (+100
+  piastres in `payment.routes.js`, built output only, reverted): **DIFF** in
+  `guest-cod-fee-fixed-coupon`, `customer-cod-free-shipping-threshold`,
+  `cod-cancel-restock` (e.g. `db.orders[0].total` 8500 -> 8600,
+  `...create-payment.body.data.codFee` 500 -> 600) and `out-of-stock`; the other 12
+  stayed PASS. After the revert the suite is 16/16 PASS again.
+- Known finding: the MyFatoorah provider still converts with a fils-era `/ 1000`
+  (the stub records `InvoiceValue: 9` for a 9000-piastre order). Parity does not
+  fail on it (both sides do the same); it is the EGP provider hand-off item.
