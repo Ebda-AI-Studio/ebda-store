@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
 import merchantSignupRoutes from './merchant-signup.routes';
+import onboardingRoutes from './onboarding.routes';
+import setupGuideRoutes from './setup-guide.routes';
 import mfaRoutes from './mfa.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
@@ -255,6 +257,8 @@ router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 // ownership guard reuses an ambient context via
 // assertStoreOwnsInTenantScope — issue 2057. reconcileCountSession's own
 // runInTenantContext is what still blocks this router.)
+router.use('/onboarding', onboardingRoutes);
+router.use('/stores', tenantContext, setupGuideRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
