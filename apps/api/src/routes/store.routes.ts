@@ -7,6 +7,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
 import { resolveDomainService } from '../services/domain-provider';
+import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
 import { ResendService } from '../services/resend.service';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
@@ -547,11 +548,26 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = parseStoreBody(createStoreSchema, req.body);
+      const actor = getAuthUser(req);
+      const isSuperAdmin = actor.role === 'super_admin';
 
-      const store = await StoreService.create(getAuthUser(req).userId, {
-        ...data,
-        settings: data.settings as Prisma.InputJsonValue,
-      });
+      // A custom domain is claimed through PUT /:id/domain (pending until the
+      // provider verifies ownership). Only a super_admin may set one here.
+      if (!isSuperAdmin) delete data.domain;
+
+      const create = () =>
+        StoreService.create(
+          actor.userId,
+          { ...data, settings: data.settings as Prisma.InputJsonValue },
+          { allowProtectedSlug: isSuperAdmin }
+        );
+      // Per-account daily cap (SP5 task 4), inside a per-owner lock.
+      const store = isSuperAdmin
+        ? await create()
+        : await withStoreCreationLock(actor.userId, async () => {
+            await assertStoreCreationBudget(actor.userId);
+            return create();
+          });
 
       res.status(201).json({
         success: true,
@@ -586,10 +602,15 @@ router.put(
               ?.timezone ?? null)
           : null;
 
-      const store = await StoreService.update(id, {
-        ...data,
-        settings: data.settings as Prisma.InputJsonValue,
-      });
+      // A custom domain is claimed through PUT /:id/domain (pending until the
+      // provider verifies ownership). Only a super_admin may set one here.
+      if (user.role !== 'super_admin') delete data.domain;
+
+      const store = await StoreService.update(
+        id,
+        { ...data, settings: data.settings as Prisma.InputJsonValue },
+        { allowProtectedSlug: user.role === 'super_admin' }
+      );
 
       if (data.timezone !== undefined && data.timezone !== previousTimezone) {
         await auditLog({

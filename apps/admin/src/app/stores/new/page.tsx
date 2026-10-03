@@ -69,7 +69,8 @@ export default function CreateStorePage() {
       if (formData.storeSlug) {
         // Same rules the API enforces (@force/shared): format, 3-40 chars, and
         // not a reserved label (`app`, `api`, `www`, …).
-        const slugCheck = validateStoreSlug(formData.storeSlug);
+        // Protected brand names are decided by the API (a super_admin may claim them).
+        const slugCheck = validateStoreSlug(formData.storeSlug, { allowProtected: true });
         if (!slugCheck.ok) {
           errors.storeSlug =
             slugCheck.code === 'SLUG_RESERVED'

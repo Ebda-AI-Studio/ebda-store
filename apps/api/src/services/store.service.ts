@@ -5,6 +5,8 @@ import {
   slugify,
   slugifyWithFallback,
   isReservedSlug,
+  isProtectedSlug,
+  STORE_SLUG_ERROR_MESSAGES,
   storeHost,
   REGION,
   LEGACY_STORE_PLAN_TO_PLAN_CODE,
@@ -277,7 +279,11 @@ export class StoreService {
     return store;
   }
 
-  static async create(ownerId: string, data: CreateStoreData) {
+  static async create(
+    ownerId: string,
+    data: CreateStoreData,
+    opts: { allowProtectedSlug?: boolean } = {}
+  ) {
     // Same class as the product-slug defect: an empty slugify result made the
     // de-duplication loop mint '-1'/'-2' store slugs. A store is even less
     // recoverable than a product, so it gets the same guarantee.
@@ -289,9 +295,14 @@ export class StoreService {
     // it is valid and unreserved ("Support" → `support-1`, not a refusal).
     let baseSlug: string;
     if (data.slug) {
-      baseSlug = assertStoreSlug(data.slug);
+      baseSlug = assertStoreSlug(data.slug, { allowProtected: opts.allowProtectedSlug });
     } else {
       baseSlug = deriveStoreSlug(slugifyWithFallback(data.name, 'store', { ascii: true }));
+      // A name-derived slug that is a protected brand is refused (suffixing it
+      // would only normalise back to the same brand).
+      if (!opts.allowProtectedSlug && isProtectedSlug(baseSlug)) {
+        throw new AppError(400, 'SLUG_PROTECTED', STORE_SLUG_ERROR_MESSAGES.SLUG_PROTECTED);
+      }
     }
 
     // Auto-deduplicate slug
@@ -379,7 +390,11 @@ export class StoreService {
     return store;
   }
 
-  static async update(storeId: string, data: UpdateStoreData) {
+  static async update(
+    storeId: string,
+    data: UpdateStoreData,
+    opts: { allowProtectedSlug?: boolean } = {}
+  ) {
     const store = await this.getById(storeId);
     // Snapshot the heroImage URL so a replaced banner gets the old R2
     // object cleaned up post-commit. Same posture as branding / seo /
@@ -388,7 +403,7 @@ export class StoreService {
 
     // Auto-deduplicate slug if changing
     if (data.slug && data.slug !== store.slug) {
-      const baseSlug = assertStoreSlug(data.slug);
+      const baseSlug = assertStoreSlug(data.slug, { allowProtected: opts.allowProtectedSlug });
       data.slug = baseSlug;
       let suffix = 0;
       while (await prisma.store.findUnique({ where: { slug: data.slug } })) {

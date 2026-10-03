@@ -8438,6 +8438,7 @@
         "available": "{host} is available",
         "taken": "This address is already taken",
         "reserved": "This address is reserved. Choose another one.",
+        "protected": "This address matches a protected brand name. Contact support to claim it, or choose another one.",
         "tooShort": "Use at least 3 characters",
         "tooLong": "Use at most 40 characters",
         "invalid": "Use lowercase letters, digits and single hyphens only",
@@ -8445,6 +8446,7 @@
         "create": "Create my store",
         "creating": "Creating…",
         "createFailed": "We could not create the store. Please try again.",
+        "dailyLimit": "You have created several stores today. Please try again tomorrow or contact support.",
         "limit": "You have reached the store limit for this account."
       },
       "template": {

@@ -86,6 +86,30 @@ describe('StoreService.create — explicit slug', () => {
     }
   );
 
+  it.each(['paymob', 'ebda-support', 'p4ym0b'])(
+    'refuses the protected brand %j with SLUG_PROTECTED unless overridden (SP5 task 4)',
+    async slug => {
+      await expect(StoreService.create('owner-1', { name: 'Shop', slug })).rejects.toMatchObject({
+        statusCode: 400,
+        code: 'SLUG_PROTECTED',
+      });
+      expect(storeCreate).not.toHaveBeenCalled();
+      // super_admin support-claim override
+      const store = await StoreService.create(
+        'owner-1',
+        { name: 'Shop', slug },
+        { allowProtectedSlug: true }
+      );
+      expect(store.slug).toBe(slug);
+    }
+  );
+
+  it('a name that derives a protected brand is refused, not suffixed', async () => {
+    await expect(StoreService.create('owner-1', { name: 'Paymob' })).rejects.toMatchObject({
+      code: 'SLUG_PROTECTED',
+    });
+  });
+
   it('refuses a malformed slug with its specific code', async () => {
     await expect(
       StoreService.create('owner-1', { name: 'Shop', slug: 'ab' })

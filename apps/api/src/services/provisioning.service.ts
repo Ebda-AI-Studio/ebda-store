@@ -96,7 +96,14 @@ export class ProvisioningService {
     // An explicit slug is the store's `<slug>.ebda.app`: validate it (format +
     // reserved list) and refuse with a stable SLUG_* code. A generated one is
     // coerced into a valid, unreserved slug.
-    const slug = storeSlug ? assertStoreSlug(storeSlug) : this.generateSlug(storeName);
+    // Protected brand names (SLUG_PROTECTED) are NOT re-checked here: this runs
+    // for super_admin provisioning (the support-claim path, which may grant a
+    // protected name) and for self-serve onboarding, which already refused a
+    // protected slug for non-super_admin before calling in. Reserved labels and
+    // format are still enforced.
+    const slug = storeSlug
+      ? assertStoreSlug(storeSlug, { allowProtected: true })
+      : this.generateSlug(storeName);
 
     // Check if slug is available
     const existingStore = await prisma.store.findUnique({
