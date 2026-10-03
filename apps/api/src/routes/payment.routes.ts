@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storefrontOrigin } from '@force/shared';
 import { z } from 'zod';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
@@ -474,11 +475,7 @@ router.post(
         // ==========================================
 
         // Resolve the correct storefront URL for payment callbacks
-        const storefrontBaseUrl = order.store?.domain
-          ? `https://${order.store.domain}`
-          : order.store?.slug
-            ? `${config.webUrl}/${order.store.slug}`
-            : config.webUrl;
+        const storefrontBaseUrl = order.store ? storefrontOrigin(order.store) : config.webUrl;
 
         // Create payment. PaymentService.createPayment throws on provider-not-
         // configured / provider-error / validation-failure — the catch block at

@@ -1,6 +1,7 @@
 import { prisma, Prisma, withMoneyTx, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
-import { slugify, slugifyWithFallback } from '@force/shared';
+import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
+import { slugify, slugifyWithFallback, isReservedSlug, storeHost } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -37,11 +38,16 @@ export async function bustStoreCaches(
   domain?: string | null
 ): Promise<void> {
   await invalidateCached(`public:store:${storeId}`);
-  if (slug) await invalidateCached(`public:store:${slug}`);
+  if (slug) {
+    await invalidateCached(`public:store:${slug}`);
+    // `<slug>.ebda.app` resolves by slug and is cached under its HOST.
+    await invalidateCached(`public:store:resolve:${storeHost(slug)}`);
+  }
   if (domain) await invalidateCached(`public:store:resolve:${domain}`);
   // The credentialed-CORS trust for the domain depends on the store's status
   // too (#1214), so it is busted on the same writes.
   if (domain) bustCorsCache(domain);
+  if (slug) bustCorsCache(storeHost(slug));
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the
@@ -266,15 +272,26 @@ export class StoreService {
     // Same class as the product-slug defect: an empty slugify result made the
     // de-duplication loop mint '-1'/'-2' store slugs. A store is even less
     // recoverable than a product, so it gets the same guarantee.
-    const baseSlug = slugifyWithFallback(data.slug || data.name, 'store', { ascii: true });
+    //
+    // An EXPLICIT slug is a merchant's choice of `<slug>.ebda.app`, so it is
+    // validated strictly (format + reserved list) and refused with a clear
+    // code — never silently rewritten into something they did not ask for.
+    // A slug DERIVED from the name is best-effort: it is padded/suffixed until
+    // it is valid and unreserved ("Support" → `support-1`, not a refusal).
+    let baseSlug: string;
+    if (data.slug) {
+      baseSlug = assertStoreSlug(data.slug);
+    } else {
+      baseSlug = deriveStoreSlug(slugifyWithFallback(data.name, 'store', { ascii: true }));
+    }
 
     // Auto-deduplicate slug
     let slug = baseSlug;
     let suffix = 0;
-    while (await prisma.store.findUnique({ where: { slug } })) {
+    while (isReservedSlug(slug) || (await prisma.store.findUnique({ where: { slug } }))) {
       suffix++;
       if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
-      slug = `${baseSlug}-${suffix}`;
+      slug = `${baseSlug.slice(0, 40 - String(suffix).length - 1)}-${suffix}`;
     }
 
     // Check domain uniqueness
@@ -337,12 +354,13 @@ export class StoreService {
 
     // Auto-deduplicate slug if changing
     if (data.slug && data.slug !== store.slug) {
-      const baseSlug = data.slug;
+      const baseSlug = assertStoreSlug(data.slug);
+      data.slug = baseSlug;
       let suffix = 0;
       while (await prisma.store.findUnique({ where: { slug: data.slug } })) {
         suffix++;
         if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
-        data.slug = `${baseSlug}-${suffix}`;
+        data.slug = `${baseSlug.slice(0, 40 - String(suffix).length - 1)}-${suffix}`;
       }
     }
 
@@ -415,6 +433,14 @@ export class StoreService {
       if (store.domain) await redis.delete(`store:domain:${store.domain}`);
       // Also invalidate updated keys if slug/domain changed
       if (data.slug && data.slug !== store.slug) await redis.delete(`store:slug:${data.slug}`);
+      // A renamed slug frees its OLD address: bust the old host's resolve entry
+      // (and the old by-slug key) so `<old>.ebda.app` stops resolving to this
+      // store immediately instead of after the 120s TTL.
+      if (data.slug && data.slug !== store.slug) {
+        await invalidateCached(`public:store:resolve:${storeHost(store.slug)}`);
+        await invalidateCached(`public:store:${store.slug}`);
+        revalidateStorefront({ slug: store.slug });
+      }
       if (data.domain && data.domain !== store.domain)
         await redis.delete(`store:domain:${data.domain}`);
     } catch (err) {

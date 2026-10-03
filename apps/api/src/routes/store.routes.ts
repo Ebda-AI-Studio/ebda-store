@@ -17,7 +17,7 @@ import { featureService } from '../services/feature.service';
 import { bustCorsCache } from '../lib/cors-cache';
 import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
-import { isSafeUrl, isValidTimeZone } from '@force/shared';
+import { isSafeUrl, isValidTimeZone, storeSlugSchema, storeSlugIssueCode } from '@force/shared';
 import {
   maskMarketingPixelSecrets,
   preserveMaskedPixelSecrets,
@@ -25,15 +25,28 @@ import {
 
 const router = Router();
 
+/**
+ * Parse a store create/update body. A rejected slug is raised as its own stable
+ * 400 code (`SLUG_RESERVED`, `SLUG_TOO_SHORT`, …) rather than the generic
+ * VALIDATION_ERROR, so the admin and API clients can key on it.
+ */
+function parseStoreBody<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
+  const result = schema.safeParse(body);
+  if (result.success) return result.data;
+  for (const issue of result.error.issues) {
+    const code = storeSlugIssueCode(issue);
+    if (code) throw new AppError(400, code, issue.message);
+  }
+  throw result.error;
+}
+
 // Validation schemas
 const createStoreSchema = z.object({
   name: z.string().min(1).max(100),
-  slug: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(/^[a-z0-9-]+$/)
-    .optional(),
+  // `<slug>.ebda.app`: lowercase a-z0-9/hyphen, 3-40 chars, no leading/trailing/
+  // double hyphen, and never a reserved label (`app`, `api`, `www`, …). One
+  // definition in @force/shared — the same list the host parser and resolver use.
+  slug: storeSlugSchema.optional(),
   domain: z.string().optional(),
   settings: z.record(z.string(), z.any()).optional(),
 });
@@ -526,7 +539,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = createStoreSchema.parse(req.body);
+      const data = parseStoreBody(createStoreSchema, req.body);
 
       const store = await StoreService.create(getAuthUser(req).userId, {
         ...data,
@@ -553,7 +566,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const data = updateStoreSchema.parse(req.body);
+      const data = parseStoreBody(updateStoreSchema, req.body);
       const user = getAuthUser(req);
 
       // The time zone decides which day a sale / expense / VAT period belongs to (Ruling FRT-2), so
