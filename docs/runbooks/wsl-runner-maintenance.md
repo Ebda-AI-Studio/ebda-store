@@ -113,6 +113,25 @@ runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-l
 runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
 ```
 
+**Scheduled runs use a second switch (2026-10-03).** Cloud billing is back
+(October allowance) and the FWB repo now runs push/PR/dispatch on cloud
+(`USE_SELF_HOSTED=false`). Crons stay on self-hosted because cloud bills each
+job at a 1-minute floor and the 30-min/hourly/2-hourly crons alone would use
+~2,500 of the month's included minutes. Every workflow with a `schedule:`
+trigger reads `vars.SCHEDULED_ON_CLOUD` instead for its cron runs:
+
+```
+runs-on: ${{ (inputs.force_cloud || (github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+```
+
+**Runner outage with crons queued** (db-backup is must-run): move the crons to
+cloud with one flip, and flip back when the guest is healthy:
+
+```bash
+gh variable set SCHEDULED_ON_CLOUD --body true  --repo ForceAI-KW/force-website-builder
+gh variable set SCHEDULED_ON_CLOUD --body false --repo ForceAI-KW/force-website-builder
+```
+
 `tests/unit/workflow-runner-selector.test.ts` enforces this: a workflow whose
 `runs-on` is neither of those forms — and is not registered there with a reason
 — fails the suite. That gate exists because `gitleaks.yml`'s `notify-failure`

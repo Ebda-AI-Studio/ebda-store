@@ -36,7 +36,7 @@ concurrency:
 jobs:
   check:
     name: A DAST scan ran in the last 26h
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 5
     steps:
       # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a

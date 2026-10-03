@@ -16,7 +16,7 @@ jobs:
     # blocked permanently; this backup MUST run, so it rides the self-hosted
     # runner like every other job. Docker (postgres:17) + apt are available
     # in the Umbra guest.
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 15
     steps:
       # Needed for scripts/verify-dump.sh below. This job used to run with no

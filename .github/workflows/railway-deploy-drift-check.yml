@@ -64,7 +64,7 @@ jobs:
     # blocked permanently, so this rides the self-hosted runner like every
     # other job. Cheap (two HTTP calls), so a 30-min schedule is not a
     # meaningful load on the 2-runner pool.
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     # 3 x (10s curl + 10s wait) for an unreachable /health, plus checkout.
     timeout-minutes: 4
     steps:

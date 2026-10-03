@@ -33,7 +33,7 @@ permissions:
 jobs:
   ai-eval:
     name: Model-as-judge AI output eval
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ (inputs.force_cloud || (github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
     steps:
       # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
@@ -78,7 +78,7 @@ jobs:
           #
           # Inverted on purpose: `A && '' || 'npm'` is NOT a ternary ('' is falsy in
           # Actions expressions, so it always yields 'npm' — see foundation #122).
-          cache: ${{ vars.USE_SELF_HOSTED != 'true' && 'npm' || '' }}
+          cache: ${{ runner.environment != 'self-hosted' && 'npm' || '' }}
       - name: Install dependencies
         run: npm ci
       # The eval imports @force/database + @force/shared, which resolve to their
@@ -107,7 +107,7 @@ jobs:
     name: Notify on failure
     # Umbra-only CI policy (2026-07-15): billing-blocked cloud runners can
     # never fire; ride the self-hosted runner (runner-death alerting = OS medic).
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs: [ai-eval]
     if: always() && failure()

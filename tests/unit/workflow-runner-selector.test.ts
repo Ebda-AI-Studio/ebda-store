@@ -26,6 +26,17 @@
  * Each `runs-on:` in `.github/workflows` is one of the sanctioned forms, or is
  * registered below with a reason. A new workflow pinning a label set fails
  * this until someone writes down why.
+ *
+ * SCHEDULED RUNS (2026-10-03)
+ *
+ * Push/PR/dispatch follow `vars.USE_SELF_HOSTED`. Workflows with a `schedule:`
+ * trigger use a second switch: a cron run stays on self-hosted unless
+ * `vars.SCHEDULED_ON_CLOUD == 'true'`. Cloud bills each job at a 1-minute
+ * floor, and the 30-min/hourly/2-hourly crons alone would burn ~2,500 of the
+ * month's included minutes. The kill switch for crons during a runner outage
+ * is therefore `SCHEDULED_ON_CLOUD=true`, not `USE_SELF_HOSTED=false`. Every
+ * schedule-triggered workflow must use a form that reads it (asserted below),
+ * so no cron is un-movable.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -42,6 +53,10 @@ const SANCTIONED = [
   '${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != \'true\') && \'ubuntu-latest\' || fromJSON(\'["self-hosted","linux","wsl2"]\') }}',
   '${{ vars.USE_SELF_HOSTED != \'true\' && \'ubuntu-latest\' || fromJSON(\'["self-hosted","linux","wsl2"]\') }}',
   "${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}",
+  // Schedule-aware forms (workflows with a `schedule:` trigger).
+  "${{ (inputs.force_cloud || (github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('[\"self-hosted\",\"linux\",\"wsl2\"]') }}",
+  "${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('[\"self-hosted\",\"linux\",\"wsl2\"]') }}",
+  "${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD != 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED == 'true')) && 'self-hosted' || 'ubuntu-latest' }}",
 ];
 
 /**
@@ -99,6 +114,43 @@ describe('workflow runner selection honours the kill switch', () => {
     expect(
       unknown.map(r => `${r.file}:${r.line} → ${r.value}`),
       'unrecognised `runs-on`. Use one of the sanctioned toggle forms, or `ubuntu-latest`, or register it in DELIBERATE with the reason.'
+    ).toEqual([]);
+  });
+
+  it('every self-hosted-capable form has a kill switch for its events', () => {
+    // Non-schedule events must still honour USE_SELF_HOSTED; schedule events
+    // must honour SCHEDULED_ON_CLOUD. A form missing either has no escape hatch
+    // for that trigger.
+    const noSwitch = runsOnValues().filter(
+      r =>
+        r.value.includes('self-hosted') &&
+        !(
+          r.value.includes('vars.USE_SELF_HOSTED') &&
+          (!r.value.includes('github.event_name') || r.value.includes('vars.SCHEDULED_ON_CLOUD'))
+        )
+    );
+    expect(noSwitch.map(r => `${r.file}:${r.line} → ${r.value}`)).toEqual([]);
+  });
+
+  it('every job in a schedule-triggered workflow can be moved by SCHEDULED_ON_CLOUD', () => {
+    const scheduled = new Set(
+      workflowFiles().filter(f =>
+        /^\s+schedule:/m.test(fs.readFileSync(path.join(WORKFLOWS, f), 'utf-8'))
+      )
+    );
+    expect(
+      scheduled.size,
+      'no schedule-triggered workflows found — walk is broken'
+    ).toBeGreaterThan(3);
+    const stuck = runsOnValues().filter(
+      r =>
+        scheduled.has(r.file) &&
+        r.value !== 'ubuntu-latest' &&
+        !r.value.includes('vars.SCHEDULED_ON_CLOUD')
+    );
+    expect(
+      stuck.map(r => `${r.file}:${r.line} → ${r.value}`),
+      'a cron job that only reads USE_SELF_HOSTED runs on cloud minutes (1-min floor per job); use a schedule-aware sanctioned form'
     ).toEqual([]);
   });
 

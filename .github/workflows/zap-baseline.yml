@@ -45,7 +45,7 @@ jobs:
     # Stays dormant until a ZAP_TARGET repo variable (or dispatch input) is set,
     # so scheduled runs don't fail before a staging/preview URL is configured.
     if: ${{ github.event.inputs.target != '' || vars.ZAP_TARGET != '' }}
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ (inputs.force_cloud || (github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
     steps:
       # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
@@ -167,7 +167,7 @@ jobs:
 
   notify-failure:
     name: Notify on failure
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs: [zap]
     # failure() is FALSE for a cancelled run (issue 2099): the old

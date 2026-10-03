@@ -93,7 +93,7 @@ jobs:
     # without this guard a post-cutover RAILWAY_ACTIONS_DEPLOY='true' would
     # redeploy production every hour regardless of whether anything changed.
     if: vars.RAILWAY_ACTIONS_DEPLOY == 'true' && github.event_name != 'schedule'
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD != 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED == 'true')) && 'self-hosted' || 'ubuntu-latest' }}
     # Covers checkout + setup-node + a global CLI install + `railway up --ci`
     # streaming a full multi-stage Docker build of this monorepo, AND the verify
     # poll window below. The verify step only short-circuits on a MATCH, so an
@@ -135,7 +135,7 @@ jobs:
             echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
             exit 0
           }
-        if: vars.USE_SELF_HOSTED == 'true'
+        if: runner.environment == 'self-hosted'
 
       - name: Require RAILWAY_TOKEN (deploy is switched on)
         env:
@@ -354,7 +354,7 @@ jobs:
     name: Guest checkout admission probe (scheduled)
     needs: deploy
     if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD != 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED == 'true')) && 'self-hosted' || 'ubuntu-latest' }}
     # 5 bounded attempts x (20s curl + 5s wait) + checkout/setup-node.
     timeout-minutes: 5
     steps:
@@ -389,7 +389,7 @@ jobs:
             echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
             exit 0
           }
-        if: vars.USE_SELF_HOSTED == 'true'
+        if: runner.environment == 'self-hosted'
       # Full (shallow) checkout, NOT sparse: on the persistent self-hosted
       # workspace a sparse config outlives this job, and the next plain
       # checkout inherited it — orders' deploy got a scripts-only tree and
@@ -432,7 +432,7 @@ jobs:
     if: failure() && github.event_name == 'push'
     # Umbra-only CI policy (2026-07-15): billing-blocked cloud runners can
     # never fire; ride the self-hosted runner (runner-death alerting = OS medic).
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ ((github.event_name == 'schedule' && vars.SCHEDULED_ON_CLOUD == 'true') || (github.event_name != 'schedule' && vars.USE_SELF_HOSTED != 'true')) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     steps:
       - name: Telegram alert
