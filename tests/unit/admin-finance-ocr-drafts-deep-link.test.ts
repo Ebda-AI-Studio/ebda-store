@@ -74,9 +74,11 @@ describe('the destination surfaces the total it was sent (issue 2417)', () => {
 
   it('sends the page it is showing and resets to page 1 when a filter changes', () => {
     expect(expenses).toMatch(/page: String\(page\)/);
-    expect(expenses).toMatch(
-      /setPage\(1\);\s*\}, \[period, customRange, statusFilter, receiptOnly\]\)/
-    );
+    // The reset rides the change handlers (receipt chip, period, status), not a standalone effect:
+    // an effect keyed on the filters runs AFTER the fetch effect of the same commit and reads the
+    // stale page (issue 2436).
+    expect(expenses.match(/setPage\(1\)/g)?.length).toBe(3);
+    expect(expenses).not.toMatch(/setPage\(1\);\s*\}, \[period/);
   });
 
   it('the dashboard card takes its count from apiGetPage meta', () => {

@@ -88,20 +88,16 @@ sudo systemctl restart 'actions.runner.*' 2>/dev/null \
 gh variable set USE_SELF_HOSTED --body false --repo ForceAI-KW/whatsapp-broadcaster
 ```
 
-> **Do not flip this during an incident — it is not a recovery action today.**
->
-> GitHub-hosted runners are **billing-blocked for this org**. Verified
-> 2026-09-13: the only two `ubuntu-latest` jobs are `cloud-rescue.yml` (marked
-> OBSOLETE) and `runner-health-check.yml`, whose last four runs — all
-> 2026-07-21 — failed, and whose own header records that on blocked billing it
-> "fails in ~3s every 15 min and alerts nobody". Setting `USE_SELF_HOSTED=false`
-> therefore does not move work to runners that can execute it; it moves work to
-> a pool that cannot, silently disabling ALL CI for this repo — including
-> `db-backup.yml`, which the same page documents as must-run.
+> **Superseded 2026-10-03 (Ruling CI-CRON-1).** The 2026-09-13 note that cloud
+> runners were billing-blocked (so `USE_SELF_HOSTED=false` could not run anything)
+> no longer holds: cloud billing is back and FWB runs push/PR/dispatch on cloud
+> with `USE_SELF_HOSTED=false` as the current setting. Do not set it to `true` to
+> "recover": that moves the full CI matrix and the six `cf-deploy.yml` jobs back
+> onto the two-runner pool. If cloud billing is ever blocked again, that is the
+> day to flip it to `true`.
 >
 > **When the guest is sick, fix the guest** (`umbra doctor`, the disk check
-> below, `ci-runner-guard.sh`). The toggle is the lever for the day cloud
-> billing is restored, not for today.
+> below, `ci-runner-guard.sh`); crons are moved with `SCHEDULED_ON_CLOUD` below.
 
 Every job routes through the toggle, so the switch is ready and no job is
 un-movable. Two spellings are in use and both honour it — most jobs carry the
@@ -142,11 +138,9 @@ only starts counting once a runner is assigned. So during exactly the incident
 this section is written for, that alert would never have sent and the run would
 have shown as still in progress.
 
-If cloud billing is ever restored, flip back once the runner is healthy:
-
-```bash
-gh variable set USE_SELF_HOSTED --body true --repo ForceAI-KW/whatsapp-broadcaster
-```
+Push/PR/dispatch stay on cloud (`USE_SELF_HOSTED=false`) through a runner
+outage; only set `USE_SELF_HOSTED` back to `true` if cloud billing is blocked
+again.
 
 (`notify-failure` jobs do NOT stay on `ubuntu-latest` — that was true before
 the 2026-07-15 Umbra-only CI policy and is no longer. They ride the self-hosted
@@ -164,10 +158,9 @@ cd ~/projects/force-website-builder/docs/runbooks   # the committed scripts (or 
 bash fix-wsl-runner.sh
 bash setup-parallel-runners.sh
 bash setup-parallel-runners.sh --list
-# then, if you'd flipped CI to cloud while the box was down:
-for r in force-website-builder whatsapp-broadcaster Force-Media-CRM; do
-  gh variable set USE_SELF_HOSTED --body true --repo ForceAI-KW/$r
-done
+# push/PR/dispatch stay on cloud (USE_SELF_HOSTED=false, Ruling CI-CRON-1); if you moved the
+# crons to cloud while the box was down, move them back:
+gh variable set SCHEDULED_ON_CLOUD --body false --repo ForceAI-KW/force-website-builder
 ```
 
 > Tiers: Neon Pro · Cloudflare Workers + Railway Hobby ($10 cap) · GitHub Pro (3000 Actions min/mo).

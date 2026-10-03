@@ -19,6 +19,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { apiGet, apiPost } from '@/lib/api';
 import { ALLOWED_CURRENCIES } from '@force/shared';
 import { useT } from '@/i18n/useT';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,6 +51,11 @@ export default function FxRatesPage() {
   const [loading, setLoading] = useState(true);
   const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
   const [filterCurrency, setFilterCurrency] = useState('');
+  // Bumped after a rate is saved: the load effect owns EVERY request, so the refetch reads the
+  // CURRENT currency filter instead of the one captured by the submit handler (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Latest-request-wins: a slower response for the previous filter must not repaint its rows.
+  const beginRequest = useLatestRequest();
 
   // Form state
   const [formCurrency, setFormCurrency] = useState('USD');
@@ -73,9 +79,10 @@ export default function FxRatesPage() {
   useEffect(() => {
     if (!storeId || featureEnabled !== true) return;
     loadRates();
-  }, [storeId, featureEnabled, filterCurrency]);
+  }, [storeId, featureEnabled, filterCurrency, refreshKey]);
 
   async function loadRates() {
+    const isLatest = beginRequest();
     setLoading(true);
     const url = `/api/v1/stores/${storeId}/finance/fx-rates${
       filterCurrency ? `?currency=${filterCurrency}` : ''
@@ -84,6 +91,7 @@ export default function FxRatesPage() {
     // `data` IS the rate array — reading `data?.data` double-unwrapped to
     // undefined and the table always rendered empty (#831 sweep).
     const { data } = await apiGet<FxRateEntry[]>(url);
+    if (!isLatest()) return;
     setRates(data ?? []);
     setLoading(false);
   }
@@ -115,7 +123,7 @@ export default function FxRatesPage() {
       setFormSuccess(true);
       setFormRate('');
       setFormDate(todayIso());
-      await loadRates();
+      setRefreshKey(k => k + 1);
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : String(e));
     } finally {

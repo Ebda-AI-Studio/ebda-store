@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../lib/api';
 import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
+import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { localDayRange, reportRangeParams } from '@force/shared';
@@ -93,7 +94,16 @@ export default function LoyaltyTransactionsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
+  // Bumped by the customer-search submit: the fetch effect owns EVERY request, so the submit reads
+  // the CURRENT page (just reset to 1) instead of a closure over the pre-reset page (issues 2443,
+  // 2451).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Latest-request-wins: a slower response for a previous page/filter must not repaint its rows
+  // (or its pager `meta`) under the new one.
+  const beginRequest = useLatestRequest();
+
   const fetchTransactions = useCallback(async () => {
+    const isLatest = beginRequest();
     setLoading(true);
     try {
       const qs = new URLSearchParams();
@@ -108,6 +118,7 @@ export default function LoyaltyTransactionsPage() {
       const { data } = await apiGet<{ transactions: LoyaltyTransaction[]; meta: Meta }>(
         `/api/v1/stores/${storeId}/loyalty/transactions?${qs}`
       );
+      if (!isLatest()) return;
       if (data) {
         setTransactions(data.transactions ?? []);
         setMeta(data.meta ?? null);
@@ -115,14 +126,14 @@ export default function LoyaltyTransactionsPage() {
     } catch {
       // error shown via empty state
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [storeId, page, typeFilter, customerFilter, dateFrom, dateTo]);
+  }, [storeId, page, typeFilter, customerFilter, dateFrom, dateTo, beginRequest]);
 
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, typeFilter, dateFrom, dateTo]);
+  }, [page, typeFilter, dateFrom, dateTo, refreshKey]);
 
   // Reset page when filters change
   const handleFilterChange = (setter: (v: string) => void, value: string) => {
@@ -133,7 +144,7 @@ export default function LoyaltyTransactionsPage() {
   const handleCustomerSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    fetchTransactions();
+    setRefreshKey(k => k + 1);
   };
 
   const columns: DataTableColumn<LoyaltyTransaction>[] = [

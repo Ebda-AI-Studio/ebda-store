@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Whisky AI OS — blast-radius PR reviewer (graphify-driven).
 # Read-only. Given a repo slug + PR number (or base..head ref), it:
-#   1. Fetches the changed files via `gh pr diff --name-only`.
+#   1. Fetches the changed files via `gh pr diff --name-only` (PR-number mode) or `git diff`
+#      (base..head ref mode, which CI uses and which needs NO gh CLI).
 #   2. Locates the repo's graphify-out/graph.json.
 #   3. Parses the graph (python3 -c) to find, for every changed file, all transitive
 #      DEPENDENTS (files that import / call / reference the changed file, directly or

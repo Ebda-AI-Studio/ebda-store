@@ -9,6 +9,7 @@ import { ErrorState } from '../../components/ErrorState';
 import { apiGet, apiPost } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
@@ -69,6 +70,9 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  // Bumped after an invite: the fetch effect owns EVERY list request, so the refetch reads the
+  // CURRENT role filter/page/search, not the ones captured when the handler's render ran (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -101,7 +105,10 @@ export default function UsersPage() {
     });
   }
 
+  // Latest-request-wins: a slower response for a previous filter/page must not repaint its rows.
+  const beginRequest = useLatestRequest();
   const fetchUsers = useCallback(async () => {
+    const isLatest = beginRequest();
     try {
       setError(null);
       const params = new URLSearchParams({
@@ -115,6 +122,7 @@ export default function UsersPage() {
         users: User[];
         pagination: Pagination;
       }>(`/api/v1/admin/users?${params}`);
+      if (!isLatest()) return;
       if (data) {
         setUsers(data.users || []);
         setPagination(prev => ({ ...prev, ...data.pagination }));
@@ -122,16 +130,18 @@ export default function UsersPage() {
         setError(apiError.message || t('errorDefault'));
       }
     } catch (error) {
-      console.error('Failed to fetch users:', error);
-      setError(t('errorNetwork'));
+      if (isLatest()) {
+        console.error('Failed to fetch users:', error);
+        setError(t('errorNetwork'));
+      }
     } finally {
-      setIsLoading(false);
+      if (isLatest()) setIsLoading(false);
     }
-  }, [pagination.page, pagination.limit, roleFilter, debouncedSearch, t]);
+  }, [pagination.page, pagination.limit, roleFilter, debouncedSearch, t, beginRequest]);
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchUsers, refreshKey]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -150,7 +160,7 @@ export default function UsersPage() {
       }
       setInviteOpen(false);
       resetInviteForm();
-      await fetchUsers();
+      setRefreshKey(k => k + 1);
     } catch {
       setInviteError(t('errorNetwork'));
     } finally {
@@ -310,7 +320,11 @@ export default function UsersPage() {
 
       {/* Error State */}
       {error && !isLoading && (
-        <ErrorState title={t('errorTitle')} message={error} onRetry={fetchUsers} />
+        <ErrorState
+          title={t('errorTitle')}
+          message={error}
+          onRetry={() => setRefreshKey(k => k + 1)}
+        />
       )}
 
       {/* Users Table */}

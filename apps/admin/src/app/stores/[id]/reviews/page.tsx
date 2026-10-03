@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 
 interface Review {
   id: string;
@@ -88,6 +89,9 @@ export default function ReviewsPage() {
     'all'
   );
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  // Bumped after approve/reject/delete: the fetch effect owns EVERY list request, so the refetch
+  // reads the CURRENT filter/page, not the ones captured at render time (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
   // Debounced search term — client-side filter over the current page of reviews.
@@ -124,27 +128,31 @@ export default function ReviewsPage() {
     );
   }, [reviews, search]);
 
+  // Latest-request-wins: a slower response for a previous filter/page must not repaint its rows.
+  const beginRequest = useLatestRequest();
   const fetchReviews = useCallback(async () => {
     if (!storeId) return;
+    const isLatest = beginRequest();
     setIsLoading(true);
     try {
       const { data } = await apiGet<{ reviews: Review[]; meta: typeof meta }>(
         `/api/v1/stores/${storeId}/reviews/admin?status=${filter}&page=${meta.page}&limit=${meta.limit}`
       );
+      if (!isLatest()) return;
       if (data) {
         setReviews(data.reviews);
         setMeta(data.meta);
       }
     } catch (error) {
-      console.error('Failed to fetch reviews:', error);
+      if (isLatest()) console.error('Failed to fetch reviews:', error);
     } finally {
-      setIsLoading(false);
+      if (isLatest()) setIsLoading(false);
     }
-  }, [storeId, filter, meta.page, meta.limit]);
+  }, [storeId, filter, meta.page, meta.limit, beginRequest]);
 
   useEffect(() => {
     fetchReviews();
-  }, [fetchReviews]);
+  }, [fetchReviews, refreshKey]);
 
   async function handleApprove(reviewId: string) {
     try {
@@ -156,7 +164,7 @@ export default function ReviewsPage() {
         return;
       }
       toastSuccess(t('toastApproveTitle'), t('toastApproveBody'));
-      fetchReviews();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to approve review:', err);
       showError(t('errorTitle'), t('toastApproveFailed'));
@@ -171,7 +179,7 @@ export default function ReviewsPage() {
         return;
       }
       toastSuccess(t('toastUnapproveTitle'), t('toastUnapproveBody'));
-      fetchReviews();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to reject review:', err);
       showError(t('errorTitle'), t('toastUnapproveFailed'));
@@ -187,7 +195,7 @@ export default function ReviewsPage() {
         return;
       }
       toastSuccess(t('toastDeleteTitle'), t('toastDeleteBody'));
-      fetchReviews();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to delete review:', err);
       showError(t('errorTitle'), t('toastDeleteFailed'));
@@ -260,7 +268,7 @@ export default function ReviewsPage() {
       }
       toastSuccess(t('aiSaveResponseTitle'), t('aiSaveResponseBody'));
       setDraftTarget(null);
-      fetchReviews();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to save response:', err);
       showError(t('errorTitle'), t('aiSaveResponseFailed'));

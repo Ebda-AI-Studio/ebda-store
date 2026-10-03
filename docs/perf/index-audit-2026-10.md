@@ -59,8 +59,10 @@ expression GIN trigram indexes on `shipping_address ->> '<key>'`, the keys `cust
 (`guestOrderIdsSql`) and adds an `id IN (…)` arm to the same OR as the order number and the
 registered customers. Registered customers' results are unchanged: a registered order is never
 matched through its shipping JSON, only through the account, as before. Terms under 3 characters and
-terms matching more than 1,000 guest orders fall back to an unindexed `shipping_address` JSON path
-filter with the same rows.
+terms matching more than 1,000 guest orders take an unindexed `shipping_address` JSON path filter for
+the GUEST half only, with the same rows; a registered customer match keeps its indexed
+`customer_id IN (…)` arm (issue 2444). Every Kuwait guest phone starts `+965`, so the first digits of a
+phone typed left to right reach that cap on any store past 1,000 guest orders.
 
 Scratch PG 16, 2 stores × 25,000 orders (91.7 % guest, like production's 92.6 %), `ANALYZE`d:
 
@@ -107,7 +109,8 @@ Execution Time: 0.205 ms          -- was 150.2 ms (count) / 168.8 ms (page) on m
 This returns the same rows by construction, and `tests/integration/order-search-indexes.test.ts`
 pins it against the old relation-join shape for every term class. There are two fallbacks to the
 relation filter, with the same rows and the unindexed plan: a term under 3 characters, which a
-trigram index cannot serve, and a term matching more than 1,000 customers.
+trigram index cannot serve (both halves), and a term matching more than 1,000 customers (the
+customer half only; the guest half keeps its own indexed arm).
 
 ## Evaluated, not added
 

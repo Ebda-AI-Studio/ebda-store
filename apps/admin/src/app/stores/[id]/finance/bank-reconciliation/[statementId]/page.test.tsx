@@ -92,3 +92,82 @@ describe('statement transactions — post-action refetch reads the CURRENT filte
     expect(filterOf(calls[calls.length - 1].url)).toBe('unmatched');
   });
 });
+
+const stmtOf = (d: Pending, reconciled: boolean) =>
+  d.resolve({
+    data: {
+      id: 'stmt-1',
+      fileName: 'jan.csv',
+      importedAt: '2026-02-01T00:00:00Z',
+      periodStart: null,
+      periodEnd: null,
+      status: 'open',
+      glAccount: { id: 'a', code: '1010', nameEn: 'Bank', nameAr: null },
+      summary: {
+        total: 2,
+        autoMatched: 0,
+        manualMatched: 0,
+        unmatched: 0,
+        ignored: 0,
+        matchedAmountFils: 0,
+        unmatchedAmountFils: 0,
+      },
+      difference: {
+        bankBalanceFils: 0,
+        ledgerBalanceFils: 0,
+        differenceFils: 0,
+        unmatchedBankFils: 0,
+        unmatchedLedgerFils: 0,
+        isReconciled: reconciled,
+      },
+    },
+    error: null,
+  });
+
+describe('statement detail — latest-request-wins (issue 2442)', () => {
+  it('an older statement response landing last does not repaint the pre-action reconciliation', async () => {
+    const stmtCalls: Pending[] = [];
+    apiGet.mockImplementation(
+      (url: string) => new Promise(resolve => stmtCalls.push({ url, resolve }))
+    );
+    render(<StatementDetailPage />);
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await waitFor(() => expect(stmtCalls).toHaveLength(1));
+    await act(async () => stmtOf(stmtCalls[0], false));
+    await act(async () =>
+      calls[0].resolve({
+        data: ['tx1', 'tx2'].map(id => ({
+          id,
+          date: '2026-02-01T00:00:00Z',
+          description: id,
+          amountFils: 1000,
+          direction: 'debit',
+          externalRef: null,
+          matchStatus: 'unmatched',
+          confidence: 0,
+          matchedJournalEntryId: null,
+          matchedJournalEntry: null,
+        })),
+        meta: { page: 1, perPage: 200, total: 2, totalPages: 1 },
+        error: null,
+      })
+    );
+    await screen.findByText('difference.mismatch');
+
+    // Two actions in flight at once -> two refreshes -> two statement requests.
+    const [ignore1, ignore2] = screen.getAllByText('ignore');
+    fireEvent.click(ignore1);
+    fireEvent.click(ignore2);
+    await waitFor(() => expect(patches).toHaveLength(2));
+    await act(async () => patches[0].resolve({ error: null }));
+    await waitFor(() => expect(stmtCalls).toHaveLength(2));
+    await act(async () => patches[1].resolve({ error: null }));
+    await waitFor(() => expect(stmtCalls).toHaveLength(3));
+
+    await act(async () => stmtOf(stmtCalls[2], true)); // newest (post both actions)
+    await act(async () => stmtOf(stmtCalls[1], false)); // older lands LAST
+
+    expect(screen.getByText('difference.reconciled')).toBeTruthy();
+    expect(screen.queryByText('difference.mismatch')).toBeNull();
+  });
+});

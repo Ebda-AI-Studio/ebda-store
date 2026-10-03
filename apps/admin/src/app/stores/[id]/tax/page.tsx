@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
 import { textFieldValue } from '../../../../lib/form-text';
+import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 import { TaxGeneralSettings } from './_components/TaxGeneralSettings';
 import { TaxTimeZoneCard } from './_components/TaxTimeZoneCard';
 import { TaxRatesTable } from './_components/TaxRatesTable';
@@ -43,6 +44,11 @@ export default function TaxSettingsPage() {
   const [editingRate, setEditingRate] = useState<TaxRate | null>(null);
   const [formData, setFormData] = useState<RateFormData>(DEFAULT_FORM);
   const [filter, setFilter] = useState<RateFilter>('all');
+  // Bumped after a rate mutation: an effect owns the refetch, so it reads the CURRENT filter
+  // instead of the one captured when the handler's closure rendered (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Latest-request-wins: a slower response for the previous filter must not repaint its rows.
+  const beginRequest = useLatestRequest();
 
   const fetchSettings = useCallback(async () => {
     const { data } = await apiGet<{ settings: TaxSettings }>(
@@ -61,6 +67,7 @@ export default function TaxSettingsPage() {
   }, [storeId]);
 
   const fetchRates = useCallback(async () => {
+    const isLatest = beginRequest();
     const qs = new URLSearchParams();
     if (filter !== 'all') {
       qs.set('includeInactive', 'true');
@@ -69,6 +76,7 @@ export default function TaxSettingsPage() {
     const { data } = await apiGet<{ rates: TaxRate[] }>(
       `/api/v1/stores/${storeId}/tax/rates?${qs}`
     );
+    if (!isLatest()) return;
     if (data) {
       let allRates = data.rates || [];
 
@@ -81,7 +89,7 @@ export default function TaxSettingsPage() {
       setRates(allRates);
       setActiveRates((data.rates || []).filter((r: TaxRate) => r.isActive));
     }
-  }, [storeId, filter]);
+  }, [storeId, filter, beginRequest]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -93,6 +101,11 @@ export default function TaxSettingsPage() {
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, filter]);
+
+  useEffect(() => {
+    if (refreshKey > 0) fetchRates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const handleSaveSettings = async (newSettings: Partial<TaxSettings>) => {
     setSavingSettings(true);
@@ -156,7 +169,7 @@ export default function TaxSettingsPage() {
 
       if (!error) {
         handleCloseModal();
-        fetchRates();
+        setRefreshKey(k => k + 1);
       }
     } catch (err) {
       console.error('Failed to save tax rate:', err);
@@ -168,7 +181,7 @@ export default function TaxSettingsPage() {
   const handleToggle = async (rate: TaxRate) => {
     try {
       await apiPatch(`/api/v1/stores/${storeId}/tax/rates/${rate.id}/toggle`);
-      fetchRates();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to toggle tax rate:', err);
     }
@@ -177,7 +190,7 @@ export default function TaxSettingsPage() {
   const handleDelete = async (rate: TaxRate) => {
     try {
       await apiDelete(`/api/v1/stores/${storeId}/tax/rates/${rate.id}`);
-      fetchRates();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       console.error('Failed to delete tax rate:', err);
     }

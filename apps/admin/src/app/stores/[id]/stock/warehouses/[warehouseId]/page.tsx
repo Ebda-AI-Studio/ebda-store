@@ -8,6 +8,7 @@ import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { useFeatures } from '@/hooks/useFeatures';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { Button, useToast } from '@force/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,6 +60,11 @@ export default function WarehouseStockPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  // Bumped after a stock write: the stock effect owns EVERY request, so the refetch reads the
+  // CURRENT page/search instead of ones captured by the handler's closure (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Latest-request-wins: a slower response for a previous page/search must not repaint its rows.
+  const beginRequest = useLatestRequest();
 
   // Inline quantity edit state: rowId → pending value
   const [editing, setEditing] = useState<Record<string, string>>({});
@@ -83,6 +89,7 @@ export default function WarehouseStockPage() {
   }
 
   async function loadStock() {
+    const isLatest = beginRequest();
     setLoading(true);
     setErr(null);
     const qs = new URLSearchParams({
@@ -93,6 +100,7 @@ export default function WarehouseStockPage() {
     const { data, error: apiError } = await apiGet<{ rows: StockRow[]; total: number }>(
       `/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock?${qs}`
     );
+    if (!isLatest()) return;
     if (apiError) {
       setErr(apiError.message);
     } else {
@@ -114,7 +122,7 @@ export default function WarehouseStockPage() {
       loadStock();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, warehouseId, page, search]);
+  }, [storeId, warehouseId, page, search, refreshKey]);
 
   async function handleSetQty(row: StockRow) {
     const val = editing[row.id];
@@ -137,7 +145,7 @@ export default function WarehouseStockPage() {
         delete copy[row.id];
         return copy;
       });
-      await loadStock();
+      setRefreshKey(k => k + 1);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Save failed';
       toastError(msg);
@@ -162,7 +170,7 @@ export default function WarehouseStockPage() {
       });
       toastSuccess(t('adjustDone'));
       setAdjustModal(null);
-      await loadStock();
+      setRefreshKey(k => k + 1);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Adjust failed';
       toastError(msg);
@@ -229,7 +237,14 @@ export default function WarehouseStockPage() {
     >
       {/* Search */}
       <div className="mb-4">
-        <SearchInput value={search} onSearch={setSearch} placeholder={t('searchPlaceholder')} />
+        <SearchInput
+          value={search}
+          onSearch={value => {
+            setSearch(value);
+            setPage(1);
+          }}
+          placeholder={t('searchPlaceholder')}
+        />
       </div>
 
       {/* Reconcile helper note */}
@@ -241,7 +256,7 @@ export default function WarehouseStockPage() {
       {err && (
         <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-ink">
           {err}{' '}
-          <button className="underline" onClick={loadStock}>
+          <button className="underline" onClick={() => setRefreshKey(k => k + 1)}>
             {tc('retry')}
           </button>
         </div>

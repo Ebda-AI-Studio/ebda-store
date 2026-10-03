@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { Button, useToast } from '@force/ui';
@@ -127,6 +128,11 @@ export default function StockInventoryPage() {
   // Bulk low-stock-threshold control state.
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [thresholdInput, setThresholdInput] = useState('');
+  // Bumped by Retry: the fetch effect owns EVERY products request, so a retry reads the CURRENT
+  // search/page instead of ones captured by a handler closure (issues 2441, 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Latest-request-wins: a slower response for a previous search/page must not repaint its rows.
+  const beginRequest = useLatestRequest();
   const { success: toastSuccess, error: toastError } = useToast();
 
   // Build the inventory list URL. Lists ALL items (no status filter) so the
@@ -195,20 +201,25 @@ export default function StockInventoryPage() {
     }
   };
 
-  // Reset to the first page whenever the search term changes so the merchant
-  // never lands on an out-of-range page for a narrower result set.
-  useEffect(() => {
+  // The page reset lives in the search handler (not a separate effect): an effect keyed on
+  // `search` runs AFTER the fetch effect of the same commit, so the fetch would read the stale
+  // page and a second request would follow (issue 2441).
+  const handleSearch = (value: string) => {
+    setSearch(value);
     setCurrentPage(1);
-  }, [search]);
+  };
 
+  // Products list — the single owner of every products request; re-fetches when the debounced
+  // search term, page or refreshKey (Retry) changes.
   useEffect(() => {
     if (!storeId) return;
-
-    // Products list — re-fetches when the debounced search term or page changes.
+    const isLatest = beginRequest();
     setProducts(null);
+    setProductsErr(null);
     setSelectedIds([]);
     apiGet<ProductsResponse>(buildListUrl(search, currentPage))
       .then(({ data, error: apiError }) => {
+        if (!isLatest()) return;
         if (apiError) {
           setProductsErr(apiError.message);
         } else {
@@ -217,7 +228,15 @@ export default function StockInventoryPage() {
           setTotalPages(data?.meta?.totalPages ?? 1);
         }
       })
-      .catch(() => setProductsErr('Failed to load inventory'));
+      .catch(() => {
+        if (!isLatest()) return;
+        setProductsErr('Failed to load inventory');
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, search, currentPage, refreshKey]);
+
+  useEffect(() => {
+    if (!storeId) return;
 
     // Reorder suggestions — fetch all open, build productId set
     apiGet<FlagListResponse>(
@@ -239,22 +258,10 @@ export default function StockInventoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, search, currentPage]);
 
-  // Retry handler — clears the error and re-fires the products fetch
+  // Retry handler — bumps the key so the products effect re-fires with the current search/page
   const retryProducts = () => {
     if (!storeId) return;
-    setProductsErr(null);
-    setProducts(null);
-    apiGet<ProductsResponse>(buildListUrl(search, currentPage))
-      .then(({ data, error: apiError }) => {
-        if (apiError) {
-          setProductsErr(apiError.message);
-        } else {
-          setProducts(data?.products ?? []);
-          setTotalSkus(data?.meta?.total ?? data?.products?.length ?? 0);
-          setTotalPages(data?.meta?.totalPages ?? 1);
-        }
-      })
-      .catch(() => setProductsErr('Failed to load inventory'));
+    setRefreshKey(k => k + 1);
   };
 
   // ─── Bulk low-stock-threshold ────────────────────────────────────────────
@@ -331,7 +338,7 @@ export default function StockInventoryPage() {
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SearchInput
             value={search}
-            onSearch={setSearch}
+            onSearch={handleSearch}
             placeholder={t('searchPlaceholder')}
             className="w-full sm:w-72"
           />

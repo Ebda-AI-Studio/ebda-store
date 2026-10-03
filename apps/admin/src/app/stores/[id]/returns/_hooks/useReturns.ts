@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import type { ListMeta, ReturnFilter, ReturnRecord, ReturnsStats } from '../_components/types';
 
 interface UseReturnsArgs {
@@ -75,25 +76,32 @@ export function useReturns({ storeId, requestRejectReason, requestRefundMethod }
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<ReturnFilter>('all');
   const [meta, setMeta] = useState<ListMeta>({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  // Bumped by refreshAll after a lifecycle mutation: the fetch effect owns EVERY list request, so
+  // the refetch reads the CURRENT filter/page, not the ones a handler captured (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Latest-request-wins: a slower response for a previous filter/page must not repaint its rows.
+  const beginRequest = useLatestRequest();
 
   const fetchReturns = useCallback(async () => {
     if (!storeId) return;
+    const isLatest = beginRequest();
     setIsLoading(true);
     try {
       const statusFilter = filter === 'all' ? '' : `&status=${filter}`;
       const { data } = await apiGet<{ returns: ReturnRecord[]; meta: ListMeta }>(
         `/api/v1/stores/${storeId}/returns/admin/list?page=${meta.page}&limit=${meta.limit}${statusFilter}`
       );
+      if (!isLatest()) return;
       if (data) {
         setReturns(data.returns);
         setMeta(data.meta);
       }
     } catch (error) {
-      console.error('Failed to fetch returns:', error);
+      if (isLatest()) console.error('Failed to fetch returns:', error);
     } finally {
-      setIsLoading(false);
+      if (isLatest()) setIsLoading(false);
     }
-  }, [storeId, filter, meta.page, meta.limit]);
+  }, [storeId, filter, meta.page, meta.limit, beginRequest]);
 
   const fetchStats = useCallback(async () => {
     if (!storeId) return;
@@ -112,12 +120,11 @@ export function useReturns({ storeId, requestRejectReason, requestRefundMethod }
   useEffect(() => {
     fetchReturns();
     fetchStats();
-  }, [fetchReturns, fetchStats]);
+  }, [fetchReturns, fetchStats, refreshKey]);
 
   const refreshAll = useCallback(() => {
-    fetchReturns();
-    fetchStats();
-  }, [fetchReturns, fetchStats]);
+    setRefreshKey(k => k + 1);
+  }, []);
 
   const approve = useCallback(
     async (returnId: string) => {

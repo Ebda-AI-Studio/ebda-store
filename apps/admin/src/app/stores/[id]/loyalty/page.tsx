@@ -7,6 +7,7 @@ import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost } from '../../../../lib/api';
+import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 import { LoyaltyStatsCards } from './_components/LoyaltyStatsCards';
 import { PointEarningForm } from './_components/PointEarningForm';
 import { TierSettings } from './_components/TierSettings';
@@ -39,6 +40,11 @@ export default function LoyaltySettingsPage() {
   const [members, setMembers] = useState<LoyaltyMember[]>([]);
   const [activeTab, setActiveTab] = useState<'settings' | 'members'>('settings');
   const [tierFilter, setTierFilter] = useState<string>('all');
+  // Bumped after an award: the members effect owns EVERY refetch, so it reads the CURRENT tier
+  // filter instead of the one captured when the award handler's closure rendered (issues 2443, 2451).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Latest-request-wins: a slower response for the previous tier must not repaint its members.
+  const beginRequest = useLatestRequest();
 
   const [showAwardModal, setShowAwardModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<LoyaltyMember | null>(null);
@@ -67,16 +73,18 @@ export default function LoyaltySettingsPage() {
   }, [storeId]);
 
   const fetchMembers = useCallback(async () => {
+    const isLatest = beginRequest();
     const qs = new URLSearchParams();
     if (tierFilter !== 'all') qs.set('tier', tierFilter);
 
     const { data } = await apiGet<{ members: LoyaltyMember[] }>(
       `/api/v1/stores/${storeId}/loyalty/members?${qs}`
     );
+    if (!isLatest()) return;
     if (data) {
       setMembers(data.members || []);
     }
-  }, [storeId, tierFilter]);
+  }, [storeId, tierFilter, beginRequest]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -94,7 +102,7 @@ export default function LoyaltySettingsPage() {
       fetchMembers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierFilter]);
+  }, [tierFilter, refreshKey]);
 
   const handleToggleEnabled = async () => {
     // Confirm before disabling to prevent accidental deactivation
@@ -169,7 +177,7 @@ export default function LoyaltySettingsPage() {
         setSelectedMember(null);
         setAwardPoints('');
         setAwardReason('');
-        fetchMembers();
+        setRefreshKey(k => k + 1);
         fetchStats();
       } else {
         showError(tToast('errorTitle'), tToast('awardFailed'));

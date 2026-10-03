@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { useLatestRequest } from '../../hooks/useLatestRequest';
 
 /**
  * Super-admin: payment webhook inbox (WebhookEvent rows) + one-click replay.
@@ -47,27 +48,36 @@ export default function WebhookEventsPage() {
   // apiGet never throws (issue 2375's class): an outage resolves as
   // `{ data: null, error }` and must not render as "no events".
   const [loadError, setLoadError] = useState(false);
+  // Bumped after a replay / manual refresh: the fetch effect owns EVERY list request, so the refetch
+  // reads the CURRENT status filter, not the one captured when replay() was created (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
 
+  // Latest-request-wins: a slower response for a previous filter must not repaint its rows.
+  const beginRequest = useLatestRequest();
   const fetchEvents = useCallback(async () => {
+    const isLatest = beginRequest();
     setLoading(true);
     try {
       const qs = status ? `?status=${encodeURIComponent(status)}&limit=100` : '?limit=100';
       const { data, error } = await apiGet<{ events: WebhookEvent[] }>(
         `/admin/webhook-events${qs}`
       );
+      if (!isLatest()) return;
       setLoadError(!!error);
       setEvents(data?.events || []);
     } catch (err) {
-      console.error('Failed to fetch webhook events:', err);
-      setLoadError(true);
+      if (isLatest()) {
+        console.error('Failed to fetch webhook events:', err);
+        setLoadError(true);
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [status]);
+  }, [status, beginRequest]);
 
   useEffect(() => {
     fetchEvents();
-  }, [fetchEvents]);
+  }, [fetchEvents, refreshKey]);
 
   const replay = async (id: string, force = false) => {
     setReplaying(id);
@@ -90,7 +100,7 @@ export default function WebhookEventsPage() {
       return;
     }
     setMessage(t('replaySuccess', { id: id.slice(0, 8) }));
-    await fetchEvents();
+    setRefreshKey(k => k + 1);
     setReplaying(null);
   };
 
@@ -163,7 +173,7 @@ export default function WebhookEventsPage() {
           <Link href="/email-queue" className="text-sm text-primary hover:underline">
             {t('emailQueueLink')}
           </Link>
-          <Button variant="outline" size="sm" onClick={() => fetchEvents()}>
+          <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)}>
             {t('refresh')}
           </Button>
         </div>

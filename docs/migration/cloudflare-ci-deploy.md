@@ -45,10 +45,13 @@ deploy the empty-cache config — a no-op `revalidateTag` — behind a green tic
 The `custom_domain` routes create the `admin.`/`orders.force-ai.co` DNS records +
 edge certs automatically on first deploy (needs the token's Zone DNS+SSL perms).
 
-It runs on the **self-hosted WSL2 runner** by default (`vars.USE_SELF_HOSTED == 'true'`,
-the same variable `ci.yml`/`deploy.yml` use), so it costs **zero GitHub Actions
-minutes**. If the runner is offline, dispatch it manually with `force_cloud: true`
-to fall back to `ubuntu-latest`.
+It runs on **GitHub-hosted runners (`ubuntu-latest`)** under the current policy
+(`vars.USE_SELF_HOSTED == 'false'`, the same variable `ci.yml`/`deploy.yml` use;
+[Ruling CI-CRON-1](../RULINGS.md#ruling-ci-cron-1--scheduled-runs-stay-on-self-hosted-pushpr-dispatch-on-cloud-2026-10-03)),
+so it **bills cloud Actions minutes** like every other push/PR job; it is not
+zero-cost (the CI-CRON-1 estimate covers the crons only, see Ruling CI-CRON-2). If
+the variable is set back to `true` it runs on the self-hosted WSL2 runner instead,
+and a dispatch with `force_cloud: true` forces `ubuntu-latest` for one run.
 
 ## One-time setup
 
@@ -160,31 +163,34 @@ subdomains. The live Vercel domains (`app.forcemediakw.com`,
 work, then cut their DNS / rebrand when ready (and drop the Vercel projects after
 a soak), exactly as wadyaljuz was cut over for the storefront.
 
-## Runner requirements (IMPORTANT — self-hosted only)
+## Runner requirements
 
-This workflow runs **entirely on the self-hosted runner** (Ahmad's Mac, label
-`["self-hosted","linux","wsl2"]`). The account has **no hosted GitHub Actions
-minutes**, so any `ubuntu-latest` job fails before it starts ("Job is about to
-start running on the hosted runner" → failure, no logs). Every job in
-`cf-deploy.yml` — including `detect` and `notify-failure` — therefore uses the
-self-hosted runner.
+Every job in `cf-deploy.yml` (including `detect` and `notify-failure`) picks its
+runner from `vars.USE_SELF_HOSTED`, and the workflow has no `schedule:` trigger, so
+it does not read `SCHEDULED_ON_CLOUD`. Per
+[Ruling CI-CRON-1](../RULINGS.md#ruling-ci-cron-1--scheduled-runs-stay-on-self-hosted-pushpr-dispatch-on-cloud-2026-10-03)
+the repo runs push, PR and dispatch on cloud (`USE_SELF_HOSTED=false`); only
+`schedule:` runs in other workflows are pinned to the self-hosted runner. Runner
+outage handling for those crons is in
+[wsl-runner-maintenance.md](../runbooks/wsl-runner-maintenance.md).
 
-**Consequence:** a deploy only runs when the **self-hosted runner is online**
-(the Mac is awake with the runner service up). If the Mac is asleep, the deploy
-job **queues** until it wakes — it doesn't fail, it just waits.
+**Consequence:** a deploy no longer waits for the self-hosted runner (the Mac being
+awake), but it does use GitHub-hosted minutes (not zero-cost; see Ruling CI-CRON-2).
+Cloud billing blocked again is the one case where deploys stop running.
 
 - **`force_cloud` workflow_dispatch input:** each job's `runs-on` honours a
-  `force_cloud: true` manual-dispatch flag that switches to `ubuntu-latest`.
-  ⚠️ Because the account has no hosted minutes, **`force_cloud` is currently a
-  no-op escape hatch — it would fail.** Leave it `false`. It exists for the
-  future case where hosted minutes are available (or a different account runs it).
+  `force_cloud: true` manual-dispatch flag that switches that run to
+  `ubuntu-latest`. It is a live escape hatch again: with `USE_SELF_HOSTED=false`
+  it changes nothing, and if the variable is ever set to `true` it is how a single
+  deploy is sent to cloud without changing the variable.
 - **Manual deploy when needed:** Actions → "Deploy to Cloudflare" → "Run
-  workflow" (deploys all three), or push to `main` — both run on the self-hosted
-  runner. If the Mac is off and you need a deploy now, use the local fallback
-  in "Manual deploy (fallback)" above.
-- **`vars.USE_SELF_HOSTED` must stay `true`** (it's what pins the jobs to the
-  self-hosted runner). If it were unset/`false`, jobs would route to the
-  (unavailable) hosted runner and fail.
+  workflow" (deploys all three), or push to `main`. If cloud billing is blocked
+  and you need a deploy now, use the local fallback in "Manual deploy (fallback)"
+  above.
+- **`vars.USE_SELF_HOSTED` should stay `false`** (push/PR/dispatch on cloud). Do
+  not set it to `true` while troubleshooting a deploy: it moves every push/PR job
+  in the repo, including the full CI matrix, back onto the two-runner Umbra pool,
+  which undoes Ruling CI-CRON-1.
 
 ## Follow-ups
 

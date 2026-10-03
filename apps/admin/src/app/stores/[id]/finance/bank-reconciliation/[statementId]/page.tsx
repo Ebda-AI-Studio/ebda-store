@@ -163,8 +163,13 @@ export default function StatementDetailPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // ── Fetch statement detail ──
+  // Latest-request-wins with its OWN sequence (a shared one would make the statement and
+  // transactions fetches invalidate each other): an older response must not repaint the pre-action
+  // summary/difference (`isReconciled`) beside the post-action transaction table (issue 2442).
+  const beginStmtRequest = useLatestRequest();
   const fetchStmt = useCallback(async () => {
     if (!storeId || !statementId) return;
+    const isLatest = beginStmtRequest();
     // apiGet already unwraps the API's `{ success, data }` envelope, so
     // `data` IS the statement detail — reading `data?.data` double-unwrapped
     // to undefined and the page never rendered a loaded statement (#831
@@ -172,12 +177,14 @@ export default function StatementDetailPage() {
     const { data, error: err } = await apiGet<StatementDetail>(
       `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}`
     );
+    if (!isLatest()) return;
     if (err) {
       setError(err.message ?? t('errors.loadStatement'));
       return;
     }
+    setError(null);
     setStmt(data ?? null);
-  }, [storeId, statementId]);
+  }, [storeId, statementId, beginStmtRequest]);
 
   // ── Fetch transactions ──
   // Latest-request-wins: a slower response for the previous filter/page must not repaint its rows

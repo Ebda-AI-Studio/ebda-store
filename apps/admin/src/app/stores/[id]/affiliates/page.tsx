@@ -20,6 +20,7 @@ import {
   type Meta,
 } from './_components/types';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 
 type TabKey = 'affiliates' | 'config';
 
@@ -61,6 +62,10 @@ export default function AffiliatesPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('affiliates');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
+  // Bumped after a mutation: the fetch effect owns EVERY list request, so the refetch reads the
+  // CURRENT status filter/page instead of the ones captured when the row's button rendered
+  // (issues 2443, 2450).
+  const [refreshKey, setRefreshKey] = useState(0);
   // Debounced search term — client-side filter over fetched affiliates by name or email.
   const [search, setSearch] = useState('');
 
@@ -97,17 +102,21 @@ export default function AffiliatesPage() {
     }
   }, [storeId]);
 
+  // Latest-request-wins: a slower response for the previous filter/page must not repaint its rows.
+  const beginRequest = useLatestRequest();
   const fetchAffiliates = useCallback(async () => {
+    const isLatest = beginRequest();
     const qs = new URLSearchParams({ page: String(page), limit: '20' });
     if (statusFilter !== 'all') qs.set('status', statusFilter);
 
     const { data } = await apiGet<AffiliatesEnvelope>(`/api/v1/stores/${storeId}/affiliates?${qs}`);
+    if (!isLatest()) return;
     if (data) {
       const payload = data.affiliates !== undefined ? data : (data.data ?? data);
       setAffiliates(payload.affiliates ?? []);
       setMeta(payload.meta ?? null);
     }
-  }, [storeId, page, statusFilter]);
+  }, [storeId, page, statusFilter, beginRequest]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -123,7 +132,7 @@ export default function AffiliatesPage() {
   useEffect(() => {
     if (!loading) fetchAffiliates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, page]);
+  }, [statusFilter, page, refreshKey]);
 
   // ---- Config Save ----
 
@@ -153,7 +162,7 @@ export default function AffiliatesPage() {
       );
       if (!error) {
         toastSuccess(tToasts('statusUpdated.title'), tToasts(`statusUpdated.${action}`));
-        fetchAffiliates();
+        setRefreshKey(k => k + 1);
         fetchStats();
       } else {
         showError(tToasts('error.title'), tToasts(`statusError.${action}`));
@@ -202,7 +211,7 @@ export default function AffiliatesPage() {
           tToasts('payoutCreated.message', { name: payoutAffiliate.name })
         );
         closePayoutModal();
-        fetchAffiliates();
+        setRefreshKey(k => k + 1);
         fetchStats();
       } else {
         showError(tToasts('error.title'), tToasts('payoutError.message'));
@@ -249,7 +258,7 @@ export default function AffiliatesPage() {
       if (!error) {
         toastSuccess(tToasts('inviteCreated.title'), tToasts('inviteCreated.message'));
         closeInviteModal();
-        fetchAffiliates();
+        setRefreshKey(k => k + 1);
         fetchStats();
       } else {
         showError(tToasts('error.title'), error.message || tToasts('inviteError.message'));

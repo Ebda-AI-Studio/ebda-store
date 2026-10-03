@@ -15,8 +15,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: gitleaks-${{ github.ref }}
-  # superseded PR pushes are cancelled; a push to main always finishes
+  # A push to main gets a group of its OWN (keyed by sha) so a burst of merges never collapses
+  # into one. `cancel-in-progress: false` alone was not enough (issue 2454): GitHub keeps at most
+  # ONE pending run per group, so a second merge cancelled the earlier main run while it was still
+  # pending, before it ever scanned, and the required "Scan for leaked secrets" gate went
+  # `cancelled` on main commits. PR pushes keep the per-ref group, where cancelling the superseded
+  # run is correct (a newer sha supersedes it).
+  group: gitleaks-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

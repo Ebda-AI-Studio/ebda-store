@@ -218,8 +218,9 @@ const GUEST_CONTACT_FIELDS = ['firstName', 'lastName', 'email', 'phone'] as cons
  *
  * Falls back to the relation filter when the term is shorter than a trigram
  * (3 chars — the indexes cannot serve it, so the lookup would only add a
- * scan) or matches more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers or
- * guest orders.
+ * scan). A term matching more than `ORDER_SEARCH_CUSTOMER_ID_CAP` customers
+ * or guest orders degrades ONLY that half to its relation/JSON arm; the other
+ * half keeps its indexed `IN (...)` arm (issue 2444).
  */
 export async function orderSearchWhere(
   storeId: string,
@@ -257,12 +258,20 @@ export async function orderSearchWhere(
     }),
     guestOrderIdsMatching(storeId, search),
   ]);
-  if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) return relationFallback;
-  if (guestOrderIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) return relationFallback;
-
+  // Each half degrades on its OWN: a broad guest term (every Kuwait guest phone starts `+965`)
+  // must not cost the registered half its indexed `customer_id IN (...)` arm, nor the reverse
+  // (issue 2444). Both over the cap is exactly `relationFallback`.
   const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
-  if (customers.length > 0) arms.push({ customerId: { in: customers.map(c => c.id) } });
-  if (guestOrderIds.length > 0) arms.push({ id: { in: guestOrderIds } });
+  if (customers.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
+    arms.push({ customer: { is: { OR: customerMatch } } });
+  } else if (customers.length > 0) {
+    arms.push({ customerId: { in: customers.map(c => c.id) } });
+  }
+  if (guestOrderIds.length > ORDER_SEARCH_CUSTOMER_ID_CAP) {
+    arms.push(guestJsonMatch);
+  } else if (guestOrderIds.length > 0) {
+    arms.push({ id: { in: guestOrderIds } });
+  }
   return arms;
 }
 

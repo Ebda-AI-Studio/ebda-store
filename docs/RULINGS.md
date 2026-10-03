@@ -5124,12 +5124,27 @@ customer's order is never matched through its shipping JSON and the registered r
 The four indexes are separate rather than one concatenated expression, so each field matches exactly
 as the registered arm does (no cross-field match). A concatenated index would be one index instead of
 four but could match a term spanning two fields. Terms under 3 characters and terms matching more
-than 1,000 guest orders take an unindexed JSON path filter with the same rows. Pinned by
+than 1,000 guest orders take an unindexed JSON path filter with the same rows; since issue 2444 that
+fallback degrades ONLY the over-cap half (a registered customer match keeps its indexed
+`customer_id IN (...)` arm). Pinned by
 `tests/integration/order-search-guest-contact.test.ts`, mutation-checked (guest arm removed, a
 different JSON expression, `customer_id IS NULL` dropped, LIKE escaping removed, fallback guard
 removed: each turns a test red). Cost if wrong: a store with a very common guest name or phone
-fragment (more than 1,000 guest orders) gets the old sequential plan for that one search; four more
-GIN indexes on `orders` add about 3 ms per 5,000 inserts.
+fragment (more than 1,000 guest orders) gets the unindexed JSON filter for the guest half of that
+one search. The cap is reached far more often than "a very common name": every Kuwait guest phone
+starts `+965`, so the characters `965`, `+965`, `9655`... of a phone typed left to right match every
+guest order and, past 1,000 guest orders, take that path for those keystrokes (300 ms debounce, no
+minimum length); four more GIN indexes on `orders` add about 3 ms per 5,000 inserts.
+
+**Ruling IDX-6 — the guest-id cap is still measured store-wide, not against the listed filters
+(declined part of issue 2444).** The issue also asked to pass `status` / `from` / `to` /
+`confirmedOnly` into `guestOrderIdsSql` so the cap counts only the rows being listed. Declined: the
+`id IN (...)` arm is ANDed with those same filters by `listWhere`, so correctness is unchanged either
+way, and threading them would change the SQL the guest-index plan test pins (the partial-index
+predicate and the `store_id` filter are what keep it eligible for the four trigram indexes) for a
+latency cliff that is now confined to the guest half. Revisit if production shows the guest half over
+the cap on filtered lists. Cost if wrong: a filtered list whose store-wide guest matches exceed 1,000
+uses the unindexed JSON filter for the guest half even when the filter would leave fewer rows.
 
 ## 2026-10-02 — SMS marketing consent (branch `feat/sms-marketing-consent`, issue 206)
 
@@ -5385,3 +5400,21 @@ removed by `afterAll` (users by id, orders by store).
 Decision: `USE_SELF_HOSTED=false` (cloud) for push, PR and dispatch; every `schedule:` run stays on self-hosted unless `vars.SCHEDULED_ON_CLOUD == 'true'`. Owner instruction ("make the crons use only umbra").
 Evidence: cloud bills each job at a 1-minute floor; the drift check (every 30 min), hourly railway probe and 2-hourly watchdog come to ~2,500 min/month before nightlies, against the plan's included minutes. The audit on #2453 (P0) showed a hard pin would make crons un-movable during a runner outage, so the pin has its own switch, and `workflow-runner-selector.test.ts` asserts every schedule-triggered job reads it (mutation-checked: reverting db-backup.yml reddens it).
 Cost if wrong: during a runner outage, crons (incl. daily db-backup and both drift monitors) queue silently until someone flips `SCHEDULED_ON_CLOUD=true`; the runbook's outage section documents the flip.
+
+## Ruling CI-CRON-2 — the ~2,500 min/month estimate covers the crons only (issue 2458, 2026-10-03)
+
+Decision: restate the CI-CRON-1 evidence rather than change it. The ~2,500 min/month figure counts the scheduled jobs alone; with `USE_SELF_HOSTED=false`, every push/PR/dispatch run (the full `ci.yml` matrix and the six `cf-deploy.yml` jobs) also bills cloud minutes and is NOT in that figure. `docs/migration/cloudflare-ci-deploy.md` now says so and no longer tells a reader to set `USE_SELF_HOSTED=true`.
+Evidence: `cf-deploy.yml` is not schedule-triggered, so its `runs-on` lines stay on the plain `USE_SELF_HOSTED` form and follow the variable to cloud. The push/PR minutes were not measured in this change; read them from the org billing page before relying on any total.
+Cost if wrong: the monthly total is understated by an unmeasured amount, and a reader who still follows the old "must stay `true`" line moves every push/PR job back onto the two-runner Umbra pool.
+
+## Ruling CI-GH-1 — the self-hosted runners have no `gh`; the blast-radius comment uses the REST API (issue 2452, 2026-10-03)
+
+Decision: `.github/workflows/blast-radius.yml` posts its PR comment with python3 and the REST API (the same endpoints `.github/scoped-audit/audit.mjs` uses), logs an explicit `::warning::` when the comment cannot be posted, and no longer relies on `continue-on-error` to hide a 127. The check itself (the compute step and the step summary) is unchanged. Partial: the other `gh`-using workflows were not changed.
+Evidence: the last run on `fwb-ci6` logged `gh: command not found` in the comment step while every step reported success. `auto-fix-watchdog.yml` is the other `gh` user that can land on a self-hosted runner (its `schedule:` path); it installs `jq` for itself but nothing installs `gh`, and its recent scheduled runs report success, so whether it works there was not verified. `runner-health-check.yml` and `cloud-rescue.yml` are `ubuntu-latest` only.
+Cost if wrong: if `gh` is also missing for the watchdog's scheduled runs, its stale-failure escalation never fires; `gh --version` on a `fwb-ci` runner settles it.
+
+## Ruling CI-CONC-1 — main-push cancellation fixed for gitleaks only (issue 2454, 2026-10-03)
+
+Decision: `gitleaks.yml` gives a push its own concurrency group keyed by sha (PR runs keep the per-ref group and stay cancellable), so the required secret scan cannot end `cancelled` on a main commit. Partial: `ci.yml`, `semgrep.yml` and `cf-deploy.yml` keep `cancel-in-progress: true` on their ref-keyed groups; `blast-radius.yml` is PR-only so it is not affected.
+Evidence: the issue's run list shows `cancelled` gitleaks runs for main pushes `01d1d4210` and `4dddb4bc9`, and GitHub keeps one pending run per group, so `cancel-in-progress: false` could not prevent it. `tests/unit/gitleaks-concurrency.test.ts` pins the group and the cancel expression (mutation-checked). Not changed for the others because each needs its own decision: `cf-deploy.yml` diffs against the last SUCCESSFUL run, so letting runs queue instead of cancel changes what it deploys and when, and `ci.yml` main runs are post-merge only (the required checks run on the PR).
+Cost if wrong: a burst of merges can still cancel a pending `ci.yml`/`semgrep.yml` main run, so the post-merge signal for that commit is missing, and a cancelled `cf-deploy.yml` run strands its apps until the next successful run (confirm a success covers the tip after merge bursts).

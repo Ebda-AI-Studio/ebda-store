@@ -261,23 +261,56 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
     expect(JSON.stringify(where.OR)).not.toContain('string_contains');
   });
 
-  it(`more than ${ORDER_SEARCH_CUSTOMER_ID_CAP} matching guest orders falls back to the JSON filter, same rows`, async () => {
-    const crowd = `crowd${tag}`;
-    await prisma.order.createMany({
-      data: Array.from({ length: ORDER_SEARCH_CUSTOMER_ID_CAP + 1 }, (_, i) => ({
-        storeId,
-        orderNumber: `OGC-${tag}-${i}`,
-        subtotal: 1,
-        total: 1,
-        shippingAddress: { firstName: crowd, lastName: `c${i}` },
-        billingAddress: {},
-      })),
+  it(`more than ${ORDER_SEARCH_CUSTOMER_ID_CAP} matching guest orders degrades ONLY the guest half; the registered customer arm survives (issue 2444), same rows`, async () => {
+    // Unique per ATTEMPT, not per file: CI runs this with `--retry=1`, which re-runs the test body
+    // against the same database while `beforeAll` is not re-run. The per-file `tag` made attempt 2
+    // collide with attempt 1's orders (unique `order_number`) so the reported failure was attempt
+    // 2's P2002, not attempt 1's real one (issue 2445). `run` is in the order numbers, the user
+    // email and the search term; the `finally` removes this attempt's rows even when it fails.
+    const run = Math.random().toString(36).slice(2, 8);
+    const crowd = `crowd${tag}${run}`;
+    const user = await prisma.user.create({
+      data: {
+        email: `${crowd}@x.test`,
+        passwordHash: 'x',
+        firstName: crowd,
+        lastName: 'Registered',
+        role: 'customer',
+      },
     });
-    const where = await OrderService.listWhere(storeId, { search: crowd });
-    expect(JSON.stringify(where.OR)).toContain('string_contains');
-    const got = await actual(crowd);
-    expect(got).toHaveLength(ORDER_SEARCH_CUSTOMER_ID_CAP + 1);
-    expect(got).toEqual(await expected(crowd));
+    try {
+      await prisma.order.createMany({
+        data: Array.from({ length: ORDER_SEARCH_CUSTOMER_ID_CAP + 1 }, (_, i) => ({
+          storeId,
+          orderNumber: `OGC-${tag}-${run}-${i}`,
+          subtotal: 1,
+          total: 1,
+          shippingAddress: { firstName: crowd, lastName: `c${i}` },
+          billingAddress: {},
+        })),
+      });
+      const regOrder = await order(storeId, {}, { customerId: user.id });
+
+      const where = await OrderService.listWhere(storeId, { search: crowd });
+      const arms = JSON.stringify(where.OR);
+      // The guest half is over the cap -> the JSON filter ...
+      expect(arms).toContain('string_contains');
+      // ... but the registered half keeps its indexed `customer_id IN (...)` arm, not the
+      // four-LEFT-JOIN relation filter.
+      expect(arms).toContain(`"customerId":{"in":["${user.id}"]}`);
+      expect(arms).not.toContain('"customer":');
+
+      const got = await actual(crowd);
+      expect(got).toHaveLength(ORDER_SEARCH_CUSTOMER_ID_CAP + 2);
+      expect(got).toContain(regOrder.id);
+      expect(got).toEqual(await expected(crowd));
+    } finally {
+      await prisma.order.deleteMany({
+        where: { storeId, orderNumber: { startsWith: `OGC-${tag}-${run}-` } },
+      });
+      await prisma.order.deleteMany({ where: { customerId: user.id } });
+      await prisma.user.deleteMany({ where: { id: user.id } });
+    }
   });
 
   it('the real statement is index-eligible: with every other index on orders removed, its plan is a BitmapOr of the guest trigram indexes', async () => {
