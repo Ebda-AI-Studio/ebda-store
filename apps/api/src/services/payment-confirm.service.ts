@@ -38,6 +38,7 @@ import type { PaymentStatus } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
+import { CardTestingGuard } from './card-testing-guard.service';
 import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
@@ -377,6 +378,17 @@ export async function confirmPaymentFromProviderStatus(
       triggeredByUserId,
       details: { source, reason: 'provider_status_confirmed_failed', providerStatus: status },
     });
+
+    // Card-testing bookkeeping (SP5 task 4): a confirmed DECLINE (not cancelled /
+    // expired). Idempotent per payment, so a webhook that already counted it is
+    // not counted twice.
+    if (status === 'failed') {
+      void CardTestingGuard.recordDecline({
+        storeId: order.storeId,
+        orderId: order.id,
+        paymentId: payment.id,
+      });
+    }
 
     return { paymentStatus: 'failed', providerStatus: status, statusChanged: true };
   }

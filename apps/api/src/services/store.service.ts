@@ -5,6 +5,8 @@ import {
   slugify,
   slugifyWithFallback,
   isReservedSlug,
+  isProtectedSlug,
+  STORE_SLUG_ERROR_MESSAGES,
   storeHost,
   REGION,
   LEGACY_STORE_PLAN_TO_PLAN_CODE,
@@ -19,6 +21,7 @@ import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { assertPlanAllows, assertWithinLimit } from './plan-limit.service';
+import { storeDomainWhere } from '../lib/store-host';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 
 /**
@@ -277,7 +280,11 @@ export class StoreService {
     return store;
   }
 
-  static async create(ownerId: string, data: CreateStoreData) {
+  static async create(
+    ownerId: string,
+    data: CreateStoreData,
+    opts: { allowProtectedSlug?: boolean } = {}
+  ) {
     // Same class as the product-slug defect: an empty slugify result made the
     // de-duplication loop mint '-1'/'-2' store slugs. A store is even less
     // recoverable than a product, so it gets the same guarantee.
@@ -289,9 +296,14 @@ export class StoreService {
     // it is valid and unreserved ("Support" → `support-1`, not a refusal).
     let baseSlug: string;
     if (data.slug) {
-      baseSlug = assertStoreSlug(data.slug);
+      baseSlug = assertStoreSlug(data.slug, { allowProtected: opts.allowProtectedSlug });
     } else {
       baseSlug = deriveStoreSlug(slugifyWithFallback(data.name, 'store', { ascii: true }));
+      // A name-derived slug that is a protected brand is refused (suffixing it
+      // would only normalise back to the same brand).
+      if (!opts.allowProtectedSlug && isProtectedSlug(baseSlug)) {
+        throw new AppError(400, 'SLUG_PROTECTED', STORE_SLUG_ERROR_MESSAGES.SLUG_PROTECTED);
+      }
     }
 
     // Auto-deduplicate slug
@@ -324,7 +336,11 @@ export class StoreService {
       data: {
         name: data.name,
         slug,
+        // Reachable only for a super_admin (the routes drop `domain` for anyone
+        // else): an operator-assigned domain is trusted, so it starts `active`.
+        // Merchants claim a domain through PUT /stores/:id/domain (pending).
         domain: data.domain,
+        ...(data.domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
         ownerId,
         settings: data.settings || {
           currency: REGION.currency,
@@ -379,7 +395,11 @@ export class StoreService {
     return store;
   }
 
-  static async update(storeId: string, data: UpdateStoreData) {
+  static async update(
+    storeId: string,
+    data: UpdateStoreData,
+    opts: { allowProtectedSlug?: boolean } = {}
+  ) {
     const store = await this.getById(storeId);
     // Snapshot the heroImage URL so a replaced banner gets the old R2
     // object cleaned up post-commit. Same posture as branding / seo /
@@ -388,7 +408,7 @@ export class StoreService {
 
     // Auto-deduplicate slug if changing
     if (data.slug && data.slug !== store.slug) {
-      const baseSlug = assertStoreSlug(data.slug);
+      const baseSlug = assertStoreSlug(data.slug, { allowProtected: opts.allowProtectedSlug });
       data.slug = baseSlug;
       let suffix = 0;
       while (await prisma.store.findUnique({ where: { slug: data.slug } })) {
@@ -427,6 +447,9 @@ export class StoreService {
         name: data.name,
         slug: data.slug,
         domain: data.domain,
+        ...(data.domain && data.domain !== store.domain
+          ? { domainStatus: 'active', domainVerifiedAt: new Date(), pendingDomain: null }
+          : {}),
         settings: mergedSettings,
         ...(data.heroTitle !== undefined && { heroTitle: data.heroTitle }),
         ...(data.heroTitleAr !== undefined && { heroTitleAr: data.heroTitleAr }),
@@ -736,8 +759,10 @@ export class StoreService {
       );
     }
 
-    const store = await prisma.store.findUnique({
-      where: { domain },
+    // VERIFIED domains only (domainStatus 'active'): an unverified claim is
+    // never a storefront (SP5 task 4).
+    const store = await prisma.store.findFirst({
+      where: storeDomainWhere(domain),
       include: {
         _count: { select: { products: true, categories: true } },
       },

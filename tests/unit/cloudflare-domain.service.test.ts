@@ -54,9 +54,41 @@ describe('CloudflareDomainService', () => {
     expect(st).toEqual({
       domain: 'shop.x.com',
       verified: true,
+      failed: false,
       misconfigured: false,
       dnsRecords: [{ type: 'CNAME', name: 'shop.x.com', value: 'cf.ebda.app' }],
     });
+  });
+
+  it.each([
+    ['blocked hostname', { status: 'blocked', ssl: { status: 'pending_validation' } }],
+    ['moved hostname', { status: 'moved', ssl: { status: 'pending_validation' } }],
+    ['validation timed out', { status: 'pending', ssl: { status: 'validation_timed_out' } }],
+    ['issuance timed out', { status: 'pending', ssl: { status: 'issuance_timed_out' } }],
+  ])('getDomain reports a terminal provider state as failed: %s', async (_name, ch) => {
+    vi.spyOn(global, 'fetch').mockReturnValue(
+      okJson({ success: true, result: [{ id: 'ch1', hostname: 'shop.x.com', ...ch }] })
+    );
+    const st = await CloudflareDomainService.getDomain('shop.x.com');
+    expect(st).toMatchObject({ verified: false, failed: true });
+  });
+
+  it('getDomain does NOT call a still-validating hostname failed', async () => {
+    vi.spyOn(global, 'fetch').mockReturnValue(
+      okJson({
+        success: true,
+        result: [
+          {
+            id: 'ch1',
+            hostname: 'shop.x.com',
+            status: 'pending',
+            ssl: { status: 'pending_validation' },
+          },
+        ],
+      })
+    );
+    const st = await CloudflareDomainService.getDomain('shop.x.com');
+    expect(st).toMatchObject({ verified: false, failed: false });
   });
 
   it('getDomain reports not-verified while ssl is pending', async () => {

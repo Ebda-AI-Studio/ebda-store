@@ -141,6 +141,11 @@ vi.mock('@api/services/store.service', () => ({
   },
 }));
 
+// The per-account daily store cap (SP5 task 4) is covered in self-serve-abuse.test.ts.
+vi.mock('@api/services/store-creation-limit', () => ({
+  assertStoreCreationBudget: vi.fn().mockResolvedValue(undefined),
+  withStoreCreationLock: (_owner: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/services/domain-provider', () => ({
   resolveDomainService: vi.fn(() => ({ isConfigured: () => false })),
 }));

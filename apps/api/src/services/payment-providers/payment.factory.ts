@@ -9,6 +9,7 @@ import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
 import { OneSignalService } from '../onesignal.service';
 import { redis } from '../redis.service';
+import { CardTestingGuard } from '../card-testing-guard.service';
 import { sendAlert } from '../alerts.service';
 import { alertUnbookedRefund } from './unbooked-refund-alert';
 import { alertOrphanedProviderInvoice } from './orphaned-invoice-alert';
@@ -2125,6 +2126,16 @@ export class PaymentService {
       webhookData.status === 'expired' ||
       webhookData.status === 'cancelled'
     ) {
+      // Card-testing bookkeeping (SP5 task 4): only a DECLINE counts, not a
+      // customer who cancelled / let the invoice expire. Idempotent per payment
+      // (webhooks retry) and never throws.
+      if (webhookData.status === 'failed') {
+        void CardTestingGuard.recordDecline({
+          storeId: order.storeId,
+          orderId: order.id,
+          paymentId: payment.id,
+        });
+      }
       OneSignalService.notifyAdminsOfPaymentFailure({
         orderId: order.id,
         orderNumber: order.orderNumber,

@@ -21,6 +21,7 @@ import { ProvisioningService } from './provisioning.service';
 import { bustStoreCaches } from './store.service';
 import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
+import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
@@ -39,10 +40,17 @@ export type SlugAvailability =
     };
 
 export class OnboardingService {
-  static async checkSlug(raw: string): Promise<SlugAvailability> {
+  /**
+   * `allowProtected` is the super_admin support-claim override: it lifts ONLY
+   * the protected brand list (`SLUG_PROTECTED`); reserved labels never lift.
+   */
+  static async checkSlug(
+    raw: string,
+    opts: { allowProtected?: boolean } = {}
+  ): Promise<SlugAvailability> {
     const slug = raw.trim().toLowerCase();
     const host = storeHost(slug);
-    const valid = validateStoreSlug(slug);
+    const valid = validateStoreSlug(slug, { allowProtected: opts.allowProtected });
     if (!valid.ok) {
       return { slug, host, available: false, reason: valid.code, message: valid.message };
     }
@@ -126,7 +134,7 @@ export class OnboardingService {
   }
 
   static async createStore(
-    owner: { userId: string },
+    owner: { userId: string; isSuperAdmin?: boolean },
     input: {
       name: string;
       nameAr?: string;
@@ -148,7 +156,9 @@ export class OnboardingService {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
     }
 
-    const availability = await this.checkSlug(input.slug);
+    const availability = await this.checkSlug(input.slug, {
+      allowProtected: owner.isSuperAdmin === true,
+    });
     if (!availability.available) {
       throw new AppError(
         availability.reason === 'SLUG_TAKEN' ? 409 : 400,
@@ -157,26 +167,32 @@ export class OnboardingService {
       );
     }
 
-    try {
-      const result = await ProvisioningService.provisionStore({
-        storeName: input.name,
-        storeNameAr: input.nameAr,
-        storeSlug: availability.slug,
-        plan: 'free',
-        status: 'inactive',
-        template: input.template,
-        ownerEmail: user.email,
-        ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
-        settings: { defaultLanguage: input.language ?? 'ar' },
-      });
-      return result.store;
-    } catch (err) {
-      // Lost the slug race between the check above and the insert.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw new AppError(409, 'SLUG_TAKEN', 'This store address is already taken');
+    const create = async () => {
+      // Velocity cap (SP5 task 4): checked INSIDE the per-owner lock so a burst
+      // of parallel creates cannot all read the same count.
+      if (!owner.isSuperAdmin) await assertStoreCreationBudget(owner.userId);
+      try {
+        const result = await ProvisioningService.provisionStore({
+          storeName: input.name,
+          storeNameAr: input.nameAr,
+          storeSlug: availability.slug,
+          plan: 'free',
+          status: 'inactive',
+          template: input.template,
+          ownerEmail: user.email,
+          ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
+          settings: { defaultLanguage: input.language ?? 'ar' },
+        });
+        return result.store;
+      } catch (err) {
+        // Lost the slug race between the check above and the insert.
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          throw new AppError(409, 'SLUG_TAKEN', 'This store address is already taken');
+        }
+        throw err;
       }
-      throw err;
-    }
+    };
+    return owner.isSuperAdmin ? create() : withStoreCreationLock(owner.userId, create);
   }
 
   /**

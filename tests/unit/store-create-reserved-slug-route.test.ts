@@ -51,6 +51,12 @@ vi.mock('@force/database', () => ({
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));
 
+// The per-account daily cap (SP5 task 4) is covered in self-serve-abuse.test.ts;
+// here it is a pass-through so the route's slug contract stays the subject.
+vi.mock('@api/services/store-creation-limit', () => ({
+  assertStoreCreationBudget: vi.fn().mockResolvedValue(undefined),
+  withStoreCreationLock: (_owner: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/services/plan-limit.service', () => ({ assertWithinLimit: vi.fn() }));
 
 const create = vi.fn();
@@ -139,6 +145,8 @@ describe('POST /stores — slug rules', () => {
     expect(res.status).toBe(201);
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0][1].slug).toBe('amelia-aurum');
+    // A store_admin never gets the protected-name override.
+    expect(create.mock.calls[0][2]).toEqual({ allowProtectedSlug: false });
   });
 
   it('a body with no slug is still accepted (the service derives one from the name)', async () => {

@@ -42,6 +42,8 @@ async function makeStore() {
       name: `FAQ RLS ${suffix}`,
       slug: `faq-rls-${suffix}`,
       domain: `faq-rls-${suffix}.test`,
+      // Only a VERIFIED domain resolves (SP5 task 4); this fixture is one.
+      domainStatus: 'active',
       ownerId: owner.id,
       status: 'active',
       plan: 'enterprise',

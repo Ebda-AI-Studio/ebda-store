@@ -7,6 +7,8 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
 import { resolveDomainService } from '../services/domain-provider';
+import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
+import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
 import { ResendService } from '../services/resend.service';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
@@ -15,8 +17,6 @@ import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
 import { assertWithinLimit } from '../services/plan-limit.service';
-import { bustCorsCache } from '../lib/cors-cache';
-import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
 import {
   isSafeUrl,
@@ -547,11 +547,26 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = parseStoreBody(createStoreSchema, req.body);
+      const actor = getAuthUser(req);
+      const isSuperAdmin = actor.role === 'super_admin';
 
-      const store = await StoreService.create(getAuthUser(req).userId, {
-        ...data,
-        settings: data.settings as Prisma.InputJsonValue,
-      });
+      // A custom domain is claimed through PUT /:id/domain (pending until the
+      // provider verifies ownership). Only a super_admin may set one here.
+      if (!isSuperAdmin) delete data.domain;
+
+      const create = () =>
+        StoreService.create(
+          actor.userId,
+          { ...data, settings: data.settings as Prisma.InputJsonValue },
+          { allowProtectedSlug: isSuperAdmin }
+        );
+      // Per-account daily cap (SP5 task 4), inside a per-owner lock.
+      const store = isSuperAdmin
+        ? await create()
+        : await withStoreCreationLock(actor.userId, async () => {
+            await assertStoreCreationBudget(actor.userId);
+            return create();
+          });
 
       res.status(201).json({
         success: true,
@@ -586,10 +601,15 @@ router.put(
               ?.timezone ?? null)
           : null;
 
-      const store = await StoreService.update(id, {
-        ...data,
-        settings: data.settings as Prisma.InputJsonValue,
-      });
+      // A custom domain is claimed through PUT /:id/domain (pending until the
+      // provider verifies ownership). Only a super_admin may set one here.
+      if (user.role !== 'super_admin') delete data.domain;
+
+      const store = await StoreService.update(
+        id,
+        { ...data, settings: data.settings as Prisma.InputJsonValue },
+        { allowProtectedSlug: user.role === 'super_admin' }
+      );
 
       if (data.timezone !== undefined && data.timezone !== previousTimezone) {
         await auditLog({
@@ -1059,24 +1079,39 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const store = await StoreService.getById(id);
+      const domainSvc0 = resolveDomainService();
+      // A pending claim is re-checked against the provider on every status
+      // read: the moment DCV passes it is promoted to the store's domain, so the
+      // merchant never waits for the next sweep tick.
+      await DomainClaimService.sync(id, domainSvc0).catch(err =>
+        logger.warn({ err, storeId: id }, 'Domain claim sync failed during GET /domain')
+      );
+      await StoreService.getById(id); // 404s an unknown store
       const storeRow = await prisma.store.findUnique({
         where: { id },
         select: {
+          domain: true,
+          pendingDomain: true,
+          domainStatus: true,
+          domainClaimedAt: true,
           emailDomainId: true,
           emailDomainStatus: true,
           emailDomainVerifiedAt: true,
           domainProvider: true,
         },
       });
+      // The hostname the merchant is working with: the unverified claim if any,
+      // else the verified domain. (`store.domain` is verified-only.)
+      const shownDomain = storeRow?.pendingDomain ?? storeRow?.domain ?? null;
 
       // No custom domain at all — neither the provider nor Resend state is meaningful.
-      if (!store.domain) {
+      if (!shownDomain) {
         res.json({
           success: true,
           data: {
             domain: null,
             verified: false,
+            claimStatus: null,
             dnsRecords: [],
             emailSender: {
               domainId: storeRow?.emailDomainId ?? null,
@@ -1092,7 +1127,7 @@ router.get(
       // is the only provider; `resolveDomainService` still takes the store's
       // row for signature compat with legacy callers).
       const domainSvc = resolveDomainService({ domainProvider: storeRow?.domainProvider });
-      const providerStatus = await domainSvc.getDomain(store.domain);
+      const providerStatus = await domainSvc.getDomain(shownDomain);
 
       // Best-effort: refresh Resend status alongside. Failure shouldn't block
       // the admin page from rendering — the storefront domain status is the
@@ -1154,7 +1189,7 @@ router.get(
       // provider API is unreachable is a single CNAME to the Cloudflare-for-SaaS
       // zone target (www handling is automatic on the Cloudflare side).
       const providerFallbackRecords = [
-        { type: 'CNAME', name: store.domain, value: config.cfFallbackOrigin },
+        { type: 'CNAME', name: shownDomain, value: config.cfFallbackOrigin },
       ];
       const providerRecords = providerStatus?.dnsRecords ?? providerFallbackRecords;
       const mergedDns = [...providerRecords, ...resendRecords];
@@ -1163,10 +1198,14 @@ router.get(
         success: true,
         data: {
           ...(providerStatus ?? {
-            domain: store.domain,
+            domain: shownDomain,
             verified: false,
             misconfigured: true,
           }),
+          // pending | active | failed — a pending/failed claim is not served and
+          // is released after DOMAIN_CLAIM_TTL_HOURS (72h) from `claimedAt`.
+          claimStatus: storeRow?.domainStatus ?? null,
+          claimedAt: storeRow?.domainClaimedAt ?? null,
           dnsRecords: mergedDns,
           emailSender: {
             domainId: storeRow?.emailDomainId ?? null,
@@ -1181,7 +1220,14 @@ router.get(
   }
 );
 
-// PUT /stores/:id/domain - Update store custom domain
+// PUT /stores/:id/domain - Claim (or clear) the store's custom domain.
+//
+// Setting a domain makes a CLAIM, not an active domain: it is stored as
+// `pendingDomain` and is not served (host resolution, credentialed CORS and
+// `storefrontOrigin` read only the verified `domain`) until the provider
+// (Cloudflare for SaaS) reports the hostname verified. A pending claim older
+// than DOMAIN_CLAIM_TTL_HOURS (72h) is released by the sweep. A domain ACTIVE on
+// another store can never be claimed. See services/domain-claim.service.ts.
 router.put(
   '/:id/domain',
   authenticate,
@@ -1189,44 +1235,25 @@ router.put(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
-    // Compensation context for partial-success rollback: if we successfully
-    // register a new domain with the provider but the subsequent DB update fails,
-    // we must remove the domain so it doesn't strand as a phantom (admin can't
-    // see it, but the provider is still serving / billing). Cleared once the DB
-    // update commits.
-    let rollbackDomainAdd: (() => Promise<void>) | null = null;
-
     try {
       const { id } = req.params;
       const rawDomain = (req.body as { domain: string | null }).domain;
 
       // Normalize domain: lowercase, strip www prefix, trim whitespace
-      const domain = rawDomain
-        ? rawDomain
-            .toLowerCase()
-            .replace(/^www\./, '')
-            .trim()
-        : null;
+      const domain = rawDomain ? normalizeDomain(rawDomain) : null;
 
       const store = await StoreService.getById(id);
       const oldDomain = store.domain;
 
       const previousEmailRow = await prisma.store.findUnique({
         where: { id },
-        select: { emailDomainId: true, domainProvider: true },
+        select: { domainProvider: true },
       });
-      const previousEmailDomainId = previousEmailRow?.emailDomainId ?? null;
 
       // Resolve the frontend host provider for this store (Cloudflare-for-SaaS
-      // is the only provider). All attach/remove/status calls below go through it.
+      // is the only provider). All attach/remove/status calls go through it.
       const domainSvc = resolveDomainService({ domainProvider: previousEmailRow?.domainProvider });
 
-      // Add new domain to the provider FIRST (before touching the old one). If
-      // we removed the old domain first and then add-new failed, the storefront
-      // on the old domain would go dark AND the new domain wouldn't work —
-      // a customer-visible outage. With this ordering, the old domain keeps
-      // serving traffic until everything else (provider add + DB update)
-      // succeeds; old-domain removal moves to AFTER the DB commit below.
       // A custom domain must be a real third-party hostname. Ebda's own hosts
       // (the apex, `<slug>.ebda.app`, platform labels), IPs, localhost and
       // malformed names can never be claimed: `<slug>.ebda.app` is already
@@ -1242,6 +1269,8 @@ router.put(
         });
         return;
       }
+
+      let claimState: 'pending' | 'active' | null = null;
 
       if (domain && domain !== oldDomain) {
         // Plan gate (SP5): custom domains are a plan capability. Clearing or
@@ -1262,178 +1291,62 @@ router.put(
           return;
         }
 
-        // Check uniqueness
-        const existingStore = await StoreService.getByDomain(domain).catch(() => null);
-        if (existingStore && existingStore.id !== id) {
-          res.status(400).json({
-            success: false,
-            error: { code: 'DOMAIN_TAKEN', message: 'Domain is already in use by another store' },
-          });
-          return;
-        }
-
-        const addResult = await domainSvc.addDomain(domain);
-        if (!addResult) {
-          res.status(502).json({
-            success: false,
-            error: {
-              code: 'DOMAIN_PROVISION_FAILED',
-              message:
-                'Failed to register domain with the platform. Please try again or contact support.',
-            },
-          });
-          return;
-        }
-
-        // Provider-add succeeded — arm the compensating action in case the DB
-        // update below throws (slug collision race, DB hiccup, etc.). Without
-        // this, the domain would be registered with the provider but invisible
-        // to the admin in our DB.
-        const domainToRollback = domain;
-        rollbackDomainAdd = async () => {
-          try {
-            await domainSvc.removeDomain(domainToRollback);
-            logger.info(
-              { domain: domainToRollback, provider: domainSvc.providerName },
-              '[STORE] Rolled back domain after DB update failure'
-            );
-          } catch (rollbackError) {
-            logger.error(
-              {
-                err: rollbackError instanceof Error ? rollbackError.message : 'Unknown error',
-                domain: domainToRollback,
-                provider: domainSvc.providerName,
-              },
-              '[STORE] Failed to roll back domain — manual cleanup required'
-            );
-          }
-        };
-      }
-
-      // Update domain in DB (use prisma directly for null clearing)
-      const updated = domain
-        ? await StoreService.update(id, { domain })
-        : await prisma.store.update({
+        // Uniqueness (active elsewhere / fresh pending elsewhere -> DOMAIN_TAKEN),
+        // provider add, and the pending claim row. The old active domain keeps
+        // serving until the new one is VERIFIED (the sweep / status poll promotes it).
+        const claim = await DomainClaimService.claim(id, domain, domainSvc);
+        claimState = claim.state === 'active' ? 'active' : 'pending';
+      } else if (domain && domain === oldDomain) {
+        // Re-saving the verified domain: nothing to claim; drop any other pending claim.
+        await DomainClaimService.cancelPending(id, domainSvc);
+        claimState = 'active';
+      } else {
+        // Clearing: drop the verified domain AND any pending claim.
+        await DomainClaimService.cancelPending(id, domainSvc);
+        if (oldDomain) {
+          await prisma.store.update({
             where: { id },
-            data: { domain: null },
-            include: {
-              owner: { select: { id: true, email: true, firstName: true, lastName: true } },
-            },
+            data: { domain: null, domainStatus: null, domainVerifiedAt: null },
           });
-
-      // DB update committed — disarm the rollback so a successful change is
-      // never undone by a downstream error (e.g. CORS-cache bust, status fetch).
-      rollbackDomainAdd = null;
-
-      // The stored llms.txt body (Store.llmsTxt) bakes ABSOLUTE URLs built from
-      // the domain at generation time, and the /llms.txt route serves it
-      // verbatim. On a real domain change those URLs go stale. Clear it so the
-      // route falls back to the live, domain-correct generator until the
-      // merchant re-runs the GEO "llms.txt" sweep for the AI-enriched version.
-      // (All other AI output — SEO/AEO meta, FAQs, citation/brand-facts — is
-      // domain-agnostic text; their URLs are computed at render time.)
-      if (domain !== oldDomain) {
-        await prisma.store
-          .update({ where: { id }, data: { llmsTxt: null } })
-          .catch(err =>
-            logger.warn(
-              { err, storeId: id },
-              '[STORE] failed to clear stale llms.txt on domain change'
-            )
-          );
-      }
-
-      // Per-store Resend provisioning. Run only on actual domain change.
-      // Order matters: remove the OLD Resend record BEFORE provisioning the
-      // new one, otherwise provisionStoreDomain would overwrite the row's
-      // emailDomainId and we'd lose the reference to the old domain.
-      if (domain !== oldDomain) {
-        if (previousEmailDomainId) {
-          // Await the removal so the upcoming provision sees a clean row state
-          // (no stale emailDomainId that would cause provisionStoreDomain to
-          // refresh the old Resend domain instead of creating a new one).
-          await ResendService.removeStoreDomain(id).catch(error =>
-            logger.error(
-              { err: error instanceof Error ? error.message : 'Unknown error', storeId: id },
-              'Failed to remove old Resend domain after domain change'
-            )
-          );
-        }
-
-        if (domain) {
-          try {
-            await ResendService.provisionStoreDomain(id);
-          } catch (err) {
-            logger.warn(
-              { err, storeId: id, domain },
-              'Resend domain provision failed (storefront still works; email stays on platform fallback)'
-            );
-          }
+          await DomainClaimService.afterDomainChanged({
+            storeId: id,
+            slug: store.slug,
+            oldDomain,
+            newDomain: null,
+            provider: domainSvc,
+          });
         }
       }
 
-      // Remove old domain from the provider AFTER the DB commit. Doing this
-      // before (and especially before adding the new domain) created a window
-      // where an addDomain failure left BOTH domains broken — old removed, new
-      // not added. Now: new domain is live, DB points at it, then we tear down
-      // the old one. Fire-and-forget — if the carrier-side removal fails we
-      // log it; the worst case is a stranded domain alias on the provider (no
-      // customer impact, just manual cleanup).
-      if (oldDomain && oldDomain !== domain) {
-        const domainToRemove = oldDomain;
-        void domainSvc.removeDomain(domainToRemove).catch(error =>
-          logger.error(
-            {
-              err: error instanceof Error ? error.message : 'Unknown error',
-              oldDomain: domainToRemove,
-              provider: domainSvc.providerName,
-            },
-            '[STORE] Failed to remove old domain from provider after DB commit — manual cleanup may be required'
-          )
-        );
-      }
+      const updated = await prisma.store.findUnique({
+        where: { id },
+        include: { owner: { select: { id: true, email: true, firstName: true, lastName: true } } },
+      });
 
-      // Bust CORS cache so the new domain works immediately
-      if (domain) bustCorsCache(domain);
-      if (oldDomain && oldDomain !== domain) bustCorsCache(oldDomain);
-
-      // Bust the `/public/store/resolve` cache for both the new domain (in
-      // case a prior lookup already cached a miss) and the old one — the
-      // domain-clearing branch above uses a raw `prisma.store.update` that
-      // bypasses `StoreService.update`'s `bustStoreCaches` call, so this is
-      // the only invalidation for that path.
-      if (domain) void invalidateCached(`public:store:resolve:${domain}`);
-      if (oldDomain && oldDomain !== domain)
-        void invalidateCached(`public:store:resolve:${oldDomain}`);
-
-      // Get verification status
+      // Verification status of what the merchant just saved (the claim if any).
+      const shown = domain;
       let domainStatus: import('../services/domain-provider').DomainStatus | null = null;
-      if (domain) {
-        domainStatus = await domainSvc.getDomain(domain);
-      }
+      if (shown) domainStatus = await domainSvc.getDomain(shown);
       const fallbackDnsValue = config.cfFallbackOrigin;
 
       res.json({
         success: true,
         data: {
           store: updated,
+          claim: claimState ? { state: claimState, domain: shown } : null,
           domainStatus:
             domainStatus ||
-            (domain
+            (shown
               ? {
-                  domain,
+                  domain: shown,
                   verified: false,
                   misconfigured: true,
-                  dnsRecords: [{ type: 'CNAME', name: domain, value: fallbackDnsValue }],
+                  dnsRecords: [{ type: 'CNAME', name: shown, value: fallbackDnsValue }],
                 }
               : null),
         },
       });
     } catch (error) {
-      // Run any compensating action that was armed above
-      if (rollbackDomainAdd) {
-        await rollbackDomainAdd();
-      }
       next(error);
     }
   }

@@ -68,12 +68,26 @@ function buildApp(): Express {
 
 describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
   let app: Express;
+  // The fill-time floor and per-domain cap are covered in merchant-signup-abuse.test.ts;
+  // this funnel test signs up many `@test.local` addresses back to back.
+  process.env.SIGNUP_MIN_FILL_MS = '0';
+  process.env.SIGNUP_EMAIL_DOMAIN_DAILY_CAP = '100000';
+  // `caps stores per owner` exercises the LIFETIME cap (3); the daily cap has its own suite.
+  process.env.STORES_PER_ACCOUNT_PER_DAY = '10';
   const api = () => request(app);
 
   async function signup(email: string, extra: Record<string, unknown> = {}) {
+    // Abuse controls (SP5 task 4): the signed form token the signup form fetches.
+    const tok = await api().get('/api/v1/auth/merchant/signup-token');
     return api()
       .post('/api/v1/auth/merchant/signup')
-      .send({ email, password: PASSWORD, name: 'Mona Hassan', ...extra });
+      .send({
+        email,
+        password: PASSWORD,
+        name: 'Mona Hassan',
+        formToken: tok.body.data.token,
+        ...extra,
+      });
   }
   async function verify(email: string) {
     const token = tokenFromCapturedMail(latestCapturedMailTo(email));

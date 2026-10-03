@@ -3,6 +3,7 @@
 
 export * from './brand';
 export * from './hosts';
+export * from './abuse';
 export * from './types';
 export * from './utils';
 export * from './csv-utils';

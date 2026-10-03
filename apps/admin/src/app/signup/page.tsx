@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@force/ui';
 import { PublicShell } from '../../components/onboarding/PublicShell';
-import { apiPost } from '../../lib/api';
+import { apiGet, apiPost } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { validateSignup, type SignupFields } from '../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
@@ -28,6 +28,19 @@ export default function SignupPage() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  // Abuse controls: a server-signed "form loaded at" token (a submit that is
+  // too fast is refused) and a honeypot input real people never see or fill.
+  const [formToken, setFormToken] = useState('');
+  const [honeypot, setHoneypot] = useState('');
+
+  async function loadFormToken() {
+    const { data } = await apiGet<{ token: string }>('/api/v1/auth/merchant/signup-token');
+    setFormToken(data?.token ?? '');
+  }
+
+  useEffect(() => {
+    void loadFormToken();
+  }, []);
 
   // Someone already signed in has no use for this page.
   useEffect(() => {
@@ -54,10 +67,18 @@ export default function SignupPage() {
       name: fields.name.trim(),
       ...(fields.phone.trim() ? { phone: fields.phone.trim() } : {}),
       language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
+      formToken,
+      company_site: honeypot,
     });
     setSubmitting(false);
     if (error) {
-      if (error.code === 'VALIDATION_ERROR' && error.details) {
+      if (error.code === 'EMAIL_DOMAIN_NOT_ALLOWED') {
+        setErrors(prev => ({ ...prev, email: 'emailDisposable' }));
+      } else if (error.code === 'SIGNUP_TOO_FAST' || error.code === 'SIGNUP_FORM_INVALID') {
+        // A used / expired / too-early token: get a fresh one and ask again.
+        void loadFormToken();
+        setFormError(tErr(error.code === 'SIGNUP_TOO_FAST' ? 'tooFast' : 'formExpired'));
+      } else if (error.code === 'VALIDATION_ERROR' && error.details) {
         setFormError(tErr('generic'));
       } else {
         setFormError(error.status === 429 ? tErr('rateLimited') : tErr('generic'));
@@ -118,6 +139,19 @@ export default function SignupPage() {
             {formError}
           </div>
         )}
+        {/* Honeypot: off-screen, not focusable, not announced. A bot fills it; a person never does. */}
+        <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', top: 'auto' }}>
+          <label htmlFor="signup-company-site">Company website</label>
+          <input
+            id="signup-company-site"
+            name="company_site"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={honeypot}
+            onChange={e => setHoneypot(e.target.value)}
+          />
+        </div>
         <Input
           id="signup-name"
           name="name"

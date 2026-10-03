@@ -12,11 +12,15 @@ type SlugUi =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'available'; host: string }
-  | { kind: 'problem'; key: 'taken' | 'reserved' | 'tooShort' | 'tooLong' | 'invalid' };
+  | {
+      kind: 'problem';
+      key: 'taken' | 'reserved' | 'protected' | 'tooShort' | 'tooLong' | 'invalid';
+    };
 
 const REASON_KEY = {
   SLUG_TAKEN: 'taken',
   SLUG_RESERVED: 'reserved',
+  SLUG_PROTECTED: 'protected',
   SLUG_TOO_SHORT: 'tooShort',
   SLUG_TOO_LONG: 'tooLong',
   SLUG_INVALID_CHARS: 'invalid',
@@ -96,6 +100,8 @@ export function StoreStep({ onCreated }: { onCreated: (store: OnboardingStore) =
     if (error || !data) {
       if (error?.code === 'SLUG_TAKEN') setSlugUi({ kind: 'problem', key: 'taken' });
       else if (error?.code === 'SLUG_RESERVED') setSlugUi({ kind: 'problem', key: 'reserved' });
+      else if (error?.code === 'SLUG_PROTECTED') setSlugUi({ kind: 'problem', key: 'protected' });
+      else if (error?.code === 'STORE_DAILY_LIMIT') setFormError(t('dailyLimit'));
       else if (error?.code === 'STORE_LIMIT_REACHED') setFormError(t('limit'));
       else setFormError(t('createFailed'));
       return;

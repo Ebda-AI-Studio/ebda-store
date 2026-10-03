@@ -49,6 +49,8 @@ describe('Public Storefront API', () => {
         nameAr: 'متجر اختبار عام',
         slug: testStoreSlug,
         domain: testStoreDomain,
+        // Only a VERIFIED domain resolves (SP5 task 4); this fixture is one.
+        domainStatus: 'active',
         ownerId: user.id,
         status: 'active',
         currency: 'EGP',
