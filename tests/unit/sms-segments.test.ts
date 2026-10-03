@@ -33,7 +33,7 @@ describe('smsSegments', () => {
 describe('promotional SMS length budget (issue 2426)', () => {
   // The appended text the dispatcher adds, at its fixed shape: label, a
   // platform-path base and a 45-char token.
-  const base = 'https://store.force-ai.co/some-store-slug';
+  const base = 'https://ebda.app/some-store-slug';
   const suffix = ` Stop offers: ${base}/sms-unsubscribe?t=${'x'.repeat(22)}.${'y'.repeat(22)}`;
 
   it('the opt-out suffix costs 78 characters plus the storefront base', () => {

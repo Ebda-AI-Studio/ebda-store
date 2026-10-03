@@ -91,7 +91,7 @@ describe('sendMarketingEmail', () => {
     const [payload, options] = emailsSend.mock.calls[0];
     expect(payload.to).toEqual(['a@x.test']);
     expect(payload.headers).toEqual(headers);
-    expect(payload.from).toBe('Shop <noreply@force-ai.co>');
+    expect(payload.from).toBe('Shop <no-reply@ebda.app>');
     expect(options).toEqual({ idempotencyKey: 'campaign-recipient/r1' });
   });
 

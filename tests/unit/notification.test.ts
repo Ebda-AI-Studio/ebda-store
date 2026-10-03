@@ -24,7 +24,7 @@ const sampleData: NotificationData = {
   trackingNumber: 'TRK-999',
   reason: 'Out of stock',
   storeId: 'store-1',
-  storeName: 'Force AI Store',
+  storeName: 'Ebda',
 };
 
 // All notification events for iteration
@@ -87,7 +87,7 @@ describe('renderSmsTemplate', () => {
       customerName: 'Ali',
       orderNumber: 'ORD-002',
       storeId: 'store-1',
-      storeName: 'Force AI Store',
+      storeName: 'Ebda',
     };
     const result = renderSmsTemplate(
       'Track: {tracking} Reason: {reason} Total: {total}',

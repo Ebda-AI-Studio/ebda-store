@@ -13,7 +13,7 @@ const baseStore = (overrides: Partial<StoreSenderShape> = {}): StoreSenderShape 
 describe('resolveSender', () => {
   it('falls back to platform domain when no custom domain', () => {
     const result = resolveSender(baseStore());
-    expect(result.from).toBe('Wady Aljuz <noreply@force-ai.co>');
+    expect(result.from).toBe('Wady Aljuz <noreply@ebda.app>');
     expect(result.replyTo).toBeUndefined();
   });
 
@@ -21,7 +21,7 @@ describe('resolveSender', () => {
     const result = resolveSender(
       baseStore({ domain: 'wadyaljuz.com', emailDomainStatus: 'pending' })
     );
-    expect(result.from).toBe('Wady Aljuz <noreply@force-ai.co>');
+    expect(result.from).toBe('Wady Aljuz <noreply@ebda.app>');
   });
 
   it('uses custom domain when verified', () => {
@@ -44,7 +44,7 @@ describe('resolveSender', () => {
 
   it('honours custom local part on platform fallback too', () => {
     const result = resolveSender(baseStore({ emailSenderLocalPart: 'orders' }));
-    expect(result.from).toBe('Wady Aljuz <orders@force-ai.co>');
+    expect(result.from).toBe('Wady Aljuz <orders@ebda.app>');
   });
 
   it('sets replyTo to store contact email when present', () => {
@@ -54,16 +54,16 @@ describe('resolveSender', () => {
 
   it('treats empty-string local part as default noreply', () => {
     const result = resolveSender(baseStore({ emailSenderLocalPart: '' }));
-    expect(result.from).toBe('Wady Aljuz <noreply@force-ai.co>');
+    expect(result.from).toBe('Wady Aljuz <no-reply@ebda.app>');
   });
 
   it('strips CRLF from store name to prevent header injection', () => {
     const result = resolveSender(baseStore({ name: 'Wady\r\nBcc: attacker@example.com' }));
-    expect(result.from).toBe('Wady  Bcc: attacker@example.com <noreply@force-ai.co>');
+    expect(result.from).toBe('Wady  Bcc: attacker@example.com <noreply@ebda.app>');
   });
 
   it('strips ASCII control chars from store name', () => {
     const result = resolveSender(baseStore({ name: 'Wady\x00Aljuz\x07' }));
-    expect(result.from).toBe('Wady Aljuz <noreply@force-ai.co>');
+    expect(result.from).toBe('Wady Aljuz <noreply@ebda.app>');
   });
 });

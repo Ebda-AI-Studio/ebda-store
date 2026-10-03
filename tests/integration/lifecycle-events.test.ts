@@ -20,7 +20,7 @@ import { API_BASE } from '../helpers/api-base';
 // silently talk to whatever holds port 4000 — which on this machine was a
 // different project's dev server for five days. See tests/helpers/api-base.ts.
 const API_URL = API_BASE;
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@force-ai.co';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@ebda.app';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // ---------------------------------------------------------------------------

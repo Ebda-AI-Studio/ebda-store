@@ -40,7 +40,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', encryptionKey: 'k'.repeat(32) },
+  config: { webUrl: 'https://ebda.app', encryptionKey: 'k'.repeat(32) },
 }));
 
 import { abandonedCartService } from '@api/services/abandoned-cart.service';

@@ -22,7 +22,7 @@
  *    whole s-maxage + SWR window. Fix: `x-store-domain` joins the default
  *    Vary set so every store-scoped response is keyed on both selectors.
  *
- * Relevant because api.force-ai.co IS Cloudflare-proxied (verified live
+ * Relevant because api.ebda.app IS Cloudflare-proxied (verified live
  * 2026-09-02: `server: cloudflare`, `cf-ray` present; `cf-cache-status:
  * DYNAMIC` today, i.e. one cache-rule away from these headers being load-
  * bearing).

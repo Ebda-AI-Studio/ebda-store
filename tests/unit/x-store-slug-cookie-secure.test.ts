@@ -41,7 +41,7 @@ function req(url: string, host: string, headers: Record<string, string> = {}) {
 describe('S3-3: x-store-slug cookie Secure attribute', () => {
   it('sets Secure in production', () => {
     setNodeEnv('production');
-    const res = middleware(req('https://store.force-ai.co/palora/products', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/palora/products', 'ebda.app'));
     const setCookie = res.headers.get('set-cookie') ?? '';
     expect(setCookie).toContain('x-store-slug=palora');
     expect(setCookie).toMatch(/;\s*Secure/i);
@@ -49,7 +49,7 @@ describe('S3-3: x-store-slug cookie Secure attribute', () => {
 
   it('does not set Secure outside production (dev over plain http must keep working)', () => {
     setNodeEnv('development');
-    const res = middleware(req('https://store.force-ai.co/palora/products', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/palora/products', 'ebda.app'));
     const setCookie = res.headers.get('set-cookie') ?? '';
     expect(setCookie).toContain('x-store-slug=palora');
     expect(setCookie).not.toMatch(/;\s*Secure/i);
@@ -57,7 +57,7 @@ describe('S3-3: x-store-slug cookie Secure attribute', () => {
 
   it('is still httpOnly and sameSite=lax in production (unchanged behaviour)', () => {
     setNodeEnv('production');
-    const res = middleware(req('https://store.force-ai.co/palora/products', 'store.force-ai.co'));
+    const res = middleware(req('https://ebda.app/palora/products', 'ebda.app'));
     const setCookie = res.headers.get('set-cookie') ?? '';
     expect(setCookie).toMatch(/HttpOnly/i);
     expect(setCookie).toMatch(/SameSite=Lax/i);

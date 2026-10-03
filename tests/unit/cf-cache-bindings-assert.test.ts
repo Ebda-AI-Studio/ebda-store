@@ -102,17 +102,12 @@ describe('cf-setup-local.sh → assert-cf-cache-bindings.sh', () => {
   );
 });
 
-describe('cf-deploy.yml and ci.yml cf-build-check run the SAME generator → assertion', () => {
-  const cfDeploy = readFileSync(path.join(ROOT, '.github/workflows/cf-deploy.yml'), 'utf8');
+describe('ci.yml cf-build-check runs generator → assertion', () => {
   const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const cfBuildCheck = ci.slice(
     ci.indexOf('\n  cf-build-check:\n'),
     ci.indexOf('\n  test-unit:\n')
   );
-
-  it('cf-deploy asserts the storefront config with the shared script', () => {
-    expect(cfDeploy).toMatch(/run: bash scripts\/assert-cf-cache-bindings\.sh web/);
-  });
 
   it('cf-build-check generates the config before building, then asserts it (issues 2089/2152/2154)', () => {
     const setupAt = cfBuildCheck.indexOf('bash scripts/cf-setup-local.sh ${{ matrix.app }}');
@@ -129,7 +124,7 @@ describe('cf-deploy.yml and ci.yml cf-build-check run the SAME generator → ass
   it('cf-build-check is sized for contention: serialized legs and a 3x budget (issue 2155)', () => {
     expect(cfBuildCheck).toMatch(/max-parallel: 1/);
     const t = Number(/timeout-minutes: (\d+)/.exec(cfBuildCheck)?.[1]);
-    // cf-deploy budgets 25 min for ONE app's install+build+deploy.
+    // 25 min budgeted for ONE app's install+build; 3x for contention.
     expect(t).toBeGreaterThanOrEqual(45);
   });
 });

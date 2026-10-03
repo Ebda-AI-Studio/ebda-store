@@ -24,7 +24,7 @@ vi.mock('@api/services/sms-consent.service', () => ({ SmsConsentService: {} }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@api/config', () => ({ config: { webUrl: 'https://store.force-ai.co' } }));
+vi.mock('@api/config', () => ({ config: { webUrl: 'https://ebda.app' } }));
 
 import {
   __storefrontBaseForTests as storefrontBase,
@@ -69,7 +69,7 @@ describe('opt-out storefront base: concurrent recipients share one store read (i
 
   it('a missing store falls back to the platform base and is not cached', async () => {
     h.findUnique.mockResolvedValueOnce(null);
-    expect(await storefrontBase('ghost')).toBe('https://store.force-ai.co/');
+    expect(await storefrontBase('ghost')).toBe('https://ebda.app/');
     await tick();
     expect(await storefrontBase('ghost')).toBe('https://shop.example.test');
     expect(h.findUnique).toHaveBeenCalledTimes(2);
