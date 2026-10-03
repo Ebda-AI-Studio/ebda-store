@@ -470,6 +470,10 @@ const CSRF_EXEMPT_AUTH_PATHS: ReadonlySet<string> = new Set([
   '/api/v1/auth/verify-email',
   '/api/v1/auth/resend-verification',
   '/api/v1/auth/mfa/verify',
+  // Self-serve merchant signup (SP5): credential-less entry points reached
+  // before any session exists, like register / resend-verification above.
+  '/api/v1/auth/merchant/signup',
+  '/api/v1/auth/merchant/resend-verification',
 ]);
 
 export function isCsrfExemptAuthPath(path: string): boolean {
@@ -1086,6 +1090,49 @@ export const verifyEmailLimiter = rateLimit({
   skip: skipForLoadTestOrTests,
   keyGenerator: verifyEmailLimiterKey,
 });
+
+/**
+ * Per-IP bucket for the public merchant signup + resend routes (SP5).
+ *
+ * Signup creates a user row and sends mail, so it needs a volume cap that
+ * `authLimiter` (sized for login guessing, keyed IP+email) does not give:
+ * rotating the email field would mint a fresh bucket every request. This key
+ * is IP-only. 20/hour is generous for a shared Egyptian mobile-carrier egress
+ * IP yet stops a signup-spam loop; the per-ADDRESS mail cap is
+ * `authEmailAddressLimiter`, stacked on the same routes.
+ *
+ * `createMerchantSignupIpLimiter` is a factory so a test can build one that is
+ * NOT skipped under vitest (every shared limiter is) and observe a real 429.
+ */
+export function merchantSignupIpLimiterKey(req: Request): string {
+  return `merchant-signup-${ipKeyGenerator(req.ip ?? '')}`;
+}
+
+export function createMerchantSignupIpLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  max?: number;
+  prefix?: string;
+}) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, opts?.prefix ?? 'merchant-signup-ip'),
+    windowMs: 60 * 60 * 1000,
+    max: opts?.max ?? 20,
+    message: {
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many signups from this network, try again later.',
+      },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: merchantSignupIpLimiterKey,
+  });
+}
+
+export const merchantSignupIpLimiter = createMerchantSignupIpLimiter();
 
 /**
  * Upper bound on a string we are willing to run an HMAC over in the refresh

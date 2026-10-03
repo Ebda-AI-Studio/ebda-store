@@ -1,0 +1,36 @@
+import { Request, Response, NextFunction } from 'express';
+import { prisma } from '@force/database';
+import { AppError } from './error-handler';
+
+/**
+ * Gate for actions a self-serve merchant may only take after proving they own
+ * the address (creating a store, going live). Reads the flag from the DB on
+ * every call, never from the JWT, so a freshly verified user is unblocked
+ * without re-login and a stale token can never carry a stale "verified".
+ * Super admins (platform staff) are exempt.
+ */
+export async function requireVerifiedEmail(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const user = req.user;
+    if (!user) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+    if (user.role === 'super_admin') return next();
+    const row = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: { emailVerified: true, deletedAt: true },
+    });
+    if (!row || row.deletedAt || !row.emailVerified) {
+      throw new AppError(
+        403,
+        'EMAIL_NOT_VERIFIED',
+        'Verify your email address before creating or publishing a store'
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+}

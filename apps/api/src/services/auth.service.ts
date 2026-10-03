@@ -5,6 +5,7 @@ import { prisma, Prisma, hasTenantContext, withMoneyTx, withRlsBypass } from '@f
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -417,8 +418,8 @@ export class AuthService {
     });
 
     // Send verification email
-    const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
     if (storeId) {
+      const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
       await EmailService.sendEmailVerification(
         storeId,
         {
@@ -430,11 +431,18 @@ export class AuthService {
         language
       );
     } else {
-      // Admin accounts (no storeId) skip the branded email path — they
-      // don't belong to a store and verification flow is admin-only.
-      logger.info(
-        { userId, email: maskEmail(email) },
-        'Skipping branded verification email — no storeId (admin account)'
+      // Accounts with no storeId are merchants (self-serve signup): no store
+      // exists yet, so the branded per-store sender is unavailable. They get
+      // the platform-sender mail with a link to the admin app's verify page.
+      // Outside production this is captured, never sent (platform-mailer).
+      await sendMerchantVerificationEmail(
+        {
+          email,
+          name,
+          verificationUrl: `${config.adminUrl}/verify-email?token=${token}`,
+          expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
+        },
+        language
       );
     }
   }
