@@ -42,6 +42,11 @@ interface ProductImportRow {
   option2Value?: string;
   option3Name?: string;
   option3Value?: string;
+  // Meta columns written by the CSV converter (csv-import.ts): the row's
+  // 1-based number in the file the merchant actually uploaded, and a reason
+  // the converter already rejected it. Absent on hand-written template CSVs.
+  sourceRow?: string;
+  _error?: string;
 }
 
 interface ImportResult {
@@ -554,7 +559,11 @@ export class BulkService {
     // Split into records respecting quoted fields that may contain embedded
     // newlines (e.g. a product description with line breaks). A naive
     // split('\n') shatters such records into broken rows.
-    const lines = this.splitCsvRecords(csvData).filter(line => line.trim());
+    // A UTF-8 BOM (Excel "CSV UTF-8") would otherwise glue itself to the first
+    // header and the `name` column would silently stop matching.
+    const lines = this.splitCsvRecords(
+      csvData.charCodeAt(0) === 0xfeff ? csvData.slice(1) : csvData
+    ).filter(line => line.trim());
     if (lines.length < 2) {
       throw new AppError(
         400,
@@ -646,10 +655,21 @@ export class BulkService {
     };
 
     for (let i = 0; i < dataRows.length; i++) {
-      const rowIndex = i + 2; // 1-based, accounting for header
+      let rowIndex = i + 2; // 1-based, accounting for header
       try {
         const values = this.parseCSVLine(dataRows[i]);
         const row = this.mapRowToObject(headers, values);
+
+        // Converted CSVs (Shopify) carry the row's number in the uploaded file
+        // so errors point at what the merchant sees, and rows the converter
+        // already rejected are reported here — per row, never aborting the file.
+        const sourceRow = Number.parseInt(String(row.sourceRow ?? ''), 10);
+        if (Number.isFinite(sourceRow) && sourceRow > 0) rowIndex = sourceRow;
+        if (row._error) {
+          result.failed++;
+          result.errors.push({ row: rowIndex, error: String(row._error) });
+          continue;
+        }
 
         // Variant rows are handled separately — they inherit name/desc/etc.
         // from their parent and only contribute option + variant-level data.
@@ -660,6 +680,20 @@ export class BulkService {
             result.errors.push({
               row: rowIndex,
               error: 'Variant row requires option1Name and option1Value',
+            });
+            continue;
+          }
+          // A fractional/garbled variant price used to fall through toFils() as
+          // undefined and silently inherit the parent's price. Fail the row.
+          const badVariantAmount = (['price', 'compareAtPrice', 'costPrice'] as const).find(k => {
+            const v = row[k];
+            return v !== undefined && String(v).trim() !== '' && !/^\d+$/.test(String(v).trim());
+          });
+          if (badVariantAmount) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: `Variant ${badVariantAmount} "${row[badVariantAmount]}" must be a whole number of piastres`,
             });
             continue;
           }
@@ -696,11 +730,14 @@ export class BulkService {
           continue;
         }
 
-        if (row.price === undefined || isNaN(Number(row.price))) {
+        // Integer piastres only: parseInt("12.5") is 12, which would silently
+        // store a wrong price. A decimal here is a template mistake — reject it.
+        if (row.price === undefined || !/^\d+$/.test(String(row.price).trim())) {
           result.failed++;
           result.errors.push({
             row: rowIndex,
-            error: 'Price is required and must be a valid number (max 2 decimals in a spreadsheet)',
+            error:
+              'Price is required and must be a whole number of piastres (spreadsheets and Shopify files use EGP with at most 2 decimals)',
           });
           continue;
         }
