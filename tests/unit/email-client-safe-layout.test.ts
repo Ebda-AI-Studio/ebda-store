@@ -57,6 +57,7 @@ import { returnStatusUpdateTemplate } from '@api/services/email-templates/return
 import { reviewRequestTemplate } from '@api/services/email-templates/review-request';
 import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-alert';
 import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
+import { subscriptionBillingTemplate } from '@api/services/email-templates/subscription-billing';
 
 type Locale = 'en' | 'ar';
 
@@ -126,6 +127,8 @@ const any = {
   limit: 100,
   used: 120,
   billingUrl: 'https://admin.test/stores/s1/billing',
+  amountMinor: 49900,
+  retryOn: '2026-11-06',
 };
 
 type Tpl = Record<Locale, (...a: never[]) => string>;
@@ -146,6 +149,7 @@ const TEMPLATES: Record<string, Tpl> = {
   reviewRequest: reviewRequestTemplate,
   lowStockAlert: lowStockAlertTemplate,
   planLimitReached: planLimitReachedTemplate,
+  subscriptionBilling: subscriptionBillingTemplate,
 };
 
 function invoiceOrder(locale: Locale) {

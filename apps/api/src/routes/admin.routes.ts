@@ -14,6 +14,7 @@ import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
 import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
+import { listLedger, refundCharge } from '../services/billing/subscription-billing.service';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
@@ -324,6 +325,57 @@ router.patch(
         success: true,
         data: { store },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Billing ledger (SP5 task 3) — super-admin view of every `billing_events` row
+ * (checkouts, renewals, upgrades, refunds) with provider references, plus a
+ * refund action. GET /admin/billing/events?storeId&status&type&limit&before.
+ */
+router.get(
+  '/billing/events',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = z
+        .object({
+          storeId: z.string().uuid().optional(),
+          status: z.enum(['pending', 'succeeded', 'failed', 'refunded']).optional(),
+          type: z.enum(['checkout', 'renewal', 'upgrade', 'refund']).optional(),
+          limit: z.coerce.number().int().min(1).max(200).optional(),
+          before: z.coerce.date().optional(),
+        })
+        .parse(req.query);
+      res.json({ success: true, data: { events: await listLedger(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/billing/events/:id/refund',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { amountMinor } = z
+        .object({ amountMinor: z.number().int().positive().optional() })
+        .parse(req.body ?? {});
+      const out = await refundCharge({ eventId: req.params.id, amountMinor });
+      await auditLog({
+        action: 'billing.refund',
+        userId: req.user!.userId,
+        resourceType: 'billing_event',
+        resourceId: req.params.id,
+        details: { amountMinor: amountMinor ?? null, status: out.status },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: out });
     } catch (error) {
       next(error);
     }

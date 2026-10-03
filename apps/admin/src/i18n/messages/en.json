@@ -5600,7 +5600,8 @@
       "staffBadgeHint": "Limited access",
       "hubSectionsAriaLabel": "Hub sections",
       "navPlatformUsageHistory": "Usage history (platform)",
-      "navPlatformPlans": "Plans (platform)"
+      "navPlatformPlans": "Plans (platform)",
+      "navPlatformBillingEvents": "Billing ledger (platform)"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -8278,7 +8279,65 @@
       "errorTitle": "Could not change the plan",
       "assignedTitle": "Plan updated",
       "assignedDesc": "This store is now on {code}."
-    }
+    },
+    "subscribeTitle": "Choose a plan",
+    "subscribeBody": "Pay by card in EGP. Your card is saved securely with our payment provider and charged automatically each period.",
+    "intervalMonthly": "Monthly",
+    "intervalYearly": "Yearly",
+    "perYear": "/ year",
+    "subscribe": "Subscribe",
+    "switchTo": "Switch to this plan",
+    "currentBadge": "Current plan",
+    "redirecting": "Redirecting to secure payment…",
+    "priceUnset": "Not available yet",
+    "checkoutError": "Could not start the payment",
+    "changeError": "Could not change the plan",
+    "upgradedToast": "Plan upgraded",
+    "upgradeDeclined": "The charge was declined. Your plan was not changed.",
+    "upgradePending": "The payment is being confirmed.",
+    "scheduledToast": "Change scheduled for the end of the current period.",
+    "canceledToast": "Your plan will end at the end of the current period.",
+    "canceledNowToast": "Your plan was canceled.",
+    "resumedToast": "Cancellation removed.",
+    "cancelPlan": "Cancel plan",
+    "resumePlan": "Keep my plan",
+    "confirmCancel": "Cancel your plan? It stays active until the end of the current period, then the store moves to Free (your data is kept).",
+    "cancelsOn": "Ends on",
+    "pendingPlan": "Switching to {plan} on {date}",
+    "pastDueTitle": "We could not charge your card",
+    "pastDueBody": "We will retry on {date}. Update your payment method by subscribing again. If it keeps failing, your store moves to the Free plan (your data is kept).",
+    "canceledTitle": "You are on the Free plan",
+    "canceledBody": "Your previous paid plan ended. Your data is kept and Free limits apply.",
+    "checkoutReturnPending": "Confirming your payment…",
+    "checkoutReturnOk": "Payment confirmed. Your plan is active.",
+    "checkoutReturnFailed": "The payment did not go through.",
+    "checkoutReturnLater": "We have not received the confirmation yet. This page will update shortly.",
+    "invoicesTitle": "Charges and invoices",
+    "invoicesEmpty": "No charges yet.",
+    "invoiceCols": {
+      "date": "Date",
+      "description": "Description",
+      "amount": "Amount",
+      "status": "Status",
+      "reason": "Reason"
+    },
+    "invoiceTypes": {
+      "checkout": "Subscription payment",
+      "renewal": "Renewal",
+      "upgrade": "Upgrade",
+      "refund": "Refund"
+    },
+    "invoiceStatuses": {
+      "pending": "Pending",
+      "succeeded": "Paid",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "retryN": "retry {n}",
+    "stubTitle": "Local test gateway",
+    "stubBody": "The stub provider is active. Simulate the gateway's answer for the pending checkout:",
+    "stubPay": "Simulate success",
+    "stubDecline": "Simulate decline"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -8494,6 +8553,50 @@
         }
       },
       "shareText": "Visit my store:"
+    }
+  },
+  "billingEvents": {
+    "title": "Billing ledger",
+    "subtitle": "Every subscription charge, renewal retry, upgrade and refund. Rows are append-only.",
+    "loading": "Loading ledger…",
+    "failedToLoad": "Failed to load the billing ledger.",
+    "empty": "No billing events yet.",
+    "refresh": "Refresh",
+    "all": "All",
+    "statusFilter": "Status",
+    "typeFilter": "Type",
+    "stuck": "Outcome unknown — reconcile",
+    "retry": "retry {n}",
+    "refund": "Refund",
+    "confirmRefund": "Refund {amount} to the merchant's card?",
+    "refundFailed": "Refund failed: {message}",
+    "refundDone": "Refund recorded.",
+    "columns": {
+      "date": "Date",
+      "store": "Store",
+      "type": "Type",
+      "plan": "Plan",
+      "amount": "Amount",
+      "status": "Status",
+      "reference": "Gateway reference",
+      "failure": "Failure",
+      "action": "Action"
+    },
+    "types": {
+      "checkout": "Checkout",
+      "renewal": "Renewal",
+      "upgrade": "Upgrade",
+      "refund": "Refund"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "interval": {
+      "monthly": "monthly",
+      "yearly": "yearly"
     }
   }
 }

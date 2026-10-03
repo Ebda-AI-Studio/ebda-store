@@ -76,7 +76,12 @@ import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
-import { tenantContext, aiRouteContext, publicStoreContext } from '../middleware/tenant-context';
+import {
+  tenantContext,
+  aiRouteContext,
+  publicStoreContext,
+  billingRouteContext,
+} from '../middleware/tenant-context';
 
 const router = Router();
 
@@ -468,7 +473,7 @@ router.use('/stores', tenantContext, botAnalyticsRoutes);
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
 
 // Merchant billing — plan, subscription, usage vs limits (SP5)
-router.use('/stores/:storeId/billing', tenantContext, billingRoutes);
+router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 
 // Payment-gateway abandonment retargeting (Enterprise — payment_abandonment)
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);

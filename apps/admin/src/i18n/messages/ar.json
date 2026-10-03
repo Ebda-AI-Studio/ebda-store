@@ -5600,7 +5600,8 @@
       "staffBadgeHint": "صلاحية محدودة",
       "hubSectionsAriaLabel": "أقسام المركز",
       "navPlatformUsageHistory": "سجل الاستخدام (المنصة)",
-      "navPlatformPlans": "الباقات (المنصة)"
+      "navPlatformPlans": "الباقات (المنصة)",
+      "navPlatformBillingEvents": "سجل الفوترة (المنصة)"
     },
     "errorState": {
       "defaultTitle": "حدث خطأ ما",
@@ -8278,7 +8279,65 @@
       "errorTitle": "تعذّر تغيير الباقة",
       "assignedTitle": "تم تحديث الباقة",
       "assignedDesc": "أصبح هذا المتجر على الباقة {code}."
-    }
+    },
+    "subscribeTitle": "اختر باقة",
+    "subscribeBody": "ادفع ببطاقتك بالجنيه المصري. تُحفظ بطاقتك بأمان لدى مزوّد الدفع ويتم الخصم تلقائيًا كل فترة.",
+    "intervalMonthly": "شهري",
+    "intervalYearly": "سنوي",
+    "perYear": "/ سنويًا",
+    "subscribe": "اشترك",
+    "switchTo": "انتقل إلى هذه الباقة",
+    "currentBadge": "باقتك الحالية",
+    "redirecting": "جارٍ التحويل إلى صفحة الدفع الآمن…",
+    "priceUnset": "غير متاحة بعد",
+    "checkoutError": "تعذّر بدء الدفع",
+    "changeError": "تعذّر تغيير الباقة",
+    "upgradedToast": "تمت ترقية الباقة",
+    "upgradeDeclined": "تم رفض الدفعة. لم تتغير باقتك.",
+    "upgradePending": "جارٍ تأكيد الدفعة.",
+    "scheduledToast": "تمت جدولة التغيير لنهاية الفترة الحالية.",
+    "canceledToast": "ستنتهي باقتك في نهاية الفترة الحالية.",
+    "canceledNowToast": "تم إلغاء باقتك.",
+    "resumedToast": "تم إلغاء طلب الإنهاء.",
+    "cancelPlan": "إلغاء الباقة",
+    "resumePlan": "الاحتفاظ بباقتي",
+    "confirmCancel": "هل تريد إلغاء باقتك؟ تبقى فعّالة حتى نهاية الفترة الحالية ثم ينتقل المتجر إلى المجانية (بياناتك محفوظة).",
+    "cancelsOn": "تنتهي في",
+    "pendingPlan": "الانتقال إلى {plan} في {date}",
+    "pastDueTitle": "تعذّر الخصم من بطاقتك",
+    "pastDueBody": "سنعيد المحاولة في {date}. حدّث وسيلة الدفع بالاشتراك من جديد. إذا استمر الفشل ينتقل متجرك إلى الباقة المجانية (بياناتك محفوظة).",
+    "canceledTitle": "أنت على الباقة المجانية",
+    "canceledBody": "انتهت باقتك المدفوعة السابقة. بياناتك محفوظة وتسري حدود الباقة المجانية.",
+    "checkoutReturnPending": "جارٍ تأكيد الدفع…",
+    "checkoutReturnOk": "تم تأكيد الدفع. باقتك فعّالة الآن.",
+    "checkoutReturnFailed": "لم تتم عملية الدفع.",
+    "checkoutReturnLater": "لم نستلم التأكيد بعد. ستتحدّث هذه الصفحة قريبًا.",
+    "invoicesTitle": "الدفعات والفواتير",
+    "invoicesEmpty": "لا توجد دفعات بعد.",
+    "invoiceCols": {
+      "date": "التاريخ",
+      "description": "الوصف",
+      "amount": "المبلغ",
+      "status": "الحالة",
+      "reason": "السبب"
+    },
+    "invoiceTypes": {
+      "checkout": "دفعة اشتراك",
+      "renewal": "تجديد",
+      "upgrade": "ترقية",
+      "refund": "استرداد"
+    },
+    "invoiceStatuses": {
+      "pending": "قيد الانتظار",
+      "succeeded": "مدفوعة",
+      "failed": "فاشلة",
+      "refunded": "مستردة"
+    },
+    "retryN": "إعادة محاولة {n}",
+    "stubTitle": "بوابة اختبار محلية",
+    "stubBody": "مزوّد الاختبار فعّال. حاكِ ردّ بوابة الدفع للدفع المعلّق:",
+    "stubPay": "محاكاة نجاح",
+    "stubDecline": "محاكاة رفض"
   },
   "planLimit": {
     "maxProducts": "باقتك تسمح بحد أقصى {limit} منتج. قم بالترقية لإضافة المزيد.",
@@ -8494,6 +8553,50 @@
         }
       },
       "shareText": "زر متجري:"
+    }
+  },
+  "billingEvents": {
+    "title": "سجل الفوترة",
+    "subtitle": "كل دفعة اشتراك وإعادة محاولة تجديد وترقية واسترداد. السجلات للإضافة فقط ولا تُعدَّل.",
+    "loading": "جارٍ تحميل السجل…",
+    "failedToLoad": "تعذّر تحميل سجل الفوترة.",
+    "empty": "لا توجد عمليات فوترة بعد.",
+    "refresh": "تحديث",
+    "all": "الكل",
+    "statusFilter": "الحالة",
+    "typeFilter": "النوع",
+    "stuck": "النتيجة غير معروفة — يلزم التسوية",
+    "retry": "إعادة محاولة {n}",
+    "refund": "استرداد",
+    "confirmRefund": "استرداد {amount} إلى بطاقة التاجر؟",
+    "refundFailed": "فشل الاسترداد: {message}",
+    "refundDone": "تم تسجيل الاسترداد.",
+    "columns": {
+      "date": "التاريخ",
+      "store": "المتجر",
+      "type": "النوع",
+      "plan": "الباقة",
+      "amount": "المبلغ",
+      "status": "الحالة",
+      "reference": "مرجع بوابة الدفع",
+      "failure": "سبب الفشل",
+      "action": "إجراء"
+    },
+    "types": {
+      "checkout": "دفع اشتراك",
+      "renewal": "تجديد",
+      "upgrade": "ترقية",
+      "refund": "استرداد"
+    },
+    "statuses": {
+      "pending": "قيد الانتظار",
+      "succeeded": "ناجحة",
+      "failed": "فاشلة",
+      "refunded": "مستردة"
+    },
+    "interval": {
+      "monthly": "شهري",
+      "yearly": "سنوي"
     }
   }
 }
