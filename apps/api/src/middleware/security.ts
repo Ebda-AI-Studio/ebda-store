@@ -12,6 +12,7 @@ import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
+import { abuseConfig } from '../lib/abuse-config';
 import logger from '../lib/logger';
 import {
   recordMemoryFallback,
@@ -1133,6 +1134,79 @@ export function createMerchantSignupIpLimiter(opts?: {
 }
 
 export const merchantSignupIpLimiter = createMerchantSignupIpLimiter();
+
+/**
+ * Signup VELOCITY (SP5 task 4), on `POST /auth/merchant/signup` only (the resend
+ * route keeps the shared budget above):
+ *
+ *   - per IP:  `SIGNUP_IP_PER_HOUR` (default 5)
+ *   - per /24: `SIGNUP_SUBNET_PER_HOUR` (default 20) - an IPv4 /24 (IPv6 /64)
+ *     is one household / office / small VPS block, so rotating the last octet
+ *     does not mint a fresh budget.
+ *
+ * Keys ignore the body (rotating the email must not help). Both are factories
+ * so a test can build ones that are NOT skipped under vitest.
+ */
+export function signupSubnetKey(ipRaw: string | undefined): string {
+  const ip = (ipRaw ?? '').replace(/^::ffff:/i, '');
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/.exec(ip);
+  if (v4) return `${v4[1]}.${v4[2]}.${v4[3]}.0/24`;
+  return `${ipKeyGenerator(ip, 64)}`;
+}
+
+function signupVelocityLimiter(opts: {
+  prefix: string;
+  max: () => number;
+  key: (req: Request) => string;
+  message: string;
+  skip?: (req: Request) => boolean;
+}) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, opts.prefix),
+    windowMs: 60 * 60 * 1000,
+    max: opts.max,
+    message: { success: false, error: { code: 'RATE_LIMITED', message: opts.message } },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: opts.skip ?? skipForLoadTestOrTests,
+    keyGenerator: opts.key,
+    // The subnet key folds IPv6 itself (signupSubnetKey -> ipKeyGenerator /64);
+    // the library's source-text check cannot see through that helper.
+    validate: { keyGeneratorIpFallback: false },
+  });
+}
+
+export function createSignupIpVelocityLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  prefix?: string;
+  max?: () => number;
+}) {
+  return signupVelocityLimiter({
+    prefix: opts?.prefix ?? 'merchant-signup-ip-h',
+    max: opts?.max ?? (() => abuseConfig.signupIpPerHour()),
+    key: req => `signup-ip-${ipKeyGenerator(req.ip ?? '')}`,
+    message: 'Too many signups from this network, try again later.',
+    skip: opts?.skip,
+  });
+}
+
+export function createSignupSubnetVelocityLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  prefix?: string;
+  max?: () => number;
+}) {
+  return signupVelocityLimiter({
+    prefix: opts?.prefix ?? 'merchant-signup-net-h',
+    max: opts?.max ?? (() => abuseConfig.signupSubnetPerHour()),
+    key: req => `signup-net-${signupSubnetKey(req.ip)}`,
+    message: 'Too many signups from this network, try again later.',
+    skip: opts?.skip,
+  });
+}
+
+export const merchantSignupIpVelocityLimiter = createSignupIpVelocityLimiter();
+export const merchantSignupSubnetVelocityLimiter = createSignupSubnetVelocityLimiter();
 
 /**
  * Upper bound on a string we are willing to run an HMAC over in the refresh

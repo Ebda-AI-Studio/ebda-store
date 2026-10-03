@@ -186,7 +186,18 @@ model Store {
   name                  String
   nameAr                String?     @map("name_ar")
   slug                  String      @unique
+  // The VERIFIED custom domain: the only column host resolution, CORS and
+  // storefrontOrigin read. A claim that is not yet verified lives in
+  // `pendingDomain` (never served), so a squatter's unproven claim can never
+  // route traffic or poison the credentialed-CORS allowlist. `domainStatus` is
+  // the state of the latest claim ('pending' | 'active' | 'failed', CHECK-
+  // constrained in SQL): pending -> active (provider verified) or failed; a
+  // pending/failed claim is released after DOMAIN_CLAIM_TTL_HOURS.
   domain                String?     @unique
+  domainStatus          String?     @map("domain_status")
+  pendingDomain         String?     @map("pending_domain")
+  domainClaimedAt       DateTime?   @map("domain_claimed_at")
+  domainVerifiedAt      DateTime?   @map("domain_verified_at")
   // Legacy frontend-hosting-provider column. Cloudflare-for-SaaS is the only
   // provider now (Vercel cancelled 2026-07) — kept as-is, no migration needed.
   domainProvider        String?     @map("domain_provider")
@@ -498,6 +509,7 @@ model Store {
   @@index([status])
   @@index([plan])
   @@index([createdAt])
+  @@index([pendingDomain])
   @@map("stores")
 }
 

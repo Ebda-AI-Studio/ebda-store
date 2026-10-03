@@ -25,6 +25,7 @@ interface StoreRow {
   slug: string;
   name: string;
   domain: string | null;
+  domainStatus: 'pending' | 'active' | 'failed' | null;
   status: 'active' | 'suspended' | 'inactive';
   deletedAt: Date | null;
 }
@@ -34,6 +35,7 @@ const STORE_A: StoreRow = {
   slug: 'amelia',
   name: 'Amelia Aurum',
   domain: 'ameliaaurum.com',
+  domainStatus: 'active',
   status: 'active',
   deletedAt: null,
 };
@@ -42,6 +44,7 @@ const STORE_B: StoreRow = {
   slug: 'palora',
   name: 'Palora',
   domain: null,
+  domainStatus: null,
   status: 'active',
   deletedAt: null,
 };

@@ -38,7 +38,12 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { slug } = z.object({ slug: z.string().min(1).max(60) }).parse(req.query);
-      res.json({ success: true, data: await OnboardingService.checkSlug(slug) });
+      res.json({
+        success: true,
+        data: await OnboardingService.checkSlug(slug, {
+          allowProtected: req.user!.role === 'super_admin',
+        }),
+      });
     } catch (error) {
       next(error);
     }
@@ -62,7 +67,10 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createStoreSchema.parse(req.body);
-      const store = await OnboardingService.createStore({ userId: req.user!.userId }, data);
+      const store = await OnboardingService.createStore(
+        { userId: req.user!.userId, isSuperAdmin: req.user!.role === 'super_admin' },
+        data
+      );
       await auditLog({
         action: 'store.self_serve_created',
         userId: req.user!.userId,

@@ -208,7 +208,13 @@ beforeAll(async () => {
     data: { slug: ids.slugA, name: 'RLS A', ownerId: ownerA.id },
   });
   const storeB = await owner.store.create({
-    data: { slug: ids.slugB, name: 'RLS B', ownerId: ownerB.id, domain: ids.domainB },
+    data: {
+      slug: ids.slugB,
+      name: 'RLS B',
+      ownerId: ownerB.id,
+      domain: ids.domainB,
+      domainStatus: 'active',
+    },
   });
   const customerA = await mkUser('custA', 'customer', storeA.id);
   const customerB = await mkUser('custB', 'customer', storeB.id);
@@ -789,6 +795,13 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     expect(await asApp(() => resolveStoreId({ slug: 'no-such-store' }))).toBeNull();
     expect(await asApp(() => resolveStoreId({ slug: ids.slugA.toUpperCase() }))).toBeNull();
     expect(await asApp(() => resolveStoreId({}))).toBeNull();
+    // a domain that is not VERIFIED (domain_status != 'active') is never a storefront
+    await owner.store.update({ where: { id: ids.storeB }, data: { domainStatus: 'pending' } });
+    try {
+      expect(await asApp(() => resolveStoreId({ domain: ids.domainB }))).toBeNull();
+    } finally {
+      await owner.store.update({ where: { id: ids.storeB }, data: { domainStatus: 'active' } });
+    }
     await owner.store.update({ where: { id: ids.storeB }, data: { status: 'suspended' } });
     try {
       expect(await asApp(() => resolveStoreId({ domain: ids.domainB }))).toBeNull();

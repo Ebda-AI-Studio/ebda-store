@@ -92,8 +92,19 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
     const t0 = Date.now();
     const logStart = fs.statSync(LOG).size;
 
+    // Abuse controls (SP5 task 4): a server-signed form token, held past the
+    // minimum fill time, exactly as the signup form does.
+    const tokenRes = await call('GET', '/auth/merchant/signup-token');
+    expect(tokenRes.status).toBe(200);
+    await new Promise(r => setTimeout(r, 3200));
     const signup = await call('POST', '/auth/merchant/signup', {
-      body: { email, password: PASSWORD, name: 'Live Merchant', phone: '012 3456 7890' },
+      body: {
+        email,
+        password: PASSWORD,
+        name: 'Live Merchant',
+        phone: '012 3456 7890',
+        formToken: tokenRes.body!.data.token,
+      },
     });
     expect(signup.status).toBe(200);
     expect(signup.body?.data).toEqual({ emailVerificationSent: true });

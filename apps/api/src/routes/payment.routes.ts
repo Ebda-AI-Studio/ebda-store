@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { storefrontOrigin } from '@force/shared';
 import { z } from 'zod';
+import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
@@ -480,6 +481,20 @@ router.post(
         // Resolve the correct storefront URL for payment callbacks
         const storefrontBaseUrl = order.store ? storefrontOrigin(order.store) : config.webUrl;
 
+        // Card-testing guard (SP5 task 4): per-store / per-IP attempt budgets and
+        // the per-session decline block. Online providers only — the COD branch
+        // above returned already, so COD is never counted or blocked. A refusal
+        // is a 429 AppError: the catch below rolls the pending order back (cart +
+        // stock restored) exactly as for a failed provider call.
+        await CardTestingGuard.assertAllowed({
+          storeId: order.storeId,
+          orderId: order.id,
+          // No explicit provider = the store's default ONLINE one (never cod here).
+          provider: data.provider ?? 'default',
+          ip: req.ip,
+          sessionId: sessionIdHeader,
+        });
+
         // Create payment. PaymentService.createPayment throws on provider-not-
         // configured / provider-error / validation-failure — the catch block at
         // the end of this handler runs the rollback so the customer's cart is
@@ -799,6 +814,15 @@ router.post(
         });
         return;
       }
+
+      // A retry is another online attempt: same card-testing budgets as /create.
+      await CardTestingGuard.assertAllowed({
+        storeId: payment.order.storeId,
+        orderId: payment.order.id,
+        provider: provider ?? payment.provider,
+        ip: req.ip,
+        sessionId: req.headers['x-session-id'] as string | undefined,
+      });
 
       const result = await runInTenantContext(payment.order.storeId, () =>
         PaymentService.retryPayment(paymentId, provider)

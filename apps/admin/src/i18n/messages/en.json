@@ -5052,6 +5052,8 @@
       "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
       "checkDns": "Check DNS",
       "checkingDns": "Checking...",
+      "claimPending": "We are waiting for DNS verification of {domain}. Add the DNS records below; it is not live yet. A claim that is not verified within 72 hours is released automatically.",
+      "claimFailed": "We could not verify {domain}. Check the DNS records below and save the domain again. An unverified claim is released automatically after 72 hours.",
       "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
       "noDomain": "No custom domain configured. This store is accessible via its default subdomain.",
       "dnsTableLabel": "DNS records",
@@ -8371,6 +8373,9 @@
         "emailInvalid": "Enter a valid email address",
         "passwordWeak": "Password needs 8+ characters, upper and lower case, a number and a symbol",
         "phoneInvalid": "Enter a valid Egyptian mobile number, or leave it empty",
+        "emailDisposable": "Please use a permanent email address, not a temporary one",
+        "tooFast": "Please wait a moment and submit again",
+        "formExpired": "This form expired. Please submit again",
         "rateLimited": "Too many attempts. Please try again in a little while.",
         "generic": "We could not create your account. Please try again."
       },
@@ -8435,6 +8440,7 @@
         "available": "{host} is available",
         "taken": "This address is already taken",
         "reserved": "This address is reserved. Choose another one.",
+        "protected": "This address matches a protected brand name. Contact support to claim it, or choose another one.",
         "tooShort": "Use at least 3 characters",
         "tooLong": "Use at most 40 characters",
         "invalid": "Use lowercase letters, digits and single hyphens only",
@@ -8442,6 +8448,7 @@
         "create": "Create my store",
         "creating": "Creating…",
         "createFailed": "We could not create the store. Please try again.",
+        "dailyLimit": "You have created several stores today. Please try again tomorrow or contact support.",
         "limit": "You have reached the store limit for this account."
       },
       "template": {

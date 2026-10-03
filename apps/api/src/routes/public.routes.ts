@@ -26,7 +26,7 @@ import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import { getCached } from '../lib/public-cache';
-import { storeLookupForHost } from '../lib/store-host';
+import { storeDomainWhere, storeLookupForHost } from '../lib/store-host';
 import { isReservedSlug, storefrontOrigin } from '@force/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
@@ -1654,7 +1654,7 @@ router.get(
         // stay hidden — those should still 404.
         const store = await prisma.store.findFirst({
           where: {
-            ...(lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain }),
+            ...(lookup.by === 'slug' ? { slug: lookup.slug } : storeDomainWhere(lookup.domain)),
             status: { in: ['active', 'suspended'] },
             deletedAt: null,
           },

@@ -12,6 +12,13 @@ export interface DomainStatus {
   domain: string;
   verified: boolean;
   misconfigured: boolean;
+  /**
+   * The provider gave up on this hostname (blocked / moved / validation timed
+   * out). Distinct from "not verified yet": a failed claim is surfaced to the
+   * merchant and released with the 72h pending TTL. Optional so a provider that
+   * cannot tell leaves it unset (= still pending).
+   */
+  failed?: boolean;
   dnsRecords: DomainDnsRecord[];
 }
 

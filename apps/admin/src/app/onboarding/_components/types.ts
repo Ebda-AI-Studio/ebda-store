@@ -39,6 +39,7 @@ export type SlugCheck =
       reason:
         | 'SLUG_TAKEN'
         | 'SLUG_RESERVED'
+        | 'SLUG_PROTECTED'
         | 'SLUG_TOO_SHORT'
         | 'SLUG_TOO_LONG'
         | 'SLUG_INVALID_CHARS'

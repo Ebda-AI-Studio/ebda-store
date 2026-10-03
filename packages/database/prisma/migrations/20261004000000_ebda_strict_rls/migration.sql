@@ -999,7 +999,9 @@ CREATE POLICY ebda_tenant_isolation ON product_variant_options AS PERMISSIVE FOR
 --      - EXECUTE revoked from PUBLIC and granted to ebda_app only.
 -- ---------------------------------------------------------------------------
 
--- 5.1 host -> store. Exact slug or custom-domain match on an ACTIVE store; a slug
+-- 5.1 host -> store. Exact slug or VERIFIED custom-domain match (domain_status
+--     'active', SP5 domain claims: an unverified claim is never a storefront) on
+--     an ACTIVE store; a slug
 --     match wins over a domain match. Returns the id only. UNGUARDED ON PURPOSE:
 --     it runs before any scope exists and the host it resolves is public.
 CREATE OR REPLACE FUNCTION public.ebda_resolve_store_id(p_slug text, p_domain text)
@@ -1011,7 +1013,7 @@ AS $fn$
   FROM public.stores s
   WHERE s.status = 'active'
     AND ((p_slug IS NOT NULL AND s.slug = p_slug)
-      OR (p_domain IS NOT NULL AND s.domain = p_domain))
+      OR (p_domain IS NOT NULL AND s.domain = p_domain AND s.domain_status = 'active'))
   ORDER BY (p_slug IS NOT NULL AND s.slug = p_slug) DESC
   LIMIT 1
 $fn$;
@@ -1435,7 +1437,7 @@ RETURNS TABLE (slug text, domain text)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
-  SELECT s.slug, s.domain
+  SELECT s.slug, CASE WHEN s.domain_status = 'active' THEN s.domain END
   FROM public.orders o
   JOIN public.stores s ON s.id = o.store_id
   WHERE p_ref IS NOT NULL AND length(p_ref) > 0
