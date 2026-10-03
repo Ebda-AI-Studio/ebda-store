@@ -5,10 +5,10 @@
       "id": "r2-cleanup-isstillreferenced-rls-bypass",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "isStillReferenced's registry-wide global orphan-existence check runs on the ambient tenant-scoped client instead of an explicit RLS-bypass one — latent only because production's role already has BYPASSRLS, but at the documented RLS cutover this silently narrows to one store, so a still-referenced cross-tenant row reads as orphaned and its R2 object is irreversibly deleted",
+      "why": "isStillReferenced's 'referenced ANYWHERE' check stops at the first store instead of OR-ing every store's own (strict-RLS) view, so a URL still used by another store reads as orphaned and its R2 object is irreversibly deleted",
       "source": "apps/api/src/services/r2-cleanup.service.ts",
-      "find": "import { withRlsBypass } from '@force/database';",
-      "replace": "import { prisma as withRlsBypassScopeEscapeHatch } from '@force/database';\nconst withRlsBypass = (fn: (tx: any) => any) => fn(withRlsBypassScopeEscapeHatch);",
+      "find": "    if (referenced) return true;\n  }\n  return false;",
+      "replace": "    return referenced;\n  }\n  return false;",
       "test": "tests/unit/r2-cleanup-rls-bypass.test.ts"
     },
     {
@@ -477,7 +477,7 @@
       "tier": "unit",
       "why": "a Prisma StringFilter object reaches the user lookup's where clause - an enumeration oracle on two unauthenticated routes",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "  if (typeof email !== 'string') {\n    throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');\n  }\n",
+      "find": "  // Same sink guard as `authScope`: only a scalar email may reach the lookup.\n  if (typeof email !== 'string') {\n    throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');\n  }\n",
       "replace": "",
       "test": "tests/unit/authscope-email-must-be-scalar.test.ts"
     },
@@ -547,8 +547,8 @@
       "tier": "unit",
       "why": "GET /stores/:id hands a whole Store row to the admin app; without the omit the agent credential ciphertext ships to the browser",
       "source": "apps/api/src/services/store.service.ts",
-      "find": "      omit: { agentApiKey: true },\n      include: {\n        owner: {\n          select: { id: true, email: true, firstName: true, lastName: true },\n        },\n        _count: { select: { products: true, orders: true, categories: true } },\n      },",
-      "replace": "      include: {\n        owner: {\n          select: { id: true, email: true, firstName: true, lastName: true },\n        },\n        _count: { select: { products: true, orders: true, categories: true } },\n      },",
+      "find": "        omit: { agentApiKey: true },\n        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n      })\n    );",
+      "replace": "        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n      })\n    );",
       "test": "tests/unit/store-read-omits-agent-credential.test.ts"
     },
     {
@@ -567,8 +567,8 @@
       "tier": "unit",
       "why": "getBySlug writes its row into a 120s Redis cache, so without the omit the credential ciphertext is not leaked once but cached and served to every reader for the TTL",
       "source": "apps/api/src/services/store.service.ts",
-      "find": "      omit: { agentApiKey: true },\n      include: {\n        _count: { select: { products: true, categories: true } },\n      },",
-      "replace": "      include: {\n        _count: { select: { products: true, categories: true } },\n      },",
+      "find": "      omit: { agentApiKey: true },\n    });\n\n    if (!store) {\n      throw new AppError(404, 'NOT_FOUND', 'Store not found');\n    }\n    const storeWithCounts",
+      "replace": "    });\n\n    if (!store) {\n      throw new AppError(404, 'NOT_FOUND', 'Store not found');\n    }\n    const storeWithCounts",
       "test": "tests/unit/store-read-omits-agent-credential.test.ts"
     },
     {
@@ -1155,10 +1155,10 @@
       "id": "erasure-addresses-escapes-user-rls",
       "domain": "erasure",
       "tier": "unit",
-      "why": "addresses carries a USER-scoped RLS policy and the merchant-initiated erase runs under the MERCHANT's current_user_id, so without the bypass the delete matches zero rows and the shopper's name/phone/street survive an erased account with no error",
+      "why": "addresses carries a USER-scoped RLS policy and the merchant-initiated erase runs under the MERCHANT's current_user_id, so a plain delete matches zero rows and the shopper's name/phone/street survive an erased account with no error; the delete must go through the ebda_user_addresses_delete definer",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "      await withScopedRlsBypass(tx, () => tx.address.deleteMany({ where: { userId } }));",
-      "replace": "      await tx.address.deleteMany({ where: { userId } });",
+      "find": "      await deleteUserAddresses(userId);",
+      "replace": "      void userId;",
       "test": "tests/unit/auth-erase-propagation.test.ts"
     },
     {
@@ -1392,16 +1392,6 @@
       "test": "tests/unit/public-mount-admin-route-guard.test.ts"
     },
     {
-      "id": "erasure-wallet-forfeit-spans-stores",
-      "domain": "erasure",
-      "tier": "unit",
-      "why": "a shopper's own / retention-cron erasure scrubs wallet notes and forfeits balances only in the store whose GUC is set, not every store (#1957)",
-      "source": "apps/api/src/services/wallet.service.ts",
-      "find": "    await withScopedRlsBypass(client, async () => {\n      const { forfeited, notesScrubbedStores } = await run();",
-      "replace": "    await (async (f: () => Promise<void>) => f())(async () => {\n      const { forfeited, notesScrubbedStores } = await run();",
-      "test": "tests/unit/auth-erase-propagation.test.ts"
-    },
-    {
       "id": "cache-agent-docs-not-cookie-resolved",
       "domain": "cache poisoning",
       "tier": "unit",
@@ -1440,16 +1430,6 @@
       "find": "const storeFilter = scope.storeId ? { storeId: scope.storeId } : {};",
       "replace": "const storeFilter = {};",
       "test": "tests/unit/auth-erase-propagation.test.ts"
-    },
-    {
-      "id": "rls-scoped-bypass-restored-on-throw",
-      "domain": "tenant / RLS",
-      "tier": "unit",
-      "why": "a throw inside a scoped RLS bypass leaves app.bypass_rls on for the rest of the caller's transaction (#2037)",
-      "source": "apps/api/src/lib/scoped-rls-bypass.ts",
-      "find": "  } finally {",
-      "replace": "  }\n  {",
-      "test": "tests/unit/scoped-rls-bypass.test.ts"
     },
     {
       "id": "money-loyalty-earn-reversal-duplicate-noop",
@@ -1622,23 +1602,13 @@
       "test": "tests/unit/unbooked-refund-alert.test.ts"
     },
     {
-      "id": "rls-scoped-bypass-asserts-transaction",
-      "domain": "tenant / RLS",
-      "tier": "unit",
-      "why": "withScopedRlsBypass stops checking that SET LOCAL app.bypass_rls persisted, so a caller that passes the plain non-transactional client runs its 'bypassed' statements with RLS still on and is told they succeeded — an erasure that silently under-erases every other store (issue 2123)",
-      "source": "apps/api/src/lib/scoped-rls-bypass.ts",
-      "find": "  if (check?.[0]?.v !== 'true') {",
-      "replace": "  if (false as boolean) {",
-      "test": "tests/unit/scoped-rls-bypass.test.ts"
-    },
-    {
       "id": "ai-quota-global-caps-count-cross-tenant",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "assertAiQuota's platform-wide daily/monthly counts run on the ambient client, so inside runInStoreScope or tenantContext the STRICT ai_usage policy filters them to one store under force_app and the global Gemini cap becomes a per-store cap (issue 2040, issue 2043)",
+      "why": "assertAiQuota's platform-wide daily count runs on the ambient client, so inside runInStoreScope or tenantContext the STRICT ai_usage policy filters it to one store under ebda_app and the global Gemini cap becomes a per-store cap (issue 2040, issue 2043); it must use the ebda_ai_usage_count definer",
       "source": "apps/api/src/lib/ai-quota.ts",
-      "find": "import { prisma, withRlsBypass } from '@force/database';",
-      "replace": "import { prisma } from '@force/database';\n// eslint-disable-next-line @typescript-eslint/no-explicit-any\nconst withRlsBypass = <T>(fn: (tx: any) => T): T => fn(prisma);",
+      "find": "      countAiUsage({ since: startOfDay, cachedHit: false }),",
+      "replace": "      prisma.aiUsage.count({ where: { createdAt: { gte: startOfDay }, cachedHit: false } }),",
       "test": "tests/unit/ai-quota-global-counts-bypass.test.ts"
     },
     {
