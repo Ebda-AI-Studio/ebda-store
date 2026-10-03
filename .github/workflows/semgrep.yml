@@ -50,7 +50,7 @@ jobs:
             echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
             exit 0
           }
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Semgrep scan (block on ERROR severity)
         # Install semgrep into a venv off the runner's SYSTEM python3 — works on
         # cloud (ubuntu-latest) AND the self-hosted Ubuntu 26.04 box, which

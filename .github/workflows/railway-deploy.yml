@@ -147,7 +147,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The self-hosted runner has no node/npm on PATH — setup-node provides it
       # (on ubuntu-latest it's a no-op-ish re-pin). Without this: "npm: command
@@ -396,7 +396,7 @@ jobs:
       # failed `npm ci` twice on 2026-09-30. Pinned by
       # tests/unit/ci-no-sparse-checkout-leak.test.ts.
       - name: Checkout the probe script
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The self-hosted runner has no node on the Actions shell PATH — the
       # probe parses the response body with `node -e`, which would die with
