@@ -126,12 +126,12 @@ IS NULL ORDER BY created_at DESC LIMIT 20001` and is served by `orders_store_id_
   `carts_store_id_idx` and discards 8,552 of 8,614 rows (13 ms in production). It runs 7 times per
   store per day from the 02:00 cron, which is not a hot path (Ruling IDX-2).
 
-## Unused-index removal candidates — NOT dropped here
+## Unused-index removal candidates (dropped 2026-10-03, see the next section)
 
 501 indexes. 329 have `idx_scan = 0`, but 147 of those are PK/unique and back a constraint, and
 175 of the 182 non-unique ones sit on tables under 300 rows, where the planner correctly seq-scans.
-A zero there says nothing about the index. Dropping is deferred to a separate change with its own
-lock plan (Ruling IDX-3).
+A zero there says nothing about the index. Dropping was deferred to a separate change with its own
+lock plan (Ruling IDX-3); that change is `20261003110100_drop_redundant_prefix_indexes` (Ruling DBM-1).
 
 **Strongest candidates: left-prefix duplicates.** 37 non-unique btree indexes whose columns are a
 strict left prefix, with the same sort order, of another btree on the same table. Any query they
@@ -164,10 +164,67 @@ The other 29 are 8–16 kB each on tables with ≤ 80 rows (`warehouses_store_id
 | `journal_lines_ref_table_ref_id_idx`       | Keep: accounting postings look up by `(ref_table, ref_id)`; the ledger is young                                                      |
 | `order_events_actor_id_idx`                | **Keep**: supports the `order_events.actor_id` FK (`ON DELETE SET NULL` from users)                                                  |
 
+## Dropped — `20261003110100_drop_redundant_prefix_indexes`
+
+Owner-approved 2026-10-03. Verified read-only against production Neon (PG 17.11, `DIRECT_URL`,
+session `default_transaction_read_only=on`) on 2026-10-03, per index. "Covering" is a valid, non
+partial btree on the same table whose first columns equal the dropped index's, with the same sort
+order. `pg_constraint.conindid` counts the constraints that use the dropped index as their backing
+index: 0 for all eight (none is a PK, unique or exclusion constraint, none is the replica identity).
+
+| Dropped index                                      |   Size | Scans (lifetime) | Longer index that keeps serving it                                                   |
+| -------------------------------------------------- | -----: | ---------------: | ------------------------------------------------------------------------------------ |
+| `carts_store_id_idx`                               | 168 kB |            8,891 | `carts_store_id_session_id_key` UNIQUE (store_id, session_id)                        |
+| `ai_recommendation_store_id_source_product_id_idx` |  80 kB |           21,971 | `ai_recommendation_store_id_source_product_id_target_product_id_` UNIQUE (3 columns) |
+| `audit_logs_store_id_idx`                          |  56 kB |               16 | `audit_logs_store_id_created_at_idx` (store_id, created_at DESC)                     |
+| `orders_store_id_idx`                              |  16 kB |              196 | `orders_store_id_created_at_idx` (+ `_status_idx`, `_customer_id_idx`)               |
+| `products_store_id_idx`                            |  16 kB |            1,263 | `products_store_id_deleted_at_created_at_idx` (+ `_status_idx` and others)           |
+| `payment_events_event_type_idx`                    |  16 kB |              394 | `payment_events_event_type_occurred_at_idx` (event_type, occurred_at)                |
+| `inventory_history_store_id_idx`                   |  16 kB |               31 | `inventory_history_store_id_reference_idx` (store_id, reference)                     |
+| `cart_bundles_cart_id_idx`                         |   8 kB |           13,455 | `cart_bundles_cart_id_bundle_id_key` UNIQUE (cart_id, bundle_id)                     |
+
+392 kB in all, and one less index to maintain on every write to eight tables. The scan counts are
+lifetime counters (`pg_stat_database.stats_reset` is NULL). A high count on a redundant index only
+means the planner chose the shorter of two equivalent indexes; it is not a reason to keep it.
+
+**Foreign keys.** An FK needs an index leading on its columns for parent-delete probes. The
+FK-coverage query from "Re-run", with the eight indexes excluded, returns 0 rows of 205 FKs. Its
+positive control (excluding `cart_bundles_cart_id_idx`, `cart_bundles_cart_id_bundle_id_key`,
+`carts_store_id_idx` and `carts_store_id_session_id_key` together) flags exactly the two FKs that
+lose their index (`carts_store_id_fkey`, `cart_bundles_cart_id_fkey`), so the query can fail.
+
+**Plans.** A fresh scratch PG 16, migrated with `prisma migrate deploy`, seeded with 20 stores and
+40k products, 60k carts, 60k orders, 60k payment events, 60k inventory rows, 100k audit rows, 40k
+recommendations and 30k cart bundles (`ANALYZE`d, identical data before and after): 17 store-scoped
+statements, EXPLAIN (ANALYZE, BUFFERS) before and after, best of 7 runs. Every statement keeps an
+index plan; none becomes a sequential scan (`payment_events` by `event_type` alone was already a seq
+scan because the column has 6 values). The statements that used a dropped index now use its
+covering one:
+
+| Statement                                    | Before                              | After                                                |
+| -------------------------------------------- | ----------------------------------- | ---------------------------------------------------- |
+| carts, count by store                        | `carts_store_id_idx`, 0.27 ms       | `carts_store_id_session_id_key`, 0.40 ms             |
+| carts, store + `created_at` range (funnel)   | `carts_store_id_idx`, 2.45 ms       | `carts_store_id_session_id_key`, 1.58 ms             |
+| audit_logs, count by store                   | `audit_logs_store_id_idx`, 0.39 ms  | `audit_logs_store_id_created_at_idx`, 0.58 ms        |
+| payment_events, `event_type` + `occurred_at` | `…event_type_idx`, 1.78 ms          | `payment_events_event_type_occurred_at_idx`, 1.60 ms |
+| cart_bundles, by cart / FK probe             | `cart_bundles_cart_id_idx`, 0.05 ms | `cart_bundles_cart_id_bundle_id_key`, 0.04 ms        |
+| ai_recommendation, store + source product    | the 3-column unique, 0.05 ms        | the same, 0.04 ms (the planner already preferred it) |
+| orders, products, inventory_history          | already on a longer or other index  | unchanged (0.04 to 8 ms, within noise)               |
+
+The cost is real but small: a plain `count(*) WHERE store_id = …` now walks a wider index, so
+`carts` and `audit_logs` store counts are 0.1 to 0.2 ms slower at 60k to 100k rows. Single-row
+lookups and the FK probe are unchanged. The saving is the write cost and 392 kB.
+
+**Kept: `product_variants_sku_idx` (32 kB, 0 scans).** Not dropped (Ruling DBM-2). It has no longer
+index behind it. Zero scans reflect a 353-row table the planner seq-scans, not an absent query:
+`stock-adjustments.routes.ts` looks variants up by `sku IN (…)` with no other index on `sku`, and
+its sibling `product_variants_product_id_barcode_idx` is also at zero because the barcode and bulk
+stock features have not been used yet. Re-check after they have run.
+
 ## Recommendations outside this PR
 
-1. Enable `pg_stat_statements` on the production Neon database (`CREATE EXTENSION`, owner
-   approval). Without it the `carts` / `cart_items` seq scans cannot be attributed to a statement.
+1. ~~Enable `pg_stat_statements` on the production Neon database.~~ Done 2026-10-03 (owner-approved):
+   migration `20261003110000_enable_pg_stat_statements`. How to read it: `docs/DB-INDEX-MIGRATIONS.md`.
 2. The per-request reads of empty or near-constant tables (`reviews`, `store_faqs`, `store_howtos`,
    `store_pages`, `warehouses`) belong to a caching pass, not an index pass.
 3. ~~The order search matches **registered** customers only.~~ Done 2026-10-03 (owner-approved): it

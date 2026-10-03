@@ -5320,6 +5320,30 @@ is the check that catches a drift. Cost if wrong: if an operator declares `palor
 default is `en`, cookie-less visitors get Arabic cache keys over English content until the token is
 corrected.
 
+## 2026-10-03 — DB maintenance (pg_stat_statements + redundant prefix indexes)
+
+**Ruling DBM-1 — eight redundant prefix indexes are dropped; each drop is guarded by its covering
+index.** `carts_store_id_idx`, `ai_recommendation_store_id_source_product_id_idx`,
+`audit_logs_store_id_idx`, `orders_store_id_idx`, `products_store_id_idx`,
+`payment_events_event_type_idx`, `inventory_history_store_id_idx`, `cart_bundles_cart_id_idx`. Each
+is a strict left prefix of a valid longer btree, backs no constraint, and leaves all 205 FKs indexed
+(read-only against production, 2026-10-03; table in `docs/perf/index-audit-2026-10.md`). This
+supersedes the "listed, not dropped" part of IDX-3. The migration drops an index only when its
+covering index exists and is valid in that database, and the matching `@@index` lines leave
+`schema.prisma`. Plain `DROP INDEX`, no `lock_timeout` (a timeout would record the migration FAILED
+and block later deploys). Cost if wrong: if a statement turns out to need the short index's smaller
+size, it reads a longer index (a few extra pages); `rollback.sql` recreates all eight in one run.
+
+**Ruling DBM-2 — `product_variants_sku_idx` is kept.** The request was to drop it "if it is truly
+never used". It has 0 scans, but it is the only index on `product_variants.sku` and
+`stock-adjustments.routes.ts` runs `sku IN (…)` against it; the table is 353 rows, so the planner
+seq-scans and the zero says nothing. Cost if wrong: 32 kB and one index of write cost on a small
+table until the barcode and bulk-stock features have run and the count is re-read.
+
+**Ruling DBM-3 — `pg_stat_statements` is enabled by a migration, not by hand.** Neon already
+preloads the library and offers version 1.11, and the migration role is in `pg_read_all_stats`, so
+`CREATE EXTENSION IF NOT EXISTS` is the whole change. Cost if wrong: nothing to undo beyond a view
+and a few functions (`rollback.sql` drops the extension and the accumulated counters).
 ## 2026-10-03 — scoped-audit follow-ups (branch `fix/backlog-followups11`, issues 2427, 2429-2432, 2434)
 
 **Ruling PG-1 — a paged list ends its sort with a unique key (issue 2429).** `skip`/`take` over a

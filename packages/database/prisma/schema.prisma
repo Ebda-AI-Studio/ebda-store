@@ -937,7 +937,6 @@ model Product {
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
-  @@index([storeId])
   @@index([status])
   @@index([featured])
   @@index([price])
@@ -996,7 +995,6 @@ model InventoryHistory {
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@index([productId])
-  @@index([storeId])
   @@index([createdAt])
   @@index([storeId, reference])
   @@map("inventory_history")
@@ -1177,7 +1175,6 @@ model Cart {
   abandonedCart AbandonedCart?
 
   @@unique([storeId, sessionId])
-  @@index([storeId])
   @@index([customerId])
   @@index([sessionId])
   @@index([updatedAt])
@@ -1278,7 +1275,6 @@ model CartBundle {
   bundle Bundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
 
   @@unique([cartId, bundleId])
-  @@index([cartId])
   // FK-only index for the Bundle delete cascade (the unique above has
   // bundleId second, which the RI trigger cannot use). 20261001140000.
   @@index([bundleId])
@@ -1449,7 +1445,6 @@ model Order {
   events              OrderEvent[]
   appliedPromotion    Promotion?           @relation("OrderAppliedPromotion", fields: [appliedPromotionId], references: [id], onDelete: SetNull)
 
-  @@index([storeId])
   @@index([customerId])
   @@index([status])
   @@index([paymentStatus])
@@ -1657,7 +1652,6 @@ model PaymentEvent {
   @@index([paymentId, occurredAt])
   @@index([storeId, occurredAt(sort: Desc)])
   @@index([orderId, occurredAt])
-  @@index([eventType])
   @@index([eventType, occurredAt])
   @@index([provider, occurredAt])
   @@index([triggeredByUserId])
@@ -2190,7 +2184,6 @@ model AiRecommendation {
   targetProduct Product @relation("AiRecTarget", fields: [targetProductId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, sourceProductId, targetProductId])
-  @@index([storeId, sourceProductId])
   @@index([storeId, generatedAt])
   @@index([sourceProductId])
   @@index([targetProductId])
@@ -2399,7 +2392,6 @@ model AuditLog {
   store Store? @relation(fields: [storeId], references: [id])
 
   @@index([userId])
-  @@index([storeId])
   @@index([action])
   @@index([resourceType])
   @@index([createdAt])

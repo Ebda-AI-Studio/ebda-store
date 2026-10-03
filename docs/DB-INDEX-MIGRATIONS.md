@@ -71,6 +71,17 @@ with evidence, lives in the latest `docs/perf/index-audit-*.md`. On a large tabl
 constraint or a foreign key (`pg_constraint.conindid`, and the FK-coverage query in the audit), and
 that it was not created recently: `idx_scan = 0` on a new index only means it is new.
 
+A redundant prefix index is dropped with a guarded `DO` block (see
+`20261003110100_drop_redundant_prefix_indexes`): each drop runs only when its covering index exists
+and is valid in that database, otherwise it raises a WARNING and keeps the short one. A migration is
+one transaction, so the `ACCESS EXCLUSIVE` locks of its drops are held until it commits. That is
+fine for small tables. Do not add a `lock_timeout` to a migration: a timeout records the migration
+as FAILED and blocks every later deploy until `prisma migrate resolve`. For a big table, pre-drop
+with `DROP INDEX CONCURRENTLY IF EXISTS` on `DIRECT_URL` and let the migration be the no-op.
+
+Rolling a drop back means two things: run the migration's `rollback.sql` (recreates the indexes with
+`CREATE INDEX CONCURRENTLY`) and revert the PR so `schema.prisma` declares the `@@index` lines again.
+
 ## Trigram (GIN) indexes and Prisma drift
 
 Prisma's schema does not declare the `gin_trgm_ops` indexes. They are raw SQL in their migrations,
@@ -93,3 +104,49 @@ and rollbacks never drop it.
 Every index migration ships a `rollback.sql` next to it, with `DROP INDEX CONCURRENTLY IF EXISTS`
 statements run on `DIRECT_URL` in autocommit. Dropping an index loses no data; the affected reads
 go back to sequential scans. If the index came with a query rewrite, roll the code back first.
+
+## Reading pg_stat_statements
+
+`pg_stat_statements` is enabled by migration `20261003110000_enable_pg_stat_statements`. Neon
+preloads the library, so statistics accumulate from the moment the extension exists. Run these on
+the non-pooled `DIRECT_URL` as `neondb_owner` (a member of `pg_read_all_stats`, which is what makes
+other roles' statement text visible), read-only:
+
+```sql
+-- since when is this window? (the counters are in memory; they start over on a stats reset
+-- and are not a long-term record: copy anything you need into the audit doc)
+SELECT stats_reset, dealloc FROM pg_stat_statements_info;
+
+-- top statements by total time: where the database actually spends its time
+SELECT queryid, calls,
+       round(total_exec_time::numeric, 1) AS total_ms,
+       round(mean_exec_time::numeric, 2)  AS mean_ms,
+       round(max_exec_time::numeric, 1)   AS max_ms,
+       rows, shared_blks_read, left(query, 160) AS query
+FROM pg_stat_statements
+WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
+ORDER BY total_exec_time DESC LIMIT 20;
+
+-- buffers touched per call: a statement that reads thousands of blocks per call for a few rows
+-- is a missing index (this is how to attribute the carts / cart_items sequential scans)
+SELECT queryid, calls, (shared_blks_hit + shared_blks_read) / calls AS blks_per_call,
+       rows / calls AS rows_per_call, left(query, 160) AS query
+FROM pg_stat_statements
+WHERE calls > 100 AND query ILIKE '%"carts"%'
+ORDER BY (shared_blks_hit + shared_blks_read) / calls DESC LIMIT 20;
+```
+
+Reading the output:
+
+- Prisma issues parameterised statements, so `query` shows `$1`, `$2`: the bound values (a phone,
+  an email, a search term) are never stored. Do not paste a statement into a ticket with its
+  parameters filled in.
+- Rank by `total_exec_time` first (what to fix), then by `mean_exec_time` and `max_exec_time` (what a
+  user feels). A cheap statement called a million times beats a slow one called twice.
+- `rows / calls` against `blks_per_call` separates a missing index (many blocks, few rows) from a
+  genuinely large result.
+- To take a clean measurement after a deploy or an index change, `SELECT pg_stat_statements_reset();`,
+  wait for traffic, then query. Do this deliberately: it discards everyone's window.
+- `pg_stat_statements.track` is `top`, so statements inside functions are not listed separately.
+- Pair a finding with `EXPLAIN (ANALYZE, BUFFERS)` of that statement on a scratch copy at production
+  size before adding or dropping an index.
