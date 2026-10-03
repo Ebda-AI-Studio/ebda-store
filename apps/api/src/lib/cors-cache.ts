@@ -2,6 +2,7 @@
 // index.ts (which sets up CORS) and store.routes.ts (which needs to bust the cache).
 import { BoundedMap } from './bounded-map';
 import { BRAND, brandUrl } from '@force/shared';
+import { storeLookupForHost } from './store-host';
 
 // Capped so a pathological stream of unknown domains (e.g. bot traffic
 // probing random hostnames) can never grow the Map without limit.
@@ -147,6 +148,28 @@ export function corsCustomDomainWhere(hostname: string) {
     domain: hostname,
     status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },
     deletedAt: null,
+  };
+}
+
+/**
+ * Prisma `where` for the credentialed-CORS lookup of ANY store origin host
+ * (#1214, extended for host routing): `<slug>.ebda.app` is matched by SLUG,
+ * anything else by custom DOMAIN, with the same live-store filter as
+ * {@link corsCustomDomainWhere}. Returns `null` for a host that can never be a
+ * store (reserved label, platform host, IP, localhost, malformed) — the caller
+ * rejects the origin without touching the database.
+ */
+export function corsStoreOriginWhere(rawHost: string) {
+  const lookup = storeLookupForHost(rawHost);
+  if (!lookup) return null;
+  const live = {
+    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },
+    deletedAt: null,
+  };
+  return {
+    cacheKey: lookup.cacheHost,
+    where:
+      lookup.by === 'slug' ? { slug: lookup.slug, ...live } : { domain: lookup.domain, ...live },
   };
 }
 

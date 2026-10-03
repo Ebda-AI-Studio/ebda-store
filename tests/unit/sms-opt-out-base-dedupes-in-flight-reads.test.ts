@@ -69,7 +69,7 @@ describe('opt-out storefront base: concurrent recipients share one store read (i
 
   it('a missing store falls back to the platform base and is not cached', async () => {
     h.findUnique.mockResolvedValueOnce(null);
-    expect(await storefrontBase('ghost')).toBe('https://ebda.app/');
+    expect(await storefrontBase('ghost')).toBe('https://ebda.app');
     await tick();
     expect(await storefrontBase('ghost')).toBe('https://shop.example.test');
     expect(h.findUnique).toHaveBeenCalledTimes(2);

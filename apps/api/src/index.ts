@@ -189,7 +189,7 @@ app.use(
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
 import {
   corsDomainCache,
-  corsCustomDomainWhere,
+  corsStoreOriginWhere,
   corsEntryAfterFailure,
   corsEntryAfterLookup,
   decideAfterFailedLookup,
@@ -260,13 +260,18 @@ app.use(
       // For other HTTPS origins, check if they match a store's custom domain in the DB.
       // We cache results briefly to avoid a DB hit on every request.
       if (origin.startsWith('https://')) {
-        let hostname: string;
+        // Host routing: `<slug>.ebda.app` is a store origin (matched by slug),
+        // any other well-formed host a custom-domain candidate; reserved labels,
+        // platform hosts, IPs and malformed values can never be a store origin
+        // and are rejected here WITHOUT a database lookup.
+        let storeOriginWhere: ReturnType<typeof corsStoreOriginWhere>;
         try {
-          // Normalize: lowercase + strip www (domains are stored normalized in DB)
-          hostname = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
+          storeOriginWhere = corsStoreOriginWhere(new URL(origin).hostname);
         } catch {
           return callback(corsRejection(origin));
         }
+        if (!storeOriginWhere) return callback(corsRejection(origin));
+        const hostname = storeOriginWhere.cacheKey;
 
         // Return cached result if still fresh
         const decision = decideCorsCache(corsDomainCache.get(hostname), Date.now());
@@ -280,9 +285,9 @@ app.use(
         // decision === 'miss' — fall through to the DB lookup below.
 
         // Async DB lookup — only allow if a LIVE store (active/suspended, not
-        // deleted) owns this custom domain. See corsCustomDomainWhere (#1214).
+        // deleted) owns this host (slug subdomain or custom domain). See corsStoreOriginWhere (#1214).
         prisma.store
-          .findFirst({ where: corsCustomDomainWhere(hostname), select: { id: true } })
+          .findFirst({ where: storeOriginWhere.where, select: { id: true } })
           .then(store => {
             const allowed = store !== null;
             corsDomainCache.set(hostname, corsEntryAfterLookup(allowed, Date.now()));

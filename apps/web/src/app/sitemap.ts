@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
-import { getSiteUrl } from '../lib/structured-data';
+import { notFound } from 'next/navigation';
 import { API_URL } from '../lib/api';
 
 // Static page slugs that exist for every store (per-tenant rewrite).
@@ -21,9 +21,6 @@ const STORE_STATIC_PAGES: Array<{ path: string; priority: number; freq: 'monthly
 type StoreListEntry = {
   id: string;
   slug: string;
-  /** ISO timestamp from /public/stores — used to pick which stores get
-   *  product fan-out (oldest first) when the store count exceeds the cap. */
-  createdAt?: string;
 };
 
 type ProductEntry = {
@@ -31,8 +28,6 @@ type ProductEntry = {
   updatedAt?: string;
   createdAt?: string;
 };
-
-const STORE_LIST_PAGE_SIZE = 100;
 
 /**
  * The API that a sitemap enumerates could not be asked (#2127). Thrown rather
@@ -48,69 +43,6 @@ class SitemapSourceUnavailableError extends Error {
     this.name = 'SitemapSourceUnavailableError';
   }
 }
-const STORE_LIST_MAX_PAGES = 50;
-
-/**
- * Page through the public store list. Both early exits are LOGGED (#1815):
- * the page ceiling and a mid-pagination failure used to return a short list
- * silently, and every downstream drop count was computed from that short
- * list, so "did any store vanish?" had no truthful answer in the logs.
- * `storesNeverFetched` is the number of stores the API reported that this
- * render never received (an estimate from `totalPages`, exact to one page).
- */
-async function fetchStores(): Promise<{
-  stores: StoreListEntry[];
-  storesNeverFetched: number;
-}> {
-  const stores: StoreListEntry[] = [];
-  let page = 1;
-  let totalPages = 1;
-  while (true) {
-    const res = await fetch(`${API_URL}/public/stores?page=${page}&limit=${STORE_LIST_PAGE_SIZE}`, {
-      next: { revalidate: 3600 },
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) {
-      console.error('sitemap: store list fetch failed mid-pagination', {
-        page,
-        status: res.status,
-        fetchedSoFar: stores.length,
-      });
-      // Page 1 failing means we know nothing at all — not "zero stores" but
-      // "could not ask" (#2127). Throw so the route 5xxs and Google keeps its
-      // last-good copy, instead of a 200 empty <urlset/> that overwrites it.
-      if (page === 1) {
-        throw new SitemapSourceUnavailableError(`store list page 1 → HTTP ${res.status}`);
-      }
-      // A later page failing leaves the remaining pages' stores unfetched.
-      return {
-        stores,
-        storesNeverFetched:
-          page === 1 ? 0 : Math.max(0, totalPages * STORE_LIST_PAGE_SIZE - stores.length),
-      };
-    }
-    const data = await res.json();
-    const batch: StoreListEntry[] = data?.data ?? [];
-    stores.push(...batch.map(s => ({ id: s.id, slug: s.slug, createdAt: s.createdAt })));
-    totalPages = data?.pagination?.totalPages ?? 1;
-    if (page >= totalPages) break;
-    // Hard cap so a runaway DB can't blow the sitemap timeout.
-    if (page >= STORE_LIST_MAX_PAGES) {
-      console.error('sitemap: store list page ceiling hit', {
-        fetchedPages: STORE_LIST_MAX_PAGES,
-        fetched: stores.length,
-        totalPages,
-      });
-      return {
-        stores,
-        storesNeverFetched: Math.max(0, totalPages * STORE_LIST_PAGE_SIZE - stores.length),
-      };
-    }
-    page += 1;
-  }
-  return { stores, storesNeverFetched: 0 };
-}
-
 /**
  * Resolve a custom-domain host (e.g. `wadyaljuz.com`) to its owning
  * store via the dedicated /public/store/resolve endpoint. Returns null
@@ -299,266 +231,32 @@ async function buildTenantSitemap(
 }
 
 /**
- * Sitemap with host-aware tenant fan-out.
+ * Per-store sitemap, keyed on the request HOST.
  *
- * The same Next.js sitemap route serves three different audiences
- * depending on the host header:
+ * Every store has its own host, and `/sitemap.xml` on that host lists ONLY that
+ * store's URLs, rooted at that host:
  *
- *   - `wadyaljuz.com` (custom domain)
- *     → ONLY Wady Aljuz's URLs, rooted at https://wadyaljuz.com
- *     → submitted to Google Search Console for that merchant's property
- *   - `ebda.app` (platform path)
- *     → master sitemap covering every store under /<slug>/, rooted
- *       at https://ebda.app
- *     → submitted to the platform's GSC property
- *   - any other host (preview deploys, IP-direct hits)
- *     → falls through to the master sitemap shape with whatever
- *       `getSiteUrl()` decides
- *
- * Without the host branch, the sitemap at wadyaljuz.com/sitemap.xml
- * would list `https://ebda.app/wady-aljuz/...` URLs,
- * which causes Google to index the wrong domain when the merchant
- * submits their own GSC property. Caught on wadyaljuz.com 2026-05-14.
+ *   - `amelia.ebda.app` / `wadyaljuz.com` (a store host)
+ *     → ONLY that store's URLs, submitted to that merchant's GSC property
+ *   - `ebda.app` and other platform hosts
+ *     → no store, nothing to list: an empty sitemap (the marketing site owns
+ *       its own). There is NO master sitemap fanning out over every store under
+ *       `/<slug>/…` — that path-based layout is gone.
+ *   - a store host that resolves to no store
+ *     → 404, never another store's URLs
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  const requestHost = (await headers()).get('host')?.toLowerCase() ?? '';
+  // `x-store-domain` is the canonical request host, asserted by middleware for
+  // `<slug>.ebda.app` and custom domains and ABSENT on platform hosts.
+  const storeHost = (await headers()).get('x-store-domain')?.toLowerCase() ?? '';
+  if (!storeHost) return [];
 
-  // Tenant branch: ask the API whether this host is a known custom
-  // domain. Avoids exposing the domain list via /public/stores. Falls
-  // through to the master sitemap on a non-match (platform path,
-  // preview deploys, etc.).
-  const tenant = await resolveStoreByHost(requestHost);
-  if (tenant) return buildTenantSitemap(requestHost, tenant.id, now);
-
-  // Master sitemap: platform path. Covers every store under /<slug>/...
-  //
-  // The platform root itself is NOT listed (#1543): `${siteUrl}/` 307s to the
-  // Ebda company site (HomePageBody's demo-store redirect), and a
-  // sitemap URL that redirects is reported by GSC as "Page with redirect".
-  const siteUrl = getSiteUrl();
-
-  // A failure here THROWS (#2127): `fetchStores` raises on a page-1 failure,
-  // and a network/parse error propagates, so the route 5xxs and Google keeps
-  // the last-good sitemap. Only a successful answer of zero stores (possible
-  // pre-launch) renders an empty sitemap.
-  let stores: StoreListEntry[];
-  let storesNeverFetched: number;
-  try {
-    ({ stores, storesNeverFetched } = await fetchStores());
-  } catch (error) {
-    console.error('sitemap: store list unavailable — failing the render (5xx)', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
-  }
-
-  // Bounded fan-out. `fetchStores()` pages up to 50x100 = 5000 stores, and one
-  // subrequest per store in a single Worker invocation would blow Cloudflare's
-  // 1000-subrequest ceiling as the platform grows — the render would throw past
-  // it and fail the whole render. Cap the
-  // per-render fan-out and emit the remaining stores with their static pages
-  // only (their 11 static pages still get indexed; their catalogs don't
-  // contribute product URLs to this render) — a promise the 50k clamp used to
-  // break, because it cut the tail of a store-by-store list and starved every
-  // store past the budget of everything. Static pages are emitted in their own
-  // pass now, so this is true again. Chunked rather than one Promise.all so we
-  // also stop opening 200 sockets at once against the API.
-  //
-  // Subrequest budget (worst case, #1271): 50 store-list pages + 1 host
-  // resolve + 200 stores x (3 product pages + 1 unpaginated bundle-list
-  // request) = 851 fetch() calls. That is NOT the whole bill: Cloudflare
-  // counts calls to its own services via bindings as subrequests too
-  // (developers.cloudflare.com/workers/platform/limits/#subrequests), and
-  // every one of these fetches carries `next.revalidate`, so OpenNext's R2
-  // incremental cache adds a get (+ a put on a cold/expired entry) and the
-  // Durable-Object tag cache a lookup per fetch — roughly 4 x 851 ≈ 3,400 on
-  // a fully cold render. The ceiling this is measured against is the Workers
-  // Paid default of 10,000 per invocation (raised from 1,000 on 2026-02-11;
-  // no `limits.subrequests` override in wrangler.jsonc). Memory is bounded
-  // separately: fetchProducts keeps only slug/updatedAt/createdAt per product.
-  // A store whose fan-out throws (e.g. a subrequest-limit error) degrades to
-  // static pages only and is COUNTED in the log below, never silently.
-  const MAX_STORES_WITH_PRODUCTS = 200;
-  const PRODUCT_PAGES_PER_STORE = 3; // x100 = up to 300 product URLs per store
-  const FANOUT_CHUNK = 20;
-
-  // /public/stores returns newest-first (`orderBy createdAt desc`), so a
-  // positional slice used to keep the 200 NEWEST stores and silently drop
-  // product URLs for every older one — the longest-tenured, largest-catalog
-  // anchor tenants lost their catalogs first while brand-new (possibly
-  // empty) stores kept theirs (audit-followup #1146/#1162). Select
-  // oldest-first for the product fan-out instead: deterministic, and
-  // priority-correct for accumulated SEO equity.
-  const byOldestFirst = [...stores].sort((a, b) =>
-    (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
-  );
-  const withProducts = byOldestFirst.slice(0, MAX_STORES_WITH_PRODUCTS);
-  const withoutProducts = byOldestFirst.slice(MAX_STORES_WITH_PRODUCTS);
-  if (withoutProducts.length > 0) {
-    // No-silent-caps rule: the drop must be observable in Worker logs.
-    console.warn('sitemap: product fan-out capped', {
-      total: stores.length,
-      withProducts: withProducts.length,
-      dropped: withoutProducts.length,
-    });
-  }
-
-  let fanoutFailures = 0;
-  const productResults: Array<{
-    store: StoreListEntry;
-    products: ProductEntry[];
-    bundles: BundleEntry[];
-  }> = [];
-  for (let i = 0; i < withProducts.length; i += FANOUT_CHUNK) {
-    const chunk = withProducts.slice(i, i + FANOUT_CHUNK);
-    productResults.push(
-      ...(await Promise.all(
-        chunk.map(store =>
-          Promise.all([fetchProducts(store.id, PRODUCT_PAGES_PER_STORE), fetchBundles(store.id)])
-            .then(([products, bundles]) => ({ store, products, bundles }))
-            .catch(() => {
-              fanoutFailures += 1;
-              return { store, products: [] as ProductEntry[], bundles: [] as BundleEntry[] };
-            })
-        )
-      ))
-    );
-  }
-  if (fanoutFailures > 0) {
-    console.error('sitemap: product fan-out failed for some stores — static pages only', {
-      failedStores: fanoutFailures,
-      attempted: withProducts.length,
-    });
-  }
-  for (const store of withoutProducts) {
-    productResults.push({ store, products: [], bundles: [] });
-  }
-
-  // TWO passes, not one interleaved pass.
-  //
-  // The 50k clamp below cuts the TAIL, and `perTenant` used to be built
-  // store-by-store — all of one store's URLs, then all of the next's. A
-  // product-bearing store emits up to 11 static + 300 product + bundle URLs,
-  // so ~161 full-catalog stores consume the entire 50,000 budget on their own
-  // and every store after them is emitted with ZERO URLs. Not "their 11 static
-  // pages still get indexed", which is what the comment above and the GSC
-  // runbook both promised: newer tenants vanish from the master sitemap
-  // outright rather than degrading to static-page-only coverage.
-  //
-  // Static pages first for EVERY store — that pass is cheap and bounded at
-  // 11 x N, so it cannot starve anyone — then product and bundle URLs until
-  // the budget runs out. Now only catalog DEPTH degrades, which is the
-  // behaviour that was documented all along.
-  const staticPages: MetadataRoute.Sitemap = [];
-  const catalogPages: MetadataRoute.Sitemap = [];
-  for (const { store } of productResults) {
-    for (const page of STORE_STATIC_PAGES) {
-      staticPages.push({
-        url: `${siteUrl}/${store.slug}${page.path}`,
-        lastModified: now,
-        changeFrequency: page.freq,
-        priority: page.priority,
-      });
-    }
-  }
-  for (const { store, products, bundles } of productResults) {
-    for (const product of products) {
-      catalogPages.push({
-        url: `${siteUrl}/${store.slug}/products/${product.slug}`,
-        lastModified: product.updatedAt
-          ? new Date(product.updatedAt)
-          : product.createdAt
-            ? new Date(product.createdAt)
-            : now,
-        changeFrequency: 'weekly',
-        priority: 0.7,
-      });
-    }
-    // Same gating as the tenant branch above: `/bundles` only listed when
-    // this store actually has purchasable bundles.
-    if (bundles.length > 0) {
-      catalogPages.push({
-        url: `${siteUrl}/${store.slug}/bundles`,
-        lastModified: now,
-        changeFrequency: 'weekly',
-        priority: 0.6,
-      });
-    }
-    for (const bundle of bundles) {
-      catalogPages.push({
-        url: `${siteUrl}/${store.slug}/bundles/${bundle.slug}`,
-        lastModified: now,
-        changeFrequency: 'weekly',
-        priority: 0.6,
-      });
-    }
-  }
-
-  const perTenant: MetadataRoute.Sitemap = [...staticPages, ...catalogPages];
-
-  // Sitemap protocol hard limit: 50,000 URLs per file (sitemaps.org) —
-  // past it Google reports an error and processes at most the first 50k.
-  // With 11 static pages per store, a full 5000-store fetch alone would
-  // emit 55,001 URLs, so clamp and log rather than ship an invalid
-  // document (audit-followup #1148/#1164). Product-bearing (oldest/anchor)
-  // stores are emitted first, so the clamp drops the newest stores' static
-  // pages last. The real fix past ~4,500 stores is sharding — but NOT via
-  // Next's `generateSitemaps()`, which remaps the route to
-  // `/sitemap/[id].xml` and 404s the bare `/sitemap.xml` every merchant
-  // has already submitted to GSC (verified against next@16.2.6's
-  // metadata-route loader; Next generates no sitemap index file).
-  const SITEMAP_URL_LIMIT = 50_000;
-  const entries = perTenant;
-  if (entries.length > SITEMAP_URL_LIMIT) {
-    // Report how many stores got NOTHING, not just the total.
-    //
-    // A total alone tells an operator that truncation happened; it does not
-    // tell them anyone vanished. With static pages emitted first, a store is
-    // fully dropped only once even the cheap 11-per-store pass overflows —
-    // which is the point past which the sitemap genuinely cannot represent the
-    // platform and sharding is the real answer.
-    const staticBudget = SITEMAP_URL_LIMIT;
-    const storesFullyDropped = Math.max(
-      0,
-      productResults.length - Math.floor(staticBudget / STORE_STATIC_PAGES.length)
-    );
-    // `storesFullyDropped` only goes non-zero once even the cheap 11-URL
-    // static pass overflows (~4,500 stores). Catalog coverage — the pages
-    // that actually convert — can be gone far earlier: MAX_STORES_WITH_PRODUCTS
-    // x PRODUCT_PAGES_PER_STORE x 100 can reach 60,000 catalog URLs against a
-    // budget that's already spent 11 x N on static pages first, so a
-    // product-bearing store past roughly the 160th can lose 100% of its
-    // catalog while its 11 static pages still get in — `storesFullyDropped`
-    // reads 0 and hides it (#1821). Walk the catalog pass in the same order
-    // it was built (oldest/anchor stores first) to find every store whose
-    // entire catalog contribution landed past the surviving budget.
-    const catalogBudget = Math.max(0, SITEMAP_URL_LIMIT - staticPages.length);
-    let storesWithNoCatalogUrls = 0;
-    let catalogConsumed = 0;
-    for (const { products, bundles } of productResults) {
-      const storeCatalogCount = products.length + (bundles.length > 0 ? 1 : 0) + bundles.length;
-      if (storeCatalogCount === 0) continue; // nothing to lose for this store
-      const survivingForThisStore = Math.max(
-        0,
-        Math.min(storeCatalogCount, catalogBudget - catalogConsumed)
-      );
-      if (survivingForThisStore === 0) storesWithNoCatalogUrls++;
-      catalogConsumed += storeCatalogCount;
-    }
-    console.error('sitemap: master sitemap exceeds the 50k-URL protocol limit — truncating', {
-      total: entries.length,
-      emitted: SITEMAP_URL_LIMIT,
-      stores: stores.length,
-      storesFullyDropped,
-      storesWithNoCatalogUrls,
-      // Stores the API reported but fetchStores() never received — see its
-      // own error log for why. Absent from `stores` above entirely.
-      storesNeverFetched,
-      catalogUrlsDropped: Math.min(catalogPages.length, entries.length - SITEMAP_URL_LIMIT),
-    });
-    return entries.slice(0, SITEMAP_URL_LIMIT);
-  }
-  return entries;
+  // Ask the API which store owns this host. A definitive miss is a 404; "could
+  // not ask" throws (SitemapSourceUnavailableError → 5xx, so Google keeps its
+  // last-good copy).
+  const tenant = await resolveStoreByHost(storeHost);
+  if (!tenant) notFound();
+  return buildTenantSitemap(storeHost, tenant.id, now);
 }

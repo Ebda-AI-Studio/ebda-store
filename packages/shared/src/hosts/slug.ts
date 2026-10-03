@@ -1,0 +1,87 @@
+import { z } from 'zod';
+import { isReservedSlug } from './reserved-slugs';
+
+export const STORE_SLUG_MIN_LENGTH = 3;
+export const STORE_SLUG_MAX_LENGTH = 40;
+
+/** Machine-readable reasons a store slug is refused. Stable: clients key on these. */
+export type StoreSlugErrorCode =
+  | 'SLUG_TOO_SHORT'
+  | 'SLUG_TOO_LONG'
+  | 'SLUG_INVALID_CHARS'
+  | 'SLUG_INVALID_HYPHEN'
+  | 'SLUG_RESERVED';
+
+export type StoreSlugValidation =
+  | { ok: true; slug: string }
+  | { ok: false; code: StoreSlugErrorCode; message: string };
+
+const SLUG_CHARS = /^[a-z0-9-]+$/;
+
+/** Human-readable text per code (English; the admin maps codes to Arabic copy). */
+export const STORE_SLUG_ERROR_MESSAGES: Record<StoreSlugErrorCode, string> = {
+  SLUG_TOO_SHORT: `Store address must be at least ${STORE_SLUG_MIN_LENGTH} characters`,
+  SLUG_TOO_LONG: `Store address must be at most ${STORE_SLUG_MAX_LENGTH} characters`,
+  SLUG_INVALID_CHARS: 'Store address may only contain lowercase letters, digits and hyphens',
+  SLUG_INVALID_HYPHEN:
+    'Store address cannot start or end with a hyphen or contain two hyphens in a row',
+  SLUG_RESERVED: 'This store address is reserved. Please choose another one',
+};
+
+/**
+ * Format-only check (no reserved-list lookup): lowercase a-z0-9 and hyphen,
+ * 3–40 chars, no leading/trailing/double hyphen. Input is NOT normalised —
+ * `Amelia` is invalid, not silently lowercased — so what is validated is
+ * exactly what gets stored and routed.
+ */
+export function validateStoreSlugFormat(raw: string): StoreSlugValidation {
+  const slug = raw;
+  const fail = (code: StoreSlugErrorCode): StoreSlugValidation => ({
+    ok: false,
+    code,
+    message: STORE_SLUG_ERROR_MESSAGES[code],
+  });
+  if (!SLUG_CHARS.test(slug)) return fail('SLUG_INVALID_CHARS');
+  if (slug.length < STORE_SLUG_MIN_LENGTH) return fail('SLUG_TOO_SHORT');
+  if (slug.length > STORE_SLUG_MAX_LENGTH) return fail('SLUG_TOO_LONG');
+  if (slug.startsWith('-') || slug.endsWith('-') || slug.includes('--')) {
+    return fail('SLUG_INVALID_HYPHEN');
+  }
+  return { ok: true, slug };
+}
+
+/** Full validation: format, then the reserved list. */
+export function validateStoreSlug(raw: string): StoreSlugValidation {
+  const format = validateStoreSlugFormat(raw);
+  if (!format.ok) return format;
+  if (isReservedSlug(format.slug)) {
+    return { ok: false, code: 'SLUG_RESERVED', message: STORE_SLUG_ERROR_MESSAGES.SLUG_RESERVED };
+  }
+  return format;
+}
+
+/**
+ * Zod schema for a store slug. The failing code rides on the issue's `params`
+ * (`{ code: 'SLUG_RESERVED' }`) so an API route can surface it as a first-class
+ * error code instead of a generic VALIDATION_ERROR — see `storeSlugIssueCode`.
+ */
+export const storeSlugSchema = z.string().superRefine((value, ctx) => {
+  const result = validateStoreSlug(value);
+  if (!result.ok) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: result.message,
+      params: { code: result.code },
+    });
+  }
+});
+
+/** The `StoreSlugErrorCode` carried by a ZodError issue produced by {@link storeSlugSchema}, if any. */
+export function storeSlugIssueCode(issue: {
+  code: string;
+  params?: unknown;
+}): StoreSlugErrorCode | null {
+  if (issue.code !== 'custom') return null;
+  const code = (issue.params as { code?: unknown } | undefined)?.code;
+  return typeof code === 'string' && code.startsWith('SLUG_') ? (code as StoreSlugErrorCode) : null;
+}

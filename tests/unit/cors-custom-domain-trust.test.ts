@@ -46,7 +46,7 @@ describe('#1214 custom-domain CORS trust requires a live store', () => {
 
   it('is the clause the CORS handler actually queries with', () => {
     const src = fs.readFileSync(path.resolve(process.cwd(), 'apps/api/src/index.ts'), 'utf8');
-    expect(src).toMatch(/findFirst\(\{\s*where:\s*corsCustomDomainWhere\(hostname\)/);
+    expect(src).toMatch(/findFirst\(\{\s*where:\s*storeOriginWhere\.where/);
   });
 
   it('a store-cache bust (status change, delete) also drops the cached CORS verdict', async () => {

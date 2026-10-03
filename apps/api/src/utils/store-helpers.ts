@@ -2,6 +2,7 @@ import { Request } from 'express';
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { AuthPayload } from '../middleware/auth';
+import { storeWhereForHost } from '../lib/store-host';
 
 /**
  * Extracts the authenticated user from the request.
@@ -40,11 +41,13 @@ export async function resolvePublicStoreId(req: Request): Promise<string | undef
     if (store) return store.id;
   }
 
-  const rawDomain = req.headers['x-store-domain'] as string | undefined;
-  if (rawDomain) {
-    const domain = rawDomain.toLowerCase().replace(/^www\./, '');
+  // `x-store-domain` carries the storefront's Host: `<slug>.ebda.app` resolves
+  // by slug, anything else by custom domain; reserved/platform/malformed hosts
+  // resolve to nothing (never to a default store).
+  const where = storeWhereForHost(req.headers['x-store-domain'] as string | undefined);
+  if (where) {
     const store = await prisma.store.findFirst({
-      where: { domain, status: 'active' },
+      where: { ...where, status: 'active' },
       select: { id: true },
     });
     if (store) return store.id;

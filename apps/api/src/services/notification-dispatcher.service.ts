@@ -28,6 +28,7 @@ import {
   SMS_TEMPLATES,
   PUSH_TEMPLATES,
   renderSmsTemplate,
+  storefrontOrigin,
 } from '@force/shared';
 import type { SmsConfig } from './sms.service';
 
@@ -353,7 +354,7 @@ async function readStorefrontBase(storeId: string): Promise<{ base: string; foun
   const store = await withRlsBypass(tx =>
     tx.store.findUnique({ where: { id: storeId }, select: { domain: true, slug: true } })
   );
-  const base = store?.domain ? `https://${store.domain}` : `${config.webUrl}/${store?.slug ?? ''}`;
+  const base = store ? storefrontOrigin(store) : config.webUrl;
   return { base, found: !!store };
 }
 

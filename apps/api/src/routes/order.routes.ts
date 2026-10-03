@@ -21,6 +21,7 @@ import {
   dayInOffset,
   parseTzOffset,
   BRAND,
+  storefrontOrigin,
 } from '@force/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
@@ -1739,11 +1740,7 @@ router.post(
       // Same storefront URL resolution the public checkout uses, so the
       // payment-success / payment-error callbacks land on the correct
       // tenant domain whether they have a custom domain or platform slug.
-      const storefrontBaseUrl = order.store?.domain
-        ? `https://${order.store.domain}`
-        : order.store?.slug
-          ? `${config.webUrl}/${order.store.slug}`
-          : config.webUrl;
+      const storefrontBaseUrl = order.store ? storefrontOrigin(order.store) : config.webUrl;
 
       const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
       const customerName =

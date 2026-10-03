@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { storefrontOrigin } from '@force/shared';
 import express from 'express';
 import crypto from 'crypto';
 import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
@@ -749,8 +750,7 @@ router.get('/payment/callback', async (req: Request, res: Response) => {
         },
         select: { store: { select: { domain: true, slug: true } } },
       });
-      if (order?.store?.domain) return `https://${order.store.domain}`;
-      if (order?.store?.slug) return `${config.webUrl}/${order.store.slug}`;
+      if (order?.store) return storefrontOrigin(order.store);
       return config.webUrl;
     } catch {
       return config.webUrl;
@@ -808,8 +808,7 @@ router.get('/payment/error', async (req: Request, res: Response) => {
         },
         select: { store: { select: { domain: true, slug: true } } },
       });
-      if (order?.store?.domain) baseUrl = `https://${order.store.domain}`;
-      else if (order?.store?.slug) baseUrl = `${config.webUrl}/${order.store.slug}`;
+      if (order?.store) baseUrl = storefrontOrigin(order.store);
     } catch {
       // Fall back to platform URL
     }

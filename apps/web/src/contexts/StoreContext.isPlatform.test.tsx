@@ -67,8 +67,10 @@ describe('StoreProvider seeds isPlatform server-side', () => {
     );
 
     expect(screen.getByTestId('is-platform').textContent).toBe('true');
-    // useStoreUrl and useIsPlatform must agree — both read the same context value.
-    expect(screen.getByTestId('home-href').textContent).toBe('/wadyaljuz');
+    // There is no path-based `/<slug>` storefront any more: even when the host is a
+    // platform host, in-store links are never slug-prefixed (a platform host renders
+    // no store at all).
+    expect(screen.getByTestId('home-href').textContent).toBe('/');
   });
 
   it('trusts a seeded `initialIsPlatform=false` too (does not re-derive it away)', () => {

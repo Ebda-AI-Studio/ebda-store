@@ -5,7 +5,7 @@ import { WarehouseService } from './warehouse.service';
 import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
-import { storeOrigin } from '@force/shared';
+import { storefrontOrigin } from '@force/shared';
 
 interface InventoryAdjustment {
   productId: string;
@@ -927,11 +927,7 @@ export class InventoryService {
         '[InventoryService] Firing back-in-stock notifications'
       );
 
-      const storeBase = store.domain
-        ? `https://${store.domain}`
-        : process.env.WEB_URL
-          ? `${process.env.WEB_URL}/${store.slug}`
-          : storeOrigin(store.slug);
+      const storeBase = storefrontOrigin(store);
 
       // Dispatch notifications for each user — fire-and-forget per user
       for (const item of wishlistItems) {

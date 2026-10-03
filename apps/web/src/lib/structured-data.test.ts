@@ -21,7 +21,7 @@ describe('storeAbsoluteUrl', () => {
     else process.env.NEXT_PUBLIC_SITE_URL = originalSiteUrl;
   });
 
-  it('includes the /<slug> path prefix for a platform-path store (no custom domain)', () => {
+  it('roots a store with no custom domain at https://<slug>.ebda.app (no /<slug> path prefix)', () => {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     const store = {
       id: 'store-1',
@@ -30,11 +30,11 @@ describe('storeAbsoluteUrl', () => {
     } as unknown as ResolvedStore;
 
     expect(storeAbsoluteUrl(store, '/products/widget')).toBe(
-      'https://ebda.app/my-store/products/widget'
+      'https://my-store.ebda.app/products/widget'
     );
   });
 
-  it('omits the slug prefix for a custom-domain store (byte-identical to bare getSiteUrl + path)', () => {
+  it('roots a custom-domain store at its own domain (byte-identical to bare getSiteUrl + path)', () => {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     const store = {
       id: 'store-1',
@@ -66,8 +66,8 @@ describe('storeAbsoluteUrl', () => {
       domain: undefined,
     } as unknown as ResolvedStore;
 
-    expect(storeAbsoluteUrl(store, '')).toBe('https://ebda.app/my-store');
-    expect(storeAbsoluteUrl(store, '/')).toBe('https://ebda.app/my-store/');
+    expect(storeAbsoluteUrl(store, '')).toBe('https://my-store.ebda.app');
+    expect(storeAbsoluteUrl(store, '/')).toBe('https://my-store.ebda.app/');
   });
 });
 
@@ -106,15 +106,15 @@ describe('getSiteUrl / storeAbsoluteUrl with NEXT_PUBLIC_SITE_URL SET (productio
     );
   });
 
-  it('platform-path stores are unaffected — env var still wins, prefix still added', () => {
+  it('a store with no custom domain gets its own <slug>.ebda.app origin — the env var never wins, no path prefix', () => {
     process.env.NEXT_PUBLIC_SITE_URL = PLATFORM;
-    expect(getSiteUrl(platformPathStore)).toBe(PLATFORM);
+    expect(getSiteUrl(platformPathStore)).toBe('https://palora.ebda.app');
     expect(storeAbsoluteUrl(platformPathStore, '/products/widget')).toBe(
-      `${PLATFORM}/palora/products/widget`
+      'https://palora.ebda.app/products/widget'
     );
   });
 
-  it('store-less callers (robots.txt, master sitemap) still get the platform host', () => {
+  it('store-less callers (robots.txt, platform pages) still get the platform host', () => {
     process.env.NEXT_PUBLIC_SITE_URL = PLATFORM;
     expect(getSiteUrl()).toBe(PLATFORM);
   });

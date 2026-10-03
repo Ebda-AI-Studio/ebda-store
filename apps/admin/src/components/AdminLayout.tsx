@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { usePathname, useRouter } from 'next/navigation';
+import { storefrontOrigin } from '@force/shared';
 import { useAuth } from '../lib/auth';
 import { useStore } from '../contexts/StoreContext';
 import { useCurrentStore } from '../hooks/useCurrentStore';
@@ -246,10 +247,9 @@ export function AdminLayout({
   const viewStoreUrl = useMemo(() => {
     const domain = storeDomain || fetchedStore?.domain;
     const slug = storeSlug || fetchedStore?.slug;
+    // Custom domain, else the store's own `<slug>.ebda.app` host.
+    if (slug) return storefrontOrigin({ slug, domain });
     if (domain) return `https://${domain}`;
-    const webBase = process.env.NEXT_PUBLIC_WEB_URL;
-    if (webBase && slug) return `${webBase}/${slug}`;
-    if (webBase) return webBase;
     return null;
   }, [storeDomain, storeSlug, fetchedStore?.domain, fetchedStore?.slug]);
 

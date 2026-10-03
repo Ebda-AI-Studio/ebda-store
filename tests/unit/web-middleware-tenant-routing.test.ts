@@ -62,10 +62,12 @@ function customDomainRequest(pathname: string, init?: { cookie?: string }) {
   });
 }
 
-function platformSlugRequest(pathname: string, init?: { cookie?: string }) {
-  return new NextRequest(`https://ebda.app${pathname}`, {
+/** A request to a store's free `<slug>.ebda.app` host (default slug: palora). */
+function subdomainRequest(pathname: string, init?: { cookie?: string; slug?: string }) {
+  const host = `${init?.slug ?? 'palora'}.ebda.app`;
+  return new NextRequest(`https://${host}${pathname}`, {
     headers: {
-      host: 'ebda.app',
+      host,
       ...(init?.cookie ? { cookie: init.cookie } : {}),
     },
   });
@@ -79,14 +81,9 @@ describe('middleware — STOREFRONT_TENANT_ROUTING dark-launch gate', () => {
     expect(res.headers.get('x-middleware-rewrite')).toBeNull();
   });
 
-  it('flag unset (default): platform-slug Track-A route is NOT rewritten to tenant-store', () => {
-    const res = middleware(platformSlugRequest('/palora/products'));
-    const rewriteTarget = res.headers.get('x-middleware-rewrite');
-    // The existing slug-stripping rewrite still applies (unchanged
-    // behavior), but it must never point at the new tree.
-    if (rewriteTarget) {
-      expect(rewriteTarget).not.toContain('/tenant-store/');
-    }
+  it('flag unset (default): <slug>.ebda.app Track-A route is NOT rewritten to tenant-store', () => {
+    const res = middleware(subdomainRequest('/products'));
+    expect(res.headers.get('x-middleware-rewrite')).toBeNull();
   });
 
   it('flag on: custom-domain Track-A route (home) IS rewritten to /tenant-store/<domain>/en', () => {
@@ -117,21 +114,18 @@ describe('middleware — STOREFRONT_TENANT_ROUTING dark-launch gate', () => {
     expect(rewriteTarget).not.toContain('/tenant-store/');
   });
 
-  it('flag on: platform-slug Track-A route IS rewritten to /tenant-store/slug:<slug>/en', () => {
+  it('flag on: <slug>.ebda.app Track-A route IS rewritten to /tenant-store/<slug>.ebda.app/en', () => {
     enableAllTrackARoutes();
-    const res = middleware(platformSlugRequest('/palora/products'));
+    const res = middleware(subdomainRequest('/products'));
     const rewriteTarget = res.headers.get('x-middleware-rewrite');
-    expect(rewriteTarget).toContain(
-      `/tenant-store/${encodeURIComponent('slug:palora')}/en/products`
-    );
+    expect(rewriteTarget).toContain('/tenant-store/palora.ebda.app/en/products');
   });
 
-  it('flag on: platform subroute via the x-store-slug cookie fallback IS rewritten', () => {
+  it('flag on: a legacy x-store-slug cookie on a store host changes nothing (the host wins)', () => {
     enableAllTrackARoutes();
-    const res = middleware(platformSlugRequest('/products', { cookie: 'x-store-slug=palora' }));
-    const rewriteTarget = res.headers.get('x-middleware-rewrite');
-    expect(rewriteTarget).toContain(
-      `/tenant-store/${encodeURIComponent('slug:palora')}/en/products`
+    const res = middleware(subdomainRequest('/products', { cookie: 'x-store-slug=pecannbee' }));
+    expect(res.headers.get('x-middleware-rewrite')).toContain(
+      '/tenant-store/palora.ebda.app/en/products'
     );
   });
 
@@ -145,9 +139,7 @@ describe('middleware — STOREFRONT_TENANT_ROUTING dark-launch gate', () => {
 
   it('direct external /tenant-store/ hit is 404, flag on, platform host', () => {
     enableAllTrackARoutes();
-    const res = middleware(
-      platformSlugRequest(`/tenant-store/${encodeURIComponent('slug:palora')}/en`)
-    );
+    const res = middleware(subdomainRequest('/tenant-store/palora.ebda.app/en'));
     expect(res.status).toBe(404);
   });
 });
@@ -190,10 +182,10 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
     customDomainRequest('/products/some-product'),
     customDomainRequest('/cart'),
     customDomainRequest('/about?_preview=1'),
-    platformSlugRequest('/palora'),
-    platformSlugRequest('/palora/about'),
-    platformSlugRequest('/faq', { cookie: 'x-store-slug=palora' }),
-    platformSlugRequest('/'),
+    subdomainRequest('/'),
+    subdomainRequest('/about'),
+    subdomainRequest('/faq'),
+    new NextRequest('https://ebda.app/', { headers: { host: 'ebda.app' } }),
   ];
 
   it('main flag off: setting the list is byte-identical to not setting it', () => {
@@ -209,16 +201,11 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
 
   const TRACK_A_PATHS = ['/', '/about', '/faq', '/products', '/products/x', '/blog/y', '/terms'];
 
-  /** No request at all reaches the tenant tree: custom domain, path slug and cookie slug. */
+  /** No request at all reaches the tenant tree: custom domain and slug subdomain. */
   const expectNoRouteRewrites = () => {
     for (const path of TRACK_A_PATHS) {
       expect(rewriteOf(middleware(customDomainRequest(path)))).not.toContain('/tenant-store/');
-      expect(rewriteOf(middleware(platformSlugRequest(`/palora${path}`)))).not.toContain(
-        '/tenant-store/'
-      );
-      expect(
-        rewriteOf(middleware(platformSlugRequest(path, { cookie: 'x-store-slug=palora' })))
-      ).not.toContain('/tenant-store/');
+      expect(rewriteOf(middleware(subdomainRequest(path)))).not.toContain('/tenant-store/');
     }
   };
 
@@ -288,22 +275,21 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
     }
   });
 
-  it('main flag on + list "about,faq": platform slug + cookie paths honour the list too', () => {
+  it('main flag on + list "about,faq": <slug>.ebda.app honours the list too', () => {
     process.env.STOREFRONT_TENANT_ROUTING = 'true';
     process.env.STOREFRONT_TENANT_ROUTING_ROUTES = 'about,faq';
-    const slugKey = encodeURIComponent('slug:palora');
-    expect(rewriteOf(middleware(platformSlugRequest('/palora/about')))).toContain(
+    const slugKey = 'palora.ebda.app';
+    expect(rewriteOf(middleware(subdomainRequest('/about')))).toContain(
       `/tenant-store/${slugKey}/en/about`
     );
-    expect(
-      rewriteOf(middleware(platformSlugRequest('/faq', { cookie: 'x-store-slug=palora' })))
-    ).toContain(`/tenant-store/${slugKey}/en/faq`);
-    // Home + PLP on the platform host keep today's slug-stripping rewrite.
-    const home = rewriteOf(middleware(platformSlugRequest('/palora')));
+    expect(rewriteOf(middleware(subdomainRequest('/faq')))).toContain(
+      `/tenant-store/${slugKey}/en/faq`
+    );
+    // Home + PLP are not on the list, so they stay on the header-based path.
+    const home = rewriteOf(middleware(subdomainRequest('/')));
     expect(home).not.toContain('/tenant-store/');
-    const plp = rewriteOf(middleware(platformSlugRequest('/palora/products')));
+    const plp = rewriteOf(middleware(subdomainRequest('/products')));
     expect(plp).not.toContain('/tenant-store/');
-    expect(new URL(plp).pathname).toBe('/products');
   });
 
   it('list "home" enables only the bare root', () => {
@@ -340,7 +326,7 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_ROUTES canary list', () => {
  */
 describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', () => {
   const rewriteOf = (res: Response) => res.headers.get('x-middleware-rewrite') ?? '';
-  const PALORA_KEY = encodeURIComponent('slug:palora');
+  const PALORA_KEY = 'palora.ebda.app';
 
   const pecannbeeRequest = (pathname: string) =>
     new NextRequest(`https://pecannbee.com.kw${pathname}`, {
@@ -352,17 +338,13 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
     });
 
   const paloraRewrites = () =>
-    rewriteOf(middleware(platformSlugRequest('/palora/about'))).includes(
-      `/tenant-store/${PALORA_KEY}/`
-    );
+    rewriteOf(middleware(subdomainRequest('/about'))).includes(`/tenant-store/${PALORA_KEY}/`);
   const pecannbeeRewrites = () =>
     rewriteOf(middleware(pecannbeeRequest('/about'))).includes('/tenant-store/');
   const wadyaljuzRewrites = () =>
     rewriteOf(middleware(customDomainRequest('/about'))).includes('/tenant-store/');
   const paloraCookieRewrites = () =>
-    rewriteOf(middleware(platformSlugRequest('/faq', { cookie: 'x-store-slug=palora' }))).includes(
-      '/tenant-store/'
-    );
+    rewriteOf(middleware(subdomainRequest('/faq'))).includes('/tenant-store/');
 
   beforeEach(() => {
     process.env.STOREFRONT_TENANT_ROUTING = 'true';
@@ -412,7 +394,7 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
 
   it('store list "palora": palora rewrites on the path and cookie paths (positive control)', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
-    expect(rewriteOf(middleware(platformSlugRequest('/palora/about')))).toContain(
+    expect(rewriteOf(middleware(subdomainRequest('/about')))).toContain(
       `/tenant-store/${PALORA_KEY}/en/about`
     );
     expect(paloraCookieRewrites()).toBe(true);
@@ -427,12 +409,12 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
 
   it('store list "palora": other platform slugs do NOT rewrite', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
-    expect(rewriteOf(middleware(platformSlugRequest('/someoneelse/about')))).not.toContain(
+    expect(
+      rewriteOf(middleware(subdomainRequest('/about', { slug: 'someoneelse' })))
+    ).not.toContain('/tenant-store/');
+    expect(rewriteOf(middleware(subdomainRequest('/faq', { slug: 'someoneelse' })))).not.toContain(
       '/tenant-store/'
     );
-    expect(
-      rewriteOf(middleware(platformSlugRequest('/faq', { cookie: 'x-store-slug=someoneelse' })))
-    ).not.toContain('/tenant-store/');
   });
 
   it('a custom domain is allowlisted by its hostname, case normalized', () => {
@@ -453,9 +435,7 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
 
   it('the store list cannot widen the route list: an unlisted route stays unrewritten', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
-    expect(rewriteOf(middleware(platformSlugRequest('/palora/products')))).not.toContain(
-      '/tenant-store/'
-    );
+    expect(rewriteOf(middleware(subdomainRequest('/products')))).not.toContain('/tenant-store/');
   });
 
   it('main flag off: a listed store still rewrites nothing', () => {
@@ -466,7 +446,7 @@ describe('middleware — STOREFRONT_TENANT_ROUTING_STORES allowlist (TRC-6)', ()
 
   it('the preview iframe still bypasses a listed store', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora';
-    expect(rewriteOf(middleware(platformSlugRequest('/palora/about?_preview=1')))).not.toContain(
+    expect(rewriteOf(middleware(subdomainRequest('/about?_preview=1')))).not.toContain(
       '/tenant-store/'
     );
   });
@@ -491,7 +471,7 @@ describe('middleware — store default locale in the route key (issue 2419)', ()
 
   it('AR-default store, no cookie: the route carries ar (platform path)', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar';
-    expect(localeOf(middleware(platformSlugRequest('/palora/about')))).toBe('ar');
+    expect(localeOf(middleware(subdomainRequest('/about')))).toBe('ar');
   });
 
   it('AR-default store, no cookie: the route carries ar (custom domain)', () => {
@@ -501,9 +481,7 @@ describe('middleware — store default locale in the route key (issue 2419)', ()
 
   it('AR-default store, no cookie: the route carries ar (x-store-slug cookie path)', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar';
-    expect(
-      localeOf(middleware(platformSlugRequest('/faq', { cookie: 'x-store-slug=palora' })))
-    ).toBe('ar');
+    expect(localeOf(middleware(subdomainRequest('/faq')))).toBe('ar');
   });
 
   it('AR-default store, force-language=en: the cookie wins, the route carries en', () => {
@@ -535,7 +513,7 @@ describe('middleware — store default locale in the route key (issue 2419)', ()
   it('the default belongs to ITS store: another listed store keeps en', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar,wadyaljuz.com';
     expect(localeOf(middleware(customDomainRequest('/about')))).toBe('en');
-    expect(localeOf(middleware(platformSlugRequest('/palora/about')))).toBe('ar');
+    expect(localeOf(middleware(subdomainRequest('/about')))).toBe('ar');
   });
 
   it.each(['palora:fr', 'palora:ar:en', 'palora:', 'all:ar', 'palora:AR ,pecannbee.com.kw:xx'])(
@@ -543,7 +521,7 @@ describe('middleware — store default locale in the route key (issue 2419)', ()
     raw => {
       process.env.STOREFRONT_TENANT_ROUTING_STORES = raw;
       expect(
-        middleware(platformSlugRequest('/palora/about')).headers.get('x-middleware-rewrite')
+        middleware(subdomainRequest('/about')).headers.get('x-middleware-rewrite') ?? ''
       ).not.toContain('/tenant-store/');
     }
   );
@@ -551,7 +529,7 @@ describe('middleware — store default locale in the route key (issue 2419)', ()
   it('main flag off: a store declared :ar rewrites nothing (parity with no declaration)', () => {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = 'palora:ar';
     delete process.env.STOREFRONT_TENANT_ROUTING;
-    const res = middleware(platformSlugRequest('/palora/about'));
+    const res = middleware(subdomainRequest('/about'));
     expect(res.headers.get('x-middleware-rewrite') ?? '').not.toContain('/tenant-store/');
   });
 });

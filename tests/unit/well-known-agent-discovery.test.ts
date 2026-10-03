@@ -24,6 +24,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const headerBag = {
+  // Store identity is the Host alone: middleware sets `x-store-domain` to the
+  // request host (`<slug>.ebda.app` or a custom domain); `slug` is a retired
+  // header kept here only to prove it is ignored.
   slug: null as string | null,
   domain: null as string | null,
   host: 'ebda.app',
@@ -84,9 +87,9 @@ const body = async (res: Response) => JSON.parse(await res.text());
 
 beforeEach(() => {
   vi.clearAllMocks();
-  headerBag.slug = 'pecanbee';
-  headerBag.domain = null;
-  headerBag.host = 'ebda.app';
+  headerBag.slug = null;
+  headerBag.domain = 'pecanbee.ebda.app';
+  headerBag.host = 'pecanbee.ebda.app';
   headerBag.slugSource = null;
 });
 
@@ -135,7 +138,8 @@ describe('acp.json', () => {
   });
 
   it('404s a platform-level request — the platform is not a shop', async () => {
-    headerBag.slug = null;
+    headerBag.domain = null;
+    headerBag.host = 'ebda.app';
     expect((await acpGet()).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -146,7 +150,7 @@ describe('acp.json', () => {
     bodies.push(await (await acpGet()).text());
     mockStore({ status: 'suspended' });
     bodies.push(await (await acpGet()).text());
-    headerBag.slug = null;
+    headerBag.domain = null;
     bodies.push(await (await acpGet()).text());
     expect(new Set(bodies).size).toBe(1);
   });
@@ -162,10 +166,18 @@ describe('acp.json', () => {
     expect(b.endpoints.llms_txt).toBe('https://wadyaljuz.com/llms.txt');
   });
 
-  it('roots URLs under the platform path for a store with no domain', async () => {
+  it('roots URLs at <slug>.ebda.app for a store with no custom domain (never a path on the apex)', async () => {
     mockStore({ slug: 'pecanbee', domain: null });
     const b = await body(await acpGet());
-    expect(b.merchant.url).toBe('https://ebda.app/pecanbee');
+    expect(b.merchant.url).toBe('https://pecanbee.ebda.app');
+    expect(b.endpoints.llms_txt).toBe('https://pecanbee.ebda.app/llms.txt');
+  });
+
+  it('ignores a retired x-store-slug header: it never names a store', async () => {
+    headerBag.domain = null;
+    headerBag.slug = 'pecanbee';
+    mockStore();
+    expect((await acpGet()).status).toBe(404);
   });
 
   it('does not advertise returns — there is no agent-facing tool for them', async () => {
@@ -174,14 +186,14 @@ describe('acp.json', () => {
     expect(b.capabilities.returns).toBe(false);
   });
 
-  it('is cached briefly and shared-cacheable when resolved from the URL slug', async () => {
+  it('is cached briefly and shared-cacheable when resolved from the Host', async () => {
     mockStore();
     const res = await acpGet();
     expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
     expect(res.headers.get('vary')).toBe('Cookie');
   });
 
-  it('stays shared-cacheable on a custom domain (the 3 live stores) — same as URL slug', async () => {
+  it('stays shared-cacheable on a custom domain (the 3 live stores) — same as a store subdomain', async () => {
     headerBag.slug = null;
     headerBag.domain = 'wadyaljuz.com';
     headerBag.host = 'wadyaljuz.com';
@@ -198,7 +210,6 @@ describe('acp.json', () => {
     // from replaying this response across visitors (edge-cache.ts), so the
     // response must not authorize shared caching at all (scoped-audit P2 on
     // PR #1942).
-    headerBag.slug = 'pecanbee';
     headerBag.slugSource = 'cookie';
     mockStore();
     const res = await acpGet();
@@ -256,7 +267,7 @@ describe('ucp', () => {
     expect(b.documents.acp).toBe('https://wadyaljuz.com/.well-known/acp.json');
   });
 
-  it('is shared-cacheable when resolved from the URL slug, same as acp.json', async () => {
+  it('is shared-cacheable when resolved from the Host, same as acp.json', async () => {
     mockStore();
     const res = await ucpGet();
     expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
@@ -274,7 +285,6 @@ describe('ucp', () => {
   });
 
   it('drops shared-cacheability when resolved via the sticky cookie fallback', async () => {
-    headerBag.slug = 'pecanbee';
     headerBag.slugSource = 'cookie';
     mockStore();
     const res = await ucpGet();

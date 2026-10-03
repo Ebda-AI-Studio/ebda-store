@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
 import {
   resolveAgentStore,
@@ -40,8 +39,7 @@ export async function GET() {
   // "no such store" from "store exists, agent checkout off" on either path.
   if (!store.enabledFeatures?.includes('agent_checkout')) return notFound();
 
-  const h = await headers();
-  const base = storefrontBaseUrl(store, h.get('host'));
+  const base = storefrontBaseUrl(store);
   const viaCookie = await resolvedViaCookie();
 
   const body = {
@@ -92,10 +90,9 @@ export async function GET() {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      // See acp.json: resolved only from URL slug / custom-domain Host
-      // (middleware.ts URL_KEYED_PUBLIC_PATHS, #1959 — the load-bearing
-      // control). The `viaCookie → private` branch is an unreachable second
-      // line of defence (#2174).
+      // See acp.json: resolved only from the request Host (`<slug>.ebda.app`
+      // or custom domain), so the URL keys the answer. The `viaCookie →
+      // private` branch is a retired second line of defence.
       'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },
