@@ -238,7 +238,9 @@ describe.skipIf(!hasDb)('flatten-single-variant-products script', () => {
     );
     expect(applied.status).toBe('flattened');
     const snap = (applied as { backup: typeof stale }).backup;
-    expect(snap.orderItemIds.sort()).toEqual([s.orderItemId, late.id].sort());
+    // Sort a COPY: `.sort()` is in place, and mutating `snap` made the next line
+    // compare the DB-ordered snapshot against a re-sorted one (order-dependent flake).
+    expect([...snap.orderItemIds].sort()).toEqual([s.orderItemId, late.id].sort());
     expect(persisted).toEqual(JSON.parse(JSON.stringify(snap))); // handed out before the writes
 
     const p = await readProduct(s.productId);
