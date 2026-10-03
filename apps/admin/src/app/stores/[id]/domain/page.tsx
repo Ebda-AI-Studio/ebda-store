@@ -34,6 +34,7 @@ export default function StoreDomainPage() {
     domain: string;
     verified: boolean;
     misconfigured: boolean;
+    claimStatus?: 'pending' | 'active' | 'failed' | null;
     dnsRecords: Array<{
       type: string;
       name: string;
@@ -49,14 +50,19 @@ export default function StoreDomainPage() {
   // loop) can branch on the live response without dealing with React's
   // state-update timing. Side effect: also pushes the data into local
   // state so the UI re-renders.
+  // The hostname being worked on: an unverified claim, else the verified domain.
+  const claimed = store?.pendingDomain ?? store?.domain ?? null;
+  const claimStatus = store?.domainStatus ?? null;
+
   const checkDns = useCallback(async () => {
-    if (!store?.domain) return null;
+    if (!claimed) return null;
     setIsChecking(true);
     try {
       const { data } = await apiGet<{
         domain: string;
         verified: boolean;
         misconfigured: boolean;
+        claimStatus?: 'pending' | 'active' | 'failed' | null;
         dnsRecords: Array<{
           type: string;
           name: string;
@@ -66,7 +72,14 @@ export default function StoreDomainPage() {
         }>;
         emailSender?: { domainId: string | null; status: string | null; verifiedAt: string | null };
       }>(`/api/v1/stores/${storeId}/domain`);
-      if (data) setDomainStatus(data);
+      if (data) {
+        setDomainStatus(data);
+        // The status read promotes a verified claim server-side: pick up the new
+        // `domain` / `domainStatus` so the page flips from "pending" to live.
+        if (data.claimStatus === 'active' && store?.domainStatus === 'pending') {
+          void refetchStore();
+        }
+      }
       return data ?? null;
     } catch {
       // non-critical
@@ -74,11 +87,18 @@ export default function StoreDomainPage() {
     } finally {
       setIsChecking(false);
     }
-  }, [store?.domain, storeId]);
+  }, [claimed, storeId, store?.domainStatus, refetchStore]);
 
   useEffect(() => {
-    if (store?.domain) checkDns();
-  }, [store?.domain, checkDns]);
+    if (claimed) checkDns();
+  }, [claimed, checkDns]);
+
+  // While a claim is pending, re-check every 30s (DCV usually lands within minutes).
+  useEffect(() => {
+    if (claimStatus !== 'pending') return;
+    const timer = setInterval(() => void checkDns(), 30_000);
+    return () => clearInterval(timer);
+  }, [claimStatus, checkDns]);
 
   async function handleSaveDomain() {
     const trimmed = newDomain.trim().toLowerCase();
@@ -220,7 +240,7 @@ export default function StoreDomainPage() {
     );
   }
 
-  const domain = store.domain;
+  const domain = claimed ?? undefined;
 
   const senderPreview = (() => {
     const name = store?.name ?? '';
@@ -241,6 +261,21 @@ export default function StoreDomainPage() {
           <h1 className="text-2xl font-bold text-foreground">{t('heading')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
+
+        {(claimStatus === 'pending' || claimStatus === 'failed') && domain && (
+          <div
+            role="status"
+            className={`mb-4 rounded-lg border p-3 text-sm ${
+              claimStatus === 'failed'
+                ? 'border-destructive/30 bg-destructive/10 text-destructive-ink'
+                : 'border-warning/30 bg-warning/10 text-foreground'
+            }`}
+          >
+            {claimStatus === 'failed'
+              ? t('claimFailed', { domain })
+              : t('claimPending', { domain })}
+          </div>
+        )}
 
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex items-center justify-between border-b p-4">

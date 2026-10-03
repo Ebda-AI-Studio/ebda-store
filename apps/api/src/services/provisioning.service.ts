@@ -203,6 +203,8 @@ export class ProvisioningService {
             name: storeName,
             slug,
             domain,
+            // Operator-assigned (super_admin) domains are trusted: active at once.
+            ...(domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
             domainProvider: input.domainProvider ?? null,
             ...(storeNameAr ? { nameAr: storeNameAr } : {}),
             ownerId: owner.id,

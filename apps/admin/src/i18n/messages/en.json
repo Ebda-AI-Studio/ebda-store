@@ -5052,6 +5052,8 @@
       "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
       "checkDns": "Check DNS",
       "checkingDns": "Checking...",
+      "claimPending": "We are waiting for DNS verification of {domain}. Add the DNS records below; it is not live yet. A claim that is not verified within 72 hours is released automatically.",
+      "claimFailed": "We could not verify {domain}. Check the DNS records below and save the domain again. An unverified claim is released automatically after 72 hours.",
       "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
       "noDomain": "No custom domain configured. This store is accessible via its default subdomain.",
       "dnsTableLabel": "DNS records",

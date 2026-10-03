@@ -33,8 +33,19 @@ export function storeLookupForHost(rawHost: string | null | undefined): StoreHos
 /** Prisma `where` fragment selecting the store a host belongs to, or `null`. */
 export function storeWhereForHost(
   rawHost: string | null | undefined
-): { slug: string } | { domain: string } | null {
+): { slug: string } | { domain: string; domainStatus: 'active' } | null {
   const lookup = storeLookupForHost(rawHost);
   if (!lookup) return null;
-  return lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain };
+  return lookup.by === 'slug' ? { slug: lookup.slug } : storeDomainWhere(lookup.domain);
+}
+
+/**
+ * The ONLY `where` that may select a store by custom domain: the domain must be
+ * VERIFIED (`domainStatus: 'active'`). An unverified claim lives in
+ * `pendingDomain` and never matches here, so a squatter's claim of someone
+ * else's domain can neither resolve a storefront nor be CORS-trusted
+ * (SP5 task 4). Every domain -> store lookup goes through this.
+ */
+export function storeDomainWhere(domain: string): { domain: string; domainStatus: 'active' } {
+  return { domain, domainStatus: 'active' };
 }

@@ -21,6 +21,7 @@ import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { assertPlanAllows, assertWithinLimit } from './plan-limit.service';
+import { storeDomainWhere } from '../lib/store-host';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 
 /**
@@ -335,7 +336,11 @@ export class StoreService {
       data: {
         name: data.name,
         slug,
+        // Reachable only for a super_admin (the routes drop `domain` for anyone
+        // else): an operator-assigned domain is trusted, so it starts `active`.
+        // Merchants claim a domain through PUT /stores/:id/domain (pending).
         domain: data.domain,
+        ...(data.domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
         ownerId,
         settings: data.settings || {
           currency: REGION.currency,
@@ -442,6 +447,9 @@ export class StoreService {
         name: data.name,
         slug: data.slug,
         domain: data.domain,
+        ...(data.domain && data.domain !== store.domain
+          ? { domainStatus: 'active', domainVerifiedAt: new Date(), pendingDomain: null }
+          : {}),
         settings: mergedSettings,
         ...(data.heroTitle !== undefined && { heroTitle: data.heroTitle }),
         ...(data.heroTitleAr !== undefined && { heroTitleAr: data.heroTitleAr }),
@@ -751,8 +759,10 @@ export class StoreService {
       );
     }
 
-    const store = await prisma.store.findUnique({
-      where: { domain },
+    // VERIFIED domains only (domainStatus 'active'): an unverified claim is
+    // never a storefront (SP5 task 4).
+    const store = await prisma.store.findFirst({
+      where: storeDomainWhere(domain),
       include: {
         _count: { select: { products: true, categories: true } },
       },

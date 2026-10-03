@@ -111,9 +111,16 @@ export class CloudflareDomainService {
       const ch = await this.findByHostname(domain);
       if (!ch) return null;
       const verified = ch.status === 'active' && ch.ssl?.status === 'active';
+      // Terminal provider states: the hostname was blocked/moved/deleted, or
+      // DCV / issuance timed out. Anything else (pending_validation, …) is "not yet".
+      const failed =
+        !verified &&
+        (['blocked', 'moved', 'deleted'].includes(ch.status) ||
+          /_timed_out$/.test(ch.ssl?.status ?? ''));
       return {
         domain,
         verified,
+        failed,
         misconfigured: !verified,
         // Cloudflare-for-SaaS: one CNAME from the merchant's hostname to our zone target.
         dnsRecords: [{ type: 'CNAME', name: domain, value: config.cfFallbackOrigin }],

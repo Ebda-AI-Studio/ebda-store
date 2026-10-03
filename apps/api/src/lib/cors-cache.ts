@@ -2,7 +2,7 @@
 // index.ts (which sets up CORS) and store.routes.ts (which needs to bust the cache).
 import { BoundedMap } from './bounded-map';
 import { BRAND, brandUrl } from '@force/shared';
-import { storeLookupForHost } from './store-host';
+import { storeDomainWhere, storeLookupForHost } from './store-host';
 
 // Capped so a pathological stream of unknown domains (e.g. bot traffic
 // probing random hostnames) can never grow the Map without limit.
@@ -145,7 +145,7 @@ export function decideAfterFailedLookup(
  */
 export function corsCustomDomainWhere(hostname: string) {
   return {
-    domain: hostname,
+    ...storeDomainWhere(hostname),
     status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },
     deletedAt: null,
   };
@@ -169,7 +169,9 @@ export function corsStoreOriginWhere(rawHost: string) {
   return {
     cacheKey: lookup.cacheHost,
     where:
-      lookup.by === 'slug' ? { slug: lookup.slug, ...live } : { domain: lookup.domain, ...live },
+      lookup.by === 'slug'
+        ? { slug: lookup.slug, ...live }
+        : { ...storeDomainWhere(lookup.domain), ...live },
   };
 }
 
