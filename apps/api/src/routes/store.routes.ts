@@ -17,8 +17,6 @@ import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
 import { assertWithinLimit } from '../services/plan-limit.service';
-import { bustCorsCache } from '../lib/cors-cache';
-import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
 import {
   isSafeUrl,

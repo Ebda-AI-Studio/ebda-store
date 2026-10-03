@@ -18,7 +18,7 @@
  * claim-override) is a false-positive tax on real merchants.
  */
 export const PROTECTED_BRAND_NAMES: readonly string[] = [
-  // Ebda / Whisky 11 / Force AI (the platform and its operator)
+  // Ebda / Whisky 11 (the platform and its operator)
   'ebda',
   'ebdaapp',
   'ebdaeg',
@@ -30,8 +30,6 @@ export const PROTECTED_BRAND_NAMES: readonly string[] = [
   'whisky-11',
   'whisky',
   'whiskyeleven',
-  'forceai',
-  'force-ai',
   'forcemedia',
   'forcewebsitebuilder',
   // Payments, wallets, fintech

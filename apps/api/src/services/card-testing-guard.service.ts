@@ -204,7 +204,10 @@ export class CardTestingGuard {
       }).catch(() => undefined);
       return { counted: true, alerted: true };
     } catch (err) {
-      logger.warn({ err, ...input }, 'card-testing: recording a decline failed');
+      logger.warn(
+        { err, storeId: input.storeId, orderId: input.orderId, paymentId: input.paymentId },
+        'card-testing: recording a decline failed'
+      );
       return { counted: false, alerted: false };
     }
   }
