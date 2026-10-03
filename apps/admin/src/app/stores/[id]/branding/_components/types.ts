@@ -133,6 +133,10 @@ export interface StoreTheme {
    * Locations. Mirrors the @force/shared StoreTheme field. 2026-09-25 (B3).
    */
   showBranchesInFooter?: boolean;
+  /** Free-tier wa.me toggles (SP8); unset = ON when the store has a number. */
+  waMeProductShare?: boolean;
+  waMeOrderQuestion?: boolean;
+  waMeCodConfirm?: boolean;
 }
 
 export interface StoreBranding {

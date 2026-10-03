@@ -13,6 +13,7 @@ import {
   formatDateTime as formatStoreDateTime,
 } from '@/lib/format-date';
 import { groupOrderLinesForDisplay, orderTaxPlacement } from '@force/shared';
+import { WaMeOrderQuestionButton } from '../../../../templates/shared/WaMeButtons';
 
 interface OrderDetail {
   id: string;
@@ -380,6 +381,8 @@ export default function OrderDetailClient() {
           </span>
         </div>
       </div>
+
+      <WaMeOrderQuestionButton orderNumber={order.orderNumber} className="self-start" />
 
       {/* Timeline info */}
       {(order.shippedAt || order.deliveredAt) && (

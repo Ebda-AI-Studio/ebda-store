@@ -911,7 +911,8 @@ export class StoreService {
       email?: string;
       phone?: string;
       phoneAr?: string;
-      whatsapp?: string;
+      /** E.164 Egyptian mobile; `null` clears it. */
+      whatsapp?: string | null;
       address?: string;
       addressAr?: string;
       /** Phase D.6 — WhatsApp bot "Locations & Hours" branch */

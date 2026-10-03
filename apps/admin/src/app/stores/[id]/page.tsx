@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, useToast } from '@force/ui';
+import { resolveDefaultLanguage } from '@force/shared';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
 import { apiDelete } from '../../../lib/api';
@@ -125,7 +126,14 @@ export default function StoreDetailPage() {
         </div>
       }
     >
-      <SetupGuideCard storeId={store.id} storeUrl={getStoreHref(store)} />
+      <SetupGuideCard
+        storeId={store.id}
+        storeUrl={getStoreHref(store)}
+        storeName={store.name}
+        locale={resolveDefaultLanguage(
+          (store.settings as { defaultLanguage?: string } | undefined)?.defaultLanguage
+        )}
+      />
 
       <StatsGrid storeId={store.id} />
 

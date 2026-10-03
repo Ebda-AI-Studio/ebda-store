@@ -63,9 +63,3 @@ export interface SetupGuideState {
 export function isSetupGuideKey(v: unknown): v is SetupGuideKey {
   return typeof v === 'string' && (SETUP_GUIDE_KEYS as readonly string[]).includes(v);
 }
-
-/** `wa.me` share link for the storefront (SP8 replaces this with the full flow). */
-export function whatsappShareUrl(storeUrl: string, text?: string): string {
-  const body = text ? `${text} ${storeUrl}` : storeUrl;
-  return `https://wa.me/?text=${encodeURIComponent(body)}`;
-}

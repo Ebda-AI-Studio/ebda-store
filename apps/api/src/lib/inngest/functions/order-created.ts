@@ -168,6 +168,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       promotionNameAr: order.appliedPromotion?.nameAr ?? undefined,
       total: order.total,
       shippingAddress: shippingAddress as OrderEmailData['shippingAddress'],
+      isCod: (paymentMethod || '').toLowerCase() === 'cod',
     };
 
     const store = await step.run('load-store', () =>

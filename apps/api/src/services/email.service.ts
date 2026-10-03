@@ -12,6 +12,7 @@ import { emailVerificationTemplate } from './email-templates/email-verification'
 import { resendVerificationTemplate } from './email-templates/resend-verification';
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from './email-templates/order-confirmation';
+import { buildOrderEmailWaMe } from './email-templates/_wa-me';
 import { emailMoney } from './email-templates/_util';
 import {
   EMAIL_COLORS,
@@ -248,6 +249,10 @@ export interface OrderEmailData {
     postalCode: string;
     country: string;
   };
+  /** Cash-on-delivery order — drives the "Confirm on WhatsApp" prompt. */
+  isCod?: boolean;
+  /** Free-tier `wa.me` link (set by `sendOrderConfirmation`; absent without a store number). */
+  waMe?: { url: string; kind: 'cod_confirm' | 'order_question' };
 }
 
 export interface OrderRefundEmailData {
@@ -442,7 +447,7 @@ export class EmailService {
   ): Promise<void> {
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { name: true, settings: true },
+      select: { name: true, nameAr: true, settings: true, whatsapp: true, theme: true },
     });
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
@@ -450,8 +455,10 @@ export class EmailService {
       resolveDefaultLanguage(
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
-    const subject = orderConfirmationTemplate.subject[lang](data, store.name);
-    const content = orderConfirmationTemplate[lang](data, store.name);
+    // Free-tier wa.me link (no API): only when the store has a valid number.
+    const withWaMe: OrderEmailData = { ...data, waMe: buildOrderEmailWaMe(data, store, lang) };
+    const subject = orderConfirmationTemplate.subject[lang](withWaMe, store.name);
+    const content = orderConfirmationTemplate[lang](withWaMe, store.name);
     await this.sendForStore(
       storeId,
       { to: data.customerEmail, subject, content, language: lang },
