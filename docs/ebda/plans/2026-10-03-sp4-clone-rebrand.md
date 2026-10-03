@@ -1,0 +1,17 @@
+# SP4 — Clone, rebrand, Egypt base, hosts, backend Stage 1 (task plan, 2026-10-03)
+
+Integration branch `claude/ebda-sp4` (PR → `main`). Each task runs in its own worktree/branch, is merged into the integration branch by the orchestrator, and gets Opus review for tenancy and money. At most 2 Sonnet agents run in parallel.
+
+| # | Task | Branch | Model | Depends |
+|---|---|---|---|---|
+| 0 | Fork scaffold: docs, spike, rulings, drop FWB deploy/cron workflows | (done) `55bdc443` | — | — |
+| 1 | Brand config `packages/shared/src/brand` + rebrand visible strings, domains, logos, emails; twin paths doc + `scripts/twin-diff.sh`; "no FWB branding" CI test; fix tests pinned to deleted workflows | `claude/sp4-rebrand` | Sonnet | 0 |
+| 2 | Region config `packages/shared/src/region` (EGP, 100 minor units, VAT 14% after discount, ar-EG, Africa/Cairo, +20 phones, governorates); replace hard-coded fils/KWD/Kuwait logic; piastre rounding tests | `claude/sp4-egypt` | Sonnet; Opus money review | 0 |
+| 3 | Reserved slugs (shared list) + host resolver (`<slug>.ebda.app`, custom domains, unknown → 404) in API + storefront middleware; cache keys include host; cross-tenant cache test | `claude/sp4-hosts` | Sonnet; Opus tenancy review | 1 |
+| 4 | Nile login animation on admin `/login` (reduced-motion aware) | `claude/sp4-login` | Sonnet | 1 |
+| 5 | Backend Stage 1a: Prisma driver adapter + `engineType="client"`, per-request client via ALS, strict RLS migration for every tenant table, `ebda_app` role, definer functions replacing `app.bypass_rls` | `claude/sp4-db` | Sonnet; Opus tenancy review | 2 |
+| 6 | Backend Stage 1b: API Worker shell (`httpServerHandler`), Redis groups → DO/KV/Rate Limiting/Queues, timers → cron, socket.io → DO, sharp/multer/Sentry/pino swaps; concurrency exit test (200 mixed requests, 0 errors, 0 leaks) | `claude/sp4-worker` | Sonnet | 5 |
+| 7 | Parity harness `--api-url` mode + provider base-URL override; run against `wrangler dev` | `claude/sp4-parity` | Sonnet | 6 |
+| 8 | Amelia Aurum catalogue CSV import → local `amelia.ebda.app` equivalent | `claude/sp4-amelia` | Sonnet | 3, 6 |
+
+Done when: Amelia's catalogue is served at the local `amelia` host through the Worker, parity is green, and the no-FWB-branding test passes (per program plan §5 SP4).
