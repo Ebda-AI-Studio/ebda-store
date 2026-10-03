@@ -55,7 +55,7 @@ import { AuthService } from '@api/services/auth.service';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
 import { verifySmsOptOutToken, SMS_OPT_OUT_TOKEN_LENGTH } from '@api/lib/sms-consent';
-import { config } from '@api/config';
+import { storefrontOrigin } from '@force/shared';
 import { cartSessionId } from '../helpers/bundle-fixtures';
 
 const hasDb =
@@ -202,7 +202,9 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     const slug = (await withRlsBypass(tx =>
       tx.store.findUnique({ where: { id: storeId }, select: { slug: true } })
     ))!.slug;
-    expect(text.endsWith(` Stop offers: ${config.webUrl}/${slug}/sms-unsubscribe?t=${m![1]}`)).toBe(
+    expect(
+      text.endsWith(` Stop offers: ${storefrontOrigin({ slug })}/sms-unsubscribe?t=${m![1]}`)
+    ).toBe(
       true
     );
     const consentId = verifySmsOptOutToken(m![1]);
@@ -592,8 +594,13 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
       storeId,
     });
     const link = (p: string) => (promoSentTo(p)[0][0] as any).messageText as string;
-    expect(link(p1)).toContain(`${config.webUrl}/`);
-    expect(link(p2)).toContain(`${config.webUrl}/`);
+    // Ebda: a store with no custom domain is served at `https://<slug>.ebda.app`.
+    const { slug } = (await withRlsBypass(tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { slug: true } })
+    ))!;
+    const slugOrigin = storefrontOrigin({ slug });
+    expect(link(p1)).toContain(`${slugOrigin}/sms-unsubscribe?t=`);
+    expect(link(p2)).toContain(`${slugOrigin}/sms-unsubscribe?t=`);
     expect(link(p2)).not.toContain(domain);
 
     // Once the cache is cold, the new domain is used.
