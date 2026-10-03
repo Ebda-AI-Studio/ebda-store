@@ -24,6 +24,7 @@ import {
   deriveBrandRoles,
   colorToHslTriplet,
   statusInkVars,
+  BRAND,
 } from '@force/shared';
 
 /**
@@ -219,7 +220,7 @@ interface StoreContextValue {
    */
   draftSettings: Record<string, unknown> | null;
   /**
-   * Whether the current request is on a platform host (`store.force-ai.co`,
+   * Whether the current request is on a platform host (`ebda.app`,
    * `localhost`, etc.) rather than a merchant's custom domain — see
    * `lib/platform-host.ts`. Seeded server-side from the `x-is-platform`
    * header middleware already sets (`layout.tsx`), so the FIRST render
@@ -238,8 +239,8 @@ const StoreContext = createContext<StoreContextValue | null>(null);
  */
 const DEFAULT_STORE: StoreData = {
   id: 'demo',
-  name: 'Force',
-  nameAr: 'فورس',
+  name: BRAND.name,
+  nameAr: BRAND.nameAr,
   slug: 'demo',
   status: 'active',
   currency: 'KWD',
@@ -519,7 +520,7 @@ export function useStoreUrl() {
 }
 
 /**
- * Whether this request is on a platform host (`store.force-ai.co`,
+ * Whether this request is on a platform host (`ebda.app`,
  * `localhost`, a preview subdomain) rather than a merchant's custom domain.
  *
  * Exposed separately from `useStoreUrl()` (rather than changing that hook's

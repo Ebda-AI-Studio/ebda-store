@@ -2,7 +2,7 @@ import type { Response } from 'express';
 
 /**
  * Apply CDN-friendly Cache-Control + Vary headers so whatever edge/CDN sits
- * in front of the API (`api.force-ai.co`, Railway-hosted) can cache public
+ * in front of the API (`api.ebda.app`, Railway-hosted) can cache public
  * read responses. Storefront reads are tenant-scoped via `x-store-id` OR
  * `x-store-domain` (`getStoreIdFromRequest` falls back to the domain header,
  * and the storefront's feed proxy sends ONLY `x-store-domain` for
@@ -20,7 +20,7 @@ import type { Response } from 'express';
  * roughly `sMaxAge` because the API also calls `invalidateCached(...)`
  * on writes (Redis L1 layer); the edge L2 just respects the TTL — IF
  * something in front of the API actually honors `Cache-Control`. VERIFIED
- * 2026-09-02: `api.force-ai.co` IS Cloudflare-proxied (live response carries
+ * 2026-09-02: `api.ebda.app` IS Cloudflare-proxied (live response carries
  * `server: cloudflare` + `cf-ray`), but `cf-cache-status: DYNAMIC` — CF does
  * not cache these JSON responses without an explicit cache rule, so today
  * these headers are honored-but-inert.

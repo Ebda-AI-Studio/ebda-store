@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LangToggle } from '@/components/LangToggle';
+import { BRAND } from '@force/shared';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -110,7 +111,7 @@ export default function LoginPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.svg"
-              alt="Force AI Store"
+              alt={BRAND.name}
               className="mx-auto mb-4 h-14 w-auto"
               width={64}
               height={54}

@@ -1,8 +1,8 @@
 /**
- * Order WhatsApp Notify — Force AI Store ↔ WBS Bridge
+ * Order WhatsApp Notify — Ebda ↔ WBS Bridge
  *
  * Fires on order lifecycle events and sends a WhatsApp template message to the
- * customer through the merchant's Force AI WhatsApp Business Platform client.
+ * customer through the merchant's Ebda WhatsApp Business Platform client.
  *
  * Covered events:
  *   order/created  → orderPaid template

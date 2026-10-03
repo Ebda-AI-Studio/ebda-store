@@ -4,28 +4,22 @@
  *
  * Why this MUST be shared: when the two lists drift, store `<Link>` hrefs lose
  * the `/<slug>` prefix on a platform host the client side doesn't recognize.
- * The CF migration added `store.force-ai.co` to the middleware's list but NOT
- * to the client check — so on `store.force-ai.co` the Home link pointed at `/`
+ * The CF migration added `ebda.app` to the middleware's list but NOT
+ * to the client check — so on `ebda.app` the Home link pointed at `/`
  * (platform landing / demo store) and the store context was lost on refresh
  * ("Unable to resolve store context"). Regression verified 2026-06-27.
  *
  * Rule: every platform host lives HERE. Never hardcode a subset anywhere else.
  */
+import { BRAND } from '@force/shared';
 export const PLATFORM_HOSTS = new Set<string>([
   'localhost',
   '127.0.0.1',
-  'forcemediakw.com',
-  'www.forcemediakw.com',
-  'admin.forcemediakw.com',
-  'app.forcemediakw.com',
-  'store.forcemediakw.com',
-  // force-ai.co — the 2026-06 platform domain rebrand (Vercel → Cloudflare).
-  // store.force-ai.co is the path-based storefront platform host (`/<slug>`).
-  'force-ai.co',
-  'www.force-ai.co',
-  'store.force-ai.co',
-  'admin.force-ai.co',
-  'orders.force-ai.co',
+  BRAND.domains.marketing,
+  `www.${BRAND.domains.marketing}`,
+  BRAND.domains.app,
+  BRAND.domains.orders,
+  BRAND.domains.api,
 ]);
 
 /**

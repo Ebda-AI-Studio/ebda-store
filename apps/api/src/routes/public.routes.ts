@@ -781,9 +781,9 @@ router.post(
       const orderData = createOrderSchema.parse(req.body);
       // Customer-leak guard: only treat req.user as the order owner when
       // the role is `customer`. The API cookie is shared between admin
-      // and storefront origins (api.force-ai.co host), so a merchant
-      // signed into app.forcemediakw.com sends the SAME cookie to
-      // /public/orders on store.forcemediakw.com. Without this guard
+      // and storefront origins (api.ebda.app host), so a merchant
+      // signed into app.ebda.app sends the SAME cookie to
+      // /public/orders on ebda.app. Without this guard
       // we'd attach the merchant's super_admin/store_admin userId as
       // `Order.customerId` — downstream loyalty / abandoned-cart /
       // analytics code assumes that ID points to a customer record and
@@ -844,7 +844,7 @@ router.get('/orders', authenticate, async (req: Request, res: Response, next: Ne
 //     /payments/create — see the comment there for the rationale.
 //
 // We use optionalAuthenticate so a stale admin cookie bleeding through
-// from app.forcemediakw.com doesn't reject a guest's success page; the
+// from app.ebda.app doesn't reject a guest's success page; the
 // role-guard below handles that case.
 router.get(
   '/orders/:id',

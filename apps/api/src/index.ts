@@ -75,7 +75,7 @@ const app = express();
 // 1 while production needs 2. Defaults to 1 so any environment that has not
 // been told otherwise keeps today's (safe, non-spoofable) behaviour.
 //
-// SET TRUST_PROXY_HOPS=2 ONLY ONCE api.force-ai.co IS PROXIED **AND** THE
+// SET TRUST_PROXY_HOPS=2 ONLY ONCE api.ebda.app IS PROXIED **AND** THE
 // RAILWAY ORIGIN NO LONGER ACCEPTS DIRECT PUBLIC TRAFFIC. Raising it while the
 // naked *.up.railway.app hostname is still reachable is the spoofing hole
 // described above. See docs/ENVIRONMENT.md.
@@ -687,7 +687,7 @@ const server = httpServer.listen(config.port, () => {
     logger.warn(
       'INNGEST_SERVE_HOST is unset in production — Inngest will register the ' +
         'localhost origin and enqueued jobs will never run. Set it to the public ' +
-        'API origin, e.g. https://api.force-ai.co'
+        'API origin, e.g. https://api.ebda.app'
     );
   }
 

@@ -1,5 +1,5 @@
 /**
- * Shared XLSX export helper — Force Website Builder API
+ * Shared XLSX export helper — Ebda API
  *
  * Wraps ExcelJS to stream a formatted workbook directly to an Express
  * response. All CSV export routes that want a parallel XLSX endpoint
@@ -12,7 +12,7 @@
  */
 import ExcelJS from 'exceljs';
 import type { Response } from 'express';
-import { neutralizeFormula, describeListFilters, type ReportRange } from '@force/shared';
+import { neutralizeFormula, describeListFilters, type ReportRange, BRAND } from '@force/shared';
 
 /**
  * Formula-injection guard, cell/row level — for routes that build an ExcelJS
@@ -109,7 +109,7 @@ export function addFiltersSheet(wb: ExcelJS.Workbook, filters: ExportFilterSumma
  */
 export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): Promise<void> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Force AI Store';
+  wb.creator = BRAND.name;
   wb.created = new Date();
 
   const ws = wb.addWorksheet(opts.sheetName || 'Sheet1');

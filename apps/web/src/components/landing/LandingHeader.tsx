@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { BRAND } from '@force/shared';
 
 export function LandingHeader() {
   const { language, setLanguage, t } = useLanguage();
@@ -17,8 +18,8 @@ export function LandingHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
         {/* Logo + wordmark */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          <img src="/logo.svg" alt="Force AI" className="h-8 w-auto" />
-          <span className="font-semibold text-white text-base leading-none">Force AI</span>
+          <img src="/logo.svg" alt={BRAND.name} className="h-8 w-auto" />
+          <span className="font-semibold text-white text-base leading-none">{BRAND.name}</span>
         </Link>
 
         {/* Desktop nav — hidden on mobile */}

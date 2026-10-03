@@ -4,7 +4,7 @@
  * based on feature flags, per-event config, and available credentials.
  *
  * WhatsApp is intentionally NOT a dispatcher channel — it flows through the
- * Force AI Store ↔ WBS bridge as a separate event-driven path
+ * Ebda ↔ WBS bridge as a separate event-driven path
  * (`apps/api/src/lib/inngest/functions/order-whatsapp-notify.ts`).
  *
  * IMPORTANT: dispatch() NEVER throws — all errors are caught and logged.

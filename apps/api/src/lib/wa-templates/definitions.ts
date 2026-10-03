@@ -1,5 +1,5 @@
 /**
- * Canonical Force AI WhatsApp template library.
+ * Canonical Ebda WhatsApp template library.
  *
  * Six templates × two languages (en + ar) = twelve total Meta template
  * submissions per merchant. All variables-only — merchants pick from this
@@ -12,6 +12,7 @@
  * lets us iterate template text without orphaning existing approvals
  * (e.g. `force_order_paid_v1` → `force_order_paid_v2` next iteration).
  */
+import { BRAND } from '@force/shared';
 
 export type TemplateLanguage = 'en' | 'ar';
 export type TemplateCategory = 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
@@ -329,7 +330,7 @@ export const TEMPLATES: TemplateDefinition[] = [
       },
       {
         type: 'FOOTER',
-        text: 'Powered by Force AI',
+        text: `Powered by ${BRAND.name}`,
       },
     ],
   },
@@ -354,7 +355,7 @@ export const TEMPLATES: TemplateDefinition[] = [
       },
       {
         type: 'FOOTER',
-        text: 'مدعوم بواسطة Force AI',
+        text: `مدعوم بواسطة ${BRAND.nameAr}`,
       },
     ],
   },

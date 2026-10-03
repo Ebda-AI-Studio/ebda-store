@@ -307,16 +307,16 @@ async function buildTenantSitemap(
  *   - `wadyaljuz.com` (custom domain)
  *     → ONLY Wady Aljuz's URLs, rooted at https://wadyaljuz.com
  *     → submitted to Google Search Console for that merchant's property
- *   - `store.forcemediakw.com` (platform path)
+ *   - `ebda.app` (platform path)
  *     → master sitemap covering every store under /<slug>/, rooted
- *       at https://store.forcemediakw.com
+ *       at https://ebda.app
  *     → submitted to the platform's GSC property
  *   - any other host (preview deploys, IP-direct hits)
  *     → falls through to the master sitemap shape with whatever
  *       `getSiteUrl()` decides
  *
  * Without the host branch, the sitemap at wadyaljuz.com/sitemap.xml
- * would list `https://store.forcemediakw.com/wady-aljuz/...` URLs,
+ * would list `https://ebda.app/wady-aljuz/...` URLs,
  * which causes Google to index the wrong domain when the merchant
  * submits their own GSC property. Caught on wadyaljuz.com 2026-05-14.
  */
@@ -335,7 +335,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Master sitemap: platform path. Covers every store under /<slug>/...
   //
   // The platform root itself is NOT listed (#1543): `${siteUrl}/` 307s to the
-  // Force AI company site (HomePageBody's demo-store redirect), and a
+  // Ebda company site (HomePageBody's demo-store redirect), and a
   // sitemap URL that redirects is reported by GSC as "Page with redirect".
   const siteUrl = getSiteUrl();
 

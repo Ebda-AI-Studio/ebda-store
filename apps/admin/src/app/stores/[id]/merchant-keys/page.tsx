@@ -439,9 +439,9 @@ export default function MerchantKeysPage() {
                       type: 'http',
                       // `getApiUrl()`, not string surgery on the admin origin.
                       // `.replace('admin.', 'api.')` only works on
-                      // admin.force-ai.co: on app.forcemediakw.com it is a
+                      // app.ebda.app: on app.ebda.app it is a
                       // no-op and the merchant copies the ADMIN worker's host,
-                      // and on admin.forcemediakw.com it yields a host that is
+                      // and on app.ebda.app it yields a host that is
                       // not the API either. This snippet is the only artifact
                       // handed over alongside a secret that can never be shown
                       // again — a merchant who pastes a wrong host gets a 404

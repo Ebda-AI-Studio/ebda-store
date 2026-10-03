@@ -30,7 +30,7 @@ import {
 // ─── Contact constant ─────────────────────────────────────────────────────────
 
 /**
- * Force AI sales WhatsApp — same number used on the storefront platform
+ * Ebda sales WhatsApp — same number used on the storefront platform
  * landing page (apps/web PlatformLanding.tsx: +965 41169141).
  * Format: wa.me/<international-number-without-plus>
  * The message is pre-filled with the store ID and feature name.

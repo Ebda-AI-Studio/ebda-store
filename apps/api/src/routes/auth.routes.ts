@@ -85,7 +85,7 @@ export function setSessionCookies(res: Response, accessToken: string, refreshTok
  *  was stored with — per RFC6265bis §5.5 a Set-Cookie that is not
  *  `SameSite=None; Secure` is ignored outright on a cross-site request, and
  *  the storefront hits /auth/refresh cross-site (pecannbee.com.kw →
- *  api.force-ai.co). Clearing with a bare `{ path: '/' }` therefore dropped
+ *  api.ebda.app). Clearing with a bare `{ path: '/' }` therefore dropped
  *  silently for exactly the shoppers that needed it. maxAge must be stripped:
  *  clearCookie supplies the epoch `expires` itself and a surviving maxAge
  *  would override it back into the future. */

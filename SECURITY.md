@@ -1,15 +1,15 @@
 # Security Policy
 
-Force AI takes the security of the Force Website Builder platform and the
+Ebda takes the security of the Ebda platform and the
 merchant stores it hosts seriously. This document describes how to report a
 vulnerability and what to expect.
 
 ## Reporting a vulnerability
 
-- **Email:** [security@force-ai.co](mailto:security@force-ai.co)
-- Machine-readable contact: [`/.well-known/security.txt`](https://store.force-ai.co/.well-known/security.txt)
-  (RFC 9116), served on `store.force-ai.co`, `admin.force-ai.co`, and
-  `orders.force-ai.co`.
+- **Email:** [security@ebda.app](mailto:security@ebda.app)
+- Machine-readable contact: [`/.well-known/security.txt`](https://ebda.app/.well-known/security.txt)
+  (RFC 9116), served on `ebda.app`, `app.ebda.app`, and
+  `orders.ebda.app`.
 
 Please include: the affected URL/endpoint, steps to reproduce, and the impact
 you believe it has. Reports in English or Arabic are both fine.
@@ -28,7 +28,7 @@ credited on request.
 
 ## Scope
 
-- `*.force-ai.co` (storefront, admin, orders apps and the API)
+- `*.ebda.app` (storefront, admin, orders apps and the API)
 - Merchant storefronts served by this platform on custom domains
 
 Out of scope: denial-of-service testing, spam/social engineering of merchants

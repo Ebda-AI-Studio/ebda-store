@@ -280,7 +280,7 @@ export async function HomePageBody({
   // visitor to the marketing site rather than rendering a second one here.
   //
   // This URL used to serve its own `EditorialLanding`, because at the time
-  // force-ai.co did not pitch the store-builder service. It does now, and
+  // ebda.app did not pitch the store-builder service. It does now, and
   // covers the whole product range, so a separate pitch on the platform host
   // only competed with it for the same search terms under a worse title
   // ("Force - Online Shopping in Kuwait").

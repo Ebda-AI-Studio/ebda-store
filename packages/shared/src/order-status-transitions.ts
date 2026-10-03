@@ -6,7 +6,7 @@
  * together. The admin order list, the admin order page and the orders PWA all
  * read THIS map, so a transition the API opens is offered on every surface at
  * once (#1936: the PWA kept a stale copy with no `cancelled` key, so a paid,
- * cancelled order could not be marked refunded from orders.force-ai.co).
+ * cancelled order could not be marked refunded from orders.ebda.app).
  *
  * Admins can jump ahead (confirmed → delivered for same-day COD); backwards
  * moves are blocked. `refunded` is reachable from every non-terminal state,

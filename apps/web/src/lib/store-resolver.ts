@@ -8,6 +8,7 @@ import {
   type StoreLocationPublic,
   DEFAULT_THEME,
   getTemplateTheme,
+  BRAND,
 } from '@force/shared';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
@@ -190,7 +191,7 @@ export interface ResolvedStore {
    *
    * It exists because those two cases are opposite facts that `id === 'demo'`
    * cannot tell apart, and `app/layout.tsx::generateMetadata` keys on that
-   * sentinel to emit `title: 'Page not found — Force AI'`. Without this flag a
+   * sentinel to emit `title: 'Page not found — Ebda'`. Without this flag a
    * rate-limited merchant's storefront renders the "we're a little busy" body
    * inside a document whose `<title>` says the page does not exist — the exact
    * claim this work removes, relocated from the body to the head.
@@ -201,15 +202,15 @@ export interface ResolvedStore {
 /**
  * Default store used as a last-resort fallback when no real store can be
  * resolved (dev environment, edge-case paths). Production traffic on
- * `store.forcemediakw.com/` is redirected to the marketing site by the
+ * `ebda.app/` is redirected to the marketing site by the
  * middleware before this fallback is ever rendered, so customers never
  * see it. The neutral copy below is intentional — if it does slip through
- * somewhere, "Force" is harmless; "Force Demo Store" looked broken.
+ * somewhere, "Ebda" is harmless; "Ebda Demo Store" looked broken.
  */
 const DEFAULT_STORE: ResolvedStore = {
   id: 'demo',
-  name: 'Force',
-  nameAr: 'فورس',
+  name: BRAND.name,
+  nameAr: BRAND.nameAr,
   slug: 'demo',
   status: 'active',
   currency: 'KWD',
@@ -626,7 +627,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
  * Exported so the OG-card route (`/og?slug=…`) can resolve a SPECIFIC store
  * independent of request headers. The old file-convention `/opengraph-image`
  * route could only ever see the platform-default store for path-based
- * storefronts (`store.forcemediakw.com/<slug>`) — WhatsApp fetches the image URL
+ * storefronts (`<slug>.ebda.app`) — WhatsApp fetches the image URL
  * with no `/<slug>` path context, so every path-based store's social preview
  * fell back to the Force default card. A slug-parameterised route fixes that.
  */
@@ -685,7 +686,7 @@ export async function getStore(): Promise<ResolvedStore> {
  * Identical chrome to `DEFAULT_STORE` — we do not know the merchant's brand
  * during a transient, and inventing one would be worse — but flagged so
  * `layout.tsx::generateMetadata` does not title the retry page
- * "Page not found — Force AI".
+ * "Page not found — Ebda".
  */
 const TRANSIENTLY_UNRESOLVED_STORE: ResolvedStore = {
   ...DEFAULT_STORE,
@@ -761,7 +762,7 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
   }
 
   // No identifier in the request at all — bare-root on a platform
-  // domain. Middleware redirects this to forcemediakw.com in
+  // domain. Middleware redirects this to ebda.app in
   // production, so reaching here means localhost or a preview
   // deploy; render the default chrome rather than 404.
   return DEFAULT_STORE;
@@ -802,7 +803,7 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  * True only for a store that actually resolved: not the demo sentinel and not
  * the transient-failure fallback (which spreads DEFAULT_STORE, id 'demo').
  * Metadata that names a URL (a canonical) must be gated on this (#1855):
- * `storeAbsoluteUrl` of the sentinel is `https://store.force-ai.co/demo`, so
+ * `storeAbsoluteUrl` of the sentinel is `https://ebda.app/demo`, so
  * an API blip told Google a merchant's page duplicated the demo store.
  */
 export function isResolvedStore(store: ResolvedStore): boolean {

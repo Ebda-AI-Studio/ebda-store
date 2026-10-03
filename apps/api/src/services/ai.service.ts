@@ -1,5 +1,5 @@
 /**
- * Force AI Store AI assistant — translation, SEO meta, category suggestions,
+ * Ebda AI assistant — translation, SEO meta, category suggestions,
  * and logo-to-palette vision extraction.
  *
  * Provider: Google Gemini 2.0 Flash (free tier — 15 req/min, ~1500

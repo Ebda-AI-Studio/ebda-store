@@ -1,4 +1,4 @@
-# Force Website Builder - Production Dockerfile
+# Ebda - Production Dockerfile
 # Multi-stage build for optimized production image
 
 # ============================================

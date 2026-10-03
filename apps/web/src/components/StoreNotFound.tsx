@@ -5,8 +5,8 @@ import type { ResolvedStore } from '../lib/store-resolver';
  * Store-branded 404 — shown for unknown paths on a merchant's storefront
  * (custom domain OR the platform `/<slug>` path).
  *
- * HARD multi-tenant rule: a store must NEVER show the Force AI platform
- * landing or link to `store.force-ai.co` to its own customers. A bad URL on
+ * HARD multi-tenant rule: a store must NEVER show the Ebda platform
+ * landing or link to `ebda.app` to its own customers. A bad URL on
  * `wadyaljuz.com` shows Wady Aljuz's OWN "page not available", not the
  * platform pitch (which also linked to competing merchants). Inherits the
  * store's theme CSS vars (set by the root layout) so it matches the brand.

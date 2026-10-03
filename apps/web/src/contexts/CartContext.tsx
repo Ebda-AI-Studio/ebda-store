@@ -90,7 +90,7 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Per-store localStorage key. Path-based stores (store.forcemediakw.com/<slug>)
+// Per-store localStorage key. Path-based stores (<slug>.ebda.app)
 // share one origin, so a flat 'force-store-cart' key bled one store's guest
 // cart into another on the same browser (visual-only — the server cart is
 // already storeId-scoped, but the optimistic first paint showed the wrong
@@ -126,7 +126,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const migratedRef = useRef(false);
   const toast = useToast();
   const { t, language } = useLanguage();
-  // On the platform domain root (store.forcemediakw.com/) there is no resolved
+  // On the platform domain root (ebda.app/) there is no resolved
   // store, so `store.id` is the 'demo' sentinel and ApiClient never gets an
   // X-Store-ID. Calling GET /public/cart in that state 400s with
   // STORE_NOT_RESOLVED (~115x/day in Sentry). Gate every cart round-trip on a

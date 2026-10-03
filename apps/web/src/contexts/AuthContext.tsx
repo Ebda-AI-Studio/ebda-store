@@ -36,8 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkUser = useCallback(async (onMount: boolean) => {
     // Auth is handled via HTTP-only cookies sent automatically with
     // credentials: 'include'. The cookie is scoped to the API domain
-    // (api.force-ai.co), so an admin signed in at
-    // app.forcemediakw.com sends the SAME cookie to /auth/me when the
+    // (api.ebda.app), so an admin signed in at
+    // app.ebda.app sends the SAME cookie to /auth/me when the
     // storefront calls it — making the storefront think the admin is
     // a logged-in customer.
     //

@@ -18,7 +18,7 @@ import { isSafeUrl, sanitizeUrl } from '@force/shared';
  *
  * `urlPrefix` (from `useStoreUrl('')`) is prepended to ROOT-RELATIVE links
  * only (`/...`) so the link keeps store context on a platform host
- * (`store.force-ai.co/<slug>/...`). Fragment/query/dot-relative links (`#`,
+ * (`<slug>.ebda.app/...`). Fragment/query/dot-relative links (`#`,
  * `?`, `./`, `../`) and absolute/external links (`http`, `mailto:`, `tel:`)
  * are left untouched.
  */

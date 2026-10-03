@@ -58,7 +58,7 @@ interface RouteErrorFallbackProps {
  * the client is holding the unresolved sentinel (`id: 'demo'`). That sentinel
  * makes `useStoreUrl` drop the `/<slug>` prefix, so the chrome's logo and nav
  * would point at `/`, `/products`, ... on the platform host — and
- * `store.force-ai.co/` 307s to the Force AI company site. Ruling SR-7
+ * `ebda.app/` 307s to the Ebda company site. Ruling SR-7
  * suppressed the fallback's own "Go Home" link for this reason; the chrome
  * around it emitted the same links. Without chrome the page matches the root
  * `app/error.tsx` boundary: the retry copy and "Try Again", nothing that can
@@ -243,7 +243,7 @@ export function RouteErrorFallback({ error, reset }: RouteErrorFallbackProps) {
             to the demo sentinel — so `useStoreUrl` drops the `/<slug>` prefix
             and the link would resolve to bare `/`, which on the platform host
             is NOT the merchant's storefront: measured 2026-09-16,
-            `https://store.force-ai.co/` answers `307 → https://force-ai.co`.
+            `https://ebda.app/` answers `307 → https://ebda.app`.
             That would walk a merchant's shopper off their store and onto the
             Force platform pitch — the HARD multi-tenant rule in
             `app/not-found.tsx`. Ruling SR-7.

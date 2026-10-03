@@ -1,11 +1,12 @@
 // Storefront URL composition for admin surfaces.
 //
 // The storefront is path-routed under a single shared subdomain
-// (`store.force-ai.co/<slug>`), NOT `<slug>.forcemediakw.com`. Six
+// (`<slug>.ebda.app`), NOT `<slug>.ebda.app`. Six
 // admin call sites previously rolled their own subdomain-style fallback;
 // keep this helper as the single source of truth.
+import { BRAND } from '@force/shared';
 
-export const PLATFORM_STORE_HOST = 'store.force-ai.co';
+export const PLATFORM_STORE_HOST: string = BRAND.domains.marketing;
 
 type StoreUrlInput = { slug: string; domain?: string | null };
 

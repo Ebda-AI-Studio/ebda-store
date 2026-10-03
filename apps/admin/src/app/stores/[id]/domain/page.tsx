@@ -9,6 +9,7 @@ import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { BRAND } from '@force/shared';
 
 interface DnsRecordRow {
   type: string;
@@ -229,7 +230,7 @@ export default function StoreDomainPage() {
     const localPart = store?.emailSenderLocalPart || 'noreply';
     const verifiedCustom = domainStatus?.emailSender?.status === 'verified' && !!store?.domain;
     // Must match PLATFORM_EMAIL_DOMAIN in apps/api/src/services/email-sender.ts
-    const host = verifiedCustom ? store!.domain : 'force-ai.co';
+    const host = verifiedCustom ? store!.domain : BRAND.domains.marketing;
     return `${name} <${localPart}@${host}>`;
   })();
 
@@ -340,7 +341,7 @@ export default function StoreDomainPage() {
                 // no records at all (undefined/null), not when it returned an
                 // empty array (matches the original `.map() || fallback` behavior).
                 const dnsRows: DnsRecordRow[] = domainStatus?.dnsRecords ?? [
-                  { type: 'CNAME', name: domain, value: 'cf.force-ai.co' },
+                  { type: 'CNAME', name: domain, value: `cf${BRAND.domains.storeSuffix}` },
                 ];
                 const dnsColumns: DataTableColumn<DnsRecordRow>[] = [
                   {

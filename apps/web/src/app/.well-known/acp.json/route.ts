@@ -24,8 +24,8 @@ import {
  * ## Served per store, on three hosts
  *
  *   wadyaljuz.com/.well-known/acp.json          → that merchant
- *   store.force-ai.co/<slug>/.well-known/…      → that merchant
- *   store.force-ai.co/.well-known/…             → 404 (the platform is not a shop)
+ *   <slug>.ebda.app/.well-known/…      → that merchant
+ *   ebda.app/.well-known/…             → 404 (the platform is not a shop)
  *
  * `resolveAgentStore()` owns that logic, shared with `/llms.txt` so the two
  * cannot disagree about which store a request belongs to.

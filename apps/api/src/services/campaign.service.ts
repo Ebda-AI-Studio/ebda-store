@@ -1,5 +1,5 @@
 import { prisma } from '@force/database';
-import { isCampaignContentComplete } from '@force/shared';
+import { isCampaignContentComplete, storeOrigin } from '@force/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
 
@@ -216,7 +216,7 @@ export function storeDefaultLanguage(store: { settings: unknown }): 'en' | 'ar' 
 
 /** Same base-URL rule the review-request email uses for its deep links. */
 export function storefrontBaseUrl(store: { domain: string | null; slug: string }): string {
-  return store.domain ? `https://${store.domain}` : `https://store.force-ai.co/${store.slug}`;
+  return store.domain ? `https://${store.domain}` : storeOrigin(store.slug);
 }
 
 /**

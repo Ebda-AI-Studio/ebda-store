@@ -5,7 +5,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Force Media Brand Colors
+        // Ebda Brand Colors
         force: {
           50: '#fff7ed',
           100: '#ffedd5',

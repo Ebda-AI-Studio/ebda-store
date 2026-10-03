@@ -40,11 +40,10 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
  * permits any https origin; every other admin route keeps the strict list.
  */
 const DEFAULT_FRAME_SRC =
-  process.env.ADMIN_DEFAULT_FRAME_SRC ??
-  'https://store.force-ai.co https://*.force-ai.co https://store.forcemediakw.com https://*.forcemediakw.com';
+  process.env.ADMIN_DEFAULT_FRAME_SRC ?? 'https://ebda.app https://*.ebda.app';
 
 const CSP_PREFIX =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co wss://store-api.forcemediakw.com wss://api.force-ai.co https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; frame-src https://onesignal.com https://*.onesignal.com ";
+  "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://api.ebda.app https://api.ebda.app wss://api.ebda.app wss://api.ebda.app https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; frame-src https://onesignal.com https://*.onesignal.com ";
 const CSP_SUFFIX = "; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'";
 
 /**
@@ -145,7 +144,7 @@ const nextConfig = {
         : []),
       {
         protocol: 'https',
-        hostname: 'cdn.forcemediakw.com',
+        hostname: 'cdn.ebda.app',
         port: '',
         pathname: '/**',
       },

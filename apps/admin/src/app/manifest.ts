@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { BRAND } from '@force/shared';
 
 /**
  * Admin PWA manifest. Why this matters:
@@ -14,15 +15,15 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Force AI Store Admin',
-    short_name: 'Force Admin',
-    description: 'Force Website Builder operator console',
+    name: `${BRAND.name} Admin`,
+    short_name: `${BRAND.name} Admin`,
+    description: `${BRAND.name} merchant dashboard`,
     start_url: '/',
     scope: '/',
     display: 'standalone',
     orientation: 'any',
-    background_color: '#ffffff',
-    theme_color: '#FF6E00',
+    background_color: BRAND.colors.night,
+    theme_color: BRAND.colors.night,
     icons: [
       {
         src: '/favicon.svg',

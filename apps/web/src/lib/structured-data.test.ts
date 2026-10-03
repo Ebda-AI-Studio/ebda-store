@@ -5,11 +5,11 @@ import type { ResolvedStore } from './store-resolver';
 /**
  * REGRESSION GUARD (2026-07-29). Every pre-existing test below `delete`s
  * NEXT_PUBLIC_SITE_URL first — so the suite never exercised the PRODUCTION
- * condition, where that env var is always set (`https://store.force-ai.co`,
+ * condition, where that env var is always set (`https://ebda.app`,
  * inlined at build time). That blind spot is exactly why a broken canonical
  * shipped: with the env var set, `getSiteUrl` returned the platform host for
  * EVERY store, so every custom-domain page advertised a canonical on
- * store.force-ai.co — a URL that resolves to the demo store. The
+ * ebda.app — a URL that resolves to the demo store. The
  * `describe` block at the bottom pins the env-var-SET behavior; do not
  * "simplify" it by deleting the env var.
  */
@@ -30,7 +30,7 @@ describe('storeAbsoluteUrl', () => {
     } as unknown as ResolvedStore;
 
     expect(storeAbsoluteUrl(store, '/products/widget')).toBe(
-      'https://store.force-ai.co/my-store/products/widget'
+      'https://ebda.app/my-store/products/widget'
     );
   });
 
@@ -66,14 +66,14 @@ describe('storeAbsoluteUrl', () => {
       domain: undefined,
     } as unknown as ResolvedStore;
 
-    expect(storeAbsoluteUrl(store, '')).toBe('https://store.force-ai.co/my-store');
-    expect(storeAbsoluteUrl(store, '/')).toBe('https://store.force-ai.co/my-store/');
+    expect(storeAbsoluteUrl(store, '')).toBe('https://ebda.app/my-store');
+    expect(storeAbsoluteUrl(store, '/')).toBe('https://ebda.app/my-store/');
   });
 });
 
 describe('getSiteUrl / storeAbsoluteUrl with NEXT_PUBLIC_SITE_URL SET (production shape)', () => {
   const originalSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  const PLATFORM = 'https://store.force-ai.co';
+  const PLATFORM = 'https://ebda.app';
 
   afterEach(() => {
     if (originalSiteUrl === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
@@ -99,7 +99,7 @@ describe('getSiteUrl / storeAbsoluteUrl with NEXT_PUBLIC_SITE_URL SET (productio
 
   it('custom-domain canonical stays on the merchant domain (the shipped bug)', () => {
     process.env.NEXT_PUBLIC_SITE_URL = PLATFORM;
-    // Regression: this returned https://store.force-ai.co/products/widget —
+    // Regression: this returned https://ebda.app/products/widget —
     // a platform URL with no /<slug> prefix, which resolves to the DEMO store.
     expect(storeAbsoluteUrl(storeWithDomain, '/products/widget')).toBe(
       'https://pecannbee.com.kw/products/widget'

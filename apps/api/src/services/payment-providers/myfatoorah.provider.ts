@@ -15,6 +15,7 @@ import {
 } from './types';
 import logger from '../../lib/logger';
 import { providerRequestError, ProviderRejectedError } from './refund-outcome';
+import { BRAND } from '@force/shared';
 
 // ==========================================
 // MyFatoorah Payment Provider
@@ -40,7 +41,7 @@ export function resolveMyFatoorahEmail(
 ): string {
   const real = rawEmail?.trim();
   if (real && MYFATOORAH_EMAIL_RE.test(real)) return real;
-  let host = 'force-ai.co';
+  let host: string = BRAND.domains.marketing;
   try {
     const h = new URL(callbackUrl).hostname;
     if (h) host = h;

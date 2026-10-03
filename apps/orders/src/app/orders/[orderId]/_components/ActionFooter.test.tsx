@@ -2,7 +2,7 @@
 /**
  * #1936 — the orders PWA kept its own stale transition map (no `cancelled`
  * key), and its footer treated `cancelled` as final, so a paid, cancelled
- * order could not be marked refunded from orders.force-ai.co.
+ * order could not be marked refunded from orders.ebda.app.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
