@@ -520,6 +520,22 @@ export default function StoreSettingsPage() {
       ),
     },
     {
+      // Plan, usage vs limits, upgrade (SP5 plans engine).
+      key: 'billing',
+      href: `/stores/${storeId}/billing`,
+      color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+          />
+        </svg>
+      ),
+    },
+    {
       key: 'staff',
       href: `/stores/${storeId}/staff`,
       color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',

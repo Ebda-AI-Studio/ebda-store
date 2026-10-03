@@ -19,6 +19,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
+import { assertWithinLimit } from '../services/plan-limit.service';
 
 const router = Router({ mergeParams: true });
 
@@ -91,6 +92,9 @@ router.post(
     try {
       const { storeId } = req.params;
       const input = inviteStaffSchema.parse(req.body);
+
+      // Plan ceiling (SP5): one more seat must fit the store's maxStaff.
+      await assertWithinLimit(storeId, 'maxStaff');
 
       // Look for an existing staff/admin user with this email (global namespace)
       let staffUser = await withRlsBypass(tx =>

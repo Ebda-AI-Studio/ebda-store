@@ -44,6 +44,8 @@ export type NavLabels = {
   /** Platform-wide AI usage rollup (super_admin only) */
   platformAiUsage: string;
   platformUsageHistory: string;
+  /** Plans catalogue editor (super_admin only) */
+  platformPlans: string;
   // Super-admin store-scoped item
   manageFeatures: string;
 };
@@ -82,6 +84,12 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.platformUsageHistory,
       href: '/usage-history',
       icon: 'M3 3v18h18M7 16v-4m4 4V8m4 8v-6m4 6V5',
+    },
+    {
+      // Layers icon — the plans catalogue (limits, visibility, prices).
+      name: labels.platformPlans,
+      href: '/plans',
+      icon: 'M12 3l9 4.5-9 4.5-9-4.5L12 3zm0 9l9 4.5-9 4.5-9-4.5L12 12z',
     },
   ];
 }

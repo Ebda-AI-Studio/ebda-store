@@ -16,6 +16,7 @@ import { cleanupRemovedImages } from './r2-cleanup.service';
 import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
 import { recordSlugRedirect } from './slug-redirect.service';
+import { assertWithinLimit } from './plan-limit.service';
 
 /**
  * Build a Prisma `AND` clause for a free-text product search.
@@ -711,6 +712,8 @@ export class ProductService {
   }
 
   static async create(storeId: string, data: CreateProductData) {
+    // Plan ceiling (SP5): one more product must fit the store's maxProducts.
+    await assertWithinLimit(storeId, 'maxProducts');
     await this.assertCategoriesInStore(storeId, data.categories);
     // slugifyWithFallback, never bare slugify: a name that slugifies to '' (no
     // letters/digits, or a product created before its name was filled in) gave

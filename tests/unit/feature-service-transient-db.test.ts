@@ -19,7 +19,13 @@ const { findUnique, findMany, withRlsBypass } = vi.hoisted(() => {
     findUnique,
     findMany,
     withRlsBypass: vi.fn(async (fn: (tx: unknown) => unknown) =>
-      fn({ store: { findUnique }, storeFeature: { findMany } })
+      fn({
+        store: { findUnique },
+        storeFeature: { findMany },
+        // plans engine (SP5): no subscription row -> resolved from the legacy enum
+        storeSubscription: { findUnique: vi.fn().mockResolvedValue(null) },
+        plan: { findUnique: vi.fn().mockResolvedValue(null) },
+      })
     ),
   };
 });

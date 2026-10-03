@@ -69,6 +69,7 @@ import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
 import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
+import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
@@ -455,6 +456,9 @@ router.use('/stores', tenantContext, botAnalyticsRoutes);
 
 // Staff management — store owners add / remove staff members
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
+
+// Merchant billing — plan, subscription, usage vs limits (SP5)
+router.use('/stores/:storeId/billing', tenantContext, billingRoutes);
 
 // Payment-gateway abandonment retargeting (Enterprise — payment_abandonment)
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);

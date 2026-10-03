@@ -1,7 +1,14 @@
-import { prisma, Prisma, withMoneyTx, StoreStatus } from '@force/database';
+import { prisma, Prisma, withMoneyTx, withRlsBypass, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
-import { slugify, slugifyWithFallback, isReservedSlug, storeHost, REGION } from '@force/shared';
+import {
+  slugify,
+  slugifyWithFallback,
+  isReservedSlug,
+  storeHost,
+  REGION,
+  LEGACY_STORE_PLAN_TO_PLAN_CODE,
+} from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -11,6 +18,8 @@ import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
+import { assertPlanAllows, assertWithinLimit } from './plan-limit.service';
+import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -305,6 +314,12 @@ export class StoreService {
       }
     }
 
+    // Plan gate (SP5): a brand-new store starts on the default plan, which
+    // decides whether it may carry a custom domain at creation.
+    if (data.domain) {
+      await assertPlanAllows(LEGACY_STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
+    }
+
     const store = await prisma.store.create({
       data: {
         name: data.name,
@@ -338,6 +353,10 @@ export class StoreService {
         },
       },
     });
+
+    // Every store gets a subscription row from day one (SP5): the plan the
+    // enum default put it on, mapped onto a plan code.
+    await withRlsBypass(tx => syncSubscriptionFromLegacyPlan(tx, store.id, store.plan));
 
     // Seed Chart of Accounts (Egypt retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.
@@ -381,6 +400,8 @@ export class StoreService {
 
     // Check domain uniqueness if changing
     if (data.domain && data.domain !== store.domain) {
+      // Plan gate (SP5): attaching a custom domain needs the plan capability.
+      await assertWithinLimit(storeId, 'customDomain');
       const existingDomain = await prisma.store.findUnique({
         where: { domain: data.domain },
       });

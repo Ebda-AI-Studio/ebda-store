@@ -4,6 +4,8 @@ import { redis } from './redis.service';
 import { bustStoreCaches } from './store.service';
 import logger from '../lib/logger';
 import { retryOnWriteConflict } from '../lib/db-retry';
+import { syncSubscriptionFromLegacyPlan } from './plan-sync';
+import { getAutomationFlags } from './plan-entitlements';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -126,7 +128,8 @@ class FeatureService {
    */
   private rowsToMap(
     plan: StorePlan,
-    rows: Array<{ featureKey: string; enabled: boolean }>
+    rows: Array<{ featureKey: string; enabled: boolean }>,
+    flags?: { abandonedCartAutomation: boolean; whatsappAutomation: boolean } | null
   ): Record<FeatureKey, boolean> {
     // Start with all false.
     const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
@@ -139,6 +142,14 @@ class FeatureService {
       if (FEATURE_KEYS_ARRAY.includes(key as FeatureKey)) {
         map[key as FeatureKey] = true;
       }
+    }
+    // Layer 1.5: the plans engine's automation flags (SP5). They decide the
+    // feature keys the engine names, both ways — a plan that turns the flag
+    // on enables the feature, one that turns it off disables it — and sit
+    // UNDER the per-store overrides so super-admin can still grant/revoke.
+    if (flags) {
+      map.abandoned_cart = flags.abandonedCartAutomation;
+      map.whatsapp = flags.whatsappAutomation;
     }
     // Layer 2: per-store overrides on top.
     for (const row of rows) {
@@ -157,15 +168,21 @@ class FeatureService {
     // enabled/disabled by override would be mis-resolved (and the wrong value
     // Redis-cached). `stores` itself has RLS disabled, but read both inside one
     // bypass tx — trusted internal read already scoped by `where: { storeId }`.
-    const [store, rows] = await withRlsBypass(tx =>
-      Promise.all([
+    const [store, rows, flags] = await withRlsBypass(async tx => {
+      const [storeRow, featureRows] = await Promise.all([
         tx.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
         tx.storeFeature.findMany({
           where: { storeId },
           select: { featureKey: true, enabled: true },
         }),
-      ])
-    );
+      ]);
+      // The plans engine's automation flags, read in the SAME bypass tx (one
+      // connection; a transient failure retries and fails closed together).
+      const planFlags = storeRow
+        ? await getAutomationFlags(storeId, tx, { legacyPlan: storeRow.plan })
+        : null;
+      return [storeRow, featureRows, planFlags] as const;
+    });
     // If the store doesn't exist, return all-false (safe default; callers
     // already handle missing stores at the route level via requireStoreAccess).
     if (!store) {
@@ -174,7 +191,7 @@ class FeatureService {
         boolean
       >;
     }
-    return this.rowsToMap(store.plan as StorePlan, rows);
+    return this.rowsToMap(store.plan as StorePlan, rows, flags);
   }
 
   /**
@@ -336,7 +353,8 @@ class FeatureService {
         where: { storeId },
         select: { featureKey: true, enabled: true },
       });
-      return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows);
+      const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
+      return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
     });
 
     await this.writeToCache(storeId, freshFeatures);
@@ -408,6 +426,8 @@ class FeatureService {
       where: { id: storeId },
       data: { plan, updatedAt: new Date() },
     });
+    // Keep the subscription (limits) on the plan the enum now names (SP5).
+    await withRlsBypass(tx => syncSubscriptionFromLegacyPlan(tx, storeId, plan));
     await this.invalidateCache(storeId);
     await this.bustPublicStoreCache(storeId);
     logger.info(

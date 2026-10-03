@@ -79,6 +79,7 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'Store.googleMapsUrl': 'Google Maps link typed by the merchant, never an upload',
   'StoreLocation.mapsUrl': 'Google Maps link, never an upload',
   'StoreLocation.mapsEmbedUrl': 'Google Maps embed URL, never an upload',
+  'Plan.limits': 'plan ceilings and on/off flags (numbers/booleans), no media',
   'Product.dimensions': 'numeric width/height/length/weight object',
   'Product.aiFieldSources': 'per-field AI provenance flags',
   'Product.aiBalanceBackup': 'backup of name/description text + aiFieldSources, no media',

@@ -49,6 +49,8 @@ vi.mock('@force/database', () => ({
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));
 
+// The plan ceiling is proven in tests/integration/plan-limits.test.ts.
+vi.mock('@api/services/plan-limit.service', () => ({ assertWithinLimit: vi.fn() }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };

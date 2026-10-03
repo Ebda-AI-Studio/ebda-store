@@ -2264,6 +2264,10 @@
       "merchantKeys": {
         "title": "Merchant MCP keys",
         "description": "Issue keys so you can run this store from Claude Code or any MCP client"
+      },
+      "billing": {
+        "title": "Billing",
+        "description": "Plan, usage and limits"
       }
     },
     "metaCatalogCard": {
@@ -5459,7 +5463,8 @@
         "staff": "Staff & roles",
         "announcement": "Announcement bar",
         "agentKey": "AI agent key",
-        "merchantKeys": "Merchant MCP keys"
+        "merchantKeys": "Merchant MCP keys",
+        "billing": "Billing"
       }
     },
     "notificationBell": {
@@ -5594,7 +5599,8 @@
       "staffBadge": "Staff",
       "staffBadgeHint": "Limited access",
       "hubSectionsAriaLabel": "Hub sections",
-      "navPlatformUsageHistory": "Usage history (platform)"
+      "navPlatformUsageHistory": "Usage history (platform)",
+      "navPlatformPlans": "Plans (platform)"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -8173,5 +8179,114 @@
       "aiCalls": "AI calls / spend",
       "aiUnpriced": "+{count} unpriced — spend is a floor"
     }
+  },
+  "plans": {
+    "title": "Plans",
+    "subtitle": "Edit the plans merchants subscribe to: limits, visibility and prices. Prices stay empty until set.",
+    "loading": "Loading plans…",
+    "loadError": "Failed to load plans.",
+    "edit": "Edit",
+    "editTitle": "Edit plan {code}",
+    "public": "Public",
+    "hidden": "Hidden",
+    "unlimited": "Unlimited",
+    "priceNotSet": "Not set",
+    "priceHint": "Prices are in EGP (stored as piastres). A blank price means not set yet, not free.",
+    "save": "Save plan",
+    "saving": "Saving…",
+    "table": {
+      "plan": "Plan",
+      "visibility": "Visibility",
+      "monthly": "Monthly price",
+      "yearly": "Yearly price",
+      "stores": "Stores",
+      "actions": "Actions"
+    },
+    "form": {
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "sort": "Sort order",
+      "isPublic": "Shown on the public pricing page",
+      "priceMonthly": "Monthly price (EGP)",
+      "priceYearly": "Yearly price (EGP)",
+      "limitsTitle": "Limits",
+      "bpsHint": "Fees are in basis points (100 = 1%). Online and cash-on-delivery fees are set separately."
+    },
+    "limits": {
+      "maxProducts": "Products",
+      "maxStaff": "Staff members",
+      "maxOrdersPerMonth": "Orders per month",
+      "maxStorageMb": "Storage (MB)",
+      "customDomain": "Custom domain",
+      "platformFeeBps": "Platform fee, online orders (bps)",
+      "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
+      "abandonedCartAutomation": "Abandoned-cart recovery",
+      "whatsappAutomation": "WhatsApp automation"
+    },
+    "errors": {
+      "invalidNumber": "Enter valid numbers for the price and sort order.",
+      "saveFailed": "Could not save the plan."
+    },
+    "toasts": {
+      "savedTitle": "Plan saved",
+      "savedDesc": "Plan {code} was updated.",
+      "errorTitle": "Error"
+    }
+  },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Your plan, what it includes, and how much of it you have used.",
+    "loading": "Loading billing…",
+    "loadError": "Failed to load billing.",
+    "currentPlan": "Current plan",
+    "unlimited": "Unlimited",
+    "usageTitle": "Usage",
+    "ordersThisMonth": "Orders this month",
+    "usedOf": "{used} of {limit}",
+    "storageNotTracked": "Up to {limit} MB (usage is not tracked yet)",
+    "includedTitle": "Included in your plan",
+    "included": "Included",
+    "notIncluded": "Not included",
+    "platformFee": "Platform fee (online orders)",
+    "codFee": "Platform fee (cash on delivery)",
+    "trialEnds": "Trial ends",
+    "renewsOn": "Renews on",
+    "endsOn": "Ends on",
+    "status": {
+      "none": "Active",
+      "trialing": "Trial",
+      "active": "Active",
+      "past_due": "Payment overdue",
+      "canceled": "Canceled",
+      "comped": "Complimentary"
+    },
+    "overLimit": {
+      "title": "You passed this month's order limit",
+      "body": "Your plan includes {limit} orders a month. Your customers can still order and nothing is blocked. Upgrade to stay within your plan."
+    },
+    "upgradeTitle": "Upgrade",
+    "upgradeBody": "Move to a bigger plan for more products, staff and orders, a custom domain and automation.",
+    "upgradeCta": "Upgrade plan",
+    "upgradeSoon": "Online upgrade is coming soon. Contact support to change your plan now.",
+    "priceTbd": "Price to be announced",
+    "perMonth": "/ month",
+    "adminTitle": "Platform admin",
+    "adminPlanLabel": "Assign plan",
+    "adminApply": "Apply plan",
+    "assigning": "Applying…",
+    "toasts": {
+      "errorTitle": "Could not change the plan",
+      "assignedTitle": "Plan updated",
+      "assignedDesc": "This store is now on {code}."
+    }
+  },
+  "planLimit": {
+    "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
+    "maxStaff": "Your plan allows up to {limit} staff members. Upgrade to add more.",
+    "maxOrdersPerMonth": "Your plan allows up to {limit} orders per month. Upgrade to keep growing.",
+    "maxStorageMb": "Your plan allows up to {limit} MB of storage. Upgrade to add more.",
+    "customDomain": "Custom domains are not included in your plan. Upgrade to connect your own domain.",
+    "abandonedCartAutomation": "Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.",
+    "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on."
   }
 }
