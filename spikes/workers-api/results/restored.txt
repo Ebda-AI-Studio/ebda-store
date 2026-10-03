@@ -1,0 +1,40 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+
+ RUN  v4.1.11 /home/user/ebda/spikes/workers-api
+
+ ✓ test/routes.test.ts > host routing > slug host and custom domain map to the right store 1871ms
+ ✓ test/routes.test.ts > host routing > unknown host -> 404 (never the first store) 754ms
+ ✓ test/routes.test.ts > host routing > reserved slugs never resolve to a store 21ms
+ ✓ test/routes.test.ts > cart add > add twice -> quantity 2, both 200 (no 25P02 abort) 1540ms
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+[load] 300 ops in 5008ms; latency p50=440.0ms p95=1016.0ms max=1208.0ms; leaks=0 bad=0; distinct backend pids=2 (5003,5004); pids serving BOTH tenants=2
+
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants 5011ms
+stdout | test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors
+[cart-concurrent] statuses 200,200,200,200,200,200,200,200,200,200,200,200
+
+ ✓ test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors 1026ms
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > role is non-bypass and every table is ENABLE+FORCE RLS 151ms
+ ✓ test/routes.test.ts > cart add > another tenant's product id on this host is a 404, and writes nothing 28ms
+ ✓ test/routes.test.ts > cart add > same session id on two hosts yields two independent carts 95ms
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > a request whose GUC is not set returns zero rows, and cannot write 102ms
+ ✓ test/routes.test.ts > payment webhook > bad signature -> 401; missing -> 401; bad hex -> 401; unknown provider -> 404; nothing stored 31ms
+ ✓ test/routes.test.ts > payment webhook > good -> 200 and cart paid; replay -> 200 no duplicate row, no second state change 118ms
+ ✓ test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200 75ms
+ ✓ test/routes.test.ts > payment webhook > a webhook delivered on rival's host cannot mark amelia's cart paid 71ms
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection
+[reuse] 40 amelia->unscoped pairs: same backend pid in 33/40; leaks=0
+
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection 1025ms
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > NEGATIVE CONTROL: a session-level set_config(..., false) DOES leak through pgbouncer (proves the harness can fail)
+[negative-control] session-level set_config leaked into a later, different client 20/20 times
+
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > NEGATIVE CONTROL: a session-level set_config(..., false) DOES leak through pgbouncer (proves the harness can fail) 442ms
+
+ Test Files  2 passed (2)
+      Tests  16 passed (16)
+   Start at  18:29:34
+   Duration  7.79s (transform 616ms, setup 0ms, import 671ms, tests 12.36s, environment 0ms)
+

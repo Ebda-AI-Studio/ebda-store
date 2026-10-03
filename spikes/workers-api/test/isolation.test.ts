@@ -40,9 +40,9 @@ describe('tenant isolation through pgbouncer (transaction mode, pool_size=2) on 
   });
 
   it('role is non-bypass and every table is ENABLE+FORCE RLS', async () => {
-    const role = await rawTx((tx) => tx.$queryRaw<{ u: string; bypass: boolean; su: boolean }[]>`SELECT current_user AS u, rolbypassrls AS bypass, rolsuper AS su FROM pg_roles WHERE rolname = current_user`);
+    const role = await rawTx((tx) => tx.$queryRaw<{ u: string; bypass: boolean; su: boolean }[]>`SELECT current_user::text AS u, rolbypassrls AS bypass, rolsuper AS su FROM pg_roles WHERE rolname = current_user`);
     expect(role[0]).toEqual({ u: 'ebda_app', bypass: false, su: false });
-    const t = await rawTx((tx) => tx.$queryRaw<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }[]>`SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname IN ('stores','products','carts','cart_items','webhook_events') AND relkind='r'`);
+    const t = await rawTx((tx) => tx.$queryRaw<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }[]>`SELECT relname::text AS relname, relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname IN ('stores','products','carts','cart_items','webhook_events') AND relkind='r'`);
     expect(t).toHaveLength(5);
     for (const r of t) expect([r.relname, r.relrowsecurity, r.relforcerowsecurity]).toEqual([r.relname, true, true]);
   });
@@ -52,8 +52,8 @@ describe('tenant isolation through pgbouncer (transaction mode, pool_size=2) on 
     expect(await rawTx((tx) => tx.product.findMany())).toEqual([]);
     expect(await rawTx((tx) => tx.cart.count())).toBe(0);
     await expect(rawTx((tx) => tx.product.create({ data: { id: crypto.randomUUID(), storeId: AMELIA.id, name: 'x', pricePiastres: 1 } }))).rejects.toThrow();
-    // and the stores table is deny-all to ebda_app (host lookup only via SECURITY DEFINER fn)
-    expect(await rawTx((tx) => tx.store.count())).toBe(0);
+    // and stores is not even granted to ebda_app (host lookup only via the SECURITY DEFINER fn)
+    await expect(rawTx((tx) => tx.store.count())).rejects.toThrow(/permission denied/);
   });
 
   it('transaction-local set_config does not leak to the next tenant on a reused pooled connection', async () => {

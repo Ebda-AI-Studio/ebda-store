@@ -68,9 +68,9 @@ app.post('/cart/items', async (c) => {
 });
 
 // ---- payment webhook ----
-const hex = (s: string): Uint8Array | null => {
+const hex = (s: string): Uint8Array<ArrayBuffer> | null => {
   if (!/^(?:[0-9a-f]{2})+$/i.test(s)) return null;
-  const out = new Uint8Array(s.length / 2);
+  const out = new Uint8Array(new ArrayBuffer(s.length / 2));
   for (let i = 0; i < out.length; i++) out[i] = parseInt(s.slice(i * 2, i * 2 + 2), 16);
   return out;
 };
