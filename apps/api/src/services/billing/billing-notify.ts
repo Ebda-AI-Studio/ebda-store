@@ -21,7 +21,11 @@ export type BillingEffect =
       nextRetryAt: Date;
       planCode: string;
     }
-  | { kind: 'downgraded'; storeId: string; reason: 'dunning' | 'canceled' | 'no_payment_method' };
+  | {
+      kind: 'downgraded';
+      storeId: string;
+      reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended';
+    };
 
 async function storeContext(storeId: string) {
   return withRlsBypass(async tx => {

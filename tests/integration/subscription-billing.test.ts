@@ -98,6 +98,7 @@ async function subscribedStore(opts: {
   token?: string | null;
   interval?: 'monthly' | 'yearly';
   provider?: string | null;
+  trialEndsAt?: Date | null;
 }) {
   const storeId = await makeStore();
   const sub = await withRlsBypass(tx =>
@@ -110,6 +111,7 @@ async function subscribedStore(opts: {
         billingInterval: opts.interval ?? 'monthly',
         currentPeriodStart: addInterval(opts.periodEnd ?? T0, 'monthly'),
         currentPeriodEnd: opts.periodEnd ?? T0,
+        trialEndsAt: opts.trialEndsAt ?? null,
         provider: opts.provider === undefined ? 'stub' : opts.provider,
         providerPaymentMethodRef:
           opts.token === null ? null : encryption.encrypt(opts.token ?? 'tok_good'),
@@ -595,6 +597,81 @@ describe.skipIf(!hasDb)('comped is never charged', () => {
   });
 });
 
+describe.skipIf(!hasDb)('trial end', () => {
+  const FAR = addDays(T0, 100);
+
+  it('trial not ended: untouched, no charge', async () => {
+    const { storeId } = await subscribedStore({
+      status: 'trialing',
+      periodEnd: FAR,
+      trialEndsAt: addDays(T0, 1),
+    });
+    await cycleFor(T0, storeId);
+    expect(stub.chargeCalls).toHaveLength(0);
+    expect(await getSub(storeId)).toMatchObject({ status: 'trialing', planCode: PRO });
+  });
+
+  it('trial ended with no card: downgraded to free + canceled, merchant notified', async () => {
+    const { storeId } = await subscribedStore({
+      status: 'trialing',
+      periodEnd: FAR,
+      trialEndsAt: T0,
+      token: null,
+      provider: null,
+    });
+    await cycleFor(T0, storeId);
+    expect(await getSub(storeId)).toMatchObject({
+      planCode: 'free',
+      status: 'canceled',
+      trialEndsAt: null,
+    });
+    expect((await storeTier(storeId)).plan).toBe('free');
+    expect(stub.chargeCalls).toHaveLength(0);
+    expect(emailSpy.mock.calls[0][1]).toMatchObject({ kind: 'downgraded' });
+    expect(bellSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('trial ended with a card: exactly one charge even if the cron runs twice', async () => {
+    const { storeId, subId } = await subscribedStore({
+      status: 'trialing',
+      periodEnd: FAR,
+      trialEndsAt: T0,
+    });
+    await cycleFor(T0, storeId);
+    await cycleFor(T0, storeId);
+    expect(stub.chargeCalls).toHaveLength(1);
+    expect(stub.chargeCalls[0].idempotencyKey).toBe(`sub:${subId}:trial-end:${T0.toISOString()}`);
+    const sub = await getSub(storeId);
+    expect(sub).toMatchObject({ status: 'active', planCode: PRO, trialEndsAt: null });
+    expect(sub.currentPeriodEnd!.toISOString()).toBe(addInterval(T0, 'monthly').toISOString());
+    expect(await ledger(storeId)).toHaveLength(1);
+  });
+
+  it('a declined trial-end charge enters dunning', async () => {
+    const { storeId } = await subscribedStore({
+      status: 'trialing',
+      periodEnd: FAR,
+      trialEndsAt: T0,
+    });
+    stub.declineAll = true;
+    await cycleFor(T0, storeId);
+    const sub = await getSub(storeId);
+    expect(sub).toMatchObject({ status: 'past_due', dunningAttempts: 1 });
+    expect(sub.nextRetryAt!.toISOString()).toBe(addDays(T0, 3).toISOString());
+  });
+
+  it('a comped store is never touched by trial handling', async () => {
+    const { storeId } = await subscribedStore({
+      planCode: 'comped',
+      status: 'comped',
+      trialEndsAt: addDays(T0, -5),
+    });
+    await cycleFor(T0, storeId);
+    expect(stub.chargeCalls).toHaveLength(0);
+    expect(await getSub(storeId)).toMatchObject({ planCode: 'comped', status: 'comped' });
+  });
+});
+
 describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
   it('cancel at period end keeps the plan until then, never charges, then moves to free', async () => {
     const { storeId, subId } = await subscribedStore({ periodEnd: addDays(T0, 10) });
@@ -693,6 +770,20 @@ describe.skipIf(!hasDb)('refunds and the append-only ledger', () => {
     const rows = await ledger(storeId);
     expect(rows.find(r => r.id === charge.id)!.status).toBe('refunded');
     expect(rows.filter(r => r.type === 'refund')).toHaveLength(2);
+    // each refund claimed its own idempotency key before the provider was called
+    expect(rows.filter(r => r.type === 'refund').map(r => r.idempotencyKey)).toEqual([
+      `refund:${charge.id}:1`,
+      `refund:${charge.id}:2`,
+    ]);
+    expect(stub.refundCalls.map(c => c.idempotencyKey)).toEqual([
+      `refund:${charge.id}:1`,
+      `refund:${charge.id}:2`,
+    ]);
+    // fully refunded: nothing left to refund
+    expect(
+      (await refundCharge({ eventId: charge.id, amountMinor: 1, provider: stub }).catch(e => e))
+        .code
+    ).toBe('NOT_REFUNDABLE');
   });
 
   it('cannot refund a failed or pending charge', async () => {

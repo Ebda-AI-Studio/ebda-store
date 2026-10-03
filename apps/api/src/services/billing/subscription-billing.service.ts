@@ -54,6 +54,17 @@ import { runBillingEffects, type BillingEffect } from './billing-notify';
 
 type Tx = Prisma.TransactionClient;
 
+/** The date a subscription is next due: the trial end while trialing, else the period end. */
+function periodEndOf(sub: {
+  status: string;
+  trialEndsAt: Date | null;
+  currentPeriodEnd: Date | null;
+}): Date | null {
+  return sub.status === 'trialing'
+    ? (sub.trialEndsAt ?? sub.currentPeriodEnd)
+    : sub.currentPeriodEnd;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STALE_CHECKOUT_MS = 24 * 3_600_000;
 
@@ -147,7 +158,7 @@ async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown
 async function downgradeToFree(
   tx: Tx,
   storeId: string,
-  reason: 'dunning' | 'canceled' | 'no_payment_method',
+  reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended',
   effects: BillingEffect[]
 ): Promise<void> {
   const free = await tx.plan.findUnique({ where: { code: FREE_PLAN_CODE } });
@@ -157,6 +168,7 @@ async function downgradeToFree(
       planCode: FREE_PLAN_CODE,
       status: 'canceled',
       cancelAtPeriodEnd: false,
+      trialEndsAt: null,
       pendingPlanCode: null,
       dunningAttempts: 0,
       nextRetryAt: null,
@@ -222,8 +234,8 @@ async function applySuccess(
     const renewable =
       sub &&
       row.forPeriodEnd &&
-      sub.currentPeriodEnd &&
-      sub.currentPeriodEnd.getTime() === row.forPeriodEnd.getTime() &&
+      periodEndOf(sub) &&
+      periodEndOf(sub)!.getTime() === row.forPeriodEnd.getTime() &&
       ['active', 'trialing', 'past_due'].includes(sub.status);
     if (!sub || !renewable) {
       // Money was taken but the subscription is not in a renewable state for
@@ -253,6 +265,7 @@ async function applySuccess(
         status: 'active',
         currentPeriodStart: start,
         currentPeriodEnd: addInterval(start, interval),
+        trialEndsAt: null,
         pendingPlanCode: null,
         dunningAttempts: 0,
         nextRetryAt: null,
@@ -271,8 +284,8 @@ async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): P
   if (
     !sub ||
     !row.forPeriodEnd ||
-    !sub.currentPeriodEnd ||
-    sub.currentPeriodEnd.getTime() !== row.forPeriodEnd.getTime() ||
+    !periodEndOf(sub) ||
+    periodEndOf(sub)!.getTime() !== row.forPeriodEnd.getTime() ||
     !['active', 'trialing', 'past_due'].includes(sub.status)
   ) {
     return;
@@ -285,7 +298,14 @@ async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): P
   const nextRetryAt = addDays(row.forPeriodEnd, DUNNING_RETRY_DAYS[row.attempt]);
   await tx.storeSubscription.update({
     where: { storeId: row.storeId },
-    data: { status: 'past_due', dunningAttempts: failedCount, nextRetryAt },
+    data: {
+      status: 'past_due',
+      dunningAttempts: failedCount,
+      nextRetryAt,
+      // A failed trial-end charge moves the due date into the period fields
+      // so the day-3 / day-7 retries run on the normal dunning path.
+      currentPeriodEnd: row.forPeriodEnd,
+    },
   });
   effects.push({
     kind: 'payment_failed',
@@ -537,10 +557,12 @@ export async function renewSubscription(
     return { action: 'skipped', reason: 'comped' };
   }
   const billable = ['active', 'trialing', 'past_due'].includes(sub.status);
-  if (!billable || !sub.currentPeriodEnd) return { action: 'skipped', reason: 'not_billable' };
+  const periodEnd = periodEndOf(sub);
+  if (!billable || !periodEnd) return { action: 'skipped', reason: 'not_billable' };
+  const trialEnd = sub.status === 'trialing';
 
   // Cancel-at-period-end (or a downgrade to free): finalize once the period is over.
-  if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd.getTime() <= now.getTime()) {
+  if (sub.cancelAtPeriodEnd && periodEnd.getTime() <= now.getTime()) {
     const effects: BillingEffect[] = [];
     await withRlsBypass(tx => downgradeToFree(tx, sub.storeId, 'canceled', effects));
     await runBillingEffects(effects);
@@ -551,8 +573,16 @@ export async function renewSubscription(
   const due =
     sub.status === 'past_due'
       ? !!sub.nextRetryAt && sub.nextRetryAt.getTime() <= now.getTime()
-      : sub.currentPeriodEnd.getTime() <= now.getTime();
+      : periodEnd.getTime() <= now.getTime();
   if (!due) return { action: 'skipped', reason: 'not_due' };
+
+  // A trial that ended with no saved card moves to free (same shape as dunning).
+  if (trialEnd && (!sub.provider || !sub.providerPaymentMethodRef)) {
+    const effects: BillingEffect[] = [];
+    await withRlsBypass(tx => downgradeToFree(tx, sub.storeId, 'trial_ended', effects));
+    await runBillingEffects(effects);
+    return { action: 'no_payment_method_downgrade' };
+  }
   if (!sub.provider) return { action: 'skipped', reason: 'not_billed_by_platform' };
 
   if (!sub.providerPaymentMethodRef) {
@@ -571,14 +601,16 @@ export async function renewSubscription(
     return { action: 'skipped', reason: 'price_not_set' };
   }
 
-  const key = renewalKey(sub.id, sub.currentPeriodEnd, attempt);
+  const key = trialEnd
+    ? `sub:${sub.id}:trial-end:${periodEnd.toISOString()}`
+    : renewalKey(sub.id, periodEnd, attempt);
   const eventId = await claimEvent({
     storeId: sub.storeId,
     subscriptionId: sub.id,
     type: 'renewal',
     planCode: plan.code,
     billingInterval: interval,
-    forPeriodEnd: sub.currentPeriodEnd,
+    forPeriodEnd: periodEnd,
     attempt,
     amountMinor: price,
     provider: provider.name,
@@ -634,6 +666,7 @@ export async function findDueSubscriptionIds(
             currentPeriodEnd: { lte: now },
             OR: [{ provider: { not: null } }, { cancelAtPeriodEnd: true }],
           },
+          { status: 'trialing', trialEndsAt: { lte: now } },
           { status: 'past_due', nextRetryAt: { lte: now } },
         ],
       },
