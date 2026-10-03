@@ -1,0 +1,214 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+
+ RUN  v4.1.11 /home/user/ebda/spikes/workers-api
+
+ ✓ test/routes.test.ts > host routing > slug host and custom domain map to the right store 1749ms
+ ✓ test/routes.test.ts > host routing > unknown host -> 404 (never the first store) 676ms
+ ✓ test/routes.test.ts > host routing > reserved slugs never resolve to a store 15ms
+ × test/routes.test.ts > cart add > add twice -> quantity 2, both 200 (no 25P02 abort) 835ms
+   → expected [ 404, 404 ] to deeply equal [ 200, 200 ]
+stdout | test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors
+[cart-concurrent] statuses 404,404,404,404,404,404,404,404,404,404,404,404
+
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+[load] 300 ops in 4626ms; latency p50=420.0ms p95=994.0ms max=1141.0ms; leaks=240 bad=0; distinct backend pids=2 (4918,4919); pids serving BOTH tenants=2
+
+ × test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors 1353ms
+   → Cannot read properties of undefined (reading 'quantity')
+ ✓ test/routes.test.ts > cart add > another tenant's product id on this host is a 404, and writes nothing 34ms
+ × test/routes.test.ts > cart add > same session id on two hosts yields two independent carts 29ms
+   → expected undefined not to be undefined // Object.is equality
+ ✓ test/routes.test.ts > payment webhook > bad signature -> 401; missing -> 401; bad hex -> 401; unknown provider -> 404; nothing stored 24ms
+stderr | test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+request failed new row violates row-level security policy for table "webhook_events"
+
+stderr | test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+request failed new row violates row-level security policy for table "webhook_events"
+
+stderr | test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+request failed new row violates row-level security policy for table "webhook_events"
+
+stderr | test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+request failed new row violates row-level security policy for table "webhook_events"
+
+stderr | test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+request failed new row violates row-level security policy for table "webhook_events"
+
+ × test/routes.test.ts > payment webhook > good -> 200 and cart paid; replay -> 200 no duplicate row, no second state change 17ms
+   → expected 400 to be 200 // Object.is equality
+ × test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200 61ms
+   → expected [ 500, 500, 500, 500, 500 ] to deeply equal [ 200, 200, 200, 200, 200 ]
+ × test/routes.test.ts > payment webhook > a webhook delivered on rival's host cannot mark amelia's cart paid 23ms
+   → expected { error: 'bad_payload' } to match object { cartMarkedPaid: false }
+(1 matching property omitted from actual)
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > NEGATIVE CONTROL: a session-level set_config(..., false) DOES leak through pgbouncer (proves the harness can fail)
+[negative-control] session-level set_config leaked into a later, different client 18/20 times
+
+ × test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants 4634ms
+   → expected 240 to be +0 // Object.is equality
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > role is non-bypass and every table is ENABLE+FORCE RLS 25ms
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > a request whose GUC is not set returns zero rows, and cannot write 57ms
+ × test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection 14ms
+   → expected null to be '11111111-1111-4111-8111-111111111111' // Object.is equality
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > NEGATIVE CONTROL: a session-level set_config(..., false) DOES leak through pgbouncer (proves the harness can fail) 406ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+AssertionError: expected 240 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 240
+
+ ❯ test/isolation.test.ts:37:19
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection
+AssertionError: expected null to be '11111111-1111-4111-8111-111111111111' // Object.is equality
+
+- Expected:
+"11111111-1111-4111-8111-111111111111"
+
++ Received:
+null
+
+ ❯ test/isolation.test.ts:67:22
+     65|         inTx: (await tx.$queryRaw<{ v: string }[]>`SELECT current_sett…
+     66|       }), AMELIA.id);
+     67|       expect(a.inTx).toBe(AMELIA.id); // GUC is visible inside its own…
+       |                      ^
+     68|       const b = await rawTx(async (tx) => ({
+     69|         pid: (await tx.$queryRaw<{ p: number }[]>`SELECT pg_backend_pi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  test/routes.test.ts > cart add > add twice -> quantity 2, both 200 (no 25P02 abort)
+AssertionError: expected [ 404, 404 ] to deeply equal [ 200, 200 ]
+
+- Expected
++ Received
+
+  [
+-   200,
+-   200,
++   404,
++   404,
+  ]
+
+ ❯ test/routes.test.ts:38:36
+     36|     const r1 = await post(AMELIA.host, '/cart/items', { productId: AME…
+     37|     const r2 = await post(AMELIA.host, '/cart/items', { productId: AME…
+     38|     expect([r1.status, r2.status]).toEqual([200, 200]);
+       |                                    ^
+     39|     const b = (await r2.json()) as any;
+     40|     expect(b.items).toEqual([{ productId: AMELIA_PRODUCT, quantity: 2 …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors
+TypeError: Cannot read properties of undefined (reading 'quantity')
+ ❯ test/routes.test.ts:49:21
+     47|     console.log('[cart-concurrent] statuses', rs.map((r) => r.status).…
+     48|     const items = await rawTx((tx) => tx.cartItem.findMany({ where: { …
+     49|     expect(items[0].quantity).toBe(1 + rs.filter((r) => r.status === 2…
+       |                     ^
+     50|     expect(rs.every((r) => r.status === 200)).toBe(true);
+     51|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  test/routes.test.ts > cart add > same session id on two hosts yields two independent carts
+AssertionError: expected undefined not to be undefined // Object.is equality
+ ❯ test/routes.test.ts:62:26
+     60|     const a = (await (await post(AMELIA.host, '/cart/items', { product…
+     61|     const b = (await (await post(RIVAL.host, '/cart/items', { productI…
+     62|     expect(a.cartId).not.toBe(b.cartId);
+       |                          ^
+     63|     expect(b.items).toEqual([{ productId: RIVAL_PRODUCT, quantity: 3 }…
+     64|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  test/routes.test.ts > payment webhook > good -> 200 and cart paid; replay -> 200 no duplicate row, no second state change
+AssertionError: expected 400 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 400
+
+ ❯ test/routes.test.ts:91:23
+     89|     const eventId = `evt_${crypto.randomUUID()}`;
+     90|     const r1 = await send(AMELIA.host, { eventId, cartId });
+     91|     expect(r1.status).toBe(200);
+       |                       ^
+     92|     expect(await r1.json()).toMatchObject({ duplicate: false, cartMark…
+     93|     expect((await cartStatus(AMELIA.id, cartId))?.status).toBe('paid');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+AssertionError: expected [ 500, 500, 500, 500, 500 ] to deeply equal [ 200, 200, 200, 200, 200 ]
+
+- Expected
++ Received
+
+  [
+-   200,
+-   200,
+-   200,
+-   200,
+-   200,
++   500,
++   500,
++   500,
++   500,
++   500,
+  ]
+
+ ❯ test/routes.test.ts:102:37
+    100|     const eventId = `evt_${crypto.randomUUID()}`;
+    101|     const rs = await Promise.all(Array.from({ length: 5 }, () => send(…
+    102|     expect(rs.map((r) => r.status)).toEqual([200, 200, 200, 200, 200]);
+       |                                     ^
+    103|     expect(await rawTx((tx) => tx.webhookEvent.count({ where: { eventI…
+    104|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  test/routes.test.ts > payment webhook > a webhook delivered on rival's host cannot mark amelia's cart paid
+AssertionError: expected { error: 'bad_payload' } to match object { cartMarkedPaid: false }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "cartMarkedPaid": false,
++   "error": "bad_payload",
+  }
+
+ ❯ test/routes.test.ts:109:28
+    107|     const cartId = ((await (await post(AMELIA.host, '/cart/items', { p…
+    108|     const r = await send(RIVAL.host, { eventId: `evt_${crypto.randomUU…
+    109|     expect(await r.json()).toMatchObject({ cartMarkedPaid: false });
+       |                            ^
+    110|     expect((await cartStatus(AMELIA.id, cartId))?.status).toBe('open');
+    111|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 8 passed (16)
+   Start at  18:29:24
+   Duration  6.18s (transform 651ms, setup 0ms, import 588ms, tests 9.96s, environment 0ms)
+

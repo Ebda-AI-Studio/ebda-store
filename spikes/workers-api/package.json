@@ -1,0 +1,28 @@
+{
+  "name": "ebda-workers-api-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:setup": "bash scripts/db-setup.sh",
+    "pooler:start": "bash scripts/pooler.sh start",
+    "pooler:stop": "bash scripts/pooler.sh stop",
+    "generate": "prisma generate",
+    "dev": "wrangler dev",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^6.19.3",
+    "@prisma/client": "^6.19.3",
+    "hono": "^4.13.12",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20261003.1",
+    "@types/pg": "^8.23.1",
+    "prisma": "^6.19.3",
+    "typescript": "^7.0.2",
+    "vitest": "4.1",
+    "wrangler": "^4.147.0"
+  }
+}

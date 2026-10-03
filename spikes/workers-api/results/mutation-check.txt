@@ -1,0 +1,43 @@
+== baseline
+== baseline: vitest exit=0
+      Tests  16 passed (16)
+
+== mutation 1: set_config(..., true) -> set_config(..., false)  (session-level GUC)
+35:    await tx.$queryRaw`SELECT set_config('app.current_store_id', ${g.storeId}, false)`;
+39:    await tx.$queryRaw`SELECT set_config('app.current_user_id', ${g.userId}, false)`;
+== mutation1-session-level: vitest exit=1
+ FAIL  test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+ FAIL  test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > a request whose GUC is not set returns zero rows, and cannot write
+ FAIL  test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection
+ × test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+ × test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > a request whose GUC is not set returns zero rows, and cannot write
+ × test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  3 failed | 13 passed (16)
+
+== mutation 2: store-id set_config call removed entirely
+35:    // MUTATION: store GUC not set
+== mutation2-no-set-config: vitest exit=1
+ FAIL  test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+ FAIL  test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection
+ FAIL  test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors
+ FAIL  test/routes.test.ts > cart add > add twice -> quantity 2, both 200 (no 25P02 abort)
+ FAIL  test/routes.test.ts > cart add > same session id on two hosts yields two independent carts
+ FAIL  test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+ FAIL  test/routes.test.ts > payment webhook > a webhook delivered on rival's host cannot mark amelia's cart paid
+ FAIL  test/routes.test.ts > payment webhook > good -> 200 and cart paid; replay -> 200 no duplicate row, no second state change
+ × test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+ × test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection
+ × test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors
+ × test/routes.test.ts > cart add > add twice -> quantity 2, both 200 (no 25P02 abort)
+ × test/routes.test.ts > cart add > same session id on two hosts yields two independent carts
+ × test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200
+ × test/routes.test.ts > payment webhook > a webhook delivered on rival's host cannot mark amelia's cart paid
+ × test/routes.test.ts > payment webhook > good -> 200 and cart paid; replay -> 200 no duplicate row, no second state change
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  8 failed | 8 passed (16)
+
+== restored
+src/db.ts identical to original
+== restored: vitest exit=0
+      Tests  16 passed (16)

@@ -1,0 +1,374 @@
+# FWB API -> Cloudflare Workers: backend inventory
+
+Read-only research on `/home/user/force-website-builder/apps/api` (FWB checked out 2026-10-03). Nothing in FWB was modified.
+Context doc: `docs/migration/backend-cf-migration-plan.md` (Option B = Workers rewrite; Option A = Containers).
+All paths are relative to `apps/api/src/` unless they start with `packages/` or `scripts/`. "NC" = `nodejs_compat`.
+
+Size: 143,570 lines TS across `apps/api/src` (non-test), 74 files in `routes/` (41,724 lines), 135 distinct `process.env.*` names.
+
+## 0. Corrections to the migration plan
+
+| Plan says | Code says |
+| --- | --- |
+| GUC is `app.current_client_id` | Real names are `app.current_store_id`, `app.current_user_id`, `app.bypass_rls` (`packages/database/src/tenant-gucs.ts:15-23`, `index.ts:691-699`). Any Hyperdrive proof must test these. |
+| 83 models | `grep -c "^model "` on `schema.prisma` = **112** |
+| 62 route files / 247 TS files | 74 files in `routes/` (incl. `index.ts`); 71 route modules |
+| Prisma 6.x | `@prisma/client` + `prisma` = **6.19.3** (lockfile) |
+
+## 1. Dependency table
+
+Import counts are non-test `.ts` files under `apps/api/src` (grep of `from '<pkg>'`). Status key: **NC** = works under `nodejs_compat`; **SWAP** = replace with Workers-native; **REWRITE** = logic must be rewritten; **DROP**.
+Items marked (verify) are my judgement of Workers behaviour and were not tested.
+
+### 1.1 `apps/api/package.json` runtime dependencies
+
+| Package | Files | Examples | Used for | Workers status |
+| --- | --- | --- | --- | --- |
+| express 4.22 | 97 (types) | `index.ts`, `middleware/tenant-context.ts`, `middleware/request-transaction.ts` | HTTP framework, 74 routers, ~40 middleware | **REWRITE** to Hono (req/res monkey-patching in `request-transaction.ts` has no Hono equivalent; see section 4). Option: `node:http` server shim under NC (`httpServerHandler`, verify) |
+| @force/database | 235 | `types/express.d.ts`, `index.ts`, `middleware/tenant-context.ts` | Prisma client + RLS proxy | **REWRITE** driver layer (section 7) |
+| @force/shared | 48 | `middleware/feature-gate.ts`, `services/feature.service.ts`, `services/analytics.service.ts` | shared types/consts/slugify (only dep: zod) | **NC** (pure TS) |
+| zod 3.22 | 72 | `middleware/error-handler.ts`, `services/ai.service.ts`, `lib/ai/brand-facts.ts` | validation | **NC** |
+| @prisma/client 6.19.3 | 16 (+235 via @force/database) | `services/inventory-decrement.ts`, `services/accounting/posting/order-posting.ts` | ORM, `Prisma.*` types/errors (P2002/P2028/P2034 handling) | **SWAP**: driver adapter (`@prisma/adapter-pg` + Hyperdrive, or `adapter-neon` WS Pool). HTTP-only neon adapter cannot do interactive tx. `datasourceUrl` option not allowed with adapters |
+| inngest 4.2.6 | 65 | `index.ts`, `lib/inngest/client.ts`, `lib/inngest/functions/product-meta-sync.ts` | 95 functions + `inngest.send` (26 files) | **NC** swap `inngest/express` -> `inngest/cloudflare` serve handler (verify exists in v4) |
+| ioredis 5.8 | 1 | `services/redis.service.ts` | all Redis (section 2) | **SWAP**: KV / Durable Object / Upstash REST / Rate Limiting binding / Queues per group |
+| @socket.io/redis-adapter | 1 | `services/socket.service.ts` | cross-replica socket fan-out | **DROP** (DO has one coordinator) |
+| socket.io 4.8 | 1 | `services/socket.service.ts` | admin realtime (471 lines, 6 caller files) | **REWRITE**: Durable Object + WebSocket Hibernation API (rooms `user:<id>`, `store:<id>`) |
+| rate-limit-redis | 1 | `middleware/security.ts` | Redis store for express-rate-limit | **SWAP**: Rate Limiting binding / DO |
+| express-rate-limit 8 | 5 | `index.ts`, `middleware/security.ts`, `mcp/agent-auth.ts` | 23 `rateLimit()` instances, 24 `makeRateLimitStore` | **SWAP** (Rate Limiting binding for coarse; DO for strict) |
+| helmet | 1 | `index.ts` | security headers | **SWAP** `hono/secure-headers` |
+| cors | 1 | `index.ts` | CORS (+ `lib/cors-cache.ts` DB-backed custom-domain allow-list) | **SWAP** `hono/cors` with async origin fn |
+| compression | 1 | `index.ts` | gzip | **DROP** (edge compresses) |
+| cookie-parser | 1 | `index.ts` | cookies/CSRF | **SWAP** `hono/cookie` |
+| dotenv 17 | 1 | `config/index.ts` | env load | **DROP** (Worker `env` bindings; `config` is read at module load, must become per-request/`env`-injected) |
+| @sentry/node 10 | 2 | `services/sentry.service.ts`, `lib/inngest/functions/order-whatsapp-notify.ts` | errors (4 caller files via `SentryService`) | **SWAP** `@sentry/cloudflare` |
+| @sentry/profiling-node | 1 | `services/sentry.service.ts` | CPU profiling (native addon) | **DROP** |
+| @opentelemetry/* (6 pkgs) | 1 | `tracing.ts` | NodeSDK + `auto-instrumentations-node` (monkey-patches http/pg/express, MUST be first import) | **DROP** -> Workers Observability tracing, or `@microlabs/otel-cf-workers` |
+| pino 10 | 2 | `lib/logger.ts`, `lib/observability/wa-bridge-timing.ts` | JSON logging; multi-transport (`pino/file`, `pino-pretty`) | **NC** without transports (console JSON). Transports use `worker_threads` -> **DROP** |
+| @axiomhq/pino | 0 direct (string target `require.resolve('@axiomhq/pino')`, `lib/logger.ts:28`) | `lib/logger.ts` | Axiom drain via pino worker transport | **DROP** -> Workers Logs/Logpush or `fetch` ingest in `ctx.waitUntil` |
+| @aws-sdk/client-s3 | 3 | `services/storage.service.ts`, `lib/inngest/functions/audit-log-archive.ts`, `lib/inngest/functions/r2-orphan-sweep.ts` | R2 via S3 API (`endpoint: config.storageEndpoint`, region `auto`): Put/Delete/DeleteObjects/ListObjectsV2/GetObject | **NC** works but heavy; **SWAP** put/delete/list to R2 binding |
+| @aws-sdk/s3-request-presigner | 1 | `services/storage.service.ts:9,348,378` | presigned GET/PUT URLs | **NC** (keep S3 signer w/ R2 keys, or `aws4fetch`); R2 bindings cannot presign |
+| @google/generative-ai | 13 | `services/ai.service.ts`, `services/accounting/gemini-ai.service.ts`, `lib/ai/product-faq-generator.ts` | Gemini | **NC** (fetch-based) |
+| @modelcontextprotocol/sdk 1.29 | 11 | `mcp/store-mcp-server.ts`, `mcp/agent-auth.ts`, `mcp/merchant-mcp-server.ts` | MCP servers; `StreamableHTTPServerTransport` per request (`routes/mcp.routes.ts:101`, `mcp-admin.routes.ts:185`) | **SWAP** transport to the web-standard Streamable HTTP transport / `agents` `createMcpHandler` (verify availability in 1.29). Uses `res.on('close')` |
+| bcryptjs 3 | 5 (+ `packages/database` seeds) | `services/auth.service.ts`, `services/provisioning.service.ts`, `services/mfa.service.ts` | password + MFA backup-code hashing, `SALT_ROUNDS=12` (`auth.service.ts:228`) | **NC** (pure JS) but ~100s of ms CPU per hash at cost 12 and `hashSync` at class init (`auth.service.ts:240`); keep hash format |
+| jsonwebtoken 9 | 9 | `middleware/auth.ts`, `middleware/security.ts`, `services/socket.service.ts` | access/refresh/MFA JWTs | **NC** (verify); recommend `jose` swap |
+| otplib 12 | 1 | `services/mfa.service.ts` | TOTP | **NC** (verify, uses `crypto.createHmac`) |
+| qrcode 1.5 | 1 | `services/mfa.service.ts` | MFA QR data-URL | **NC** (verify) |
+| resend 4 | 1 | `services/resend.service.ts` | email send | **NC** (fetch) |
+| web-push 3.6 | 1 | `services/push.service.ts:9,33,106,300` | W3C Web Push, VAPID | **SWAP** (uses node `https`/`crypto` ECDH; use WebCrypto web-push lib) (verify) |
+| sharp 0.35 | 5 | `services/image-resize.service.ts`, `services/pwa.service.ts`, `routes/pwa.routes.ts` (also `services/ai.service.ts:55`, `lib/ai/product-alt-text-generator.ts:41` - PNG normalise for Gemini) | resize/convert, PWA icon generation (SVG density render) | **SWAP**: Cloudflare Images binding (resize/format) / Browser-free wasm (photon) for PNG normalise; native addon will not run |
+| multer 2 | 5 | `routes/upload.routes.ts:29,504`, `routes/expenses.routes.ts:26`, `routes/finance.routes.ts:1158`, `routes/pwa.routes.ts:131`, `routes/shipping.routes.ts:333` | multipart, all `memoryStorage` | **SWAP** `request.formData()` / `c.req.parseBody()`; keep size limits manually |
+| exceljs 4.4 | 6 | `lib/exports/xlsx.ts`, `services/xlsx-import.ts`, `routes/order.routes.ts` (also customers, newsletter, finance, shipping routes) | xlsx import/export; one streaming `wb.xlsx.write(res)` (`bulk.routes.ts`) | **NC?** (verify; uses streams/zlib/jszip, large bundle, memory-heavy). Fallback: SheetJS, or generate off-Worker (Inngest -> R2) |
+| imapflow 1.3 | 1 | `services/gmail-alert-poller.service.ts:1` (`pollGmailAlerts`, Inngest cron `*/15`) | IMAP over TCP/TLS to Gmail | **REWRITE**: Gmail REST API over fetch, or leave on a non-Workers host. TCP IMAP via `node:net`/`tls` NC shim unlikely to be reliable (verify) |
+| swagger-jsdoc, swagger-ui-express | 1 each | `docs/swagger.ts` | `/api-docs` | **DROP** (swagger-jsdoc scans files via fs at runtime) -> prebuilt JSON |
+
+### 1.2 `packages/database/package.json`
+
+| Package | Files | Used for | Status |
+| --- | --- | --- | --- |
+| @prisma/client ^6.19.3 | `packages/database/src/index.ts`, `src/with-money-tx.ts`, `src/index.d.ts` | client + `Prisma` namespace | **SWAP** as above |
+| bcryptjs | `prisma/seed*.ts`, `prisma/clone-demo-stores.ts` only | seeds | not in Worker bundle |
+| prisma (dev) | `prisma generate`, `migrate deploy` | tooling | runs in CI/Node, not on Workers |
+
+Also uses `node:async_hooks` `AsyncLocalStorage` (`index.ts:3`, `tenantStorage`, `storeScope`) - needs `nodejs_compat` (supported; see section 4).
+
+### 1.3 `packages/shared/package.json`
+
+| Package | Files | Used for | Status |
+| --- | --- | --- | --- |
+| zod ^3.22.4 | 7 files in `packages/shared/src` | schemas | **NC** |
+
+### 1.4 Node built-ins (non-test files, `apps/api/src`)
+
+| Module | Files | Where | Status |
+| --- | --- | --- | --- |
+| crypto | 42 | `services/encryption.service.ts` (AES-GCM `createCipheriv`, authTagLength 16), 4 payment providers (`createHmac`, `timingSafeEqual`), `auth.service.ts` | **NC** (works; prefer WebCrypto for new code). Hesabe uses `createCipheriv` (`hesabe.provider.ts:76`) - verify mode support |
+| http / https | 3 / 1 | `index.ts:5` (`createServer`), `socket.service.ts:1`, `services/accounting/expense-ocr.service.ts:14-15,106` (stream download w/ `res.on('data')`) | **REWRITE** to `fetch` |
+| dns, net | 1 each | `lib/safe-fetch.ts:23-24` (SSRF guard: resolve host, reject private IPs) | **REWRITE** (Workers cannot reach private ranges; DoH resolve or drop) |
+| path | 1 | - | NC |
+| fs, child_process, worker_threads | 0 in src (pino transports use worker_threads indirectly) | - | n/a |
+
+## 2. Redis
+
+Single wrapper: `services/redis.service.ts` (357 lines, class `RedisService`, export `redis`). Client: `new Redis(config.redisUrl, { maxRetriesPerRequest: 3, lazyConnect: true, keyPrefix: config.redisKeyPrefix || undefined })` (`redis.service.ts:16-31`; env `REDIS_URL`, `REDIS_KEY_PREFIX`). Connected at boot (`index.ts:114`). Everything is fail-open (`isAvailable()` is checked at 37 sites; memory fallbacks exist for rate limits, CSRF, lockout).
+Raw ioredis access via `redis.getClient()`: 42 call sites (`index.ts`, `security.ts`, `account-lockout`, `email-queue`, `sms-queue`, `low-stock-scan`, `leader-election`, `campaign-send-pacer`, `agent-auth`, `recommendation`, `socket.service`).
+
+### 2.1 Commands in use
+
+`GET SET SETEX SET..EX..NX SET..PX DEL UNLINK EXISTS EXPIRE PEXPIRE INCR MULTI(INCR+EXPIRE) PIPELINE(EXISTS/SET NX/SETEX/DEL) SCAN MATCH COUNT PUBLISH(defined, 0 callers) PING EVAL(2 Lua scripts) CALL (rate-limit-redis: SCRIPT LOAD/EVALSHA) LPUSH RPOP LLEN LRANGE QUIT DUPLICATE (socket.io adapter pub/sub)`.
+Dead wrapper methods (no external callers): `setSession/getSession/deleteSession/extendSession`, `publish`, `exists`.
+
+### 2.2 Groups, callers, consistency requirement
+
+| # | Purpose | Commands / wrapper | Key shape | Callers (file:line) | Consistency requirement | Suggested CF primitive |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | **Read cache** (L2 behind a 1000-entry in-process BoundedMap) | `redis.get/set(setex)/delete`, `deleteByPattern` (SCAN+UNLINK) | `cache:*` (`store:slug:*`, `store:domain:*`, feature flags, public product lists, AI results, shipping-carrier configs, recommendations) | `lib/public-cache.ts:43,70,95,116` (`getCached` TTL 120s), `services/store.service.ts:121,221,254,414-419,572`, `feature.service.ts:91,104,188`, `product.service.ts:673-674`, `ai.service.ts:355-845` (16 sets, 5 gets), `shipping-carrier.service.ts:88,927`, `recommendation.service.ts:197,537,549-564`, `analytics.service.ts`, `notification-config.service.ts`, `abandoned-cart.service.ts:624` | **Eventually consistent OK** (TTLs 120s typical). BUT invalidate-on-write (`store:slug`, feature flags, `invalidateStoreProductCaches`) is expected to be prompt; KV propagation up to ~60s is tolerable only if TTL already is. Prefix invalidation (`deleteByPattern`) needs a design: versioned keys or KV `list({prefix})` | KV (or Cache API / tiered cache); version-stamp keys instead of SCAN |
+| B | **Auth revocation / token versions** | `denyJti` SETEX, `isJtiDenied` EXISTS, `setUserTokenVersion` SET (no TTL), `getUserTokenVersion` GET, `clearUserTokenVersion` DEL | `jti:deny:<jti>`, `user:tv:<userId>` | `middleware/auth.ts:102,110,152,241`, `routes/auth.routes.ts:712`, `services/auth.service.ts:198,202`, `services/socket.service.ts:160,172,181` | **Strong / read-your-writes** (logout, password change, role change must invalidate immediately on every isolate). KV staleness (~60s) is a security gap | Durable Object (per-user or sharded) or Upstash; D1/Postgres fallback |
+| C | **CSRF tokens** | `setCsrfToken` SETEX 3600, `getCsrfToken`, `deleteCsrfToken`; in-memory fallback `csrfTokensMemory` BoundedMap(10000) | `csrf:<sessionId>` | `middleware/security.ts:100,161` | Read-your-writes within a session (token minted then validated on next request, possibly other isolate). Sticky-ish | DO or signed double-submit cookie (stateless, removes Redis need) |
+| D | **General rate limits** (23 limiters, incl. `cartLimiter` 30/min at `security.ts:1378`, auth limiter 15/15min, `inngestLimiter`) | express-rate-limit + `rate-limit-redis` (`client.call` -> SCRIPT LOAD / EVALSHA Lua), per-request store choice `RedisOrMemoryStore` (`security.ts:700-815`); env kill-switch `RATE_LIMIT_SHARED=0` | `rl:<name>:<key>` | `middleware/security.ts` (24 `makeRateLimitStore`), `index.ts`, `mcp/agent-auth.ts:508` | **Approximate OK** (fails open on store error: `passOnStoreError`) | Workers Rate Limiting binding (note: period only 10s or 60s, per-location counters) |
+| E | **Brute-force controls** | account lockout: `INCR`, `PEXPIRE`, `GET`, `DEL` on `<key>:attempts`/`<key>:locked`; MFA: `incrementMfaAttempt` MULTI(INCR+EXPIRE), `lockMfaChallenge` SETEX 999, `getMfaAttempts` GET | `lockout:*`, `mfa:verify:attempts:<jti>` | `services/account-lockout.service.ts:45-188`, `routes/mfa.routes.ts:190,228,231` | **Strong/atomic counter** (INCR then threshold; concurrency must not let N parallel guesses through) | Durable Object per key (or per email/jti) |
+| F | **Webhook/agent throttles & dedup counters** | `incrementRateLimit` (MULTI INCR+EXPIRE), `getRateLimitCount` | `ratelimit:*` | `payment-providers/payment.factory.ts:1408` (3+ bad-signature failures per provider per 300s -> alert), `notification-dispatcher.service.ts:81`, `mcp/agent-auth.ts:508,519` | Approximate OK (alert dedup) | Rate Limiting binding / KV counter |
+| G | **Distributed locks / leader election** | `acquireLock` = `SET lock:<name> 1 EX ttl NX`, `releaseLock` DEL (no owner check); `withLeaderLock` = `SET key instanceId EX NX` + Lua compare-and-delete (`leader-election.ts:58,77-83`) | `lock:*`, leader keys | `services/abandoned-cart.service.ts:138,163`, `alerts.service.ts:271`, `recommendation.service.ts:383,474`, `shipping-carrier.service.ts:804,817`, `lib/leader-election.ts` (used by `index.ts`, `loyalty-automation`, `recommendation`, `ai-autofill-sweep`) | **Strong/atomic** (mutual exclusion). Becomes unnecessary for jobs moved to Inngest cron / Cron Triggers (single fire) | Drop for crons; DO for remaining mutexes |
+| H | **Alert-once sentinels** (use `acquireLock` as `SET NX`) | same as G | `refund-claim-alerted:<id>:<stage>`, `status-fanout-failed:<id>:<ts>` | `lib/inngest/functions/refund-claim-stuck-sweep.ts:201`, `order-status-fanout-stuck-sweep.ts:271` | Atomic set-if-absent, but duplicates only cost a duplicate alert | KV (best-effort) or DO |
+| I | **Low-stock sentinels** | `EXISTS`, `SETEX`, `DEL`, pipeline(EXISTS), pipeline(`SET .. 'pending' EX NX`) claim, pipeline(SETEX/DEL) | `low-stock-alerted:<storeId>:<productId>` | `services/inventory/low-stock-scan.service.ts:89-365` | NX claim must be atomic to avoid double-notify; else eventual | DO per store or KV + D1 |
+| J | **MCP denial-row coalesce** | `SET key:row ... EX NX`, `GET`, `DEL` | `<key>:row` | `mcp/agent-auth.ts:551-601` | Atomic NX (dedup of audit rows) | DO / KV |
+| K | **Campaign send pacer** | Lua `EVAL`: `TIME`, `GET`, `SET PX` - reserves next send slot, conditional on maxWait | `campaign:send-pacer:next-slot` | `lib/campaign-send-pacer.ts:50-90` (called from `lib/inngest/functions/campaign-send.ts`) | **Strong/atomic** (single global slot allocator) | Single Durable Object (alarm-free, trivial) |
+| L | **Queues** (email, SMS) | `LPUSH` enqueue, `RPOP` consume (no ack/visibility timeout), `LLEN`, `LRANGE`, `DEL`; failed + corrupt lists; consumer polled by `setInterval` (email 1000ms, SMS 2000ms) | `email:queue`, `email:failed`, `email:failed:corrupt` , `sms:queue`, `sms:failed`, `sms:failed:corrupt` | `services/email-queue.service.ts:71,92,115-119,203-232,298-373`, `services/sms-queue.service.ts:90,107,130-134,270-309,329-397` | At-least-once delivery desired; current is at-most-once (RPOP then send; failure re-LPUSH). Needs durability, retries, DLQ | Cloudflare Queues (+DLQ), or Inngest events |
+| M | **Pub/sub** | socket.io redis-adapter (`redisClient.duplicate()` x2, `socket.service.ts:98-104`); `redis.publish` has zero callers | adapter channels | `services/socket.service.ts` | Real-time fan-out across replicas | Durable Object WebSocket Hibernation (single DO per store/user room) |
+| N | **Health** | `PING` | - | `index.ts:491-492`, `redis.service.ts:345` | n/a | drop / binding health |
+
+Key prefix: `REDIS_KEY_PREFIX` (staging uses `fwb-staging:`) applied transparently by ioredis `keyPrefix`; any replacement must replicate it (namespacing KV, DO names).
+
+## 3. In-process state and timers
+
+What breaks: an isolate may be evicted at any time, handles requests concurrently with others, and has no background loop between requests. `setInterval` loops simply never run (or run only while a request is in flight). Module-level Maps are per-isolate, not shared and not durable.
+
+### 3.1 Intervals (all started from the boot IIFE `index.ts:111-145` after `redis.connect()`)
+
+| Loop | Started at | Period | Work | Leader-gated | Replacement |
+| --- | --- | --- | --- | --- | --- |
+| `emailQueue.startProcessing()` | `email-queue.service.ts:92` | 1 s | drain `email:queue` | no (RPOP is atomic) | Queues consumer |
+| `smsQueue.startProcessing(2000)` | `sms-queue.service.ts:107` | 2 s | drain `sms:queue` | no | Queues consumer |
+| `abandonedCartService.startProcessing(900000)` | `abandoned-cart.service.ts:115` | 15 min | abandoned-cart emails | `acquireLock` (`:138`) | Cron Trigger / Inngest cron |
+| `recommendationService.startFBTCron(86400000, [])` | `recommendation.service.ts:487` | 24 h | frequently-bought-together recompute (storeIds list is `[]` at boot) | `withLeaderLock('fbt-recalculation')` | Inngest cron |
+| `shippingCarrierService.startTrackingCron(1800000)` | `shipping-carrier.service.ts:801` | 30 min | tracking poll | `acquireLock(TRACKING_CRON_LOCK)` | Cron Trigger |
+| `loyaltyAutomationService.startCron(86400000)` | `loyalty-automation.service.ts:51` | 24 h (+ run at start) | birthday bonuses, point expiry | `withLeaderLock('loyalty-automation-daily')` | Inngest cron |
+| refresh-token cleanup | `index.ts:131` | 12 h (+ run at boot) | `AuthService.cleanupRefreshTokens` | `withLeaderLock('auth-refresh-token-cleanup')` | Inngest cron |
+| CSRF memory sweep | `middleware/security.ts:37` | 5 min | evict expired in `csrfTokensMemory` | no | unnecessary once CSRF is stateless/DO |
+| view-debounce sweep | `services/view-ingest.service.ts:54` | 5 min | evict `sessionViewDebounce` | no | KV TTL / drop |
+
+Also: boot `setTimeout(3000)` self-PUT to `/api/v1/inngest` to register functions (`index.ts:~705`) - replace with CI `PUT` after deploy.
+
+### 3.2 Other timers (non-trivial)
+
+| File:line | Purpose | Note |
+| --- | --- | --- |
+| `middleware/request-transaction.ts:356` | COMMIT deadline (`REQUEST_COMMIT_TIMEOUT_MS`, default 10000) answers 503 `COMMIT_TIMEOUT` | needs `AbortSignal`/`Promise.race`; timers inside a request are fine in Workers |
+| `lib/public-cache.ts:275` | **order-purge coalescing window** `ORDER_PURGE_COALESCE_MS = 10_000`: first order opens a 10 s window; orders arriving mid-window set `pending`; a trailing purge fires at the end (recursive re-open). State in `orderPurgeWindows` BoundedMap(10000) | **Breaks**: needs a trailing timer after the response and shared state. Use DO alarm per store, or drop coalescing, or `ctx.waitUntil` + KV flag |
+| `services/alerts.service.ts:186,236,292` | alert send hard deadline, `awaitInFlightAlerts`, Telegram abort | in-flight set `inFlightAlerts` (`:226`) drained on shutdown -> use `ctx.waitUntil` |
+| `lib/after-tenant-commit.ts:289` | `awaitDeferredWork` timeout; `inFlightDrains` Set (`:265`) | see section 4 |
+| `services/email-queue.service.ts:203`, `sms-queue.service.ts:270` | retry re-enqueue delay via `setTimeout` | needs Queues `delaySeconds` |
+| `lib/db-retry.ts:102,175` | backoff sleeps for P2034 / connection errors | fine |
+| `services/return.service.ts:148` | poll `CREATE_LOCK_POLL_MS` | fine within a request |
+| `services/accounting/*-scan.service.ts`, `gemini-ai.service.ts:198`, `lib/campaign-send-pacer.ts:127`, `lib/inngest/ai-retry.ts`, 15 `sleep()` in `lib/inngest/functions/bulk-ai-*.ts` | throttling inside Inngest steps (Gemini rate pacing, campaign slot wait) | wall-clock waits inside a Worker invocation count against duration (not CPU) but a step must stay under subrequest/time limits |
+| `lib/revalidate-storefront.ts:72` | 4 s abort on storefront revalidate call | fine |
+| `services/resend.service.ts:221` | 8 s timeout | fine |
+
+### 3.3 Module-level caches / singletons
+
+| Symbol | File:line | Bound | Content | On ephemeral isolates |
+| --- | --- | --- | --- | --- |
+| `memoryCache` BoundedMap | `lib/public-cache.ts:26` | 1000 | L1 of `getCached` | harmless L1 (hit rate drops); fine |
+| `inFlight` Map | `lib/public-cache.ts:35` | unbounded | single-flight de-dupe | per-isolate only; fine |
+| `orderPurgeWindows` BoundedMap | `lib/public-cache.ts:264` | 10000 | purge coalescing | **breaks** (see 3.2) |
+| `csrfTokensMemory` BoundedMap | `middleware/security.ts:32` | 10000 | CSRF fallback when Redis down | per-isolate = tokens invisible to other isolates; make stateless/DO |
+| `corsDomainCache` BoundedMap | `lib/cors-cache.ts:42` | 5000 | custom-domain CORS allow-list from DB | fine as cache; first request per isolate hits DB |
+| `redirectCache` BoundedMap | `services/slug-redirect.service.ts:149` | 5000 | slug redirects | fine |
+| `optOutBaseCache` BoundedMap | `services/notification-dispatcher.service.ts:350` | 2000 | cached promise | fine |
+| `lastWarnedAt` BoundedMap | `middleware/deprecation.ts:62` | 500 | log throttle | fine |
+| `sessionViewDebounce` BoundedMap | `services/view-ingest.service.ts:50` | MAX_DEBOUNCE_ENTRIES | page-view dedupe | **semantics change** (more duplicate views); move to KV/DO or accept |
+| `analyticsMemCache` Map | `services/analytics.service.ts:13` | unbounded | analytics TTL cache | fine but unbounded growth per isolate |
+| `memoryStore` Map | `services/account-lockout.service.ts:25` (MAX_LOCKOUT_ENTRIES) | bounded by hand | lockout fallback when Redis down | **security regression** if used in Workers (per-isolate) |
+| `circuits` Map | `services/circuit-breaker.service.ts:33` | unbounded | circuit breaker state | per-isolate; breaker never trips across isolates |
+| `savepointSeq` counter | `lib/savepoint.ts` | - | savepoint names | per-isolate counter is fine (name unique within a tx) |
+| `localNextSlot`, `INSTANCE_ID` | `lib/campaign-send-pacer.ts`, `lib/leader-election.ts:~33` | - | fallbacks / instance identity (`pid-random`) | meaningless on Workers |
+| Prisma singleton | `packages/database/src/index.ts:64` (`globalForPrisma`) | - | one `PrismaClient`/pool per process | per-isolate client; pool size and cold start matter; cannot hold a pool across requests with Hyperdrive/WS safely |
+
+`BoundedMap` is `lib/bounded-map.ts`; users: `middleware/security.ts`, `middleware/deprecation.ts`, `services/view-ingest.service.ts`, `services/slug-redirect.service.ts`, `services/notification-dispatcher.service.ts`, `lib/cors-cache.ts`, `lib/public-cache.ts`.
+
+### 3.4 process.on handlers and graceful shutdown
+
+| Handler | File:line | Behaviour |
+| --- | --- | --- |
+| `SIGTERM`, `SIGINT` -> `gracefulShutdown` | `index.ts:778-779` | sets `isShuttingDown` (new requests get 503 `Connection: close`), `server.close`, stops 6 timers, `socketService.close()`, `await awaitDeferredWork(10000)`, `await awaitInFlightAlerts(ALERT_SEND_DEADLINE_MS)`, `prisma.$disconnect()`, `redis.disconnect()`, `SentryService.close()`, `process.exit`; hard kill after 30 s |
+| `uncaughtException`, `unhandledRejection` | `index.ts:782,800` | log + alert (+ exit logic) |
+| `SIGTERM`, `SIGINT` once | `tracing.ts:68-69` | OTel SDK shutdown |
+
+On Workers: no signals. In-flight deferred work (return emails, R2 cleanup, audit rows, alerts) must be handed to `ctx.waitUntil` (30 s grace after response) or Queues/Inngest, otherwise dropped. `unhandledRejection` -> Sentry `captureException` wrapper / `tail`.
+Counts relevant to this: `deferAfterTenantCommit(` 16 call sites outside the lib; `void <call>(` fire-and-forget patterns 54 sites; "fire-and-forget" comments in 33 files.
+
+## 4. Request lifecycle hooks
+
+### 4.1 Hook inventory
+
+| Hook | Where | Purpose | Workers impact |
+| --- | --- | --- | --- |
+| `res.on('finish')` | `middleware/request-transaction.ts:456` (streaming-lane commit), `middleware/request-logger.ts:7`, `lib/observability/wa-bridge-timing.ts:16` | settle tx / log / timing | no `res` events; use `ctx.waitUntil` and post-handler middleware |
+| `res.on('close')` (client abort) | `request-transaction.ts:464` (ROLLBACK via `AbandonedRequest`, issue 1604), `routes/mcp.routes.ts:102`, `routes/mcp-admin.routes.ts:186` (close MCP transport/server) | rollback on disconnect | use `request.signal` abort / `waitUntil` cleanup |
+| `req.on('aborted')`, `req.on(...)` | none | - | - |
+| `res.end` monkey-patch (capture args, commit, replay) | `request-transaction.ts` (BUFFERED lane; whole file 466+ lines) | commit-before-respond | **REWRITE** as Hono middleware: `await next(); commit(); return c.res` (Response is naturally buffered) |
+| Streaming escalation (`res.write`, `res.download`, `res.sendFile`, `res.flushHeaders`, pipe) | detector in `request-transaction.ts:50-60`; actual uses: `routes/admin.routes.ts:1564,1623` (cursor-streamed `GET /admin/export/orders`, context-less), `routes/bulk.routes.ts` `streamXlsxResponse` -> `wb.xlsx.write(res)` (the ONLY in-tx streaming route: `GET /stores/:storeId/bulk/export.xlsx`) | exports | `TransformStream`/`ReadableStream`; tx must stay open while streaming (keep Postgres conn for stream duration) or materialise first |
+| SSE / `text/event-stream` / `res.writeHead` | none found | - | - |
+| MCP Streamable HTTP | `mcp.routes.ts:101`, `mcp-admin.routes.ts:185` | stateless (`sessionIdGenerator: undefined`) per-request transport | web-standard transport |
+| Raw body for HMAC | `index.ts:404` `express.raw({ type: 'application/json' })` on `/api/v1/webhooks`; `index.ts:407` `express.json({ limit: '10mb' })` | payment signature verification needs exact bytes | `await c.req.text()` before parse (easy) |
+| `trust proxy` | `index.ts:93` (`TRUST_PROXY_HOPS`) | client IP for limiters | use `CF-Connecting-IP` |
+
+### 4.2 AsyncLocalStorage usage (3 + 1 stores)
+
+| Store | File:line | Holds | Needs |
+| --- | --- | --- | --- |
+| `tenantStorage` (`TenantTx`) | `packages/database/src/index.ts:118` | the open interactive tx for the current request/job; Prisma proxy routes every model call to it | NC `node:async_hooks` (supported in Workers) |
+| `storeScope` | `packages/database/src/index.ts:130` | `{ storeId }` for `runInStoreScope` (per-op short txs; used by long Inngest jobs) | same |
+| `deferralStorage` (`DeferralScope`) | `lib/after-tenant-commit.ts:124` | queue of post-commit tasks; each later runs in a FRESH tenant tx with same GUCs | same; drain must run in `ctx.waitUntil` |
+| WeakMaps `txGucs`, `closedTenantTxs`, `closedTenantTxReason` | `packages/database/src/index.ts` | GUCs and closed-state per tx | fine |
+| (comment only) | `lib/inngest/functions/payment-webhook-process.ts:41` | explains `tx` is not threaded through ALS | - |
+
+`middleware/tenant-context.ts` (functions `tenantContext:84`, `storeScopeContext:166`, `aiRouteContext:219`, `userContext:278`) does not itself use ALS; it calls `runRequestInTransaction` -> `runInTenantContext`.
+
+### 4.3 How the per-request RLS transaction works
+
+1. Mounted on `/stores/:storeId/*`, `/admin/*`, etc. (`routes/index.ts`: e.g. `:130,:148,:219`); skipped (calls `next()`) if `:storeId` is not a UUID (`tenant-context.ts:95-99`), and de-duplicated by a `REQUEST_TENANT_SCOPE` symbol on `res` when store+user match.
+2. `runRequestInTransaction(res, next, open)` (`request-transaction.ts`) opens ONE Prisma interactive transaction around the whole handler: `basePrisma.$transaction(cb, { maxWait: 10000, timeout: 30000 })` (`packages/database/src/index.ts:599-603`; same in `withTenantContext`, `withMoneyTx` `with-money-tx.ts:18-19`, `withRlsBypass` `:702`). maxWait raised from 2 s because Neon pgbouncer slot contention fired P2028.
+3. First statements inside the tx are `SET LOCAL app.current_store_id = '<uuid>'` and, if authenticated, `SET LOCAL app.current_user_id = '<uuid>'` (`tenant-gucs.ts:16-24`, executed with `$executeRawUnsafe`, ids validated by `UUID_RE` and quote-escaped). `userContext` sets only user id; `withRlsBypass` sets `SET LOCAL app.bypass_rls = 'true'` and `SET LOCAL app.current_store_id = ''` (`index.ts:689-699`).
+4. The tx client goes into `tenantStorage` ALS; the exported `prisma` is a Proxy that reroutes model calls to the ambient tx (`hasTenantContext()` `:391`). `prisma.$transaction` is NOT proxied (opens a new tx on another connection, inherits GUCs via `transactionWithGucs`).
+5. RLS policies (migrations; ADR `docs/adr/0001-fwb-tenant-isolation.md`) are `FOR ALL TO force_app` using `current_store_id() IS NULL OR current_setting('app.bypass_rls', true) = 'true' OR store_id = current_store_id()` (hybrid idiom; strict variants on a few tables). App connects as non-owner `force_app`; `DIRECT_URL` (owner) is migrations only.
+6. **Commit before respond** (changed 2026-09-08): `res.end` is intercepted, args captured; `status < 500` -> COMMIT, `>= 500` -> ROLLBACK (`IntendedRollback`); only then bytes are replayed. COMMIT deadline `REQUEST_COMMIT_TIMEOUT_MS` (10 s default) -> 503 `COMMIT_TIMEOUT` + P1 alert (`request-transaction.ts:184-187,356`). Client disconnect (`res.close` before settle) -> ROLLBACK (`AbandonedRequest`). Ordering: `COMMIT -> releaseResponse() -> drain deferred tasks (fresh tx, same GUCs)`.
+7. **Savepoints**: Postgres aborts the whole tx after any statement error (25P02). `lib/savepoint.ts` `withSavepoint(fn)`: if `hasTenantContext()`, `SAVEPOINT "fwb_sp_<n>"` (module counter) ... `RELEASE SAVEPOINT` on success, `ROLLBACK TO SAVEPOINT` + RELEASE on error; passthrough outside a tenant ctx. Used for P2002 recovery in `cart.service.ts`, `pages.service.ts`, `variant.service.ts`, `customer-group.service.ts`, `journal.service.ts`, `middleware/security.ts:1590` (audit log insert).
+8. Retry helpers: `lib/db-retry.ts` (`retryOnWriteConflict`, codes `P2034`, transient `P1001/P1002/P1017`), money paths use `withMoneyTx` and `Serializable`/`ReadCommitted` per call site.
+9. Public (storefront) routes are mounted at `/public` OUTSIDE `tenantContext` (`routes/index.ts:80-81`); they resolve the store via `getStoreIdFromRequest` (`utils/store-helpers.ts`, `X-Store-ID` / `x-store-domain` header, `prisma.store.findFirst`) and use `readInStoreContext`/`runInTenantContext` only for RLS-strict tables (e.g. `public.routes.ts:1368-1385`). Cart tables on this path run contextless (old idiom lets `current_store_id() IS NULL` through) with its own `prisma.$transaction` (`cart.service.ts:476-495`).
+10. **Workers risk**: the whole design depends on one pooled connection keeping `SET LOCAL` for the tx lifetime and on an interactive tx held across `await`s (up to 30 s). Needs: Hyperdrive in session (not transaction) pooling, or direct Neon WebSocket pool; plus a throwaway-branch proof that `current_setting('app.current_store_id')` does not leak between requests. Per-request tx = 1 held connection per in-flight request (Neon pooler slots).
+
+## 5. Inngest
+
+- Files in `lib/inngest/functions/`: 65 (+ `index.ts`); `createFunction(` occurrences: **95** (several files export more than one).
+- Serve handler: `index.ts:428-441` (`inngestServe` from `inngest/express`, mounted at `/api/v1/inngest`, behind `inngestLimiter` at `:401`); env `INNGEST_SIGNING_KEY`, `config.inngestServeHost`. Client: `lib/inngest/client.ts`. Senders (`inngest.send`): 26 files.
+- Triggers: **29 cron triggers in 27 files**, remainder (~66) event-triggered (some functions have several event triggers, e.g. `order-whatsapp-notify.ts:387-389`; `order/created` fans out to `order-created`, `accounting-post-order-journal`, `order-capi-conversion`, `order-whatsapp-notify`).
+- Long waits: **2 functions** use durable sleeps: `review-request.ts:48` `step.sleep('wait-7-days', '7d')`; `campaign-send.ts:238` `step.sleepUntil('wait-for-schedule', nonce)`. No `step.waitForEvent`. In-step sleeps (plain `setTimeout`) elsewhere: bulk-ai-* Gemini throttling, `campaign-send-pacer` wait. `campaign-send.ts:143,474` has a per-step wall-clock budget and `CAMPAIGN_LEFTOVER_MAX_PASSES = 200`.
+
+### 5.1 Cron schedules (UTC)
+
+| Cron | Function file | Cron | Function file |
+| --- | --- | --- | --- |
+| `0 22 * * *` | accounting-daily-close | `0 4 * * 0` | data-retention (:52), r2-orphan-sweep |
+| `30 22 * * *` | accounting-period-reconciliation | `0 2 1 * *` | data-retention (:101) |
+| `30 3 * * *` | accounting-profit-anomaly | `30 3 1 * *` | data-retention (:194) |
+| `*/15 * * * *` | agent-write-denied-watch, gmail-alert-poller, order-created-stuck-sweep, order-status-fanout-stuck-sweep, payment-webhook-stuck-sweep, queue-depth-watch, refund-reversal-stuck-sweep | `0 4 * * *` | gsc-ingest |
+| `0 0 * * *` | ai-autofill-sweep | `0 * * * *` | heartbeat |
+| `0 23 * * *` | analytics-daily-rollup | `0 3 * * *` | order-auto-cancel-unpaid, stock-reorder-scan, warehouse-reconcile-sweep |
+| `0 2 * * 1` | answer-engine-citation-scan | `*/30 * * * *` | payment-abandonment-sweep |
+| `0 3 * * 0` | audit-log-archive, stock-deadstock-scan | `17 * * * *` | payment-reconcile-sweep |
+| `0 */4 * * *` | bulk-import-orphan-cleanup | `0 */6 * * *` | stock-low-stock-alert |
+| `0 3 1 * *` | store-usage-snapshot | | |
+
+Notes: Inngest calls the Worker over HTTPS (POST per step), so crons need no Workers Cron Triggers; each step is one Worker invocation (CPU time limit per invocation, subrequest limit 1000 on paid). Heavy functions to inspect for limits: `bulk-import.ts`, `bulk-ai-*` (14 files), `campaign-send.ts`, `audit-log-archive.ts` (S3 PutObject of large dumps), `answer-engine-citation-scan.ts`.
+Related code NOT in Inngest and needing a new owner: the 7 in-process intervals in section 3.1.
+
+## 6. Routes
+
+`routes/` = 74 files, 41,724 lines. Mount table at `routes/index.ts` (475 lines). Line counts (descending):
+
+| Lines | File | Lines | File | Lines | File |
+| --- | --- | --- | --- | --- | --- |
+| 2372 | ai | 479 | loyalty | 214 | pages |
+| 2223 | admin | 475 | index | 213 | blog |
+| 2075 | public | 471 | stock-adjustments | 207 | purchase-orders |
+| 1982 | order | 441 | review | 200 | mcp-admin |
+| 1706 | store | 435 | wa-templates | 194 | agent-credential |
+| 1606 | finance | 431 | coupon | 193 | abandoned-cart |
+| 1414 | wa-bridge | 428 | wishlist | 181 | typography |
+| 1221 | payment-settings | 414 | variant | 175 | suppliers |
+| 1140 | auth | 410 | smart-layer | 175 | customer-groups |
+| 1028 | shipping | 369 | feature | 166 | locations |
+| 993 | product | 342 | expenses | 150 | public-store-layout |
+| 981 | payment | 335 | warehouse | 140 | campaign-public |
+| 899 | store-layout | 314 | newsletter | 120 | admin-answer-engine |
+| 892 | webhook | 295 | mfa | 117 | bot-analytics |
+| 890 | customers | 280 | promotion / payment-abandonments / alert-webhooks | 116 | mcp |
+| 884 | bundle | 279 | recommendation / pwa | 68 | answer-engine |
+| 862 | wbs-integration | 262 | merchant-key | 65 | slug-redirects / backorders |
+| 672 | insights | 261 | address | 255 | cart |
+| 627 | campaign | 248 | onesignal | 244 | tax |
+| 619 | upload | 243 | wallet | 232 | staff |
+| 616 | category | 218 | sms-consent | | |
+| 586 | return | 524 | affiliate | 545 | notification |
+| 571 | inventory | 526 | bulk | 512 | payment-links |
+| 519 | shipping-carrier | 480 | analytics | | |
+
+### 6.1 Spike candidates
+
+Public storefront mount: `routes/index.ts:80` `router.use('/public', publicRoutes)` (outside `tenantContext`, no auth). Storefront web client calls `/public/cart/items` (`apps/web/src/lib/api.ts:1167`).
+
+| | (a) Catalogue read | (b) Cart write | (c) Payment webhook |
+| --- | --- | --- | --- |
+| Route | `GET /public/products` `routes/public.routes.ts:176`; detail `GET /public/products/:slugOrId` `public.routes.ts:297` | `POST /public/cart/items` `routes/public.routes.ts:512` (`cartLimiter`, header `x-session-id`, zod `addCartItemSchema`) | `POST /webhooks/payment/:provider` `routes/webhook.routes.ts:446-448` (mount `index.ts:404` with `express.raw`); legacy autodetect `POST /webhooks/payment` `:586` |
+| Core call | `ProductService.listPublic` `services/product.service.ts:1258`; `getPublicBySlug` `:1826`; `getPublicById` `:1852` | `CartService.addItem` `services/cart.service.ts:325` (`getOrCreate` -> `featureService.isFeatureEnabled('inventory.backorder')` -> `retryOnWriteConflict(...prisma.$transaction(writeLine, {ReadCommitted, maxWait 10000, timeout 30000}))` `:476-495`) | `verifyWebhookSignature` middleware `webhook.routes.ts:19-53` (requires header, stores `req.webhookSignature`); handler `:446-585`; inbox `recordInboundWebhook` `:130-200` (`withRlsBypass`; `webhookEvent.findUnique` by `idempotencyKey` -> create `status:'received'` / update unless `processed`; P2002 race -> re-read); enqueue/fallback `:225-330` (`inngest.send('payment/webhook.received')` else inline `PaymentService.handleWebhook` + mark processed); signature check `PaymentService.handleWebhook` `services/payment-providers/payment.factory.ts:1376` (`p.verifyWebhook(rawBody, signature)` `:1400`; HMAC-SHA256 + `timingSafeEqual` in `tap.provider.ts:212-221`, `myfatoorah.provider.ts:479-483`, `hesabe.provider.ts:232-242`, `upayments.provider.ts:226-236`; failure counter `redis.incrementRateLimit` `:1408`) |
+| Store resolution | `getStoreIdFromRequest` `utils/store-helpers.ts` -> `prisma.store.findFirst` by `x-store-id` / `x-store-domain` | same | per-store webhook secret read from `payment_configs`, decrypted via `encryption.service.ts` |
+| Level 1 deps | `lib/public-cache.ts` (`getCached` TTL 120 s), `services/redis.service.ts`, `lib/effective-inventory.ts`, `middleware/error-handler.ts`, `@force/database` | `middleware/security.ts` (`cartLimiter` Redis store, savepoint audit), `services/feature.service.ts` (Redis cache), `lib/db-retry.ts`, `lib/savepoint.ts`, `lib/cart-pricing.ts`, `services/bundle.service.ts` (`resolveBundle`), `services/product.service.ts` (`STOREFRONT_PRODUCT_SELECT`) | `services/payment-providers/payment.factory.ts`, `@force/database` (`withRlsBypass`, `runInTenantContext`), `lib/inngest/client.ts`, `middleware/security.ts` (`auditLog`), `services/shipping-carrier.service.ts`, `config` |
+| Level 2 deps | `redis` (ioredis), `lib/bounded-map.ts`, `services/r2-cleanup.service.ts` + `slug-redirect.service.ts` + `ai-autofill.service.ts` (imported by product.service, not on read path), Prisma | `redis` (feature cache), `lib/bounded-map`, Prisma (serializable/read-committed tx), `rate-limit-redis`/`express-rate-limit` | `order.service.ts` (`OrderService`, `assertValidTransition`), `socket.service.ts` (socket.io emit), `onesignal.service.ts`, `alerts.service.ts`, `redis` (failure counter), `payment-event.service.ts`, `unbooked-refund-alert`, `orphaned-invoice-alert`, `encryption.service.ts` (AES-GCM), `lib/public-cache.ts` (`invalidateCustomersCache`), `lib/payment-line-items.ts`; async leg `lib/inngest/functions/payment-webhook-process.ts` (event `payment/webhook.received`) |
+| Workers blockers | Redis -> KV (L2 cache); ioredis; Prisma adapter | Redis rate limiter; Prisma tx semantics (serializable/RC, savepoints, retry); RLS contextless path | raw-body access; `socket.io` emit (pulled in transitively via `payment.factory.ts:8`); `onesignal`; Redis counter; Inngest send; `crypto` (NC) |
+| Why spike | read-only, no tx GUC for core path (store resolve + list), cacheable | write + interactive tx + rate limit | signature + idempotency inbox + Inngest + `withRlsBypass` tx with `SET LOCAL app.bypass_rls` |
+
+Caveat for (c): the legacy `/webhooks/payment` route and the "contextless" webhook reads of `orders`/`payments` rely on `current_store_id() IS NULL` allowance (ADR 0001 "Contextless-read caveat"); the spike must preserve that.
+
+## 7. Prisma
+
+| Item | Value | Source |
+| --- | --- | --- |
+| Version | `@prisma/client` 6.19.3, `prisma` ^6.19.3 | `package-lock.json`, `packages/database/package.json` |
+| Generator | `provider = "prisma-client-js"`; **no `previewFeatures`**, no `binaryTargets`/`engineType` | `packages/database/prisma/schema.prisma:10-12` |
+| Datasource | `provider = "postgresql"`, `url = env("DATABASE_URL")`, `directUrl = env("DIRECT_URL")` | `schema.prisma:14-18` |
+| Models | **112** (`grep -c '^model '`) | `schema.prisma` |
+| Client construction | `new PrismaClient(prismaOptions)` cached on `globalThis` (`globalForPrisma.prisma`); options `{ log, datasourceUrl: appendPoolParams(DATABASE_URL), omit: {...} }` | `packages/database/src/index.ts:9-64` |
+| Pool params | `connect_timeout=10`, `pool_timeout=DB_POOL_TIMEOUT||20`, `connection_limit` small, `pgbouncer=true` (Neon pooler) | `index.ts:68-100` |
+| Global `omit` | `user.{passwordHash,mfaSecret,mfaBackupCodes}`, `store.{wbsApiKey,metaAccessToken,agentApiKey}` (types depend on it: `AppPrismaClient`, `DbClient`) | `index.ts:32-57` |
+| Wrapper | `prisma` exported as a Proxy over `basePrisma` routing to ambient tx (ALS); `$connect/$disconnect/$on/$transaction/$use/$extends` excluded from routing | `index.ts:~110-420` |
+| Roles | App: `force_app` (non-owner, RLS enforced; policies `TO force_app`). Owner/superuser (`DIRECT_URL`): migrations, bypasses RLS unless FORCE (all tenant tables are FORCE'd, but policies only target `force_app`, so owner still bypasses). CI/test uses `SET LOCAL ROLE force_app` | ADR 0001 |
+| Transaction opts | `{ maxWait: 10000, timeout: 30000 }` everywhere (`runInTenantContext`, `withTenantContext`, `withRlsBypass`, `withMoneyTx`) | `index.ts:603,627,702`, `with-money-tx.ts` |
+| Raw SQL (non-test, apps/api/src + packages/database/src) | `$queryRaw` 93 uses / 40 files; `$queryRawUnsafe` 17 / 5; `$executeRaw` 36 / 13; `$executeRawUnsafe` 16 / 5; `Prisma.sql` 15 / 7 | grep |
+| Prisma error codes relied on | `P2002` (unique), `P2025`, `P2034` (serialization), `P2028` (tx closed/timeout), `P1001/P1002/P1017`, `P2024` (pool) | `lib/db-retry.ts`, `lib/savepoint.ts`, `lib/after-tenant-commit.ts` |
+
+Workers implications: need `engineType`/driver-adapter generation (Prisma 6.19 supports adapters; `datasourceUrl` incompatible with adapters, move URL into adapter ctor); `$transaction` interactive semantics (timeout, isolationLevel, maxWait) behave differently across adapters (neon-http cannot; neon-ws Pool and `adapter-pg` over Hyperdrive can); `directUrl` for migrations stays in CI. Raw SQL volume (~160 call sites) must be re-tested on the adapter.
+
+## 8. Buy-flow parity harness (`scripts/buy-flow-parity`)
+
+Files: `run.mjs` (hundreds of lines, entry), `lib/{client,compare,fixture,inngest-executor,preload,scenarios,snapshot,stub}.mjs` (1,736 lines), `README.md`. Runs on macOS (`container` CLI for Postgres/Redis).
+
+### 8.1 How it starts the API
+
+Builds each git ref in a worktree and spawns the compiled Express app (`run.mjs:291-295`):
+
+```js
+const child = spawn(
+  process.execPath,
+  ['--import', path.join(HERE, 'lib', 'preload.mjs'), 'apps/api/dist/index.js'],
+  { cwd: dir, env, stdio: ['ignore', out, out] }
+);
+```
+
+Hand-built env, nothing inherited but PATH/HOME (`run.mjs:269-288`): `NODE_ENV=development`, `PORT=<apiPort>`, `API_URL=http://127.0.0.1:<port>`, `WEB_URL=http://localhost:3000`, `ADMIN_URL=http://localhost:3001`, `DATABASE_URL` (as `force_app`), `DIRECT_URL` (owner), `REDIS_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `INNGEST_BASE_URL`, `INNGEST_DEV` (both = stub URL), `BFP_STUB_URL`, `LOAD_TEST_BYPASS_TOKEN` (via `HARNESS_ENV`, `lib/client.mjs:14`), `TZ=UTC`. Waits for `GET /health` (`:301`). Per ref: `npm ci`, `prisma generate`, build database/shared/api, `prisma migrate deploy`, `ALTER ROLE force_app ... LOGIN` (`:370-379`), SQL fixture (`:385`).
+
+### 8.2 Existing Postgres / Redis flags
+
+Parsed in `parseArgs` (`run.mjs:37-66`): `--base`, `--head`, `--only a,b`, `--allow scenario:path=reason`, `--keep-worktrees`, `--keep-db`, `--pg-url`, `--redis-url`, `--api-port` (default 4610), `--stub-port` (default 4690), `--out`, `--list`, `-h/--help`. Defaults otherwise: Apple `container`s `fwb-buyflow-pg` (127.0.0.1:55432) and `fwb-buyflow-redis` (127.0.0.1:56379) (`README.md`). Both URLs must be loopback (`run.mjs:597-598`):
+
+```js
+if (args.pgUrl) assertLocal(args.pgUrl, '--pg-url');
+if (args.redisUrl) assertLocal(args.redisUrl, '--redis-url');
+// assertLocal: if (!(h === 'localhost' || h.startsWith('127.') || h === '::1')) throw ...
+```
+
+The harness creates and drops a fresh database per ref (needs owner credentials in `--pg-url`) and issues raw Redis via `redisCmd`.
+
+### 8.3 Scenario ids (16; `node run.mjs --list`)
+
+`guest-mf-single-verify-paid`, `guest-mf-multiqty-webhook-paid`, `webhook-forged-signature`, `customer-mf-variant-pct-coupon`, `guest-cod-fee-fixed-coupon`, `customer-cod-free-shipping-threshold`, `vat-store-mf-pct-coupon`, `mf-create-fails-rollback`, `mf-payment-failed`, `out-of-stock`, `price-tampering`, `bundle-checkout-mf`, `area-not-deliverable`, `paid-refund-via-provider`, `paid-cancel-then-refund`, `cod-cancel-restock`.
+
+### 8.4 Can it target a non-Express server? Not today.
+
+No `--api-url`. The API origin is built from the local port and spawn is unconditional (`run.mjs:397-398`):
+
+```js
+const apiBase = `http://127.0.0.1:${args.apiPort}/api/v1`;
+const executor = createExecutor({ stub, apiOrigin: `http://127.0.0.1:${args.apiPort}` });
+```
+
+Each run compares two git refs (base vs head), both built and spawned from source via `startApi`. To point it at `wrangler dev`/a deployed Worker, a patch is needed: (1) add `--api-url` (and a `--no-spawn` branch skipping `startApi`/worktree build); (2) the network boundary is an in-process Node preload (`lib/preload.mjs`, patches `globalThis.fetch` `:40` and `http.request` `:99`; hard-fails without `BFP_STUB_URL`) that rewrites `api.myfatoorah.com`/`apitest.myfatoorah.com` to the local stub - the provider hardcodes its base URL (`services/payment-providers/myfatoorah.provider.ts:119`), so a Worker needs an env override (`MYFATOORAH_BASE_URL`) to reach the stub, and the stub/Inngest executor must be reachable from the Worker (tunnel or `wrangler dev --local` on loopback); (3) HMAC webhooks use the seeded per-store secret, which works against any target that shares the DB; (4) DB must be the same loopback Postgres (Hyperdrive local connection string for `wrangler dev`); (5) Inngest executor drives `${apiOrigin}/api/v1/inngest` (`inngest-executor.mjs:35`) with `x-inngest-server-kind: dev` so the Worker serve handler must accept dev mode; (6) rate limiters bypassed via `LOAD_TEST_BYPASS_TOKEN` (`middleware/security.ts:849-853`) - must be ported to the Worker.
+
+## 9. Open questions / verification list
+
+1. Hyperdrive (or Neon WS pool) + Prisma adapter: does `SET LOCAL app.current_store_id` survive for the interactive tx and not leak across pooled requests (use the real names from section 4.3).
+2. `inngest/cloudflare` serve handler on `inngest@4.2.6`; dev-mode compatibility for the parity executor.
+3. `exceljs` streaming under NC; `jsonwebtoken`, `otplib`, `web-push`, Hesabe `createCipheriv` under NC.
+4. MCP SDK 1.29 web-standard Streamable HTTP transport.
+5. Decide which Redis groups (B, C, E, G, K) need Durable Objects vs an external Upstash; sizing of cache group A on KV.
+6. Replacement for IMAP alert poller (Gmail API vs move off Workers).
+7. Owner of the 7 non-Inngest intervals (section 3.1) and the order-purge coalescing window.
