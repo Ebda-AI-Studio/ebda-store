@@ -43,7 +43,7 @@ export interface BundleItemRow {
   variantId?: string | null;
   /** Locale-resolved display name (product, or "product — variant"). */
   name: string;
-  /** fils */
+  /** piastres */
   unitPrice: number;
   quantity: number;
   trackInventory: boolean;

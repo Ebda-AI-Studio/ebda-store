@@ -3,11 +3,14 @@
  * (issue 2412). The column is what finance reports / tax periods read (Ruling
  * FRT-2); the old `settings.timezone` JSON key had zero readers, so a Dubai
  * store provisioned with `settings.timezone = 'Asia/Dubai'` still counted
- * Kuwait days. The JSON key is no longer written.
+ * Egypt days. The JSON key is no longer written.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { storeCreate } = vi.hoisted(() => ({ storeCreate: vi.fn() }));
+const { storeCreate, taxRateCreate } = vi.hoisted(() => ({
+  storeCreate: vi.fn(),
+  taxRateCreate: vi.fn(),
+}));
 
 vi.mock('@force/database', () => {
   const tx = {
@@ -18,6 +21,7 @@ vi.mock('@force/database', () => {
     },
     store: { create: storeCreate },
     category: { create: vi.fn() },
+    taxRate: { create: taxRateCreate },
     paymentConfig: { create: vi.fn() },
   };
   return {
@@ -67,6 +71,16 @@ describe('provisioning time zone', () => {
     await ProvisioningService.provisionStore({ ...base, settings: { currency: 'AED' } });
     expect(createdData()).not.toHaveProperty('timezone');
     expect(createdData().settings).toMatchObject({ currency: 'AED' });
+  });
+
+  it('defaults an Ebda store to EGP + Arabic and seeds the 14% default VAT rate (inactive charge until taxEnabled)', async () => {
+    await ProvisioningService.provisionStore({ ...base });
+    expect(createdData().settings).toMatchObject({ currency: 'EGP', defaultLanguage: 'ar' });
+    // `taxEnabled` is not set here: the charge stays off until the merchant is VAT-registered.
+    expect(createdData()).not.toHaveProperty('taxEnabled');
+    expect(taxRateCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ storeId: 's1', name: 'VAT', rate: 14, isActive: true }),
+    });
   });
 
   it('never writes an unresolvable zone to the column', async () => {

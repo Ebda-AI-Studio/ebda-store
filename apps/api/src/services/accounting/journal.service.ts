@@ -5,6 +5,7 @@ import { nextSequence } from '../sequence.service';
 import { broadcastToStore } from '../../lib/socket-broadcast';
 import { withSavepointOn } from '../../lib/savepoint';
 
+import { REGION } from '@force/shared';
 export interface JournalLineInput {
   accountId: string;
   debit: number;
@@ -15,20 +16,20 @@ export interface JournalLineInput {
   refId?: string;
   /**
    * ISO-4217 currency code of the original transaction.
-   * Defaults to 'KWD' (no conversion needed).
+   * Defaults to 'EGP' (no conversion needed).
    */
   currency?: string;
   /**
-   * FX rate: 1 unit of `currency` = fxRate KWD.
-   * Required when currency !== 'KWD'.
+   * FX rate: 1 unit of `currency` = fxRate EGP.
+   * Required when currency !== 'EGP'.
    * Stored as Prisma Decimal (numeric(16,8)) for exact arithmetic.
    * Pass as a number or string — it is coerced to Decimal on write.
    */
   fxRate?: number;
   /**
-   * Original amount in the foreign currency's minor units (before KWD conversion).
-   * For KWD lines this equals debit or credit.
-   * For non-KWD lines, debit/credit hold the KWD-converted fils.
+   * Original amount in the foreign currency's minor units (before EGP conversion).
+   * For EGP lines this equals debit or credit.
+   * For non-EGP lines, debit/credit hold the EGP-converted piastres.
    */
   originalAmount?: number;
 }
@@ -120,8 +121,8 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
         debit: l.debit,
         credit: l.credit,
         // Multi-currency: thread FX fields through when present.
-        // KWD lines omit these (Prisma uses schema defaults: currency='KWD', fxRate=1, originalAmount=0).
-        ...(l.currency && l.currency !== 'KWD'
+        // EGP lines omit these (Prisma uses schema defaults: currency='EGP', fxRate=1, originalAmount=0).
+        ...(l.currency && l.currency !== REGION.currency
           ? {
               currency: l.currency,
               fxRate: l.fxRate ?? 1,
@@ -248,7 +249,7 @@ export async function reverseEntry(
             credit: l.debit,
             // Preserve FX metadata on reversals so the reversal entry still
             // shows the original foreign-currency context.
-            ...(l.currency && l.currency !== 'KWD'
+            ...(l.currency && l.currency !== REGION.currency
               ? {
                   currency: l.currency,
                   fxRate: l.fxRate ?? 1,

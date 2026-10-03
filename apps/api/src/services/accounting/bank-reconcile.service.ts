@@ -27,9 +27,10 @@ import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-sta
 import { assertStoreOwns } from './assert-store-owns';
 import { COUNTED_STATUSES_SQL } from './reports.service';
 
+import { minorToDecimalString } from '@force/shared';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Fil tolerance for amount matching (5 fils = 0.005 KWD — rounding/truncation). */
+/** Fil tolerance for amount matching (5 piastres = 0.005 EGP — rounding/truncation). */
 const AMOUNT_TOLERANCE_FILS = 5;
 
 /** Maximum days difference between bank transaction date and journal posting date. */
@@ -90,15 +91,15 @@ export interface ReconciliationSummary {
  *   explaining what the merchant should do to close the gap.
  */
 export interface ReconciliationDifference {
-  /** Sum of all bank statement lines net in fils (credits positive, debits negative from bank POV). */
+  /** Sum of all bank statement lines net in piastres (credits positive, debits negative from bank POV). */
   bankBalanceFils: number;
-  /** Ledger balance for the linked GL account up to statement period end (debit−credit, fils). */
+  /** Ledger balance for the linked GL account up to statement period end (debit−credit, piastres). */
   ledgerBalanceFils: number;
   /** bankBalanceFils − ledgerBalanceFils. Zero = reconciled. */
   differenceFils: number;
-  /** Total fils of unmatched bank lines (explains bank side of the gap). */
+  /** Total piastres of unmatched bank lines (explains bank side of the gap). */
   unmatchedBankFils: number;
-  /** Total fils of unmatched ledger entries for this GL account in the period (explains ledger side). */
+  /** Total piastres of unmatched ledger entries for this GL account in the period (explains ledger side). */
   unmatchedLedgerFils: number;
   /** How many ledger entries against this GL account in the period have no matching bank tx. */
   unmatchedLedgerCount: number;
@@ -392,7 +393,7 @@ export async function runAutoMatch(
   return { matched, unmatched, ambiguous };
 }
 
-/** Confidence 0–100: 100 = exact fils match, lower as difference grows. */
+/** Confidence 0–100: 100 = exact piastres match, lower as difference grows. */
 function computeConfidence(txFils: number, ledgerFils: number): number {
   const diff = Math.abs(txFils - ledgerFils);
   if (diff === 0) return 100;
@@ -591,11 +592,11 @@ export async function getReconciliationSummary(
  *   < 0 → ledger shows more than bank (over-posted or duplicate ledger entries)
  *   = 0 → bank and ledger agree for this period
  *
- * UNMATCHED BANK FILS:
+ * UNMATCHED BANK PIASTRES:
  *   Sum of unmatched BankTransaction amounts. These are the bank lines that have
  *   no corresponding ledger entry — they represent the "missing" ledger side.
  *
- * UNMATCHED LEDGER FILS:
+ * UNMATCHED LEDGER PIASTRES:
  *   Net of counted (posted + reversed) JournalLine entries against the GL account in the period that
  *   are NOT matched to any BankTransaction. These are ledger entries that have
  *   no bank confirmation.
@@ -644,7 +645,7 @@ export async function getReconciliationDifference(
 
       const status = btx.matchStatus as BankMatchStatus;
       if (status === 'unmatched') {
-        unmatchedBankFils += btx.amountFils; // absolute fils (sign context is per bank tx)
+        unmatchedBankFils += btx.amountFils; // absolute piastres (sign context is per bank tx)
       }
     }
 
@@ -721,9 +722,9 @@ export async function getReconciliationDifference(
     const isReconciled = differenceFils === 0;
 
     // ── Suggested action ──
-    const kwdBank = (Math.abs(bankBalanceFils) / 1000).toFixed(3);
-    const kwdLedger = (Math.abs(ledgerBalanceFils) / 1000).toFixed(3);
-    const kwdDiff = (Math.abs(differenceFils) / 1000).toFixed(3);
+    const baseBank = minorToDecimalString(Math.abs(bankBalanceFils));
+    const baseLedger = minorToDecimalString(Math.abs(ledgerBalanceFils));
+    const baseDiff = minorToDecimalString(Math.abs(differenceFils));
     const unmatchedCount = bankTxs.filter(b => b.matchStatus === 'unmatched').length;
     const unmatchedLedgerCount = unmatched.length;
 
@@ -736,26 +737,26 @@ export async function getReconciliationDifference(
       suggestedActionAr = 'البنك والدفتر متطابقان — تم إغلاق كشف الحساب بالكامل. لا يلزم أي إجراء.';
     } else if (differenceFils > 0) {
       suggestedActionEn =
-        `Bank balance (KWD ${kwdBank}) exceeds ledger balance (KWD ${kwdLedger}) by KWD ${kwdDiff}. ` +
-        `${unmatchedCount} unmatched bank line(s) totalling KWD ${(unmatchedBankFils / 1000).toFixed(3)} have no ledger entry. ` +
+        `Bank balance (EGP ${baseBank}) exceeds ledger balance (EGP ${baseLedger}) by EGP ${baseDiff}. ` +
+        `${unmatchedCount} unmatched bank line(s) totalling EGP ${minorToDecimalString(unmatchedBankFils)} have no ledger entry. ` +
         `Suggested action: record journal entries for the missing bank transactions, ` +
-        `or post an adjusting entry of KWD ${kwdDiff} (debit bank account, credit appropriate account).`;
+        `or post an adjusting entry of EGP ${baseDiff} (debit bank account, credit appropriate account).`;
       suggestedActionAr =
-        `رصيد البنك (${kwdBank} د.ك) يتجاوز رصيد الدفتر (${kwdLedger} د.ك) بفارق ${kwdDiff} د.ك. ` +
-        `${unmatchedCount} حركة/حركات بنكية غير مطابقة بمجموع ${(unmatchedBankFils / 1000).toFixed(3)} د.ك لا يقابلها قيود في الدفتر. ` +
+        `رصيد البنك (${baseBank} ج.م) يتجاوز رصيد الدفتر (${baseLedger} ج.م) بفارق ${baseDiff} ج.م ` +
+        `${unmatchedCount} حركة/حركات بنكية غير مطابقة بمجموع ${minorToDecimalString(unmatchedBankFils)} ج.م لا يقابلها قيود في الدفتر. ` +
         `الإجراء المقترح: سجّل قيوداً محاسبية للحركات البنكية الغائبة، ` +
-        `أو أضف قيد تسوية بقيمة ${kwdDiff} د.ك (مدين: حساب البنك، دائن: الحساب المناسب).`;
+        `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (مدين: حساب البنك، دائن: الحساب المناسب).`;
     } else {
       suggestedActionEn =
-        `Ledger balance (KWD ${kwdLedger}) exceeds bank balance (KWD ${kwdBank}) by KWD ${kwdDiff}. ` +
-        `${unmatchedLedgerCount} unmatched ledger entry/entries totalling KWD ${(Math.abs(unmatchedLedgerFils) / 1000).toFixed(3)} have no bank confirmation. ` +
+        `Ledger balance (EGP ${baseLedger}) exceeds bank balance (EGP ${baseBank}) by EGP ${baseDiff}. ` +
+        `${unmatchedLedgerCount} unmatched ledger entry/entries totalling EGP ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} have no bank confirmation. ` +
         `Suggested action: verify the ${unmatchedLedgerCount} unmatched ledger entries — reverse any duplicates, ` +
-        `or post an adjusting entry of KWD ${kwdDiff} (credit bank account, debit appropriate account).`;
+        `or post an adjusting entry of EGP ${baseDiff} (credit bank account, debit appropriate account).`;
       suggestedActionAr =
-        `رصيد الدفتر (${kwdLedger} د.ك) يتجاوز رصيد البنك (${kwdBank} د.ك) بفارق ${kwdDiff} د.ك. ` +
-        `${unmatchedLedgerCount} قيد/قيود في الدفتر بمجموع ${(Math.abs(unmatchedLedgerFils) / 1000).toFixed(3)} د.ك لا يقابلها حركات بنكية. ` +
+        `رصيد الدفتر (${baseLedger} ج.م) يتجاوز رصيد البنك (${baseBank} ج.م) بفارق ${baseDiff} ج.م ` +
+        `${unmatchedLedgerCount} قيد/قيود في الدفتر بمجموع ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} ج.م لا يقابلها حركات بنكية. ` +
         `الإجراء المقترح: راجع القيود ${unmatchedLedgerCount} غير المطابقة — اعكس أي قيود مكررة، ` +
-        `أو أضف قيد تسوية بقيمة ${kwdDiff} د.ك (دائن: حساب البنك، مدين: الحساب المناسب).`;
+        `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (دائن: حساب البنك، مدين: الحساب المناسب).`;
     }
 
     return {

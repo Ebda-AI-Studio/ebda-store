@@ -11,7 +11,7 @@ import { featureService } from '../../../services/feature.service';
  *   CR paidFromAccount (total)
  *
  * v1 simplification: tax recovery is rolled into the expense account line.
- * This will be split out when Kuwait VAT activates (Batch 3+).
+ * This will be split out when Egypt VAT activates (Batch 3+).
  *
  * Idempotent via journal.service's (source, sourceId) lookup.
  * Concurrency keyed per-store (limit 5) to prevent sequence races.

@@ -8,7 +8,7 @@ import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
-import { isValidTimeZone, slugifyWithFallback } from '@force/shared';
+import { isValidTimeZone, slugifyWithFallback, REGION } from '@force/shared';
 
 // ==========================================
 // Store Provisioning Service
@@ -180,9 +180,26 @@ export class ProvisioningService {
             ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
             settings: {
               theme: settingsRest.theme || 'default',
-              currency: settingsRest.currency || 'USD',
+              currency: settingsRest.currency || REGION.currency,
               ...settingsRest,
+              // Arabic-first unless the caller said otherwise (spread above wins if present).
+              defaultLanguage:
+                (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
+                REGION.defaultLocale,
             },
+          },
+        });
+
+        // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an ACTIVE
+        // editable rate. The charge itself stays gated on `Store.taxEnabled`
+        // (ruling TAX-1), which the merchant flips once VAT-registered.
+        await tx.taxRate.create({
+          data: {
+            storeId: store.id,
+            name: 'VAT',
+            nameAr: 'ضريبة القيمة المضافة',
+            rate: REGION.defaultVatBps / 100,
+            isActive: true,
           },
         });
 
@@ -211,7 +228,7 @@ export class ProvisioningService {
             displayNameAr: 'الدفع عند الاستلام',
             testMode: false,
             supportedMethods: ['cod'],
-            supportedCurrencies: ['KWD'],
+            supportedCurrencies: [REGION.currency],
             fixedFee: 0,
             percentageFee: 0,
           },

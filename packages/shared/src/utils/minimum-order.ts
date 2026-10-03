@@ -7,7 +7,7 @@
  * below/at/above rule, so it lives here once instead of being re-implemented
  * per surface.
  *
- * Config lives in `Store.settings.minimumOrderFils` (fils; no dedicated DB
+ * Config lives in `Store.settings.minimumOrderFils` (piastres; no dedicated DB
  * column — same JSON-settings pattern as `checkoutDelivery`). `0` or
  * `undefined`/`null` means "no minimum configured", the platform-standard
  * opt-in convention used by every other per-store settings flag.
@@ -20,7 +20,7 @@ export interface MinimumOrderCheck {
   /** True when the store has no minimum configured, or the subtotal already
    *  meets/exceeds it. */
   met: boolean;
-  /** Fils still needed to reach the minimum. 0 when `met` is true. */
+  /** Piastres still needed to reach the minimum. 0 when `met` is true. */
   shortfallFils: number;
 }
 
@@ -29,7 +29,7 @@ export interface MinimumOrderCheck {
  *
  * - `minimumOrderFils` <= 0, null, or undefined → always met (no minimum).
  * - `subtotalFils >= minimumOrderFils` → met (equality passes).
- * - Otherwise → not met, with the exact fils shortfall.
+ * - Otherwise → not met, with the exact piastres shortfall.
  */
 export function checkMinimumOrder(
   subtotalFils: number,

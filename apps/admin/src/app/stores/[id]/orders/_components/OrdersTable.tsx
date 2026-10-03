@@ -29,7 +29,7 @@ function isInteractive(target: EventTarget | null): boolean {
   return !!target.closest('button, a, select, input, [role="button"], [data-row-stop]');
 }
 
-import { formatDate, filsToKwd } from '@/lib/format';
+import { formatDate, minorToMajor } from '@/lib/format';
 
 /**
  * Build a compact, single-line item summary for the orders list row, e.g.
@@ -158,7 +158,7 @@ export function OrdersTable({
       header: t('table.total'),
       cell: order => (
         <span className="font-bold text-foreground">
-          {t('table.totalValue', { amount: filsToKwd(order.total) })}
+          {t('table.totalValue', { amount: minorToMajor(order.total) })}
         </span>
       ),
     },

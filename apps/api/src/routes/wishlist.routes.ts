@@ -4,6 +4,7 @@ import { prisma } from '@force/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
 
+import { fromMinor } from '@force/shared';
 const router = Router();
 
 // Helper to get store ID from request header
@@ -115,9 +116,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         id: item.product.id,
         name: item.product.name,
         slug: item.product.slug,
-        price: item.product.price / 1000, // Convert fils to KWD
+        price: fromMinor(item.product.price), // Convert piastres to EGP
         compareAtPrice: item.product.compareAtPrice
-          ? item.product.compareAtPrice / 1000
+          ? fromMinor(item.product.compareAtPrice)
           : undefined,
         // Merchant-authored card badge — the wishlist grid renders through
         // T.ProductGrid → the theme ProductCards, so this projection must
@@ -236,9 +237,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
             id: item.product.id,
             name: item.product.name,
             slug: item.product.slug,
-            price: item.product.price / 1000,
+            price: fromMinor(item.product.price),
             compareAtPrice: item.product.compareAtPrice
-              ? item.product.compareAtPrice / 1000
+              ? fromMinor(item.product.compareAtPrice)
               : undefined,
             badgeLabel: item.product.badgeLabel,
             badgeLabelAr: item.product.badgeLabelAr,

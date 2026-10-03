@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPatch } from '@/lib/api';
 import { numericFieldValue, textFieldValue } from '@/lib/form-text';
 
+import { REGION } from '@force/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Supplier {
@@ -198,7 +199,7 @@ export default function NewSupplierPage() {
               value={phone}
               onChange={e => setPhone(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-              placeholder="+965 …"
+              placeholder={REGION.phone.placeholderIntl}
             />
           </label>
           <label className="space-y-1">

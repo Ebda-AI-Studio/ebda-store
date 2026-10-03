@@ -4,7 +4,7 @@ import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';
 
 /**
- * Seed the Kuwait-retail Chart of Accounts for a store. Idempotent — existing
+ * Seed the Egypt-retail Chart of Accounts for a store. Idempotent — existing
  * system accounts (matched by code) are left untouched; only missing rows are
  * inserted. Safe to re-run after partial failures.
  *

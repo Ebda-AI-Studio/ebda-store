@@ -33,10 +33,10 @@ export interface TemplateProduct {
   price: number;
   compareAtPrice?: number;
   /** Discount type set by the merchant — 'percentage' | 'fixed'. Passed through
-   *  from the API Product so getDiscountBadgeText can show KWD-saving text for
+   *  from the API Product so getDiscountBadgeText can show EGP-saving text for
    *  fixed discounts instead of always showing a percentage badge. */
   discountType?: 'percentage' | 'fixed' | null;
-  /** Discount value: basis points for percentage; fils for fixed. */
+  /** Discount value: basis points for percentage; piastres for fixed. */
   discountValue?: number | null;
   images: Array<{ id: string; url: string; alt?: string }>;
   rating?: number;
@@ -890,7 +890,7 @@ export interface SummaryColors {
 }
 
 export interface OrderSummaryProps {
-  /** All amounts are in the smallest currency unit (fils for KWD). */
+  /** All amounts are in the smallest currency unit (piastres for EGP). */
   subtotal: number;
   discount?: number;
   discountLabel?: string;
@@ -927,7 +927,7 @@ export interface OrderSummaryProps {
   /**
    * Already-localized message shown just above the CTA when `ctaDisabled`
    * is true because the store's minimum order value isn't met yet (e.g.
-   * "Minimum order is 5.000 KWD — add 2.000 KWD more"). Only rendered
+   * "Minimum order is 5.000 EGP — add 2.000 EGP more"). Only rendered
    * while `ctaDisabled` is true.
    */
   ctaBlockedMessage?: string;

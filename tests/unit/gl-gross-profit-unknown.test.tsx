@@ -29,7 +29,7 @@ describe('GL gross profit — unknown when no COGS was booked', () => {
     expect(html).toContain('grossProfitUnknown');
     expect(html).toContain('noCogsBooked');
     // Revenue and net income still render as figures; gross profit does not.
-    expect(html.match(/12\.345/g)).toHaveLength(2);
+    expect(html.match(/123\.45/g)).toHaveLength(2);
   });
 
   it('renders the figure when COGS was booked', () => {
@@ -40,7 +40,7 @@ describe('GL gross profit — unknown when no COGS was booked', () => {
       />
     );
     expect(html).not.toContain('grossProfitUnknown');
-    expect(html).toContain('6.000');
+    expect(html).toContain('60.00');
   });
 
   it('a period with no revenue is a known 0, not unknown', () => {

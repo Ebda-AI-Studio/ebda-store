@@ -99,7 +99,7 @@ export function CustomerWalletCard({
     setLoadingMore(false);
   }
 
-  const money = (fils: number) => formatPrice(fils, { locale });
+  const money = (piastres: number) => formatPrice(piastres, { locale });
 
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">

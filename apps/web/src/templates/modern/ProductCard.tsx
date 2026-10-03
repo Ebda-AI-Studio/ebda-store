@@ -17,7 +17,7 @@ import {
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor, getProductCardTextSizes } from '@force/shared';
+import { resolveColor, getProductCardTextSizes, fromMinor, REGION } from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
@@ -44,7 +44,7 @@ import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/Product
 function ModernProductCard({
   product,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   onAddToCart,
   onAddToWishlist,
   quantityInCart = 0,
@@ -98,7 +98,7 @@ function ModernProductCard({
   // Item 10 — image normalization.
   const normalizeImages = store.theme?.normalizeProductImages === true;
 
-  // BUG 1 fix: use helper so fixed-KWD discounts show "Save KWD X.XXX" instead of pct.
+  // BUG 1 fix: use helper so fixed-EGP discounts show "Save EGP X.XX" instead of pct.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Localized name for alt text + display. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
@@ -438,7 +438,7 @@ function ModernProductCard({
                 <div className="mt-auto pt-1 tabular-nums">
                   <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
                     <meta itemProp="priceCurrency" content={currency} />
-                    <meta itemProp="price" content={String(product.price / 1000)} />
+                    <meta itemProp="price" content={String(fromMinor(product.price))} />
                   </span>
                   <Price
                     price={product.price}

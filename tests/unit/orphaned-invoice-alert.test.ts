@@ -30,7 +30,7 @@ const invoice = {
   provider: 'myfatoorah',
   transactionId: 'mf-123',
   amount: 12500,
-  currency: 'KWD',
+  currency: 'EGP',
   source: 'record' as const,
 };
 

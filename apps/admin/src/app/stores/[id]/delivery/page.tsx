@@ -10,6 +10,7 @@ import { buildCheckoutDeliverySettings } from '../../../../lib/checkout-delivery
 import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@force/shared';
 
+import { minorToDecimalString } from '@force/shared';
 const DEFAULT_CONFIG: CheckoutDeliverySettings = {
   note: { enabled: false, text: '', textAr: '' },
   windows: { enabled: false, items: [] },
@@ -35,10 +36,10 @@ export default function CheckoutDeliveryPage() {
 
   const [existingSettings, setExistingSettings] = useState<Record<string, unknown>>({});
   const [config, setConfig] = useState<CheckoutDeliverySettings>(DEFAULT_CONFIG);
-  // Per-store, opt-in minimum order value. Held as the raw KWD string the
-  // merchant types (e.g. "5.000") — converted to integer fils only on save.
+  // Per-store, opt-in minimum order value. Held as the raw EGP string the
+  // merchant types (e.g. "5.000") — converted to integer piastres only on save.
   // Empty/0 = disabled.
-  const [minimumOrderKwd, setMinimumOrderKwd] = useState('');
+  const [minimumOrderMajor, setMinimumOrderMajor] = useState('');
   // Per-store, opt-in owner order-invoice email. Every order in this store
   // auto-emails the rendered invoice to this address. Empty = disabled.
   const [orderInvoiceEmail, setOrderInvoiceEmail] = useState('');
@@ -64,9 +65,9 @@ export default function CheckoutDeliveryPage() {
         },
       });
       const existingMinFils = settings.minimumOrderFils;
-      setMinimumOrderKwd(
+      setMinimumOrderMajor(
         typeof existingMinFils === 'number' && existingMinFils > 0
-          ? (existingMinFils / 1000).toFixed(3)
+          ? minorToDecimalString(existingMinFils)
           : ''
       );
       setOrderInvoiceEmail(
@@ -91,7 +92,7 @@ export default function CheckoutDeliveryPage() {
         settings: buildCheckoutDeliverySettings({
           existingSettings,
           config,
-          minimumOrderKwd,
+          minimumOrderMajor,
           orderInvoiceEmail,
         }),
       });
@@ -105,7 +106,7 @@ export default function CheckoutDeliveryPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [storeId, existingSettings, config, minimumOrderKwd, orderInvoiceEmail, t]);
+  }, [storeId, existingSettings, config, minimumOrderMajor, orderInvoiceEmail, t]);
 
   const patchNote = (next: Partial<CheckoutDeliverySettings['note']>) =>
     setConfig(prev => ({ ...prev, note: { ...prev.note, ...next } }));
@@ -327,9 +328,9 @@ export default function CheckoutDeliveryPage() {
             <input
               type="number"
               min={0}
-              step="0.001"
-              value={minimumOrderKwd}
-              onChange={e => setMinimumOrderKwd(e.target.value)}
+              step="0.01"
+              value={minimumOrderMajor}
+              onChange={e => setMinimumOrderMajor(e.target.value)}
               placeholder={t('minOrderPlaceholder')}
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
             />

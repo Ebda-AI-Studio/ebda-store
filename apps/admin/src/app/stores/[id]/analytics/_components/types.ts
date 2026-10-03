@@ -1,4 +1,5 @@
 import type { AnalyticsPeriod, SalesGranularity } from '@force/shared';
+import { formatMoney } from '@force/shared';
 
 export type { SalesGranularity };
 
@@ -18,7 +19,7 @@ export interface DashboardStats {
   totalProfit: number | null;
   /** Sold lines with no cost price — excluded from totalProfit. */
   profitItemsMissingCost?: number;
-  /** Revenue (fils) of those lines. */
+  /** Revenue (piastres) of those lines. */
   profitRevenueMissingCost?: number;
   profitChange: number | null;
 }
@@ -171,15 +172,11 @@ export function resolveDateRange(period: Period, custom?: ResolvedDateRange): Re
 export type ChartType = 'revenue' | 'orders';
 
 /**
- * Formats fils (integer) to a KWD-denominated localized currency string.
- * Amounts are stored as fils (1 KWD = 1000 fils) so we divide before formatting.
+ * Formats minor units (integer piastres) to an EGP-denominated currency string.
+ * Amounts are stored as piastres (1 EGP = 100 piastres); `formatMoney` scales.
  */
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(amount / 1000);
+  return formatMoney(amount, 'en');
 }
 
 /** Shortens large integers with K/M suffixes for compact stat display. */

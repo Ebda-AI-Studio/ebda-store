@@ -14,10 +14,11 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import type { OrderSummaryProps } from '../types';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 export interface OrderSummaryBaseResult {
   isRtl: boolean;
-  /** Format a fils-denominated price as "X.XXX KWD" */
-  fmt: (fils: number) => string;
+  /** Format a piastres-denominated price as "X.XXX EGP" */
+  fmt: (piastres: number) => string;
   /** RTL-resolved CTA label */
   ctaText: string | undefined;
   /** Whether label text should render bold (default true) */
@@ -37,7 +38,7 @@ export interface OrderSummaryBaseResult {
  * destructure the result directly into your JSX.
  */
 export function useOrderSummaryBase({
-  currency = 'KWD',
+  currency = REGION.currency,
   ctaLabel,
   ctaLabelAr,
   summaryColors,
@@ -62,7 +63,7 @@ export function useOrderSummaryBase({
 
   return {
     isRtl,
-    fmt: (p: number) => `${localize((p / 1000).toFixed(3))} ${currency}`,
+    fmt: (p: number) => `${localize(minorToDecimalString(p))} ${currency}`,
     ctaText: isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr),
     summaryLabelBold: summaryColors?.bold !== false,
     labelColorStyle: summaryColors?.labelColor ? { color: summaryColors.labelColor } : undefined,

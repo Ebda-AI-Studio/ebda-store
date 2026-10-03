@@ -263,7 +263,7 @@ router.get(
 
       res.json({
         data: {
-          // Page contract: aov is an object with this/last-period fils so the
+          // Page contract: aov is an object with this/last-period piastres so the
           // tile can render a period-over-period delta (dashboard/page.tsx).
           aov: {
             thisPeriodFils: orderStats._avg?.total ?? 0,

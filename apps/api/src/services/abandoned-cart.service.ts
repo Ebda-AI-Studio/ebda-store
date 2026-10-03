@@ -289,7 +289,7 @@ class AbandonedCartService {
             )
           ).filter((b): b is CartItemSnapshot => b !== null);
 
-          // Calculate total from snapshot (price is in fils / integer cents) —
+          // Calculate total from snapshot (price is in piastres / integer cents) —
           // per chosen variant price, matching cart/checkout. Bundles add
           // their resolved bundle price x quantity, exactly like the
           // storefront cart's own `bundlesSubtotal` (cart.service.ts).
@@ -597,8 +597,8 @@ class AbandonedCartService {
 
     // Build variables for force_cart_abandoned_v1:
     //   {{1}} customer name, {{2}} cart total, {{3}} store name
-    const cartTotalKwd = (cart.totalFils / 1000).toFixed(3);
-    const totalDisplay = `${cartTotalKwd} ${cart.currency}`;
+    const cartTotalMajor = (cart.totalFils / 1000).toFixed(3);
+    const totalDisplay = `${cartTotalMajor} ${cart.currency}`;
     const customerName = cart.customerName || 'Customer';
 
     const variables = [customerName, totalDisplay, store.name];
@@ -738,7 +738,7 @@ class AbandonedCartService {
     const customerName = abandonedCart.customer
       ? `${abandonedCart.customer.firstName} ${abandonedCart.customer.lastName}`.trim()
       : 'Customer';
-    const cartTotalFormatted = (abandonedCart.cartTotal / 1000).toFixed(3); // fils → KWD
+    const cartTotalFormatted = (abandonedCart.cartTotal / 1000).toFixed(3); // piastres → EGP
 
     const notificationData: NotificationData = {
       customerName,
@@ -806,8 +806,8 @@ class AbandonedCartService {
 
       const expiresAt = new Date(Date.now() + storeConfig.couponExpiryHours * 60 * 60 * 1000);
 
-      // Coupon.value is Int (percentage 0–100 or fixed amount in fils)
-      // couponMaxDiscount is now Int (fils) — use directly as Coupon.maxDiscount
+      // Coupon.value is Int (percentage 0–100 or fixed amount in piastres)
+      // couponMaxDiscount is now Int (piastres) — use directly as Coupon.maxDiscount
       const maxDiscountInt =
         storeConfig.couponMaxDiscount !== null ? storeConfig.couponMaxDiscount : undefined;
 

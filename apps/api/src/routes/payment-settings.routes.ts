@@ -10,6 +10,7 @@ import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
 import { tenantContext } from '../middleware/tenant-context';
 
+import { REGION } from '@force/shared';
 const router = Router();
 
 // Mounted bare at '/payment-settings' in routes/index.ts — the global
@@ -39,7 +40,7 @@ const paymentConfigSchema = z.object({
   webhookSecret: z.string().optional(),
   testMode: z.boolean().default(true),
   supportedMethods: z.array(z.string()).default([]),
-  supportedCurrencies: z.array(z.string()).default(['KWD']),
+  supportedCurrencies: z.array(z.string()).default([REGION.currency]),
   fixedFee: z.number().int().min(0).default(0),
   percentageFee: z.number().min(0).max(100).default(0),
 });

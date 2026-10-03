@@ -6,8 +6,9 @@ import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.se
 import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
 import { featureService } from '../../../services/feature.service';
 
+import { REGION } from '@force/shared';
 /**
- * Cron-triggered dead-stock scan — runs every Sunday at 06:00 Kuwait time (03:00 UTC).
+ * Cron-triggered dead-stock scan — runs every Sunday at 06:00 Egypt time (03:00 UTC).
  *
  * For every store with accountingEnabled + aiFeaturesEnabled, calls
  * runDeadstockScan() which:
@@ -27,7 +28,7 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
     name: 'Dead-stock scan — weekly cron (AI)',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '0 3 * * 0' }], // Sunday 06:00 KW = Sunday 03:00 UTC (Kuwait is UTC+3)
+    triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * 0` }], // Sunday 06:00 Cairo (DST-aware via TZ=)
   },
   async ({ step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the

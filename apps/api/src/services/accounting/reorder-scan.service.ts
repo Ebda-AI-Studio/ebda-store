@@ -3,7 +3,7 @@
  *
  * Scans active trackInventory products for a store and generates AI-powered
  * bilingual reorder suggestions when projected stock falls below the minimum
- * threshold. Designed to be called by the Inngest daily cron (06:00 KW) or
+ * threshold. Designed to be called by the Inngest daily cron (06:00 Cairo) or
  * on-demand by a super_admin "Re-scan now" action.
  *
  * Algorithm (per spec Part 3.1):
@@ -188,7 +188,7 @@ function buildGeminiPrompt(candidates: ReorderCandidate[]): string {
     minQty: c.minQty,
   }));
 
-  return `You are an inventory ops assistant for a Kuwait retailer. For each product below,
+  return `You are an inventory ops assistant for an Egypt retailer. For each product below,
 in <=2 sentences each, explain WHY this reorder suggestion makes sense given the velocity
 + on-hand + lead time + open backlog. Output bilingual (English + Arabic).
 Return STRICT JSON:

@@ -53,9 +53,9 @@ interface ProductRow {
   lowStockThreshold: number;
   allowBackorder: boolean;
   status: string;
-  /** Unit selling price in fils. */
+  /** Unit selling price in piastres. */
   price: number;
-  /** Cost-of-goods in fils. Null for rows that never had a cost set. */
+  /** Cost-of-goods in piastres. Null for rows that never had a cost set. */
   costPrice: number | null;
   /** Total units sold across realized-sale orders. Supplied by the API when
    *  the list is requested with `withSalesQuantity=true`. */

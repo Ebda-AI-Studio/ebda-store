@@ -510,9 +510,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'Accounting — Invoicing',
     nameAr: 'المحاسبة — إصدار الفواتير',
     description:
-      'Kuwait-compliant invoice generation with tax line, bilingual layout, and PDF export.',
+      'Egypt-compliant invoice generation with tax line, bilingual layout, and PDF export.',
     descriptionAr:
-      'إصدار فواتير متوافقة مع متطلبات الكويت تتضمّن خانة الضريبة وتصميماً ثنائي اللغة وتصدير PDF.',
+      'إصدار فواتير متوافقة مع متطلبات مصر تتضمّن خانة الضريبة وتصميماً ثنائي اللغة وتصدير PDF.',
     category: 'operations',
     tier: 'addon',
   },
@@ -530,9 +530,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'Accounting — Multi-Currency',
     nameAr: 'المحاسبة — تعدد العملات',
     description:
-      'Track non-KWD transactions with FX rates and automatic KWD conversion at the book-keeping level.',
+      'Track non-EGP transactions with FX rates and automatic EGP conversion at the book-keeping level.',
     descriptionAr:
-      'تتبع المعاملات بعملات غير الدينار مع أسعار صرف وتحويل تلقائي إلى الدينار على مستوى الدفاتر.',
+      'تتبع المعاملات بعملات غير الجنيه مع أسعار صرف وتحويل تلقائي إلى الجنيه على مستوى الدفاتر.',
     category: 'operations',
     tier: 'addon',
   },
@@ -543,7 +543,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description:
       'Runs a daily AI scan of margins (06:30 KWT); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
     descriptionAr:
-      'فحص يومي بالذكاء الاصطناعي للهوامش (06:30 بتوقيت الكويت)؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
+      'فحص يومي بالذكاء الاصطناعي للهوامش (06:30 بتوقيت القاهرة)؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
     category: 'operations',
     tier: 'addon',
   },

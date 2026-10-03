@@ -6,7 +6,7 @@ export const storeFaqNamesGatewayCompany: KnownFailureCase = {
   type: 'store-faq',
   description:
     'FAQ answer names "MyFatoorah" instead of the payment methods customers actually see (KNET/Visa/Mastercard).',
-  input: { storeDescription: 'Kuwait-based online store.' },
+  input: { storeDescription: 'Egypt-based online store.' },
   output: [
     {
       question: 'What payment methods do you accept?',

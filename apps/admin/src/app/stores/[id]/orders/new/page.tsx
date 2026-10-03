@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { useLocale } from 'next-intl';
-import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
+import { EGYPT_GOVERNORATES, areasForGovernorate, roundToMinor, REGION } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { useAuth } from '../../../../../lib/auth';
@@ -95,7 +95,7 @@ export default function NewOrderPage() {
   // that reads shippingAddress.city, but it mirrors the governorate.
   const [governorate, setGovernorate] = useState('');
   const [area, setArea] = useState('');
-  const [country, setCountry] = useState('Kuwait');
+  const [country, setCountry] = useState(REGION.countryName.en);
   const [notes, setNotes] = useState('');
   const [couponCode, setCouponCode] = useState('');
   // Coupon rules are ENFORCED by default (#1370). A store admin may override
@@ -107,9 +107,9 @@ export default function NewOrderPage() {
   const [shippingPreview, setShippingPreview] = useState<ShippingPreview | null>(null);
   const [shippingPreviewLoading, setShippingPreviewLoading] = useState(false);
 
-  // Manual fee override. Stored as the raw string the merchant types (KWD),
-  // converted to integer fils on submit.
-  const [shippingOverrideKwd, setShippingOverrideKwd] = useState('');
+  // Manual fee override. Stored as the raw string the merchant types (EGP),
+  // converted to integer piastres on submit.
+  const [shippingOverrideMajor, setShippingOverrideMajor] = useState('');
 
   // Product picker state.
   const [productSearch, setProductSearch] = useState('');
@@ -331,14 +331,14 @@ export default function NewOrderPage() {
     setShippingPreview(null);
   };
 
-  // Shipping override in fils (integer). Blank = use calculated.
+  // Shipping override in piastres (integer). Blank = use calculated.
   const shippingOverrideFils = useMemo(() => {
-    const trimmed = shippingOverrideKwd.trim();
+    const trimmed = shippingOverrideMajor.trim();
     if (!trimmed) return undefined;
     const parsed = parseFloat(trimmed);
     if (isNaN(parsed) || parsed < 0) return undefined;
-    return Math.round(parsed * 1000);
-  }, [shippingOverrideKwd]);
+    return roundToMinor(parsed);
+  }, [shippingOverrideMajor]);
 
   const handleSubmit = useCallback(async () => {
     if (items.length === 0) {
@@ -382,7 +382,7 @@ export default function NewOrderPage() {
         payload.overrideCouponRules = true;
         payload.couponOverrideReason = couponOverrideReason.trim();
       }
-      // shippingOverride — integer fils, omitted when blank.
+      // shippingOverride — integer piastres, omitted when blank.
       if (typeof shippingOverrideFils === 'number') {
         payload.shippingOverride = shippingOverrideFils;
       }
@@ -582,7 +582,7 @@ export default function NewOrderPage() {
                 {/* Governorate names are shown in both languages together on purpose —
                     the merchant and the delivery driver may read different locales,
                     so this bilingual place-name data is not swapped by admin locale. */}
-                {KUWAIT_GOVERNORATES.map(gov => (
+                {EGYPT_GOVERNORATES.map(gov => (
                   <option key={gov.en} value={gov.en}>
                     {gov.en} / {gov.ar}
                   </option>
@@ -661,10 +661,10 @@ export default function NewOrderPage() {
               <input
                 type="number"
                 min="0"
-                step="0.001"
+                step="0.01"
                 placeholder={t('shippingSection.overridePlaceholder')}
-                value={shippingOverrideKwd}
-                onChange={e => setShippingOverrideKwd(e.target.value)}
+                value={shippingOverrideMajor}
+                onChange={e => setShippingOverrideMajor(e.target.value)}
                 dir="ltr"
                 className="w-48 rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
@@ -672,7 +672,7 @@ export default function NewOrderPage() {
                 <p className="text-xs text-primary">
                   {t('shippingSection.overrideActive', {
                     price: formatPrice(shippingOverrideFils),
-                    fils: shippingOverrideFils,
+                    piastres: shippingOverrideFils,
                   })}
                 </p>
               )}

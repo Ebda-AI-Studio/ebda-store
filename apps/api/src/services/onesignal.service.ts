@@ -17,6 +17,7 @@ import { prisma, Prisma } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 
+import { minorToDecimalString } from '@force/shared';
 const ENDPOINT = 'https://onesignal.com/api/v1/notifications';
 
 interface NotifyOrderInput {
@@ -25,7 +26,7 @@ interface NotifyOrderInput {
   storeId: string;
   storeName: string;
   customerName: string;
-  total: number; // fils
+  total: number; // piastres
   currency: string;
   /** Payment method the customer chose at checkout (e.g. 'cod', 'knet',
    *  'visa'). Surfaced in the super_admin push body so platform staff can
@@ -65,7 +66,7 @@ interface NotifyOrdersAppInput {
   orderId: string;
   orderNumber: string;
   storeId: string;
-  total: number; // fils
+  total: number; // piastres
   currency: string;
   customerName: string;
   /** Buyer locale — only used to pick which contents string leads (both
@@ -158,8 +159,8 @@ function ordersAppOrderUrl(orderId: string, storeId: string): string {
   return `${config.ordersUrl}/orders/${orderId}?store=${encodeURIComponent(storeId)}`;
 }
 
-function formatMoney(fils: number, currency: string): string {
-  return `${(fils / 1000).toFixed(3)} ${currency}`;
+function formatMoney(piastres: number, currency: string): string {
+  return `${minorToDecimalString(piastres, currency)} ${currency}`;
 }
 
 export class OneSignalService {

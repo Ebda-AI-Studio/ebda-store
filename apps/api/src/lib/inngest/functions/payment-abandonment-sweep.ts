@@ -5,6 +5,7 @@ import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import { OneSignalService } from '../../../services/onesignal.service';
 
+import { REGION } from '@force/shared';
 /**
  * Payment-gateway abandonment sweep — runs every 30 min (Enterprise only).
  *
@@ -178,7 +179,7 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
               storeName: order.store?.name ?? order.storeId,
               customerName: '',
               total: order.total ?? 0,
-              currency: order.currency ?? 'KWD',
+              currency: order.currency ?? REGION.currency,
             });
           } catch (err) {
             logger.error(

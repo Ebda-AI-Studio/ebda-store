@@ -14,7 +14,7 @@ interface ProductImportRow {
   slug?: string;
   description?: string;
   descriptionAr?: string;
-  price: number; // In fils
+  price: number; // In piastres
   compareAtPrice?: number;
   costPrice?: number;
   sku?: string;
@@ -55,8 +55,8 @@ interface ImportResult {
 
 /**
  * A parsed variant row, grouped under its parent product by parentSku.
- * Numeric fields are already in fils / ints (the xlsx converter pre-multiplies
- * price; CSV callers pass fils directly).
+ * Numeric fields are already in piastres / ints (the xlsx converter pre-multiplies
+ * price; CSV callers pass piastres directly).
  */
 export interface VariantImportRow {
   parentSku: string;
@@ -460,7 +460,7 @@ export class BulkService {
       'product-slug',
       'Product description goes here',
       'وصف المنتج هنا',
-      '5000', // 5 KWD in fils
+      '5000', // 50.00 EGP in piastres
       '7500', // Compare at price
       '3000', // Cost price
       'SKU-001',
@@ -497,7 +497,7 @@ export class BulkService {
       '', // slug
       '', // description
       '', // descriptionAr
-      '5500', // variant price (5.5 KWD in fils)
+      '5500', // variant price (55.00 EGP in piastres)
       '', // compareAtPrice
       '', // costPrice
       'SKU-001-1KG', // variant sku
@@ -698,7 +698,10 @@ export class BulkService {
 
         if (row.price === undefined || isNaN(Number(row.price))) {
           result.failed++;
-          result.errors.push({ row: rowIndex, error: 'Price is required and must be a number' });
+          result.errors.push({
+            row: rowIndex,
+            error: 'Price is required and must be a valid number (max 2 decimals in a spreadsheet)',
+          });
           continue;
         }
 

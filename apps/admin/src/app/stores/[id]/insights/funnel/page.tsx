@@ -7,7 +7,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
@@ -165,7 +165,7 @@ export default function InsightsFunnelPage() {
     {
       header: t('revenue'),
       alignEnd: true,
-      cell: day => <span className="font-mono">{filsToKwd(day.revenueFils)}</span>,
+      cell: day => <span className="font-mono">{minorToMajor(day.revenueFils)}</span>,
     },
   ];
 
@@ -258,9 +258,9 @@ export default function InsightsFunnelPage() {
                     {t('revenue')}
                   </p>
                   <p className="text-2xl font-semibold font-mono text-green-700">
-                    {filsToKwd(totals.revenueFils)}
+                    {minorToMajor(totals.revenueFils)}
                   </p>
-                  <p className="text-xs text-muted-foreground">KWD</p>
+                  <p className="text-xs text-muted-foreground">EGP</p>
                 </div>
                 <div className="rounded-xl border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">

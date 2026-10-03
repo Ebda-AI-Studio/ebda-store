@@ -276,7 +276,7 @@ describe('public/customer loyalty routes — behavior + tenancy', () => {
     loyaltyService.getSettings.mockResolvedValue({
       loyaltyEnabled: true,
       settings: {
-        pointsPerDinar: 10,
+        pointsPerMajorUnit: 1,
         signupBonus: 100,
         pointsValue: 1,
         minRedeemPoints: 50,
@@ -289,7 +289,7 @@ describe('public/customer loyalty routes — behavior + tenancy', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.enabled).toBe(true);
-    expect(res.body.data.pointsPerDinar).toBe(10);
+    expect(res.body.data.pointsPerMajorUnit).toBe(1);
     // The checkout estimate needs the redemption cap the server applies (#181).
     expect(res.body.data.maxRedeemPercentage).toBe(50);
   });

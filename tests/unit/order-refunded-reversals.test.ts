@@ -157,7 +157,7 @@ const ORDER = {
   // explicitly below with status 'cancelled'.
   status: 'refunded',
   total: 5000,
-  currency: 'KWD',
+  currency: 'EGP',
   locale: 'en',
   customer: { email: 'buyer@test.com', firstName: 'Sam', lastName: 'B' },
   payments: [],

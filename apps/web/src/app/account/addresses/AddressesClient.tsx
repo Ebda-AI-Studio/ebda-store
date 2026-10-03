@@ -8,6 +8,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 
+import { REGION } from '@force/shared';
 interface Address {
   id: string;
   firstName: string;
@@ -16,6 +17,8 @@ interface Address {
   address2?: string;
   city: string;
   state: string;
+  governorate?: string;
+  governorateAr?: string;
   area?: string;
   postalCode?: string;
   country: string;
@@ -30,9 +33,11 @@ const EMPTY_FORM = {
   address2: '',
   city: '',
   state: '',
+  governorate: '',
+  governorateAr: '',
   area: '',
   postalCode: '',
-  country: 'Kuwait',
+  country: REGION.countryName.en,
   phone: '',
   isDefault: false,
 };
@@ -145,6 +150,8 @@ export default function AddressesClient() {
       address2: address.address2 || '',
       city: address.city,
       state: address.state,
+      governorate: address.governorate || address.state,
+      governorateAr: address.governorateAr || '',
       area: address.area || '',
       postalCode: address.postalCode || '',
       country: address.country,
@@ -248,7 +255,7 @@ export default function AddressesClient() {
               type="tel"
               value={formData.phone}
               onChange={e => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="+965 XXXX XXXX"
+              placeholder={REGION.phone.placeholderIntl}
             />
 
             <Input
@@ -272,15 +279,31 @@ export default function AddressesClient() {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label={t('City', '\u0627\u0644\u0645\u062f\u064a\u0646\u0629')}
+                label={t('City / District', 'المدينة / الحي')}
                 value={formData.city}
                 onChange={e => setFormData({ ...formData, city: e.target.value })}
                 required
               />
-              <Input
-                label={t('State / Area', '\u0627\u0644\u0645\u0646\u0637\u0642\u0629')}
-                value={formData.state}
-                onChange={e => setFormData({ ...formData, state: e.target.value })}
+              <Select
+                label={t('Governorate', 'المحافظة')}
+                value={formData.governorate}
+                onChange={e => {
+                  // `state` is NOT NULL in the DB and what older readers use; mirror the governorate.
+                  const gov = REGION.governorates.find(g => g.nameEn === e.target.value);
+                  setFormData({
+                    ...formData,
+                    governorate: e.target.value,
+                    governorateAr: gov?.nameAr ?? '',
+                    state: e.target.value,
+                  });
+                }}
+                options={[
+                  { value: '', label: t('Select…', 'اختر…') },
+                  ...REGION.governorates.map(g => ({
+                    value: g.nameEn,
+                    label: t(g.nameEn, g.nameAr),
+                  })),
+                ]}
                 required
               />
               <Input
@@ -298,7 +321,7 @@ export default function AddressesClient() {
               value={formData.country}
               onChange={e => setFormData({ ...formData, country: e.target.value })}
               options={[
-                { value: 'Kuwait', label: 'Kuwait' },
+                { value: REGION.countryName.en, label: REGION.countryName.en },
                 { value: 'Saudi Arabia', label: 'Saudi Arabia' },
                 { value: 'UAE', label: 'United Arab Emirates' },
                 { value: 'Bahrain', label: 'Bahrain' },

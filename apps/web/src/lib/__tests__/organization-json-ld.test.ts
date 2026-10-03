@@ -20,8 +20,8 @@ function makeStore(overrides: Partial<ResolvedStore> = {}): ResolvedStore {
     slug: 'pecannbee',
     domain: 'pecannbee.com.kw',
     status: 'active',
-    currency: 'KWD',
-    timezone: 'Asia/Kuwait',
+    currency: 'EGP',
+    timezone: 'Africa/Cairo',
     template: 'elegant',
     theme: {},
     socialLinks: {},
@@ -51,8 +51,8 @@ describe('organizationJsonLd', () => {
   });
 
   it('emits areaServed as Text from aboutJson.location, never invented when absent', () => {
-    const withLocation = organizationJsonLd(makeStore({ aboutJson: { location: 'Kuwait' } }), 'en');
-    expect(withLocation.areaServed).toBe('Kuwait');
+    const withLocation = organizationJsonLd(makeStore({ aboutJson: { location: 'Egypt' } }), 'en');
+    expect(withLocation.areaServed).toBe('Egypt');
 
     const withoutAboutJson = organizationJsonLd(makeStore(), 'en');
     expect(withoutAboutJson).not.toHaveProperty('areaServed');
@@ -66,9 +66,9 @@ describe('organizationJsonLd', () => {
   it('folds every other aboutJson key into additionalProperty PropertyValue entries, none dropped', () => {
     const store = makeStore({
       aboutJson: {
-        location: 'Kuwait',
+        location: 'Egypt',
         region: 'GCC',
-        currency: 'KWD',
+        currency: 'EGP',
         languages: ['Arabic', 'English'],
         keyCategories: ['Nuts', 'Dried Fruit'],
         contactMethods: ['email', 'whatsapp'],
@@ -79,7 +79,7 @@ describe('organizationJsonLd', () => {
     // location/region are consumed by areaServed, not duplicated here.
     expect(node.additionalProperty).toEqual(
       expect.arrayContaining([
-        { '@type': 'PropertyValue', name: 'currency', value: 'KWD' },
+        { '@type': 'PropertyValue', name: 'currency', value: 'EGP' },
         { '@type': 'PropertyValue', name: 'languages', value: 'Arabic, English' },
         { '@type': 'PropertyValue', name: 'keyCategories', value: 'Nuts, Dried Fruit' },
         { '@type': 'PropertyValue', name: 'contactMethods', value: 'email, whatsapp' },
@@ -95,9 +95,9 @@ describe('organizationJsonLd', () => {
     const node = organizationJsonLd(
       makeStore({
         aboutJson: {
-          currency: 'KWD',
+          currency: 'EGP',
           contactMethods: [{ type: 'email', value: 'x@y.com' }],
-          address: { city: 'Kuwait City' },
+          address: { city: 'Cairo' },
           fax: null,
           languages: ['Arabic', 'English'],
         },
@@ -108,7 +108,7 @@ describe('organizationJsonLd', () => {
     expect(json).not.toContain('[object Object]');
     expect(json).not.toContain('"null"');
     expect(node.additionalProperty).toEqual([
-      { '@type': 'PropertyValue', name: 'currency', value: 'KWD' },
+      { '@type': 'PropertyValue', name: 'currency', value: 'EGP' },
       { '@type': 'PropertyValue', name: 'languages', value: 'Arabic, English' },
     ]);
   });

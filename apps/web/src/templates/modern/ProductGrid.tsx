@@ -6,6 +6,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { cn } from '@force/ui';
 import { NoProductsIcon } from '../shared/icons';
 
+import { REGION } from '@force/shared';
 /**
  * Modern Template - Product Grid
  *
@@ -18,7 +19,7 @@ import { NoProductsIcon } from '../shared/icons';
 export default function ModernProductGrid({
   products,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   columns = 4,
   cartQuantities = {},
   onAddToCart,

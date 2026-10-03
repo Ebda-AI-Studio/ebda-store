@@ -41,10 +41,10 @@ const baseOrderData = {
     firstName: 'Wallet',
     lastName: 'Buyer',
     address1: 'Block 1',
-    city: 'Kuwait City',
+    city: 'Cairo',
     state: 'Capital',
     postalCode: '00000',
-    country: 'KW',
+    country: 'EG',
     phone: '96550000000',
   },
   paymentMethod: 'myfatoorah',
@@ -53,8 +53,8 @@ const baseOrderData = {
 describe.skipIf(!hasDb)('customer wallet — integration', () => {
   let ownerId: string;
   let storeId: string;
-  let productA: string; // 6000 fils
-  let productB: string; // 4000 fils
+  let productA: string; // 6000 piastres
+  let productB: string; // 4000 piastres
 
   async function setFeature(featureKey: string, enabled: boolean) {
     await prisma.storeFeature.upsert({

@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
 import { resolvedViaCookie } from '../../lib/agent-store-resolver';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 /**
  * Dynamic /llms.txt — served at three levels:
  *
@@ -254,7 +255,7 @@ Every store follows the same URL pattern:
 - Schema.org structured data on every page (JSON-LD blocks in <head>)
 - Sitemap: https://store.force-ai.co/sitemap.xml (lists every URL for every active store)
 - Languages: bilingual (English + Arabic). Store default in \`Store.inLanguage\`. Customer can browse either.
-- Currency: KWD (Kuwaiti Dinar) unless individual store overrides
+- Currency: ${REGION.currency} (Egyptian Pound, 2 decimals) unless individual store overrides
 - Real-time inventory in \`Product.offers.availability\` (InStock / OutOfStock)
 - All product data is publicly accessible — no auth or scraping protection on /<slug>/* pages
 - Rate limit: 100 req/min per IP for catalogue scrape
@@ -305,7 +306,7 @@ ${prodLines || '_No active products._'}${buildAgentSections(store, base)}
 
 ## For AI agents
 
-- Each product page has full JSON-LD \`Product\` schema with name, image, description, price, availability, currency (KWD)
+- Each product page has full JSON-LD \`Product\` schema with name, image, description, price, availability, currency (${REGION.currency})
 - Each category page has \`ItemList\` schema enumerating products
 - Sitemap for this store: ${base}/sitemap.xml (subset of the platform sitemap)
 - Inventory updates in real time — re-crawl daily for fresh availability
@@ -325,12 +326,12 @@ function categoryLines(categories: PublicCategory[], base: string): string {
     .join('\n');
 }
 
-/** `- [name](url) — price KWD` per product; an unknown price renders as `—`, never 0. */
+/** `- [name](url) — price EGP` per product; an unknown price renders as `—`, never 0. */
 function productLines(products: PublicProduct[], base: string): string {
   return products
     .map(p => {
-      const price = typeof p.price === 'number' ? (p.price / 1000).toFixed(3) : '—';
-      return `- [${p.name}](${base}/products/${p.slug}) — ${price} KWD`;
+      const price = typeof p.price === 'number' ? minorToDecimalString(p.price) : '—';
+      return `- [${p.name}](${base}/products/${p.slug}) — ${price} ${REGION.currency}`;
     })
     .join('\n');
 }

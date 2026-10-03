@@ -191,7 +191,7 @@ export function CouponFormModal({
             <input
               type="number"
               min="0"
-              step="0.001"
+              step="0.01"
               value={formData.minOrderAmount}
               onChange={e => onChange({ ...formData, minOrderAmount: e.target.value })}
               placeholder={tForm('minOrderPlaceholder')}
@@ -206,7 +206,7 @@ export function CouponFormModal({
               <input
                 type="number"
                 min="0"
-                step="0.001"
+                step="0.01"
                 value={formData.maxDiscount}
                 onChange={e => onChange({ ...formData, maxDiscount: e.target.value })}
                 placeholder={tForm('maxDiscountPlaceholder')}

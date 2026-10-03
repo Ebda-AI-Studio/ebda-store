@@ -1,7 +1,7 @@
 /**
  * Per-tenant date/time formatting.
  *
- * The storefront is multi-tenant: a Kuwait beauty brand and a UAE retailer
+ * The storefront is multi-tenant: an Egypt beauty brand and a UAE retailer
  * can both run on the same Vercel deployment but should render dates using
  * their own timezone (`store.timezone`) and the visitor's preferred locale
  * (`useLanguage().language`). Every call site that previously hardcoded
@@ -17,7 +17,7 @@
 export type FormatDateStyle = 'short' | 'long' | 'datetime';
 
 export interface FormatDateOptions {
-  /** Store IANA timezone (e.g. 'Asia/Kuwait'). Falls back to Asia/Kuwait. */
+  /** Store IANA timezone (e.g. 'Africa/Cairo'). Falls back to Africa/Cairo. */
   timezone?: string;
   /** Visitor language. Falls back to 'en'. */
   language?: 'en' | 'ar';
@@ -25,16 +25,16 @@ export interface FormatDateOptions {
   style?: FormatDateStyle;
 }
 
-const DEFAULT_TIMEZONE = 'Asia/Kuwait';
+const DEFAULT_TIMEZONE = 'Africa/Cairo';
 
 /**
  * Map the storefront's `'en' | 'ar'` language to the BCP-47 tag we hand to
- * `Intl.DateTimeFormat`. Arabic visitors get Arabic-Kuwait formatting (so
+ * `Intl.DateTimeFormat`. Arabic visitors get Arabic-Egypt formatting (so
  * digits and month names render in Arabic) — same convention `formatPrice`
  * already uses elsewhere.
  */
 function resolveLocale(language: FormatDateOptions['language']): string {
-  return language === 'ar' ? 'ar-KW' : 'en-US';
+  return language === 'ar' ? 'ar-EG' : 'en-US';
 }
 
 function presetOptions(style: FormatDateStyle): Intl.DateTimeFormatOptions {

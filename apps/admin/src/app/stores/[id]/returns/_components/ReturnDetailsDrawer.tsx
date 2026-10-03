@@ -10,12 +10,9 @@ import { ReturnLifecycleTimeline } from '../../../../../components/return-timeli
 import { RETURN_COLORS } from './types';
 import type { ReturnItem, ReturnRecord } from './types';
 
+import { formatMoney } from '@force/shared';
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(amount / 1000);
+  return formatMoney(amount, 'en');
 }
 
 export type ReturnDetailsEntry =

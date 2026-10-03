@@ -13,7 +13,7 @@ export default getRequestConfig(async () => {
   return {
     locale,
     messages,
-    timeZone: 'Asia/Kuwait',
+    timeZone: 'Africa/Cairo',
     formats: intlFormats,
   };
 });

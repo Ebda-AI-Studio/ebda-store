@@ -561,7 +561,7 @@ const seoMeta: CriteriaSpec<SeoEvalInput, SeoSuggestion> = {
     {
       name: 'search-relevance',
       instruction:
-        'The title/keywords plausibly match how a Kuwaiti/GCC shopper would actually search for this entity.',
+        'The title/keywords plausibly match how an Egyptian/GCC shopper would actually search for this entity.',
     },
   ],
 };
@@ -1461,7 +1461,7 @@ const expenseOcr: CriteriaSpec<{ receiptUrl?: string }, OcrEvalOutput> = {
       name: 'currency-iso-code',
       run: (_input, output) => ({
         pass: typeof output?.currency === 'string' && /^[A-Z]{3}$/.test(output.currency),
-        reason: 'currency must be a 3-letter uppercase ISO code (e.g. KWD)',
+        reason: 'currency must be a 3-letter uppercase ISO code (e.g. EGP)',
       }),
     },
     {

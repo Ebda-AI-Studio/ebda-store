@@ -35,7 +35,7 @@ export async function ContactPageBody({ store }: { store: ResolvedStore }) {
               ...(store.phone ? { telephone: store.phone } : {}),
               ...(store.email ? { email: store.email } : {}),
               contactType: 'Customer Service',
-              areaServed: 'KW',
+              areaServed: 'EG',
               availableLanguage: ['Arabic', 'English'],
             },
           }

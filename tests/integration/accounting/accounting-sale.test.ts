@@ -34,8 +34,8 @@ beforeAll(async () => {
       storeId,
       name: 'Sale Test Product',
       slug: `sale-test-product-${Date.now()}`,
-      price: 5000, // 5 KWD
-      costPrice: 3000, // 3 KWD COGS
+      price: 5000, // 5 EGP
+      costPrice: 3000, // 3 EGP COGS
       inventory: 100,
       status: 'active',
     },
@@ -68,7 +68,7 @@ describe('order payment posts a balanced journal entry', () => {
         shipping: 0,
         discount: 0,
         total: 5000,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {
@@ -155,7 +155,7 @@ describe('order payment posts a balanced journal entry', () => {
         shipping: 500,
         discount: 0,
         total: 5750,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {
@@ -224,7 +224,7 @@ describe('order payment posts a balanced journal entry', () => {
         shipping: 500,
         discount: 0,
         total: 5500, // subtotal + shipping — the VAT is already inside subtotal
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {

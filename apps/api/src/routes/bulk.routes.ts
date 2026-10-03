@@ -12,6 +12,7 @@ import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { tenantContext } from '../middleware/tenant-context';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 
+import { fromMinor, excelMoneyFormat } from '@force/shared';
 const router = Router();
 
 // Mounted at the bare '/stores' prefix in routes/index.ts, so Express does
@@ -142,9 +143,9 @@ router.get(
         slug: p.slug,
         description: p.description ?? '',
         descriptionAr: p.descriptionAr ?? '',
-        price: p.price / 1000,
-        compareAtPrice: p.compareAtPrice != null ? p.compareAtPrice / 1000 : '',
-        costPrice: p.costPrice != null ? p.costPrice / 1000 : '',
+        price: fromMinor(p.price),
+        compareAtPrice: p.compareAtPrice != null ? fromMinor(p.compareAtPrice) : '',
+        costPrice: p.costPrice != null ? fromMinor(p.costPrice) : '',
         sku: p.sku ?? '',
         barcode: p.barcode ?? '',
         inventory: p.inventory,
@@ -184,14 +185,24 @@ router.get(
           { header: 'Slug', key: 'slug', width: 24 },
           { header: 'Description', key: 'description', width: 40 },
           { header: 'Description (AR)', key: 'descriptionAr', width: 40 },
-          { header: 'Price (KWD)', key: 'price', width: 14, numFmt: '#,##0.000' },
           {
-            header: 'Compare At Price (KWD)',
+            header: 'Price (EGP)',
+            key: 'price',
+            width: 14,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
+          {
+            header: 'Compare At Price (EGP)',
             key: 'compareAtPrice',
             width: 22,
-            numFmt: '#,##0.000',
+            numFmt: excelMoneyFormat({ grouped: true }),
           },
-          { header: 'Cost Price (KWD)', key: 'costPrice', width: 18, numFmt: '#,##0.000' },
+          {
+            header: 'Cost Price (EGP)',
+            key: 'costPrice',
+            width: 18,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
           { header: 'SKU', key: 'sku', width: 16 },
           { header: 'Barcode', key: 'barcode', width: 16 },
           { header: 'Inventory', key: 'inventory', width: 12 },

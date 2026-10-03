@@ -54,7 +54,7 @@ export interface PartialReturnJournalArgs {
  *      DR Inventory       line costPrice × qty returned, per line
  *      CR COGS            same amounts
  *
- * All amounts are integer minor units (fils) — no float arithmetic. The
+ * All amounts are integer minor units (piastres) — no float arithmetic. The
  * per-line revenue/COGS amounts are exact (price × qty). The order-level
  * discount and tax are allocated pro-rata by returned gross over subtotal
  * using CUMULATIVE floor allocation across this order's partial returns:
@@ -303,7 +303,7 @@ export async function postPartialReturnJournal(
     }
     if (salesReturnDebit < 0) {
       throw new Error(
-        `postPartialReturnJournal: refund ${refundKey} on order ${orderId} recorded ${creditTotal} fils, less than its tax share ${taxThis}`
+        `postPartialReturnJournal: refund ${refundKey} on order ${orderId} recorded ${creditTotal} piastres, less than its tax share ${taxThis}`
       );
     }
 
@@ -481,7 +481,7 @@ export async function postAmountOnlyRefundJournal(args: {
   storeId?: string;
   /** `refund:<providerRefundId>` — see amountOnlyRefundKey (lib/refund-methods). */
   refundKey: string;
-  /** Fils actually refunded. */
+  /** Piastres actually refunded. */
   amount: number;
   tx?: Prisma.TransactionClient;
 }): Promise<{ posted: number; skipped?: string }> {

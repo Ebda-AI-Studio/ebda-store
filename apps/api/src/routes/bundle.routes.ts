@@ -141,7 +141,7 @@ function assertPricingValueInRange(pricingType: BundlePricingType, pricingValue:
       break;
     case 'fixed_price':
     case 'fixed':
-      // Both are fils, and their only ceiling is the component sum — which
+      // Both are piastres, and their only ceiling is the component sum — which
       // isn't known until the components resolve, so it is enforced in
       // `assertPriceWithinComponentSum` instead of here.
       return;
@@ -302,13 +302,13 @@ async function resolveBundleLines(
  * A price EQUAL to componentSum is fine (a bundle at no discount is a
  * legitimate, if pointless, configuration) — only ABOVE it is unrepresentable.
  *
- * P1 (this task) extended the same guard to 'fixed' (fils OFF the component
+ * P1 (this task) extended the same guard to 'fixed' (piastres OFF the component
  * sum), which was the one member of `BundlePricingType` no save-time guard
  * covered. `computeBundlePrice` clamps `componentSum - pricingValue` with
  * `Math.max(0, …)`, so a 20.000 discount on a 14.500 kit was accepted and
  * quietly sold the box for 0 — the same mistake the semantically identical
  * `fixed_price: 15000` was already rejected for. The threshold differs by
- * one fil on purpose: for 'fixed_price' the VALUE IS the price, so
+ * one piastre on purpose: for 'fixed_price' the VALUE IS the price, so
  * `value === componentSum` is a real (zero-discount) price; for 'fixed' the
  * value is subtracted, so `value === componentSum` leaves 0 — a 100%-off
  * amount-off discount, which is never a legitimate configuration. A

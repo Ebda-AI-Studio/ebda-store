@@ -73,7 +73,7 @@ async function seedStore(tag: string, withFeature: boolean): Promise<Fixture> {
         name: `mcp-read ${suffix}`,
         slug: `mcp-read-${suffix}`,
         template: 'modern',
-        currency: 'KWD',
+        currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
       },
@@ -130,7 +130,7 @@ async function seedStore(tag: string, withFeature: boolean): Promise<Fixture> {
       block: '4',
       area: 'Salmiya',
       governorate: 'Hawally',
-      country: 'KW',
+      country: 'EG',
       phone,
       ...(email ? { email } : {}),
     });

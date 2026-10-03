@@ -10,6 +10,9 @@ import {
   computeDiscountAmount,
   deriveDiscountInput,
   formatPrice,
+  minorToDecimalString,
+  roundToMinor,
+  REGION,
 } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
@@ -113,11 +116,11 @@ export default function EditProductPage() {
     descriptionAr: '',
     excerpt: '',
     excerptAr: '',
-    /** Regular (RRP) price as KWD string. Derived from product on load via deriveDiscountInput. */
+    /** Regular (RRP) price as EGP string. Derived from product on load via deriveDiscountInput. */
     price: '',
     // Cost-of-goods. Used for profit reporting (price - costPrice = margin)
-    // and snapshotted onto OrderItem at sale time. Stored in fils on the
-    // server, displayed/edited as KWD in the form.
+    // and snapshotted onto OrderItem at sale time. Stored in piastres on the
+    // server, displayed/edited as EGP in the form.
     costPrice: '',
     sku: '',
     inventory: '',
@@ -140,7 +143,7 @@ export default function EditProductPage() {
 
   // Discount state — separate from formData since type is a union, not string.
   const [discountType, setDiscountType] = useState<DiscountTypeUI>('none');
-  /** Discount value string: "12.5" for percentage (%), or KWD decimal for fixed. */
+  /** Discount value string: "12.5" for percentage (%), or EGP decimal for fixed. */
   const [discountValue, setDiscountValue] = useState('');
 
   const [seoGenerating, setSeoGenerating] = useState(false);
@@ -229,8 +232,8 @@ export default function EditProductPage() {
           excerpt: (p as Product & { excerpt?: string }).excerpt || '',
           excerptAr: (p as Product & { excerptAr?: string }).excerptAr || '',
           // Show the regular (RRP) price, not the discounted price.
-          price: derived.regularPrice ? (derived.regularPrice / 1000).toFixed(3) : '',
-          costPrice: p.costPrice ? (p.costPrice / 1000).toFixed(3) : '',
+          price: derived.regularPrice ? minorToDecimalString(derived.regularPrice) : '',
+          costPrice: p.costPrice ? minorToDecimalString(p.costPrice) : '',
           sku: p.sku || '',
           inventory: String(p.inventory ?? 0),
           lowStockThreshold:
@@ -261,8 +264,8 @@ export default function EditProductPage() {
           // stored as basis points → display as decimal percent (12.5).
           setDiscountValue(String(derived.value / 100));
         } else if (derived.type === 'fixed') {
-          // stored as fils → display as KWD.
-          setDiscountValue((derived.value / 1000).toFixed(3));
+          // stored as piastres → display as EGP.
+          setDiscountValue(minorToDecimalString(derived.value));
         } else {
           setDiscountValue('');
         }
@@ -421,9 +424,9 @@ export default function EditProductPage() {
     setSaving(true);
 
     try {
-      const regularPriceFils = Math.round(parseFloat(formData.price) * 1000);
+      const regularPriceFils = roundToMinor(parseFloat(formData.price));
       const costPriceInFils = formData.costPrice
-        ? Math.round(parseFloat(formData.costPrice) * 1000)
+        ? roundToMinor(parseFloat(formData.costPrice))
         : null;
 
       // Derive price + compareAtPrice from the discount input.
@@ -446,7 +449,7 @@ export default function EditProductPage() {
             apiDiscountValue = basisPoints;
           }
         } else {
-          const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+          const fixedFils = roundToMinor(parseFloat(discountValue));
           if (Number.isFinite(fixedFils) && fixedFils > 0) {
             const result = applyDiscount(regularPriceFils, 'fixed', fixedFils);
             finalPrice = result.price;
@@ -796,7 +799,7 @@ export default function EditProductPage() {
                 <Input
                   label={tFields('price')}
                   type="number"
-                  step="0.001"
+                  step="0.01"
                   min={0}
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
@@ -806,7 +809,7 @@ export default function EditProductPage() {
                 <Input
                   label={tFields('costPrice')}
                   type="number"
-                  step="0.001"
+                  step="0.01"
                   min={0}
                   value={formData.costPrice}
                   onChange={e => updateField('costPrice', e.target.value)}
@@ -836,7 +839,7 @@ export default function EditProductPage() {
                         : tFields('discountFixed')
                     }
                     type="number"
-                    step={discountType === 'percentage' ? '0.01' : '0.001'}
+                    step={discountType === 'percentage' ? '0.01' : '0.01'}
                     min={0}
                     max={discountType === 'percentage' ? 100 : undefined}
                     value={discountValue}
@@ -852,7 +855,7 @@ export default function EditProductPage() {
               {/* Row 3: Preview cell */}
               {(() => {
                 if (discountType === 'none' || !discountValue || !formData.price) return null;
-                const regularFils = Math.round(parseFloat(formData.price) * 1000);
+                const regularFils = roundToMinor(parseFloat(formData.price));
                 if (!Number.isFinite(regularFils) || regularFils <= 0) return null;
 
                 let discountedFils = regularFils;
@@ -866,7 +869,7 @@ export default function EditProductPage() {
                   discountedFils = regularFils - amount;
                   pctOff = pct;
                 } else {
-                  const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+                  const fixedFils = roundToMinor(parseFloat(discountValue));
                   if (!Number.isFinite(fixedFils) || fixedFils <= 0) return null;
                   const amount = computeDiscountAmount(regularFils, 'fixed', fixedFils);
                   discountedFils = regularFils - amount;
@@ -910,7 +913,8 @@ export default function EditProductPage() {
                   >
                     {tFields('profitLabel')}{' '}
                     <span className="font-semibold">
-                      {margin.toFixed(3)} KWD ({marginPct.toFixed(1)}%)
+                      {minorToDecimalString(roundToMinor(margin))} {REGION.currency} (
+                      {marginPct.toFixed(1)}%)
                     </span>
                   </p>
                 );

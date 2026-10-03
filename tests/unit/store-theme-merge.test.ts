@@ -33,7 +33,9 @@ vi.mock('@force/database', () => ({
   withMoneyTx: vi.fn(),
 }));
 
-vi.mock('@force/shared', () => ({
+vi.mock('@force/shared', async importOriginal => ({
+  // Keep the real region config (REGION is read at import time by api config/services).
+  ...(await importOriginal<typeof import('@force/shared')>()),
   slugify: (s: string) => s,
 }));
 

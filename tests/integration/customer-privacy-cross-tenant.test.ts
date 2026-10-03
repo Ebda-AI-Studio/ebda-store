@@ -52,7 +52,7 @@ describe.skipIf(!hasDb)('merchant customer erase/export refuses cross-tenant ids
           name: 'cpxt-store-a',
           slug: `cpxt-store-a-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: ownerA.id,
         },
       });
@@ -72,7 +72,7 @@ describe.skipIf(!hasDb)('merchant customer erase/export refuses cross-tenant ids
           name: 'cpxt-store-b',
           slug: `cpxt-store-b-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: ownerB.id,
         },
       });

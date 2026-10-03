@@ -6,7 +6,7 @@ import logger from '../../../lib/logger';
 
 /**
  * Maps a Payment.provider value to the COA system account code that should
- * be debited when that provider's payment is received. KNET = 1000,
+ * be debited when that provider's payment is received. Online/instant gateways = 1000,
  * Card (Tap/Hesabe/UPayments) = 1010, COD = 1020.
  */
 export const PROVIDER_TO_CASH_CODE: Record<string, string> = {

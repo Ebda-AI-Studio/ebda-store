@@ -160,13 +160,14 @@ describe('dateFieldValue — create (new-record forms)', () => {
 
 // #1570: a stored UTC instant hydrated into a datetime-local input and saved
 // straight back must be the SAME instant. Hydrating with `iso.slice(0, 16)`
-// rendered UTC wall-clock that dateFieldValue re-read as local, so in Kuwait
-// (UTC+3) every edit-save moved a coupon's expiry three hours earlier.
+// rendered UTC wall-clock that dateFieldValue re-read as local, so in Egypt
+// (UTC+2 in winter, UTC+3 in summer) every edit-save moved a coupon's expiry
+// by the zone offset.
 describe('dateTimeLocalValue — the inverse of dateFieldValue (#1570)', () => {
   let savedTz: string | undefined;
   beforeAll(() => {
     savedTz = process.env.TZ;
-    process.env.TZ = 'Asia/Kuwait';
+    process.env.TZ = 'Africa/Cairo';
   });
   afterAll(() => {
     if (savedTz === undefined) delete process.env.TZ;
@@ -174,7 +175,9 @@ describe('dateTimeLocalValue — the inverse of dateFieldValue (#1570)', () => {
   });
 
   it('renders the LOCAL wall-clock time of the stored instant', () => {
-    expect(dateTimeLocalValue('2026-12-01T00:00:00.000Z')).toBe('2026-12-01T03:00');
+    // Cairo is UTC+2 in December (no DST) and UTC+3 in July (DST): both must hold.
+    expect(dateTimeLocalValue('2026-12-01T00:00:00.000Z')).toBe('2026-12-01T02:00');
+    expect(dateTimeLocalValue('2026-07-01T00:00:00.000Z')).toBe('2026-07-01T03:00');
   });
 
   it('stored -> hydrate -> save round-trips to the identical instant, repeatedly', () => {

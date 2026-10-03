@@ -2,7 +2,7 @@
  * Unit tests: customer RFM segment classification
  *
  * Regression guard for the bug where a customer with 3 paid orders
- * (Ahmad Sharaf, 20.750 KWD spent) was labelled "Potential" — a label
+ * (Ahmad Sharaf, 20.750 EGP spent) was labelled "Potential" — a label
  * that implies a prospect who hasn't ordered.
  *
  * Root cause: classifySegment's catch-all returned RfmSegment.potential

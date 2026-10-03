@@ -1,11 +1,12 @@
 /**
  * Bank Statement Parsers — CSV + OFX
  *
- * MONEY-PATH RULE: all amounts converted to integer FILS via string/integer
+ * MONEY-PATH RULE: all amounts converted to integer PIASTRES via string/integer
  * arithmetic. No float intermediates cross the boundary.
- *   KWD 12.345 → 12345 fils
- *   KWD  1.000 →  1000 fils
- *   KWD  0.001 →     1 fil
+ *   EGP 12.34 → 1234 piastres
+ *   EGP 10.00 → 1000 piastres
+ *   EGP  0.01 →    1 piastre
+ *   (a 3rd decimal, if a statement carries one, is truncated — never rounded up)
  *
  * The row_hash (SHA-256 of canonical fields) is the idempotent dedup key.
  * Re-importing the same statement rows is a no-op in the DB.
@@ -13,13 +14,14 @@
 
 import { createHash } from 'crypto';
 
+import { REGION, currencyExponent, minorUnitsPerMajor } from '@force/shared';
 export type TransactionDirection = 'debit' | 'credit';
 
 export interface ParsedRow {
   /** Transaction date (midnight UTC) */
   date: Date;
   description: string;
-  /** Amount in integer fils (1 KWD = 1000 fils). Always positive. */
+  /** Amount in integer piastres (1 EGP = 100 piastres). Always positive. */
   amountFils: number;
   direction: TransactionDirection;
   /** Provider-supplied reference id (FITID, cheque no., etc.) */
@@ -31,13 +33,13 @@ export interface ParsedRow {
   rowHash: string;
 }
 
-// ─── Fils conversion ──────────────────────────────────────────────────────────
+// ─── Piastres conversion ──────────────────────────────────────────────────────────
 
 /**
- * Convert a decimal money string to integer fils.
+ * Convert a decimal money string to integer piastres.
  * Uses only string manipulation and integer math — NO float arithmetic.
  *
- * Supports: "12.345", "1,234.567", "-0.500", "١٢٣.٤٥٦" (Arabic-indic)
+ * Supports: "12.34", "1,234.56", "-0.50", "١٢٣.٤٥" (Arabic-indic)
  */
 export function decimalStringToFils(raw: string): number {
   if (!raw || raw.trim() === '') return 0;
@@ -55,12 +57,15 @@ export function decimalStringToFils(raw: string): number {
   const isNegative = intPart.startsWith('-');
   const absInt = parseInt(isNegative ? intPart.slice(1) : intPart, 10) || 0;
 
-  // Pad or trim fractional part to exactly 3 digits (KWD = 3 decimal places)
-  const frac3 = fracPart.padEnd(3, '0').slice(0, 3);
-  const fracFils = parseInt(frac3, 10) || 0;
+  // Pad or TRUNCATE the fractional part to the currency's exponent (EGP = 2
+  // decimals). A bank statement never carries sub-piastre amounts, so an extra
+  // digit is statement noise, not money — it is dropped, never rounded up.
+  const exp = currencyExponent(REGION.currency);
+  const fracDigits = fracPart.padEnd(exp, '0').slice(0, exp);
+  const fracMinor = parseInt(fracDigits || '0', 10) || 0;
 
-  const totalFils = absInt * 1000 + fracFils;
-  return isNegative ? -totalFils : totalFils;
+  const totalMinor = absInt * minorUnitsPerMajor(REGION.currency) + fracMinor;
+  return isNegative ? -totalMinor : totalMinor;
 }
 
 /** Compute the deterministic row hash. */
@@ -274,13 +279,13 @@ export function parseStatementCsv(buffer: Buffer): CsvParseResult {
     } else {
       // Single amount column — negative = debit, positive = credit
       const raw = cells[amountIdx] ?? '';
-      const fils = decimalStringToFils(raw);
-      if (fils === 0) {
+      const piastres = decimalStringToFils(raw);
+      if (piastres === 0) {
         skipped++;
         continue;
       }
-      amountFils = Math.abs(fils);
-      direction = fils < 0 ? 'debit' : 'credit';
+      amountFils = Math.abs(piastres);
+      direction = piastres < 0 ? 'debit' : 'credit';
     }
 
     const rowHash = computeRowHash(date, amountFils, direction, externalRef, descRaw);
@@ -376,14 +381,14 @@ export function parseStatementOfx(buffer: Buffer): OfxParseResult {
       continue;
     }
 
-    const fils = decimalStringToFils(trnamt);
-    if (fils === 0) {
+    const piastres = decimalStringToFils(trnamt);
+    if (piastres === 0) {
       skipped++;
       continue;
     }
 
-    const amountFils = Math.abs(fils);
-    const direction: TransactionDirection = fils < 0 ? 'debit' : 'credit';
+    const amountFils = Math.abs(piastres);
+    const direction: TransactionDirection = piastres < 0 ? 'debit' : 'credit';
     const externalRef = fitid || null;
     const description = name || `OFX transaction ${txIdx}`;
 

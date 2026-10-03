@@ -14,7 +14,7 @@ export interface AddressJson {
   floor?: string;
   apartment?: string;
   notes?: string;
-  // Governorate (top-level KW administrative division) — added 2026-06-18.
+  // Governorate (top-level Egyptian governorate (محافظة)) — added 2026-06-18.
   governorate?: string;
   governorateAr?: string;
   // Bilingual fallback fields stored as the customer entered them
@@ -71,7 +71,7 @@ export interface OrderPaymentDetail {
   paymentUrl?: string | null;
   /** Legacy alias for paymentUrl kept for backwards compatibility. */
   paymentLink?: string | null;
-  /** Fils already refunded from this payment (partial refunds accumulate). */
+  /** Piastres already refunded from this payment (partial refunds accumulate). */
   refundedAmount?: number | null;
   createdAt: string;
 }
@@ -106,7 +106,7 @@ export interface OrderDetail {
   /** The promotion that discounted this order, when `promotionDiscount` > 0.
    *  Null when a coupon (or nothing) was the winning lever. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
-  /** Customer-wallet (store credit) portion of `total`, in fils (D1). The
+  /** Customer-wallet (store credit) portion of `total`, in piastres (D1). The
    *  gateway / courier collects `total - walletAmount`. 0 or absent for every
    *  order that did not use the wallet. */
   walletAmount?: number;

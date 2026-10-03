@@ -4,7 +4,7 @@ import { BundlesPageBody } from './BundlesPageBody';
 
 export const metadata: Metadata = {
   title: 'Bundles',
-  description: 'Shop curated product bundles at a special price. Fast delivery in Kuwait.',
+  description: 'Shop curated product bundles at a special price. Fast delivery in Egypt.',
 };
 
 export default async function BundlesPage() {

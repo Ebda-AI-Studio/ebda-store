@@ -5,15 +5,18 @@
  * Encoding conventions:
  *   percentage → basis points (percent × 100, range 0–10 000)
  *                e.g. 12.5% is stored as 1250
- *   fixed      → fils   (1 KWD = 1 000 fils)
+ *   fixed      → minor units (EGP: 1 EGP = 100 piastres)
  *
- * All price amounts in/out of these helpers are in FILS.
+ * All price amounts in/out of these helpers are in MINOR units (piastres).
+ * Percentage discounts round HALF UP to the piastre (integer math).
  */
+
+import { percentOfMinor } from '../region';
 
 export type DiscountType = 'percentage' | 'fixed';
 
 export interface ApplyDiscountResult {
-  /** Active selling price in fils. */
+  /** Active selling price in minor units. */
   price: number;
   /**
    * "Was" price shown struck-through on the storefront.
@@ -23,10 +26,10 @@ export interface ApplyDiscountResult {
 }
 
 /**
- * Compute the discount amount in fils.
+ * Compute the discount amount in minor units (piastres).
  *
- * - percentage: `round(basisPoints / 10000 × regularPrice)`
- * - fixed:      `value` (already in fils)
+ * - percentage: `round-half-up(basisPoints / 10000 × regularPrice)`
+ * - fixed:      `value` (already in minor units)
  * - Clamped to [0, regularPrice] so we never produce a negative price.
  */
 export function computeDiscountAmount(
@@ -36,8 +39,8 @@ export function computeDiscountAmount(
 ): number {
   let amount: number;
   if (type === 'percentage') {
-    // basisPoints ÷ 10 000 gives the fraction; multiply by regular price.
-    amount = Math.round((value / 10000) * regularPriceFils);
+    // basisPoints ÷ 10 000 of the regular price, exact integer math, half up.
+    amount = percentOfMinor(regularPriceFils, value);
   } else {
     amount = value;
   }
@@ -74,14 +77,14 @@ export function applyDiscount(
 }
 
 export interface DiscountInput {
-  /** The regular (RRP) price the merchant typed, in fils. */
+  /** The regular (RRP) price the merchant typed, in minor units. */
   regularPrice: number;
   /** The discount type, or 'none' when no discount is active. */
   type: DiscountType | 'none';
   /**
    * The raw discount value:
    *   - percentage → basis points (e.g. 1250 for 12.5%)
-   *   - fixed      → fils
+   *   - fixed      → minor units
    *   - none       → 0
    */
   value: number;
@@ -111,7 +114,7 @@ export function deriveDiscountInput(product: {
   }
 
   // Case 2 — legacy compareAtPrice > price (admin previously set the raw
-  // compare-at field). Treat as a fixed-fils discount so the form
+  // compare-at field). Treat as a fixed-amount discount so the form
   // is pre-populated rather than blank.
   if (compareAtPrice != null && compareAtPrice > price) {
     return {

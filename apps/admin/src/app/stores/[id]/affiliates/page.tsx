@@ -22,6 +22,7 @@ import {
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 
+import { roundToMinor, REGION } from '@force/shared';
 type TabKey = 'affiliates' | 'config';
 
 // Narrow type for tolerant unwrapping of legacy `{ data: { ... } }` responses.
@@ -193,7 +194,7 @@ export default function AffiliatesPage() {
     e.preventDefault();
     if (!payoutAffiliate) return;
 
-    const amountFils = Math.round(parseFloat(payoutAmount) * 1000);
+    const amountFils = roundToMinor(parseFloat(payoutAmount));
     if (!amountFils || amountFils <= 0) {
       showError(tToasts('invalidAmount.title'), tToasts('invalidAmount.message'));
       return;
@@ -456,7 +457,7 @@ export default function AffiliatesPage() {
                     value={invitePhone}
                     onChange={e => setInvitePhone(e.target.value)}
                     maxLength={30}
-                    placeholder="+965 XXXX XXXX"
+                    placeholder={REGION.phone.placeholderIntl}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>

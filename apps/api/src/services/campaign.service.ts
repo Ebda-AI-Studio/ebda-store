@@ -1,5 +1,5 @@
 import { prisma } from '@force/database';
-import { isCampaignContentComplete } from '@force/shared';
+import { isCampaignContentComplete, resolveDefaultLanguage } from '@force/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
 
@@ -211,7 +211,7 @@ export const CAMPAIGN_STORE_SELECT = {
 
 export function storeDefaultLanguage(store: { settings: unknown }): 'en' | 'ar' {
   const s = store.settings as Record<string, unknown> | null;
-  return s?.defaultLanguage === 'ar' ? 'ar' : 'en';
+  return resolveDefaultLanguage(s?.defaultLanguage);
 }
 
 /** Same base-URL rule the review-request email uses for its deep links. */

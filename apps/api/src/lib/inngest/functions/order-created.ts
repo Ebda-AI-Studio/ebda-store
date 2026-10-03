@@ -130,7 +130,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       customerName,
       customerEmail: order.customer?.email || guestEmail,
       // Bundle boxes collapse to ONE row each (see groupOrderLinesForDisplay)
-      // — the emailed confirmation must show "Ramadan Box · 12.000 KWD",
+      // — the emailed confirmation must show "Ramadan Box · 12.000 EGP",
       // never the per-component allocated shares that fund that one price.
       items: groupOrderLinesForDisplay(
         order.items as Array<{

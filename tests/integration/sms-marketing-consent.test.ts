@@ -63,10 +63,14 @@ const hasDb =
 
 const uid = () => `${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`;
 
-/** A distinct 8-digit Kuwait mobile per call, so tests never share a phone. */
-function kwMobile(): string {
-  return `5${String(crypto.randomInt(0, 9_999_999)).padStart(7, '0')}`;
+/** A distinct Egyptian mobile (010/011/012/015 + 8 digits, local form) per call, so tests never share a phone. */
+function egMobile(): string {
+  const operator = ['0', '1', '2', '5'][crypto.randomInt(0, 4)];
+  return `01${operator}${String(crypto.randomInt(0, 99_999_999)).padStart(8, '0')}`;
 }
+
+/** The consent phone key (digits, country code first) for a local Egyptian mobile. */
+const egKey = (local: string) => `20${local.slice(1)}`;
 
 async function seedStore(opts: { sms: boolean } = { sms: true }) {
   const id = uid();
@@ -85,7 +89,7 @@ async function seedStore(opts: { sms: boolean } = { sms: true }) {
         name: `smsc-${id}`,
         slug: `smsc-${id}`,
         template: 'modern',
-        currency: 'KWD',
+        currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
       },
@@ -159,7 +163,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it('no consent → no promotional SMS; transactional SMS still sends', async () => {
     const storeId = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     await notificationDispatcher.dispatch(storeId, 'cart_abandoned_step1', {
       ...cartData(phone),
       storeId,
@@ -178,10 +182,10 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it('granted consent → promotional SMS sends, matched across phone formats, with a working opt-out link', async () => {
     const storeId = await seedStore();
-    const local = kwMobile();
+    const local = egMobile();
     await SmsConsentService.recordGrant(storeId, {
-      customerKey: `+965 ${local.slice(0, 4)} ${local.slice(4)}`,
-      phone: `+965 ${local.slice(0, 4)} ${local.slice(4)}`,
+      customerKey: `+20 ${local.slice(1, 4)} ${local.slice(4, 8)} ${local.slice(8)}`,
+      phone: `+20 ${local.slice(1, 4)} ${local.slice(4, 8)} ${local.slice(8)}`,
       source: 'checkout',
     });
     await notificationDispatcher.dispatch(storeId, 'cart_abandoned_step1', {
@@ -230,11 +234,11 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it('withdrawn consent → no SMS, even with an older granted guest row for the same phone', async () => {
     const storeId = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     await SmsConsentService.recordGrant(storeId, { customerKey: phone, phone, source: 'checkout' });
     await SmsConsentService.recordGrant(storeId, {
       customerKey: `guest-${uid()}@example.test`,
-      phone: `965${phone}`,
+      phone: egKey(phone),
       source: 'checkout',
     });
     const flipped = await SmsConsentService.revoke(storeId, { phone }, 'account');
@@ -249,7 +253,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
   it("another store's consent does not count", async () => {
     const storeA = await seedStore();
     const storeB = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     await SmsConsentService.recordGrant(storeA, { customerKey: phone, phone, source: 'checkout' });
     await notificationDispatcher.dispatch(storeB, 'cart_abandoned_step1', {
       ...cartData(phone),
@@ -260,7 +264,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it('back-in-stock SMS for two shoppers do not share one idempotency key', async () => {
     const storeId = await seedStore();
-    const [p1, p2] = [kwMobile(), kwMobile()];
+    const [p1, p2] = [egMobile(), egMobile()];
     for (const p of [p1, p2]) {
       await SmsConsentService.recordGrant(storeId, {
         customerKey: p,
@@ -329,7 +333,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
           lastName: 'Uest',
           address1: 'Block 1',
           city: '',
-          country: 'Kuwait',
+          country: 'Egypt',
           phone,
           email,
         },
@@ -338,7 +342,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
       } as never);
     };
 
-    const tickedPhone = kwMobile();
+    const tickedPhone = egMobile();
     const tickedEmail = `Guest-${uid()}@Example.test`;
     const order = await place(true, tickedEmail, tickedPhone);
     expect(order.smsOptIn).toBe(true);
@@ -349,20 +353,20 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     );
     expect(row?.granted).toBe(true);
     expect(row?.grantedSource).toBe('checkout');
-    expect(row?.phoneKey).toBe(`965${tickedPhone}`);
+    expect(row?.phoneKey).toBe(egKey(tickedPhone));
 
-    const untickedPhone = kwMobile();
+    const untickedPhone = egMobile();
     await place(false, `g2-${uid()}@example.test`, untickedPhone);
     await place(undefined, `g3-${uid()}@example.test`, untickedPhone);
     const none = await withRlsBypass(tx =>
-      tx.smsMarketingConsent.count({ where: { storeId, phoneKey: `965${untickedPhone}` } })
+      tx.smsMarketingConsent.count({ where: { storeId, phoneKey: egKey(untickedPhone) } })
     );
     expect(none).toBe(0);
   });
 
   it('account page: grant needs a phone, withdraw always works, and it drives the gate', async () => {
     const storeId = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     const shopper = await seedCustomer(storeId, phone);
     const noPhone = await seedCustomer(storeId, null);
     const app = buildApp();
@@ -421,7 +425,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
           role: 'customer',
           firstName: 'L',
           lastName: 'G',
-          phone: kwMobile(),
+          phone: egMobile(),
         },
       })
     );
@@ -435,7 +439,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it('GDPR: export includes consent, erasure deletes it (own + guest rows for the same phone)', async () => {
     const storeId = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     const shopper = await seedCustomer(storeId, phone);
     await SmsConsentService.recordGrant(storeId, {
       customerKey: shopper.id,
@@ -445,10 +449,10 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     });
     await SmsConsentService.recordGrant(storeId, {
       customerKey: shopper.email.toLowerCase(),
-      phone: `+965${phone}`,
+      phone: `+20${phone.slice(1)}`,
       source: 'checkout',
     });
-    const bystander = kwMobile();
+    const bystander = egMobile();
     await SmsConsentService.recordGrant(storeId, {
       customerKey: bystander,
       phone: bystander,
@@ -472,7 +476,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it('admin: customer profile and list rows carry the consent status', async () => {
     const storeId = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     const key = `list-${uid()}@example.test`;
     await SmsConsentService.recordGrant(storeId, { customerKey: key, phone, source: 'checkout' });
     const view = await SmsConsentService.getForCustomerKey(storeId, key);
@@ -491,12 +495,12 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it('a guest opt-in shows on the account the same phone registers later, and its withdraw button works (issue 2423)', async () => {
     const storeId = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     // Checkout as a guest: the row is keyed by the guest's email.
     const guestKey = `guest-${uid()}@example.test`;
     await SmsConsentService.recordGrant(storeId, {
       customerKey: guestKey,
-      phone: `+965${phone}`,
+      phone: `+20${phone.slice(1)}`,
       source: 'checkout',
     });
     // The same person registers: customerKeyOf is now the user id.
@@ -541,7 +545,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
   it("a later grant on another key for the same phone outranks the account's own withdrawn row", async () => {
     const storeId = await seedStore();
-    const phone = kwMobile();
+    const phone = egMobile();
     const shopper = await seedCustomer(storeId, phone);
     await SmsConsentService.recordGrant(storeId, {
       customerKey: shopper.id,
@@ -567,7 +571,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
   it('the opt-out link reads the store once per fan-out, not once per recipient (issue 2426)', async () => {
     __clearOptOutBaseCacheForTests();
     const storeId = await seedStore();
-    const [p1, p2] = [kwMobile(), kwMobile()];
+    const [p1, p2] = [egMobile(), egMobile()];
     for (const p of [p1, p2]) {
       await SmsConsentService.recordGrant(storeId, {
         customerKey: p,
@@ -594,7 +598,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
 
     // Once the cache is cold, the new domain is used.
     __clearOptOutBaseCacheForTests();
-    const p3 = kwMobile();
+    const p3 = egMobile();
     await SmsConsentService.recordGrant(storeId, {
       customerKey: p3,
       phone: p3,

@@ -43,7 +43,11 @@ vi.mock('@force/database', () => ({
   Prisma: {},
   withMoneyTx: vi.fn(),
 }));
-vi.mock('@force/shared', () => ({ slugify: (s: string) => s }));
+vi.mock('@force/shared', async importOriginal => ({
+  // Keep the real region config (REGION is read at import time by api config/services).
+  ...(await importOriginal<typeof import('@force/shared')>()),
+  slugify: (s: string) => s,
+}));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: { delete: vi.fn(), get: redisGetMock, set: redisSetMock },
 }));

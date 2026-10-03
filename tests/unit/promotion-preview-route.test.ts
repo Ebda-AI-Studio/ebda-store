@@ -101,8 +101,8 @@ function promo(overrides: Record<string, unknown>) {
 // route must server-resolve those from Product.
 const ITEMS = [{ productId: 'p1', quantity: 2 }];
 
-// What the server should look up for product p1: price 5000 fils, category
-// c1 — so the server-built snapshot line total is 5000 * 2 = 10000 fils,
+// What the server should look up for product p1: price 5000 piastres, category
+// c1 — so the server-built snapshot line total is 5000 * 2 = 10000 piastres,
 // matching the promotion-math fixtures below.
 const PRODUCTS = [{ id: 'p1', price: 5000, categories: [{ categoryId: 'c1' }] }];
 
@@ -118,8 +118,8 @@ describe('POST /public/:storeId/promotions/preview', () => {
   it('returns the best eligible promotion computed from the server-resolved cart', async () => {
     mockPrisma.product.findMany.mockResolvedValue(PRODUCTS);
     mockPrisma.promotion.findMany.mockResolvedValue([
-      promo({ id: 'A', priority: 10, value: 10 }), // 1000 fils
-      promo({ id: 'B', priority: 5, value: 20 }), // 2000 fils
+      promo({ id: 'A', priority: 10, value: 10 }), // 1000 piastres
+      promo({ id: 'B', priority: 5, value: 20 }), // 2000 piastres
     ]);
 
     const res = await request(app)
@@ -128,7 +128,7 @@ describe('POST /public/:storeId/promotions/preview', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // 2000 fils only follows if the server built lineTotal = 5000*2 from the
+    // 2000 piastres only follows if the server built lineTotal = 5000*2 from the
     // looked-up product price, not from anything the client sent.
     expect(res.body.data.promotion).toEqual({ id: 'B', discount: 2000 });
   });

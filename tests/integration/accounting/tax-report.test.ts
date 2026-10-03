@@ -53,7 +53,7 @@ beforeAll(async () => {
       storeId,
       name: 'Tax Report Test Product',
       slug: `tax-report-product-${Date.now()}`,
-      price: 10_000, // 10 KWD
+      price: 10_000, // 10 EGP
       inventory: 100,
       status: 'active',
     },
@@ -63,15 +63,15 @@ beforeAll(async () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Seed orders
   //
-  // Order A: 10 KWD subtotal, 5% VAT = 500 fils tax (paid, in-period)
-  // Order B: 20 KWD subtotal, 5% VAT = 1000 fils tax, 500 discount
+  // Order A: 10 EGP subtotal, 5% VAT = 500 piastres tax (paid, in-period)
+  // Order B: 20 EGP subtotal, 5% VAT = 1000 piastres tax, 500 discount
   //          → taxable base = 20k - 0 discount on order level... wait,
   //          the GL posts order.subtotal and order.tax directly.
   //          taxable base in the report = subtotal - discount.
   //          Let's make: subtotal=20000, discount=0, tax=1000 → taxable=20000.
   // Order C: no tax (tax=0) — must NOT appear in the report
-  // Order D: 15 KWD subtotal, 10% VAT = 1500 fils tax (different rate)
-  // Order E: 8 KWD subtotal, 5% VAT = 400 fils, but paid OUTSIDE the report period
+  // Order D: 15 EGP subtotal, 10% VAT = 1500 piastres tax (different rate)
+  // Order E: 8 EGP subtotal, 5% VAT = 400 piastres, but paid OUTSIDE the report period
   //          → should NOT appear when period filter is applied
 
   const ts = Date.now();
@@ -98,7 +98,7 @@ beforeAll(async () => {
         shipping: opts.shipping,
         discount: opts.discount,
         total,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {
@@ -142,7 +142,7 @@ beforeAll(async () => {
   const inPeriodDate = new Date('2026-03-15T10:00:00.000Z');
   const outOfPeriodDate = new Date('2026-01-05T10:00:00.000Z');
 
-  // A: 5% rate, 10 KWD taxable
+  // A: 5% rate, 10 EGP taxable
   await seedOrder({
     key: 'A',
     num: `TAXRPT-A-${ts}`,
@@ -154,7 +154,7 @@ beforeAll(async () => {
     postedAt: inPeriodDate,
   });
 
-  // B: 5% rate, 20 KWD taxable
+  // B: 5% rate, 20 EGP taxable
   await seedOrder({
     key: 'B',
     num: `TAXRPT-B-${ts}`,
@@ -178,7 +178,7 @@ beforeAll(async () => {
     postedAt: inPeriodDate,
   });
 
-  // D: 10% rate, 15 KWD taxable
+  // D: 10% rate, 15 EGP taxable
   await seedOrder({
     key: 'D',
     num: `TAXRPT-D-${ts}`,
@@ -244,7 +244,7 @@ describe('generateTaxReport — integration (real DB)', () => {
   it('summary counts and totals are correct', async () => {
     const report = await generateTaxReport(storeId, { from: FROM, to: TO });
 
-    // A: 500 fils tax, B: 1000 fils tax, D: 1500 fils tax
+    // A: 500 piastres tax, B: 1000 piastres tax, D: 1500 piastres tax
     expect(report.summary.transactionCount).toBe(3);
     expect(report.summary.totalTaxCollected).toBe(3_000); // 500 + 1000 + 1500
     expect(report.summary.totalTaxableSales).toBe(45_000); // 10k + 20k + 15k

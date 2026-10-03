@@ -114,7 +114,7 @@ describe('trackPurchase — Google Ads conversion event', () => {
     expect(gtag).toHaveBeenCalledWith('event', 'conversion', {
       send_to: 'AW-123456789/AbC123def',
       value: 12.5,
-      currency: 'KWD',
+      currency: 'EGP',
       transaction_id: 'order-1',
     });
   });

@@ -245,14 +245,14 @@ interface CreateProductData {
   price: number;
   /** Original/RRP shown struck-through next to the sale price. `null` clears it. */
   compareAtPrice?: number | null;
-  /** Cost-of-goods in fils. Used for profit reporting. */
+  /** Cost-of-goods in piastres. Used for profit reporting. */
   costPrice?: number | null;
   /** Admin-authored discount type — 'percentage' | 'fixed'. null clears. */
   discountType?: 'percentage' | 'fixed' | null;
   /**
    * Discount value:
    *   percentage → basis points (percent×100; 12.5% → 1250)
-   *   fixed      → fils
+   *   fixed      → piastres
    * null when no discount.
    */
   discountValue?: number | null;
@@ -294,9 +294,9 @@ interface ListProductsOptions {
   category?: string;
   search?: string;
   featured?: boolean;
-  /** Inclusive lower bound on `Product.price` (in fils). */
+  /** Inclusive lower bound on `Product.price` (in piastres). */
   minPrice?: number;
-  /** Inclusive upper bound on `Product.price` (in fils). */
+  /** Inclusive upper bound on `Product.price` (in piastres). */
   maxPrice?: number;
   /** Filter to a specific list of product ids — used by page-builder
    *  ExtraCarousel with `productSource === 'manual'`. Capped at 50.
@@ -1087,7 +1087,7 @@ export class ProductService {
    *   status / isFeatured / isNew / isBestSeller → updateMany (all products)
    *   addCategoryId → upsert ProductCategory link per product (append-only)
    *   price.set → updateMany on SIMPLE products only (variant products skipped)
-   *   price.adjustPct → read each then update (simple products only), rounded to integer fils, ≥0
+   *   price.adjustPct → read each then update (simple products only), rounded to integer piastres, ≥0
    *   inventory.set / adjust → same simple-product-only rule
    *
    * Returns { updated, skippedVariantProducts }.
@@ -1197,10 +1197,10 @@ export class ProductService {
     if (fields.price && simpleIds.length > 0) {
       const { mode, value } = fields.price;
       if (mode === 'set') {
-        const fils = Math.max(0, Math.round(value));
+        const piastres = Math.max(0, Math.round(value));
         await prisma.product.updateMany({
           where: { storeId, id: { in: simpleIds }, deletedAt: null },
-          data: { price: fils },
+          data: { price: piastres },
         });
       } else {
         // adjustPct: value is a percentage like -10 (10% off) or +5 (5% up).

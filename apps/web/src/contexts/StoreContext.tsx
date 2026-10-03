@@ -24,6 +24,7 @@ import {
   deriveBrandRoles,
   colorToHslTriplet,
   statusInkVars,
+  REGION,
 } from '@force/shared';
 
 /**
@@ -242,8 +243,8 @@ const DEFAULT_STORE: StoreData = {
   nameAr: 'فورس',
   slug: 'demo',
   status: 'active',
-  currency: 'KWD',
-  timezone: 'Asia/Kuwait',
+  currency: REGION.currency,
+  timezone: 'Africa/Cairo',
   template: 'modern',
   theme: DEFAULT_THEME,
   socialLinks: {},

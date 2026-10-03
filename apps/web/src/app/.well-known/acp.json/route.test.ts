@@ -36,7 +36,7 @@ const STORE = {
   name: 'Test Store',
   slug: 'test-store',
   email: 'merchant@example.com',
-  currency: 'KWD',
+  currency: 'EGP',
   enabledFeatures: ['agent_checkout'],
 };
 

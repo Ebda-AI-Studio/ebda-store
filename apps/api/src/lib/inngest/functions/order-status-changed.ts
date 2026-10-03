@@ -169,7 +169,7 @@ export async function handleOrderStatusChanged(
             customerEmail,
             // Bundle boxes collapse to ONE row each (see
             // groupOrderLinesForDisplay) — the payment-success email must
-            // show "Ramadan Box · 12.000 KWD", never the per-component
+            // show "Ramadan Box · 12.000 EGP", never the per-component
             // allocated shares that fund that one price.
             items: groupOrderLinesForDisplay(order.items).map(row =>
               row.kind === 'bundle'

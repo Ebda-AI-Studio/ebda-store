@@ -54,7 +54,7 @@ const isSafeHttpUrl = (u?: string | null): boolean => {
  * Used when countryAr is empty and the locale is Arabic.
  */
 const GCC_COUNTRY_AR: Record<string, string> = {
-  Kuwait: 'الكويت',
+  Egypt: 'مصر',
   'U.A.E.': 'الإمارات',
   UAE: 'الإمارات',
   'United Arab Emirates': 'الإمارات',
@@ -63,7 +63,7 @@ const GCC_COUNTRY_AR: Record<string, string> = {
   Qatar: 'قطر',
   Bahrain: 'البحرين',
   Oman: 'عُمان',
-  Egypt: 'مصر',
+  Kuwait: 'الكويت',
 };
 
 interface LocationsClientProps {

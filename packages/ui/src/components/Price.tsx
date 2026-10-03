@@ -2,18 +2,18 @@
 
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
-import { formatPrice } from '@force/shared';
+import { formatPrice, REGION } from '@force/shared';
 
 export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Price in fils (1 KWD = 1000 fils). For products with variants
+  /** Price in piastres (1 EGP = 100 piastres). For products with variants
    *  this is the cheapest variant's price (the caller resolves which
    *  number to pass via product-pricing.ts). */
   price: number;
-  /** Original price for showing discount (in fils). Pass `null` for
+  /** Original price for showing discount (in piastres). Pass `null` for
    *  variant-parent cards where the parent's compareAtPrice is stale
    *  pre-fold data; the helper already filters those out. */
   compareAtPrice?: number;
-  /** Currency code (default: KWD) */
+  /** Currency code (default: EGP) */
   currency?: string;
   /** Show in RTL format */
   isRtl?: boolean;
@@ -46,14 +46,14 @@ const compareSizeStyles = {
 
 /**
  * Price component with currency formatting, discount display, and RTL support.
- * Handles fils to currency conversion automatically.
+ * Handles piastres to currency conversion automatically.
  */
 export const Price = forwardRef<HTMLDivElement, PriceProps>(
   (
     {
       price,
       compareAtPrice,
-      currency = 'KWD',
+      currency = REGION.currency,
       isRtl = false,
       size = 'md',
       showDiscount = true,

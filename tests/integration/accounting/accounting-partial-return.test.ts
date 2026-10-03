@@ -97,7 +97,7 @@ async function seedOrder(tag: string, overrides?: { discount?: number; tax?: num
       shipping: 500,
       discount,
       total: 9000 - discount + tax + 500,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
       items: {
@@ -285,7 +285,7 @@ describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
     // Revenue/cash adjustment entry:
     //   returned gross = 2000; discount share = floor(1000×2000/9000) = 222
     //   tax share      = floor(900×2000/9000) = 200
-    //   DR revenue 1778, DR tax 200, CR cash 1978 (myfatoorah → 1000 Cash KNET)
+    //   DR revenue 1778, DR tax 200, CR cash 1978 (myfatoorah → 1000 Cash Online)
     const adj = await prisma.journalEntry.findFirst({
       where: { storeId, source: 'order', sourceId: `${order.id}:partial:${refundKey}` },
       include: { lines: true },
@@ -637,7 +637,7 @@ describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
         shipping: 0,
         discount: 0,
         total: 1000,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {

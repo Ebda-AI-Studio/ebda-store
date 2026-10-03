@@ -69,7 +69,7 @@ export function groupItemsForAdmin(items: OrderItemDetail[]): ItemsCardEntry[] {
  * THEN group it. With 4 loose lines followed by a 3-component box and
  * `previewLimit = 5`, the slice kept only the box's FIRST component, so
  * `BundleGroupRow` summed one allocated line and the merchant read
- * "Ramadan Box · 3.724 KWD" for a box the customer paid 12.000 for — and
+ * "Ramadan Box · 3.724 EGP" for a box the customer paid 12.000 for — and
  * "+2 more" counted component lines, not rows. Group first, then limit, so a
  * box is never rendered as a fraction of itself. Identity for an order with
  * no bundle, where one item is exactly one row.

@@ -12,7 +12,7 @@
  *     refund for exactly that amount (DR 4090 / CR cash), no stock movement,
  *     idempotent per provider refund id, and backed out by a later full refund.
  *  4. #1956 — a partial gateway refund on an order paid partly from the wallet
- *     is split pro-rata to the payment mix; fils rounding goes to the card.
+ *     is split pro-rata to the payment mix; piastres rounding goes to the card.
  *
  * Amounts are chosen so nothing divides evenly (1333 × 3 + 777 × 2, discount
  * 101, tax 277, shipping 250). Only the provider is stubbed
@@ -57,8 +57,8 @@ const uid = (label: string) => `${TAG}-${label}-${++seq}-${Math.random().toStrin
 describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
   let ownerId: string;
   let storeId: string;
-  let productA: string; // 1333 fils, cost 611
-  let productB: string; // 777 fils, cost 409
+  let productA: string; // 1333 piastres, cost 611
+  let productB: string; // 777 piastres, cost 409
   const code = new Map<string, string>(); // account code -> id
 
   beforeAll(async () => {
@@ -74,7 +74,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
     ownerId = owner.id;
     const slug = uid('store');
     const store = await prisma.store.create({
-      data: { name: slug, slug, ownerId, currency: 'KWD', template: 'modern' },
+      data: { name: slug, slug, ownerId, currency: 'EGP', template: 'modern' },
     });
     storeId = store.id;
     await seedCoaForStore(storeId);
@@ -179,7 +179,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
         shipping,
         total,
         walletAmount,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {
@@ -547,7 +547,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
   // ─── 4. #1956 — wallet + card order, partial gateway refund ───────────────
   describe('partial gateway refund on a wallet + card order (#1956)', () => {
     // No discount/tax/shipping: total 5553 = 2000 wallet + 3553 card.
-    it('splits each refund pro-rata to the payment mix; the rounding fils go to the card', async () => {
+    it('splits each refund pro-rata to the payment mix; the rounding piastres go to the card', async () => {
       const customerId = await newCustomer();
       await WalletService.applyEntry({
         storeId,
@@ -591,7 +591,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
 
       // Return 2: everything left, 2 × A + 2 × B = 4220. Cumulatively the
       // wallet is owed all 2000, so 1520 now; the card gets 2700, which makes
-      // exactly the 3553 it paid (853 + 2700) — no fils stranded or overpaid.
+      // exactly the 3553 it paid (853 + 2700) — no piastres stranded or overpaid.
       const r2 = await receivedReturn(order, [
         { orderItemId: itemA.id, productId: productA, quantity: 2 },
         { orderItemId: itemB.id, productId: productB, quantity: 2 },

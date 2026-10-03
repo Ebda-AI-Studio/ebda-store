@@ -102,7 +102,7 @@ export const DEFAULT_CONFIGS: CarrierConfigs = {
     accountNumber: '',
     accountPin: '',
     accountEntity: '',
-    accountCountryCode: 'KW',
+    accountCountryCode: 'EG',
     username: '',
     password: '',
     pickup: { ...DEFAULT_PICKUP },

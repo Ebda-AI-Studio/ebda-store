@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Canonical Kuwait address schema — shared across all three address Zod
+ * Canonical Egypt address schema — shared across all three address Zod
  * definitions that previously drifted:
  *   - apps/api/src/routes/address.routes.ts   (user saved-address book)
  *   - apps/api/src/routes/public.routes.ts    (checkout shipping address)
@@ -12,16 +12,20 @@ import { z } from 'zod';
  * customer saved an address after the GovernorateAreaSelect checkout step.
  *
  * Field notes:
- *  - `governorate` / `governorateAr`: top-level KW administrative division
- *    (Capital, Hawally, Farwaniya, Ahmadi, Jahra, Mubarak Al-Kabeer).
- *  - `area` / `areaAr`: sub-district within the governorate (e.g. Salmiya).
+ *  - `governorate` / `governorateAr`: one of the 27 Egyptian governorates
+ *    (`REGION.governorates`, e.g. Cairo / القاهرة).
+ *  - `area` / `areaAr`: city or district within the governorate (e.g. Maadi).
  *  - `state`: legacy/generic field kept for backwards compat; overlaps `area`
  *    in older orders.  Both are accepted simultaneously.
- *  - `city`: Kuwait has no city concept in addresses; accepted but defaults to
- *    '' so the checkout never 400s on an empty value.
- *  - `postalCode`: not used in Kuwait; accepted and stored but not required.
+ *  - `city`: free-text city/town; accepted but defaults to '' so the checkout
+ *    never 400s on an empty value.
+ *  - `address1`: street + building; `address2`: floor / apartment / landmark.
+ *  - `postalCode`: optional (Egyptian postal codes are rarely used).
+ *  - `phone`: an Egyptian mobile (`REGION.phone`), normalised client-side to
+ *    `+20…`; the schema stays permissive (any plausible phone string) so a
+ *    legacy or foreign number never blocks checkout.
  */
-export const kuwaitAddressSchema = z.object({
+export const egyptAddressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   address1: z.string().trim().min(1).max(500),
@@ -33,10 +37,16 @@ export const kuwaitAddressSchema = z.object({
   areaAr: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
+  // Structured Egyptian delivery details (also folded into address1 by the
+  // storefront for display back-compat). Optional so older clients still pass.
+  street: z.string().max(200).optional(),
+  building: z.string().max(100).optional(),
+  floor: z.string().max(50).optional(),
+  apartment: z.string().max(50).optional(),
   country: z.string().trim().min(2).max(60),
   phone: z.string().max(40).optional(),
 });
-export type KuwaitAddressInput = z.infer<typeof kuwaitAddressSchema>;
+export type EgyptAddressInput = z.infer<typeof egyptAddressSchema>;
 
 // Optional http(s) URL. `null` (or '') clears the stored value on an UPDATE;
 // an omitted key leaves it alone. See the nullability note on

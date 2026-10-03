@@ -9,6 +9,7 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 
+import { REGION, minorToDecimalString, roundToMinor } from '@force/shared';
 interface SortOption {
   value: string;
   label: string;
@@ -39,13 +40,15 @@ interface ProductsFilterSidebarProps {
   perPage?: number;
   perPageOptions?: readonly number[];
   onPerPageChange?: (value: number) => void;
-  /** Price range state in MAJOR currency units (KD, USD…), not fils. */
+  /** Price range state in MAJOR currency units (EGP, USD…), not piastres. */
   priceMin?: number;
   priceMax?: number;
   /** Lower bound that the data could possibly contain (data-driven, not hardcoded). */
   priceFloor?: number;
   /** Upper bound that the data could possibly contain. */
   priceCeil?: number;
+  /** Slider step in major units (default 1). */
+  priceStep?: number;
   onPriceChange?: (min: number, max: number) => void;
   /**
    * Merchant-controlled initial open/collapsed state for the desktop sticky
@@ -187,6 +190,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     priceMax,
     priceFloor,
     priceCeil,
+    priceStep = 1,
     onPriceChange,
     facets = [],
     optionFilters = {},
@@ -335,10 +339,12 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs lg:text-sm text-[hsl(var(--primary-foreground)/0.8)]">
                 <span>
-                  {localize(priceMin.toFixed(3))} {t('KWD', 'د.ك')}
+                  {localize(minorToDecimalString(roundToMinor(priceMin)))}{' '}
+                  {t(REGION.currencySymbol.en, REGION.currencySymbol.ar)}
                 </span>
                 <span>
-                  {localize(priceMax.toFixed(3))} {t('KWD', 'د.ك')}
+                  {localize(minorToDecimalString(roundToMinor(priceMax)))}{' '}
+                  {t(REGION.currencySymbol.en, REGION.currencySymbol.ar)}
                 </span>
               </div>
               <div className="relative h-1.5 rounded-full bg-[hsl(var(--primary-foreground)/0.25)]">
@@ -359,7 +365,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                   type="range"
                   min={priceFloor}
                   max={priceCeil}
-                  step={0.5}
+                  step={priceStep}
                   value={priceMin}
                   onChange={e => {
                     const v = Math.min(Number(e.target.value), priceMax);
@@ -372,7 +378,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                   type="range"
                   min={priceFloor}
                   max={priceCeil}
-                  step={0.5}
+                  step={priceStep}
                   value={priceMax}
                   onChange={e => {
                     const v = Math.max(Number(e.target.value), priceMin);

@@ -30,7 +30,7 @@ import {
   OrderStatus,
   OrderPaymentStatus,
 } from '@force/database';
-import { csvField, isValidTimeZone } from '@force/shared';
+import { csvField, isValidTimeZone, fromMinor, excelMoneyFormat } from '@force/shared';
 
 const router = Router();
 
@@ -94,7 +94,7 @@ const provisionStoreSchema = z.object({
       theme: z.string().optional(),
       currency: z.string().optional(),
       // Governs the store's tax periods — reject a non-IANA name rather than
-      // silently falling back to Kuwait days (issue 2412).
+      // silently falling back to Egypt days (issue 2412).
       timezone: z
         .string()
         .refine(isValidTimeZone, { message: 'timezone must be a valid IANA time zone' })
@@ -1705,7 +1705,7 @@ router.get(
           storeName: o.store?.name ?? '',
           status: o.status,
           paymentStatus: o.paymentStatus,
-          total: o.total / 1000,
+          total: fromMinor(o.total),
           customerEmail: o.customer?.email ?? '',
           customerName: o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : '',
           shippingCountry: addr?.country ?? '',
@@ -1742,7 +1742,12 @@ router.get(
           { header: 'Store Name', key: 'storeName', width: 30 },
           { header: 'Status', key: 'status', width: 16 },
           { header: 'Payment Status', key: 'paymentStatus', width: 18 },
-          { header: 'Total (KWD)', key: 'total', width: 14, numFmt: '#,##0.000' },
+          {
+            header: 'Total (EGP)',
+            key: 'total',
+            width: 14,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
           { header: 'Customer Email', key: 'customerEmail', width: 34 },
           { header: 'Customer Name', key: 'customerName', width: 28 },
           { header: 'Shipping Country', key: 'shippingCountry', width: 18 },

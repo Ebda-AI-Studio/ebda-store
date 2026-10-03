@@ -45,7 +45,7 @@ vi.mock('@api/services/encryption.service', () => ({
 
 vi.mock('@api/middleware/wa-bridge-auth', () => ({
   waBridgeAuth: (req: any, _res: any, next: any) => {
-    req.bridgeStore = { id: 'store-test-123', name: 'Test Store', currency: 'KWD', slug: 'test' };
+    req.bridgeStore = { id: 'store-test-123', name: 'Test Store', currency: 'EGP', slug: 'test' };
     next();
   },
 }));

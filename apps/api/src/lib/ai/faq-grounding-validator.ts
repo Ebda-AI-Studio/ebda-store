@@ -11,7 +11,7 @@
  *
  * Scope is deliberately narrow + high-precision: only NUMBER+UNIT claims are
  * checked (the most common and most damaging invented spec). Quantities without
- * a measurement unit ("2-3 days", "3 packs", "5 KWD") are ignored, so policy /
+ * a measurement unit ("2-3 days", "3 packs", "5 EGP") are ignored, so policy /
  * shipping / pricing answers are never falsely dropped. It does not attempt to
  * verify qualitative claims (ingredients, materials) — those aren't
  * deterministically checkable and are left to the prompt + merchant review.

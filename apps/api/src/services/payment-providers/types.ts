@@ -1,6 +1,6 @@
 // ==========================================
 // Payment Provider Types
-// Common interfaces for all Kuwait payment gateways
+// Common interfaces for all payment gateways
 // ==========================================
 
 export type PaymentProvider = 'tap' | 'myfatoorah' | 'hesabe' | 'upayments' | 'cod';
@@ -26,7 +26,17 @@ export type PaymentStatus =
   | 'expired'
   | 'cod_pending';
 
-export type Currency = 'KWD' | 'USD' | 'EUR' | 'GBP' | 'AED' | 'SAR' | 'BHD' | 'OMR' | 'QAR';
+export type Currency =
+  | 'EGP'
+  | 'KWD'
+  | 'USD'
+  | 'EUR'
+  | 'GBP'
+  | 'AED'
+  | 'SAR'
+  | 'BHD'
+  | 'OMR'
+  | 'QAR';
 
 export interface CustomerInfo {
   id?: string;
@@ -49,14 +59,14 @@ export interface PaymentItem {
   name: string;
   description?: string;
   quantity: number;
-  unitPrice: number; // In fils (1 KWD = 1000 fils)
+  unitPrice: number; // In piastres (minor units: 1 EGP = 100 piastres)
   sku?: string;
 }
 
 export interface CreatePaymentRequest {
   orderId: string;
   orderNumber: string;
-  amount: number; // In fils (1 KWD = 1000 fils)
+  amount: number; // In piastres (minor units: 1 EGP = 100 piastres)
   currency: Currency;
   customer: CustomerInfo;
   items?: PaymentItem[];
@@ -121,7 +131,7 @@ export interface PaymentStatusResponse {
 
 export interface RefundRequest {
   transactionId: string;
-  amount?: number; // Partial refund amount in fils
+  amount?: number; // Partial refund amount in piastres
   reason?: string;
   /**
    * PaymentService.refund only — never sent to a provider. A stable key for
@@ -192,7 +202,7 @@ export interface WebhookPayload {
     /** Normalized refund status: completed = funds returned to customer's
      *  card; pending = queued (MyFatoorah finance team); failed = canceled. */
     status: 'pending' | 'completed' | 'failed';
-    /** Refund amount in fils. */
+    /** Refund amount in piastres. */
     amount?: number;
   };
   rawPayload: unknown;

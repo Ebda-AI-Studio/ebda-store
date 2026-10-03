@@ -26,15 +26,18 @@ afterEach(() => {
 });
 
 describe('smsConsentPhoneKey', () => {
-  it('maps every way a Kuwait number is typed to one key', () => {
+  it('maps every way an Egyptian mobile is typed to one key', () => {
     for (const typed of [
-      '+965 5123 4567',
-      '96551234567',
-      '0096551234567',
-      '5123-4567',
-      '51234567',
+      '+20 10 1234 5678',
+      '+201012345678',
+      '201012345678',
+      '00201012345678',
+      '010 1234 5678',
+      '01012345678',
+      '1012345678',
+      '٠١٠١٢٣٤٥٦٧٨', // Eastern Arabic digits
     ]) {
-      expect(smsConsentPhoneKey(typed)).toBe('96551234567');
+      expect(smsConsentPhoneKey(typed)).toBe('201012345678');
     }
   });
 

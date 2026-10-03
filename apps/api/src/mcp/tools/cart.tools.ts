@@ -31,7 +31,7 @@ import { ok } from './tool-result';
  *     priced at 0 doesn't fall through to the parent price) — the same
  *     helper the cart/order subtotal math uses, so the tool's line price can
  *     never drift from what the store actually charges.
- *   - `cart.subtotal` — computed by the service, integer fils.
+ *   - `cart.subtotal` — computed by the service, integer piastres.
  *   - No `currency` column on Cart/CartItem/Product — read from
  *     `store.currency` (the `McpStore` passed into `registerCartTools`),
  *     confirmed absent from `STOREFRONT_PRODUCT_SELECT` (Task 4 finding,

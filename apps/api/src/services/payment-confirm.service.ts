@@ -56,11 +56,13 @@ export type ConfirmSource = 'admin_refresh' | 'guest_verify' | 'auto_cancel_swee
 
 /** Money-integrity F3 (2026-07-02 audit): reconciliation tolerance for a
  *  provider-reported paid amount vs the expected `Payment.amount`. Both
- *  sides are in fils (see `PaymentService.createPayment`, which stores
+ *  sides are in piastres (see `PaymentService.createPayment`, which stores
  *  `amount: request.amount === order.total`, and every provider's
- *  `parseWebhook`/`getPaymentStatus`, which convert to fils via
- *  `Math.round(x * 1000)`). 5 fils absorbs float/rounding noise without
- *  masking a real underpayment. */
+ *  `parseWebhook`/`getPaymentStatus`, which convert to piastres via
+ *  `Math.round(x * 100)` for a 2-decimal currency). 5 piastres (0.05 EGP)
+ *  absorbs float/rounding noise without masking a real underpayment — the same
+ *  5-minor-unit noise bound FWB used, deliberately NOT re-tuned in the EGP
+ *  conversion (it is a rounding allowance, not a money value). */
 const AMOUNT_TOLERANCE_FILS = 5;
 
 export interface ConfirmPaymentInput {
@@ -70,10 +72,10 @@ export interface ConfirmPaymentInput {
     status: string;
     provider: string;
     metadata: unknown;
-    /** Expected amount in fils (mirrors order.total at payment creation) —
+    /** Expected amount in piastres (mirrors order.total at payment creation) —
      *  required for the paid-amount reconciliation gate below. */
     amount: number;
-    /** Payment.currency (default 'KWD'). Used only to gate the amount
+    /** Payment.currency (default 'EGP'). Used only to gate the amount
      *  reconciliation to same-currency comparisons — see below. */
     currency?: string;
   };
@@ -137,7 +139,7 @@ export async function confirmPaymentFromProviderStatus(
     // Paid-amount reconciliation (money-integrity audit F3, 2026-07-02).
     // The provider says the invoice is "Paid", but that alone doesn't prove
     // the AMOUNT paid matches what we expect. `providerStatus.paidAmount`
-    // (fils) is only populated by providers that distinguish invoiced vs
+    // (piastres) is only populated by providers that distinguish invoiced vs
     // settled amount (currently MyFatoorah's GetPaymentStatus —
     // `PaidCurrencyValue`); Tap/Hesabe/UPayments never set it. Only gate
     // when it's actually present + parseable and the currencies line up —
@@ -194,7 +196,7 @@ export async function confirmPaymentFromProviderStatus(
         store: { id: order.storeId, name: alertStore?.name ?? order.storeId },
         source: 'payment.confirm.amount_mismatch',
         title: 'payment.confirm.amount_mismatch',
-        body: `Order ${order.id}: ${payment.provider} reports paid ${paidAmount} fils but the order total is ${payment.amount} fils. Order was NOT marked as paid — investigate before fulfilling.`,
+        body: `Order ${order.id}: ${payment.provider} reports paid ${paidAmount} piastres but the order total is ${payment.amount} piastres. Order was NOT marked as paid — investigate before fulfilling.`,
         context: {
           orderId: order.id,
           paymentId: payment.id,

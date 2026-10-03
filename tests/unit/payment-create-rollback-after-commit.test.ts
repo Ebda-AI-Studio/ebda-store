@@ -96,7 +96,7 @@ beforeEach(() => {
     status: 'pending',
     total: 5000,
     walletAmount: 0,
-    currency: 'KWD',
+    currency: 'EGP',
     items: [],
     customer: null,
     shippingAddress: { email: 'g@example.com' },

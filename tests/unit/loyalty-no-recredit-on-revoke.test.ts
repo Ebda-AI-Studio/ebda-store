@@ -137,7 +137,7 @@ describe('a revoked earn stays revoked', () => {
     // The credit path ran AND credited the right amount. Reaching the
     // transaction alone is not enough: with orderId/orderTotalFils swapped
     // (#1444) this test used to credit NaN points and still pass.
-    // 5000 fils = 5 KWD × 10 points/KWD (default) × 1.0 bronze multiplier = 50.
+    // 5000 piastres = 50 EGP × 1 point/EGP (default) × 1.0 bronze multiplier = 50.
     expect(transaction).toHaveBeenCalled();
     expect(res.pointsEarned).toBe(50);
     expect(pointsUpdate).toHaveBeenCalledWith(

@@ -16,6 +16,7 @@ import { useCoupons } from './_hooks/useCoupons';
 import { dateTimeLocalValue } from '@/lib/form-text';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
+import { fromMinor } from '@force/shared';
 interface CustomerGroupOption {
   id: string;
   name: string;
@@ -76,11 +77,11 @@ export default function CouponsPage() {
       description: coupon.description || '',
       descriptionAr: coupon.descriptionAr || '',
       type: coupon.type,
-      // `fixed` coupons are stored in fils → show as KWD (÷1000) in the form.
+      // `fixed` coupons are stored in piastres → show as EGP (÷1000) in the form.
       // `percentage` coupons store the raw percent, shown as-is.
-      value: coupon.type === 'fixed' ? coupon.value / 1000 : coupon.value,
-      minOrderAmount: coupon.minOrderAmount ? String(coupon.minOrderAmount / 1000) : '',
-      maxDiscount: coupon.maxDiscount ? String(coupon.maxDiscount / 1000) : '',
+      value: coupon.type === 'fixed' ? fromMinor(coupon.value) : coupon.value,
+      minOrderAmount: coupon.minOrderAmount ? String(fromMinor(coupon.minOrderAmount)) : '',
+      maxDiscount: coupon.maxDiscount ? String(fromMinor(coupon.maxDiscount)) : '',
       usageLimit: coupon.usageLimit ? String(coupon.usageLimit) : '',
       usageLimitPerUser: coupon.usageLimitPerUser ? String(coupon.usageLimitPerUser) : '',
       isActive: coupon.isActive,

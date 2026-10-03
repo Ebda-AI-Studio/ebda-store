@@ -125,7 +125,7 @@ export function resolveDeliverySelection(
 /**
  * Derives "now" as minutes-since-midnight in the given IANA timezone
  * (defaults handled by the caller — this repo's store default is
- * 'Asia/Kuwait'). Kept separate from the availability helpers so the pure
+ * 'Africa/Cairo'). Kept separate from the availability helpers so the pure
  * logic never depends on Date.now() / Intl directly and stays deterministic
  * under test.
  */

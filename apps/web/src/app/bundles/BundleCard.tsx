@@ -13,6 +13,7 @@ import { pickBundleName } from '@/lib/bundle-locale';
 import { trackAddToCart } from '../../components/MarketingPixels';
 import { BundlePlaceholderIcon } from '../../components/BundleLine';
 
+import { fromMinor, REGION } from '@force/shared';
 interface BundleCardProps {
   bundle: PublicBundle;
 }
@@ -48,8 +49,8 @@ export function BundleCard({ bundle }: BundleCardProps) {
       contentId: bundle.id,
       contentName: bundle.name,
       quantity: 1,
-      value: bundle.price / 1000,
-      currency: 'KWD',
+      value: fromMinor(bundle.price),
+      currency: REGION.currency,
     });
   };
 

@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { prisma, Prisma, OrderStatus, withMoneyTx, setTenantGucs } from '@force/database';
-import { checkMinimumOrder, allocateBundlePrice } from '@force/shared';
+import {
+  checkMinimumOrder,
+  allocateBundlePrice,
+  fromMinor,
+  minorToDecimalString,
+  REGION,
+} from '@force/shared';
 import { generateOrderNumber } from '../utils/order-number';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
@@ -258,7 +264,7 @@ export async function orderSearchWhere(
     }),
     guestOrderIdsMatching(storeId, search),
   ]);
-  // Each half degrades on its OWN: a broad guest term (every Kuwait guest phone starts `+965`)
+  // Each half degrades on its OWN: a broad guest term (every Egyptian guest phone starts `+20`)
   // must not cost the registered half its indexed `customer_id IN (...)` arm, nor the reverse
   // (issue 2444). Both over the cap is exactly `relationFallback`.
   const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
@@ -735,7 +741,7 @@ export class OrderService {
     // Build the targeting cart snapshot (product + category ids, per-line
     // totals) shared by coupon targeting and automatic promotion resolution.
     // Prices each line the same way as `subtotal` so scoped discounts compute
-    // against the exact fils the customer is charged.
+    // against the exact piastres the customer is charged.
     const cartItems = cart.items.map(item => ({
       productId: item.productId,
       categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
@@ -746,7 +752,7 @@ export class OrderService {
     }));
 
     // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
-    // fils; 0/unset = no minimum). Platform-level — any store can configure
+    // piastres; 0/unset = no minimum). Platform-level — any store can configure
     // it, never a hardcoded slug. This is the REAL guard for the customer
     // checkout path; the storefront cart/checkout mirror it for UX only.
     // Deliberately NOT applied to OrderService.createAdminOrder — merchants
@@ -765,7 +771,7 @@ export class OrderService {
       throw new AppError(
         400,
         'MINIMUM_ORDER_NOT_MET',
-        `Minimum order value of ${((minimumOrderFils as number) / 1000).toFixed(3)} KWD required`
+        `Minimum order value of ${minorToDecimalString(minimumOrderFils as number)} EGP required`
       );
     }
 
@@ -868,9 +874,7 @@ export class OrderService {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
-          `Minimum order amount of ${(appliedCoupon.minOrderAmount / 1000).toFixed(
-            3
-          )} KWD required for this coupon`
+          `Minimum order amount of ${minorToDecimalString(appliedCoupon.minOrderAmount)} ${REGION.currency} required for this coupon`
         );
       }
       // Targeting is evaluated for EVERY coupon type, including free_shipping —
@@ -2376,7 +2380,7 @@ export class OrderService {
       couponCode?: string;
       currency?: string;
       /**
-       * Optional shipping fee override in integer fils (KWD × 1000).
+       * Optional shipping fee override in integer piastres (EGP × 100).
        * When present, replaces the ShippingService-computed fee.
        * Used for negotiated phone-order rates.
        */
@@ -2506,7 +2510,7 @@ export class OrderService {
     }
 
     // Manual override: if the admin specified a negotiated shipping fee
-    // (integer fils), it takes precedence over the calculated value.
+    // (integer piastres), it takes precedence over the calculated value.
     // This is intentionally applied AFTER calculateShipping so that any
     // future coupon type=free_shipping still runs against the base fee
     // first (the coupon block below may zero it out regardless).
@@ -2714,7 +2718,7 @@ export class OrderService {
           shipping,
           discount: couponDiscount,
           total,
-          currency: data.currency ?? 'KWD',
+          currency: data.currency ?? REGION.currency,
           couponCode: couponCode ?? null,
           shippingAddress: data.shippingAddress as Prisma.InputJsonValue,
           billingAddress: (data.billingAddress ?? data.shippingAddress) as Prisma.InputJsonValue,

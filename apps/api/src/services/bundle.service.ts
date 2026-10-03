@@ -73,7 +73,7 @@ export function bundleAvailability(items: AvailabilityItem[]): number {
  * because BundleItem ids are random uuids.)
  *
  * Never violates a money invariant either way: the allocation always sums to
- * the bundle price. This only fixes WHICH component absorbs a 1-fil
+ * the bundle price. This only fixes WHICH component absorbs a 1-piastre
  * remainder, and stops the two surfaces disagreeing about whether a price is
  * representable at all.
  */
@@ -292,7 +292,7 @@ export async function resolveBundle(
 
   // P1 (this task): a zero price is only ever sellable when the components
   // are themselves free. `componentSum` is recomputed from CURRENT component
-  // prices on EVERY read, so a `fixed` (fils-off) discount that was smaller
+  // prices on EVERY read, so a `fixed` (piastres-off) discount that was smaller
   // than the components when it was saved can outgrow them later — a sale, a
   // bulk edit or a CSV import drops component prices, `computeBundlePrice`
   // clamps `componentSum - pricingValue` at 0, and the box then sells for

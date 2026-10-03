@@ -9,6 +9,7 @@ import { redis } from './redis.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { AppError } from '../middleware/error-handler';
+import { fromMinor, formatMoney } from '@force/shared';
 // UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline
 // the interface here to avoid a circular dependency
 // (socket-broadcast → socket.service → socket-broadcast).
@@ -358,9 +359,7 @@ class SocketService {
     this.notifyStore(storeId, {
       type: 'new_order',
       title: 'New Order Received',
-      message: `Order #${order.orderNumber} from ${order.customerName} - ${(
-        order.total / 1000
-      ).toFixed(3)} KWD`,
+      message: `Order #${order.orderNumber} from ${order.customerName} - ${formatMoney(order.total, 'en')}`,
       data: { ...order, storeId, url },
       createdAt: new Date(),
     });

@@ -39,13 +39,13 @@ import { RETURN_WALLET_SHARE_KEY_PREFIX, returnWalletShareKey } from '../lib/ref
 
 export type WalletClient = Prisma.TransactionClient;
 
-/** Largest single movement accepted: 100,000 KWD in fils. */
+/** Largest single movement accepted: 1,000,000 EGP in piastres (a sanity bound, well inside int32). */
 export const WALLET_MAX_ENTRY_FILS = 100_000_000;
 
 export interface ApplyEntryInput {
   storeId: string;
   customerId: string;
-  /** Signed fils. Positive credits the wallet, negative spends it. Never 0. */
+  /** Signed piastres. Positive credits the wallet, negative spends it. Never 0. */
   amount: number;
   type: WalletTransactionType;
   /** Makes the write idempotent. Unique per store. */
@@ -111,7 +111,7 @@ function assertValidInput(input: ApplyEntryInput): void {
     throw new AppError(
       400,
       'INVALID_WALLET_AMOUNT',
-      'Amount must be a non-zero whole number of fils'
+      'Amount must be a non-zero whole number of piastres'
     );
   }
   if (Math.abs(input.amount) > WALLET_MAX_ENTRY_FILS) {
@@ -452,7 +452,7 @@ export class WalletService {
    * original `order_payment` entry (NOT `Order.walletAmount`/`customerId`,
    * which erasure may have nulled) so the credit lands on the wallet that
    * paid. No-op (null) when the order never spent from a wallet, or when
-   * partial gateway returns already gave every fils of it back.
+   * partial gateway returns already gave every piastres of it back.
    */
   static async reverseOrderPayment(
     args: { storeId: string; orderId: string },

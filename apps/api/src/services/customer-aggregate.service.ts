@@ -39,7 +39,7 @@ export interface AggregatedCustomer {
   postalCode: string;
   totalOrders: number;
   totalSpent: number;
-  /** Average order value = totalSpent / totalOrders, in fils. */
+  /** Average order value = totalSpent / totalOrders, in piastres. */
   avgOrderValue: number;
   lastOrderTotal: number;
   // Null for a registered shopper with zero orders (#1882) — everything
@@ -123,9 +123,9 @@ export interface CustomersSummary {
   repeatRate: number | null;
   /** Counted orders across all customers. */
   orders: number;
-  /** Sum of counted order totals, in fils. */
+  /** Sum of counted order totals, in piastres. */
   totalSpent: number;
-  /** totalSpent / orders, in fils. Null when there are no counted orders. */
+  /** totalSpent / orders, in piastres. Null when there are no counted orders. */
   avgOrderValue: number | null;
 }
 

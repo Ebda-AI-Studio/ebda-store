@@ -31,8 +31,8 @@ import type { TargetingCtx } from '../../apps/api/src/services/promotion-targeti
 
 const STORE = 'store-1';
 
-// base=10000 fils cart; percentage discounts compute against the whole cart
-// (no scope set) so value maps 1:1 to a predictable fils amount.
+// base=10000 piastres cart; percentage discounts compute against the whole cart
+// (no scope set) so value maps 1:1 to a predictable piastres amount.
 const CTX: TargetingCtx = {
   customerGroupId: 'g1',
   isFirstOrder: true,
@@ -72,8 +72,8 @@ describe('resolveBestPromotion', () => {
     // findMany returns priority-desc; A has higher priority but a smaller
     // discount, B a larger one — the larger discount must win.
     mockPrisma.promotion.findMany.mockResolvedValue([
-      promo({ id: 'A', priority: 10, value: 10 }), // 1000 fils
-      promo({ id: 'B', priority: 5, value: 20 }), // 2000 fils
+      promo({ id: 'A', priority: 10, value: 10 }), // 1000 piastres
+      promo({ id: 'B', priority: 5, value: 20 }), // 2000 piastres
     ]);
     const best = await resolveBestPromotion(STORE, CTX);
     expect(best).toEqual({ promotionId: 'B', discount: 2000 });
@@ -83,8 +83,8 @@ describe('resolveBestPromotion', () => {
     // Equal discounts; A comes first (higher priority) so it holds — the
     // strict > comparison never lets a later equal-discount promo replace it.
     mockPrisma.promotion.findMany.mockResolvedValue([
-      promo({ id: 'A', priority: 10, value: 15 }), // 1500 fils
-      promo({ id: 'B', priority: 5, value: 15 }), // 1500 fils
+      promo({ id: 'A', priority: 10, value: 15 }), // 1500 piastres
+      promo({ id: 'B', priority: 5, value: 15 }), // 1500 piastres
     ]);
     const best = await resolveBestPromotion(STORE, CTX);
     expect(best).toEqual({ promotionId: 'A', discount: 1500 });
@@ -94,7 +94,7 @@ describe('resolveBestPromotion', () => {
     // Big discount but wrong group → skipped; small eligible one wins.
     mockPrisma.promotion.findMany.mockResolvedValue([
       promo({ id: 'BIG', priority: 10, value: 50, customerGroupId: 'g2' }), // ineligible
-      promo({ id: 'OK', priority: 1, value: 10 }), // 1000 fils, eligible
+      promo({ id: 'OK', priority: 1, value: 10 }), // 1000 piastres, eligible
     ]);
     const best = await resolveBestPromotion(STORE, CTX);
     expect(best).toEqual({ promotionId: 'OK', discount: 1000 });

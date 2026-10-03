@@ -20,10 +20,10 @@ const base: OrderEmailData = {
     firstName: 'S',
     lastName: 'A',
     address1: 'Block 1',
-    city: 'Kuwait',
+    city: 'Egypt',
     state: 'Capital',
     postalCode: '00000',
-    country: 'KW',
+    country: 'EG',
   },
 };
 
@@ -34,7 +34,7 @@ describe('order confirmation email — tax placement', () => {
       const html = orderConfirmationTemplate[lang]({ ...base, taxIncludedInPrice: true }, 'Shop');
       const taxLabel = lang === 'en' ? '>Tax</td>' : '>الضريبة</td>';
       expect(html).not.toContain(taxLabel);
-      const caption = lang === 'en' ? 'Incl. VAT 0.238' : 'شامل ضريبة القيمة المضافة 0.238';
+      const caption = lang === 'en' ? 'Incl. VAT 2.38' : 'شامل ضريبة القيمة المضافة 2.38';
       expect(html).toContain(caption);
       const totalLabel = lang === 'en' ? '>Total</td>' : '>الإجمالي</td>';
       expect(html.indexOf(caption)).toBeGreaterThan(html.indexOf(totalLabel));
@@ -44,7 +44,7 @@ describe('order confirmation email — tax placement', () => {
   it.each(['en', 'ar'] as const)('%s: exclusive tax keeps its summed row (unchanged)', lang => {
     const html = orderConfirmationTemplate[lang]({ ...base, total: 5738 }, 'Shop');
     expect(html).toContain(lang === 'en' ? '>Tax</td>' : '>الضريبة</td>');
-    expect(html).toContain('0.238');
+    expect(html).toContain('2.38');
     expect(html).not.toContain('Incl. VAT');
     expect(html).not.toContain('شامل ضريبة');
   });

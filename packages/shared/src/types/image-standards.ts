@@ -201,7 +201,7 @@ export const IMAGE_STANDARDS = {
     // Per-theme overrides for mobile product crops:
     // modern/classic: explicit 3:4 mobile crop at 400×533 (2× the 200px rendered card width).
     // elegant: compact mobile stays at 600×800 (zFloos spec) — desktop luxury-tier
-    //   but mobile must stay compact per LCP + Kuwait mobile traffic.
+    //   but mobile must stay compact per LCP + Egypt mobile traffic.
     // bold: square mobile crop 600×600 matches bold's square ProductCard aspect.
     // minimal: inherits base (compact throughout, ascetic identity).
     // Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.
@@ -216,7 +216,7 @@ export const IMAGE_STANDARDS = {
         width: 600,
         height: 800,
         aspect: '3:4',
-        note: 'Desktop is luxury-spec (800×1067) but mobile stays at compact baseline per LCP constraint + Kuwait mobile traffic. 04-25 audit §P0 #1. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.',
+        note: 'Desktop is luxury-spec (800×1067) but mobile stays at compact baseline per LCP constraint + Egypt mobile traffic. 04-25 audit §P0 #1. Ref: 2026-05-18-per-theme-image-spec-audit.md §Surface 7.',
       },
       classic: {
         width: 400,

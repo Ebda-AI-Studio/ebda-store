@@ -18,7 +18,7 @@ export interface LoyaltyEstimateSettings {
 export interface LoyaltyEstimate {
   /** Points to request from the server (0 = request no redemption). */
   pointsToSend: number;
-  /** Discount the server will apply for that request, in fils. */
+  /** Discount the server will apply for that request, in piastres. */
   loyaltyDiscount: number;
 }
 

@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { allocatePartialReturn } from '@api/services/accounting/posting/partial-return-allocation';
 
-/** Two lines: 2 × 10.000 KWD and 1 × 5.000 KWD. Subtotal 25.000. */
+/** Two lines: 2 × 10.000 EGP and 1 × 5.000 EGP. Subtotal 25.000. */
 const LINES = [
   { id: 'oi-1', quantity: 2, price: 10_000 },
   { id: 'oi-2', quantity: 1, price: 5_000 },
@@ -138,7 +138,7 @@ describe('allocatePartialReturn', () => {
     // Same order as the pro-rata case above, but the store's listed prices
     // already contained the VAT (ruling M3-7): `subtotal` is gross and the
     // customer never paid `tax` on top of it. Crediting revenueDebit + taxThis
-    // would hand back 500 fils of VAT the customer was never charged
+    // would hand back 500 piastres of VAT the customer was never charged
     // separately — the order's own `taxIncludedInPrice` is what distinguishes
     // the two, so an inclusive order refunds the line value and no more.
     const r = alloc([{ orderItemId: 'oi-1', quantity: 1 }], [], {

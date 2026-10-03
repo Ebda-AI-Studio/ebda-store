@@ -6,6 +6,7 @@ import {
   storefrontBaseUrl,
 } from '../../../lib/agent-store-resolver';
 
+import { REGION, minorUnitsPerMajor } from '@force/shared';
 /**
  * `/.well-known/ucp` — Universal Commerce Protocol discovery.
  *
@@ -54,14 +55,13 @@ export async function GET() {
         phone: store.phone ?? undefined,
       },
     },
-    // Integer MINOR units everywhere on this platform. KWD has three decimal
-    // places (1 KWD = 1000 fils), so an agent that assumes the near-universal
-    // two is wrong by a factor of ten — stated explicitly because a wrong
+    // Integer MINOR units everywhere on this platform (EGP: 1 EGP = 100 piastres,
+    // 2 decimals). The scale is stated explicitly per currency because a wrong
     // assumption here is a mispriced order, not a display bug.
     pricing: {
-      currency: store.currency ?? 'KWD',
+      currency: store.currency ?? REGION.currency,
       amounts: 'integer-minor-units',
-      minor_units_per_major: (store.currency ?? 'KWD') === 'KWD' ? 1000 : 100,
+      minor_units_per_major: minorUnitsPerMajor(store.currency ?? REGION.currency),
     },
     transports: [
       {

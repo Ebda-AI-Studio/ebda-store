@@ -67,7 +67,7 @@ const gatewayOrder = (id: string) => ({
       provider: 'tap',
       metadata: {},
       amount: 1000,
-      currency: 'KWD',
+      currency: 'EGP',
       transactionId: `tx-${id}`,
     },
   ],

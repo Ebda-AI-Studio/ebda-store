@@ -17,6 +17,7 @@ import {
   type OrphanedProviderInvoice,
 } from '../services/payment-providers/orphaned-invoice-alert';
 
+import { REGION, codFeeMinor } from '@force/shared';
 const router = Router();
 
 // ==========================================
@@ -83,7 +84,7 @@ const refundSchema = z.object({
 
 /**
  * GET /payments/config
- * Get payment configuration for Kuwait providers
+ * Get payment configuration for Egypt providers
  */
 router.get('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -131,7 +132,7 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
         cod: codConfig,
         defaultProvider,
         defaultCurrency: config.defaultCurrency,
-        supportedCurrencies: ['KWD', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
+        supportedCurrencies: ['EGP', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
         supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'google_pay', 'samsung_pay'],
         testMode: config.paymentTestMode,
       },
@@ -148,7 +149,7 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
 router.get('/methods', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const amount = parseInt(req.query.amount as string) || 1000;
-    const currency = (req.query.currency as Currency) || 'KWD';
+    const currency = (req.query.currency as Currency) || REGION.currency;
     const provider = req.query.provider as PaymentProvider | undefined;
     const storeId = req.headers['x-store-id'] as string | undefined;
 
@@ -376,7 +377,9 @@ router.post(
             };
           }
 
-          const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
+          // COD fee in integer piastres via the single helper (fixed fee today; a
+          // percentage, if ever configured, rounds half up to the piastre).
+          const codFee = codFeeMinor(order.total, { fixedMinor: Number(codConfig.fixedFee) || 0 });
 
           // Add the COD fee to order.total only when NO prior COD payment row
           // exists for this order — a prior row (even a failed/cancelled one,

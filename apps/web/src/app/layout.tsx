@@ -27,7 +27,7 @@ import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
-import { type MarketingPixels } from '@force/shared';
+import { type MarketingPixels, resolveDefaultLanguage } from '@force/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
 import '../styles/globals.css';
@@ -180,9 +180,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const resolvedLanguage: 'en' | 'ar' =
     cookieLang === 'ar' || cookieLang === 'en'
       ? cookieLang
-      : storeDefaultLanguage === 'ar'
-        ? 'ar'
-        : 'en';
+      : resolveDefaultLanguage(storeDefaultLanguage);
   const lang = resolvedLanguage;
   const dir = resolvedLanguage === 'ar' ? 'rtl' : 'ltr';
 

@@ -90,7 +90,7 @@ export default function WalletPage() {
 
   if (gate) return gate;
 
-  const money = (fils: number) => formatPrice(fils, { locale });
+  const money = (piastres: number) => formatPrice(piastres, { locale });
   const checkoutCopy = !data
     ? null
     : data.checkout.available

@@ -1047,7 +1047,7 @@ export const authEmailAddressLimiter = rateLimit({
  * `/verify-email` isn't one — the token is a 256-bit hash (brute force is
  * infeasible; see the S5-4 comment above) — and this platform is
  * multi-tenant, so shoppers on DIFFERENT stores sharing one egress IP (a
- * Kuwait mobile carrier, an office/retail wifi) pooled into one budget. The
+ * Egypt mobile carrier, an office/retail wifi) pooled into one budget. The
  * 16th person to click a perfectly valid verification link in 15 minutes got
  * 429'd with `authLimiter`'s "Too many login attempts" message (#1863).
  *

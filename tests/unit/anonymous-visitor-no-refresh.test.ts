@@ -8,7 +8,7 @@
  * a request with no verifiable token as the SHARED `<ip>-refresh-anon` key
  * (120/15min) beneath an IP-wide backstop (600/15min), and express-rate-limit
  * counts the request before the route answers 400 — so guest browsing behind a
- * Kuwait carrier CGNAT or a mall/office wifi exhausts the bucket and the real
+ * Egypt carrier CGNAT or a mall/office wifi exhausts the bucket and the real
  * signed-in customers on that IP start getting 429 on the route that renews
  * their access token and re-mints their CSRF token.
  *

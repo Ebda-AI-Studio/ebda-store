@@ -4,7 +4,7 @@
  *
  * `resolveBundle` recomputes `componentSum` from the components' CURRENT
  * prices on every read, and `computeBundlePrice` clamps
- * `componentSum - pricingValue` with `Math.max(0, …)`. A `fixed` (fils-off)
+ * `componentSum - pricingValue` with `Math.max(0, …)`. A `fixed` (piastres-off)
  * discount that was a real discount when the merchant saved it therefore
  * becomes a 100%-off discount the moment a sale, a bulk edit or a CSV import
  * drops the component prices below it — with no merchant error anywhere, and
@@ -40,7 +40,7 @@ const BUNDLE_ID = 'bundle-1';
 
 /**
  * "Ramadan Box": one component, quantity 1, sold at `pricingType: 'fixed'`
- * with 5.000 KWD off. At the component's original 20.000 the box is 15.000;
+ * with 5.000 EGP off. At the component's original 20.000 the box is 15.000;
  * after the component is repriced to 4.500 the discount swallows it whole
  * and `computeBundlePrice` clamps the box to 0.
  */
@@ -278,10 +278,10 @@ const ORDER_DATA = {
     firstName: 'Test',
     lastName: 'Customer',
     address1: '123 Test St',
-    city: 'Kuwait City',
+    city: 'Cairo',
     state: 'Capital',
     postalCode: '12345',
-    country: 'Kuwait',
+    country: 'Egypt',
     phone: '+96500000000',
   },
   paymentMethod: 'cod',

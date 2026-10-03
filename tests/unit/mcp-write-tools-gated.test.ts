@@ -38,7 +38,7 @@ vi.mock('@api/lib/logger', () => ({
 import { buildStoreMcpServer } from '@api/mcp/store-mcp-server';
 import { MCP_READ_TOOLS, MCP_WRITE_TOOLS } from '@api/mcp/agent-auth';
 
-const store = { id: 'store-a', name: 'Store A', slug: 'store-a', currency: 'KWD', domain: null };
+const store = { id: 'store-a', name: 'Store A', slug: 'store-a', currency: 'EGP', domain: null };
 
 type Registered = Record<string, { handler: (args: unknown, extra: unknown) => Promise<unknown> }>;
 const registered = () =>

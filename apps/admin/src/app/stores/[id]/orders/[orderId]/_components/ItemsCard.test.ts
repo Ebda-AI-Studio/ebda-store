@@ -124,7 +124,7 @@ describe('groupItemsForAdmin', () => {
 /**
  * P1-2 (final review): `ItemsCard` sliced `items` to `previewLimit` and only
  * then grouped, so a box straddling the preview cut rendered as a FRACTION
- * of itself — the merchant read "Ramadan Box · 3.724 KWD" for a box the
+ * of itself — the merchant read "Ramadan Box · 3.724 EGP" for a box the
  * customer paid 12.000 for — and "+N more" counted component lines rather
  * than display rows. `previewRows` groups first and limits by display rows.
  */

@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { formatFils, type Affiliate } from './types';
 
 interface PayoutsHistoryProps {
@@ -20,7 +20,7 @@ interface PayoutsHistoryProps {
 const PAYOUT_METHODS = ['bank_transfer', 'knet', 'cash', 'manual'] as const;
 
 /**
- * Payout creation modal. Collects amount (KWD), method, and optional notes
+ * Payout creation modal. Collects amount (EGP), method, and optional notes
  * for a specific approved affiliate with a positive pending balance.
  */
 export function PayoutsHistory({
@@ -71,12 +71,12 @@ export function PayoutsHistory({
             </label>
             <input
               type="number"
-              step="0.001"
-              min="0.001"
-              max={filsToKwd(Number(affiliate.pendingBalance))}
+              step="0.01"
+              min="0.01"
+              max={minorToMajor(Number(affiliate.pendingBalance))}
               value={amount}
               onChange={e => onAmountChange(e.target.value)}
-              placeholder="0.000"
+              placeholder="0.00"
               className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               required
             />

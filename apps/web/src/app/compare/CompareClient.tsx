@@ -11,6 +11,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { compareStorageKey } from '../../lib/compare';
 
+import { minorToDecimalString } from '@force/shared';
 interface CompareProduct {
   id: string;
   name: string;
@@ -237,11 +238,11 @@ export default function CompareClient() {
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
                     <span className="font-bold text-lg">
-                      {localize((product.price / 1000).toFixed(3))} KWD
+                      {localize(minorToDecimalString(product.price))} EGP
                     </span>
                     {isOnSale(product) && (
                       <span className="block text-muted-foreground/70 line-through text-sm">
-                        {localize((product.compareAtPrice / 1000).toFixed(3))} KWD
+                        {localize(minorToDecimalString(product.compareAtPrice))} EGP
                       </span>
                     )}
                   </td>

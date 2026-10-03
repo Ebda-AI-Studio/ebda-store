@@ -9,6 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 
+import { roundToMinor } from '@force/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SupplierOption {
@@ -42,7 +43,7 @@ interface POLineItem {
   // variant-less line is refused by the API (inventory-model.md, 2026-10-01).
   variantId: string;
   qty: string;
-  unitCost: string; // KWD (user types dinar; converted to fils on save)
+  unitCost: string; // EGP (user types major units; converted to piastres on save)
 }
 
 interface POCreated {
@@ -54,10 +55,10 @@ interface POCreated {
 
 const EMPTY_LINE: POLineItem = { productId: '', variantId: '', qty: '', unitCost: '' };
 
-// Returns line total in FILS (qty × unitCost-in-dinar × 1000)
+// Returns line total in PIASTRES (qty × unitCost-in-EGP × 100)
 function lineTotal(line: POLineItem): number {
   const qty = parseInt(line.qty) || 0;
-  const costFils = Math.round((parseFloat(line.unitCost) || 0) * 1000);
+  const costFils = roundToMinor(parseFloat(line.unitCost) || 0);
   return qty * costFils;
 }
 
@@ -204,11 +205,11 @@ export default function NewPurchaseOrderPage() {
         <input
           type="number"
           min="0"
-          step="0.001"
+          step="0.01"
           value={line.unitCost}
           onChange={e => updateLine(i, { unitCost: e.target.value })}
           className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
-          placeholder="0.000"
+          placeholder="0.00"
         />
       ),
     },
@@ -270,7 +271,7 @@ export default function NewPurchaseOrderPage() {
         productId: l.productId,
         variantId: l.variantId || undefined,
         qty: parseInt(l.qty),
-        unitCost: Math.round((parseFloat(l.unitCost) || 0) * 1000), // convert KWD → fils
+        unitCost: roundToMinor(parseFloat(l.unitCost) || 0), // convert EGP → piastres
       })),
     };
 

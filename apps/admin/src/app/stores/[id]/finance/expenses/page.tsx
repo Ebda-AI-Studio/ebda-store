@@ -7,7 +7,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGetPage, apiPost, type PageMeta } from '@/lib/api';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
@@ -38,7 +38,7 @@ interface ExpenseRow {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const kwd = filsToKwd;
+const major = minorToMajor;
 
 const STATUS_BADGE: Record<ExpenseStatus, string> = {
   draft: 'bg-muted text-foreground',
@@ -175,18 +175,18 @@ export default function ExpensesPage() {
       header: t('amount'),
       hideOnMobile: true,
       alignEnd: true,
-      cell: exp => <span className="font-mono">{kwd(exp.amount)}</span>,
+      cell: exp => <span className="font-mono">{major(exp.amount)}</span>,
     },
     {
       header: t('tax'),
       hideOnMobile: true,
       alignEnd: true,
-      cell: exp => <span className="font-mono">{kwd(exp.taxAmount)}</span>,
+      cell: exp => <span className="font-mono">{major(exp.taxAmount)}</span>,
     },
     {
       header: t('total'),
       alignEnd: true,
-      cell: exp => <span className="font-mono font-medium">{kwd(exp.totalAmount)}</span>,
+      cell: exp => <span className="font-mono font-medium">{major(exp.totalAmount)}</span>,
     },
     {
       header: t('status'),

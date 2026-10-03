@@ -51,7 +51,7 @@ export function ProductListItem({
   // multi-variant products render "From <min>" instead of the parent's
   // (often stale) standalone price.
   const pricing = getProductPricing(product, undefined, 'card');
-  // BUG 1 fix: use helper for correct KWD/pct badge text.
+  // BUG 1 fix: use helper for correct EGP/pct badge text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: orderable = truly in-stock OR backorder allowed. Derived from
   // inventory because ProductListItem uses a richer inventory check (undefined
@@ -127,7 +127,7 @@ export function ProductListItem({
     >
       {/* Image */}
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
-        {/* Sale badge — BUG 1 fix: show KWD or pct text via helper.
+        {/* Sale badge — BUG 1 fix: show EGP or pct text via helper.
             BUG 2 fix: no inStock gate. Corner + color are merchant-
             configurable via productCardDefaults.discountBadge (physical;
             unset = top corner, or bottom-left when theme.saleBadgeLegacyCorner, #1998). */}

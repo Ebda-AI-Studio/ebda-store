@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
-import { kuwaitAddressSchema } from '@force/shared';
+import { egyptAddressSchema } from '@force/shared';
 import { authenticate } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
 
@@ -37,13 +37,13 @@ router.use(userContext(req => req.user!.userId));
 
 // Validation schema for creating/updating an address.
 //
-// Derives from the canonical `kuwaitAddressSchema` in @force/shared which
-// covers the full Kuwait field set (governorate / governorateAr / area /
+// Derives from the canonical `egyptAddressSchema` in @force/shared which
+// covers the full Egypt field set (governorate / governorateAr / area /
 // areaAr / state / ...).  The `isDefault` flag is the only address-book-
 // specific addition.  This fixes the silent-drop bug where governorate +
 // governorateAr + areaAr were accepted by the checkout form but stripped
 // here before reaching the DB.
-const addressSchema = kuwaitAddressSchema.extend({
+const addressSchema = egyptAddressSchema.extend({
   // Tighten validation messages for fields most likely to trigger errors.
   firstName: z.string().trim().min(1, 'First name is required').max(100),
   lastName: z.string().trim().min(1, 'Last name is required').max(100),
@@ -114,11 +114,15 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         city: data.city,
         governorate: data.governorate ?? '',
         governorateAr: data.governorateAr ?? '',
-        // `state` is required by the DB but optional in the API since Kuwait
+        // `state` is required by the DB but optional in the API since Egypt
         // doesn't really use it. Persist an empty string when omitted.
         state: data.state ?? '',
         area: data.area,
         areaAr: data.areaAr ?? '',
+        street: data.street,
+        building: data.building,
+        floor: data.floor,
+        apartment: data.apartment,
         postalCode: data.postalCode,
         country: data.country,
         phone: data.phone,
@@ -196,6 +200,10 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
         ...(data.state !== undefined && { state: data.state }),
         ...(data.area !== undefined && { area: data.area }),
         ...(data.areaAr !== undefined && { areaAr: data.areaAr }),
+        ...(data.street !== undefined && { street: data.street }),
+        ...(data.building !== undefined && { building: data.building }),
+        ...(data.floor !== undefined && { floor: data.floor }),
+        ...(data.apartment !== undefined && { apartment: data.apartment }),
         ...(data.postalCode !== undefined && { postalCode: data.postalCode }),
         ...(data.country !== undefined && { country: data.country }),
         ...(data.phone !== undefined && { phone: data.phone }),

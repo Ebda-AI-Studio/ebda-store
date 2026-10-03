@@ -16,10 +16,10 @@
  * Allocation is a cumulative floor by gross-returned-so-far, not a per-return
  * percentage: `entitled(total_returned) − entitled(previously_returned)`. That
  * is what keeps a sequence of partial returns summing to exactly the order's
- * discount and tax instead of drifting a fil per return, and it is why prior
+ * discount and tax instead of drifting a piastre per return, and it is why prior
  * returns have to be passed in rather than inferred.
  *
- * Everything is integer fils. `amount * gross` stays far below
+ * Everything is integer piastres. `amount * gross` stays far below
  * Number.MAX_SAFE_INTEGER for any real order.
  */
 
@@ -27,7 +27,7 @@
 export interface AllocationLine {
   id: string;
   quantity: number;
-  /** Unit price in fils. */
+  /** Unit price in piastres. */
   price: number;
 }
 
@@ -56,11 +56,11 @@ export interface AllocationResult<L extends AllocationLine> {
 }
 
 export function allocatePartialReturn<L extends AllocationLine>(input: {
-  /** Order subtotal in fils — the basis the discount and tax are allocated over. */
+  /** Order subtotal in piastres — the basis the discount and tax are allocated over. */
   subtotal: number;
-  /** Order-level discount in fils. */
+  /** Order-level discount in piastres. */
   discount: number;
-  /** Order-level tax in fils. */
+  /** Order-level tax in piastres. */
   tax: number;
   /**
    * `Order.taxIncludedInPrice` — was `tax` already inside the line prices when
@@ -150,19 +150,19 @@ export function allocatePartialReturn<L extends AllocationLine>(input: {
  * never exceed what the card paid: it is at most
  * `ceil(cash × (total − walletAmount) / total)`, which is ≤ the integer
  * `total − walletAmount` whenever `cash ≤ total`. A per-refund floor would
- * instead hand the card up to one extra fil per refund and could push the
+ * instead hand the card up to one extra piastre per refund and could push the
  * last piece over the payment's refundable balance.
  *
  * `prevCash` is the cash value of every earlier item-level reversal of the
  * order (the same allocation, over the prior quantities) — see
- * ReturnService.allocateThisReturn. All integer fils.
+ * ReturnService.allocateThisReturn. All integer piastres.
  */
 export function splitByPaymentMix(input: {
   /** What this refund is worth (the allocation's `cashCredit`). */
   cashCredit: number;
   /** Cash value of the order's earlier item-level reversals. */
   prevCash: number;
-  /** Order total, fils — what wallet + card paid together. */
+  /** Order total, piastres — what wallet + card paid together. */
   total: number;
   /** Part of `total` paid from the customer wallet at checkout. */
   walletAmount: number;

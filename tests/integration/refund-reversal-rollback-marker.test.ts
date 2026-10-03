@@ -88,7 +88,7 @@ describe.skipIf(!hasDb)('rollbackForPaymentFailure marks the reversal as done', 
           name: 'rr-test-store',
           slug: `rr-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -290,7 +290,7 @@ describe.skipIf(!hasDb)('order/refunded on an order rolled back before the marke
           name: 'rr-legacy-store',
           slug: `rr-test-legacy-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });

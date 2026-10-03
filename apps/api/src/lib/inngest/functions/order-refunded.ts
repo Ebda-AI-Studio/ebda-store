@@ -20,6 +20,7 @@ import { healBackorderStockDebt } from '../../../services/accounting/backorder-s
 import logger from '../../logger';
 import { inngest } from '../client';
 
+import { fromMinor } from '@force/shared';
 interface FanoutStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }
@@ -730,7 +731,7 @@ export async function handleOrderRefunded(
   // money — a paid order CANCELLED before any refund was executed — is not a
   // refund and must not spend the once-per-order "Refund issued" claim. It
   // used to: the cancel emailed "Refund issued" for the order total before a
-  // fils moved, took the claim, and the real settlement later found the claim
+  // piastres moved, took the claim, and the real settlement later found the claim
   // and told the customer nothing. The cancel now sends its own notice
   // ("Your order was cancelled. You were not charged.", en/ar, claimed once
   // via `cancel_notified`), and "Refund issued" waits for the event that moved
@@ -888,7 +889,7 @@ export async function handleOrderRefunded(
               customerName,
               customerPhone: guestPhone || undefined,
               orderNumber: order.orderNumber,
-              amount: refundAmount / 1000,
+              amount: fromMinor(refundAmount),
               storeId,
               storeName: store?.name ?? storeId,
             })

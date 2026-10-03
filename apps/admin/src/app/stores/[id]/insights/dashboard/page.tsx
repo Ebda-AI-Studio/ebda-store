@@ -10,6 +10,7 @@ import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
+import { minorToDecimalString } from '@force/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TopSku {
@@ -57,9 +58,9 @@ interface InsightsDashboard {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function kwd(fils: number | null | undefined): string {
-  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '0.000';
-  return (fils / 1000).toFixed(3);
+function major(piastres: number | null | undefined): string {
+  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return '0.00';
+  return minorToDecimalString(piastres);
 }
 
 // Unknown (null) renders as "—", never as a false 0.0%.
@@ -175,9 +176,9 @@ export default function InsightsDashboardPage() {
           {/* AOV */}
           <div className="rounded-xl border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('aov')}</p>
-            <p className="text-2xl font-semibold font-mono">{kwd(aovThis)}</p>
+            <p className="text-2xl font-semibold font-mono">{major(aovThis)}</p>
             <p className="text-xs text-muted-foreground">
-              KWD
+              EGP
               {aovChange !== 0 && (
                 <span
                   className={`ms-2 font-medium ${
@@ -194,8 +195,8 @@ export default function InsightsDashboardPage() {
           {/* MRR / 30d revenue */}
           <div className="rounded-xl border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('mrr30d')}</p>
-            <p className="text-2xl font-semibold font-mono text-green-700">{kwd(data.mrr30d)}</p>
-            <p className="text-xs text-muted-foreground">KWD</p>
+            <p className="text-2xl font-semibold font-mono text-green-700">{major(data.mrr30d)}</p>
+            <p className="text-xs text-muted-foreground">EGP</p>
           </div>
 
           {/* Repeat purchase rate */}
@@ -222,8 +223,8 @@ export default function InsightsDashboardPage() {
                   {data.topSegment.segment.replace(/_/g, ' ')}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {data.topSegment.count} customers · {kwd(data.topSegment.revenueContributionFils)}{' '}
-                  KWD
+                  {data.topSegment.count} customers ·{' '}
+                  {major(data.topSegment.revenueContributionFils)} EGP
                 </p>
               </>
             ) : (

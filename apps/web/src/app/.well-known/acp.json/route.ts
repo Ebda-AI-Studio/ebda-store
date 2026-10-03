@@ -6,6 +6,7 @@ import {
   storefrontBaseUrl,
 } from '../../../lib/agent-store-resolver';
 
+import { REGION } from '@force/shared';
 /**
  * `/.well-known/acp.json` — Agentic Commerce Protocol discovery.
  *
@@ -72,9 +73,9 @@ export async function GET() {
       },
     },
     // The currency a price in any of these surfaces is quoted in. Integer minor
-    // units throughout — KWD prices are in fils (1 KWD = 1000 fils), so an
+    // units throughout — EGP prices are in piastres (1 EGP = 100 piastres), so an
     // agent that assumes 2 decimal places will be wrong by 10x on this platform.
-    currency: store.currency ?? 'KWD',
+    currency: store.currency ?? REGION.currency,
     capabilities: {
       catalog: true,
       cart: true,

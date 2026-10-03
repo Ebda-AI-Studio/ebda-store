@@ -89,7 +89,7 @@ async function seedSingleVariantProduct(store: FixtureStore) {
         shipping: 0,
         discount: 0,
         total: 4000,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {

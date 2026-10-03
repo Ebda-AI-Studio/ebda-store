@@ -7,6 +7,7 @@ import type { MarketingPixels } from '@force/shared';
 import { useFeatures } from '../contexts/FeatureContext';
 import { useConsent } from '../contexts/ConsentContext';
 
+import { REGION } from '@force/shared';
 interface MarketingPixelsProps {
   pixels: MarketingPixels;
 }
@@ -266,25 +267,25 @@ export function trackViewContent(params: {
     content_name: params.contentName,
     content_category: params.contentCategory,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.ttq?.track('ViewContent', {
     content_id: params.contentId,
     content_name: params.contentName,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.snaptr?.('track', 'VIEW_CONTENT', {
     item_ids: [params.contentId],
     price: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.gtag?.('event', 'view_item', {
     items: [{ item_id: params.contentId, item_name: params.contentName, price: params.value }],
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
     value: params.value,
   });
 
@@ -309,27 +310,27 @@ export function trackAddToCart(params: {
     content_ids: [params.contentId],
     content_name: params.contentName,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.ttq?.track('AddToCart', {
     content_id: params.contentId,
     quantity: params.quantity || 1,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.snaptr?.('track', 'ADD_CART', {
     item_ids: [params.contentId],
     price: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.gtag?.('event', 'add_to_cart', {
     items: [
       { item_id: params.contentId, item_name: params.contentName, quantity: params.quantity || 1 },
     ],
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
     value: params.value,
   });
 
@@ -353,13 +354,13 @@ export function trackInitiateCheckout(params: {
     content_ids: params.contentIds,
     num_items: params.numItems,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.ttq?.track('InitiateCheckout', {
     content_ids: params.contentIds,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.snaptr?.('track', 'START_CHECKOUT', {
@@ -370,7 +371,7 @@ export function trackInitiateCheckout(params: {
 
   w.gtag?.('event', 'begin_checkout', {
     items: params.contentIds.map(id => ({ item_id: id })),
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
     value: params.value,
   });
 
@@ -415,7 +416,7 @@ export function trackPurchase(params: {
       content_ids: params.contentIds,
       num_items: params.numItems,
       value: params.value,
-      currency: params.currency || 'KWD',
+      currency: params.currency || REGION.currency,
     },
     {
       eventID: params.orderId,
@@ -426,7 +427,7 @@ export function trackPurchase(params: {
   w.ttq?.track('CompletePayment', {
     content_ids: params.contentIds,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
     event_id: params.orderId,
   });
 
@@ -439,7 +440,7 @@ export function trackPurchase(params: {
   w.gtag?.('event', 'purchase', {
     transaction_id: params.orderId,
     items: params.contentIds.map(id => ({ item_id: id })),
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
     value: params.value,
   });
 
@@ -451,7 +452,7 @@ export function trackPurchase(params: {
     w.gtag?.('event', 'conversion', {
       send_to: googleAdsSendTo,
       value: params.value,
-      currency: params.currency || 'KWD',
+      currency: params.currency || REGION.currency,
       transaction_id: params.orderId,
     });
   }
@@ -493,18 +494,18 @@ export function trackAddToWishlist(params: {
     content_ids: [params.contentId],
     content_name: params.contentName,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.ttq?.track('AddToWishlist', {
     content_id: params.contentId,
     value: params.value,
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
   });
 
   w.gtag?.('event', 'add_to_wishlist', {
     items: [{ item_id: params.contentId, item_name: params.contentName }],
-    currency: params.currency || 'KWD',
+    currency: params.currency || REGION.currency,
     value: params.value,
   });
 }
@@ -519,7 +520,10 @@ export function trackLead(params?: { contentName?: string; value?: number; curre
   w.fbq?.('track', 'Lead', { content_name: params?.contentName, value: params?.value });
   w.ttq?.track('SubmitForm', { content_name: params?.contentName });
   w.snaptr?.('track', 'SIGN_UP');
-  w.gtag?.('event', 'generate_lead', { value: params?.value, currency: params?.currency || 'KWD' });
+  w.gtag?.('event', 'generate_lead', {
+    value: params?.value,
+    currency: params?.currency || REGION.currency,
+  });
   w.twq?.('track', 'Lead');
   w.pintrk?.('track', 'lead');
 }

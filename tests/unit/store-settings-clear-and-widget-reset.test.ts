@@ -38,7 +38,9 @@ vi.mock('@force/database', () => ({
   withMoneyTx: vi.fn(),
 }));
 
-vi.mock('@force/shared', () => ({
+vi.mock('@force/shared', async importOriginal => ({
+  // Keep the real region config (REGION is read at import time by api config/services).
+  ...(await importOriginal<typeof import('@force/shared')>()),
   slugify: (s: string) => s,
 }));
 
@@ -94,10 +96,10 @@ beforeEach(() => {
 
 describe('StoreService.update — settings is a shallow merge, so null is the only clear', () => {
   it('writes an explicit null over the stored order-invoice address', async () => {
-    mockStore({ currency: 'KWD', orderInvoiceEmail: 'former.employee@store.com' });
+    mockStore({ currency: 'EGP', orderInvoiceEmail: 'former.employee@store.com' });
 
     await StoreService.update(STORE_ID, {
-      settings: overTheWire({ currency: 'KWD', orderInvoiceEmail: null }),
+      settings: overTheWire({ currency: 'EGP', orderInvoiceEmail: null }),
     } as never);
 
     const written = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
@@ -105,12 +107,12 @@ describe('StoreService.update — settings is a shallow merge, so null is the on
   });
 
   it('PRESERVES the stored address when the key is omitted — the bug, pinned', async () => {
-    mockStore({ currency: 'KWD', orderInvoiceEmail: 'former.employee@store.com' });
+    mockStore({ currency: 'EGP', orderInvoiceEmail: 'former.employee@store.com' });
 
     // This is what the admin used to send after the merchant emptied the
     // field: `orderInvoiceEmail: undefined` → JSON.stringify drops the key.
     await StoreService.update(STORE_ID, {
-      settings: overTheWire({ currency: 'KWD', orderInvoiceEmail: undefined }),
+      settings: overTheWire({ currency: 'EGP', orderInvoiceEmail: undefined }),
     } as never);
 
     const written = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
@@ -118,7 +120,7 @@ describe('StoreService.update — settings is a shallow merge, so null is the on
   });
 
   it('leaves untouched settings keys alone', async () => {
-    mockStore({ currency: 'KWD', navMenu: [{ label: 'Shop', href: '/products' }] });
+    mockStore({ currency: 'EGP', navMenu: [{ label: 'Shop', href: '/products' }] });
 
     await StoreService.update(STORE_ID, {
       settings: overTheWire({ orderInvoiceEmail: 'owner@store.com' }),
@@ -126,7 +128,7 @@ describe('StoreService.update — settings is a shallow merge, so null is the on
 
     const written = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
     expect(written.navMenu).toEqual([{ label: 'Shop', href: '/products' }]);
-    expect(written.currency).toBe('KWD');
+    expect(written.currency).toBe('EGP');
   });
 });
 
@@ -139,7 +141,7 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
   };
 
   it('deletes the toggle colour the merchant cleared', async () => {
-    mockStore({ currency: 'KWD', floatingWidget: STORED_WIDGET });
+    mockStore({ currency: 'EGP', floatingWidget: STORED_WIDGET });
 
     // The admin page holds the whole config and clears one colour to
     // `undefined`; the wire body therefore has no `toggleBgColor` key.
@@ -159,7 +161,7 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
   });
 
   it('deletes a per-button colour the merchant cleared', async () => {
-    mockStore({ currency: 'KWD', floatingWidget: STORED_WIDGET });
+    mockStore({ currency: 'EGP', floatingWidget: STORED_WIDGET });
 
     const body = overTheWire({
       ...STORED_WIDGET,
@@ -175,7 +177,7 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
   });
 
   it('still writes a colour the merchant actually picked', async () => {
-    mockStore({ currency: 'KWD', floatingWidget: STORED_WIDGET });
+    mockStore({ currency: 'EGP', floatingWidget: STORED_WIDGET });
 
     await StoreService.updateFloatingWidget(
       STORE_ID,
@@ -189,12 +191,12 @@ describe('StoreService.updateFloatingWidget — a cleared colour resets to the t
   });
 
   it('never touches the sibling settings keys', async () => {
-    mockStore({ currency: 'KWD', orderInvoiceEmail: 'owner@store.com', floatingWidget: {} });
+    mockStore({ currency: 'EGP', orderInvoiceEmail: 'owner@store.com', floatingWidget: {} });
 
     await StoreService.updateFloatingWidget(STORE_ID, overTheWire({ enabled: false }));
 
     const settings = updateMock.mock.calls[0][0].data.settings as Record<string, unknown>;
-    expect(settings.currency).toBe('KWD');
+    expect(settings.currency).toBe('EGP');
     expect(settings.orderInvoiceEmail).toBe('owner@store.com');
   });
 });

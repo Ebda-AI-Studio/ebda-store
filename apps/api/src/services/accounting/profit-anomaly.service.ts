@@ -208,8 +208,9 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   // meaningful absolute revenue in EITHER window makes the percentage a
   // signal — a real drop off a real baseline still fires, including the
   // −100% of a store whose revenue stopped.
-  //   v1 (2026-10-01): 50.000 KWD / week floor in either window.
-  const REVENUE_DROP_MIN_FILS = 50_000;
+  //   v1 (2026-10-01): 50 KWD / week floor in either window; re-based for Ebda
+  //   to 5,000 EGP / week (500_000 piastres) — product to confirm.
+  const REVENUE_DROP_MIN_FILS = 500_000;
   const includeRevenue =
     revenue7d >= REVENUE_DROP_MIN_FILS || revenueBaseline >= REVENUE_DROP_MIN_FILS;
   const rawMetrics: Array<{
@@ -317,7 +318,7 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   let p0Count = 0;
 
   for (const anomaly of anomalies) {
-    const prompt = `You are a retail finance analyst for a Kuwait e-commerce store. A profit anomaly was detected. Given the context, explain in 1-2 sentences (English and Arabic) the LIKELY cause and what the merchant should investigate.
+    const prompt = `You are a retail finance analyst for an Egypt e-commerce store. A profit anomaly was detected. Given the context, explain in 1-2 sentences (English and Arabic) the LIKELY cause and what the merchant should investigate.
 
 Anomaly: ${JSON.stringify({
       metric: anomaly.metric,

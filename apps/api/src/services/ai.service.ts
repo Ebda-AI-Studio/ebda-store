@@ -369,7 +369,7 @@ export class AIService {
           : '';
 
     const systemInstruction =
-      'You translate Kuwaiti e-commerce content between English and Arabic. ' +
+      'You translate Egyptian e-commerce content between English and Arabic. ' +
       'Preserve brand names, product codes, sizes, units, and numbers exactly. ' +
       'Keep the same tone (formal/casual) as the source. ' +
       'Output only the translation as plain text — no quotes, no labels, no commentary.';
@@ -428,12 +428,12 @@ export class AIService {
     await checkBudget(input.storeId);
 
     const systemInstruction =
-      'You write SEO meta for Kuwaiti e-commerce stores. Output only valid JSON ' +
+      'You write SEO meta for Egyptian e-commerce stores. Output only valid JSON ' +
       'matching this shape exactly: {"title": string, "titleAr": string, ' +
       '"description": string, "descriptionAr": string, "keywords": string[]}. ' +
       `Title under ${META_TITLE_MAX} characters. Description under ${META_DESCRIPTION_MAX} characters. ` +
-      'Keywords: 5-10 short Kuwait + GCC search phrases. Do not mention prices ' +
-      'or out-of-stock status. Match how Kuwaiti shoppers actually search.';
+      'Keywords: 5-10 short Egypt + GCC search phrases. Do not mention prices ' +
+      'or out-of-stock status. Match how Egyptian shoppers actually search.';
 
     const detailLines = [
       `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
@@ -522,7 +522,7 @@ export class AIService {
     await checkBudget(input.storeId);
 
     const systemInstruction =
-      'You write homepage section copy for Kuwaiti e-commerce stores. Output only ' +
+      'You write homepage section copy for Egyptian e-commerce stores. Output only ' +
       'valid JSON matching this shape exactly: {"kicker": string, "kickerAr": string, ' +
       '"subtitle": string, "subtitleAr": string}. ' +
       'kicker: 1-2 short uppercase words, max 16 chars (e.g. "EXPLORE", "JUST IN", ' +
@@ -530,7 +530,7 @@ export class AIService {
       'subtitle: one short tagline, max 80 chars, sentence case. Will render as a ' +
       'muted line below the title. ' +
       'Both fields must work alongside the merchant-chosen title without repeating it. ' +
-      'Match how Kuwaiti shoppers actually talk (informal but professional, no fake hype).';
+      'Match how Egyptian shoppers actually talk (informal but professional, no fake hype).';
 
     const detailLines = [
       `Store: ${input.storeName}${input.storeNameAr ? ` / ${input.storeNameAr}` : ''}`,
@@ -603,7 +603,7 @@ export class AIService {
     await checkBudget(input.storeId);
 
     const systemInstruction =
-      'You write short marketing emails for Kuwaiti e-commerce stores. Output only valid ' +
+      'You write short marketing emails for Egyptian e-commerce stores. Output only valid ' +
       'JSON matching this shape exactly: {"subject": string, "subjectAr": string, ' +
       '"bodyHtml": string, "bodyHtmlAr": string}. subject: max 70 chars, no emoji spam, ' +
       'no ALL CAPS. bodyHtml: 2-4 short paragraphs using ONLY <p>, <h2>, <strong>, <em>, ' +
@@ -611,7 +611,7 @@ export class AIService {
       'images, no scripts. Do not invent prices, discounts, codes, dates or URLs that the ' +
       'brief does not give; if the brief gives none, write copy that needs none. Do not add ' +
       'an unsubscribe line (the platform adds one). The Arabic version is natural Gulf-' +
-      'friendly Modern Standard Arabic, not a literal translation. Match how Kuwaiti shoppers ' +
+      'friendly Modern Standard Arabic, not a literal translation. Match how Egyptian shoppers ' +
       'actually talk: warm, professional, no fake hype.';
 
     const detailLines = [
@@ -794,7 +794,7 @@ export class AIService {
       .join('\n');
 
     const systemInstruction =
-      'You categorise products for a Kuwaiti e-commerce store. Given a product ' +
+      'You categorise products for an Egyptian e-commerce store. Given a product ' +
       'name + description and a list of available categories, pick the 1-3 best ' +
       'matches. If none of the categories fit well, return an empty array. ' +
       'Output only valid JSON matching: {"matches": [{"id": string, ' +

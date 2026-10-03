@@ -108,7 +108,7 @@ interface Product {
   compareAtPrice?: number;
   /** Discount type set by the merchant — 'percentage' | 'fixed'. null = no explicit discount. */
   discountType?: 'percentage' | 'fixed' | null;
-  /** Discount value: basis points (bps) for percentage; fils for fixed. null when unset. */
+  /** Discount value: basis points (bps) for percentage; piastres for fixed. null when unset. */
   discountValue?: number | null;
   sku?: string;
   /** Merchant-authored free-text card badge (EN). null/absent = no badge. */
@@ -244,7 +244,7 @@ interface Order {
   status: string;
   paymentStatus: string;
   total: number;
-  /** Part of `total` paid from the customer wallet (D1), in fils. The
+  /** Part of `total` paid from the customer wallet (D1), in piastres. The
    *  gateway charges `total - walletAmount`. 0 when the wallet was not used. */
   walletAmount?: number;
   items: Array<{
@@ -317,24 +317,22 @@ interface OrderAddress {
   address1: string;
   address2?: string;
   city: string;
-  /** Structured Kuwait delivery area (English area name). */
+  /** Structured Egyptian city/district (English name). */
   area?: string;
-  /** Arabic name of the Kuwait delivery area. */
+  /** Arabic name of the city/district. */
   areaAr?: string;
-  /** English governorate name (e.g. 'Hawalli'). */
+  /** English governorate name (e.g. 'Cairo'). */
   governorate?: string;
-  /** Arabic governorate name (e.g. 'حولي'). */
+  /** Arabic governorate name (e.g. 'القاهرة'). */
   governorateAr?: string;
-  /** Kuwait address block number. */
-  block?: string;
-  /** Kuwait street name/number. */
+  /** Street name. */
   street?: string;
-  /** Kuwait avenue (جادة). */
-  avenue?: string;
-  /** House or building number/name. */
-  house?: string;
+  /** Building number/name. */
+  building?: string;
   /** Floor number. */
   floor?: string;
+  /** Apartment number. */
+  apartment?: string;
   state?: string;
   postalCode?: string;
   country: string;
@@ -409,7 +407,7 @@ const SESSION_ENDED = 'session-ended';
  * gate every guest page load posted a credential-less refresh, which
  * `refreshLimiterKey` buckets as the SHARED `<ip>-refresh-anon` key (120/15min)
  * under an IP-wide backstop (600/15min); express-rate-limit counts the request
- * before the route can answer 400. Behind Kuwait carrier CGNAT or mall/office
+ * before the route can answer 400. Behind Egypt carrier CGNAT or mall/office
  * wifi, ordinary guest browsing exhausts those buckets, and the REAL signed-in
  * customers on that IP then get 429 on the one route that renews their access
  * token and re-mints their CSRF token — checkout writes 403 and the mount check

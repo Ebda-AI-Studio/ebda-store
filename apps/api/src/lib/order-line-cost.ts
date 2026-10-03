@@ -1,5 +1,5 @@
 /**
- * The unit cost (fils) an order line snapshots at sale time.
+ * The unit cost (piastres) an order line snapshots at sale time.
  *
  * A variant line takes the VARIANT's cost and falls back to the parent
  * product's; a variant-less line takes the product's. `null` means "no cost

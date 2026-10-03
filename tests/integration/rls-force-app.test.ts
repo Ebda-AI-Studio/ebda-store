@@ -171,8 +171,8 @@ beforeAll(async () => {
         firstName: 'A',
         lastName: 'User',
         address1: `${TEST_PREFIX}addr-a`,
-        city: 'Kuwait City',
-        state: 'Kuwait',
+        city: 'Cairo',
+        state: 'Egypt',
       },
     });
     addressA = addrA.id;
@@ -182,8 +182,8 @@ beforeAll(async () => {
         firstName: 'B',
         lastName: 'User',
         address1: `${TEST_PREFIX}addr-b`,
-        city: 'Kuwait City',
-        state: 'Kuwait',
+        city: 'Cairo',
+        state: 'Egypt',
       },
     });
     addressB = addrB.id;
@@ -201,7 +201,7 @@ beforeAll(async () => {
     });
 
     const payment = await tx.payment.create({
-      data: { orderId: order.id, amount: 10, currency: 'KWD', provider: 'cod', status: 'pending' },
+      data: { orderId: order.id, amount: 10, currency: 'EGP', provider: 'cod', status: 'pending' },
     });
     paymentB = payment.id;
 

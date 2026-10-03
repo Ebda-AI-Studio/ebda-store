@@ -69,7 +69,7 @@ function mockStore(o: StoreOpts = {}) {
     email: 'hi@pecanbee.test',
     phone: '+96500000000',
     domain: o.domain ?? null,
-    currency: o.currency ?? 'KWD',
+    currency: o.currency ?? 'EGP',
     status: o.status ?? 'active',
   };
   fetchMock.mockResolvedValue({
@@ -229,17 +229,23 @@ describe('ucp', () => {
     expect(b.transports[0].auth.header).toBe('x-agent-key');
   });
 
-  it('declares KWD as 1000 minor units — the 10x trap', async () => {
-    mockStore({ currency: 'KWD' });
+  it('declares EGP as 100 minor units (piastres) from the single currencyExponent', async () => {
+    mockStore({ currency: 'EGP' });
     const b = await body(await ucpGet());
     expect(b.pricing.amounts).toBe('integer-minor-units');
-    expect(b.pricing.minor_units_per_major).toBe(1000);
+    expect(b.pricing.minor_units_per_major).toBe(100);
   });
 
-  it('declares 100 minor units for a two-decimal currency', async () => {
+  it('declares 100 minor units for another two-decimal currency', async () => {
     mockStore({ currency: 'USD' });
     const b = await body(await ucpGet());
     expect(b.pricing.minor_units_per_major).toBe(100);
+  });
+
+  it('declares 1000 minor units for a three-decimal currency — the 10x trap', async () => {
+    mockStore({ currency: 'KWD' });
+    const b = await body(await ucpGet());
+    expect(b.pricing.minor_units_per_major).toBe(1000);
   });
 
   it('404s when agent_checkout is off, same as its sibling', async () => {

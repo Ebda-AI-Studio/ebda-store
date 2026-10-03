@@ -8,6 +8,7 @@ import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { API_URL } from '../../lib/api';
 
+import { REGION } from '@force/shared';
 // ==========================================
 // Referral Tracking (run once per session)
 // ==========================================
@@ -277,7 +278,7 @@ function AffiliatePageContent() {
                     type="tel"
                     value={form.phone}
                     onChange={handleChange}
-                    placeholder="+965 XXXX XXXX"
+                    placeholder={REGION.phone.placeholderIntl}
                     className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>

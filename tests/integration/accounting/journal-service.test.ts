@@ -50,7 +50,7 @@ describe('journal.service', () => {
       storeId,
       source: 'manual',
       sourceId: 'unit-test-1',
-      memo: 'cash sale 1 KWD',
+      memo: 'cash sale 1 EGP',
       lines: [
         { accountId: cashId, debit: 1000, credit: 0 },
         { accountId: revId, debit: 0, credit: 1000 },

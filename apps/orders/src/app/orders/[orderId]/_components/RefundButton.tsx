@@ -6,11 +6,12 @@ import { useToast } from '@/contexts/ToastContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney, fmt } from '@/lib/format';
 
+import { REGION } from '@force/shared';
 interface RefundButtonProps {
   storeId: string;
   orderId: string;
   orderNumber: string;
-  /** Fils the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
+  /** Piastres the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
   total: number;
   currency?: string;
   onRefunded?: () => void;
@@ -28,7 +29,7 @@ export function RefundButton({
   orderId,
   orderNumber,
   total,
-  currency = 'KWD',
+  currency = REGION.currency,
   onRefunded,
   disabled = false,
 }: RefundButtonProps) {

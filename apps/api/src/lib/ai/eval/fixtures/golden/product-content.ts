@@ -25,10 +25,10 @@ export const PRODUCT_CONTENT_GOLDEN: GoldenCase[] = [
           'لا يحدد وصف المنتج ما إذا كان آمنًا للميكروويف — نوصي بالتواصل معنا قبل استخدامه في الميكروويف لتجنب تلف الطلاء.',
       },
       {
-        question: 'How long does delivery take in Kuwait?',
-        questionAr: 'كم تستغرق مدة التوصيل داخل الكويت؟',
-        answer: 'Standard delivery within Kuwait takes 2-4 business days from order confirmation.',
-        answerAr: 'يستغرق التوصيل القياسي داخل الكويت من 2 إلى 4 أيام عمل من تاريخ تأكيد الطلب.',
+        question: 'How long does delivery take in Egypt?',
+        questionAr: 'كم تستغرق مدة التوصيل داخل مصر؟',
+        answer: 'Standard delivery within Egypt takes 2-4 business days from order confirmation.',
+        answerAr: 'يستغرق التوصيل القياسي داخل مصر من 2 إلى 4 أيام عمل من تاريخ تأكيد الطلب.',
       },
       {
         question: 'What is the return policy if the mug arrives damaged?',

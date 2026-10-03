@@ -155,8 +155,8 @@ describe('finance XLSX exports hold exactly the selected period', () => {
   it('P&L: August vs September differ, filename + Filters sheet name the range', async () => {
     const aug = await xlsx('/finance/reports/pnl.xlsx?from=2026-08-01&to=2026-08-31');
     const sep = await xlsx('/finance/reports/pnl.xlsx?from=2026-09-01&to=2026-09-30');
-    expect(amountOf(aug.wb, 'P&L', 'Total Revenue')).toBe(1);
-    expect(amountOf(sep.wb, 'P&L', 'Total Revenue')).toBe(2);
+    expect(amountOf(aug.wb, 'P&L', 'Total Revenue')).toBe(10);
+    expect(amountOf(sep.wb, 'P&L', 'Total Revenue')).toBe(20);
     expect(sep.disposition).toContain('pnl-2026-09-01_to_2026-09-30.xlsx');
     expect(filtersText(sep.wb)).toContain('2026-09-01 to 2026-09-30');
   });
@@ -171,8 +171,8 @@ describe('finance XLSX exports hold exactly the selected period', () => {
       });
       return v;
     };
-    expect(cashDebit(aug.wb)).toBe(1);
-    expect(cashDebit(sep.wb)).toBe(3);
+    expect(cashDebit(aug.wb)).toBe(10); // 1000 piastres = 10.00 EGP
+    expect(cashDebit(sep.wb)).toBe(30);
     expect(aug.disposition).toContain('trial-balance-as-of-2026-08-31.xlsx');
     expect(filtersText(aug.wb)).toContain('2026-08-31');
   });
@@ -180,8 +180,8 @@ describe('finance XLSX exports hold exactly the selected period', () => {
   it('balance sheet: as-of changes the totals and is named in the file', async () => {
     const aug = await xlsx('/finance/reports/balance-sheet.xlsx?asOf=2026-08-31');
     const sep = await xlsx('/finance/reports/balance-sheet.xlsx?asOf=2026-09-30');
-    expect(amountOf(aug.wb, 'Balance Sheet', 'Total Assets')).toBe(1);
-    expect(amountOf(sep.wb, 'Balance Sheet', 'Total Assets')).toBe(3);
+    expect(amountOf(aug.wb, 'Balance Sheet', 'Total Assets')).toBe(10);
+    expect(amountOf(sep.wb, 'Balance Sheet', 'Total Assets')).toBe(30);
     expect(sep.disposition).toContain('balance-sheet-as-of-2026-09-30.xlsx');
   });
 

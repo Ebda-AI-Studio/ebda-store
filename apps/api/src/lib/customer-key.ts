@@ -85,8 +85,8 @@ function guestKeySecret(): Buffer {
  * row's id, and no plain email or phone is written to the analytics table.
  *
  * Keyed, not a plain sha256 (issue 2242): this value leaves the platform as
- * the MCP `customerRef`, next to a masked email/phone. A Kuwait mobile is 8
- * digits (10^8 preimages) and the masked forms reveal most of it, so an
+ * the MCP `customerRef`, next to a masked email/phone. An Egyptian mobile
+ * has 8 free digits after its 01x prefix (~4×10^8 preimages) and the masked forms reveal most of it, so an
  * unkeyed hash was reversible in seconds by anyone holding a transcript — the
  * "contact details are masked" contract did not hold. Without the server
  * secret the HMAC cannot be brute-forced.

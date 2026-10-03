@@ -108,7 +108,7 @@ describe('report hooks surface API errors', () => {
 
   // Issue 2256: /dashboard answers 200 with `stats: null` when a sub-query
   // rejects (Promise.allSettled). Detection by HTTP status alone missed it and
-  // the page rendered KWD 0.000 revenue with no banner.
+  // the page rendered EGP 0.000 revenue with no banner.
   it('useAnalytics: a 200 dashboard with failed sub-queries is an error, not zeros', async () => {
     apiGet.mockImplementation(async (...args: unknown[]) =>
       String(args[0]).includes('/dashboard?')

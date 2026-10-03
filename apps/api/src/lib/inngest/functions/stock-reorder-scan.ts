@@ -6,8 +6,9 @@ import { runReorderScan } from '../../../services/accounting/reorder-scan.servic
 import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
 import { featureService } from '../../../services/feature.service';
 
+import { REGION } from '@force/shared';
 /**
- * Cron-triggered reorder scan — runs every day at 06:00 Kuwait time (03:00 UTC).
+ * Cron-triggered reorder scan — runs every day at 06:00 Egypt time (03:00 UTC).
  *
  * For every store with accountingEnabled + aiFeaturesEnabled, calls
  * runReorderScan() which:
@@ -25,7 +26,7 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     name: 'Reorder scan — daily cron (AI)',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '0 3 * * *' }], // 06:00 KW = 03:00 UTC (Kuwait is UTC+3)
+    triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * *` }], // 06:00 Cairo (DST-aware via TZ=)
   },
   async ({ step }) => {
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.

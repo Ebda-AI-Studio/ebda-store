@@ -18,7 +18,7 @@ export function toTemplateProduct(p: Product): TemplateProduct {
     price: p.price,
     compareAtPrice: p.compareAtPrice ?? undefined,
     // Bug A fix: pass discountType + discountValue through so getDiscountBadgeText
-    // can render "Save KWD X.XXX" instead of "-Y%" for fixed-amount discounts.
+    // can render "Save EGP X.XX" instead of "-Y%" for fixed-amount discounts.
     discountType: p.discountType ?? undefined,
     discountValue: p.discountValue ?? undefined,
     // Merchant-authored card badge. This adapter is an explicit whitelist, so

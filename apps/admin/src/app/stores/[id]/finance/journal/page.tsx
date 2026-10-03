@@ -8,7 +8,7 @@ import { DateRangePicker } from '../../../../../components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGetPage, type PageMeta } from '@/lib/api';
 import { PageControls } from '../../../../../components/PageControls';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -213,8 +213,12 @@ export default function JournalListPage() {
                           <td className="px-3 py-2 text-muted-foreground truncate max-w-[12rem]">
                             {entry.memo ?? '—'}
                           </td>
-                          <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(dr)}</td>
-                          <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(cr)}</td>
+                          <td className="px-3 py-2 text-end font-mono text-xs">
+                            {minorToMajor(dr)}
+                          </td>
+                          <td className="px-3 py-2 text-end font-mono text-xs">
+                            {minorToMajor(cr)}
+                          </td>
                           <td className="px-3 py-2 text-end">
                             <Link
                               href={`/stores/${storeId}/finance/journal/${entry.id}`}

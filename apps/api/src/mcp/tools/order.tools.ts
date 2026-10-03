@@ -23,6 +23,7 @@ import {
 } from '../agent-auth';
 import { ok } from './tool-result';
 
+import { codFeeMinor } from '@force/shared';
 /**
  * Agent orders reuse the SAME required-field contract as a human guest
  * order (`shippingAddressSchema` in `public.routes.ts`): firstName+lastName
@@ -40,7 +41,7 @@ const customerSchema = z.object({
   email: z.string().trim().email().optional(),
   address: z.string().trim().min(1),
   city: z.string().trim().optional(),
-  country: z.string().trim().min(2).default('KW'),
+  country: z.string().trim().min(2).default('EG'),
 });
 
 function splitName(name: string): { firstName: string; lastName: string } {
@@ -170,7 +171,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // cod branch, so an agent COD order is indistinguishable from a
           // human COD order to the rest of the platform (admin order detail,
           // "mark cash collected" flow, payment events).
-          const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
+          const codFee = codFeeMinor(order.total, { fixedMinor: Number(codConfig.fixedFee) || 0 });
           const total = codFee > 0 ? order.total + codFee : order.total;
 
           // Tenant-scoped AND atomic: `withTenantContext` runs both writes

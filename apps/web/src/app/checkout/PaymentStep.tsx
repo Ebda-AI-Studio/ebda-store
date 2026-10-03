@@ -29,7 +29,7 @@ interface PaymentStepProps {
   onSelectProvider: (provider: string) => void;
   isProcessing: boolean;
   total: number;
-  formatPrice: (fils: number) => string;
+  formatPrice: (piastres: number) => string;
   /**
    * Per-store opt-in delivery block (info note + delivery-window picker).
    * Rendered immediately above the Pay button in every state — passed in as

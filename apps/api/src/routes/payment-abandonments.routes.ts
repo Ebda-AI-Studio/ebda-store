@@ -40,7 +40,7 @@ const listQuerySchema = z.object({
 
 /**
  * Masks a phone number to show only the last 4 digits:
- * "+965 9876 5432" → "***5432"
+ * "+20 101 234 5678" → "***5678"
  * Returns null/undefined as-is.
  */
 function maskPhone(phone: string | null | undefined): string | null | undefined {
@@ -85,7 +85,7 @@ router.get('/', ...adminMiddleware, async (req: Request, res: Response, next: Ne
     };
 
     // Shared report-range contract (viewer-local days as instants); the
-    // legacy date-only `from`/`to` were read as server-local days, so a Kuwait
+    // legacy date-only `from`/`to` were read as server-local days, so an Egypt
     // merchant's "today" started 3 hours late.
     const range = rangeOrLegacyDays(req.query as Record<string, unknown>);
     if (!range.ok) {

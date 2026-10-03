@@ -65,7 +65,7 @@ const STORE = (locale: Locale): EmailStoreContext => ({
   theme: { primaryColor: '28 55% 30%' },
   email: 'hello@pecannbee.test',
   phone: '+965 5555 1234',
-  address: 'Kuwait City',
+  address: 'Cairo',
   defaultLanguage: locale,
 });
 
@@ -76,7 +76,7 @@ const addr = {
   city: 'Salmiya',
   state: 'Hawalli',
   postalCode: '22000',
-  country: 'Kuwait',
+  country: 'Egypt',
 };
 const orderData = {
   orderNumber: 'ORD-1',
@@ -147,7 +147,7 @@ function invoiceOrder(locale: Locale) {
     id: 'o1',
     orderNumber: 'ORD-TM67JC-2Q6XK',
     locale,
-    currency: 'KWD',
+    currency: 'EGP',
     status: 'processing',
     paymentStatus: 'paid',
     createdAt: new Date('2026-09-29T10:00:00Z'),
@@ -165,7 +165,7 @@ function invoiceOrder(locale: Locale) {
     notes: null,
     shippingAddress: addr,
     billingAddress: null,
-    store: { ...STORE(locale), currency: 'KWD', timezone: 'Asia/Kuwait' },
+    store: { ...STORE(locale), currency: 'EGP', timezone: 'Africa/Cairo' },
     customer: null,
     items: [
       {

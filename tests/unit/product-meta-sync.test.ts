@@ -85,7 +85,7 @@ describe('productMetaSync', () => {
           name: 'Wady Aljuz',
           slug: 'wady-aljuz',
           domain: 'wadyaljuz.com',
-          currency: 'KWD',
+          currency: 'EGP',
         }),
       },
       product: {
@@ -116,7 +116,7 @@ describe('productMetaSync', () => {
     expect(sent.product).toMatchObject({
       link: 'https://wadyaljuz.com/products/test-product',
       brand: 'Wady Aljuz',
-      currency: 'KWD',
+      currency: 'EGP',
     });
   });
 
@@ -167,7 +167,7 @@ describe('productMetaSync', () => {
           name: 'Palora',
           slug: 'palora',
           domain: null,
-          currency: 'KWD',
+          currency: 'EGP',
         }),
       },
       product: {
@@ -208,7 +208,7 @@ describe('productMetaSync', () => {
           name: 'Palora',
           slug: 'palora',
           domain: null,
-          currency: 'KWD',
+          currency: 'EGP',
         }),
       },
       product: {
@@ -248,7 +248,7 @@ describe('productMetaSync', () => {
           name: 'Palora',
           slug: 'palora',
           domain: null,
-          currency: 'KWD',
+          currency: 'EGP',
         }),
       },
       product: {
@@ -288,7 +288,7 @@ describe('productMetaSync', () => {
           name: 'Palora',
           slug: 'palora',
           domain: null,
-          currency: 'KWD',
+          currency: 'EGP',
         }),
       },
       product: {

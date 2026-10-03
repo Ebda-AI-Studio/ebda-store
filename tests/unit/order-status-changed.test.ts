@@ -76,10 +76,10 @@ const ORDER = {
     firstName: 'Sam',
     lastName: 'B',
     address1: 'X',
-    city: 'KW',
+    city: 'EG',
     state: '',
     postalCode: '',
-    country: 'KW',
+    country: 'EG',
   },
 };
 

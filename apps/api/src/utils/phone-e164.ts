@@ -15,7 +15,7 @@ const E164_RE = /^\+[1-9]\d{6,14}$/;
 
 /**
  * Validate that `phone` is a well-formed E.164 number.
- * Kuwait examples: +96512345678 (11 chars after +)
+ * Egypt example: +201012345678 (12 chars after +: 20 + 10-digit mobile)
  * Returns the trimmed phone string or null.
  */
 export function validateE164(phone: string | null | undefined): string | null {

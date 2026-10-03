@@ -4,8 +4,8 @@
  * `date_trunc(unit, created_at + offset)` statement itself is valid or
  * lines up with the JS zero-fill keys).
  *
- * An order at 2026-09-01T22:30Z is Sep 2, 01:30 in Kuwait (UTC+3). With the
- * Kuwait offset it must land in the `2026-09-02` bucket; bucketing by UTC day
+ * An order at 2026-09-01T22:30Z is Sep 2, 01:30 in Egypt (UTC+3). With the
+ * Egypt offset it must land in the `2026-09-02` bucket; bucketing by UTC day
  * (the old behaviour) put it on Sep 1.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -28,7 +28,7 @@ async function order(createdAt: string, total: number) {
       shipping: 0,
       discount: 0,
       total,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
       createdAt: new Date(createdAt),
@@ -52,8 +52,8 @@ beforeAll(async () => {
     data: { name: `sales-chart-${suffix}`, slug: `sales-chart-${suffix}`, ownerId: OWNER },
   });
   storeId = s.id;
-  await order('2026-09-01T22:30:00Z', 1000); // Sep 2 01:30 Kuwait
-  await order('2026-09-02T10:00:00Z', 2000); // Sep 2 13:00 Kuwait
+  await order('2026-09-01T22:30:00Z', 1000); // Sep 2 01:30 Egypt
+  await order('2026-09-02T10:00:00Z', 2000); // Sep 2 13:00 Egypt
   await order('2026-03-10T10:00:00Z', 500); // March
 });
 
@@ -63,7 +63,7 @@ afterAll(async () => {
 });
 
 describe('AnalyticsService.getSalesChart against Postgres', () => {
-  it('daily buckets follow the viewer offset (Kuwait)', async () => {
+  it('daily buckets follow the viewer offset (Egypt)', async () => {
     const { sales, granularity } = await AnalyticsService.getSalesChart(
       storeId,
       'this_month',

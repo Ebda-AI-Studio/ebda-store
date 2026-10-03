@@ -6,6 +6,7 @@ import { StatusBadge } from './StatusBadge';
 import { formatMoney, formatDateTime, customerName } from '@/lib/format';
 import { useLanguage } from '@/contexts/LanguageContext';
 
+import { REGION } from '@force/shared';
 export function OrderCard({ order, storeId }: { order: Order; storeId: string }) {
   const { t, locale } = useLanguage();
   const itemCount = order.items?.reduce((sum, i) => sum + (i.quantity ?? 0), 0) ?? 0;
@@ -52,7 +53,7 @@ export function OrderCard({ order, storeId }: { order: Order; storeId: string })
         </div>
         <div className="text-end">
           <p className="text-base font-bold leading-tight text-foreground">
-            {formatMoney(order.total, order.currency ?? 'KWD')}
+            {formatMoney(order.total, order.currency ?? REGION.currency)}
           </p>
           {order.paymentStatus === 'paid' ? (
             <p className="text-xs font-semibold text-success-ink">{t.filters.paid}</p>

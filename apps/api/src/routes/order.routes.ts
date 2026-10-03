@@ -20,6 +20,8 @@ import {
   exportFilename,
   dayInOffset,
   parseTzOffset,
+  minorToDecimalString,
+  excelMoneyFormat,
 } from '@force/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
@@ -68,7 +70,7 @@ const MAX_ORDERS_SCANNED = 20_000;
  * Date range: the shared report-range contract (`startDate`/`endDate`, ISO
  * instants resolved in the viewer's timezone). The legacy date-only
  * `from`/`to` pair stays accepted for older callers; it is read as a whole
- * UTC day, which is why the admin no longer sends it (a Kuwait
+ * UTC day, which is why the admin no longer sends it (an Egypt
  * merchant's "today" started 3 hours late). Returns null after a 422.
  */
 function parseOrderListFilters(
@@ -238,19 +240,19 @@ router.get(
         { header: 'Pay Provider', key: 'payProvider', width: 16 },
         { header: 'Pay Method', key: 'payMethod', width: 16 },
         { header: 'Items', key: 'itemCount', width: 8 },
-        { header: 'Subtotal (KWD)', key: 'subtotal', width: 16 },
-        { header: 'Discount (KWD)', key: 'discount', width: 16 },
+        { header: 'Subtotal (EGP)', key: 'subtotal', width: 16 },
+        { header: 'Discount (EGP)', key: 'discount', width: 16 },
         { header: 'Coupon', key: 'coupon', width: 14 },
         { header: 'Promotion', key: 'promotion', width: 18 },
         // Loyalty points' share of Discount (issue 2239) — invisible before.
-        { header: 'Loyalty Discount (KWD)', key: 'loyaltyDiscount', width: 20 },
-        { header: 'Shipping (KWD)', key: 'shipping', width: 16 },
-        { header: 'Tax (KWD)', key: 'tax', width: 12 },
+        { header: 'Loyalty Discount (EGP)', key: 'loyaltyDiscount', width: 20 },
+        { header: 'Shipping (EGP)', key: 'shipping', width: 16 },
+        { header: 'Tax (EGP)', key: 'tax', width: 12 },
         // Issue 2168: for an inclusive order Tax is INSIDE Total, so
         // Subtotal − Discount + Shipping + Tax ≠ Total. This column says which
         // formula reconciles the row.
         { header: 'Tax Included In Price', key: 'taxIncluded', width: 20 },
-        { header: 'Total (KWD)', key: 'total', width: 14 },
+        { header: 'Total (EGP)', key: 'total', width: 14 },
         { header: 'Area', key: 'area', width: 18 },
         { header: 'City', key: 'city', width: 16 },
         { header: 'Country', key: 'country', width: 14 },
@@ -279,9 +281,9 @@ router.get(
         { header: 'SKU', key: 'sku', width: 16 },
         { header: 'Variant', key: 'variant', width: 20 },
         { header: 'Qty', key: 'qty', width: 8 },
-        { header: 'Unit Price (KWD)', key: 'unitPrice', width: 18 },
-        { header: 'Cost Price (KWD)', key: 'costPrice', width: 18 },
-        { header: 'Line Total (KWD)', key: 'lineTotal', width: 18 },
+        { header: 'Unit Price (EGP)', key: 'unitPrice', width: 18 },
+        { header: 'Cost Price (EGP)', key: 'costPrice', width: 18 },
+        { header: 'Line Total (EGP)', key: 'lineTotal', width: 18 },
       ];
 
       const itemsHeader = itemsSheet.getRow(1);
@@ -313,20 +315,20 @@ router.get(
             payProvider: payment?.provider ?? '',
             payMethod: payment?.method ?? '',
             itemCount: order.items?.length ?? 0,
-            subtotal: Number((order.subtotal / 1000).toFixed(3)),
+            subtotal: Number(minorToDecimalString(order.subtotal)),
             // `order.discount` is already the AUTHORITATIVE total (coupon/
             // promotion + loyalty combined) — adding couponDiscount on top
             // double-counted it. See order.service.ts's create() comment on
             // couponDiscount + promotionDiscount + loyaltyDiscount reconciling
             // to `discount`.
-            discount: Number((order.discount / 1000).toFixed(3)),
+            discount: Number(minorToDecimalString(order.discount)),
             coupon: order.couponCode ?? '',
             promotion: order.appliedPromotion?.name ?? '',
-            loyaltyDiscount: Number((order.loyaltyDiscount / 1000).toFixed(3)),
-            shipping: Number((order.shipping / 1000).toFixed(3)),
-            tax: Number((order.tax / 1000).toFixed(3)),
+            loyaltyDiscount: Number(minorToDecimalString(order.loyaltyDiscount)),
+            shipping: Number(minorToDecimalString(order.shipping)),
+            tax: Number(minorToDecimalString(order.tax)),
             taxIncluded: order.taxIncludedInPrice ? 'Yes' : 'No',
-            total: Number((order.total / 1000).toFixed(3)),
+            total: Number(minorToDecimalString(order.total)),
             area: addr?.area ?? addr?.state ?? '',
             city: addr?.city ?? '',
             country: addr?.country ?? '',
@@ -352,11 +354,11 @@ router.get(
               sku: item.sku ?? '',
               variant: item.variantName ?? '',
               qty: item.quantity,
-              unitPrice: Number((item.price / 1000).toFixed(3)),
-              // costPrice is snapshotted per line (fils) but nullable — leave the
+              unitPrice: Number(minorToDecimalString(item.price)),
+              // costPrice is snapshotted per line (piastres) but nullable — leave the
               // cell blank when unknown rather than showing a misleading 0.
-              costPrice: item.costPrice != null ? Number((item.costPrice / 1000).toFixed(3)) : '',
-              lineTotal: Number((item.total / 1000).toFixed(3)),
+              costPrice: item.costPrice != null ? Number(minorToDecimalString(item.costPrice)) : '',
+              lineTotal: Number(minorToDecimalString(item.total)),
             })
           );
         }
@@ -372,12 +374,12 @@ router.get(
 
       // Apply numeric and date formats
       for (const col of ['subtotal', 'discount', 'shipping', 'tax', 'total']) {
-        ordersSheet.getColumn(col).numFmt = '0.000';
+        ordersSheet.getColumn(col).numFmt = excelMoneyFormat();
       }
       ordersSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
       for (const col of ['unitPrice', 'costPrice', 'lineTotal']) {
-        itemsSheet.getColumn(col).numFmt = '0.000';
+        itemsSheet.getColumn(col).numFmt = excelMoneyFormat();
       }
       itemsSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
@@ -424,9 +426,9 @@ router.get(
 
 // Validation schemas
 //
-// Kuwait-friendly address validation: state and postalCode are not universally
-// applicable (Kuwait uses governorate names but no postal codes for delivery).
-// The structured Kuwait fields `area` (English governorate name) and `areaAr`
+// Egypt-friendly address validation: state and postalCode are not universally
+// applicable (Egypt uses governorate names but no postal codes for delivery).
+// The structured Egypt fields `area` (English governorate name) and `areaAr`
 // (Arabic name) are preferred over the generic `state` field. The storefront
 // checkout sends both since 2026-06-15; older orders only have `state`.
 // Admin manual order form sends `area` directly.
@@ -437,18 +439,24 @@ const addressSchema = z.object({
   address1: z.string().trim().min(1).max(500),
   address2: z.string().max(500).optional(),
   city: z.string().max(150).optional().default(''),
-  // Governorate (محافظة) — top-level KW administrative division.
+  // Governorate (محافظة) — top-level Egyptian administrative division.
   // Added 2026-06-18 alongside sub-area to support the cascade selector.
   governorate: z.string().max(60).optional().default(''),
   governorateAr: z.string().max(60).optional().default(''),
-  // Structured Kuwait sub-area / district, English name.
+  // Structured Egypt sub-area / district, English name.
   // Preferred over generic `state`; both are accepted for backwards compat.
   area: z.string().max(150).optional().default(''),
-  // Arabic name of the Kuwait delivery sub-area — stored so the admin UI can
+  // Arabic name of the Egypt delivery sub-area — stored so the admin UI can
   // render the address in Arabic without a client-side lookup table.
   areaAr: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
+  // Structured Egyptian delivery details (also folded into address1 by the
+  // storefront for display back-compat). Optional so older clients still pass.
+  street: z.string().max(200).optional(),
+  building: z.string().max(100).optional(),
+  floor: z.string().max(50).optional(),
+  apartment: z.string().max(50).optional(),
   country: z.string().trim().min(2).max(60),
   phone: z.string().max(40).optional(),
   email: z.string().email().optional().or(z.literal('')),
@@ -677,7 +685,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
-  // accounting.invoicing is a Professional-tier addon (Kuwait-compliant tax
+  // accounting.invoicing is a Professional-tier addon (Egypt-compliant tax
   // invoice + PDF). Previously ungated at every layer — every plan incl. free
   // could generate it. Gate the merchant-facing generation; the customer-facing
   // public receipt route is intentionally left open (don't 403 a paying buyer).
@@ -1223,7 +1231,7 @@ router.post(
         //
         // A missing, non-finite or non-positive provider amount is NOT
         // evidence of a partial refund — a status payload that carries no
-        // amount would otherwise be recorded as a 0-fil partial refund while
+        // amount would otherwise be recorded as a 0-piastre partial refund while
         // the gateway has already sent the WHOLE sum back: the order keeps its
         // pre-refund status, no reversal or GL entry runs, and the payment
         // still reads as refundable so a later return fires a second real
@@ -1304,7 +1312,7 @@ router.post(
       // Whole-order side effects belong to a whole-order refund. The write
       // above now distinguishes a partial out-of-band refund from a full one,
       // so gating this on the same arithmetic keeps the two coherent: without
-      // it a 2000-fil refund on a 5000-fil payment would record the payment as
+      // it a 2000-piastre refund on a 5000-piastre payment would record the payment as
       // partially refunded and then flip the ORDER to refunded and restore ALL
       // its inventory — the whole-order fanout the item-level path exists to
       // avoid. A partial refresh updates the payment and stops there; the
@@ -1425,7 +1433,7 @@ router.post(
  *   - loyalty points reversal (NEW — was missing before)
  *   - order/refunded Inngest event → customer refund email + admin push
  *
- * Defaults to full refund. Partial refunds: pass `amount` (in fils).
+ * Defaults to full refund. Partial refunds: pass `amount` (in piastres).
  */
 const refundViaProviderSchema = z.object({
   amount: z.number().int().positive().optional(),
@@ -1608,10 +1616,10 @@ const adminOrderSchema = z
     couponCode: z.string().optional(),
     currency: z.string().optional(),
     /**
-     * Optional shipping fee override in integer fils (KWD × 1000).
+     * Optional shipping fee override in integer piastres (EGP × 100).
      * When set, it replaces the ShippingService-computed fee for this order.
      * Intended for phone orders where the merchant negotiates a custom rate.
-     * The admin UI collects KWD and converts to fils before sending.
+     * The admin UI collects EGP and converts to piastres before sending.
      */
     shippingOverride: z.number().int().min(0).optional(),
     /**

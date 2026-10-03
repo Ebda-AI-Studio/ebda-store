@@ -108,7 +108,7 @@ beforeAll(async () => {
       ownerId,
       plan: 'enterprise',
       status: 'active',
-      currency: 'KWD',
+      currency: 'EGP',
     },
   });
   storeId = store.id;

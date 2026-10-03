@@ -1,6 +1,6 @@
 import { prisma, Prisma, withMoneyTx, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
-import { slugify, slugifyWithFallback } from '@force/shared';
+import { slugify, slugifyWithFallback, REGION } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -295,8 +295,9 @@ export class StoreService {
         domain: data.domain,
         ownerId,
         settings: data.settings || {
-          currency: 'KWD',
-          locale: 'en-KW',
+          currency: REGION.currency,
+          locale: 'ar-EG',
+          defaultLanguage: REGION.defaultLocale,
         },
         // 2026-07-12 design structural batch: new stores get the persona-chrome
         // completion + card-frame dedup ON by default (Ahmad-approved for NEW
@@ -321,9 +322,23 @@ export class StoreService {
       },
     });
 
-    // Seed Chart of Accounts (Kuwait retail template, 27 system accounts).
+    // Seed Chart of Accounts (Egypt retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.
     await seedCoaForStore(store.id);
+
+    // Default VAT (Ebda: 14%, `REGION.defaultVatBps`). Seeded as an ACTIVE rate
+    // row so the merchant's tax page shows it and only has to flip `taxEnabled`
+    // once VAT-registered (the charge is gated on `Store.taxEnabled`, ruling
+    // TAX-1); it is editable per store like any other rate.
+    await prisma.taxRate.create({
+      data: {
+        storeId: store.id,
+        name: 'VAT',
+        nameAr: 'ضريبة القيمة المضافة',
+        rate: REGION.defaultVatBps / 100,
+        isActive: true,
+      },
+    });
 
     return store;
   }
@@ -622,8 +637,8 @@ export class StoreService {
     // sits in 'pending' fulfillment but the customer's card was already
     // charged (Tap/MyFatoorah webhook landed the payment but a fulfillment
     // worker hasn't moved the order forward yet). Without the paymentStatus
-    // arm, dashboards showed Revenue=0 even when KWDs had been collected.
-    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, KWD 0.000 revenue.
+    // arm, dashboards showed Revenue=0 even when money had been collected.
+    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, EGP 0.000 revenue.
     const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
       [
         prisma.product.count({ where: { storeId, status: 'active' } }),

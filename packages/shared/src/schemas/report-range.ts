@@ -116,12 +116,12 @@ export function localDayRange(fromDay?: string, toDay?: string): ReportRange | u
 //
 // Owner decision 2026-10-01: Finance Reports (P&L, trial balance, balance
 // sheet, tax report and their exports) count days in the STORE's time zone,
-// the same days the finance dashboard shows a Kuwait merchant. A date-only
+// the same days the finance dashboard shows an Egypt merchant. A date-only
 // `YYYY-MM-DD` bound is resolved here, on the server, from the store's
 // `timezone` column — never from the server's own TZ and never as a UTC day.
 
 /** Used when a store has no usable `timezone` (Ruling FRT-2). */
-export const DEFAULT_STORE_TIME_ZONE = 'Asia/Kuwait';
+export const DEFAULT_STORE_TIME_ZONE = 'Africa/Cairo';
 
 const dtfCache = new Map<string, Intl.DateTimeFormat>();
 

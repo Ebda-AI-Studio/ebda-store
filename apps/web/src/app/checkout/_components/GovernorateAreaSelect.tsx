@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useId, useMemo } from 'react';
-import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
+import { EGYPT_GOVERNORATES, areasForGovernorate } from '@force/shared';
 // Pure filter logic lives in a separate .ts file so vitest (node env) can
 // import and unit-test it without a JSX transformer.
 export { filterGovernorates, filterAreas } from './governorate-area-utils';
@@ -297,7 +297,7 @@ export function GovernorateAreaSelect({
   const isMultiCountry = countries.length > 1;
 
   // Internal country selection state (only meaningful when multi-country).
-  // Default: first country from the list or 'Kuwait' as fallback.
+  // Default: first country from the list or 'Egypt' as fallback.
   const defaultCountry = useMemo(() => {
     if (!isMultiCountry) return '';
     // If the current governorate belongs to a country in the rates, use that.
@@ -319,18 +319,18 @@ export function GovernorateAreaSelect({
 
   // --------------------------------------------------------------------------
   // Build the MERGED governorate option list:
-  //   (a) Static Kuwait govs that appear in ratedGovernorates
+  //   (a) Static Egypt govs that appear in ratedGovernorates
   //   (b) Custom govs from areaRates NOT in the static set
   // When multi-country, further filter to govs belonging to the active country.
   // --------------------------------------------------------------------------
   const governorateOptions = useMemo<ComboboxOption[]>(() => {
     // Compute effective country inline so this memo's deps are explicit state refs.
     const activeCountry = isMultiCountry ? selectedCountry : '';
-    const staticGovNames = new Set(KUWAIT_GOVERNORATES.map(g => g.en));
+    const staticGovNames = new Set(EGYPT_GOVERNORATES.map(g => g.en));
 
     // (a) Static govs that have at least one rated area (and match the active
     //     country when multi-country).
-    const staticOptions: ComboboxOption[] = KUWAIT_GOVERNORATES.filter(gov => {
+    const staticOptions: ComboboxOption[] = EGYPT_GOVERNORATES.filter(gov => {
       if (ratedGovernorates && ratedGovernorates.size > 0 && !ratedGovernorates.has(gov.en)) {
         return false;
       }

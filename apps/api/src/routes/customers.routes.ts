@@ -28,6 +28,7 @@ import { AuthService, eraseNeedsCrmReview } from '../services/auth.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 
+import { minorToDecimalString, excelMoneyFormat } from '@force/shared';
 const router = Router({ mergeParams: true });
 
 // The aggregation itself (grouping, KPI summary, segment parsing, the detail
@@ -157,10 +158,10 @@ router.get(
         { header: 'Pending', key: 'pendingCount', width: 10 },
         { header: 'Cancelled', key: 'cancelledCount', width: 11 },
         { header: 'Failed', key: 'failedCount', width: 9 },
-        { header: 'Total Spent (KWD)', key: 'totalSpent', width: 18 },
-        { header: 'Avg Order Value (KWD)', key: 'avgOrderValue', width: 20 },
+        { header: 'Total Spent (EGP)', key: 'totalSpent', width: 18 },
+        { header: 'Avg Order Value (EGP)', key: 'avgOrderValue', width: 20 },
         { header: 'Last Order #', key: 'lastOrderNumber', width: 22 },
-        { header: 'Last Order (KWD)', key: 'lastOrderTotal', width: 18 },
+        { header: 'Last Order (EGP)', key: 'lastOrderTotal', width: 18 },
         { header: 'Last Order Status', key: 'lastOrderStatus', width: 18 },
         { header: 'Last Payment Status', key: 'lastOrderPaymentStatus', width: 20 },
         { header: 'Last Order Date', key: 'lastOrderDate', width: 18 },
@@ -196,12 +197,12 @@ router.get(
             pendingCount: c.pendingCount,
             cancelledCount: c.cancelledCount,
             failedCount: c.failedCount,
-            // Convert fils → KWD with 3 decimals so the cell is numeric and
+            // Convert piastres → EGP with 2 decimals so the cell is numeric and
             // sortable in Excel rather than a formatted string.
-            totalSpent: Number((c.totalSpent / 1000).toFixed(3)),
-            avgOrderValue: Number((c.avgOrderValue / 1000).toFixed(3)),
+            totalSpent: Number(minorToDecimalString(c.totalSpent)),
+            avgOrderValue: Number(minorToDecimalString(c.avgOrderValue)),
             lastOrderNumber: c.lastOrderNumber,
-            lastOrderTotal: Number((c.lastOrderTotal / 1000).toFixed(3)),
+            lastOrderTotal: Number(minorToDecimalString(c.lastOrderTotal)),
             lastOrderStatus: c.lastOrderStatus,
             lastOrderPaymentStatus: c.lastOrderPaymentStatus,
             lastOrderDate: c.lastOrderDate,
@@ -228,11 +229,11 @@ router.get(
         noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
 
-      // Format the date + currency columns. Excel's "kwd" doesn't have a
-      // built-in symbol, so we use a numeric format with 3 decimals.
-      sheet.getColumn('totalSpent').numFmt = '0.000';
-      sheet.getColumn('avgOrderValue').numFmt = '0.000';
-      sheet.getColumn('lastOrderTotal').numFmt = '0.000';
+      // Format the date + currency columns. Excel's "major" doesn't have a
+      // built-in symbol, so we use a numeric format with 2 decimals.
+      sheet.getColumn('totalSpent').numFmt = excelMoneyFormat();
+      sheet.getColumn('avgOrderValue').numFmt = excelMoneyFormat();
+      sheet.getColumn('lastOrderTotal').numFmt = excelMoneyFormat();
       sheet.getColumn('lastOrderDate').numFmt = 'yyyy-mm-dd';
       sheet.getColumn('firstOrderDate').numFmt = 'yyyy-mm-dd';
 
@@ -256,8 +257,8 @@ router.get(
         { header: 'SKU', key: 'sku', width: 16 },
         { header: 'Variant', key: 'variant', width: 20 },
         { header: 'Qty', key: 'qty', width: 8 },
-        { header: 'Unit Price (KWD)', key: 'unitPrice', width: 18 },
-        { header: 'Line Total (KWD)', key: 'lineTotal', width: 18 },
+        { header: 'Unit Price (EGP)', key: 'unitPrice', width: 18 },
+        { header: 'Line Total (EGP)', key: 'lineTotal', width: 18 },
         { header: 'Area', key: 'area', width: 18 },
         { header: 'City', key: 'city', width: 18 },
         { header: 'Country', key: 'country', width: 16 },
@@ -308,8 +309,8 @@ router.get(
               sku: item.sku ?? '',
               variant: item.variantName ?? '',
               qty: item.quantity,
-              unitPrice: Number((item.price / 1000).toFixed(3)),
-              lineTotal: Number((item.total / 1000).toFixed(3)),
+              unitPrice: Number(minorToDecimalString(item.price)),
+              lineTotal: Number(minorToDecimalString(item.total)),
               area,
               city,
               country,
@@ -320,8 +321,8 @@ router.get(
         }
       }
 
-      purchasesSheet.getColumn('unitPrice').numFmt = '0.000';
-      purchasesSheet.getColumn('lineTotal').numFmt = '0.000';
+      purchasesSheet.getColumn('unitPrice').numFmt = excelMoneyFormat();
+      purchasesSheet.getColumn('lineTotal').numFmt = excelMoneyFormat();
       purchasesSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
       if (ordersTruncated) {
@@ -337,7 +338,7 @@ router.get(
       // ----------------------------------------------------------------
       const summarySheet = workbook.addWorksheet('Summary');
 
-      // Aggregate products: sum qty + revenue (in fils, convert at write time).
+      // Aggregate products: sum qty + revenue (in piastres, convert at write time).
       const productMap = new Map<string, { qty: number; revenue: number }>();
       for (const order of orders) {
         for (const item of order.items) {
@@ -406,7 +407,7 @@ router.get(
       const topProductsTitle = summarySheet.addRow(['TOP PRODUCTS']);
       topProductsTitle.getCell(1).font = { bold: true, size: 12 };
       summarySheet.addRow([]); // blank spacer
-      const productsHeaderRow = summarySheet.addRow(['Product', 'Total Qty', 'Revenue (KWD)']);
+      const productsHeaderRow = summarySheet.addRow(['Product', 'Total Qty', 'Revenue (EGP)']);
       productsHeaderRow.font = { bold: true };
       productsHeaderRow.fill = {
         type: 'pattern',
@@ -415,7 +416,7 @@ router.get(
       };
       for (const p of topProducts) {
         summarySheet.addRow(
-          neutralizeRowArray([p.product, p.qty, Number((p.revenue / 1000).toFixed(3))])
+          neutralizeRowArray([p.product, p.qty, Number(minorToDecimalString(p.revenue))])
         );
       }
 
@@ -431,7 +432,7 @@ router.get(
         'Email',
         'Orders',
         'Items',
-        'Total Spent (KWD)',
+        'Total Spent (EGP)',
       ]);
       spendHeaderRow.font = { bold: true };
       spendHeaderRow.fill = {
@@ -446,7 +447,7 @@ router.get(
             r.email,
             r.orders,
             r.items,
-            Number((r.spend / 1000).toFixed(3)),
+            Number(minorToDecimalString(r.spend)),
           ])
         );
       }

@@ -2,6 +2,7 @@ import type { ResolvedStore } from './store-resolver';
 import { pickMetaDescription } from './seo/meta-description';
 import type { StorefrontLocale } from './seo/resolve-locale';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 /**
  * The name/description a JSON-LD node publishes for `locale` (#2196): the
  * Arabic field when the page resolved to `ar` and the merchant filled it in,
@@ -93,14 +94,14 @@ export function merchantReturnPolicyJsonLd(
   if (days === 0) {
     return {
       '@type': 'MerchantReturnPolicy',
-      applicableCountry: 'KW',
+      applicableCountry: 'EG',
       returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
     };
   }
 
   return {
     '@type': 'MerchantReturnPolicy',
-    applicableCountry: 'KW',
+    applicableCountry: 'EG',
     returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
     merchantReturnDays: days,
     returnMethod: 'https://schema.org/ReturnByMail',
@@ -114,7 +115,7 @@ export function merchantReturnPolicyJsonLd(
 /** Public shape of a ShippingZone row, as served by GET /public/:storeId/shipping. */
 export interface PublicShippingZone {
   name: string;
-  /** In fils (1 KWD = 1000 fils), like every other money value in this codebase. */
+  /** In piastres (1 EGP = 100 piastres), like every other money value in this codebase. */
   deliveryFee: number;
   freeShippingThreshold: number | null;
   estimatedDaysMin: number | null;
@@ -150,8 +151,8 @@ export function shippingDetailsJsonLd(zones: PublicShippingZone[], opts: { curre
     '@type': 'OfferShippingDetails',
     shippingRate: {
       '@type': 'MonetaryAmount',
-      value: (cheapest.deliveryFee / 1000).toFixed(3),
-      currency: opts.currency || 'KWD',
+      value: minorToDecimalString(cheapest.deliveryFee),
+      currency: opts.currency || REGION.currency,
     },
     ...(min !== null && max !== null
       ? {
@@ -209,8 +210,8 @@ export function productJsonLd(
     })(),
     offers: {
       '@type': 'Offer',
-      price: (product.price / 1000).toFixed(3),
-      priceCurrency: store.currency || 'KWD',
+      price: minorToDecimalString(product.price),
+      priceCurrency: store.currency || REGION.currency,
       availability,
       url: productUrl,
       seller: {
@@ -244,7 +245,7 @@ interface BundleForJsonLd {
   descriptionAr?: string | null;
   slug: string;
   image?: string | null;
-  /** The bundle's single selling price (fils) — never a per-component price. */
+  /** The bundle's single selling price (piastres) — never a per-component price. */
   price: number;
   available: number;
 }
@@ -282,8 +283,8 @@ export function bundleJsonLd(
     })(),
     offers: {
       '@type': 'Offer',
-      price: (bundle.price / 1000).toFixed(3),
-      priceCurrency: store.currency || 'KWD',
+      price: minorToDecimalString(bundle.price),
+      priceCurrency: store.currency || REGION.currency,
       availability,
       url: bundleUrl,
       seller: {
@@ -322,9 +323,9 @@ export function organizationJsonLd(store: ResolvedStore, locale: StorefrontLocal
 
   // Real schema.org property. `areaServed` accepts Text — no need to guess
   // a Place/Country/AdministrativeArea @type for AI-generated free text
-  // ("Kuwait", "GCC") that isn't guaranteed to be a formal place name.
+  // ("Egypt", "GCC") that isn't guaranteed to be a formal place name.
   // Absent when the merchant/sweep never populated either field — never
-  // invented (a default "Kuwait/GCC" would be a false claim for a
+  // invented (a default "Egypt/GCC" would be a false claim for a
   // GCC-adjacent merchant that hasn't actually confirmed its service area).
   const areaServed =
     typeof aboutJson.location === 'string' && aboutJson.location.trim()
@@ -413,7 +414,7 @@ interface ItemListProduct {
   name: string;
   url: string;
   image?: string | null;
-  price?: number | null; // in fils (KWD * 1000)
+  price?: number | null; // in piastres (EGP * 1000)
   currency?: string;
   inStock?: boolean;
 }
@@ -436,8 +437,8 @@ export function itemList(products: ItemListProduct[], listName?: string): object
           ? {
               offers: {
                 '@type': 'Offer',
-                price: (p.price / 1000).toFixed(3),
-                priceCurrency: p.currency ?? 'KWD',
+                price: minorToDecimalString(p.price),
+                priceCurrency: p.currency ?? REGION.currency,
                 availability:
                   p.inStock !== false
                     ? 'https://schema.org/InStock'
@@ -482,7 +483,7 @@ export function storeJsonLd(s: StoreSchemaData): object {
           address: {
             '@type': 'PostalAddress',
             streetAddress: s.address,
-            addressCountry: 'KW', // Kuwait — platform-wide default for Force AI Store
+            addressCountry: 'EG', // Egypt — platform-wide default for Force AI Store
           },
         }
       : {}),

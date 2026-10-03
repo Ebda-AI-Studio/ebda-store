@@ -23,13 +23,13 @@ export function PointEarningForm({ settings, disabled, onChange }: PointEarningF
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-2">
-            {t('pointsPerDinar')}
+            {t('pointsPerMajorUnit')}
           </label>
           <input
             type="number"
             min="1"
-            value={settings.pointsPerDinar}
-            onChange={e => onChange({ pointsPerDinar: parseInt(e.target.value) || 1 })}
+            value={settings.pointsPerMajorUnit}
+            onChange={e => onChange({ pointsPerMajorUnit: parseInt(e.target.value) || 1 })}
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             disabled={disabled}
           />

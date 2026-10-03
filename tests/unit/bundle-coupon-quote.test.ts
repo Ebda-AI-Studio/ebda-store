@@ -6,7 +6,7 @@
  * a coupon against `cart.items` only (Ruling B1 — no stacking on an
  * already-discounted box). The storefront, however, quoted the coupon
  * against `CartContext.total`, which now FOLDS IN the bundle. A bundle-only
- * cart therefore showed "-1.200 KWD" on the pay button and was charged the
+ * cart therefore showed "-1.200 EGP" on the pay button and was charged the
  * full 12.000; a mixed cart was quoted 2.200 and charged with 1.000 applied.
  *
  * The assertion that would have caught it is the one below: quote the
@@ -93,7 +93,7 @@ const BUNDLE_ITEM_ROWS = [
 ];
 
 const BUNDLE_PRICE = 12000;
-/** One loose line used by the mixed-cart case: 5000 fils x 2. */
+/** One loose line used by the mixed-cart case: 5000 piastres x 2. */
 const LOOSE_LINE = {
   id: 'ci-1',
   productId: 'p-loose',
@@ -288,10 +288,10 @@ const ORDER_DATA = {
     firstName: 'Test',
     lastName: 'Customer',
     address1: '123 Test St',
-    city: 'Kuwait City',
+    city: 'Cairo',
     state: 'Capital',
     postalCode: '12345',
-    country: 'Kuwait',
+    country: 'Egypt',
     phone: '+96500000000',
   },
   paymentMethod: 'cod',
@@ -373,7 +373,7 @@ describe('coupon on a cart containing a bundle — quote must equal charge', () 
     const quotedTheOldWay = await quoteDiscount(BUNDLE_PRICE);
     const charged = await chargedDiscount();
 
-    // 1200 promised on the pay button, 0 actually applied — a 1.200 KWD
+    // 1200 promised on the pay button, 0 actually applied — a 1.200 EGP
     // overcharge relative to the displayed total.
     expect(quotedTheOldWay).toBe(1200);
     expect(charged).toBe(0);
@@ -410,7 +410,7 @@ describe('coupon on a cart containing a bundle — quote must equal charge', () 
   });
 
   // #193 (owner decision): VAT is levied AFTER discount. The mixed cart is
-  // 22000 fils of goods (10000 loose + 12000 box) with a 1000-fils coupon, so
+  // 22000 piastres of goods (10000 loose + 12000 box) with a 1000-piastres coupon, so
   // at 5% the tax is 5% of 21000 = 1050 — not 5% of 22000 = 1100 as before.
   it('a VAT store charges tax on the subtotal net of the discount', async () => {
     // resolveActiveTaxRate gates the charge on taxEnabled + the `tax`

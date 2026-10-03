@@ -100,7 +100,7 @@ export interface AbandonedWaCartItem {
 export interface AbandonedWaCart {
   waCartId: string;
   fwbStoreId: string | null;
-  customerPhone: string; // E.164 (e.g. +96512345678)
+  customerPhone: string; // E.164 (e.g. +201012345678)
   customerName: string | null;
   items: AbandonedWaCartItem[];
   totalFils: number;

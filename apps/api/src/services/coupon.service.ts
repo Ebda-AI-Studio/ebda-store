@@ -2,6 +2,7 @@ import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
+import { fromMinor, REGION, minorToDecimalString } from '@force/shared';
 /** One coupon rule an admin order broke. `code` is the checkout error code. */
 export interface CouponRuleViolation {
   code:
@@ -324,9 +325,7 @@ export class CouponService {
     if (coupon.minOrderAmount && subtotal < coupon.minOrderAmount) {
       out.push({
         code: 'MIN_ORDER_NOT_MET',
-        message: `Minimum order amount of ${(coupon.minOrderAmount / 1000).toFixed(
-          3
-        )} KWD required for this coupon`,
+        message: `Minimum order amount of ${minorToDecimalString(coupon.minOrderAmount)} ${REGION.currency} required for this coupon`,
       });
     }
     if (!CouponService.evaluateForCart(coupon, ctx).eligible) {

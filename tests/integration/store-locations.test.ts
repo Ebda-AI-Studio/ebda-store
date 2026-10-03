@@ -40,14 +40,14 @@ describe('LocationsService', () => {
   it('creates, lists ordered, updates store-scoped, filters published, deletes', async () => {
     const a = await LocationsService.create(storeId, {
       name: 'Avenues F-152',
-      country: 'Kuwait',
+      country: 'Egypt',
       address: 'Al-Rai',
       position: 1,
       isPublished: true,
     } as any);
     const b = await LocationsService.create(storeId, {
       name: 'Hidden',
-      country: 'Kuwait',
+      country: 'Egypt',
       address: 'x',
       position: 0,
       isPublished: false,

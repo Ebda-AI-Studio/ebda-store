@@ -5,7 +5,7 @@ export const translationWrongTargetScript: KnownFailureCase = {
   id: 'translation-wrong-target-script',
   type: 'translation',
   description: 'Translation to Arabic returned the English source text verbatim, untranslated.',
-  input: { text: 'Free shipping on orders over 20 KWD', from: 'en', to: 'ar', kind: 'free' },
-  output: { translation: 'Free shipping on orders over 20 KWD' },
+  input: { text: 'Free shipping on orders over 20 EGP', from: 'en', to: 'ar', kind: 'free' },
+  output: { translation: 'Free shipping on orders over 20 EGP' },
   expectedFailedChecks: ['target-script-correct'],
 };

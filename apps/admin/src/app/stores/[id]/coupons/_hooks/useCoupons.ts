@@ -6,6 +6,7 @@ import { textFieldValue, numericFieldValue, dateFieldValue } from '../../../../.
 import type { Coupon, CouponFormData, CouponStatusFilter } from '../_components/types';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 
+import { roundToMinor } from '@force/shared';
 interface UseCouponsResult {
   coupons: Coupon[];
   isLoading: boolean;
@@ -19,9 +20,9 @@ interface UseCouponsResult {
   toggleActive: (couponId: string) => Promise<void>;
 }
 
-/** A merchant-typed KWD amount → integer fils, rounded once. */
-function kwdStringToFils(v: string): number {
-  return Math.round(parseFloat(v) * 1000);
+/** A merchant-typed EGP amount → integer piastres, rounded once. */
+function majorStringToMinor(v: string): number {
+  return roundToMinor(parseFloat(v));
 }
 
 /**
@@ -37,19 +38,19 @@ export function buildCouponPayload(formData: CouponFormData, intent: 'create' | 
     description: textFieldValue(formData.description, intent),
     descriptionAr: textFieldValue(formData.descriptionAr, intent),
     type: formData.type,
-    // `fixed` coupons: the input is in KWD (dinar) → store as fils (×1000).
+    // `fixed` coupons: the input is in EGP → store as piastres (×100, via roundToMinor).
     // `percentage` coupons: the value is a percent (e.g. 5 = 5%), stored as-is.
-    value: formData.type === 'fixed' ? Math.round(formData.value * 1000) : formData.value,
+    value: formData.type === 'fixed' ? roundToMinor(formData.value) : formData.value,
     // Clearing a limit/date must remove the restriction (null), not
     // silently no-op (undefined) — same convention as the text fields
     // above. A cleared minOrderAmount/expiresAt/usageLimit makes the
     // coupon MORE permissive (no minimum / never expires / unlimited
     // uses); see CouponService.getByCode + evaluateForCart.
-    // KWD → fils with the fraction kept. The edit form hydrates these as
-    // fils / 1000 (e.g. 5500 → "5.5"), so `parseInt` here silently lowered a
-    // 5.500 KWD minimum to 5.000 on every unrelated save (#1569).
-    minOrderAmount: numericFieldValue(formData.minOrderAmount, intent, kwdStringToFils),
-    maxDiscount: numericFieldValue(formData.maxDiscount, intent, kwdStringToFils),
+    // EGP → piastres with the fraction kept. The edit form hydrates these as
+    // fromMinor(piastres) (e.g. 5500 → "5.5"), so `parseInt` here silently lowered a
+    // 5.500 EGP minimum to 5.000 on every unrelated save (#1569).
+    minOrderAmount: numericFieldValue(formData.minOrderAmount, intent, majorStringToMinor),
+    maxDiscount: numericFieldValue(formData.maxDiscount, intent, majorStringToMinor),
     usageLimit: numericFieldValue(formData.usageLimit, intent, v => parseInt(v)),
     usageLimitPerUser: numericFieldValue(formData.usageLimitPerUser, intent, v => parseInt(v)),
     isActive: formData.isActive,

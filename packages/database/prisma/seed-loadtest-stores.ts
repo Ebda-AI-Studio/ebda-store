@@ -20,6 +20,7 @@ import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { roundToMinor, REGION } from '@force/shared';
 const prisma = new PrismaClient();
 
 // ============================================
@@ -47,8 +48,8 @@ function generateSlug(name: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-function priceInFils(kwd: number): number {
-  return Math.round(kwd * 1000);
+function priceInFils(major: number): number {
+  return roundToMinor(major);
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -292,7 +293,7 @@ async function seedLoadtestStore(ownerId: string, storeIndex: number) {
       plan: 'starter',
       description: `Disposable load-test store #${storeIndex}. Safe to delete.`,
       descriptionAr: `متجر اختبار حمل مؤقت رقم ${storeIndex}`,
-      currency: 'KWD',
+      currency: REGION.currency,
       template: 'modern',
       theme: {
         primaryColor: '26 100% 50%',

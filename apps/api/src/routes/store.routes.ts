@@ -77,7 +77,7 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
   locationsEnabled: z.boolean().optional(),
   // The zone the store's finance reports / tax periods count days in
   // (Ruling FRT-2). A name the runtime cannot resolve is REJECTED, not
-  // silently coerced to Kuwait days (issue 2411).
+  // silently coerced to Egypt days (issue 2411).
   timezone: z
     .string()
     .refine(isValidTimeZone, { message: 'timezone must be a valid IANA time zone' })

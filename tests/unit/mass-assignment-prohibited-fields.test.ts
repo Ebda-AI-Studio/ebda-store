@@ -348,7 +348,7 @@ describe('mass assignment — prohibited fields never reach the write-service ca
       .post(`/api/v1/stores/${STORE_ID}/orders`)
       .set('x-session-id', 'session-1')
       .send({
-        shippingAddress: { firstName: 'A', lastName: 'B', address1: 'Street 1', country: 'KW' },
+        shippingAddress: { firstName: 'A', lastName: 'B', address1: 'Street 1', country: 'EG' },
         paymentMethod: 'cod',
         ...BASE_PROHIBITED,
       });

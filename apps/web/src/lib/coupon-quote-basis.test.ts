@@ -11,7 +11,7 @@ import { couponQuoteBasis, couponQuoteCartItems } from './coupon-quote-basis';
  * storefront surfaces that call `POST /coupons/validate` must therefore send
  * the loose-items-only subtotal as `orderTotal`. They previously sent
  * `CartContext.total`, which folds the bundle in — so a bundle-only cart was
- * shown a 1.200 KWD discount and charged the full 12.000.
+ * shown a 1.200 EGP discount and charged the full 12.000.
  *
  * The server side of this is asserted behaviourally in
  * `tests/unit/bundle-coupon-quote.test.ts`. The ARITHMETIC is now asserted

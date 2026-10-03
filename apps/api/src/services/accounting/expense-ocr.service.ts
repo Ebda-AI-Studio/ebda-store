@@ -19,6 +19,7 @@ import { callGemini } from './gemini-ai.service';
 import { createExpense } from './expense.service';
 import { getSystemAccountIdByCode } from './account.service';
 
+import { REGION, roundToMinor } from '@force/shared';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ interface OcrReceiptResult {
   vendor: string | null;
   vendorAr: string | null;
   invoiceDate: string | null; // ISO 8601 date string
-  currency: string; // 3-letter code, default KWD
+  currency: string; // 3-letter code, default EGP
   subtotal: number | null;
   taxAmount: number | null;
   total: number | null;
@@ -66,12 +67,12 @@ const CATEGORY_TO_COA: Record<string, string> = {
   other: '5990',
 };
 
-const OCR_PROMPT = `You are a receipt parser for a Kuwait retailer. Extract the following fields from the attached receipt image:
+const OCR_PROMPT = `You are a receipt parser for an Egypt retailer. Extract the following fields from the attached receipt image:
 
 - vendor (English name or transliteration)
 - vendorAr (Arabic vendor name if visible, otherwise null)
 - invoiceDate (ISO 8601 date string, e.g. "2026-05-20", or null if not found)
-- currency (3-letter ISO code; default to "KWD" if not explicitly shown)
+- currency (3-letter ISO code; default to "EGP" if not explicitly shown)
 - subtotal (numeric amount before tax, or null if not found)
 - taxAmount (numeric tax amount, or null if not found)
 - total (final numeric total, or null if not found)
@@ -111,11 +112,10 @@ function fetchBuffer(url: string): Promise<Buffer> {
   });
 }
 
-/** Convert decimal amount → integer fils. Non-KWD amounts pass through as-is (rounded). */
+/** Convert a decimal amount (OCR'd from a receipt) → integer minor units of `currency`. */
 function toFils(amount: number | null | undefined, currency: string): number {
   if (amount == null || !isFinite(amount)) return 0;
-  const multiplier = currency === 'KWD' ? 1000 : 100;
-  return Math.round(amount * multiplier);
+  return roundToMinor(amount, currency);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ export async function processExpenseReceipt(
   try {
     [expenseAccountId, paidFromAccountId] = await Promise.all([
       getSystemAccountIdByCode(storeId, coaCode),
-      getSystemAccountIdByCode(storeId, '1000'), // Cash / KNET
+      getSystemAccountIdByCode(storeId, '1000'), // Cash Online
     ]);
   } catch (acctErr) {
     logger.error({ err: acctErr, storeId, coaCode }, 'expense-ocr: account lookup failed');
@@ -210,28 +210,28 @@ export async function processExpenseReceipt(
     );
   }
 
-  // ── 6. Convert amounts to fils ────────────────────────────────────────────
-  const currency = parsed.currency || 'KWD';
+  // ── 6. Convert amounts to piastres ────────────────────────────────────────────
+  const currency = parsed.currency || REGION.currency;
   const amountFils = toFils(parsed.total ?? parsed.subtotal, currency);
   const taxFils = toFils(parsed.taxAmount, currency);
 
-  const nonKwdNote =
-    currency !== 'KWD'
-      ? ` Non-KWD receipt (${currency}). FX rate stored as 1 (placeholder). Please set the correct rate before approving.`
+  const nonBaseNote =
+    currency !== REGION.currency
+      ? ` Non-EGP receipt (${currency}). FX rate stored as 1 (placeholder). Please set the correct rate before approving.`
       : '';
 
   const notes = [
     `Auto-parsed from receipt. Vendor: ${parsed.vendor ?? 'unknown'}. Currency: ${currency}.`,
-    nonKwdNote,
+    nonBaseNote,
   ]
     .join('')
     .trim();
 
   // ── 7. Create draft Expense ───────────────────────────────────────────────
-  // For non-KWD OCR receipts we don't know the day's FX rate — store the raw
+  // For non-EGP OCR receipts we don't know the day's FX rate — store the raw
   // foreign-currency amount as `originalAmount` and fxRate=1 as a placeholder.
   // The merchant must set the correct fxRate in the expense edit UI before
-  // approving, which will re-compute the KWD amount.
+  // approving, which will re-compute the EGP amount.
   let exp;
   try {
     exp = await createExpense({
@@ -242,7 +242,7 @@ export async function processExpenseReceipt(
       taxAmount: taxFils,
       expenseDate: parsed.invoiceDate ? new Date(parsed.invoiceDate) : new Date(),
       currency,
-      // fxRate omitted for non-KWD (stored as 1 placeholder): merchant reviews before posting
+      // fxRate omitted for non-EGP (stored as 1 placeholder): merchant reviews before posting
       receiptImageUrl: receiptUrl,
       notes,
       createdBy: uploadedBy,

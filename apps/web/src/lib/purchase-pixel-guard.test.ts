@@ -43,7 +43,7 @@ type PixelWindow = { fbq?: unknown; gtag?: unknown; ttq?: unknown };
 const PIXEL_GLOBALS = ['fbq', 'gtag', 'ttq', 'snaptr', 'twq', 'pintrk'] as const;
 
 function purchase(orderId: string) {
-  return { orderId, contentIds: ['p1'], numItems: 1, value: 12.5, currency: 'KWD' };
+  return { orderId, contentIds: ['p1'], numItems: 1, value: 12.5, currency: 'EGP' };
 }
 
 /** What SuccessClient does for a confirmed order, on one page load. */

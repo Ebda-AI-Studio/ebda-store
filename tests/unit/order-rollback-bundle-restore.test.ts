@@ -6,7 +6,7 @@
  * they can retry. It used to aggregate EVERY `OrderItem` — including the
  * component lines a box expanded into — into loose `CartItem` rows.
  * `CartService.getOrCreate` then priced those through `cartLineUnitPrice` at
- * shelf price, so a customer who failed payment on a 12.000 KWD "Ramadan
+ * shelf price, so a customer who failed payment on a 12.000 EGP "Ramadan
  * Box" (componentSum 14.500) came back to a 14.500 cart with no explanation
  * and, if they retried, paid 2.500 more than they intended while the
  * merchant's bundle never sold.

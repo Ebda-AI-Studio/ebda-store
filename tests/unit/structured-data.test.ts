@@ -36,7 +36,7 @@ describe('breadcrumbJsonLd', () => {
 });
 
 describe('itemList', () => {
-  it('formats price from fils to KWD with 3 decimals', () => {
+  it('formats price from piastres to EGP with 2 decimals', () => {
     const r = itemList(
       [{ name: 'Test', url: 'https://example.com/p', price: 1500 }],
       'Featured'
@@ -44,8 +44,8 @@ describe('itemList', () => {
     expect(r['@type']).toBe('ItemList');
     expect(r.name).toBe('Featured');
     expect(r.numberOfItems).toBe(1);
-    expect(r.itemListElement[0].item.offers.price).toBe('1.500');
-    expect(r.itemListElement[0].item.offers.priceCurrency).toBe('KWD');
+    expect(r.itemListElement[0].item.offers.price).toBe('15.00');
+    expect(r.itemListElement[0].item.offers.priceCurrency).toBe('EGP');
   });
 
   it('omits offers when no price', () => {
@@ -105,11 +105,11 @@ describe('storeJsonLd', () => {
     expect(r.url).toBe('https://x.com');
   });
 
-  it('emits PostalAddress with Kuwait default', () => {
+  it('emits PostalAddress with Egypt default', () => {
     const r = storeJsonLd({ name: 'Wady', url: 'https://x', address: 'Hawalli' }) as any;
     expect(r.address['@type']).toBe('PostalAddress');
     expect(r.address.streetAddress).toBe('Hawalli');
-    expect(r.address.addressCountry).toBe('KW');
+    expect(r.address.addressCountry).toBe('EG');
   });
 
   it('emits sameAs only when social array is non-empty', () => {

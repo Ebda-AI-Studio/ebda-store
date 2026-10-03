@@ -30,7 +30,7 @@ function order(status: string, paymentStatus: string): OrderDetail {
     storeId: 's1',
     orderNumber: 'ORD-1',
     total: 5000,
-    currency: 'KWD',
+    currency: 'EGP',
     status,
     paymentStatus,
     createdAt: '2026-09-01T00:00:00.000Z',

@@ -62,7 +62,7 @@ const storeA: McpStore = {
   id: 'store-a',
   name: 'Store A',
   slug: 'store-a',
-  currency: 'KWD',
+  currency: 'EGP',
   domain: null,
 };
 

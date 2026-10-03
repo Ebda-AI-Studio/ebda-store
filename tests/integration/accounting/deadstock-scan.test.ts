@@ -53,15 +53,16 @@ beforeAll(async () => {
   storeId = s.id;
   await seedCoaForStore(storeId);
 
-  // Dead product: inventory=20, costPrice=5000 fils → value=100000 fils > 50000 threshold.
+  // Dead product: inventory=20, costPrice=50000 piastres (500 EGP) → value=1,000,000 piastres ≥ the
+  // 500,000-piastre (5,000 EGP) threshold.
   // No paid sales ever → daysSinceSale = 9999 ≥ 90.
   const dead = await prisma.product.create({
     data: {
       storeId,
       name: 'Dead Stock Product',
       slug: `dead-${Date.now()}`,
-      price: 10000,
-      costPrice: 5000,
+      price: 100000,
+      costPrice: 50000,
       inventory: 20,
       trackInventory: true,
       status: 'active',
@@ -69,7 +70,7 @@ beforeAll(async () => {
   });
   deadProductId = dead.id;
 
-  // Fresh product: inventory=10, costPrice=3000 fils → value=30000 fils < 50000 threshold.
+  // Fresh product: inventory=10, costPrice=3000 piastres → value=30000 piastres, far below the 500,000-piastre threshold.
   // Has a recent paid order → daysSinceSale < 90.
   const fresh = await prisma.product.create({
     data: {
@@ -104,22 +105,22 @@ beforeAll(async () => {
 
   // Variant product: the cost lives on the variants, the parent has none.
   // Valued per active variant at the variant's own cost (STOCK_VALUE_SQL rule,
-  // ruling AP-10): 10×3000 + 10×4000 = 70000. The disabled variant is not
+  // ruling AP-10): 10×30000 + 10×40000 = 700000. The disabled variant is not
   // stock. Valuing at the parent cost alone made this "unknown".
   const variantProduct = await prisma.product.create({
     data: {
       storeId,
       name: 'Variant Product',
       slug: `variant-${Date.now()}`,
-      price: 9000,
+      price: 90000,
       inventory: 0,
       trackInventory: true,
       status: 'active',
       variants: {
         create: [
-          { title: 'S', price: 9000, inventory: 10, costPrice: 3000 },
-          { title: 'M', price: 9000, inventory: 10, costPrice: 4000 },
-          { title: 'L', price: 9000, inventory: 50, costPrice: 9000, isActive: false },
+          { title: 'S', price: 90000, inventory: 10, costPrice: 30000 },
+          { title: 'M', price: 90000, inventory: 10, costPrice: 40000 },
+          { title: 'L', price: 90000, inventory: 50, costPrice: 90000, isActive: false },
         ],
       },
     },
@@ -179,7 +180,7 @@ beforeAll(async () => {
       shipping: 0,
       discount: 0,
       total: 30000,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
       createdAt: recentDate,
@@ -217,11 +218,11 @@ describe('deadstock scan', () => {
 
     const allFlags = await prisma.deadStockFlag.findMany({ where: { storeId } });
 
-    // Dead product (no sales, value ≥ 50000 fils) MUST get a flag.
+    // Dead product (no sales, value ≥ 500,000 piastres) MUST get a flag.
     const deadFlag = allFlags.find(f => f.productId === deadProductId);
     expect(deadFlag).toBeDefined();
     expect(deadFlag!.status).toBe('open');
-    expect(deadFlag!.stockValueFils).toBeGreaterThanOrEqual(50_000);
+    expect(deadFlag!.stockValueFils).toBeGreaterThanOrEqual(500_000);
     expect(deadFlag!.daysSinceSale).toBeGreaterThanOrEqual(90);
 
     // Fresh product (recent sale) MUST NOT be flagged.
@@ -252,7 +253,7 @@ describe('deadstock scan', () => {
     });
     expect(flags).toHaveLength(1);
     expect(flags[0].stockOnHand).toBe(20);
-    expect(flags[0].stockValueFils).toBe(70_000);
+    expect(flags[0].stockValueFils).toBe(700_000);
   });
 
   it("re-running refreshes each product's ONE open flag instead of adding another", async () => {

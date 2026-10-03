@@ -9,7 +9,7 @@ import { API_URL } from '../../../lib/api';
 
 /**
  * `retry` is a TRANSIENT failure — the verification endpoint throttled us
- * (#1863: a shared Kuwait carrier/office IP) or the network dropped. The
+ * (#1863: a shared Egypt carrier/office IP) or the network dropped. The
  * link itself may be perfectly valid, so this state must never read
  * "Invalid Link" and must offer a way to try the SAME token again (#2162):
  * Login is a dead end for an address that is still unverified.

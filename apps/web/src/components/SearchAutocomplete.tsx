@@ -14,6 +14,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNumerals } from '../hooks/useNumerals';
 import { api, type SearchSuggestion } from '../lib/api';
 
+import { minorToDecimalString } from '@force/shared';
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface SearchAutocompleteProps {
@@ -234,8 +235,8 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
           {suggestions.map((product, idx) => {
             const isActive = activeIndex === idx;
             const displayName = isAr && product.nameAr ? product.nameAr : product.name;
-            // Prices stored in fils — divide by 1000 for KWD.
-            const priceKwd = localize((product.price / 1000).toFixed(3));
+            // Prices stored in piastres — divide by 1000 for EGP.
+            const priceMajor = localize(minorToDecimalString(product.price));
 
             return (
               <Link
@@ -283,7 +284,7 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
                 {/* Name + price */}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-foreground">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">{priceKwd} KWD</p>
+                  <p className="text-xs text-muted-foreground">{priceMajor} EGP</p>
                 </div>
               </Link>
             );

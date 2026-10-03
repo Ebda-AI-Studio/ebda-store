@@ -1,3 +1,4 @@
+import { minorToDecimalString, roundToMinor } from '@force/shared';
 /**
  * `ProductVariant.price` is `Int?` — an OVERRIDE, where null means "sell at the
  * product's price". The variants endpoint returns the raw row, so admin code
@@ -6,23 +7,23 @@
  * helpers are the admin's copy of that rule.
  */
 
-/** The price a variant actually sells at, in fils. */
+/** The price a variant actually sells at, in piastres. */
 export function effectiveVariantPrice(variantPrice: number | null, productPrice: number): number {
   return variantPrice ?? productPrice;
 }
 
-/** An override price for an editable KWD field: empty when the variant inherits. */
-export function variantPriceToField(fils: number | null): string {
-  return fils === null ? '' : (fils / 1000).toFixed(3);
+/** An override price for an editable EGP field: empty when the variant inherits. */
+export function variantPriceToField(piastres: number | null): string {
+  return piastres === null ? '' : minorToDecimalString(piastres);
 }
 
 /**
- * A KWD field back to an override price. Empty keeps inheriting (null) — it
+ * A EGP field back to an override price. Empty keeps inheriting (null) — it
  * must never become 0, which would pin the variant to a zero price.
  */
 export function variantFieldToPrice(field: string): number | null {
   if (field.trim() === '') return null;
   const n = parseFloat(field);
   if (isNaN(n) || n < 0) return 0;
-  return Math.round(n * 1000);
+  return roundToMinor(n);
 }

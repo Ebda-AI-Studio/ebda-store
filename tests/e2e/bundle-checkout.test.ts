@@ -55,7 +55,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { withRlsBypass, runInTenantContext } from '@force/database';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay, minorToDecimalString } from '@force/shared';
 import { InvoiceService } from '@api/services/invoice.service';
 import { orderConfirmationTemplate } from '@api/services/email-templates/order-confirmation';
 import type { OrderEmailData } from '@api/services/email.service';
@@ -195,7 +195,7 @@ describe.skipIf(!hasDb)('bundle storefront rendering — one row, never the spli
     // appear in the rendered invoice.
     const group = order.items.filter(i => i.bundleGroupId);
     expect(group).toHaveLength(3);
-    const allocatedShares = group.map(i => (i.total / 1000).toFixed(3));
+    const allocatedShares = group.map(i => minorToDecimalString(i.total));
 
     const html = await runInTenantContext(store.storeId, () =>
       InvoiceService.generateInvoice(store.storeId, order.id, 'en')
@@ -213,7 +213,7 @@ describe.skipIf(!hasDb)('bundle storefront rendering — one row, never the spli
     const order = await checkoutBundleFor(store.storeId, ramadanBox, 1, { customerId });
 
     const group = order.items.filter(i => i.bundleGroupId);
-    const allocatedShares = group.map(i => (i.total / 1000).toFixed(3));
+    const allocatedShares = group.map(i => minorToDecimalString(i.total));
 
     // Mirrors order-created.ts's `emailData.items` construction EXACTLY —
     // the same `groupOrderLinesForDisplay(...).map(...)` this fix-round
@@ -243,10 +243,10 @@ describe.skipIf(!hasDb)('bundle storefront rendering — one row, never the spli
         firstName: 'Bundle',
         lastName: 'Buyer',
         address1: 'Block 1, Street 1',
-        city: 'Kuwait City',
+        city: 'Cairo',
         state: 'Capital',
         postalCode: '00000',
-        country: 'KW',
+        country: 'EG',
       },
     };
 
