@@ -4,7 +4,7 @@ Status: NOT done in SP4 (accepted residual, R-EBDA-002). Decision date 2026-10-0
 
 ## Why it is not in SP4
 
-`stores` is read or written at **286 call sites in 103 files** (grep below), far over the ~40-site budget set for this task. Most are legitimately store-scoped, but about a third run BEFORE any scope exists (host resolution, API-key and MCP auth, WA bridge auth, the `acrossStores` store listing, every Inngest sweep, super-admin lists, provisioning, signup slug checks) and would need a definer. Every relation join from a tenant table to its store is also affected. Doing this under the SP4 deadline would mean rewriting the auth and cron entry points without the per-path tests they need.
+`stores` is read or written at **304 call sites in 106 files** (grep below), far over the ~40-site budget set for this task. Most are legitimately store-scoped, but about a third run BEFORE any scope exists (host resolution, API-key and MCP auth, WA bridge auth, the `acrossStores` store listing, every Inngest sweep, super-admin lists, provisioning, signup slug checks) and would need a definer. Every relation join from a tenant table to its store is also affected. Doing this under the SP4 deadline would mean rewriting the auth and cron entry points without the per-path tests they need.
 
 ## What the residual is
 
@@ -141,5 +141,10 @@ Status: NOT done in SP4 (accepted residual, R-EBDA-002). Decision date 2026-10-0
 - `apps/api/src/services/return.service.ts` (1)
 - `apps/api/src/services/socket.service.ts` (1)
 - `apps/api/src/services/wallet.service.ts` (1)
+
+### Added by the SP5 merges (stores-only, no tenant table involved)
+
+- `apps/api/src/services/domain-claim.service.ts` and the `domain-claim-sweep` cron read and write only `stores`; they need the same routing definers as the rest (pending-claim scan: `ebda_list_pending_domain_claims`).
+- `apps/api/src/services/onboarding.service.ts` slug check and owner store count; `card-testing-guard.service.ts` store name for the alert.
 
 The category split is by file name and is a starting point: each site must still be classified (in scope or pre-scope) while converting.
