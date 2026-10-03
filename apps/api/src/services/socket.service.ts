@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { prisma } from '@force/database';
+import { getUserState } from '../lib/definer';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -172,10 +173,7 @@ class SocketService {
           const cachedTv = await redis.getUserTokenVersion(payload.userId);
           let currentTv: number;
           if (cachedTv === null) {
-            const u = await prisma.user.findUnique({
-              where: { id: payload.userId },
-              select: { tokenVersion: true },
-            });
+            const u = await getUserState(payload.userId);
             currentTv = u?.tokenVersion ?? 0;
             // Warm the cache so subsequent connections skip the DB lookup.
             await redis.setUserTokenVersion(payload.userId, currentTv);

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { config } from '../config';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import {
@@ -777,10 +777,12 @@ router.delete(
       const userId = req.user!.userId;
 
       // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
-      await prisma.user.update({
-        where: { id: userId },
-        data: { deletedAt: new Date() },
-      });
+      await withUser(userId, tx =>
+        tx.user.update({
+          where: { id: userId },
+          data: { deletedAt: new Date() },
+        })
+      );
 
       // Audit log
       await auditLog({

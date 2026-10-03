@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { AppError } from './error-handler';
 
 /**
@@ -25,10 +25,13 @@ export async function requireMfaEnrolled(
   }
 
   try {
-    const u = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { mfaEnabled: true },
-    });
+    // `users` is RLS-scoped to the user itself: read as them.
+    const u = await withUser(req.user.userId, tx =>
+      tx.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { mfaEnabled: true },
+      })
+    );
 
     if (!u?.mfaEnabled) {
       return next(
