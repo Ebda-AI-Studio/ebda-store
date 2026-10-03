@@ -7,8 +7,15 @@
 // directory (e.g. prisma/migrations/<name>/down.sql) so the change can be
 // safely reverted in production if needed.
 
+// Ebda (R-EBDA-001): the query compiler (wasm) runs the same client under Node
+// (Express, vitest) and under workerd, so there is no native engine binary to
+// ship. The client MUST be built with a driver adapter (`@prisma/adapter-pg`):
+// see src/client.ts. `driverAdapters` and `queryCompiler` were previews before
+// 6.16; on 6.19.3 they are deprecated no-ops (generate warns if listed), and
+// `engineType = "client"` alone selects both. Proven in spikes/workers-api.
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
