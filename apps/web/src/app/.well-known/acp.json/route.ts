@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
 import {
   resolveAgentStore,
@@ -53,8 +52,7 @@ export async function GET() {
   // Fail closed. Same 404 as an unknown store — do not diverge these.
   if (!store.enabledFeatures?.includes('agent_checkout')) return notFound();
 
-  const h = await headers();
-  const base = storefrontBaseUrl(store, h.get('host'));
+  const base = storefrontBaseUrl(store);
   const viaCookie = await resolvedViaCookie();
 
   const body = {
@@ -124,13 +122,12 @@ export async function GET() {
       // tells an agent it may transact when it may not (or the reverse). Five
       // minutes bounds the window without a per-request DB read.
       //
-      // Shared-cacheable because this path is resolved ONLY from the URL slug
-      // segment or the custom-domain Host — middleware.ts's
-      // URL_KEYED_PUBLIC_PATHS guard (#1959) never lets the sticky
-      // `x-store-slug` cookie reach it. THAT guard is the load-bearing control
-      // against a cross-tenant edge-cache entry; the `viaCookie → private`
-      // branch below is an unreachable second line of defence (#2174, see
-      // resolvedViaCookie). `Vary: Cookie` covers a Vary-respecting cache.
+      // Shared-cacheable because this path is resolved ONLY from the request
+      // Host (`<slug>.ebda.app` or the custom domain) — middleware sets
+      // `x-store-domain` from it and no cookie or path ever names a store, so
+      // the URL (host included) fully keys the answer at a shared cache. The
+      // `viaCookie → private` branch below is a retired second line of defence
+      // (see resolvedViaCookie). `Vary: Cookie` covers a Vary-respecting cache.
       'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },

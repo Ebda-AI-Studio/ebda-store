@@ -89,7 +89,7 @@ describe('storeRedirectUrl', () => {
     else process.env.NEXT_PUBLIC_SITE_URL = originalSiteUrl;
   });
 
-  it('includes the /<slug> path prefix for a platform-path store (no custom domain)', () => {
+  it('roots a store with no custom domain at <slug>.ebda.app, never a /<slug> path', () => {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     const store = {
       id: 'store-1',
@@ -99,7 +99,7 @@ describe('storeRedirectUrl', () => {
 
     const url = storeRedirectUrl(store, '/products/new-handle');
 
-    expect(url).toBe('https://ebda.app/my-store/products/new-handle');
+    expect(url).toBe('https://my-store.ebda.app/products/new-handle');
   });
 
   it('omits the slug prefix for a custom-domain store', () => {

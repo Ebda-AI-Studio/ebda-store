@@ -396,7 +396,9 @@
       "errors": {
         "storeNameRequired": "Store name is required",
         "storeUrlRequired": "Store URL is required",
-        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and hyphens",
+        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and single hyphens (not at the start or end)",
+        "storeUrlReserved": "This address is reserved. Please choose another one",
+        "storeUrlLength": "Address must be 3 to 40 characters",
         "emailRequired": "Email is required",
         "emailInvalid": "Please enter a valid email address",
         "ownerNameRequired": "Owner name is required",

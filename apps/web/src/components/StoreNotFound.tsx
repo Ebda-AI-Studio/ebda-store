@@ -3,7 +3,7 @@ import type { ResolvedStore } from '../lib/store-resolver';
 
 /**
  * Store-branded 404 — shown for unknown paths on a merchant's storefront
- * (custom domain OR the platform `/<slug>` path).
+ * (its `<slug>.ebda.app` host or its custom domain).
  *
  * HARD multi-tenant rule: a store must NEVER show the Ebda platform
  * landing or link to `ebda.app` to its own customers. A bad URL on
@@ -12,9 +12,8 @@ import type { ResolvedStore } from '../lib/store-resolver';
  * store's theme CSS vars (set by the root layout) so it matches the brand.
  */
 export function StoreNotFound({ store }: { store: ResolvedStore }) {
-  // Custom domain → root; platform path → `/<slug>` (so we never link off the
-  // store onto the platform host).
-  const homeHref = store.domain ? '/' : `/${store.slug}`;
+  // Every store has its own host, so its home is simply `/`.
+  const homeHref = '/';
   const logo = store.logo || store.logoAr;
   const storeName = store.nameAr || store.name;
 

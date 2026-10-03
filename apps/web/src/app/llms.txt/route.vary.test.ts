@@ -28,7 +28,7 @@ function jsonResponse(body: unknown, ok = true) {
 
 function mockStoreFetches() {
   fetchMock.mockImplementation((url: string) => {
-    if (url.includes('/public/stores/')) {
+    if (url.includes('/public/store/resolve') || url.includes('/public/stores/')) {
       return Promise.resolve(
         jsonResponse({
           data: {
@@ -46,6 +46,18 @@ function mockStoreFetches() {
 }
 
 describe('GET /llms.txt — shared-cacheability by resolution source', () => {
+  it('an unresolvable store host is a 404, never the platform index', async () => {
+    headerBag.clear();
+    headerBag.set('x-store-domain', 'nobody.ebda.app');
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    const { GET } = await import('./route');
+    const res = await GET();
+    expect(res.status).toBe(404);
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     headerBag.clear();
     fetchMock.mockReset();
@@ -53,9 +65,9 @@ describe('GET /llms.txt — shared-cacheability by resolution source', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('URL slug segment: public + s-maxage + Vary: Cookie', async () => {
-    headerBag.set('x-store-slug', 'test-store');
-    // No x-store-slug-source — this came from the URL, not the cookie fallback.
+  it('store host: public + s-maxage + Vary: Cookie', async () => {
+    headerBag.set('x-store-domain', 'test-store.ebda.app');
+    // No x-store-slug-source — this came from the Host, not a cookie fallback.
     mockStoreFetches();
 
     const { GET } = await import('./route');
@@ -68,8 +80,8 @@ describe('GET /llms.txt — shared-cacheability by resolution source', () => {
     expect(res.headers.get('vary')).toBe('Cookie');
   });
 
-  it('cookie fallback (bare /llms.txt, sticky cookie): private, no shared-cache directive, no Vary', async () => {
-    headerBag.set('x-store-slug', 'test-store');
+  it('a non-URL identity signal (retired cookie fallback): private, no shared-cache directive, no Vary', async () => {
+    headerBag.set('x-store-domain', 'test-store.ebda.app');
     headerBag.set('x-store-slug-source', 'cookie');
     mockStoreFetches();
 

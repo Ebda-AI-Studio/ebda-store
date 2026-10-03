@@ -116,10 +116,12 @@ describe('fixCategoryLinks — Arabic slugs (#1854)', () => {
 });
 
 describe('buildPlatformBody — no dead /categories/ route (#1890)', () => {
-  it('documents the real category-browse URL, never /<slug>/categories/<cat>', () => {
+  it('documents the real category-browse URL, never /categories/<cat>', () => {
     const body = buildPlatformBody([]);
     expect(body).not.toMatch(/\/categories\/</);
-    expect(body).toContain('/<slug>/products?category=<cat>');
+    expect(body).toContain('/products?category=<cat>');
+    // No path-based `/<slug>/…` store URLs: every store has its own host.
+    expect(body).not.toContain('/<slug>/');
   });
 });
 

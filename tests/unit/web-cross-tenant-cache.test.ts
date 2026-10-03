@@ -1,0 +1,284 @@
+/**
+ * SP4 / Review Focus 1 — storefront tenant isolation across `<slug>.ebda.app`
+ * and custom domains, including the caches.
+ *
+ * Two layers are exercised end to end with NO mocks of the code under test:
+ *
+ *  1. `middleware()` — the Host (and only the Host) picks the store; the tenant
+ *     tree's route key (the thing Next's full-route cache and OpenNext's R2
+ *     incremental cache are keyed on) carries the HOST, so store A's HTML at a
+ *     path can never be served for store B at the same path. The apex and other
+ *     platform hosts never resolve a store; a malformed host is a 404.
+ *  2. `store-resolver` — the in-process store cache and the Next data-cache
+ *     fetches are keyed on the host: A then B at the same path each get their
+ *     own store, including after A is cached, and an unknown host asked right
+ *     after a known one is a 404 (no stale store, no default store).
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
+import { middleware } from '../../apps/web/middleware';
+
+const NOT_FOUND = vi.hoisted(() => new Error('NEXT_NOT_FOUND'));
+const headerBag = vi.hoisted(() => ({ value: new Map<string, string>() }));
+
+vi.mock('next/navigation', () => ({
+  notFound: () => {
+    throw NOT_FOUND;
+  },
+}));
+vi.mock('next/headers', () => ({
+  headers: async () => ({ get: (k: string) => headerBag.value.get(k.toLowerCase()) ?? null }),
+}));
+
+// ─── 1. middleware ──────────────────────────────────────────────────────────
+
+const rewriteOf = (res: Response) => res.headers.get('x-middleware-rewrite') ?? '';
+const forwarded = (res: Response, name: string) => res.headers.get(`x-middleware-request-${name}`);
+const at = (host: string, path: string, headers: Record<string, string> = {}) =>
+  new NextRequest(`https://${host}${path}`, { headers: { host, ...headers } });
+
+describe('middleware — the Host alone picks the store', () => {
+  const ENV = { ...process.env };
+  beforeEach(() => {
+    process.env.STOREFRONT_TENANT_ROUTING = 'true';
+    process.env.STOREFRONT_TENANT_ROUTING_ROUTES = 'all';
+    process.env.STOREFRONT_TENANT_ROUTING_STORES = 'amelia,palora,ameliaaurum.com';
+  });
+  afterEach(() => {
+    process.env = { ...ENV };
+  });
+
+  it('store A and store B at the SAME path get DIFFERENT tenant route keys (cache key includes the host)', () => {
+    const a = rewriteOf(middleware(at('amelia.ebda.app', '/products')));
+    const b = rewriteOf(middleware(at('palora.ebda.app', '/products')));
+    const custom = rewriteOf(middleware(at('ameliaaurum.com', '/products')));
+    expect(new URL(a).pathname).toBe('/tenant-store/amelia.ebda.app/en/products');
+    expect(new URL(b).pathname).toBe('/tenant-store/palora.ebda.app/en/products');
+    expect(new URL(custom).pathname).toBe('/tenant-store/ameliaaurum.com/en/products');
+    expect(new Set([a, b, custom]).size).toBe(3);
+  });
+
+  it('a request’s tenant key can never be steered by cookie, header or query to another store', () => {
+    const res = middleware(
+      at('palora.ebda.app', '/products?store=amelia&slug=amelia', {
+        cookie: 'x-store-slug=amelia',
+        'x-store-slug': 'amelia',
+        'x-store-domain': 'amelia.ebda.app',
+        'x-forwarded-host': 'amelia.ebda.app',
+      })
+    );
+    expect(new URL(rewriteOf(res)).pathname).toBe('/tenant-store/palora.ebda.app/en/products');
+    expect(forwarded(res, 'x-store-domain')).toBe('palora.ebda.app');
+    expect(forwarded(res, 'x-store-slug')).toBeNull();
+  });
+
+  it('header-based (non-tree) routes carry the request host as the store, per request', () => {
+    process.env.STOREFRONT_TENANT_ROUTING = 'false';
+    const a = middleware(at('amelia.ebda.app', '/cart'));
+    const b = middleware(at('palora.ebda.app', '/cart'));
+    expect(forwarded(a, 'x-store-domain')).toBe('amelia.ebda.app');
+    expect(forwarded(b, 'x-store-domain')).toBe('palora.ebda.app');
+  });
+
+  it('a dev-only suffix is canonicalised to the real store host (outside production)', () => {
+    process.env.NODE_ENV = 'development';
+    const res = middleware(at('amelia.localhost:3000', '/products'));
+    expect(forwarded(res, 'x-store-domain')).toBe('amelia.ebda.app');
+  });
+
+  it.each(['ebda.app', 'www.ebda.app'])('the apex %s never resolves a store', host => {
+    const res = middleware(at(host, '/palora/products', { cookie: 'x-store-slug=palora' }));
+    // `www.ebda.app` canonicalises to the apex (301); the apex itself passes through.
+    expect([200, 301]).toContain(res.status);
+    expect(forwarded(res, 'x-store-domain')).toBeNull();
+    expect(forwarded(res, 'x-store-slug')).toBeNull();
+    expect(rewriteOf(res)).not.toContain('/tenant-store/');
+    expect(res.headers.get('set-cookie') ?? '').not.toContain('x-store-slug');
+  });
+
+  it.each([
+    'app.ebda.app',
+    'api.ebda.app',
+    'orders.ebda.app',
+    'docs.ebda.app',
+    'whatsapp.ebda.app',
+  ])('platform service host %s is not served by the storefront (404, no store)', host => {
+    const res = middleware(at(host, '/'));
+    expect(res.status).toBe(404);
+    expect(forwarded(res, 'x-store-domain')).toBeNull();
+  });
+
+  it.each([
+    'store.ebda.app', // there is no store.ebda.app
+    'admin.ebda.app',
+    'x.y.ebda.app',
+    'ab.ebda.app',
+    '127.0.0.1:3000',
+    'localhost:3000',
+    '[::1]:3000',
+  ])('invalid host %j is a 404 with nothing cacheable', host => {
+    const res = middleware(at(host, '/products'));
+    expect(res.status).toBe(404);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(forwarded(res, 'x-store-domain')).toBeNull();
+  });
+
+  it('www custom domains still 301 to the apex; www.<store>.ebda.app is invalid', () => {
+    expect(middleware(at('www.ameliaaurum.com', '/products?p=2')).status).toBe(301);
+    expect(middleware(at('www.amelia.ebda.app', '/')).status).toBe(404);
+  });
+
+  it('there is no path-based store entry: /<slug>/… on a store host is just a path', () => {
+    const res = middleware(at('palora.ebda.app', '/amelia/products'));
+    expect(forwarded(res, 'x-store-domain')).toBe('palora.ebda.app');
+    expect(rewriteOf(res)).not.toContain('amelia.ebda.app');
+  });
+});
+
+// ─── 2. store-resolver ─────────────────────────────────────────────────────
+
+interface FakeStore {
+  id: string;
+  slug: string;
+  name: string;
+}
+const STORES: Record<string, FakeStore> = {
+  'amelia.ebda.app': { id: 'store-a', slug: 'amelia', name: 'Amelia Aurum' },
+  'ameliaaurum.com': { id: 'store-a', slug: 'amelia', name: 'Amelia Aurum' },
+  'palora.ebda.app': { id: 'store-b', slug: 'palora', name: 'Palora' },
+};
+
+const fetchMock = vi.fn();
+
+function installApi() {
+  fetchMock.mockReset();
+  // Behaves like the real API: the store is chosen by the `x-store-domain` header.
+  fetchMock.mockImplementation(async (url: string, init?: { headers?: Record<string, string> }) => {
+    if (String(url).includes('/public/store/resolve')) {
+      const host = init?.headers?.['x-store-domain'] ?? '';
+      const store = STORES[host];
+      if (!store) {
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({ success: false, error: { code: 'STORE_NOT_FOUND' } }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ success: true, data: { store } }) };
+    }
+    return { ok: false, status: 404, json: async () => ({}) };
+  });
+  vi.stubGlobal('fetch', fetchMock);
+}
+
+describe('store-resolver — per-host store cache', () => {
+  let resolver: typeof import('../../apps/web/src/lib/store-resolver');
+
+  beforeEach(async () => {
+    vi.resetModules();
+    headerBag.value.clear();
+    installApi();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    resolver = await import('../../apps/web/src/lib/store-resolver');
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const asHost = (host: string) => {
+    headerBag.value.clear();
+    headerBag.value.set('x-store-domain', host);
+  };
+
+  it('store A then store B at the same path: each gets its own store, before and after A is cached', async () => {
+    asHost('amelia.ebda.app');
+    const a1 = await resolver.getStoreOrNotFound(); // fills A's cache
+    asHost('palora.ebda.app');
+    const b1 = await resolver.getStoreOrNotFound();
+    asHost('amelia.ebda.app');
+    const a2 = await resolver.getStoreOrNotFound(); // served from A's cache
+    asHost('palora.ebda.app');
+    const b2 = await resolver.getStoreOrNotFound();
+    asHost('ameliaaurum.com'); // A's custom domain
+    const aCustom = await resolver.getStoreOrNotFound();
+
+    expect([a1.id, b1.id, a2.id, b2.id, aCustom.id]).toEqual([
+      'store-a',
+      'store-b',
+      'store-a',
+      'store-b',
+      'store-a',
+    ]);
+    // The in-process cache is real (3 hosts → 3 API calls, not 5)...
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // ...and every API call named the HOST it was resolving.
+    expect(fetchMock.mock.calls.map(c => c[1].headers['x-store-domain']).sort()).toEqual([
+      'amelia.ebda.app',
+      'ameliaaurum.com',
+      'palora.ebda.app',
+    ]);
+  });
+
+  it('an unknown host asked AFTER a known one is a 404 — no stale store, no default store', async () => {
+    asHost('amelia.ebda.app');
+    expect((await resolver.getStoreOrNotFound()).id).toBe('store-a'); // cached
+    asHost('nobody.ebda.app');
+    await expect(resolver.getStoreOrNotFound()).rejects.toBe(NOT_FOUND);
+    asHost('nobody.example.com');
+    await expect(resolver.getStoreOrNotFound()).rejects.toBe(NOT_FOUND);
+    asHost('amelia.ebda.app'); // the known one is unaffected
+    expect((await resolver.getStoreOrNotFound()).id).toBe('store-a');
+  });
+
+  it('a 404 is never cached as a store: a host that appears later resolves at once', async () => {
+    asHost('newshop.ebda.app');
+    await expect(resolver.getStoreOrNotFound()).rejects.toBe(NOT_FOUND);
+    STORES['newshop.ebda.app'] = { id: 'store-new', slug: 'newshop', name: 'New' };
+    try {
+      expect((await resolver.getStoreOrNotFound()).id).toBe('store-new');
+    } finally {
+      delete STORES['newshop.ebda.app'];
+    }
+  });
+
+  it('a request with no store host (the apex / a platform host) never renders a store', async () => {
+    headerBag.value.clear();
+    await expect(resolver.getStoreOrNotFound()).rejects.toBe(NOT_FOUND);
+    expect(fetchMock).not.toHaveBeenCalled();
+    // The lenient chrome resolver hands back the neutral sentinel, never a real store.
+    expect((await resolver.getStore()).id).toBe('demo');
+  });
+
+  it('the lenient chrome resolver never answers an unknown host with another store', async () => {
+    asHost('amelia.ebda.app');
+    await resolver.getStore(); // A cached
+    asHost('nobody.ebda.app');
+    const chrome = await resolver.getStore();
+    expect(chrome.id).toBe('demo');
+    expect(chrome.slug).not.toBe('amelia');
+  });
+
+  it('the tenant-tree resolver is keyed on the route host too (A, B, A, unknown)', async () => {
+    const ids: string[] = [];
+    for (const host of ['amelia.ebda.app', 'palora.ebda.app', 'amelia.ebda.app']) {
+      ids.push((await resolver.getStoreByTenantParam(host)).id);
+    }
+    expect(ids).toEqual(['store-a', 'store-b', 'store-a']);
+    await expect(resolver.getStoreByTenantParam('nobody.ebda.app')).rejects.toBe(NOT_FOUND);
+    // Hand-built tenant keys that are not store hosts never resolve (and never reach the API).
+    fetchMock.mockClear();
+    for (const bad of ['slug:amelia', 'app.ebda.app', 'ebda.app', '127.0.0.1']) {
+      await expect(resolver.getStoreByTenantParam(bad)).rejects.toBe(NOT_FOUND);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('the Next data-cache fetch is tagged and keyed per host', async () => {
+    asHost('palora.ebda.app');
+    await resolver.getStoreOrNotFound();
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.next.tags).toEqual(['store-domain:palora.ebda.app']);
+    expect(init.headers['x-store-domain']).toBe('palora.ebda.app');
+  });
+});

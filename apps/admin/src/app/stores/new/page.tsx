@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiPost } from '../../../lib/api';
-import { isValidEmail } from '@force/shared';
+import { isValidEmail, validateStoreSlug } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { StepIndicator } from './_components/StepIndicator';
 import { StoreDetailsStep } from './_components/StoreDetailsStep';
@@ -66,8 +66,18 @@ export default function CreateStorePage() {
     if (step === 'store') {
       if (!formData.storeName.trim()) errors.storeName = t('errors.storeNameRequired');
       if (!formData.storeSlug.trim()) errors.storeSlug = t('errors.storeUrlRequired');
-      if (formData.storeSlug && !/^[a-z0-9-]+$/.test(formData.storeSlug)) {
-        errors.storeSlug = t('errors.storeUrlInvalid');
+      if (formData.storeSlug) {
+        // Same rules the API enforces (@force/shared): format, 3-40 chars, and
+        // not a reserved label (`app`, `api`, `www`, …).
+        const slugCheck = validateStoreSlug(formData.storeSlug);
+        if (!slugCheck.ok) {
+          errors.storeSlug =
+            slugCheck.code === 'SLUG_RESERVED'
+              ? t('errors.storeUrlReserved')
+              : slugCheck.code === 'SLUG_TOO_SHORT' || slugCheck.code === 'SLUG_TOO_LONG'
+                ? t('errors.storeUrlLength')
+                : t('errors.storeUrlInvalid');
+        }
       }
     }
 

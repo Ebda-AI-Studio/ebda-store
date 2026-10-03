@@ -1,105 +1,31 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } from '@force/shared';
 // Relative import (not the `@/*` tsconfig alias) so this file is importable
 // directly from the root Vitest suite, which has no per-workspace `@/*`
 // alias plugin (each app's `@/*` points at its OWN `src/`, so a single
 // global alias would be ambiguous across apps/{web,admin,api,orders}).
 // Zero behavior change — Next.js resolves both forms identically.
-import { isPlatformHost } from './src/lib/platform-host';
+import { devSuffixesAllowed } from './src/lib/platform-host';
 
 /**
- * Check if a hostname is a platform domain (not a custom store domain).
- * Delegates to the shared `isPlatformHost` so the server (this middleware) and
- * the client (`useStoreUrl` in StoreContext) can never drift — drift is exactly
- * what broke ebda.app (see `lib/platform-host.ts`).
+ * HOST ROUTING (program plan §1, design cloudflare-backend §4).
+ *
+ * The Host header — and nothing else — says which store a request is for:
+ *
+ *   `<slug>.ebda.app`  → that store (resolved by the API from the slug)
+ *   a custom domain    → that store (resolved by the API from the domain)
+ *   `ebda.app`, `app.`, `api.`, … → the PLATFORM: never renders a store
+ *   anything unparseable (IP, `localhost`, reserved label with no surface,
+ *   `x.y.ebda.app`) → 404
+ *
+ * There is NO path-based `/<slug>` entry and NO sticky store cookie: a store
+ * reached through a path or a cookie on a shared host was a cross-tenant cache
+ * hazard (the same URL answering as different stores), and it is gone. Whether a
+ * well-formed host actually belongs to a store is the API's call
+ * (`GET /public/store/resolve`); middleware is synchronous and cannot ask, so
+ * an unknown-but-well-formed host is 404'd by the page layer (`notFound()`).
  */
-function isPlatformDomain(hostname: string): boolean {
-  return isPlatformHost(hostname);
-}
-
-/**
- * Extract the store identifier from a custom domain.
- * Normalizes the domain: strips www prefix, lowercases, removes port.
- * For custom domains, the normalized domain is the identifier.
- */
-function getStoreIdentifier(hostname: string): string | null {
-  const host = hostname
-    .split(':')[0]
-    .toLowerCase()
-    .replace(/^www\./, '');
-
-  if (isPlatformDomain(hostname)) {
-    return null;
-  }
-
-  return host;
-}
-
-/**
- * Known app routes that should NOT be treated as store slugs
- */
-const KNOWN_APP_ROUTES = new Set([
-  'products',
-  'cart',
-  'checkout',
-  'auth',
-  'account',
-  'about',
-  'faq',
-  'contact',
-  'search',
-  'compare',
-  'categories',
-  'privacy',
-  'terms',
-  'returns',
-  'shipping',
-  'wishlist',
-  'review',
-  // Campaign-email unsubscribe landing page (D2) — linked from every campaign
-  // email as <storefront>/unsubscribe?token=…, including platform-path stores.
-  'unsubscribe',
-  // Promotional-SMS opt-out landing page (issue 206) — linked from every
-  // promotional SMS as <storefront>/sms-unsubscribe?t=…, incl. platform-path stores.
-  'sms-unsubscribe',
-  '_next',
-  'api',
-  'manifest',
-  'error',
-  'not-found',
-  // Reserved Next.js file-based metadata routes (no file extension, so the
-  // `firstSegment.includes('.')` check below doesn't catch them). Without these
-  // the platform domain treats e.g. /opengraph-image as a store slug and serves
-  // HTML, breaking WhatsApp/social link-preview images + favicons.
-  'opengraph-image',
-  'twitter-image',
-  'icon',
-  'apple-icon',
-  'sitemap',
-  'robots',
-  // Platform-level routes (not store-scoped) — must never be read as a store
-  // slug on the platform domain, or ebda.app/<route> resolves to a
-  // nonexistent store and 404s. `og` is the store-aware OG-card route
-  // (GET /og?slug=…) used by social link previews; `landing-preview` is the
-  // redesigned-landing preview page.
-  'og',
-  'landing-preview',
-  // Static asset folder for the landing preview (e.g. /landing/after-store.jpg).
-  // Without this the platform domain treats `landing` as a store slug and 404s
-  // the image.
-  'landing',
-  // Static asset folder for the social brand icons (e.g. /social-icons/whatsapp.png).
-  // The file extension is on the 2nd segment, so the `firstSegment.includes('.')`
-  // check below doesn't catch it — without this the platform domain reads
-  // `social-icons` as a store slug and 404s the footer/widget brand icons (they
-  // worked on custom domains but broke on <slug>.ebda.app).
-  'social-icons',
-  // /feeds/products.json — the agent_feed storefront route. The file
-  // extension is on the 2nd segment (products.json), so the
-  // `firstSegment.includes('.')` check below doesn't catch `feeds` — without
-  // this the platform domain reads `feeds` as a store slug and 404s.
-  'feeds',
-]);
 
 /**
  * Route roots eligible for the tenant-cacheable Track-A rewrite. Dark-
@@ -293,11 +219,11 @@ function resolveTrackALocale(request: NextRequest, storeKey: string): TrackALoca
 }
 
 /** Build the internal (never customer-visible) rewrite target for the
- *  tenant-cacheable Track-A tree. `tenantKey` is either a normalized custom
- *  domain or `slug:<slug>` for platform-path stores (plan §3.3);
- *  `encodeURIComponent` keeps the `slug:` colon path-segment-safe — Next
- *  decodes it back on the way into `params.tenant`. `storeKey` is the
- *  allowlist identity (the bare slug / hostname). */
+ *  tenant-cacheable Track-A tree. `tenantKey` is the request HOST
+ *  (`amelia.ebda.app` or a custom domain), so the route's full-route-cache key
+ *  carries the host and store A's HTML can never be served for store B's host.
+ *  `storeKey` is the allowlist identity (the bare slug for a `<slug>.ebda.app`
+ *  host, the hostname for a custom domain). */
 function buildStoreTreeUrl(
   request: NextRequest,
   tenantKey: string,
@@ -309,32 +235,6 @@ function buildStoreTreeUrl(
   const suffix = pathname === '/' ? '' : pathname;
   url.pathname = `/tenant-store/${encodeURIComponent(tenantKey)}/${locale}${suffix}`;
   return url;
-}
-
-/**
- * Extract store slug from the first path segment on platform domains.
- * Returns the slug and the remaining path, or null if the first segment is a known route.
- */
-function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: string } | null {
-  // Remove leading slash and split
-  const segments = pathname.replace(/^\//, '').split('/');
-  const firstSegment = segments[0];
-
-  if (!firstSegment || KNOWN_APP_ROUTES.has(firstSegment)) {
-    return null;
-  }
-
-  // Skip anything that looks like a file (contains a dot) — e.g.
-  // robots.txt, sitemap.xml, favicon.ico, manifest.webmanifest, *.js
-  if (firstSegment.includes('.')) {
-    return null;
-  }
-
-  // The first segment is a potential store slug
-  const remainingSegments = segments.slice(1);
-  const rewrittenPath = '/' + remainingSegments.join('/') || '/';
-
-  return { slug: firstSegment, rewrittenPath };
 }
 
 /**
@@ -430,28 +330,27 @@ function isTenantTreeEligible(
   );
 }
 
-/** Custom-domain requests: the Host itself identifies the store. */
-function handleCustomDomain(
+/**
+ * Store-host requests (`<slug>.ebda.app` or a custom domain): the Host itself
+ * identifies the store. `host` is the normalised hostname; `storeKey` is the
+ * canary-allowlist identity (slug for a subdomain, hostname for a custom domain).
+ */
+function handleStoreHost(
   request: NextRequest,
-  storeIdentifier: string,
+  host: string,
+  storeKey: string,
   requestHeaders: Headers,
   isPreviewIframe: boolean
 ): NextResponse {
-  requestHeaders.set('x-store-domain', storeIdentifier);
-  requestHeaders.set('x-store-identifier', storeIdentifier);
+  requestHeaders.set('x-store-domain', host);
+  requestHeaders.set('x-store-identifier', host);
   // Asserted explicitly (not just left absent) so layout.tsx can tell
-  // "custom domain" apart from "middleware never ran" — the latter is the only
+  // "store host" apart from "middleware never ran" — the latter is the only
   // case where StoreProvider's client-side host detection should run (#2091).
   requestHeaders.set('x-is-platform', 'false');
-  // Host-resolved, never cookie-resolved — clear any client-supplied value
-  // (requestHeaders is seeded from the raw request) so a custom-domain
-  // response is never wrongly marked non-shared-cacheable.
-  requestHeaders.delete('x-store-slug-source');
 
-  // Custom-domain /favicon.ico → dynamic per-store favicon (falling back to the
-  // neutral platform default when the store has none). Unreachable on a platform
-  // host, where getStoreIdentifier returns null, so the shared-domain
-  // /favicon.ico keeps serving the static asset. The `sf=1` marker is set by the
+  // /favicon.ico → dynamic per-store favicon (falling back to the neutral
+  // platform default when the store has none). The `sf=1` marker is set by the
   // route handler's own fallback redirect, so this cannot loop.
   if (request.nextUrl.pathname === '/favicon.ico' && !request.nextUrl.searchParams.has('sf')) {
     const url = request.nextUrl.clone();
@@ -459,139 +358,41 @@ function handleCustomDomain(
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 
-  if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, storeIdentifier)) {
-    const storeTreeUrl = buildStoreTreeUrl(
-      request,
-      storeIdentifier,
-      request.nextUrl.pathname,
-      storeIdentifier
-    );
+  if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, storeKey)) {
+    const storeTreeUrl = buildStoreTreeUrl(request, host, request.nextUrl.pathname, storeKey);
     const response = NextResponse.rewrite(storeTreeUrl, {
       request: { headers: requestHeaders },
     });
-    response.headers.set('x-store-domain', storeIdentifier);
+    response.headers.set('x-store-domain', host);
     return response;
   }
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.headers.set('x-store-domain', storeIdentifier);
+  response.headers.set('x-store-domain', host);
   return response;
 }
 
-/** Platform-domain requests: the store comes from the path slug, or the cookie. */
-function handlePlatformDomain(
-  request: NextRequest,
-  requestHeaders: Headers,
-  isPreviewIframe: boolean
-): NextResponse {
+/** Platform apps this Worker serves directly (the rest are other Workers/sites). */
+const SERVED_PLATFORM_APPS: ReadonlySet<PlatformApp> = new Set<PlatformApp>([
+  'marketing',
+  'preview',
+]);
+
+/**
+ * Platform-host requests: NEVER a store. `x-is-platform: true` and NO store
+ * identifier, so every store-dependent page 404s (or, for `/`, redirects to the
+ * marketing site) instead of rendering anything tenant-shaped.
+ */
+function handlePlatformHost(requestHeaders: Headers): NextResponse {
   requestHeaders.set('x-is-platform', 'true');
-  // requestHeaders is seeded from the raw client request, so a caller could
-  // send this header themselves. Clear it first so only the cookie-fallback
-  // branch below (the sole `.set` for this header) can ever turn it on —
-  // otherwise a spoofed value could force a legitimately URL-resolved
-  // response into the private/non-shared-cacheable path below.
-  requestHeaders.delete('x-store-slug-source');
-
-  const slugInfo = extractStoreSlug(request.nextUrl.pathname);
-  if (slugInfo) {
-    requestHeaders.set('x-store-slug', slugInfo.slug);
-
-    const storeTreeEligible = isTenantTreeEligible(
-      slugInfo.rewrittenPath,
-      isPreviewIframe,
-      slugInfo.slug
-    );
-    const url = storeTreeEligible
-      ? buildStoreTreeUrl(request, `slug:${slugInfo.slug}`, slugInfo.rewrittenPath, slugInfo.slug)
-      : request.nextUrl.clone();
-    if (!storeTreeEligible) {
-      url.pathname = slugInfo.rewrittenPath;
-    }
-
-    const response = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
-
-    // Only write the cookie when missing or stale. Re-setting it on every request
-    // forces `Cache-Control: no-store`, which hurts storefront crawl budget.
-    if (request.cookies.get('x-store-slug')?.value !== slugInfo.slug) {
-      // maxAge (30d) is REQUIRED. As a session cookie this dies on browser close,
-      // so a next-day refresh of a bare deep route on a platform host has neither
-      // slug nor cookie and falls back to the demo store — "Unable to resolve
-      // store context" (CF-migration regression, fixed 2026-06-27).
-      response.cookies.set('x-store-slug', slugInfo.slug, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        // S3-3 (2026-09-22 security audit): explicit Secure in production.
-        // Gated on NODE_ENV (not unconditional) so local dev over plain
-        // http keeps working — same pattern as AUTH_COOKIE_OPTIONS in
-        // apps/api/src/routes/auth.routes.ts.
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 30,
-      });
-    }
-    return response;
-  }
-
-  // Bare platform root — clear any sticky store cookie so visitors aren't trapped
-  // on the last store they looked at.
-  if (request.nextUrl.pathname === '/') {
-    const response = NextResponse.next({ request: { headers: requestHeaders } });
-    if (request.cookies.get('x-store-slug')) {
-      response.cookies.delete('x-store-slug');
-    }
-    return response;
-  }
-
-  // Subroute with no slug in the URL — carry store context from the cookie
-  // (e.g. /products or /cart after /palora). NOT for the agent/feed documents
-  // (#1959): they answer `public, s-maxage=…`, and Cloudflare's cache key
-  // ignores Vary/Cookie, so a cookie-resolved store's document would be cached
-  // under the bare platform URL and served to every other visitor. Those paths
-  // resolve ONLY from the URL slug (`/<slug>/llms.txt`) or the custom-domain
-  // Host — the platform root answers as the platform (404 for ACP/UCP/feed).
-  const cookieSlug = isUrlKeyedPublicPath(request.nextUrl.pathname)
-    ? undefined
-    : request.cookies.get('x-store-slug')?.value;
-  if (cookieSlug) {
-    requestHeaders.set('x-store-slug', cookieSlug);
-    // Signal-only header (nothing routes on it): the agent-discovery routes
-    // (llms.txt, .well-known/acp.json, .well-known/ucp) need to tell "the
-    // slug came from the URL" apart from "the slug came from this cookie
-    // fallback" so they can mark a cookie-resolved response non-shared-
-    // cacheable — the same request line can otherwise answer with a
-    // different store depending on which visitor's cookie it carried
-    // (scoped-audit P2 on PR #1942).
-    requestHeaders.set('x-store-slug-source', 'cookie');
-
-    if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, cookieSlug)) {
-      const storeTreeUrl = buildStoreTreeUrl(
-        request,
-        `slug:${cookieSlug}`,
-        request.nextUrl.pathname,
-        cookieSlug
-      );
-      return NextResponse.rewrite(storeTreeUrl, { request: { headers: requestHeaders } });
-    }
-  }
-
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
-/**
- * Store-specific documents that are SHARED-cacheable (`public, s-maxage`) and
- * therefore must be keyed by URL/Host alone — never by the sticky
- * `x-store-slug` cookie, which no cache in front of us keys on (#1959).
- */
-const URL_KEYED_PUBLIC_PATHS = [
-  '/llms.txt',
-  '/.well-known/acp.json',
-  '/.well-known/ucp',
-  '/feeds/products.json',
-];
-
-/** Exact match OR anything beneath it (`/.well-known/ucp/<doc>`). */
-function isUrlKeyedPublicPath(pathname: string): boolean {
-  return URL_KEYED_PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
+function notFoundResponse(): NextResponse {
+  return new NextResponse('Not found', {
+    status: 404,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
 }
 
 /**
@@ -603,7 +404,9 @@ function isUrlKeyedPublicPath(pathname: string): boolean {
  * `/feeds/products.json` answer as another store under a `public, s-maxage`
  * header, and a spoofed `x-preview-draft` would render a draft layout outside
  * the preview iframe. Every value in this list is re-set below from the Host,
- * the URL, the sticky cookie or the preview params — never from the client.
+ * the URL or the preview params — never from the client. The retired
+ * `x-store-slug*` headers stay in the list: nothing sets them any more, and
+ * stripping them means a client can never smuggle one in as a store identity.
  */
 export const MIDDLEWARE_ASSERTED_HEADERS = [
   'x-is-platform',
@@ -629,18 +432,33 @@ export function middleware(request: NextRequest) {
     return new NextResponse(null, { status: 404 });
   }
 
-  // www → apex canonical 301 for CUSTOM store domains only. Platform www hosts
-  // (ebda.app / ebda.app) are real platform hosts and are
-  // skipped via isPlatformDomain. The www custom hostname is enrolled in
+  const parsedHost = parseStoreHost(hostname, { allowDevSuffixes: devSuffixesAllowed() });
+
+  // An IP, `localhost`, a reserved label with no surface (`admin.ebda.app`), a
+  // multi-label name under `.ebda.app` or any malformed Host is never a store
+  // and never a page: 404, with no store lookup and nothing cacheable.
+  if (parsedHost.kind === 'invalid') return notFoundResponse();
+
+  // www → apex canonical 301: for CUSTOM store domains, and for the platform's
+  // own `www.ebda.app`. The www custom hostname is enrolled in
   // Cloudflare-for-SaaS (CloudflareDomainService.addDomain) so TLS terminates
   // before we reach here; we then send visitors to the single canonical apex.
-  const bareHost = hostname.split(':')[0].toLowerCase();
-  if (bareHost.startsWith('www.') && !isPlatformDomain(hostname)) {
+  const bareHost = hostname.split(':')[0].toLowerCase().replace(/\.$/, '');
+  if (
+    bareHost.startsWith('www.') &&
+    (parsedHost.kind === 'custom' || parsedHost.kind === 'platform')
+  ) {
     const apexUrl = new URL(
       request.nextUrl.pathname + request.nextUrl.search,
       `https://${bareHost.replace(/^www\./, '')}`
     );
     return NextResponse.redirect(apexUrl, 301);
+  }
+
+  // Platform hosts this Worker does not serve (app., api., orders., docs., …) are
+  // misrouted traffic, not pages.
+  if (parsedHost.kind === 'platform' && !SERVED_PLATFORM_APPS.has(parsedHost.app)) {
+    return notFoundResponse();
   }
 
   const draftToken = request.nextUrl.searchParams.get('_layoutDraft');
@@ -652,18 +470,39 @@ export function middleware(request: NextRequest) {
   requestHeaders.set('x-original-host', hostname);
   propagateDraftHeader(requestHeaders, request, draftToken, isPreviewIframe);
 
-  // Bare root on `ebda.app` deliberately does NOT redirect to
-  // ebda.app: the homepage serves the Ebda landing page
-  // (apps/web/src/components/PlatformLanding.tsx) and unknown slugs render the
-  // same component via app/not-found.tsx. The old redirect was lossy — visitors
-  // learning about the store builder were dumped on a site pitching another service.
-  const storeIdentifier = getStoreIdentifier(hostname);
+  return withDraftCookie(routeByHost(request, parsedHost, requestHeaders, isPreviewIframe));
+}
 
-  return withDraftCookie(
-    storeIdentifier
-      ? handleCustomDomain(request, storeIdentifier, requestHeaders, isPreviewIframe)
-      : handlePlatformDomain(request, requestHeaders, isPreviewIframe)
-  );
+/** Dispatch a classified, non-invalid host. */
+function routeByHost(
+  request: NextRequest,
+  parsedHost: Exclude<ParsedStoreHost, { kind: 'invalid' }>,
+  requestHeaders: Headers,
+  isPreviewIframe: boolean
+): NextResponse {
+  switch (parsedHost.kind) {
+    case 'subdomain':
+      // The store's slug is the allowlist identity; the canonical HOST
+      // (`<slug>.ebda.app`, also for the dev-only `.localhost` suffixes) is what
+      // the API resolves and what the tenant tree is keyed on.
+      return handleStoreHost(
+        request,
+        storeHost(parsedHost.slug),
+        parsedHost.slug,
+        requestHeaders,
+        isPreviewIframe
+      );
+    case 'custom':
+      return handleStoreHost(
+        request,
+        parsedHost.hostname,
+        parsedHost.hostname,
+        requestHeaders,
+        isPreviewIframe
+      );
+    case 'platform':
+      return handlePlatformHost(requestHeaders);
+  }
 }
 
 /**

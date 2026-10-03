@@ -271,14 +271,6 @@ interface Order {
   createdAt: string;
 }
 
-interface Store {
-  id: string;
-  name: string;
-  slug: string;
-  logo?: string;
-  settings?: Record<string, unknown>;
-}
-
 interface PaginationMeta {
   page: number;
   limit: number;
@@ -1295,11 +1287,6 @@ class ApiClient {
         location?: string;
       }>;
     }>(`/stores/${storeId}/orders/${orderId}/timeline`);
-  }
-
-  // Store
-  async getStore() {
-    return this.request<{ store: Store }>('/public/store');
   }
 
   /**
