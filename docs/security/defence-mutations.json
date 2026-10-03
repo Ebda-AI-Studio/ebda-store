@@ -557,8 +557,8 @@
       "tier": "unit",
       "why": "the admin store list returns whole Store rows; without the omit every listed store ships its agent credential ciphertext",
       "source": "apps/api/src/services/store.service.ts",
-      "find": "        omit: { agentApiKey: true },\n        include: {\n          owner: {",
-      "replace": "        include: {\n          owner: {",
+      "find": "        omit: { agentApiKey: true },\n        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n        orderBy: { createdAt: 'desc' },",
+      "replace": "        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n        orderBy: { createdAt: 'desc' },",
       "test": "tests/unit/store-read-omits-agent-credential.test.ts"
     },
     {
