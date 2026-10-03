@@ -204,9 +204,7 @@ describe.skipIf(!hasDb)('SMS-marketing consent (issue 206)', () => {
     ))!.slug;
     expect(
       text.endsWith(` Stop offers: ${storefrontOrigin({ slug })}/sms-unsubscribe?t=${m![1]}`)
-    ).toBe(
-      true
-    );
+    ).toBe(true);
     const consentId = verifySmsOptOutToken(m![1]);
     expect(consentId).not.toBeNull();
 
