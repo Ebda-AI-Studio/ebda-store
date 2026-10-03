@@ -53,7 +53,8 @@ process.env.DIRECT_URL ??= dbUrl;
 const csvPath = resolve(root, opt('--csv', 'tests/fixtures/amelia-aurum-catalogue.csv'));
 const ownerEmail = opt('--owner-email', 'amelia-owner@ebda.local');
 
-const { prisma, runInStoreScope } = await import('@force/database');
+const { prisma, runInStoreScope, withUser } = await import('@force/database');
+const { ensureAdminUser } = await import('../apps/api/src/lib/definer.ts');
 const { StoreService } = await import('../apps/api/src/services/store.service.ts');
 const { BulkService } = await import('../apps/api/src/services/bulk.service.ts');
 const { decodeCsvBytes, importCsvToPlatformCsv } =
@@ -62,21 +63,23 @@ const { invalidateStoreProductCaches } = await import('../apps/api/src/lib/publi
 
 try {
   // ---- owner -----------------------------------------------------------------
-  let owner = await prisma.user.findFirst({ where: { email: ownerEmail, storeId: null } });
-  if (!owner) {
-    owner = await prisma.user.create({
-      data: {
-        email: ownerEmail,
-        // Not a valid hash of anything: this account cannot log in. Set a real
-        // password through the normal reset flow if a human needs to sign in.
-        passwordHash: '!seed-no-login',
-        firstName: 'Amelia',
-        lastName: 'Aurum',
-        role: 'store_admin',
-        emailVerified: true,
-        language: 'ar',
-      },
-    });
+  // The admin namespace (users.store_id NULL) is not visible from any RLS scope,
+  // so find-or-create goes through the same `ebda_admin_user_ensure` definer the
+  // API uses. Not a valid hash of anything: this account cannot log in. Set a real
+  // password through the normal reset flow if a human needs to sign in.
+  const admin = await ensureAdminUser({
+    email: ownerEmail,
+    passwordHash: '!seed-no-login',
+    firstName: 'Amelia',
+    lastName: 'Aurum',
+    role: 'store_admin',
+    emailVerified: true,
+  });
+  const owner = { id: admin.id };
+  if (admin.created) {
+    await withUser(owner.id, tx =>
+      tx.user.update({ where: { id: owner.id }, data: { language: 'ar' } })
+    );
   }
 
   // ---- store -----------------------------------------------------------------

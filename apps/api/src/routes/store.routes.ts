@@ -632,7 +632,7 @@ router.delete(
       const { id } = req.params;
       const user = getAuthUser(req);
 
-      const deleted = await StoreService.delete(id);
+      const deleted = await StoreService.delete(id, user.userId);
 
       await auditLog({
         action: 'STORE_DELETED',

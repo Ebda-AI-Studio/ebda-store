@@ -19,12 +19,13 @@
  *      an unreadable limits blob must never make a store unlimited by accident
  *      (unknown code -> the FREE seed) nor lock it out.
  *
- * Reads go through `withRlsBypass`: trusted, internal, already scoped by
- * `storeId` — same posture as FeatureService, and it keeps working when
- * `store_subscriptions` moves to strict RLS (no tenant context needed).
+ * Reads go through `withStore(storeId, ...)`: `store_subscriptions` is under
+ * strict RLS, so the lookup runs in the store's own scope (it joins the request
+ * transaction when the caller already has one) — the same posture as
+ * FeatureService. The `plans` catalog has no tenant and is read as is.
  */
 
-import { withRlsBypass, type Prisma } from '@force/database';
+import { withStore, type Prisma } from '@force/database';
 import {
   DEFAULT_PLAN_SEEDS,
   FALLBACK_PLAN_CODE,
@@ -112,7 +113,7 @@ export async function getEntitlements(
       ordersOverLimitMonth: sub?.ordersOverLimitMonth ?? null,
     };
   };
-  return tx ? run(tx) : withRlsBypass(run);
+  return tx ? run(tx) : withStore(storeId, run);
 }
 
 /**

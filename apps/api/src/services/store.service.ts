@@ -572,7 +572,7 @@ export class StoreService {
    * Caller is responsible for super_admin authorization (route enforces it)
    * and for writing the STORE_DELETED audit log AFTER this returns successfully.
    */
-  static async delete(storeId: string) {
+  static async delete(storeId: string, actorUserId?: string) {
     const store = await this.getById(storeId);
 
     await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
@@ -606,7 +606,11 @@ export class StoreService {
       // The transaction is scoped to THIS store with a transaction-local
       // set_config (no bypass flag exists any more). It dies on commit/rollback,
       // and this is a super-admin-only code path (the route gates on role).
-      await setTenantGucs(tx, { storeId });
+      // The acting super_admin is set too: unlinking the owner's audit rows below
+      // happens AFTER the store row is gone, so the definer's "user of the caller's
+      // store" test cannot match; the caller's own role (ebda_is_super_admin) is
+      // what authorises it.
+      await setTenantGucs(tx, { storeId, ...(actorUserId ? { userId: actorUserId } : {}) });
 
       logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
 

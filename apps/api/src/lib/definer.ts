@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { prisma, type Prisma } from '@force/database';
+import { prisma, withSystemJob, type Prisma } from '@force/database';
 
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration
@@ -68,10 +68,11 @@ export async function getUserState(userId: string): Promise<UserState | null> {
 export async function findUserIdByEmail(
   email: string,
   storeId: string | null,
-  opts: { includeDeleted?: boolean } = {}
+  opts: { includeDeleted?: boolean; caseInsensitive?: boolean } = {}
 ): Promise<string | null> {
   const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
-    SELECT public.ebda_auth_find_user_id(${email}, ${storeId}, ${opts.includeDeleted === true}) AS id`;
+    SELECT public.ebda_auth_find_user_id(
+      ${email}, ${storeId}, ${opts.includeDeleted === true}, ${opts.caseInsensitive === true}) AS id`;
   return rows[0]?.id ?? null;
 }
 
@@ -107,6 +108,7 @@ export interface AdminUser {
   created: boolean;
   role: string;
   status: string;
+  /** The email and name the CALLER supplied: the stored name of an existing account is never returned. */
   email: string;
   firstName: string;
   lastName: string;
@@ -132,15 +134,7 @@ export async function ensureAdminUser(
   db: Pick<Prisma.TransactionClient, '$queryRaw'> = prisma
 ): Promise<AdminUser> {
   const rows = await db.$queryRaw<
-    Array<{
-      user_id: string;
-      created: boolean;
-      role: string;
-      status: string;
-      email: string;
-      first_name: string;
-      last_name: string;
-    }>
+    Array<{ user_id: string; created: boolean; role: string; status: string }>
   >`SELECT * FROM public.ebda_admin_user_ensure(
       ${input.email}, ${input.passwordHash}, ${input.firstName}, ${input.lastName},
       ${input.role}, ${input.emailVerified === true})`;
@@ -150,9 +144,9 @@ export async function ensureAdminUser(
     created: r.created,
     role: r.role,
     status: r.status,
-    email: r.email,
-    firstName: r.first_name,
-    lastName: r.last_name,
+    email: input.email,
+    firstName: input.firstName,
+    lastName: input.lastName,
   };
 }
 
@@ -250,6 +244,14 @@ export interface WebhookInboxPatch {
 }
 
 /**
+ * `get` / `update` / `stuck` read raw payment payloads or change processing
+ * state across stores, so the SQL functions only answer a super_admin or the
+ * `webhook-inbox` system job. This wrapper is the sanctioned way to be that job:
+ * the setting is transaction-local and dies with the transaction.
+ */
+const asWebhookInbox = <T>(fn: () => Promise<T>): Promise<T> => withSystemJob('webhook-inbox', fn);
+
+/**
  * The payment-webhook inbox (`webhook_events`). `store_id` is NULL on the
  * platform path and the consumer must read a row before it can enter a store
  * scope, so every operation is a definer keyed by the row id / idempotency key.
@@ -273,35 +275,41 @@ export const webhookInbox = {
   },
 
   async get(id: string): Promise<WebhookInboxRow | null> {
-    const rows = await prisma.$queryRaw<InboxDbRow[]>`
-      SELECT * FROM public.ebda_webhook_inbox_get(${id})`;
+    const rows = await asWebhookInbox(
+      () => prisma.$queryRaw<InboxDbRow[]>`SELECT * FROM public.ebda_webhook_inbox_get(${id})`
+    );
     return rows[0] ? toInboxRow(rows[0]) : null;
   },
 
   async update(id: string, patch: WebhookInboxPatch): Promise<boolean> {
-    const rows = await prisma.$queryRaw<Array<{ ok: boolean }>>`
+    const rows = await asWebhookInbox(
+      () => prisma.$queryRaw<Array<{ ok: boolean }>>`
       SELECT public.ebda_webhook_inbox_update(
         ${id}, ${patch.status ?? null}, ${patch.lastError ?? null},
         ${patch.incrementAttempts === true}, ${patch.markProcessed !== undefined},
         ${patch.markProcessed?.resultOrderId ?? null}, ${patch.markProcessed?.resultStatus ?? null},
         ${patch.requeue === true}
-      ) AS ok`;
+      ) AS ok`
+    );
     return rows[0]?.ok === true;
   },
 
   /** Rows never consumed or wedged past `cutoff`, oldest first. */
   async stuck(cutoff: Date, limit: number) {
-    const rows = await prisma.$queryRaw<
-      Array<{
-        id: string;
-        provider: string;
-        idempotency_key: string;
-        store_id: string | null;
-        status: string;
-        attempts: number;
-        received_at: Date;
-      }>
-    >`SELECT * FROM public.ebda_webhook_inbox_stuck(${cutoff}::timestamp, ${limit}::int)`;
+    const rows = await asWebhookInbox(
+      () =>
+        prisma.$queryRaw<
+          Array<{
+            id: string;
+            provider: string;
+            idempotency_key: string;
+            store_id: string | null;
+            status: string;
+            attempts: number;
+            received_at: Date;
+          }>
+        >`SELECT * FROM public.ebda_webhook_inbox_stuck(${cutoff}::timestamp, ${limit}::int)`
+    );
     return rows.map(r => ({
       id: r.id,
       provider: r.provider,
@@ -549,20 +557,33 @@ export async function auditLogExists(
 }
 
 /**
+ * The retention functions answer only an ACTIVE super_admin or the
+ * `audit-log-retention` system job (the cron has no user and no store).
+ */
+const asRetentionJob = <T>(fn: () => Promise<T>): Promise<T> =>
+  withSystemJob('audit-log-retention', fn);
+
+/**
  * Audit-trail retention (the weekly archive cron): count, page out and purge rows
  * older than `cutoff`, across every store and the store-less platform rows. The
  * SQL functions refuse a cutoff newer than 30 days.
  */
 export const auditRetention = {
   async count(cutoff: Date): Promise<number> {
-    const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
-      SELECT public.ebda_audit_log_retention_count(${cutoff}::timestamp) AS n`;
+    const rows = await asRetentionJob(
+      () =>
+        prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT public.ebda_audit_log_retention_count(${cutoff}::timestamp) AS n`
+    );
     return Number(rows[0]?.n ?? 0);
   },
   /** A page of rows (as the JSON an archive line holds), ascending by id after `afterId`. */
   async page(cutoff: Date, afterId: string | null, limit: number): Promise<Array<{ id: string }>> {
-    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>`
-      SELECT * FROM public.ebda_audit_log_retention_page(${cutoff}::timestamp, ${afterId}, ${limit}::int)`;
+    const rows = await asRetentionJob(
+      () =>
+        prisma.$queryRaw<Array<Record<string, unknown>>>`
+      SELECT * FROM public.ebda_audit_log_retention_page(${cutoff}::timestamp, ${afterId}, ${limit}::int)`
+    );
     return rows.map(r => ({
       id: r.id as string,
       action: r.action,
@@ -577,8 +598,31 @@ export const auditRetention = {
     }));
   },
   async purge(cutoff: Date, limit: number): Promise<number> {
-    const rows = await prisma.$queryRaw<Array<{ n: number }>>`
-      SELECT public.ebda_audit_log_retention_purge(${cutoff}::timestamp, ${limit}::int) AS n`;
+    const rows = await asRetentionJob(
+      () =>
+        prisma.$queryRaw<Array<{ n: number }>>`
+      SELECT public.ebda_audit_log_retention_purge(${cutoff}::timestamp, ${limit}::int) AS n`
+    );
     return Number(rows[0]?.n ?? 0);
   },
 };
+
+// ---------------------------------------------------------------------------
+// Plans engine (SP5): platform-wide reads for the super-admin Plans page
+// ---------------------------------------------------------------------------
+
+/** Stores per plan code, across every store. Super_admin only (the function checks). */
+export async function planSubscriberCounts(): Promise<Map<string, number>> {
+  const rows = await prisma.$queryRaw<
+    Array<{ plan_code: string; n: bigint }>
+  >`SELECT plan_code, n FROM public.ebda_plan_subscriber_counts()`;
+  return new Map(rows.map(r => [r.plan_code, Number(r.n)]));
+}
+
+/** The ids of every store subscribed to `planCode`. Super_admin only (the function checks). */
+export async function storeIdsOnPlan(planCode: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{ store_id: string }>
+  >`SELECT store_id FROM public.ebda_plan_store_ids(${planCode})`;
+  return rows.map(r => r.store_id);
+}

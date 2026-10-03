@@ -26,7 +26,7 @@
 -- the definer functions rely on that. Section 0 refuses to continue otherwise.
 --
 -- =============================================================================
--- TABLES WITH A store_id COLUMN (84 incl. users and store_staff; policy: store_id = store GUC)
+-- TABLES WITH A store_id COLUMN (85 incl. users and store_staff; policy: store_id = store GUC)
 --   enumerated from information_schema.columns on 2026-10-04 (column store_id)
 --   abandoned_cart_configs
 --   abandoned_carts
@@ -100,6 +100,7 @@
 --   store_howtos
 --   store_locations
 --   store_pages
+--   store_subscriptions   (SP5 plans engine, migration 20261003130000)
 --   store_usage_snapshots
 --   suppliers
 --   tags  [store_id NULLABLE: NULL rows are unreachable for ebda_app]
@@ -163,6 +164,8 @@
 --                           definer for every auth path. Revisit in SP5.
 --   answer_engine_provider_configs
 --                           platform-global provider credentials, no tenant.
+--   plans                   platform-global plan catalog (SP5; config written only
+--                           by super_admin routes, no tenant data, no store_id).
 --   system_settings         platform-global key/value; policy is `true` for
 --                           ebda_app (it holds no tenant data).
 --   _prisma_migrations      not granted to ebda_app at all.
@@ -226,6 +229,62 @@ AS $fn$
     WHERE u.id = nullif(current_setting('app.current_user_id', true), '')
       AND u.role = 'super_admin' AND u.status = 'active' AND u.deleted_at IS NULL
   )
+$fn$;
+
+-- ---------------------------------------------------------------------------
+-- 2c. Caller checks for the MUTATING and cross-store definers in section 5.
+--     A SECURITY DEFINER function runs as the owner and sees every row, so a
+--     function that accepts "any id" would let one application bug (or an
+--     injected statement) rewrite another tenant's data despite RLS. Each
+--     mutating function therefore checks WHO is calling, from the same
+--     transaction-local settings the policies use, and raises SQLSTATE 42501
+--     (insufficient_privilege) when the caller has no business with the target.
+--
+--     ebda_may_act_on_user(p_user_id): the caller IS that user
+--       (app.current_user_id), OR is an ACTIVE super_admin, OR the user belongs
+--       to the store the transaction is scoped to: a customer
+--       (users.store_id = app.current_store_id) or a staff member / the owner of
+--       that store (store_staff / stores.owner_id). It never matches when no
+--       user and no store is set.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.ebda_may_act_on_user(p_user_id text)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT p_user_id IS NOT NULL AND (
+    coalesce(p_user_id = nullif(current_setting('app.current_user_id', true), ''), false)
+    OR public.ebda_is_super_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = p_user_id AND u.store_id IS NOT NULL
+        AND u.store_id = nullif(current_setting('app.current_store_id', true), '')
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.store_staff ss
+      WHERE ss.user_id = p_user_id
+        AND ss.store_id = nullif(current_setting('app.current_store_id', true), '')
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.stores s
+      WHERE s.owner_id = p_user_id
+        AND s.id = nullif(current_setting('app.current_store_id', true), '')
+    )
+  )
+$fn$;
+
+--     ebda_is_system_job(p_job): the transaction was opened by the named platform
+--       job (`withSystemJob` in @force/database sets app.system_job
+--       transaction-locally). Used ONLY for the few cross-store definers that run
+--       from a cron with no store and no user (audit retention, the webhook
+--       inbox consumer). It is a named, narrow context, not a bypass: it opens
+--       no table to ebda_app and no other function checks it.
+CREATE OR REPLACE FUNCTION public.ebda_is_system_job(p_job text)
+RETURNS boolean
+LANGUAGE sql STABLE
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT coalesce(nullif(current_setting('app.system_job', true), ''), '') = p_job
 $fn$;
 
 -- ---------------------------------------------------------------------------
@@ -315,6 +374,7 @@ BEGIN
         'store_howtos',
         'store_locations',
         'store_pages',
+        'store_subscriptions',
         'store_usage_snapshots',
         'suppliers',
         'tags',
@@ -722,6 +782,11 @@ ALTER TABLE store_pages FORCE ROW LEVEL SECURITY;
 CREATE POLICY ebda_tenant_isolation ON store_pages AS PERMISSIVE FOR ALL TO ebda_app
   USING (store_id = nullif(current_setting('app.current_store_id', true), ''))
   WITH CHECK (store_id = nullif(current_setting('app.current_store_id', true), ''));
+ALTER TABLE store_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE store_subscriptions FORCE ROW LEVEL SECURITY;
+CREATE POLICY ebda_tenant_isolation ON store_subscriptions AS PERMISSIVE FOR ALL TO ebda_app
+  USING (store_id = nullif(current_setting('app.current_store_id', true), ''))
+  WITH CHECK (store_id = nullif(current_setting('app.current_store_id', true), ''));
 ALTER TABLE store_usage_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE store_usage_snapshots FORCE ROW LEVEL SECURITY;
 CREATE POLICY ebda_tenant_isolation ON store_usage_snapshots AS PERMISSIVE FOR ALL TO ebda_app
@@ -926,7 +991,8 @@ CREATE POLICY ebda_tenant_isolation ON product_variant_options AS PERMISSIVE FOR
 -- ---------------------------------------------------------------------------
 
 -- 5.1 host -> store. Exact slug or custom-domain match on an ACTIVE store; a slug
---     match wins over a domain match. Returns the id only.
+--     match wins over a domain match. Returns the id only. UNGUARDED ON PURPOSE:
+--     it runs before any scope exists and the host it resolves is public.
 CREATE OR REPLACE FUNCTION public.ebda_resolve_store_id(p_slug text, p_domain text)
 RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -942,6 +1008,9 @@ AS $fn$
 $fn$;
 
 -- 5.2 identity, by exact id: the facts an access-token check needs.
+--     UNGUARDED ON PURPOSE: it runs on every request BEFORE any user or store
+--     scope exists (it is what authenticates the token), the id is the signed
+--     token's subject, and it returns no secret (no email, no hash).
 CREATE OR REPLACE FUNCTION public.ebda_user_state(p_user_id text)
 RETURNS TABLE (id text, role text, status text, token_version integer, store_id text, deleted_at timestamp)
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -955,9 +1024,12 @@ $fn$;
 -- 5.3 login/registration lookup: email -> user id inside ONE namespace
 --     (p_store_id NULL = the admin namespace). Soft-deleted users are excluded
 --     unless p_include_deleted. Returns the id only; the caller then reads the
---     row under its own user scope.
+--     row under its own user scope. UNGUARDED ON PURPOSE: login, registration
+--     and signup have no principal yet, and an id alone discloses nothing.
+--     p_case_insensitive matches the email regardless of case (merchant signup).
 CREATE OR REPLACE FUNCTION public.ebda_auth_find_user_id(
-  p_email text, p_store_id text, p_include_deleted boolean DEFAULT false
+  p_email text, p_store_id text, p_include_deleted boolean DEFAULT false,
+  p_case_insensitive boolean DEFAULT false
 )
 RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -965,7 +1037,7 @@ SET search_path = pg_catalog, public, pg_temp
 AS $fn$
   SELECT u.id
   FROM public.users u
-  WHERE u.email = p_email
+  WHERE (u.email = p_email OR (p_case_insensitive AND lower(u.email) = lower(p_email)))
     AND u.store_id IS NOT DISTINCT FROM p_store_id
     AND (p_include_deleted OR u.deleted_at IS NULL)
   LIMIT 1
@@ -974,12 +1046,15 @@ $fn$;
 -- 5.3b find-or-create an ADMIN-namespace account (users.store_id NULL): store
 --      owners and staff. Returns an existing account untouched; otherwise creates
 --      a store_admin/staff account. Refuses every other role, so it can never mint
---      a super_admin or a customer.
+--      a super_admin or a customer. UNGUARDED ON PURPOSE (signup and provisioning
+--      have no principal) but it returns ids and flags only, never another
+--      person's name or email, so an existing address leaks nothing it was not
+--      asked about.
 CREATE OR REPLACE FUNCTION public.ebda_admin_user_ensure(
   p_email text, p_password_hash text, p_first_name text, p_last_name text,
   p_role text, p_email_verified boolean DEFAULT false
 )
-RETURNS TABLE (user_id text, created boolean, role text, status text, email text, first_name text, last_name text)
+RETURNS TABLE (user_id text, created boolean, role text, status text)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
@@ -993,7 +1068,7 @@ BEGIN
    WHERE u.email = p_email AND u.store_id IS NULL
    ORDER BY u.created_at LIMIT 1;
   IF FOUND THEN
-    RETURN QUERY SELECT v.id, false, v.role::text, v.status::text, v.email, v.first_name, v.last_name;
+    RETURN QUERY SELECT v.id, false, v.role::text, v.status::text;
     RETURN;
   END IF;
   INSERT INTO public.users
@@ -1002,11 +1077,14 @@ BEGIN
     (gen_random_uuid()::text, p_email, p_password_hash, p_first_name, p_last_name,
      p_role::public."UserRole", NULL, p_email_verified, now())
   RETURNING * INTO v;
-  RETURN QUERY SELECT v.id, true, v.role::text, v.status::text, v.email, v.first_name, v.last_name;
+  RETURN QUERY SELECT v.id, true, v.role::text, v.status::text;
 END
 $fn$;
 
--- 5.4 audit trail: append-only through a definer. audit_logs is store-scoped
+-- 5.4 audit trail: append-only through a definer. UNGUARDED ON PURPOSE: platform
+--     events (failed logins, signup) have no principal and a super-admin logs
+--     against stores it is not scoped to; the function can only ADD a row, never
+--     read, change or remove one. audit_logs is store-scoped
 --     under RLS, but platform events (login failures, super-admin actions) have
 --     no store, and a request may log against a store other than its own. ebda_app
 --     can still SELECT its store's rows; it can no longer rewrite history of
@@ -1032,6 +1110,9 @@ $fn$;
 -- 5.5 audit-trail maintenance on delete: nulling store_id / user_id leaves the
 --     caller's store scope (WITH CHECK would reject it), so these two narrow
 --     mutations are definers. Both return the number of rows changed.
+--     GUARDED: detach_store only for the store the transaction is scoped to (or a
+--     super_admin); unlink_user only for a user the caller may act on
+--     (ebda_may_act_on_user). Otherwise SQLSTATE 42501.
 CREATE OR REPLACE FUNCTION public.ebda_audit_logs_detach_store(p_store_id text)
 RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
@@ -1040,6 +1121,12 @@ AS $fn$
 DECLARE
   v_n integer;
 BEGIN
+  IF p_store_id IS NULL OR NOT (
+       coalesce(p_store_id = nullif(current_setting('app.current_store_id', true), ''), false)
+       OR public.ebda_is_super_admin()) THEN
+    RAISE EXCEPTION 'ebda_audit_logs_detach_store: caller is not scoped to store %', p_store_id
+      USING ERRCODE = '42501';
+  END IF;
   UPDATE public.audit_logs a SET store_id = NULL WHERE a.store_id = p_store_id;
   GET DIAGNOSTICS v_n = ROW_COUNT;
   RETURN v_n;
@@ -1054,6 +1141,10 @@ AS $fn$
 DECLARE
   v_n integer;
 BEGIN
+  IF NOT public.ebda_may_act_on_user(p_user_id) THEN
+    RAISE EXCEPTION 'ebda_audit_logs_unlink_user: caller may not act on user %', p_user_id
+      USING ERRCODE = '42501';
+  END IF;
   UPDATE public.audit_logs a SET user_id = NULL WHERE a.user_id = p_user_id;
   GET DIAGNOSTICS v_n = ROW_COUNT;
   RETURN v_n;
@@ -1077,13 +1168,19 @@ $fn$;
 -- 5.5c retention of the audit trail (weekly cron): count / export / purge rows
 --      older than a cutoff, across every store and the store-less platform rows.
 --      A cutoff newer than 30 days is refused, so a stolen role cannot use the
---      purge to erase recent history.
+--      purge to erase recent history. GUARDED: only an ACTIVE super_admin or the
+--      `audit-log-retention` system job (the weekly cron, which has no user and no
+--      store) may call these; anyone else gets SQLSTATE 42501.
 CREATE OR REPLACE FUNCTION public.ebda_audit_log_retention_count(p_cutoff timestamp)
 RETURNS bigint
 LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
 BEGIN
+  IF NOT (public.ebda_is_super_admin() OR public.ebda_is_system_job('audit-log-retention')) THEN
+    RAISE EXCEPTION 'ebda_audit_log_retention_*: caller is neither a super_admin nor the retention job'
+      USING ERRCODE = '42501';
+  END IF;
   IF p_cutoff > now() - interval '30 days' THEN
     RAISE EXCEPTION 'ebda_audit_log_retention_*: cutoff must be at least 30 days old';
   END IF;
@@ -1097,6 +1194,10 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
 BEGIN
+  IF NOT (public.ebda_is_super_admin() OR public.ebda_is_system_job('audit-log-retention')) THEN
+    RAISE EXCEPTION 'ebda_audit_log_retention_*: caller is neither a super_admin nor the retention job'
+      USING ERRCODE = '42501';
+  END IF;
   IF p_cutoff > now() - interval '30 days' THEN
     RAISE EXCEPTION 'ebda_audit_log_retention_*: cutoff must be at least 30 days old';
   END IF;
@@ -1116,6 +1217,10 @@ AS $fn$
 DECLARE
   v_n integer;
 BEGIN
+  IF NOT (public.ebda_is_super_admin() OR public.ebda_is_system_job('audit-log-retention')) THEN
+    RAISE EXCEPTION 'ebda_audit_log_retention_*: caller is neither a super_admin nor the retention job'
+      USING ERRCODE = '42501';
+  END IF;
   IF p_cutoff > now() - interval '30 days' THEN
     RAISE EXCEPTION 'ebda_audit_log_retention_*: cutoff must be at least 30 days old';
   END IF;
@@ -1128,6 +1233,9 @@ $fn$;
 
 -- 5.6 payment-webhook routing. A provider's callback names a provider reference,
 --     not a store, so the store is discovered BEFORE any scope exists.
+--     UNGUARDED ON PURPOSE (a, b, c): a provider callback names a reference, not a
+--     principal, so no store or user can be set yet; each returns ids / flags for
+--     an exact, unguessable provider reference and nothing else.
 --     (a) provider reference -> store id (exact match on payments.transaction_id
 --         or payments.invoice_id; returns the store id only).
 CREATE OR REPLACE FUNCTION public.ebda_webhook_resolve_store(p_transaction_id text, p_invoice_id text)
@@ -1166,7 +1274,10 @@ $fn$;
 -- 5.7 the webhook inbox (webhook_events). store_id is NULL on the platform path,
 --     and the consumer must read a row before it can enter a store scope, so
 --     every inbox operation is a definer keyed by the row id / idempotency key.
---     (a) record: first delivery inserts; a redelivery refreshes the volatile
+--     (a) record: UNGUARDED ON PURPOSE (it IS the public ingress: the provider's
+--         callback has no principal); it only inserts, or refreshes a row that is
+--         not yet processed, and never touches a processed one. First delivery
+--         inserts; a redelivery refreshes the volatile
 --         fields of a row that is NOT yet processed and leaves a processed row
 --         untouched. Returns the row id.
 CREATE OR REPLACE FUNCTION public.ebda_webhook_inbox_record(
@@ -1196,16 +1307,26 @@ BEGIN
 END
 $fn$;
 
---     (b) read one row by id.
+--     (b) read one row by id (payload, raw body, signature). GUARDED: an ACTIVE
+--         super_admin (the inbox viewer) or the `webhook-inbox` system job (the
+--         consumer, which must read the row before it knows the store).
 CREATE OR REPLACE FUNCTION public.ebda_webhook_inbox_get(p_id text)
 RETURNS SETOF public.webhook_events
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
-  SELECT * FROM public.webhook_events w WHERE w.id = p_id
+BEGIN
+  IF NOT (public.ebda_is_super_admin() OR public.ebda_is_system_job('webhook-inbox')) THEN
+    RAISE EXCEPTION 'ebda_webhook_inbox_get: caller is neither a super_admin nor the webhook consumer'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY SELECT * FROM public.webhook_events w WHERE w.id = p_id;
+END
 $fn$;
 
 --     (c) advance one row's processing state. Only these columns can change.
+--         GUARDED like (b): super_admin (requeue from the viewer) or the
+--         `webhook-inbox` system job (the consumer).
 CREATE OR REPLACE FUNCTION public.ebda_webhook_inbox_update(
   p_id text,
   p_status text DEFAULT NULL,
@@ -1221,6 +1342,10 @@ LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
 BEGIN
+  IF NOT (public.ebda_is_super_admin() OR public.ebda_is_system_job('webhook-inbox')) THEN
+    RAISE EXCEPTION 'ebda_webhook_inbox_update: caller is neither a super_admin nor the webhook consumer'
+      USING ERRCODE = '42501';
+  END IF;
   UPDATE public.webhook_events w SET
     status = CASE WHEN p_requeue THEN 'received' ELSE COALESCE(p_status, w.status) END,
     attempts = CASE WHEN p_requeue THEN 0 ELSE w.attempts + CASE WHEN p_increment_attempts THEN 1 ELSE 0 END END,
@@ -1236,17 +1361,26 @@ BEGIN
 END
 $fn$;
 
---     (d) rows that never got consumed or wedged (the stuck-row sweep).
+--     (d) rows that never got consumed or wedged (the stuck-row sweep). GUARDED
+--         like (b): a cross-store listing, so super_admin or the `webhook-inbox`
+--         system job (the sweep cron).
 CREATE OR REPLACE FUNCTION public.ebda_webhook_inbox_stuck(p_cutoff timestamp, p_limit integer)
 RETURNS TABLE (id text, provider text, idempotency_key text, store_id text, status text, attempts integer, received_at timestamp)
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
+BEGIN
+  IF NOT (public.ebda_is_super_admin() OR public.ebda_is_system_job('webhook-inbox')) THEN
+    RAISE EXCEPTION 'ebda_webhook_inbox_stuck: caller is neither a super_admin nor the webhook sweep'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
   SELECT w.id, w.provider, w.idempotency_key, w.store_id, w.status, w.attempts, w.received_at
   FROM public.webhook_events w
   WHERE w.status IN ('received', 'processing') AND w.received_at < p_cutoff
   ORDER BY w.received_at ASC
-  LIMIT GREATEST(p_limit, 0)
+  LIMIT GREATEST(p_limit, 0);
+END
 $fn$;
 
 --     (e) super-admin inbox viewer: filtered page + total. Only an ACTIVE
@@ -1282,7 +1416,9 @@ BEGIN
 END
 $fn$;
 
---     (f) payment-redirect callbacks carry only the provider's transaction id
+--     (f) UNGUARDED ON PURPOSE: the shopper's browser comes back from the payment
+--         page with no session; it returns the store's PUBLIC slug and domain only.
+--         payment-redirect callbacks carry only the provider's transaction id
 --         (matched against the order's idempotency key / id): the storefront
 --         origin to send the shopper back to is the store's slug and domain.
 CREATE OR REPLACE FUNCTION public.ebda_storefront_for_payment_ref(p_ref text)
@@ -1300,6 +1436,7 @@ AS $fn$
 $fn$;
 
 -- 5.8 shipping-carrier webhooks identify a parcel by tracking number only.
+--     UNGUARDED ON PURPOSE: a carrier callback has no principal; returns a store id.
 CREATE OR REPLACE FUNCTION public.ebda_shipment_store_id_by_tracking(p_tracking_number text)
 RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -1316,6 +1453,10 @@ $fn$;
 --     transaction stays atomic with them.
 --     (a) "sign out everywhere": bump token_version and revoke the user's
 --         merchant MCP keys in EVERY store. NULL when the user does not exist.
+--         GUARDED (ebda_may_act_on_user): the user themself (logout-all, password
+--         change, MFA change, and the password reset once its token is validated,
+--         which runs under withUser(target)), a super_admin, or a user of the
+--         caller's own store; otherwise SQLSTATE 42501.
 CREATE OR REPLACE FUNCTION public.ebda_user_revoke_sessions(p_user_id text)
 RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
@@ -1324,6 +1465,10 @@ AS $fn$
 DECLARE
   v_tv integer;
 BEGIN
+  IF NOT public.ebda_may_act_on_user(p_user_id) THEN
+    RAISE EXCEPTION 'ebda_user_revoke_sessions: caller may not act on user %', p_user_id
+      USING ERRCODE = '42501';
+  END IF;
   UPDATE public.users u
      SET token_version = u.token_version + 1, updated_at = now()
    WHERE u.id = p_user_id
@@ -1341,6 +1486,8 @@ $fn$;
 --     (b) erasure of a user's own addresses. `addresses` is scoped to
 --         app.current_user_id, but a MERCHANT erasing a customer runs with the
 --         merchant's user id set, so a plain DELETE would silently match zero rows.
+--         GUARDED like (a): the shopper themself, a super_admin, or the merchant
+--         whose store the shopper belongs to; otherwise SQLSTATE 42501.
 CREATE OR REPLACE FUNCTION public.ebda_user_addresses_delete(p_user_id text)
 RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
@@ -1349,16 +1496,23 @@ AS $fn$
 DECLARE
   v_n integer;
 BEGIN
+  IF NOT public.ebda_may_act_on_user(p_user_id) THEN
+    RAISE EXCEPTION 'ebda_user_addresses_delete: caller may not act on user %', p_user_id
+      USING ERRCODE = '42501';
+  END IF;
   DELETE FROM public.addresses a WHERE a.user_id = p_user_id;
   GET DIAGNOSTICS v_n = ROW_COUNT;
   RETURN v_n;
 END
 $fn$;
 
--- 5.10 platform operator reads. Every one takes the acting user id, refuses
---      anyone who is not an ACTIVE super_admin (a data check, not a flag), and is
---      listed here so the cross-store surface stays small and reviewable.
---      (a) which store owns a product / order / customer / journal entry id (exact primary key).
+-- 5.10 platform operator reads. (b) takes the acting user id and refuses anyone
+--      who is not an ACTIVE super_admin (a data check, not a flag); (a) is an
+--      id -> id lookup used by the background jobs, listed here so the cross-store
+--      surface stays small and reviewable.
+--      (a) which store owns a product / order / customer / journal entry id (exact
+--          primary key). UNGUARDED ON PURPOSE: an Inngest event names a row before
+--          any store is known, and the answer is a store id, never row data.
 CREATE OR REPLACE FUNCTION public.ebda_entity_store_id(p_kind text, p_id text)
 RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -1407,7 +1561,7 @@ BEGIN
 END
 $fn$;
 
--- 5.11 platform-wide AI usage counters. The global daily/monthly AI caps and the
+-- 5.11 platform-wide AI usage counters. UNGUARDED ON PURPOSE: it returns one count. The global daily/monthly AI caps and the
 --      paid answer-engine budget are cross-store AGGREGATES on a hot path (every
 --      AI request); fanning out per store would cost one transaction per store
 --      per call. The function returns a single count, never rows.
@@ -1426,6 +1580,9 @@ AS $fn$
 $fn$;
 
 -- 5.12 SMS opt-out links name a consent row, not a store (the store is on the row).
+--      UNGUARDED ON PURPOSE: the unguessable consent id in the link IS the
+--      credential (the shopper has no session); returns the row's own phone and
+--      its store's display name, nothing about any other row.
 CREATE OR REPLACE FUNCTION public.ebda_sms_consent_lookup(p_id text)
 RETURNS TABLE (id text, store_id text, phone text, granted boolean, store_name text, store_name_ar text)
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -1435,6 +1592,39 @@ AS $fn$
   FROM public.sms_marketing_consents c
   JOIN public.stores s ON s.id = c.store_id
   WHERE c.id = p_id
+$fn$;
+
+-- 5.13 plans engine (SP5). The super-admin Plans page counts stores per plan and
+--      the plan editor busts the feature cache of every store on a plan: both are
+--      cross-store reads of store_subscriptions, so definers. GUARDED: an ACTIVE
+--      super_admin only (SQLSTATE 42501 otherwise). They return a count per plan
+--      and store ids, never subscription rows.
+CREATE OR REPLACE FUNCTION public.ebda_plan_subscriber_counts()
+RETURNS TABLE (plan_code text, n bigint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+BEGIN
+  IF NOT public.ebda_is_super_admin() THEN
+    RAISE EXCEPTION 'ebda_plan_subscriber_counts: caller is not a super_admin' USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+    SELECT ss.plan_code, count(*) FROM public.store_subscriptions ss GROUP BY ss.plan_code;
+END
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.ebda_plan_store_ids(p_code text)
+RETURNS TABLE (store_id text)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+BEGIN
+  IF NOT public.ebda_is_super_admin() THEN
+    RAISE EXCEPTION 'ebda_plan_store_ids: caller is not a super_admin' USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+    SELECT ss.store_id FROM public.store_subscriptions ss WHERE ss.plan_code = p_code;
+END
 $fn$;
 
 -- ---------------------------------------------------------------------------

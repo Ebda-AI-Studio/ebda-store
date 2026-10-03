@@ -35,6 +35,7 @@ import {
   withUser,
   acrossStores,
   withOwnerTx,
+  withSystemJob,
   prisma,
   type AppPrismaClient,
 } from '@force/database';
@@ -57,6 +58,9 @@ import {
   revokeUserSessionsRow,
   deleteUserAddresses,
   detachStoreAuditLogs,
+  unlinkUserAuditLogs,
+  planSubscriberCounts,
+  storeIdsOnPlan,
 } from '../../apps/api/src/lib/definer';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
@@ -824,7 +828,16 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
         role: 'store_admin',
       })
     );
-    expect(again).toMatchObject({ created: false, id: created.id, role: 'staff', firstName: 'E' });
+    // an existing account is returned untouched, and its stored name is NOT disclosed: the
+    // wrapper echoes what the caller supplied, and the SQL function has no PII columns at all
+    expect(again).toMatchObject({ created: false, id: created.id, role: 'staff', firstName: 'X' });
+    const rawCols = await asApp(
+      () =>
+        prisma.$queryRaw<
+          Array<Record<string, unknown>>
+        >`SELECT * FROM public.ebda_admin_user_ensure(${email}, 'h', 'Other', 'Name', 'staff', false)`
+    );
+    expect(Object.keys(rawCols[0]).sort()).toEqual(['created', 'role', 'status', 'user_id']);
     await expect(
       asApp(
         () =>
@@ -973,7 +986,9 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     expect(page.rows.find(r => r.resourceId === 'r1')?.storeId).toBeNull();
     expect(page.rows.find(r => r.resourceId === 'r1')?.user?.id).toBe(ids.ownerA);
     // detach (store delete path): nulls store_id, scoped to one store
-    expect(await asApp(() => detachStoreAuditLogs(ids.storeB))).toBeGreaterThanOrEqual(1);
+    expect(
+      await asApp(() => runInTenantContext(ids.storeB, () => detachStoreAuditLogs(ids.storeB)))
+    ).toBeGreaterThanOrEqual(1);
     expect(
       (await owner.auditLog.findMany({ where: { action, resourceId: 'r2' } }))[0].storeId
     ).toBeNull();
@@ -1061,7 +1076,7 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     await expect(
       asApp(() =>
         prisma.$transaction(async tx => {
-          await tx.$queryRaw`SELECT set_config('app.current_store_id', ${ids.storeA}, true)`;
+          await tx.$queryRaw`SELECT set_config('app.current_user_id', ${ids.ownerB}, true)`;
           const rows = await tx.$queryRaw<
             Array<{ tv: number }>
           >`SELECT public.ebda_user_revoke_sessions(${ids.ownerB}) AS tv`;
@@ -1077,12 +1092,15 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
       (await owner.merchantApiKey.findUniqueOrThrow({ where: { keyHash } })).revokedAt
     ).toBeNull();
     // committed
-    const r = await asApp(() => revokeUserSessionsRow(ids.ownerB));
+    const r = await asApp(() => withUser(ids.ownerB, () => revokeUserSessionsRow(ids.ownerB)));
     expect(r.tokenVersion).toBe(tv0 + 1);
     expect(
       (await owner.merchantApiKey.findUniqueOrThrow({ where: { keyHash } })).revokedAt
     ).not.toBeNull();
-    await expect(asApp(() => revokeUserSessionsRow(uid()))).rejects.toThrow(/not found/);
+    // an id that does not exist: only a super_admin gets past the guard to learn that
+    await expect(
+      asApp(() => runInTenantContext(undefined, () => revokeUserSessionsRow(uid()), ids.superAdmin))
+    ).rejects.toThrow(/not found/);
   });
 
   it('address erasure deletes by the shopper id from a MERCHANT scope (the policy alone would match zero rows)', async () => {
@@ -1098,6 +1116,246 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     );
     expect(merchantScope).toEqual({ viaPolicy: 0, viaDefiner: 1 });
     expect(await owner.address.count({ where: { id: ids.addressB } })).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Caller guards on the mutating / cross-store definers (SQLSTATE 42501)
+// ---------------------------------------------------------------------------
+type Scope = { storeId?: string; userId?: string };
+
+/** The failure carries SQLSTATE 42501 (insufficient_privilege) from a RAISE in the function. */
+async function expectDenied(p: Promise<unknown>, label: string): Promise<void> {
+  let err: unknown;
+  try {
+    await p;
+  } catch (e) {
+    err = e;
+  }
+  expect(err, `${label}: expected a 42501 denial`).toBeDefined();
+  const text = `${(err as Error).message} ${JSON.stringify((err as { meta?: unknown }).meta ?? {})} ${String((err as { cause?: unknown }).cause ?? '')}`;
+  expect(text, label).toMatch(/42501|caller|insufficient/i);
+}
+
+const callDetach = (scope: Scope, storeId: string) =>
+  appTx(
+    scope,
+    tx =>
+      tx.$queryRaw<
+        Array<{ n: number }>
+      >`SELECT public.ebda_audit_logs_detach_store(${storeId}) AS n`
+  );
+const callUnlink = (scope: Scope, userId: string) =>
+  appTx(
+    scope,
+    tx =>
+      tx.$queryRaw<Array<{ n: number }>>`SELECT public.ebda_audit_logs_unlink_user(${userId}) AS n`
+  );
+const callRevoke = (scope: Scope, userId: string) =>
+  appTx(
+    scope,
+    tx =>
+      tx.$queryRaw<
+        Array<{ n: number | null }>
+      >`SELECT public.ebda_user_revoke_sessions(${userId}) AS n`
+  );
+const callAddrDelete = (scope: Scope, userId: string) =>
+  appTx(
+    scope,
+    tx =>
+      tx.$queryRaw<Array<{ n: number }>>`SELECT public.ebda_user_addresses_delete(${userId}) AS n`
+  );
+
+describe('definer guards: the mutating functions check WHO is calling', () => {
+  // The target user and the scope that is allowed to act on it, per function. `storeB`'s customer is
+  // the cross-tenant victim; every denial below is a caller that holds some OTHER legitimate scope.
+  const guarded: Array<[string, (scope: Scope, userId: string) => Promise<unknown>]> = [
+    ['ebda_audit_logs_unlink_user', callUnlink],
+    ['ebda_user_revoke_sessions', callRevoke],
+    ['ebda_user_addresses_delete', callAddrDelete],
+  ];
+
+  for (const [name, call] of guarded) {
+    it(`${name}: denied with no scope, a foreign store, a foreign user or a non-super_admin; allowed for self / own store / super_admin`, async () => {
+      // no scope at all
+      await expectDenied(call({}, ids.customerB), `${name} contextless`);
+      // a store scope for ANOTHER store (a merchant reaching into someone else's customer)
+      await expectDenied(call({ storeId: ids.storeA }, ids.customerB), `${name} foreign store`);
+      // a user scope for ANOTHER user (a customer acting on another customer)
+      await expectDenied(call({ userId: ids.customerA }, ids.customerB), `${name} foreign user`);
+      // a merchant of store A acting on store B's owner (admin namespace, no store_id)
+      await expectDenied(
+        call({ storeId: ids.storeA, userId: ids.ownerA }, ids.ownerB),
+        `${name} foreign owner`
+      );
+      // a staff member / owner of store A is NOT a platform operator
+      await expectDenied(call({ userId: ids.ownerA }, ids.customerB), `${name} owner as operator`);
+      // the target does not even exist: denied (not "not found") unless the caller is a super_admin
+      await expectDenied(call({ storeId: ids.storeA }, uid()), `${name} unknown id`);
+
+      // allowed: the user themself ...
+      await call({ userId: ids.customerB }, ids.customerB);
+      // ... a merchant on its OWN customer ...
+      await call({ storeId: ids.storeB }, ids.customerB);
+      // ... the store's staff member and its owner (admin namespace, linked to the store) ...
+      await call({ storeId: ids.storeA }, ids.staffA);
+      await call({ storeId: ids.storeA }, ids.ownerA);
+      // ... and an active super_admin on anybody
+      await call({ userId: ids.superAdmin }, ids.customerB);
+    });
+  }
+
+  it('ebda_audit_logs_detach_store: only the store the transaction is scoped to, or a super_admin', async () => {
+    const action = `${PREFIX}det-${uid()}`;
+    await owner.auditLog.create({
+      data: { action, storeId: ids.storeA, resourceType: 'x', resourceId: 'a1' },
+    });
+    await expectDenied(callDetach({}, ids.storeA), 'detach contextless');
+    await expectDenied(callDetach({ storeId: ids.storeB }, ids.storeA), 'detach foreign store');
+    await expectDenied(callDetach({ userId: ids.ownerA }, ids.storeA), 'detach as an owner only');
+    // untouched by the denials
+    expect((await owner.auditLog.findMany({ where: { action } }))[0].storeId).toBe(ids.storeA);
+    const [{ n }] = await callDetach({ storeId: ids.storeA }, ids.storeA);
+    expect(Number(n)).toBeGreaterThanOrEqual(1);
+    expect((await owner.auditLog.findMany({ where: { action } }))[0].storeId).toBeNull();
+    // a super_admin may detach any store
+    await owner.auditLog.create({
+      data: { action, storeId: ids.storeB, resourceType: 'x', resourceId: 'b1' },
+    });
+    await callDetach({ userId: ids.superAdmin }, ids.storeB);
+    expect(
+      (await owner.auditLog.findMany({ where: { action, resourceId: 'b1' } }))[0].storeId
+    ).toBeNull();
+  });
+
+  it("a denied call changes nothing (sessions of another store's customer stay valid)", async () => {
+    const tv0 = (await owner.user.findUniqueOrThrow({ where: { id: ids.customerA } })).tokenVersion;
+    await expectDenied(callRevoke({ storeId: ids.storeB }, ids.customerA), 'revoke foreign');
+    expect(
+      (await owner.user.findUniqueOrThrow({ where: { id: ids.customerA } })).tokenVersion
+    ).toBe(tv0);
+    const action = `${PREFIX}unl-${uid()}`;
+    await owner.auditLog.create({
+      data: { action, userId: ids.customerA, resourceType: 'x', resourceId: 'u1' },
+    });
+    await expectDenied(callUnlink({ storeId: ids.storeB }, ids.customerA), 'unlink foreign');
+    expect((await owner.auditLog.findMany({ where: { action } }))[0].userId).toBe(ids.customerA);
+    await callUnlink({ storeId: ids.storeA }, ids.customerA);
+    expect((await owner.auditLog.findMany({ where: { action } }))[0].userId).toBeNull();
+  });
+
+  it('audit retention: only a super_admin or the audit-log-retention job (cron), never a plain caller', async () => {
+    const cutoff = new Date(Date.now() - 400 * 86_400_000);
+    type Db = Pick<AppPrismaClient, '$queryRaw'>;
+    const queries: Array<[string, (db: Db) => Promise<unknown>]> = [
+      [
+        'count',
+        db => db.$queryRaw`SELECT public.ebda_audit_log_retention_count(${cutoff}::timestamp)`,
+      ],
+      [
+        'page',
+        db =>
+          db.$queryRaw`SELECT * FROM public.ebda_audit_log_retention_page(${cutoff}::timestamp, NULL, 5)`,
+      ],
+      [
+        'purge',
+        db => db.$queryRaw`SELECT public.ebda_audit_log_retention_purge(${cutoff}::timestamp, 5)`,
+      ],
+    ];
+    for (const [label, q] of queries) {
+      await expectDenied(
+        appTx({}, tx => q(tx)),
+        `retention ${label} contextless`
+      );
+      await expectDenied(
+        appTx({ storeId: ids.storeA, userId: ids.ownerA }, tx => q(tx)),
+        `retention ${label} owner`
+      );
+      // another job's name does not open it
+      await expectDenied(
+        asApp(() => withSystemJob('webhook-inbox', () => q(prisma))),
+        `retention ${label} wrong job`
+      );
+      await appTx({ userId: ids.superAdmin }, tx => q(tx));
+      await asApp(() => withSystemJob('audit-log-retention', () => q(prisma)));
+    }
+    // the cron path (wrapper = the job) still works end to end
+    expect(await asApp(() => auditRetention.count(cutoff))).toBeGreaterThanOrEqual(0);
+  });
+
+  it('webhook inbox get / update / stuck: only a super_admin or the webhook-inbox job; record stays public ingress', async () => {
+    const key = `${PREFIX}wh-guard-${uid()}`;
+    const id = await asApp(() =>
+      webhookInbox.record({
+        provider: 'tap',
+        idempotencyKey: key,
+        storeId: ids.storeB,
+        payload: { secret: 'pan' },
+        rawBody: 'raw',
+        signature: 'sig',
+      })
+    );
+    type Db = Pick<AppPrismaClient, '$queryRaw'>;
+    const get = (tx: Db) => tx.$queryRaw`SELECT * FROM public.ebda_webhook_inbox_get(${id})`;
+    const upd = (tx: Db) => tx.$queryRaw`SELECT public.ebda_webhook_inbox_update(${id}, 'failed')`;
+    const stuck = (tx: Db) =>
+      tx.$queryRaw`SELECT * FROM public.ebda_webhook_inbox_stuck(now()::timestamp, 5)`;
+    for (const [label, q] of [
+      ['get', get],
+      ['update', upd],
+      ['stuck', stuck],
+    ] as const) {
+      await expectDenied(appTx({}, q), `inbox ${label} contextless`);
+      // even the store the row belongs to may not read its raw payload through the definer
+      await expectDenied(appTx({ storeId: ids.storeB }, q), `inbox ${label} own store`);
+    }
+    expect((await owner.webhookEvent.findUniqueOrThrow({ where: { id } })).status).toBe('received');
+    await appTx({ userId: ids.superAdmin }, get);
+    expect(await asApp(() => webhookInbox.get(id))).toMatchObject({ id, rawBody: 'raw' });
+    expect(await asApp(() => webhookInbox.update(id, { status: 'failed' }))).toBe(true);
+  });
+
+  it('the plans-engine cross-store reads are super_admin only', async () => {
+    await expectDenied(
+      asApp(() => planSubscriberCounts()),
+      'counts contextless'
+    );
+    await expectDenied(
+      asApp(() => storeIdsOnPlan('free')),
+      'ids contextless'
+    );
+    await expectDenied(
+      asApp(() => runInTenantContext(ids.storeA, () => planSubscriberCounts(), ids.ownerA)),
+      'counts as an owner'
+    );
+    const counts = await asApp(() =>
+      runInTenantContext(undefined, () => planSubscriberCounts(), ids.superAdmin)
+    );
+    expect(counts instanceof Map).toBe(true);
+    const free = await asApp(() =>
+      runInTenantContext(undefined, () => storeIdsOnPlan('free'), ids.superAdmin)
+    );
+    expect(Array.isArray(free)).toBe(true);
+  });
+
+  it('withSystemJob is transaction-local: it neither leaks to the next transaction nor survives an ambient scope', async () => {
+    const read = () =>
+      prisma.$queryRaw<
+        Array<{ j: string | null }>
+      >`SELECT nullif(current_setting('app.system_job', true), '') AS j`;
+    const inside = await asApp(() => withSystemJob('webhook-inbox', read));
+    expect(inside[0].j).toBe('webhook-inbox');
+    const after = await asApp(() => read());
+    expect(after[0].j).toBeNull();
+    // inside an ambient scope the job is set for the call only
+    const both = await asApp(() =>
+      runInTenantContext(ids.storeA, async () => {
+        const during = await withSystemJob('audit-log-retention', read);
+        const post = await read();
+        return [during[0].j, post[0].j];
+      })
+    );
+    expect(both).toEqual(['audit-log-retention', null]);
   });
 });
 

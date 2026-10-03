@@ -440,7 +440,7 @@ router.put(
       // FIRST, exactly as `featureService.setStorePlan` does.
       // Keep the subscription (limits) on the same plan the enum now names.
       if (plan !== undefined) {
-        await withRlsBypass(tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
+        await withStore(store.id, tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
         await featureService.invalidateCache(store.id);
       }
       await bustStoreCaches(store.id, store.slug, store.domain);

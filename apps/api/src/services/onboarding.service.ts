@@ -9,7 +9,7 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, withUser } from '@force/database';
 import {
   storeHost,
   storefrontOrigin,
@@ -61,10 +61,13 @@ export class OnboardingService {
   }
 
   static async state(userId: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, firstName: true, emailVerified: true, phone: true },
-    });
+    // As that user: `users` is RLS-scoped to app.current_user_id.
+    const user = await withUser(userId, tx =>
+      tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, firstName: true, emailVerified: true, phone: true },
+      })
+    );
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
     const store = await prisma.store.findFirst({
@@ -85,21 +88,23 @@ export class OnboardingService {
     let codEnabled = false;
     let subscriptionPlan: string | null = null;
     if (store) {
+      // products, payment_configs and store_subscriptions are all store-scoped.
       const counts = await readInStoreContext(store.id, async () => ({
         products: await prisma.product.count({ where: { storeId: store.id, deletedAt: null } }),
         cod: await prisma.paymentConfig.count({
           where: { storeId: store.id, provider: 'cod', isEnabled: true },
         }),
+        planCode:
+          (
+            await prisma.storeSubscription.findUnique({
+              where: { storeId: store.id },
+              select: { planCode: true },
+            })
+          )?.planCode ?? null,
       }));
       productCount = counts.products;
       codEnabled = counts.cod > 0;
-      subscriptionPlan =
-        (
-          await prisma.storeSubscription.findUnique({
-            where: { storeId: store.id },
-            select: { planCode: true },
-          })
-        )?.planCode ?? null;
+      subscriptionPlan = counts.planCode;
     }
 
     return {
@@ -135,10 +140,12 @@ export class OnboardingService {
       language?: 'ar' | 'en';
     }
   ) {
-    const user = await prisma.user.findUnique({
-      where: { id: owner.userId },
-      select: { email: true, firstName: true, lastName: true, storeId: true },
-    });
+    const user = await withUser(owner.userId, tx =>
+      tx.user.findUnique({
+        where: { id: owner.userId },
+        select: { email: true, firstName: true, lastName: true, storeId: true },
+      })
+    );
     if (!user || user.storeId !== null) {
       throw new AppError(403, 'FORBIDDEN', 'Only merchant accounts can create a store');
     }

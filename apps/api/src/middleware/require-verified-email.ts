@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { AppError } from './error-handler';
 
 /**
@@ -18,10 +18,13 @@ export async function requireVerifiedEmail(
     const user = req.user;
     if (!user) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
     if (user.role === 'super_admin') return next();
-    const row = await prisma.user.findUnique({
-      where: { id: user.userId },
-      select: { emailVerified: true, deletedAt: true },
-    });
+    // As that user: `users` is RLS-scoped to app.current_user_id.
+    const row = await withUser(user.userId, tx =>
+      tx.user.findUnique({
+        where: { id: user.userId },
+        select: { emailVerified: true, deletedAt: true },
+      })
+    );
     if (!row || row.deletedAt || !row.emailVerified) {
       throw new AppError(
         403,

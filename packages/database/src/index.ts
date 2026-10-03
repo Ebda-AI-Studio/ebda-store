@@ -741,6 +741,48 @@ export async function acrossStoresFlat<T>(
 }
 
 // ---------------------------------------------------------------------------
+// Named platform jobs (the cron-side context of a few cross-store definers)
+// ---------------------------------------------------------------------------
+
+/**
+ * The platform jobs a cross-store SECURITY DEFINER function recognises. A job is
+ * a NAME, not a bypass: it opens no table to `ebda_app`, and only the definers
+ * that list it (`ebda_is_system_job`) consult it.
+ */
+export type SystemJob = 'audit-log-retention' | 'webhook-inbox';
+
+/**
+ * Run `fn` with `app.system_job = job` set TRANSACTION-LOCALLY, so the definer
+ * functions that serve a cron (audit retention, the webhook inbox consumer) can
+ * tell it from an arbitrary caller. Inside a tenant transaction the setting is
+ * put on that transaction for the duration of `fn` and cleared afterwards (the
+ * work stays atomic with the request); otherwise `fn` runs in its own short
+ * transaction that carries only the job name. Never a session-level setting.
+ */
+export async function withSystemJob<T>(job: SystemJob, fn: () => Promise<T>): Promise<T> {
+  const setJob = (tx: TenantTx, value: string) =>
+    tx.$queryRawUnsafe(`SELECT set_config('app.system_job', $1, true)`, value);
+  const ambient = tenantStorage.getStore();
+  if (ambient) {
+    await setJob(ambient, job);
+    try {
+      return await fn();
+    } finally {
+      // Best effort: on an aborted transaction the reset cannot run, and the
+      // setting dies with the rollback anyway.
+      await setJob(ambient, '').catch(() => undefined);
+    }
+  }
+  return basePrisma().$transaction(
+    async tx => {
+      await setJob(tx, job);
+      return tenantStorage.run(tx, fn);
+    },
+    { maxWait: 10000, timeout: 30000 }
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Owner-role transactions (migrations, ops scripts, test fixtures ONLY)
 // ---------------------------------------------------------------------------
 

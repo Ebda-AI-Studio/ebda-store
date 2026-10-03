@@ -78,6 +78,9 @@ vi.mock('@force/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   hasTenantContext: () => false,
+  // no ambient transaction: the revoke runs AS the target user (own short transaction)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withUser: (_userId: string, fn: any) => fn(mockPrisma),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   withMoneyTx: (client: any, fn: any) => fn(client),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

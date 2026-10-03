@@ -1414,7 +1414,17 @@ export class AuthService {
     // only way to reach another user's row or another store's keys under strict
     // RLS. A partial "sign out all devices" is worse than a failed one, so the
     // key revocation is not left to a store-scoped query.
-    const updated = await revokeUserSessionsRow(userId);
+    //
+    // The definer only answers the user themself, a super_admin, or a caller scoped
+    // to the user's own store (SQLSTATE 42501 otherwise). With an ambient
+    // transaction the request's own scope decides (admin editing a user, a
+    // merchant acting on its customer). With none (logout-all, password change,
+    // MFA change, and a password reset whose token was just validated) the caller
+    // has already established that it is acting for this user, so the call runs AS
+    // that user, in its own short transaction that commits before the cache push.
+    const updated = hasTenantContext()
+      ? await revokeUserSessionsRow(userId)
+      : await withUser(userId, () => revokeUserSessionsRow(userId));
 
     // Warm the Redis cache with the new version so the middleware sees it
     // immediately without a DB round-trip on the next request.
