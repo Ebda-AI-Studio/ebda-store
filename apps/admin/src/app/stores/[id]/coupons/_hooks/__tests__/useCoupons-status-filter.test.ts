@@ -8,12 +8,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 
 const apiGet = vi.fn(async (_url: string) => ({ data: { coupons: [] } }));
+const apiDelete = vi.fn();
 vi.mock('../../../../../../lib/api', () => ({
   apiGet: (url: string) => apiGet(url),
   apiPost: vi.fn(),
   apiPut: vi.fn(),
   apiPatch: vi.fn(),
-  apiDelete: vi.fn(),
+  apiDelete: (url: string) => apiDelete(url),
 }));
 
 import { useCoupons } from '../useCoupons';
@@ -38,5 +39,30 @@ describe('useCoupons status filter', () => {
     act(() => result.current.setFilterActive('inactive'));
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(3));
     expect(lastUrl()).toContain('isActive=false');
+  });
+});
+
+describe('useCoupons post-mutation refetch (issue 2443)', () => {
+  it('a delete resolving after a filter change refetches with the CURRENT filter', async () => {
+    let finishDelete: (v: { error: null }) => void = () => {};
+    apiDelete.mockImplementationOnce(() => new Promise(resolve => (finishDelete = resolve)));
+    const { result } = renderHook(() => useCoupons('s1'));
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+
+    // The delete callback is captured from the render where the filter was still 'all'.
+    const staleDelete = result.current.deleteCoupon;
+    let pending: Promise<void> = Promise.resolve();
+    act(() => {
+      pending = staleDelete('c1');
+    });
+    act(() => result.current.setFilterActive('active'));
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      finishDelete({ error: null });
+      await pending;
+    });
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(3));
+    expect(lastUrl()).toContain('isActive=true');
   });
 });

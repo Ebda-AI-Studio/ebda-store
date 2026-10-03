@@ -11,6 +11,7 @@ import { PageControls } from '../../../../../components/PageControls';
 import { filsToKwd } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useNotifications, useUiRefresh } from '@/contexts/NotificationContext';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
@@ -82,13 +83,13 @@ export default function JournalListPage() {
     useCallback(() => setRefreshKey(k => k + 1), [])
   );
 
-  // A new date window is a new list: start it on page 1.
-  useEffect(() => {
-    setPage(1);
-  }, [period, customRange]);
+  // Latest-request-wins: a slower response for the previous window/page must not repaint its rows
+  // under the new one (issue 2436).
+  const beginRequest = useLatestRequest();
 
   useEffect(() => {
     if (!storeId) return;
+    const isLatest = beginRequest();
 
     const resolved = resolveDateRange(period, customRange);
     // The journal API expects full ISO datetime strings for from/to
@@ -99,6 +100,7 @@ export default function JournalListPage() {
       `/api/v1/stores/${storeId}/finance/journal?perPage=${PER_PAGE}&page=${page}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
     )
       .then(({ data, meta: pageMeta, error: apiError }) => {
+        if (!isLatest()) return;
         if (apiError) {
           setError(apiError.message);
         } else {
@@ -107,8 +109,10 @@ export default function JournalListPage() {
           setMeta(pageMeta);
         }
       })
-      .catch(() => setError('Failed to load journal entries'));
-  }, [storeId, refreshKey, period, customRange, page]);
+      .catch(() => {
+        if (isLatest()) setError('Failed to load journal entries');
+      });
+  }, [storeId, refreshKey, period, customRange, page, beginRequest]);
 
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
@@ -118,6 +122,9 @@ export default function JournalListPage() {
         onChange={(p, c) => {
           setPeriod(p);
           if (c) setCustomRange(c);
+          // A new date window is a new list: start it on page 1, batched with the window change
+          // so exactly one request goes out (issue 2436).
+          setPage(1);
         }}
       />
 

@@ -101,6 +101,9 @@ export default function StoreOrdersPage() {
   // Overlapping list requests (a filter or period change mid-flight) resolve
   // in either order; only the newest may write (#2234 class).
   const beginRequest = useLatestRequest();
+  // Bumped after a status change / mark-paid: the fetch effect owns EVERY request, so the refetch
+  // reads the CURRENT filters/page, not the closure captured when the action started (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
   const fetchOrders = useCallback(async () => {
     if (!storeId) return;
     const isLatest = beginRequest();
@@ -141,7 +144,7 @@ export default function StoreOrdersPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, refreshKey]);
 
   /**
    * Trigger the server-side XLSX export. Uses apiFetch (which forwards the
@@ -212,7 +215,7 @@ export default function StoreOrdersPage() {
           t('toast.statusUpdatedTitle'),
           t('toast.statusUpdatedDescription', { status: t(`status.${newStatus}`) })
         );
-        fetchOrders();
+        setRefreshKey(k => k + 1);
       } else {
         showError(t('toast.errorTitle'), apiError.message || t('errors.statusUpdate'));
       }
@@ -279,7 +282,7 @@ export default function StoreOrdersPage() {
               : o
           )
         );
-        fetchOrders();
+        setRefreshKey(k => k + 1);
       } else {
         showError(t('toast.errorTitle'), apiError.message || t('errors.markPaid'));
       }
@@ -326,7 +329,7 @@ export default function StoreOrdersPage() {
           )
         );
         setSelectedOrders(new Set());
-        fetchOrders();
+        setRefreshKey(k => k + 1);
       } else {
         showError(t('toast.errorTitle'), apiError?.message || t('errors.bulkMarkPaid'));
       }

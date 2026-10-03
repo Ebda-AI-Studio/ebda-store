@@ -7,6 +7,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGetPage, apiDelete, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,9 +51,17 @@ export default function BankReconciliationPage() {
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  // Bumped after a delete: the fetch effect owns EVERY request, so the refetch reads the CURRENT
+  // page instead of the one captured when the Delete button rendered (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Latest-request-wins: paging quickly (or a refetch after a delete) must not let an older
+  // response repaint its rows over the newer page (issue 2436).
+  const beginRequest = useLatestRequest();
 
   const fetchStatements = useCallback(async () => {
     if (!storeId) return;
+    const isLatest = beginRequest();
     // GET /finance/bank-statements returns `{ data: items, meta }`. `apiGetPage` keeps the
     // sibling `meta` that `apiGet` drops, so the footer shows the store's REAL statement count
     // and a pager reaches every statement beyond the page (issue 2430).
@@ -63,6 +72,7 @@ export default function BankReconciliationPage() {
     } = await apiGetPage<BankStatementRow>(
       `/api/v1/stores/${storeId}/finance/bank-statements?perPage=${PER_PAGE}&page=${page}`
     );
+    if (!isLatest()) return;
     if (err) {
       setError(err.message ?? 'Failed to load statements');
       return;
@@ -80,11 +90,11 @@ export default function BankReconciliationPage() {
     setError(null);
     setStatements(data ?? []);
     setMeta(pageMeta);
-  }, [storeId, page]);
+  }, [storeId, page, beginRequest]);
 
   useEffect(() => {
     fetchStatements();
-  }, [fetchStatements]);
+  }, [fetchStatements, refreshKey]);
 
   async function handleDelete(id: string, fileName: string) {
     if (!confirm(`Delete statement "${fileName}"? This will remove all matched transactions.`))
@@ -98,7 +108,7 @@ export default function BankReconciliationPage() {
       alert(err.message ?? 'Delete failed');
       return;
     }
-    fetchStatements();
+    setRefreshKey(k => k + 1);
   }
 
   return (

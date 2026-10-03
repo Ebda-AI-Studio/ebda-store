@@ -77,6 +77,9 @@ export default function StoreProductsPage() {
   // Overlapping list requests (search typed mid-flight, a filter change)
   // resolve in either order; only the newest may write (#2234 class).
   const beginRequest = useLatestRequest();
+  // Bumped after a delete / mass edit: the fetch effect owns EVERY request, so the refetch reads
+  // the CURRENT filters/page, not the closure captured when the action started (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
   const fetchProducts = useCallback(async () => {
     if (!isAuthenticated) return;
     const isLatest = beginRequest();
@@ -149,7 +152,7 @@ export default function StoreProductsPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchProducts();
-  }, [isAuthenticated, fetchProducts]);
+  }, [isAuthenticated, fetchProducts, refreshKey]);
 
   // NOTE: filter/search/page changes do NOT clear the selection — it accumulates
   // across searches by design. Selection clears only on the explicit "Clear"
@@ -223,7 +226,7 @@ export default function StoreProductsPage() {
           t('toast.deletedTitle'),
           t('toast.deletedDescription', { name: productToDelete.name })
         );
-        fetchProducts();
+        setRefreshKey(k => k + 1);
       } else {
         toastError(t('toast.deleteFailedTitle'), t('toast.deleteFailedDescription'));
       }
@@ -326,7 +329,7 @@ export default function StoreProductsPage() {
         selectedProducts={Array.from(selectedMap.values())}
         onSuccess={() => {
           clearSelection();
-          fetchProducts();
+          setRefreshKey(k => k + 1);
         }}
       />
     </AdminLayout>

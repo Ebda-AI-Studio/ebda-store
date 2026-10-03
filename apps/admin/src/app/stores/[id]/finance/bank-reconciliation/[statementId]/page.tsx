@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -157,6 +158,9 @@ export default function StatementDetailPage() {
   const [autoMatchMsg, setAutoMatchMsg] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [matchModal, setMatchModal] = useState<string | null>(null); // txId
+  // Bumped after a mutation: the fetch effects own EVERY request, so a refetch reads the CURRENT
+  // filter/page instead of the ones captured when the action's button rendered (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // ── Fetch statement detail ──
   const fetchStmt = useCallback(async () => {
@@ -176,8 +180,12 @@ export default function StatementDetailPage() {
   }, [storeId, statementId]);
 
   // ── Fetch transactions ──
+  // Latest-request-wins: a slower response for the previous filter/page must not repaint its rows
+  // under the new one (issue 2436).
+  const beginTxRequest = useLatestRequest();
   const fetchTxs = useCallback(async () => {
     if (!storeId || !statementId) return;
+    const isLatest = beginTxRequest();
     const qs = filter !== 'all' ? `&matchStatus=${filter}` : '';
     // `apiGetPage` keeps the route's `meta`, so the row count is the statement's REAL total and a
     // pager reaches every transaction past the 200-row page (issue 2430).
@@ -188,20 +196,21 @@ export default function StatementDetailPage() {
     } = await apiGetPage<BankTx>(
       `/api/v1/stores/${storeId}/finance/bank-statements/${statementId}/transactions?perPage=200&page=${txPage}${qs}`
     );
+    if (!isLatest()) return;
     if (err) {
       setError(err.message ?? t('errors.loadTransactions'));
       return;
     }
     setTxs(data ?? []);
     setTxMeta(meta);
-  }, [storeId, statementId, filter, txPage]);
+  }, [storeId, statementId, filter, txPage, beginTxRequest]);
 
   useEffect(() => {
     fetchStmt();
-  }, [fetchStmt]);
+  }, [fetchStmt, refreshKey]);
   useEffect(() => {
     fetchTxs();
-  }, [fetchTxs]);
+  }, [fetchTxs, refreshKey]);
 
   // ── Auto-match ──
   async function handleAutoMatch() {
@@ -230,8 +239,7 @@ export default function StatementDetailPage() {
           .replace('{ambiguous}', String(r.ambiguous))
       );
     }
-    fetchStmt();
-    fetchTxs();
+    setRefreshKey(k => k + 1);
   }
 
   // ── Manual override ──
@@ -246,8 +254,7 @@ export default function StatementDetailPage() {
       alert(err.message ?? t('errors.action'));
       return;
     }
-    fetchStmt();
-    fetchTxs();
+    setRefreshKey(k => k + 1);
   }
 
   async function handleManualMatch(txId: string, journalEntryId: string) {
@@ -259,8 +266,7 @@ export default function StatementDetailPage() {
       alert(err.message ?? t('errors.match'));
       return;
     }
-    fetchStmt();
-    fetchTxs();
+    setRefreshKey(k => k + 1);
   }
 
   const summary = stmt?.summary;

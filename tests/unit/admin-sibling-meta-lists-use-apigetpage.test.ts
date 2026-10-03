@@ -77,15 +77,35 @@ describe('each page shows the real total and pages through the rest (issue 2430)
     expect(src).not.toMatch(/orders\.filter\(/);
   });
 
-  it('a new journal window / PO search / tx filter restarts on page 1', () => {
-    expect(read('app/stores/[id]/finance/journal/page.tsx')).toMatch(
-      /setPage\(1\);\s*\}, \[period, customRange\]\)/
-    );
-    expect(read('app/stores/[id]/stock/purchase-orders/page.tsx')).toMatch(
-      /setPage\(1\);\s*\}, \[search\]\)/
-    );
+  it('a new journal window / PO search / tx filter / expenses filter restarts on page 1 in the SAME handler (issue 2436)', () => {
+    // A separate `setPage(1)` effect runs AFTER the fetch effect of the same commit, so the fetch
+    // reads the stale page and a second request follows. The reset rides the change handler.
+    const journal = read('app/stores/[id]/finance/journal/page.tsx');
+    expect(journal).toMatch(/setCustomRange\(c\);[^}]*setPage\(1\);/);
+    expect(journal).not.toMatch(/setPage\(1\);\s*\}, \[period, customRange\]\)/);
+    const po = read('app/stores/[id]/stock/purchase-orders/page.tsx');
+    expect(po).toMatch(/setSearch\(value\);[^}]*setPage\(1\);/);
+    expect(po).not.toMatch(/setPage\(1\);\s*\}, \[search\]\)/);
+    const exp = read('app/stores/[id]/finance/expenses/page.tsx');
+    expect(exp.match(/setPage\(1\)/g)?.length).toBe(3);
+    expect(exp).not.toMatch(/setPage\(1\);\s*\}, \[period/);
     expect(read('app/stores/[id]/finance/bank-reconciliation/[statementId]/page.tsx')).toMatch(
       /setTxPage\(1\)/
     );
+  });
+
+  it('every converted list fetch is latest-request-wins (issue 2436)', () => {
+    for (const [name, file] of pages) {
+      const src = read(file);
+      if (name === 'purchase orders') {
+        // guards through the effect cleanup instead of the shared hook
+        expect(src).toMatch(/let stale = false;/);
+        expect(src).toMatch(/return \(\) => \{\s*stale = true;/);
+        expect(src).toMatch(/if \(stale\) return;/);
+      } else {
+        expect(src).toMatch(/useLatestRequest\(\)/);
+        expect(src).toMatch(/if \(!isLatest\(\)\) return;/);
+      }
+    }
   });
 });

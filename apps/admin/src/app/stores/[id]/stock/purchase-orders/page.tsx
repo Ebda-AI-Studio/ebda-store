@@ -55,11 +55,6 @@ export default function PurchaseOrdersPage() {
   const [meta, setMeta] = useState<PageMeta | null>(null);
   const [page, setPage] = useState(1);
 
-  // A new search is a new list: start it on page 1.
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
-
   useEffect(() => {
     if (!storeId) return;
     let stale = false;
@@ -107,7 +102,12 @@ export default function PurchaseOrdersPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SearchInput
             value={search}
-            onSearch={setSearch}
+            onSearch={value => {
+              setSearch(value);
+              // A new search is a new list: start it on page 1, batched with the term change so
+              // exactly one request goes out (issue 2436).
+              setPage(1);
+            }}
             placeholder={t('searchPlaceholder')}
             className="w-full sm:w-64"
           />

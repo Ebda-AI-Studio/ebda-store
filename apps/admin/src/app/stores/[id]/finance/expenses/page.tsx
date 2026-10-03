@@ -79,6 +79,9 @@ export default function ExpensesPage() {
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // Bumped after an action: the fetch effect owns EVERY request, so the refetch reads the CURRENT
+  // filters/page instead of the ones captured when the row's button rendered (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
 
   function toDateStr(d: Date): string {
     const yyyy = d.getFullYear();
@@ -123,14 +126,9 @@ export default function ExpensesPage() {
       });
   }, [storeId, period, customRange, statusFilter, receiptOnly, page, beginRequest]);
 
-  // A new filter is a new list: start it on page 1.
-  useEffect(() => {
-    setPage(1);
-  }, [period, customRange, statusFilter, receiptOnly]);
-
   useEffect(() => {
     fetchExpenses();
-  }, [fetchExpenses]);
+  }, [fetchExpenses, refreshKey]);
 
   async function performAction(expenseId: string, action: 'approve' | 'post' | 'reject') {
     if (action === 'reject') {
@@ -144,7 +142,7 @@ export default function ExpensesPage() {
       if (apiError) {
         alert(apiError.message);
       } else {
-        fetchExpenses();
+        setRefreshKey(k => k + 1);
       }
     } catch {
       alert('Action failed');
@@ -263,7 +261,10 @@ export default function ExpensesPage() {
           <span>{t('receiptOnly')}</span>
           <button
             type="button"
-            onClick={() => setReceiptOnly(false)}
+            onClick={() => {
+              setReceiptOnly(false);
+              setPage(1); // a new filter is a new list, in the same batch (issue 2436)
+            }}
             className="text-xs text-primary hover:underline"
           >
             {t('receiptOnlyClear')}
@@ -276,6 +277,7 @@ export default function ExpensesPage() {
           onChange={(p, c) => {
             setPeriod(p);
             if (c) setCustomRange(c);
+            setPage(1); // a new filter is a new list, in the same batch (issue 2436)
           }}
         />
       )}
@@ -284,7 +286,10 @@ export default function ExpensesPage() {
         <span className="text-muted-foreground">{t('status')}</span>
         <select
           value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as ExpenseStatus | 'all')}
+          onChange={e => {
+            setStatusFilter(e.target.value as ExpenseStatus | 'all');
+            setPage(1); // a new filter is a new list, in the same batch (issue 2436)
+          }}
           className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
         >
           <option value="all">{t('allStatuses')}</option>

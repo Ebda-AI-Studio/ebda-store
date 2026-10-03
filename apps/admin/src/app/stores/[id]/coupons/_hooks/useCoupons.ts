@@ -72,6 +72,9 @@ export function useCoupons(storeId: string): UseCouponsResult {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<CouponStatusFilter>('all');
 
+  // Bumped after a save/delete/toggle: the fetch effect owns EVERY request, so the refetch reads
+  // the CURRENT filter, not the one captured when the mutation started (issue 2443).
+  const [refreshKey, setRefreshKey] = useState(0);
   const beginRequest = useLatestRequest();
   const fetchCoupons = useCallback(async () => {
     const isLatest = beginRequest();
@@ -104,7 +107,7 @@ export function useCoupons(storeId: string): UseCouponsResult {
   useEffect(() => {
     void fetchCoupons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, filterActive]);
+  }, [storeId, filterActive, refreshKey]);
 
   const saveCoupon = useCallback(
     async (formData: CouponFormData, editingId: string | null): Promise<boolean> => {
@@ -122,14 +125,14 @@ export function useCoupons(storeId: string): UseCouponsResult {
           return false;
         }
 
-        await fetchCoupons();
+        setRefreshKey(k => k + 1);
         return true;
       } catch (error) {
         console.error('Failed to save coupon:', error);
         return false;
       }
     },
-    [storeId, fetchCoupons]
+    [storeId]
   );
 
   const deleteCoupon = useCallback(
@@ -137,13 +140,13 @@ export function useCoupons(storeId: string): UseCouponsResult {
       try {
         const { error } = await apiDelete(`/api/v1/stores/${storeId}/coupons/${couponId}`);
         if (!error) {
-          await fetchCoupons();
+          setRefreshKey(k => k + 1);
         }
       } catch (error) {
         console.error('Failed to delete coupon:', error);
       }
     },
-    [storeId, fetchCoupons]
+    [storeId]
   );
 
   const toggleActive = useCallback(
@@ -151,13 +154,13 @@ export function useCoupons(storeId: string): UseCouponsResult {
       try {
         const { error } = await apiPatch(`/api/v1/stores/${storeId}/coupons/${couponId}/toggle`);
         if (!error) {
-          await fetchCoupons();
+          setRefreshKey(k => k + 1);
         }
       } catch (error) {
         console.error('Failed to toggle coupon:', error);
       }
     },
-    [storeId, fetchCoupons]
+    [storeId]
   );
 
   return {
