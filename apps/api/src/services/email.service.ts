@@ -43,6 +43,10 @@ import {
   planLimitReachedTemplate,
   type PlanLimitReachedData,
 } from './email-templates/plan-limit-reached';
+import {
+  subscriptionBillingTemplate,
+  type SubscriptionBillingNoticeData,
+} from './email-templates/subscription-billing';
 import { BRAND, brandFrom, poweredByBrand } from '@force/shared';
 
 import { resolveDefaultLanguage } from '@force/shared';
@@ -922,6 +926,28 @@ export class EmailService {
       content: planLimitReachedTemplate[lang](data),
       language: lang,
     });
+  }
+
+  /**
+   * Merchant notice from the subscription dunning cycle (SP5 task 3): a failed
+   * renewal with a retry scheduled, or the final downgrade to Free.
+   */
+  static async sendSubscriptionBillingNotice(
+    storeId: string,
+    data: SubscriptionBillingNoticeData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const lang: 'en' | 'ar' = language ?? 'en';
+    await this.sendForStore(
+      storeId,
+      {
+        to: data.to,
+        subject: subscriptionBillingTemplate.subject[lang](data),
+        content: subscriptionBillingTemplate[lang](data),
+        language: lang,
+      },
+      { queue: true }
+    );
   }
 
   // ---------------------------------------------------------------------------

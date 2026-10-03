@@ -225,6 +225,21 @@ export function aiRouteContext(req: Request, res: Response, next: NextFunction):
 }
 
 /**
+ * Merchant billing router context (SP5 task 3): reads (GET/HEAD) share ONE
+ * request transaction; writes (checkout, change-plan, cancel, resume) call the
+ * payment gateway, so they run under a store scope instead — the billing
+ * service opens its own short transactions around the claim/settle steps and
+ * never holds one across the provider call (CLAUDE.md RLS note).
+ */
+export function billingRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (SAFE_METHODS.has(req.method)) {
+    tenantContext(req, res, next);
+    return;
+  }
+  storeScopeContext(req, res, next);
+}
+
+/**
  * RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — user-scoped
  * context wrapper for routers that never pass through `tenantContext`.
  *

@@ -25,6 +25,8 @@ import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
+import billingWebhookRoutes from './routes/billing-webhook.routes';
+import { assertBillingConfigAtBoot } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import waBridgeRoutes from './routes/wa-bridge.routes';
 import { socketService } from './services/socket.service';
@@ -50,6 +52,9 @@ import logger from './lib/logger';
 
 // Initialize Sentry before anything else
 SentryService.init();
+
+// SP5 task 3: refuse BILLING_PROVIDER=stub in production before serving anything.
+assertBillingConfigAtBoot();
 
 const app = express();
 
@@ -404,6 +409,14 @@ app.use(
 // step's 5xx, issue 2314), and sits BEFORE the body parser so a
 // capped caller is refused before its body is read. See inngestLimiter.
 app.use('/api/v1/inngest', inngestLimiter);
+
+// Subscription-billing webhooks (SP5 task 3): raw body for HMAC, mounted BEFORE
+// the generic payment webhooks and the JSON parser.
+app.use(
+  '/api/v1/webhooks/billing',
+  express.raw({ type: () => true, limit: '1mb' }),
+  billingWebhookRoutes
+);
 
 // Webhook routes need raw body parsing (must be before json middleware)
 app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
