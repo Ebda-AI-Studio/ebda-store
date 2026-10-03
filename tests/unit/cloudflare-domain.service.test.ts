@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../apps/api/src/config', () => ({
-  config: { cfApiToken: 'tok', cfZoneId: 'zone1', cfFallbackOrigin: 'cf.forcemediakw.com' },
+  config: { cfApiToken: 'tok', cfZoneId: 'zone1', cfFallbackOrigin: 'cf.ebda.app' },
 }));
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
@@ -55,7 +55,7 @@ describe('CloudflareDomainService', () => {
       domain: 'shop.x.com',
       verified: true,
       misconfigured: false,
-      dnsRecords: [{ type: 'CNAME', name: 'shop.x.com', value: 'cf.forcemediakw.com' }],
+      dnsRecords: [{ type: 'CNAME', name: 'shop.x.com', value: 'cf.ebda.app' }],
     });
   });
 

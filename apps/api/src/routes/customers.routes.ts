@@ -27,6 +27,7 @@ import {
 import { AuthService, eraseNeedsCrmReview } from '../services/auth.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
+import { BRAND } from '@force/shared';
 
 import { minorToDecimalString, excelMoneyFormat } from '@force/shared';
 const router = Router({ mergeParams: true });
@@ -133,7 +134,7 @@ router.get(
           : aggregated.orders.filter(o => exportedIds.has(customerKeyOf(o) ?? `guest:${o.id}`));
 
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'Force Website Builder';
+      workbook.creator = BRAND.name;
       workbook.created = new Date();
       const sheet = workbook.addWorksheet('Customers');
 

@@ -17,7 +17,13 @@ import { featureService } from '../services/feature.service';
 import { bustCorsCache } from '../lib/cors-cache';
 import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
-import { isSafeUrl, isValidTimeZone } from '@force/shared';
+import {
+  isSafeUrl,
+  isValidTimeZone,
+  parseStoreHost,
+  storeSlugSchema,
+  storeSlugIssueCode,
+} from '@force/shared';
 import {
   maskMarketingPixelSecrets,
   preserveMaskedPixelSecrets,
@@ -25,15 +31,28 @@ import {
 
 const router = Router();
 
+/**
+ * Parse a store create/update body. A rejected slug is raised as its own stable
+ * 400 code (`SLUG_RESERVED`, `SLUG_TOO_SHORT`, …) rather than the generic
+ * VALIDATION_ERROR, so the admin and API clients can key on it.
+ */
+function parseStoreBody<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
+  const result = schema.safeParse(body);
+  if (result.success) return result.data;
+  for (const issue of result.error.issues) {
+    const code = storeSlugIssueCode(issue);
+    if (code) throw new AppError(400, code, issue.message);
+  }
+  throw result.error;
+}
+
 // Validation schemas
 const createStoreSchema = z.object({
   name: z.string().min(1).max(100),
-  slug: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(/^[a-z0-9-]+$/)
-    .optional(),
+  // `<slug>.ebda.app`: lowercase a-z0-9/hyphen, 3-40 chars, no leading/trailing/
+  // double hyphen, and never a reserved label (`app`, `api`, `www`, …). One
+  // definition in @force/shared — the same list the host parser and resolver use.
+  slug: storeSlugSchema.optional(),
   domain: z.string().optional(),
   settings: z.record(z.string(), z.any()).optional(),
 });
@@ -526,7 +545,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = createStoreSchema.parse(req.body);
+      const data = parseStoreBody(createStoreSchema, req.body);
 
       const store = await StoreService.create(getAuthUser(req).userId, {
         ...data,
@@ -553,7 +572,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const data = updateStoreSchema.parse(req.body);
+      const data = parseStoreBody(updateStoreSchema, req.body);
       const user = getAuthUser(req);
 
       // The time zone decides which day a sale / expense / VAT period belongs to (Ruling FRT-2), so
@@ -1207,6 +1226,22 @@ router.put(
       // a customer-visible outage. With this ordering, the old domain keeps
       // serving traffic until everything else (provider add + DB update)
       // succeeds; old-domain removal moves to AFTER the DB commit below.
+      // A custom domain must be a real third-party hostname. Ebda's own hosts
+      // (the apex, `<slug>.ebda.app`, platform labels), IPs, localhost and
+      // malformed names can never be claimed: `<slug>.ebda.app` is already
+      // routed by slug, and letting a store claim one would hijack another
+      // store's (or the platform's) host (Review Focus 1).
+      if (domain && parseStoreHost(domain).kind !== 'custom') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'DOMAIN_INVALID',
+            message: 'Enter your own domain (for example mystore.com), not an Ebda address.',
+          },
+        });
+        return;
+      }
+
       if (domain && domain !== oldDomain) {
         // Check platform configuration first — domain feature is unusable
         // without the resolved provider's API credentials configured on the API

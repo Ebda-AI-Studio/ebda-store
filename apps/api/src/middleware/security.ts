@@ -246,7 +246,7 @@ const STOREFRONT_ALLOWED_STORE_PATHS: RegExp[] = [
   // patterns all expected a store id as the segment after /stores and these
   // have the literal `public` there. That would have returned 403 on shipping,
   // coupons and promotions for every merchant on a custom domain — checkout
-  // unusable — while working perfectly on store.force-ai.co, which is a
+  // unusable — while working perfectly on ebda.app, which is a
   // platform origin and returns early long before this list is consulted.
   // Anchored against a `.` segment so `/stores/public/../<id>/customers`
   // cannot satisfy a bare prefix. A store id never begins with a dot. Belt and
@@ -539,7 +539,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // `application/x-www-form-urlencoded` / `multipart/form-data` /
   // `text/plain`. JSON / XHR requests trigger a CORS preflight first,
   // and our CORS config rejects unknown origins — so JSON POSTs from
-  // forcemediakw.com (admin / storefront) are inherently safe.
+  // ebda.app (admin / storefront) are inherently safe.
   //
   // CRITICAL: this skip MUST gate on the request's Origin being a
   // PLATFORM origin, not "any allowed origin". Custom merchant domains

@@ -122,20 +122,20 @@ export class OneSignalRequestError extends Error {
 }
 
 /** Storefront app — used by `broadcastToStore` (customer-facing pushes
- *  from merchants). Origin: https://store.forcemediakw.com. */
+ *  from merchants). Origin: https://ebda.app. */
 function isStorefrontConfigured(): boolean {
   return !!(config.onesignalAppId && config.onesignalRestApiKey);
 }
 
 /** Admin app — used by `notifyAdminsOfOrder` (new-order pings to store
- *  owners). Origin: https://app.forcemediakw.com. Distinct from the
+ *  owners). Origin: https://app.ebda.app. Distinct from the
  *  storefront app because OneSignal locks each app to a single origin. */
 function isAdminConfigured(): boolean {
   return !!(config.onesignalAdminAppId && config.onesignalAdminRestApiKey);
 }
 
 /** Orders PWA — used by `notifyOrdersAppOfOrder` (new-order pings to store
- *  staff running the Orders app). Origin: https://orders.forcemediakw.com.
+ *  staff running the Orders app). Origin: https://orders.ebda.app.
  *  A SEPARATE OneSignal app from both the admin and storefront ones because
  *  OneSignal locks each app to a single origin. No fallback — when unset we
  *  skip the send silently (see `notifyOrdersAppOfOrder`). */
@@ -171,7 +171,7 @@ export class OneSignalService {
    */
   static async notifyAdminsOfOrder(input: NotifyOrderInput): Promise<void> {
     // Admin pushes go through the admin OneSignal app (origin
-    // app.forcemediakw.com), NOT the storefront app. OneSignal locks each
+    // app.ebda.app), NOT the storefront app. OneSignal locks each
     // app to a single chrome_web_origin so we can't reuse the storefront
     // app for admin devices — they'd fail subscription with an origin
     // mismatch error.
@@ -311,8 +311,8 @@ export class OneSignalService {
 
   /**
    * Push a "New order" notification to the staff running the Orders PWA
-   * (orders.forcemediakw.com) for THIS store. Distinct from
-   * `notifyAdminsOfOrder` (admin PWA, app.forcemediakw.com) — a different
+   * (orders.ebda.app) for THIS store. Distinct from
+   * `notifyAdminsOfOrder` (admin PWA, app.ebda.app) — a different
    * device set + a different OneSignal app, so the two never double-send.
    *
    * Targeting is TAG-BASED: the Orders app tags each subscribed device with

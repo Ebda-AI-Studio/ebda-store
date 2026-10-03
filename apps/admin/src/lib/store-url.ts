@@ -1,24 +1,28 @@
 // Storefront URL composition for admin surfaces.
 //
-// The storefront is path-routed under a single shared subdomain
-// (`store.force-ai.co/<slug>`), NOT `<slug>.forcemediakw.com`. Six
-// admin call sites previously rolled their own subdomain-style fallback;
-// keep this helper as the single source of truth.
+// Every store is served at its own host: `<slug>.ebda.app` (free), plus an
+// optional merchant custom domain. There is NO path-based `/<slug>` store URL
+// on the apex. This module is the single place admin code turns a store into a
+// URL/display host — it delegates to the shared brand helpers so the format
+// can never drift from the storefront's own host routing.
+import { BRAND, storeHost, storefrontOrigin } from '@force/shared';
 
-export const PLATFORM_STORE_HOST = 'store.force-ai.co';
+/** The suffix the free store address ends with, e.g. `.ebda.app`. */
+export const STORE_HOST_SUFFIX: string = BRAND.domains.storeSuffix;
 
 type StoreUrlInput = { slug: string; domain?: string | null };
 
+/** Display host for a store: its custom domain, else `<slug>.ebda.app`. */
 export function getStoreDisplayUrl(store: StoreUrlInput): string {
-  return store.domain || `${PLATFORM_STORE_HOST}/${store.slug}`;
+  return store.domain || storeHost(store.slug);
 }
 
+/** The free `<slug>.ebda.app` host for a slug (display form, no scheme). */
 export function getPlatformStoreUrl(slug: string): string {
-  return `${PLATFORM_STORE_HOST}/${slug}`;
+  return storeHost(slug);
 }
 
+/** Absolute storefront URL: `https://<custom-domain>` or `https://<slug>.ebda.app`. */
 export function getStoreHref(store: StoreUrlInput): string {
-  if (store.domain) return `https://${store.domain}`;
-  const base = process.env.NEXT_PUBLIC_WEB_URL ?? `https://${PLATFORM_STORE_HOST}`;
-  return `${base}/${store.slug}`;
+  return storefrontOrigin(store);
 }

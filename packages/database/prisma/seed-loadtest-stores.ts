@@ -27,7 +27,7 @@ const prisma = new PrismaClient();
 // Config
 // ============================================
 
-const LOADTEST_USER_EMAIL = 'loadtest+stores@forcemediakw.com';
+const LOADTEST_USER_EMAIL = 'loadtest+stores@ebda.app';
 const LOADTEST_STORE_SLUG_PREFIX = 'loadtest-store-';
 const STORE_COUNT = parseInt(process.env.LOADTEST_STORE_COUNT ?? '20', 10);
 const IS_CLEANUP = process.argv.includes('--cleanup');

@@ -54,21 +54,21 @@ interface WorkerEnv {
 }
 
 /**
- * Force AI COMPANY-page carve-out (2026-07-09).
+ * Ebda COMPANY-page carve-out (2026-07-09).
  *
- * `force-ai.co` / `www.force-ai.co` are the Force AI *company* umbrella page —
+ * `ebda.app` / `ebda.app` are the Ebda *company* umbrella page —
  * a separate static site hosted on Cloudflare Pages (`force-ai-landing-preview`).
- * But this storefront Worker owns the WHOLE `force-ai.co` zone via the SaaS
- * wildcard catch-all route (needed for `store.force-ai.co` + every merchant
+ * But this storefront Worker owns the WHOLE `ebda.app` zone via the SaaS
+ * wildcard catch-all route (needed for `ebda.app` + every merchant
  * custom hostname), and Worker routes take priority over Pages custom domains —
  * so the apex would otherwise render the storefront platform landing.
  *
  * Fix: intercept the company hosts here, BEFORE the Next handler. The `www`
  * variant 301-redirects to the bare apex so there is a single canonical host
- * (no duplicate-content across `force-ai.co` + `www.force-ai.co`); the apex
- * reverse-proxies to the Pages company site (URL stays `force-ai.co`; content
+ * (no duplicate-content across `ebda.app` + `ebda.app`); the apex
+ * reverse-proxies to the Pages company site (URL stays `ebda.app`; content
  * comes from Pages, including its `/api/demo-request` Function). Everything else —
- * `store.force-ai.co`, merchant domains, `/<slug>` — falls through to Next
+ * `ebda.app`, merchant domains, `/<slug>` — falls through to Next
  * completely unchanged. The Pages origin is a different zone, so the proxied
  * subrequest never re-enters this Worker (no loop).
  */

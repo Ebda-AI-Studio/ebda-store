@@ -3110,7 +3110,7 @@ export default function StoreLayoutPage() {
         </div>
 
         {/* Live preview pane — iframe to the storefront. CSP frame-ancestors
-            was relaxed to allow framing from app.forcemediakw.com (admin) +
+            was relaxed to allow framing from app.ebda.app (admin) +
             localhost:3001 (dev). 2026-05-20: was a "click to open" link
             because of stricter CSP; now renders inline. */}
         <aside className="hidden lg:block">

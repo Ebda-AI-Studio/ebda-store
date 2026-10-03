@@ -79,8 +79,8 @@ describe('S1-1: production frame-ancestors default excludes localhost', () => {
       NODE_ENV: 'production',
       STOREFRONT_FRAME_ANCESTORS: undefined,
     });
-    expect(fa).toContain('https://admin.force-ai.co');
-    expect(fa).toContain('https://app.forcemediakw.com');
+    expect(fa).toContain('https://app.ebda.app');
+    expect(fa).toContain('https://app.ebda.app');
   });
 
   it('a non-production build keeps the localhost origins (dev must still work over http)', async () => {
@@ -98,6 +98,6 @@ describe('S1-1: production frame-ancestors default excludes localhost', () => {
       STOREFRONT_FRAME_ANCESTORS: 'https://custom.example.com',
     });
     expect(fa).toContain('https://custom.example.com');
-    expect(fa).not.toContain('admin.force-ai.co');
+    expect(fa).not.toContain('app.ebda.app');
   });
 });

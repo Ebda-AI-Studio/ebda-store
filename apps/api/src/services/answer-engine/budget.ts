@@ -7,7 +7,7 @@
  * `assertAiQuota()` inside `gemini.provider.ts`'s `query()`, which is a
  * shared daily/monthly request cap across every store and engine. Paid
  * engines need a SEPARATE bound because they're opt-in, billed directly to
- * Force AI (not covered by the Gemini free-tier accounting), and each has
+ * Ebda (not covered by the Gemini free-tier accounting), and each has
  * its own account-level rate/spend limits.
  *
  * Reuses the existing `aiUsage` table rather than adding a new one: the

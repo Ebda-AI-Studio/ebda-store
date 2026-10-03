@@ -1,24 +1,26 @@
 import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
 import { resolvedViaCookie } from '../../lib/agent-store-resolver';
+import { storeOrigin, BRAND } from '@force/shared';
 
 import { minorToDecimalString, REGION } from '@force/shared';
 /**
  * Dynamic /llms.txt — served at three levels:
  *
- *   store.force-ai.co/llms.txt
+ *   ebda.app/llms.txt
  *     → platform-level index: lists every active merchant with a one-liner
  *       + a structure map for AI crawlers. No store context in headers.
  *
- *   store.force-ai.co/<slug>/llms.txt
- *     → middleware rewrites to /llms.txt + sets x-store-slug header.
- *       Route detects the slug, fetches that store's categories + products
- *       + contact info, renders a per-store markdown index.
+ *   <slug>.ebda.app/llms.txt
+ *     → middleware sets x-store-domain to the host. Route resolves the host to
+ *       its store, fetches that store's categories + products + contact info,
+ *       renders a per-store markdown index.
  *
  *   wadyaljuz.com/llms.txt (a merchant's custom domain)
  *     → middleware sets x-store-domain. Route resolves the domain to its
  *       store and renders THAT store's per-store index (links rooted at the
- *       custom domain), NOT the generic platform index.
+ *       custom domain), NOT the generic platform index. A store host that
+ *       resolves to NO store is a 404, never the platform index.
  *
  * All data is fetched from the public API (no direct Prisma — the web app
  * doesn't depend on @force/database).
@@ -220,15 +222,15 @@ async function fetchProducts(storeId: string): Promise<PublicProduct[] | null> {
 export function buildPlatformBody(stores: PublicStore[]): string {
   const storeLines = stores
     .map(s => {
-      const desc = s.description?.trim() || 'Kuwait-based merchant on Force AI Store.';
-      return `- [${s.name}](https://store.force-ai.co/${s.slug}): ${desc}`;
+      const desc = s.description?.trim() || 'Egypt-based merchant on Ebda.';
+      return `- [${s.name}](${storeOrigin(s.slug)}): ${desc}`;
     })
     .join('\n');
 
-  return `# Force AI Store — Multi-tenant Storefront Platform
+  return `# ${BRAND.name} — Multi-tenant Storefront Platform
 
-> Force AI Store is the per-merchant e-commerce platform by Force AI.
-> Each merchant gets a path-based storefront at \`store.force-ai.co/<slug>\`
+> ${BRAND.name} is the per-merchant e-commerce platform by ${BRAND.company}.
+> Each merchant gets a storefront at \`<slug>${BRAND.domains.storeSuffix}\`
 > with their own products, branding, and contact info. Customers in Kuwait,
 > Saudi Arabia, and Qatar can browse + buy across multiple merchants from one
 > platform.
@@ -239,30 +241,30 @@ ${storeLines || '_No active stores yet._'}
 
 ## Per-store structure
 
-Every store follows the same URL pattern:
+Every store lives on its own host (\`https://<slug>${BRAND.domains.storeSuffix}\`, or the merchant's custom domain) and follows the same URL pattern:
 
-- \`/<slug>\` — store homepage (JSON-LD: Store, ItemList of featured products, BreadcrumbList)
-- \`/<slug>/products\` — full catalogue (JSON-LD: ItemList, BreadcrumbList)
-- \`/<slug>/categories\` — category browse
-- \`/<slug>/products?category=<cat>\` — products in a category (JSON-LD: ItemList, BreadcrumbList)
-- \`/<slug>/products/<product-slug>\` — product detail (JSON-LD: Product with price, availability, image)
-- \`/<slug>/about\` — about the merchant (JSON-LD: AboutPage, Organization)
-- \`/<slug>/contact\` — contact info (JSON-LD: ContactPage, PostalAddress, ContactPoint)
-- \`/<slug>/llms.txt\` — per-store LLM index with all products + categories enumerated
+- \`/\` — store homepage (JSON-LD: Store, ItemList of featured products, BreadcrumbList)
+- \`/products\` — full catalogue (JSON-LD: ItemList, BreadcrumbList)
+- \`/categories\` — category browse
+- \`/products?category=<cat>\` — products in a category (JSON-LD: ItemList, BreadcrumbList)
+- \`/products/<product-slug>\` — product detail (JSON-LD: Product with price, availability, image)
+- \`/about\` — about the merchant (JSON-LD: AboutPage, Organization)
+- \`/contact\` — contact info (JSON-LD: ContactPage, PostalAddress, ContactPoint)
+- \`/llms.txt\` — per-store LLM index with all products + categories enumerated
 
 ## For AI agents
 
 - Schema.org structured data on every page (JSON-LD blocks in <head>)
-- Sitemap: https://store.force-ai.co/sitemap.xml (lists every URL for every active store)
+- Sitemap: each store serves its own \`/sitemap.xml\` on its own host
 - Languages: bilingual (English + Arabic). Store default in \`Store.inLanguage\`. Customer can browse either.
 - Currency: ${REGION.currency} (Egyptian Pound, 2 decimals) unless individual store overrides
 - Real-time inventory in \`Product.offers.availability\` (InStock / OutOfStock)
-- All product data is publicly accessible — no auth or scraping protection on /<slug>/* pages
+- All product data is publicly accessible — no auth or scraping protection on any store page
 - Rate limit: 100 req/min per IP for catalogue scrape
 
 ## Sitemap
 
-https://store.force-ai.co/sitemap.xml
+Each store serves its own sitemap at \`/sitemap.xml\` on its host.
 `;
 }
 
@@ -286,7 +288,7 @@ export function buildPerStoreBody(
   const contactLines = storeContactLines(store, base);
 
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
-  const storeDesc = store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`;
+  const storeDesc = store.description || `${store.name} on Ebda — Egypt-based merchant.`;
 
   return `# ${storeTitle}
 
@@ -313,8 +315,8 @@ ${prodLines || '_No active products._'}${buildAgentSections(store, base)}
 
 ## Platform
 
-This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
-Force AI. See https://store.force-ai.co/llms.txt for the
+This store is hosted on Ebda, a multi-tenant e-commerce platform by
+Whisky 11. See https://ebda.app/llms.txt for the
 platform-wide index.
 `;
 }
@@ -347,7 +349,7 @@ function storeContactLines(store: PublicStore, base: string): string {
 
 /** Public origin the store's links are rooted at (custom domain or platform path). */
 function storeBaseUrl(store: PublicStore): string {
-  return store.domain ? `https://${store.domain}` : `https://store.force-ai.co/${store.slug}`;
+  return store.domain ? `https://${store.domain}` : storeOrigin(store.slug);
 }
 
 /**
@@ -556,13 +558,11 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
     status: 200,
     headers: {
       'Content-Type': 'text/markdown; charset=utf-8',
-      // Shared-cacheable because `/llms.txt` is resolved ONLY from the URL
-      // slug segment or the custom-domain Host: middleware.ts's
-      // URL_KEYED_PUBLIC_PATHS guard (#1959) never lets the sticky
-      // `x-store-slug` cookie reach this path. THAT guard is the load-bearing
-      // control against a cross-tenant edge-cache entry; `viaCookie → private`
-      // is an unreachable second line of defence (#2174, see
-      // resolvedViaCookie). A degraded body (an upstream API could not be
+      // Shared-cacheable because `/llms.txt` is resolved ONLY from the request
+      // Host (`<slug>.ebda.app` or the custom domain): middleware sets
+      // `x-store-domain` from it and no cookie or path ever names a store, so
+      // the URL (host included) fully keys the answer. `viaCookie → private` is
+      // a retired second line of defence (see resolvedViaCookie). A degraded body (an upstream API could not be
       // asked, #1853/#2224) gets a short retry TTL so the next request heals it.
       'Cache-Control': viaCookie
         ? 'private, max-age=600'
@@ -576,35 +576,26 @@ export async function perStoreResponse(store: PublicStore, viaCookie = false): P
 
 export async function GET() {
   const headersList = await headers();
-  const storeSlug = headersList.get('x-store-slug');
   const storeDomain = headersList.get('x-store-domain');
   const viaCookie = await resolvedViaCookie();
 
-  // ── Per-store mode (platform path: store.force-ai.co/<slug>/llms.txt) ───────
-  if (storeSlug) {
-    const store = await fetchStore(storeSlug);
-    if (!store || store.status !== 'active') {
-      return new Response('Not Found', { status: 404 });
-    }
-    return perStoreResponse(store, viaCookie);
-  }
-
-  // ── Per-store mode (custom domain: wadyaljuz.com/llms.txt) ──────────────────
-  // The middleware sets x-store-domain (NOT x-store-slug) on custom domains, so
-  // without this branch a merchant's own domain fell through to the generic
-  // platform index. Resolve the domain → load the full store via the slug path
-  // (so contact + llmsTxt override behave identically) → serve THAT store's
-  // index. Unknown/inactive domains fall through to the platform index, not 404.
+  // ── Per-store mode (`<slug>.ebda.app` or a custom domain) ──────────────────
+  // The middleware sets x-store-domain to the request HOST for every store
+  // host. Resolve it → load the full store via the slug path (so contact +
+  // llmsTxt override behave identically) → serve THAT store's index. A store
+  // host that resolves to no (active) store is a 404: it must NEVER fall
+  // through to the platform index or answer as some other store.
   if (storeDomain) {
     const resolved = await fetchStoreByHost(storeDomain);
     const store = resolved?.slug ? ((await fetchStore(resolved.slug)) ?? resolved) : resolved;
-    if (store && (!store.status || store.status === 'active')) {
-      // Custom-domain resolution is Host-based, never cookie-based.
-      return perStoreResponse(store, false);
+    if (!store || (store.status && store.status !== 'active')) {
+      return new Response('Not Found', { status: 404 });
     }
+    // Host-based resolution, never cookie-based.
+    return perStoreResponse(store, viaCookie);
   }
 
-  // ── Platform mode (store.force-ai.co/llms.txt + the Force AI landing) ───────
+  // ── Platform mode (ebda.app/llms.txt + the Ebda landing) ───────
   // The generic multi-tenant index — only the platform host reaches here.
   const stores = await fetchAllStores();
   const body = buildPlatformBody(stores);

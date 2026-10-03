@@ -75,7 +75,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', apiUrl: 'https://api.force-ai.co' },
+  config: { webUrl: 'https://ebda.app', apiUrl: 'https://api.ebda.app' },
 }));
 
 import { registerOrderTools } from '@api/mcp/tools/order.tools';

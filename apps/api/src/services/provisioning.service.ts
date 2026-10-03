@@ -2,13 +2,20 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma, Prisma, StoreStatus, withMoneyTx, withRlsBypass } from '@force/database';
 import { bustStoreCaches } from './store.service';
+import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
-import { isValidTimeZone, slugifyWithFallback, REGION } from '@force/shared';
+import {
+  isValidTimeZone,
+  slugifyWithFallback,
+  REGION,
+  storefrontOrigin,
+  isReservedSlug,
+} from '@force/shared';
 
 // ==========================================
 // Store Provisioning Service
@@ -72,8 +79,10 @@ export class ProvisioningService {
       settings,
     } = input;
 
-    // Generate slug if not provided
-    const slug = storeSlug || this.generateSlug(storeName);
+    // An explicit slug is the store's `<slug>.ebda.app`: validate it (format +
+    // reserved list) and refuse with a stable SLUG_* code. A generated one is
+    // coerced into a valid, unreserved slug.
+    const slug = storeSlug ? assertStoreSlug(storeSlug) : this.generateSlug(storeName);
 
     // Check if slug is available
     const existingStore = await prisma.store.findUnique({
@@ -301,7 +310,7 @@ export class ProvisioningService {
         temporaryPassword: result.isNewUser ? tempPassword : undefined,
       },
       urls: {
-        storefront: domain ? `https://${domain}` : `${process.env.WEB_URL}/${result.store.slug}`,
+        storefront: storefrontOrigin({ slug: result.store.slug, domain }),
         admin: `${process.env.ADMIN_URL}`,
       },
     };
@@ -431,7 +440,10 @@ export class ProvisioningService {
    * defect that put '' and '-1'..'-4' product slugs on a live store.
    */
   private static generateSlug(name: string): string {
-    return slugifyWithFallback(name, 'store', { ascii: true }).substring(0, 50);
+    const derived = deriveStoreSlug(slugifyWithFallback(name, 'store', { ascii: true }));
+    // A name that derives a reserved label ("Support") gets a suffix so the
+    // store is created at a legal address instead of failing.
+    return isReservedSlug(derived) ? `${derived}-1` : derived;
   }
 
   /**

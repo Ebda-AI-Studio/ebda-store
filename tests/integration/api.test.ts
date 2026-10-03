@@ -17,7 +17,7 @@ const API_URL = API_BASE;
 
 // Admin credentials must match what the seed script provisioned. CI sets
 // ADMIN_PASSWORD; locally we fall back to the historical value.
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@force-ai.co';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@ebda.app';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // Test utilities

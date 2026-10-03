@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { storefrontOrigin } from '@force/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { prisma, runInTenantContext, withTenantContext } from '@force/database';
 import type { McpStore } from '../resolve-store';
@@ -51,9 +52,9 @@ function splitName(name: string): { firstName: string; lastName: string } {
 
 // Mirrors payment.routes.ts's storefront-base-url derivation (POST
 // /payments/create, online branch): custom domain wins, else the
-// platform web app at /<slug>.
+// store's free `<slug>.ebda.app` origin.
 function storefrontBaseUrl(store: McpStore): string {
-  return store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;
+  return storefrontOrigin(store);
 }
 
 export function registerOrderTools(server: McpServer, store: McpStore): void {

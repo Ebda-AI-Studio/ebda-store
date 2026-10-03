@@ -1,5 +1,5 @@
 /**
- * The fulfilment app (orders.force-ai.co) reads the same order-detail
+ * The fulfilment app (orders.ebda.app) reads the same order-detail
  * endpoint admin reads, so a bundle box arrives as N `OrderItem` rows
  * sharing one `bundleGroupId`. Before this fix `ItemsCard` rendered them
  * flat — a fulfiller saw "Ramadan Box" as three unrelated products at

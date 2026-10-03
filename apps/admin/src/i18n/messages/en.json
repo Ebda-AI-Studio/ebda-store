@@ -184,7 +184,7 @@
         "storeName": "Store Name",
         "urlSlug": "URL Slug",
         "slugPlaceholder": "my-store-name",
-        "slugHint": "Your store will be at: store.force-ai.co/{slug}",
+        "slugHint": "Your store will be at: {slug}.ebda.app",
         "slugHintPlaceholder": "your-slug",
         "plan": "Plan",
         "status": "Status",
@@ -396,7 +396,9 @@
       "errors": {
         "storeNameRequired": "Store name is required",
         "storeUrlRequired": "Store URL is required",
-        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and hyphens",
+        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and single hyphens (not at the start or end)",
+        "storeUrlReserved": "This address is reserved. Please choose another one",
+        "storeUrlLength": "Address must be 3 to 40 characters",
         "emailRequired": "Email is required",
         "emailInvalid": "Please enter a valid email address",
         "ownerNameRequired": "Owner name is required",
@@ -2225,7 +2227,7 @@
       },
       "whatsapp": {
         "title": "WhatsApp Integration",
-        "description": "Force Business Platform · templates · order updates · payment links"
+        "description": "Ebda WhatsApp Platform · templates · order updates · payment links"
       },
       "staff": {
         "title": "Staff Members",
@@ -2233,7 +2235,7 @@
       },
       "whatsappBridge": {
         "title": "WhatsApp Business",
-        "description": "Connect Force AI Store to Force AI WhatsApp Business Platform — paste your API key + configure templates"
+        "description": "Connect Ebda to Ebda WhatsApp Business Platform — paste your API key + configure templates"
       },
       "whatsappTemplates": {
         "title": "WhatsApp Templates",
@@ -2265,8 +2267,8 @@
       }
     },
     "metaCatalogCard": {
-      "provisionLabel": "Provision automatically · Force AI assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Force AI parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
+      "provisionLabel": "Provision automatically · Ebda assisted",
+      "provisionDescription": "Creates a new Commerce Catalog under the Ebda parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
       "provisionButton": "Provision automatically",
       "provisioningButton": "Provisioning…"
     },
@@ -3300,11 +3302,11 @@
   },
   "pwa": {
     "installHint": {
-      "title": "Install Force Admin to receive push notifications",
+      "title": "Install Ebda Admin to receive push notifications",
       "description": "iPhone needs the app added to your home screen before push notifications can work.",
       "step1": "Tap the Share icon in Safari",
       "step2": "Choose Add to Home Screen",
-      "step3": "Open Force Admin from the home screen and allow notifications",
+      "step3": "Open Ebda Admin from the home screen and allow notifications",
       "dismiss": "Dismiss"
     },
     "page": {
@@ -4925,7 +4927,7 @@
       "twitterPlaceholder": "yourstorehandle",
       "googleSiteVerification": "Google Search Console verification (custom domain only)",
       "googleSiteVerificationPlaceholder": "Paste the meta tag or just the token",
-      "googleSiteVerificationHint": "Your store is already verified on store.force-ai.co — you only need this once you connect a custom domain (e.g. yourstore.com).\n1. Open Google Search Console and add your custom domain as a URL-prefix property.\n2. Pick the \"HTML tag\" verification method.\n3. Paste the whole meta tag (or just the content token) here and save.\n4. Click Verify in Search Console — your storefront will already be serving the tag.",
+      "googleSiteVerificationHint": "Your store is already verified on ebda.app — you only need this once you connect a custom domain (e.g. yourstore.com).\n1. Open Google Search Console and add your custom domain as a URL-prefix property.\n2. Pick the \"HTML tag\" verification method.\n3. Paste the whole meta tag (or just the content token) here and save.\n4. Click Verify in Search Console — your storefront will already be serving the tag.",
       "successMessage": "SEO settings saved successfully",
       "failedMessage": "Failed to save SEO settings",
       "connectionError": "Unable to connect to the server",
@@ -5299,7 +5301,7 @@
   "auth": {
     "login": {
       "title": "Admin Login",
-      "subtitle": "Sign in to access the Force AI Platform",
+      "subtitle": "Sign in to access the Ebda Platform",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
@@ -5307,8 +5309,8 @@
       "signIn": "Sign in",
       "signingIn": "Signing in…",
       "loginFailed": "Login failed",
-      "footer": "Force AI Platform Admin Panel",
-      "brandTitle": "Force AI Store",
+      "footer": "Ebda Platform Admin Panel",
+      "brandTitle": "Ebda",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
       "statProducts": "Products",
@@ -5577,9 +5579,9 @@
       "closeSidebar": "Close sidebar",
       "goBack": "Go back",
       "viewStore": "View Store",
-      "forcePlatformBrand": "AI Platform",
+      "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Admin",
-      "forceBrandPrefix": "Force",
+      "forceBrandPrefix": "Ebda",
       "languageLabel": "Language",
       "focusMode": {
         "enterFocusMode": "Focus mode",
@@ -5603,7 +5605,7 @@
       "ariaLabel": "Language"
     },
     "brand": {
-      "forceMediaAlt": "Force AI"
+      "forceMediaAlt": "Ebda"
     },
     "aiUsageSummaryCard": {
       "loading": "Loading AI quota…",
@@ -7243,7 +7245,7 @@
       "topQueriesTitle": "Top queries (latest day)",
       "noTopQueries": "No query data yet.",
       "notConnectedTitle": "Google Search Console not connected",
-      "notConnectedBody": "Once Force AI's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
+      "notConnectedBody": "Once Ebda's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
     }
   },
   "paymentAbandonments": {
@@ -7277,7 +7279,7 @@
   "whatsappIntegration": {
     "page": {
       "title": "WhatsApp Integration",
-      "subtitle": "Force AI WhatsApp Business Platform · templates · order updates · payment links",
+      "subtitle": "Ebda WhatsApp Business Platform · templates · order updates · payment links",
       "navAriaLabel": "WhatsApp settings"
     },
     "tabs": {
@@ -7290,13 +7292,13 @@
       "botAnalytics": "Bot Analytics"
     },
     "connection": {
-      "connectTitle": "Connect Force AI WhatsApp",
-      "connectDescription": "Paste the API key generated in your Force AI WhatsApp Business Platform admin to link this store.",
-      "apiKeyLabel": "Force AI WhatsApp API Key",
-      "apiKeyHint": "Generate the key in WBS admin → Clients → Force AI Store Bridge icon. Paste it here — the key is verified immediately.",
+      "connectTitle": "Connect Ebda WhatsApp",
+      "connectDescription": "Paste the API key generated in your Ebda WhatsApp Business Platform admin to link this store.",
+      "apiKeyLabel": "Ebda WhatsApp API Key",
+      "apiKeyHint": "Generate the key in WBS admin → Clients → Ebda Bridge icon. Paste it here — the key is verified immediately.",
       "connecting": "Connecting...",
       "connect": "Connect",
-      "finishTitle": "Finish connecting Force AI WhatsApp",
+      "finishTitle": "Finish connecting Ebda WhatsApp",
       "finishDescription": "An API key is saved but WhatsApp notifications aren't enabled yet. Select your templates below and enable to activate.",
       "disconnecting": "Disconnecting...",
       "removeKey": "Remove key",
@@ -7307,7 +7309,7 @@
       "available": "available",
       "savedNotVerified": "Saved — not verified",
       "keyInvalid": "The API key may be invalid. Template sending will fail — disconnect and re-key.",
-      "cantVerify": "Couldn't reach Force AI WhatsApp to verify this key. It's saved but unconfirmed — use Retry.",
+      "cantVerify": "Couldn't reach Ebda WhatsApp to verify this key. It's saved but unconfirmed — use Retry.",
       "retry": "Retry",
       "notificationsTitle": "Enable WhatsApp Notifications",
       "notificationsDescription": "Master switch for outbound WhatsApp messages. Per-event templates and channel choices live in the Order Updates tab.",
@@ -7319,17 +7321,17 @@
       "toastInvalidKeyTitle": "Invalid key",
       "toastInvalidKeyBody": "The API key was rejected. Generate a new key in WBS admin.",
       "toastConnectFailedTitle": "Connection failed",
-      "toastConnectFailedBody": "Could not connect to Force AI WhatsApp",
+      "toastConnectFailedBody": "Could not connect to Ebda WhatsApp",
       "toastConnectedTitle": "Connected",
-      "toastConnectedAutoErr": "Force AI WhatsApp connected — but template auto-submit failed: {error}. Visit Templates tab to retry.",
+      "toastConnectedAutoErr": "Ebda WhatsApp connected — but template auto-submit failed: {error}. Visit Templates tab to retry.",
       "toastConnectedSeededTitle": "Connected + templates submitted",
       "toastConnectedSeededBody": "{seeded} template(s) seeded, {submitted} pending Meta approval (~10min–24h).",
-      "toastConnectedBody": "Force AI WhatsApp Business Platform connected",
+      "toastConnectedBody": "Ebda WhatsApp Business Platform connected",
       "toastUnexpected": "An unexpected error occurred",
       "toastDisconnectFailedTitle": "Disconnect failed",
       "toastDisconnectFailedBody": "Could not disconnect",
       "toastDisconnectedTitle": "Disconnected",
-      "toastDisconnectedBody": "Force WhatsApp integration removed",
+      "toastDisconnectedBody": "Ebda WhatsApp integration removed",
       "toastConnectFirstTitle": "Connect first",
       "toastConnectFirstBody": "Please connect a WBS API key before enabling notifications",
       "toastSaveFailedTitle": "Save failed",
@@ -7341,7 +7343,7 @@
       "toastWaOnBody": "Customers can now order directly via WhatsApp DM.",
       "toastWaOffBody": "WhatsApp DM ordering has been turned off.",
       "toastWaSaveFailedBody": "Could not update WA ordering setting",
-      "apiKeyPlaceholder": "Paste key from WBS admin → Client → Force AI Store Bridge"
+      "apiKeyPlaceholder": "Paste key from WBS admin → Client → Ebda Bridge"
     },
     "templates": {
       "generating": "Generating…",
@@ -7355,7 +7357,7 @@
       "refresh": "Refresh",
       "loading": "Loading templates…",
       "noTemplates": "No templates set up yet.",
-      "noTemplatesHint": "Click Generate defaults to add the 12 canonical Force AI templates as drafts.",
+      "noTemplatesHint": "Click Generate defaults to add the 12 canonical Ebda templates as drafts.",
       "howItWorks": "How it works: Click Generate defaults to create the canonical templates as drafts. Click Sync to Meta to submit them. Meta reviews each template; approval typically takes 10 minutes to 24 hours.",
       "logoLabel": "Use my store logo as the WhatsApp message header",
       "logoHint": "Customers see your store logo at the top of every order-update message. Applied when you next generate or sync templates.",
@@ -7405,7 +7407,7 @@
     },
     "orderUpdates": {
       "notConnected": "Not connected yet.",
-      "notConnectedHint": "Connect to Force AI WhatsApp Business Platform first from the Connection tab, then come back here.",
+      "notConnectedHint": "Connect to Ebda WhatsApp Business Platform first from the Connection tab, then come back here.",
       "loading": "Loading…",
       "messageLanguage": "Message language",
       "templateNotFound": "Template not found",
@@ -7416,7 +7418,7 @@
       "bothOff": "Both off — event will be silent",
       "saving": "Saving…",
       "saveChanges": "Save changes",
-      "howItWorks": "How it works: when a customer's order transitions to one of these states, the FWB API fires the corresponding WhatsApp template via your Force WhatsApp Business Platform integration. Use the channel checkboxes to control which notification methods are active per event.",
+      "howItWorks": "How it works: when a customer's order transitions to one of these states, the Ebda API fires the corresponding WhatsApp template via your Ebda WhatsApp Business Platform integration. Use the channel checkboxes to control which notification methods are active per event.",
       "events": {
         "orderPaid": {
           "label": "Order paid",
@@ -7566,8 +7568,8 @@
       "accessTokenPlaceholderRotate": "Type a new token to rotate it",
       "accessTokenPlaceholderNew": "Paste your System User token",
       "accessTokenHint": "Create a System User in Meta Business Manager → grant <code>catalog_management</code> permission. Token is encrypted at rest and never shown again after saving.",
-      "provisionTitle": "Provision automatically · Force AI assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Force AI parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
+      "provisionTitle": "Provision automatically · Ebda assisted",
+      "provisionDescription": "Creates a new Commerce Catalog under the Ebda parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
       "provisioning": "Provisioning…",
       "provisionButton": "Provision automatically",
       "saving": "Saving…",
@@ -7577,7 +7579,7 @@
       "provisionError": "Meta auto-provisioning failed",
       "provisionSuccess": "Meta catalog provisioned — submit it for Meta review next.",
       "confirmAlready": "A catalog id is already filled in. Clear it first if you really want to provision a new one. Continue anyway?",
-      "confirmNew": "This will call Meta Graph API to create a brand-new Commerce Catalog under the Force AI parent Business Manager and assign it to this store. Continue?",
+      "confirmNew": "This will call Meta Graph API to create a brand-new Commerce Catalog under the Ebda parent Business Manager and assign it to this store. Continue?",
       "catalogIdPlaceholder": "e.g. 123456789012345",
       "businessIdPlaceholder": "e.g. 987654321098765"
     },
@@ -7985,7 +7987,7 @@
     },
     "premiumSubtitle": "Premium add-on",
     "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Force AI to request access.",
+    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda to request access.",
     "mainSubtitle": "Sticky button group your customers see on every page",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -8138,7 +8140,7 @@
     "walletsWithBalance": "Customers with a balance",
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
-    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Force AI support to turn it on.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda support to turn it on.",
     "checkoutAccounting": "Unavailable while accounting is on — the ledger does not yet record store credit as a liability, so wallet payments would be booked as cash.",
     "colCustomer": "Customer",
     "colContact": "Contact",

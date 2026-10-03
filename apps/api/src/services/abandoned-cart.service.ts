@@ -11,6 +11,7 @@
  */
 
 import { prisma, withRlsBypass } from '@force/database';
+import { storefrontOrigin } from '@force/shared';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
@@ -722,9 +723,7 @@ class AbandonedCartService {
     // storefront ever read them, the snapshot could not restore a cart (no
     // product/variant ids), and the signed link never expired, so the
     // recovery flow they implied did not exist.
-    const storeDomain = abandonedCart.store?.domain
-      ? `https://${abandonedCart.store.domain}`
-      : `${config.webUrl}/${abandonedCart.store?.slug ?? ''}`;
+    const storeDomain = abandonedCart.store ? storefrontOrigin(abandonedCart.store) : config.webUrl;
 
     const cartUrl = `${storeDomain}/cart`;
 

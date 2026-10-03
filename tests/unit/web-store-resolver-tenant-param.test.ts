@@ -29,6 +29,15 @@ describe('getStoreByTenantParam', () => {
         // not the URL, to distinguish a known vs. unknown domain.
         if (url.includes('/public/store/resolve')) {
           const requestedDomain = init?.headers?.['x-store-domain'];
+          if (requestedDomain === 'palora.ebda.app') {
+            return {
+              ok: true,
+              json: async () => ({
+                success: true,
+                data: { store: { id: 'store-slug-1', slug: 'palora', name: 'Palora' } },
+              }),
+            } as Response;
+          }
           if (requestedDomain === 'wadyaljuz.com') {
             return {
               ok: true,
@@ -89,9 +98,9 @@ describe('getStoreByTenantParam', () => {
     expect(store.slug).toBe('wadyaljuz');
   });
 
-  it('resolves a `slug:<slug>` tenant string as a platform-path store', async () => {
+  it('resolves a `<slug>.ebda.app` tenant (the request host) as that store', async () => {
     const { getStoreByTenantParam } = await import('@web/lib/store-resolver');
-    const store = await getStoreByTenantParam('slug:palora');
+    const store = await getStoreByTenantParam('palora.ebda.app');
     expect(store.id).toBe('store-slug-1');
     expect(store.slug).toBe('palora');
   });
@@ -101,8 +110,27 @@ describe('getStoreByTenantParam', () => {
     await expect(getStoreByTenantParam('unknown-domain.com')).rejects.toThrow('NEXT_NOT_FOUND');
   });
 
-  it('triggers notFound() when the slug does not resolve', async () => {
+  it('triggers notFound() when the store subdomain does not resolve', async () => {
     const { getStoreByTenantParam } = await import('@web/lib/store-resolver');
-    await expect(getStoreByTenantParam('slug:unknown-slug')).rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(getStoreByTenantParam('nobody.ebda.app')).rejects.toThrow('NEXT_NOT_FOUND');
+  });
+
+  // The tenant key is re-classified as a HOST: a hand-built key that is not a
+  // store host can never resolve a store (and never reaches the API).
+  it.each([
+    'slug:palora', // the retired path-slug tenant encoding
+    'ebda.app',
+    'app.ebda.app',
+    'www.ebda.app',
+    'x.y.ebda.app',
+    'localhost',
+    '127.0.0.1',
+    '',
+  ])('triggers notFound() without an API call for non-store tenant %j', async tenant => {
+    const { getStoreByTenantParam } = await import('@web/lib/store-resolver');
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockClear();
+    await expect(getStoreByTenantParam(tenant)).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

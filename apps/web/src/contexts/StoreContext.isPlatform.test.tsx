@@ -3,7 +3,7 @@
  * Issue #1544 — `useStoreUrl`'s `isPlatform` used to start `false` on every
  * render and only correct itself in a `useEffect` via
  * `isPlatformHost(window.location.hostname)`. That means the server-rendered
- * HTML on a platform host (`store.force-ai.co/<slug>`) always shipped a bare
+ * HTML on a platform host (`<slug>.ebda.app`) always shipped a bare
  * `/` home href — a pre-hydration click, or a crawler following the raw
  * href, landed a merchant's shopper on the platform root instead of their
  * store.
@@ -67,8 +67,10 @@ describe('StoreProvider seeds isPlatform server-side', () => {
     );
 
     expect(screen.getByTestId('is-platform').textContent).toBe('true');
-    // useStoreUrl and useIsPlatform must agree — both read the same context value.
-    expect(screen.getByTestId('home-href').textContent).toBe('/wadyaljuz');
+    // There is no path-based `/<slug>` storefront any more: even when the host is a
+    // platform host, in-store links are never slug-prefixed (a platform host renders
+    // no store at all).
+    expect(screen.getByTestId('home-href').textContent).toBe('/');
   });
 
   it('trusts a seeded `initialIsPlatform=false` too (does not re-derive it away)', () => {

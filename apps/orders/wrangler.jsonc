@@ -5,7 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "routes": [
-    { "pattern": "orders.force-ai.co", "custom_domain": true }
+    { "pattern": "orders.ebda.app", "custom_domain": true }
   ],
   "observability": { "enabled": true }
 }

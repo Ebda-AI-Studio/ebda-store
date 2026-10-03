@@ -1,4 +1,4 @@
-// Force Website Builder - Database Schema
+// Ebda - Database Schema
 // Prisma ORM
 //
 // NOTE: Prisma Migrate does not generate down (rollback) migrations by default.
@@ -298,7 +298,7 @@ model Store {
   // /locations routes return 404 and the locations admin page is hidden.
   locationsEnabled Boolean @default(false) @map("locations_enabled")
 
-  // Force AI WhatsApp Business Platform integration (opt-in per store)
+  // Ebda WhatsApp Business Platform integration (opt-in per store)
   // wbsApiKey is encrypted via AES-GCM using apps/api/src/services/encryption.service.ts
   // wbsTemplates shape: { orderPaid?, orderShipped?, orderDelivered? }
   //   each entry: { name: string, languageCode: string, channels?: { whatsapp: boolean, email: boolean } }

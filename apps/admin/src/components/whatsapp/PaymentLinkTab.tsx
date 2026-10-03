@@ -138,7 +138,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      // 1000 covers every active Force AI Store catalogue today (Wady Aljuz
+      // 1000 covers every active Ebda catalogue today (Wady Aljuz
       // tops at ~235). For catalogues that grow past 1000 the next
       // iteration should switch to server-side `?search=` paging.
       const { data } = await apiGet<{ products: ProductOption[] }>(

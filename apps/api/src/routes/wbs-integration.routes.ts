@@ -1,7 +1,7 @@
 /**
- * WBS Integration Routes — Force AI Store ↔ WBS Bridge Admin API
+ * WBS Integration Routes — Ebda ↔ WBS Bridge Admin API
  *
- * Allows store admins to configure their Force AI WhatsApp Business Platform
+ * Allows store admins to configure their Ebda WhatsApp Business Platform
  * integration: enable/disable, set client ID, API key (stored encrypted),
  * and per-event template names.
  *
@@ -376,7 +376,7 @@ router.put(
               success: false,
               error: {
                 code: 'INVALID_API_KEY',
-                message: 'The API key was rejected by Force AI WhatsApp Business Platform',
+                message: 'The API key was rejected by Ebda WhatsApp Business Platform',
               },
             });
             return;
@@ -715,12 +715,12 @@ router.put(
 // ─── POST /stores/:id/integrations/wbs/provision-meta-catalog ───────────────
 //
 // Super-admin only. Calls Meta Graph API to auto-create a Commerce Catalog
-// under the Force AI parent Business Manager, assigns the system user, then
+// under the Ebda parent Business Manager, assigns the system user, then
 // persists the catalog id + BM id + encrypted access token onto the Store row
 // — so the merchant doesn't have to navigate Meta Business Manager themselves.
 //
 // Refuses if:
-//   - the Force AI master credentials aren't configured (env vars missing)
+//   - the Ebda master credentials aren't configured (env vars missing)
 //   - the store already has a metaCatalogId (rotation goes through PUT)
 //
 // On success returns { metaCatalogId, metaBusinessId, hasMetaToken }.
@@ -743,7 +743,7 @@ router.post(
             code: 'PROVISIONER_NOT_CONFIGURED',
             message:
               'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
-              'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Force AI setup).',
+              'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda setup).',
           },
         });
         return;
@@ -839,7 +839,7 @@ router.post(
         store: { id: storeId, name: updated.name, slug: updated.slug },
         title: 'Meta Commerce catalog auto-provisioned',
         body:
-          `New Meta catalog ${result.catalogId} created under Force AI BM ${result.businessId}. ` +
+          `New Meta catalog ${result.catalogId} created under Ebda BM ${result.businessId}. ` +
           `Submit it for Meta review before flipping bot_mode to a native_catalog variant.`,
       }).catch(err => {
         logger.warn({ err }, 'sendAlert failed (non-blocking)');

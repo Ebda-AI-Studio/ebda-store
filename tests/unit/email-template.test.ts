@@ -74,12 +74,12 @@ describe('renderBrandedShell', () => {
     expect(html).not.toMatch(/hsla?\(/);
   });
 
-  it('falls back to platform orange when theme color is invalid', () => {
+  it('falls back to platform gold when theme color is invalid', () => {
     const html = renderBrandedShell(
       '<p>hi</p>',
       baseStore({ theme: { primaryColor: 'rm -rf /' } })
     );
-    expect(html).toContain('background-color:#ff6e00');
+    expect(html).toContain('background-color:#B08D57');
     expect(html).not.toContain('rm -rf');
   });
 
@@ -102,7 +102,7 @@ describe('renderBrandedShell', () => {
 
   it('includes powered-by line in footer', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
-    expect(html).toContain('Powered by Force AI');
+    expect(html).toContain('Powered by Ebda');
   });
 
   it('escapes the store name to prevent XSS in header', () => {

@@ -39,6 +39,7 @@ import { returnConfirmationTemplate } from './email-templates/return-confirmatio
 import { returnStatusUpdateTemplate } from './email-templates/return-status-update';
 import { reviewRequestTemplate, type ReviewRequestData } from './email-templates/review-request';
 import { lowStockAlertTemplate, type LowStockAlertItem } from './email-templates/low-stock-alert';
+import { BRAND, brandFrom, poweredByBrand } from '@force/shared';
 
 import { resolveDefaultLanguage } from '@force/shared';
 // ==========================================
@@ -184,7 +185,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
               ${contactBlock}
               <p class="copyright" style="${footerP}color:${c.inkSoft};font-weight:500;">© ${year} ${storeName}</p>
               ${footerLines.map(l => `<p style="${footerP}">${l}</p>`).join('\n              ')}
-              <p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">Powered by Force AI</p>
+              <p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">${poweredByBrand()}</p>
             </td>
           </tr>
         </table>
@@ -354,7 +355,7 @@ export class EmailService {
     opts?: { queue?: boolean }
   ): Promise<void> {
     const html = renderBrandedShell(args.content, {
-      name: 'Force AI Store',
+      name: BRAND.name,
       nameAr: null,
       logo: null,
       theme: null,
@@ -370,7 +371,7 @@ export class EmailService {
     }
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force AI Store <noreply@force-ai.co>',
+      from: brandFrom(),
       to: Array.isArray(args.to) ? args.to : [args.to],
       subject: args.subject,
       html,
@@ -406,7 +407,7 @@ export class EmailService {
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force AI Store <noreply@force-ai.co>',
+      from: brandFrom(),
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
       html: options.html,
@@ -956,7 +957,7 @@ export class EmailService {
       content,
       text: this.htmlToText(
         renderBrandedShell(content, {
-          name: 'Force AI Store',
+          name: BRAND.name,
           nameAr: null,
           logo: null,
           theme: null,

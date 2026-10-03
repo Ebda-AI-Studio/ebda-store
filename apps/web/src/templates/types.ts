@@ -426,7 +426,7 @@ export interface HeroBannerProps {
   /**
    * Store-slug URL prefix (from `useStoreUrl('')`) — prefixed onto relative
    * internal `ctaHref`/`link` values so they keep store context on a
-   * platform host (`store.force-ai.co/<slug>/...`). Absolute/external
+   * platform host (`<slug>.ebda.app/...`). Absolute/external
    * links are left untouched. Empty string on custom domains.
    */
   urlPrefix?: string;

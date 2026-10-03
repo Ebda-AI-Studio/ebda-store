@@ -157,14 +157,13 @@ export function slugify(text: string, opts: { ascii?: boolean } = {}): string {
  * is exactly what reached production on a live store (2026-09-02). Every
  * server-side path that WRITES a slug must use this, not bare `slugify`.
  *
- * PASS `ascii: true` FOR STORE SLUGS. A store slug is the path prefix on
- * platform hosts (`/<slug>/products/...`), and the storefront middleware reads
- * it from `nextUrl.pathname` — which is percent-encoded for non-ASCII — then
- * forwards it verbatim as the `x-store-slug` header. The by-slug lookup would
- * compare `%D9%84%D9%88%D8%B2` against `لوز` and never match, so a non-ASCII
- * store slug is unroutable. `store.routes.ts` enforces /^[a-z0-9-]+$/ for the
- * same reason. An Arabic-only store name therefore falls back to `store-<id>`
- * rather than minting a slug nothing can resolve.
+ * PASS `ascii: true` FOR STORE SLUGS. A store slug is the host label of the
+ * store's free address (`<slug>.ebda.app`), and DNS labels are ASCII (letters,
+ * digits, hyphen): a non-ASCII slug is unroutable. `parseStoreHost` and the
+ * slug validation in `./hosts` enforce `[a-z0-9-]` for the same reason. An
+ * Arabic-only store name therefore falls back to `store-<id>` rather than
+ * minting a slug nothing can resolve. (Reserved labels and the 3-40 length
+ * rules are applied on top by `validateStoreSlug`.)
  */
 export function slugifyWithFallback(
   text: string,

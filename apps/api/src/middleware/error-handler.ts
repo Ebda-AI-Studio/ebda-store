@@ -184,7 +184,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   // requestId. NEVER return `err.code` (reveals Prisma/Postgres), `err.message`
   // (raw SQL/constraint text), or `err.meta` (schema column/constraint names)
   // to the client — that leaks the internal stack. Support maps requestId →
-  // the logged detail. (Force AI internal-data boundary; CLAUDE.md: never
+  // the logged detail. (Ebda internal-data boundary; CLAUDE.md: never
   // expose database error messages, codes, hints, or stack traces to clients.)
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     logger.error({ err, requestId }, 'Prisma known request error');

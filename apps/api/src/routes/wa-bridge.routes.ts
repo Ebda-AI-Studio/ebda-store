@@ -25,7 +25,7 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
 import { prisma } from '@force/database';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay, BRAND_MARKETING_URL } from '@force/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
@@ -1045,7 +1045,7 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
 
     // Compute the storefront checkout URL. Per-store custom domain may
     // be set on the Store row; for now, fall back to slug-based URL.
-    const storefrontBase = process.env.STOREFRONT_BASE_URL || 'https://store.force-ai.co';
+    const storefrontBase = process.env.STOREFRONT_BASE_URL || BRAND_MARKETING_URL;
     const checkoutUrl = `${storefrontBase}/checkout?waToken=${encodeURIComponent(checkoutToken)}`;
 
     logger.info(

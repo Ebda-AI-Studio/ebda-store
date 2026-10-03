@@ -27,7 +27,7 @@ import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
-import { type MarketingPixels, resolveDefaultLanguage } from '@force/shared';
+import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@force/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
 import '../styles/globals.css';
@@ -54,14 +54,14 @@ export const viewport: Viewport = {
   // real pixel values; lets a future bottom utility / floating add-to-cart
   // bar sit above the home indicator instead of overlapping it.
   viewportFit: 'cover',
-  themeColor: '#ff6e00',
+  themeColor: BRAND.colors.night,
 };
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getStore();
 
   // Detect whether we're rendering for the merchant's custom domain
-  // (wadyaljuz.com) vs the platform path (store.forcemediakw.com/<slug>).
+  // (wadyaljuz.com) vs the platform path (<slug>.ebda.app).
   // The signal is the request host header. When on the custom domain,
   // GSC verification needs the merchant's own token — emitting the
   // platform token alongside breaks verification (GSC reads only the
@@ -90,15 +90,14 @@ export async function generateMetadata(): Promise<Metadata> {
   // Bare platform host (no custom domain, no slug) resolves to DEFAULT_STORE,
   // whose name is "Force" — which produced the merchant-shaped title
   // "Force - Online Shopping in Kuwait" for a store that does not exist. The
-  // root now redirects to force-ai.co, so the ONLY page that renders under this
+  // root now redirects to ebda.app, so the ONLY page that renders under this
   // sentinel is the platform 404; title it as one and keep it out of the index.
   // Without this the tab still reads like the old marketing page even though
   // the body is a 404 — the title kept making a promise the page no longer did.
   if (store.id === 'demo') {
     return {
-      title: 'Page not found — Force AI',
-      description:
-        'This page does not exist. Force AI builds online stores, WhatsApp ordering and custom systems for Kuwait and the GCC.',
+      title: `Page not found — ${BRAND.name}`,
+      description: `This page does not exist. ${BRAND.name} builds online stores for merchants.`,
       robots: { index: false, follow: false },
     };
   }

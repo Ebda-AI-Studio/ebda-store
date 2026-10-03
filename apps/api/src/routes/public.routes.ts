@@ -22,11 +22,12 @@ import {
 } from '../middleware/security';
 import { recordProductView } from '../services/view-ingest.service';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
-import { config } from '../config';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import { getCached } from '../lib/public-cache';
+import { storeLookupForHost } from '../lib/store-host';
+import { isReservedSlug, storefrontOrigin } from '@force/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
@@ -367,20 +368,21 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     //
     // The fallback is now the same derivation `order.tools.ts`'s
     // `storefrontBaseUrl` and `payment.routes.ts` already use — custom domain
-    // wins, else the platform web app at /<slug>. This is also a live BUG fix,
-    // not only a hardening: `apps/web` never forwards `x-original-host` to the
-    // API (its feed passthrough sends only `x-store-domain`/`X-Store-ID`, and
-    // `apps/web/middleware.ts` sets that header on the web app's OWN inbound
-    // request headers, which never leave it), so a platform-hosted store's feed
-    // was falling through to `req.get('host')` = the API host and emitting
-    // `https://api.../products/<slug>` links that point at the API, not the
-    // storefront. No request-supplied header can influence the output any more.
+    // wins, else the store's own `<slug>.ebda.app` origin (`storefrontOrigin`).
+    // This is also a live BUG fix, not only a hardening: `apps/web` never
+    // forwards `x-original-host` to the API (its feed passthrough sends only
+    // `x-store-domain`/`X-Store-ID`, and `apps/web/middleware.ts` sets that
+    // header on the web app's OWN inbound request headers, which never leave
+    // it), so a platform-hosted store's feed was falling through to
+    // `req.get('host')` = the API host and emitting `https://api.../products/<slug>`
+    // links that point at the API, not the storefront. No request-supplied
+    // header can influence the output any more.
     //
     // Cache tail after deploy: the old value survives in
     // `public:products:<storeId>:feed:v2` (v1 before issue 2327) for up to 600s and at the CDN for
     // 600s + 86400s stale-while-revalidate. "Fixed" and "visible" are not the
     // same instant.
-    const baseUrl = store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;
+    const baseUrl = storefrontOrigin(store);
     // `bundles` is in NO plan baseline (super-admin override only) — a
     // store without it must see this feed completely unchanged, so the
     // bundle listing query below is skipped entirely rather than run and
@@ -788,9 +790,9 @@ router.post(
       const orderData = createOrderSchema.parse(req.body);
       // Customer-leak guard: only treat req.user as the order owner when
       // the role is `customer`. The API cookie is shared between admin
-      // and storefront origins (api.force-ai.co host), so a merchant
-      // signed into app.forcemediakw.com sends the SAME cookie to
-      // /public/orders on store.forcemediakw.com. Without this guard
+      // and storefront origins (api.ebda.app host), so a merchant
+      // signed into app.ebda.app sends the SAME cookie to
+      // /public/orders on ebda.app. Without this guard
       // we'd attach the merchant's super_admin/store_admin userId as
       // `Order.customerId` — downstream loyalty / abandoned-cart /
       // analytics code assumes that ID points to a customer record and
@@ -851,7 +853,7 @@ router.get('/orders', authenticate, async (req: Request, res: Response, next: Ne
 //     /payments/create — see the comment there for the rationale.
 //
 // We use optionalAuthenticate so a stale admin cookie bleeding through
-// from app.forcemediakw.com doesn't reject a guest's success page; the
+// from app.ebda.app doesn't reject a guest's success page; the
 // role-guard below handles that case.
 router.get(
   '/orders/:id',
@@ -1462,14 +1464,26 @@ async function fetchFooterLocations(store: {
 // GET /stores/:slugOrId - Get store by slug or ID (public, cached 120s)
 router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slugOrId } = req.params;
+    // Lowercased so `Amelia` and `amelia` share ONE cache entry (slugs are
+    // stored lowercase; the by-slug match below is case-sensitive).
+    const slugOrId = req.params.slugOrId.toLowerCase();
 
+    // Check if it's a UUID (ID) or slug
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+
+    // A reserved label (`app`, `api`, `www`, …) is never a store: answer 404
+    // without touching the cache or the database.
+    if (!isUuid && isReservedSlug(slugOrId)) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'STORE_NOT_FOUND', message: 'Store not found' },
+      });
+      return;
+    }
+
+    // A miss throws out of the fetcher (below) so it is never written to the
+    // cache — a store created a moment later must resolve immediately.
     const result = await getCached(`public:store:${slugOrId}`, 120, async () => {
-      // Check if it's a UUID (ID) or slug
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        slugOrId
-      );
-
       // Return active OR suspended stores (so the storefront can render a
       // branded "we'll be back soon" page for suspended stores instead of
       // 404'ing). Inactive stores stay hidden — `inactive` is reserved for
@@ -1539,7 +1553,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         },
       });
 
-      if (!store) return null;
+      if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
       // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
       // access tokens) before this store object reaches the public storefront
@@ -1597,48 +1611,6 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
   }
 });
 
-// GET /store - Get default store info
-router.get('/store', async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Legacy "default store" lookup — single caller (`apps/web/src/lib/api.ts`),
-    // no invalidation hook (default store rarely changes; the 300s TTL keeps
-    // merchant edits visible without one — accepted staleness, not a bug).
-    // Reuses the shared `getCached()` helper (Redis L1 → in-memory L2 →
-    // in-process single-flight on a double-miss) for consistency with every
-    // other public-route cache instead of hand-rolling raw redis.get/set,
-    // which had neither single-flight nor the in-memory fallback (L1, see
-    // docs/audits/2026-07-13-cache-stampede.md). A 404 (no store yet) is
-    // never cached — the fetcher throws instead of returning a sentinel.
-    const store = await getCached('public:store:default', 300, async () => {
-      const s = await prisma.store.findFirst({
-        orderBy: { createdAt: 'asc' },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logo: true,
-          settings: true,
-        },
-      });
-      if (!s) {
-        throw new AppError(404, 'NOT_FOUND', 'Store not found');
-      }
-      // Redacted before it enters the cache, not just before the response —
-      // this key is Redis-cached for 300s, and the raw settings blob (which
-      // can carry orderInvoiceEmail, owner PII) must never sit there either.
-      return { ...s, settings: publicStoreSettings(s.settings) };
-    });
-
-    setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
-    res.json({
-      success: true,
-      data: { store },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
 // GET /store/resolve - Resolve store by domain header (for multi-tenant)
 router.get(
   '/store/resolve',
@@ -1655,21 +1627,34 @@ router.get(
         return;
       }
 
-      // Normalize domain: strip www prefix, lowercase — matches how domains
-      // are stored in the DB and how the storefront middleware normalizes them.
-      const domain = rawDomain.toLowerCase().replace(/^www\./, '');
+      // Host → store (design cloudflare-backend §4): `<slug>.ebda.app` resolves
+      // by slug, any other well-formed host by custom domain. Reserved labels,
+      // platform hosts, IPs, `localhost` and malformed values never reach the
+      // database — they are a 404, and there is NO default-store fallback.
+      const lookup = storeLookupForHost(rawDomain);
+      if (!lookup) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'STORE_NOT_FOUND', message: 'No store found for the specified domain' },
+        });
+        return;
+      }
 
       // Redis-cached (120s, same shape/TTL as /stores/:slugOrId above) —
-      // this is the domain→store lookup every storefront page load depends
-      // on, so it must not hit Postgres on every request.
-      const result = await getCached(`public:store:resolve:${domain}`, 120, async () => {
+      // this is the host→store lookup every storefront page load depends
+      // on, so it must not hit Postgres on every request. The key carries the
+      // canonical HOST (`<slug>.ebda.app` or the custom domain), so two stores
+      // can never share an entry. A MISS throws out of the fetcher: getCached
+      // only stores what the fetcher returns, so an unknown host is never
+      // cached (a store created a second later must resolve immediately).
+      const result = await getCached(`public:store:resolve:${lookup.cacheHost}`, 120, async () => {
         // Find store by domain. Suspended stores are returned with their
         // `status` so the storefront can render the branded maintenance page
         // for that store. Inactive (archived/draft) and soft-deleted stores
         // stay hidden — those should still 404.
         const store = await prisma.store.findFirst({
           where: {
-            domain,
+            ...(lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain }),
             status: { in: ['active', 'suspended'] },
             deletedAt: null,
           },
@@ -1730,7 +1715,8 @@ router.get(
           },
         });
 
-        if (!store) return null;
+        if (!store)
+          throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
 
         const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
 

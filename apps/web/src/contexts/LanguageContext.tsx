@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from 'react';
+import { BRAND } from '@force/shared';
 
 import { resolveDefaultLanguage } from '@force/shared';
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -243,7 +244,7 @@ export const translations = {
   'is currently undergoing maintenance. Please check back later.':
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
-  'Powered by Force AI': 'مدعوم من Force AI',
+  'Powered by Ebda': `مدعوم من ${BRAND.nameAr}`,
 
   // Campaign unsubscribe page (/unsubscribe, D2 email campaigns).
   'Email preferences': 'تفضيلات البريد الإلكتروني',
@@ -275,11 +276,11 @@ export const translations = {
   'You will not receive SMS offers from us.': 'لن تصلك عروض عبر الرسائل القصيرة منا بعد الآن.',
   'This link is invalid.': 'هذا الرابط غير صالح.',
 
-  // Platform-host 404 (PlatformNotFound — store.force-ai.co/<unknown>).
+  // Platform-host 404 (PlatformNotFound — ebda.app/<unknown>).
   'This page doesn’t exist': 'هذه الصفحة غير موجودة',
   'The store you’re looking for may have moved, or the link may be wrong.':
     'ربما انتقل المتجر الذي تبحث عنه، أو قد يكون الرابط غير صحيح.',
-  'Go to Force AI': 'الانتقال إلى Force AI',
+  'Go to Ebda': `الانتقال إلى ${BRAND.nameAr}`,
 
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',

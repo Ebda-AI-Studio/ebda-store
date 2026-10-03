@@ -1,6 +1,6 @@
 // OneSignal Web Push service worker — Orders PWA.
 // Hosted at /OneSignalSDKWorker.js so it's served from the same origin as the
-// Orders app (orders.forcemediakw.com). Required by the OneSignal Web SDK.
+// Orders app (orders.ebda.app). Required by the OneSignal Web SDK.
 //
 // Pre-register the four SW event handlers SYNCHRONOUSLY during initial
 // evaluation to satisfy Chrome's (Chromium 133+) "Event handler of

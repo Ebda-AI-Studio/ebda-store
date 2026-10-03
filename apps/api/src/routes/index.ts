@@ -372,7 +372,7 @@ router.use('/public/campaigns', campaignPublicRoutes);
 // Login-free opt-out link carried by every promotional SMS (issue 206).
 router.use('/public/sms-consent', smsConsentPublicRoutes);
 
-// WBS integration routes (Force AI Store ↔ WBS bridge config).
+// WBS integration routes (Ebda ↔ WBS bridge config).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): handlers
 // call the external WBS backend via `fetch` in-request.
 router.use('/stores', tenantContext, wbsIntegrationRoutes);

@@ -26,6 +26,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import { storefrontOrigin } from '@force/shared';
 import { z } from 'zod';
 import { prisma } from '@force/database';
 import { config } from '../config';
@@ -321,9 +322,7 @@ router.post(
       draftOrderId = draftOrder.id;
 
       // ── Mint MyFatoorah payment link ───────────────────────────────────────
-      const storefrontBaseUrl = store.domain
-        ? `https://${store.domain}`
-        : `${config.webUrl}/${store.slug}`;
+      const storefrontBaseUrl = storefrontOrigin(store);
 
       const customerDisplayName =
         `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || 'Customer';

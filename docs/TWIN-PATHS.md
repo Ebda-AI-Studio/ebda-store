@@ -1,0 +1,48 @@
+# Twin paths — what Ebda shares with FWB
+
+Ebda forked from FWB (Force Website Builder, `upstream` remote, **read-only**) at `dbe8293d867c7f134065235694c8beb5faa696c5`. The two products keep evolving. This file says which paths are worth pulling upstream fixes from, and which are Ebda-only. The last sync point is recorded in `.twin-sync`; `scripts/twin-diff.sh` lists what upstream changed in the shared paths since then. Nothing here ever pushes to upstream.
+
+## Shared (worth syncing)
+
+Bug fixes and security fixes upstream usually apply here as-is. Port by cherry-picking or re-applying by hand, then rebrand and strip Kuwait specifics.
+
+| Path                                                        | Why shared                                                                 |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `apps/api/src/middleware/`                                  | auth, tenant context, RLS GUCs, CORS/CSRF, security headers, error handler |
+| `apps/api/src/lib/`                                         | caches, edge cache, revalidation, queue/Inngest helpers, exports           |
+| `apps/api/src/services/` (core, non-payment)                | order, inventory, email, notification, campaign, AI services               |
+| `packages/database/`                                        | Prisma schema, migrations, RLS policies — **keep migrations in lockstep**  |
+| `apps/web/src/templates/`                                   | storefront themes (modern, elegant, classic, minimal, bold)                |
+| `apps/web/src/lib/`, `apps/web/middleware.ts`               | tenant/host resolution (rebranded hosts differ, logic is shared)           |
+| `packages/ui/`                                              | shared React components                                                    |
+| `apps/admin/src/components/`, `apps/admin/src/lib/`         | merchant dashboard components and API client                               |
+| `packages/shared/src/` (money, tax, schemas, order helpers) | pure helpers; Ebda rewrites currency/VAT, see below                        |
+
+## Ebda-only (never overwritten by a sync)
+
+| Path                                                       | Why                                                                                    |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `docs/ebda/`                                               | Ebda plans, research, design, brand brief                                              |
+| `docs/TWIN-PATHS.md`, `scripts/twin-diff.sh`, `.twin-sync` | this mechanism                                                                         |
+| `packages/shared/src/brand/`                               | `BRAND` identity, helpers                                                              |
+| `packages/shared/src/region/`                              | Egypt region config (EGP, governorates, phone formats) — lands with SP4 region work    |
+| Egyptian payment and shipping adapters                     | Paymob, Kashier, Fawry, Valu, InstaPay; Bosta, Aramex — behind the provider interfaces |
+| Cloudflare Workers API port (`spikes/`, API entrypoints)   | SP3 backend; FWB stays on Express/Railway                                              |
+| Self-serve onboarding, EGP subscription billing            | SP5                                                                                    |
+| `apps/*/public/` brand assets, manifests                   | Ebda marks and PWA icons (`scripts/generate-app-brand-icons.mjs`)                      |
+| `tests/unit/no-fwb-branding.test.ts`                       | guards the rebrand                                                                     |
+| Marketing site, docs site, help centre, status page        | SP9                                                                                    |
+
+## Diverged files (sync by hand, expect conflicts)
+
+These exist upstream but Ebda has intentionally changed them: Kuwait money/VAT/currency (`packages/shared/src/order-tax*.ts`, `bundle-pricing.ts`), Kuwait address data (`packages/shared/src/data/kuwait-areas.ts`, `schemas/location.ts`), payment-provider services (`apps/api/src/services/payment-providers/`), locale defaults, and every file that imports `BRAND`. When upstream touches one, read the change for intent and re-implement it against the Ebda version.
+
+## Workflow
+
+```bash
+scripts/twin-diff.sh                 # upstream commits touching shared paths since .twin-sync
+scripts/twin-diff.sh <since-ref>     # same, from an explicit ref/sha instead of the marker
+scripts/twin-diff.sh --mark <sha>    # record <sha> as the new sync point (writes .twin-sync)
+```
+
+After porting a batch, run the full gates (typecheck, lint, `npm run test:unit`, prettier) and then `--mark` the upstream sha you reviewed up to, in the same commit as the port.

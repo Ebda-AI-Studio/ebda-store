@@ -45,7 +45,7 @@ describe('resolveMyFatoorahEmail', () => {
   it('falls back to the platform domain when the callback URL is unparseable', () => {
     const out = resolveMyFatoorahEmail('', 'not-a-url', 'ORD-6');
     expect(VALID.test(out)).toBe(true);
-    expect(out).toBe('guest-ORD-6@force-ai.co');
+    expect(out).toBe('guest-ORD-6@ebda.app');
   });
 
   it('never returns an empty string', () => {

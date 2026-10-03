@@ -7,7 +7,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
 import { prisma } from '@force/database';
-import { EGYPT_GOVERNORATES, minorToDecimalString, tryToMinor, REGION } from '@force/shared';
+import { EGYPT_GOVERNORATES, minorToDecimalString, tryToMinor, REGION, BRAND } from '@force/shared';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -116,7 +116,7 @@ router.get(
       });
 
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'Force Website Builder';
+      workbook.creator = BRAND.name;
       workbook.created = new Date();
       const sheet = workbook.addWorksheet('Area Rates');
 

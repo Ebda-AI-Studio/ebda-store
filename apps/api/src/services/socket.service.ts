@@ -61,7 +61,7 @@ class SocketService {
           // Reuse the SINGLE platform-origin allowlist shared with the Express
           // CORS handler + CSRF middleware (lib/cors-cache). This inline list
           // used to only cover webUrl/adminUrl + Vercel, so it dropped the
-          // Orders PWA (orders.force-ai.co) and the force-ai.co / forcemediakw
+          // Orders PWA (orders.ebda.app) and the ebda.app
           // prod fallbacks + CF Worker previews → the admin/orders WebSocket
           // handshake failed CORS. Delegating here keeps the two configs from
           // ever drifting again.

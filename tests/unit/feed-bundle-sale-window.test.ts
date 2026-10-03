@@ -22,7 +22,7 @@ vi.mock('@force/database', () => ({
 }));
 
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', apiUrl: 'https://api.force-ai.co' },
+  config: { webUrl: 'https://ebda.app', apiUrl: 'https://api.ebda.app' },
 }));
 
 vi.mock('@api/lib/product-feed', () => ({

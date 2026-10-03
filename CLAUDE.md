@@ -1,3 +1,9 @@
+# Ebda — fork notice (read first)
+
+This repository is **Ebda** (ebda.app), Whisky 11's self-serve store builder for **Egypt** — a fork of FWB (Force Website Builder, Force AI's Kuwait/GCC product). FWB is the read-only `upstream` remote: never push to it, never edit `/home/user/force-website-builder`. Ebda's plans, research, design and brand brief live in `docs/ebda/` (start with `docs/ebda/plans/2026-10-03-ebda-program-plan.md`); which paths stay in sync with FWB is in `docs/TWIN-PATHS.md`. Brand strings, colours, fonts, domains and sender addresses come from `BRAND` in `packages/shared/src/brand/` — never hardcode them. The market is Egypt (EGP, Arabic-first); the Kuwait-specific rules below are inherited FWB context being replaced sub-project by sub-project, so treat them as history unless a rule is about tenancy, money integrity or testing. The rest of this file is the inherited FWB guideline set, kept as-is.
+
+---
+
 # Force Website Builder — Project Guidelines
 
 Rules + invariants only (slimmed 2026-07-11). Reference catalogs moved out: **env vars → `docs/ENVIRONMENT.md`**, **theme flags / canonical editors / card-CTA system → `docs/architecture/store-theme-flags.md`**, **sizing baselines → `design.md`**. Cross-project rules live in the global `~/.claude/CLAUDE.md` — they are NOT repeated here.

@@ -71,7 +71,7 @@ Write a meta description that directly answers the question a user might ask an 
 - Both English and Arabic (formal MSA)
 
 Return ONLY a JSON object with keys "en" and "ar". No markdown, no code fences — pure JSON only.
-Example: {"en": "Force AI Store is an Egypt-based online retailer ...", "ar": "فورس ستور متجر مصري متخصص في ..."}`;
+Example: {"en": "Ebda is an Egypt-based online retailer ...", "ar": "ابدأ متجر مصري متخصص في ..."}`;
 }
 
 export interface GenerateProductMetaAeoInput {

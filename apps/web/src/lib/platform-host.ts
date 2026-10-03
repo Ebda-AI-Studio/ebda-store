@@ -1,58 +1,39 @@
 /**
- * Canonical platform-host detection — the SINGLE source of truth shared by the
- * storefront middleware (server) AND `useStoreUrl` in StoreContext (client).
+ * Platform-host detection — a thin wrapper over the ONE host classifier,
+ * `parseStoreHost` in `@force/shared`, shared by the storefront middleware
+ * (server) AND `StoreProvider` (client) so the two can never drift.
  *
- * Why this MUST be shared: when the two lists drift, store `<Link>` hrefs lose
- * the `/<slug>` prefix on a platform host the client side doesn't recognize.
- * The CF migration added `store.force-ai.co` to the middleware's list but NOT
- * to the client check — so on `store.force-ai.co` the Home link pointed at `/`
- * (platform landing / demo store) and the store context was lost on refresh
- * ("Unable to resolve store context"). Regression verified 2026-06-27.
- *
- * Rule: every platform host lives HERE. Never hardcode a subset anywhere else.
+ * A host is either a STORE host (`<slug>.ebda.app` or a merchant custom
+ * domain) or it is not. "Platform" here means "not a store host": the apex,
+ * `app.`/`api.`/… service hosts, preview hosts, and anything unparseable. A
+ * platform host never renders a store — there is no `/<slug>` path entry any
+ * more (program plan §1: every store lives at `<slug>.ebda.app`).
  */
-export const PLATFORM_HOSTS = new Set<string>([
-  'localhost',
-  '127.0.0.1',
-  'forcemediakw.com',
-  'www.forcemediakw.com',
-  'admin.forcemediakw.com',
-  'app.forcemediakw.com',
-  'store.forcemediakw.com',
-  // force-ai.co — the 2026-06 platform domain rebrand (Vercel → Cloudflare).
-  // store.force-ai.co is the path-based storefront platform host (`/<slug>`).
-  'force-ai.co',
-  'www.force-ai.co',
-  'store.force-ai.co',
-  'admin.force-ai.co',
-  'orders.force-ai.co',
-]);
+import { parseStoreHost, PREVIEW_HOST_SUFFIXES } from '@force/shared';
+
+/** Hosting-provider preview suffixes (re-exported for callers that list them). */
+export const PLATFORM_SUFFIXES: readonly string[] = PREVIEW_HOST_SUFFIXES;
+
+/** `<slug>.ebda.localhost` / `<slug>.localhost` are store hosts outside production only. */
+export function devSuffixesAllowed(): boolean {
+  return process.env.NODE_ENV !== 'production';
+}
 
 /**
- * Hosting-provider suffixes — ANY subdomain is a platform preview host (preview
- * deploys, tunnels). Production custom merchant domains never end with these.
- * `workers.dev` is the Cloudflare Workers / OpenNext preview target.
- * (Vercel cancelled 2026-07 — `vercel.app` removed; the platform runs solely
- * on Cloudflare Workers now.)
- */
-export const PLATFORM_SUFFIXES = ['netlify.app', 'ngrok.io', 'ngrok-free.app', 'workers.dev'];
-
-/**
- * True when `hostname` is a platform domain (not a merchant custom domain).
- * Strips the port and lowercases before matching.
+ * True when `hostname` is NOT a store host. Strips the port and lowercases
+ * (via `parseStoreHost`). An empty hostname is not a platform host.
  */
 export function isPlatformHost(hostname: string): boolean {
   if (!hostname) return false;
-  const host = hostname.split(':')[0].toLowerCase();
-  if (PLATFORM_HOSTS.has(host)) return true;
-  return PLATFORM_SUFFIXES.some(suffix => host.endsWith(`.${suffix}`));
+  const parsed = parseStoreHost(hostname, { allowDevSuffixes: devSuffixesAllowed() });
+  return parsed.kind !== 'subdomain' && parsed.kind !== 'custom';
 }
 
 /**
  * Read middleware's `x-is-platform` request header as a TRI-state (#2091).
  *
  * `middleware.ts` asserts it on every request it handles — `'true'` on a
- * platform host, `'false'` on a custom domain — after stripping any
+ * platform host, `'false'` on a store host — after stripping any
  * client-supplied value. ABSENT therefore means "middleware did not run for
  * this render", which is exactly when StoreProvider must fall back to its
  * client-side `isPlatformHost()` detection. Collapsing absent to `false`

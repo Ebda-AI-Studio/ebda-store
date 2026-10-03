@@ -1,5 +1,5 @@
 /**
- * Bot Analytics Proxy Routes — Force AI Store ↔ WBS Bridge
+ * Bot Analytics Proxy Routes — Ebda ↔ WBS Bridge
  *
  * Proxies the bot conversion funnel analytics from WBS to the FWB admin.
  * The admin frontend calls FWB (same-origin JWT auth), FWB decrypts the

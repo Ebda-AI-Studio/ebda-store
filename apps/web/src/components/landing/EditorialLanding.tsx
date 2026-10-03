@@ -12,8 +12,8 @@ import { LandingNotFoundBanner } from '@/components/landing/LandingNotFoundBanne
 import { Reveal } from '@/components/landing/Reveal';
 
 /**
- * The Force AI platform landing (store.force-ai.co) — editorial dark system:
- * warm near-black + grain, orange as accent/glow only, and a real Force AI
+ * The Ebda platform landing (ebda.app) — editorial dark system:
+ * warm near-black + grain, orange as accent/glow only, and a real Ebda
  * client store (Pecannbee) as the hero. Rendered at the bare platform root
  * (`page.tsx`), on the 404 (`not-found.tsx`, with `notFoundBanner`), and at
  * `/landing-preview`. Replaces the old light `PlatformLanding.tsx`.

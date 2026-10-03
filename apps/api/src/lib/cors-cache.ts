@@ -1,6 +1,8 @@
 // Shared CORS domain cache — extracted to avoid circular imports between
 // index.ts (which sets up CORS) and store.routes.ts (which needs to bust the cache).
 import { BoundedMap } from './bounded-map';
+import { BRAND, brandUrl } from '@force/shared';
+import { storeLookupForHost } from './store-host';
 
 // Capped so a pathological stream of unknown domains (e.g. bot traffic
 // probing random hostnames) can never grow the Map without limit.
@@ -150,6 +152,28 @@ export function corsCustomDomainWhere(hostname: string) {
 }
 
 /**
+ * Prisma `where` for the credentialed-CORS lookup of ANY store origin host
+ * (#1214, extended for host routing): `<slug>.ebda.app` is matched by SLUG,
+ * anything else by custom DOMAIN, with the same live-store filter as
+ * {@link corsCustomDomainWhere}. Returns `null` for a host that can never be a
+ * store (reserved label, platform host, IP, localhost, malformed) — the caller
+ * rejects the origin without touching the database.
+ */
+export function corsStoreOriginWhere(rawHost: string) {
+  const lookup = storeLookupForHost(rawHost);
+  if (!lookup) return null;
+  const live = {
+    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },
+    deletedAt: null,
+  };
+  return {
+    cacheKey: lookup.cacheHost,
+    where:
+      lookup.by === 'slug' ? { slug: lookup.slug, ...live } : { domain: lookup.domain, ...live },
+  };
+}
+
+/**
  * Bust the CORS cache for a domain. Called when a store's domain changes and,
  * via `bustStoreCaches`, whenever a store's status or other storefront-visible
  * state is written. The cache is per-process, so other replicas converge on
@@ -185,18 +209,13 @@ export function isPlatformOrigin(
 
   // Hardcoded prod fallbacks — kept in sync with the CORS handler in
   // index.ts so a missing/forgotten env var doesn't downgrade trust.
-  if (origin === 'https://store.forcemediakw.com') return true;
-  if (origin === 'https://app.forcemediakw.com') return true;
-  // Orders PWA (staff order-management app) — a distinct origin from admin.
-  if (origin === 'https://orders.forcemediakw.com') return true;
-
-  // force-ai.co platform origins — the 2026-06 domain rebrand (Vercel→Cloudflare
-  // migration, completed 2026-07; Vercel is fully decommissioned). Mirror of the
-  // forcemediakw.com platform origins above. (whatsapp[-api].force-ai.co belong
-  // to the WhatsApp Bulk Sender — a different API — so they are NOT listed here.)
-  if (origin === 'https://store.force-ai.co') return true;
-  if (origin === 'https://admin.force-ai.co') return true;
-  if (origin === 'https://orders.force-ai.co') return true;
+  // Marketing site, merchant dashboard and the Orders PWA (staff
+  // order-management app — a distinct origin from admin). Store origins
+  // (`<slug>.ebda.app`) and custom domains are validated separately.
+  // (The post-launch WhatsApp platform host is NOT listed here.)
+  if (origin === brandUrl(BRAND.domains.marketing)) return true;
+  if (origin === brandUrl(BRAND.domains.app)) return true;
+  if (origin === brandUrl(BRAND.domains.orders)) return true;
 
   // Cloudflare Workers preview deploys for the project (OpenNext migration).
   // SCOPED to OUR account subdomain + our worker names — NOT any *.workers.dev,

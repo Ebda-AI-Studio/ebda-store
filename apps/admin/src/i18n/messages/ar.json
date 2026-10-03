@@ -184,7 +184,7 @@
         "storeName": "اسم المتجر",
         "urlSlug": "معرّف الرابط",
         "slugPlaceholder": "my-store-name",
-        "slugHint": "سيكون متجرك على: store.force-ai.co/{slug}",
+        "slugHint": "سيكون متجرك على: {slug}.ebda.app",
         "slugHintPlaceholder": "your-slug",
         "plan": "الخطة",
         "status": "الحالة",
@@ -396,7 +396,9 @@
       "errors": {
         "storeNameRequired": "اسم المتجر مطلوب",
         "storeUrlRequired": "رابط المتجر مطلوب",
-        "storeUrlInvalid": "يمكن أن يحتوي الرابط على أحرف إنجليزية صغيرة وأرقام وشرطات فقط",
+        "storeUrlInvalid": "يمكن أن يحتوي الرابط على أحرف إنجليزية صغيرة وأرقام وشرطات مفردة فقط (وليس في البداية أو النهاية)",
+        "storeUrlReserved": "هذا العنوان محجوز. اختر عنوانًا آخر",
+        "storeUrlLength": "يجب أن يتكون العنوان من 3 إلى 40 حرفًا",
         "emailRequired": "البريد الإلكتروني مطلوب",
         "emailInvalid": "يرجى إدخال عنوان بريد إلكتروني صالح",
         "ownerNameRequired": "اسم المالك مطلوب",
@@ -2225,7 +2227,7 @@
       },
       "whatsapp": {
         "title": "تكامل واتساب",
-        "description": "منصة فورس للأعمال · القوالب · تحديثات الطلبات · روابط الدفع"
+        "description": "منصة ابدأ للأعمال · القوالب · تحديثات الطلبات · روابط الدفع"
       },
       "staff": {
         "title": "أعضاء الفريق",
@@ -2233,7 +2235,7 @@
       },
       "whatsappBridge": {
         "title": "واتساب الأعمال",
-        "description": "اربط متجرك بمنصة فورس لواتساب الأعمال — الصق مفتاح الواجهة البرمجية واضبط القوالب"
+        "description": "اربط متجرك بمنصة ابدأ لواتساب الأعمال — الصق مفتاح الواجهة البرمجية واضبط القوالب"
       },
       "whatsappTemplates": {
         "title": "قوالب واتساب",
@@ -2265,8 +2267,8 @@
       }
     },
     "metaCatalogCard": {
-      "provisionLabel": "إعداد تلقائي · مُدار بواسطة Force AI",
-      "provisionDescription": "ينشئ كتالوج تجاري جديد ضمن حساب Business Manager الرئيسي لـ Force AI ويملأ الحقول الثلاثة أعلاه. يغني المتجر عن التنقل داخل Meta Business Manager. ستحتاج لاحقًا إلى تقديم الكتالوج لمراجعة ميتا.",
+      "provisionLabel": "إعداد تلقائي · مُدار بواسطة ابدأ",
+      "provisionDescription": "ينشئ كتالوج تجاري جديد ضمن حساب Business Manager الرئيسي لـ ابدأ ويملأ الحقول الثلاثة أعلاه. يغني المتجر عن التنقل داخل Meta Business Manager. ستحتاج لاحقًا إلى تقديم الكتالوج لمراجعة ميتا.",
       "provisionButton": "إعداد تلقائي",
       "provisioningButton": "جارٍ الإعداد…"
     },
@@ -3300,11 +3302,11 @@
   },
   "pwa": {
     "installHint": {
-      "title": "ثبّت تطبيق فورس أدمن لتلقي الإشعارات",
+      "title": "ثبّت تطبيق ابدأ أدمن لتلقي الإشعارات",
       "description": "يحتاج الآيفون لإضافة التطبيق للشاشة الرئيسية قبل أن يصلك الإشعار.",
       "step1": "اضغط أيقونة المشاركة في Safari",
       "step2": "اختر إضافة إلى الشاشة الرئيسية",
-      "step3": "افتح فورس أدمن من الشاشة الرئيسية واسمح بالإشعارات",
+      "step3": "افتح ابدأ أدمن من الشاشة الرئيسية واسمح بالإشعارات",
       "dismiss": "إغلاق"
     },
     "page": {
@@ -4925,7 +4927,7 @@
       "twitterPlaceholder": "yourstorehandle",
       "googleSiteVerification": "التحقق من Google Search Console (للنطاق المخصص فقط)",
       "googleSiteVerificationPlaceholder": "الصق وسم meta كاملاً أو رمز التحقق فقط",
-      "googleSiteVerificationHint": "متجرك موثّق بالفعل على store.force-ai.co — لا تحتاج إلى هذا الحقل إلا بعد ربط نطاق مخصص (مثل yourstore.com).\n1. افتح Google Search Console وأضف نطاقك المخصص كخاصية URL-prefix.\n2. اختر طريقة التحقق \"HTML tag\".\n3. الصق وسم meta كاملاً (أو رمز content فقط) هنا واحفظ.\n4. اضغط Verify في Search Console — المتجر سيكون قد بدأ بإصدار الوسم تلقائياً.",
+      "googleSiteVerificationHint": "متجرك موثّق بالفعل على ebda.app — لا تحتاج إلى هذا الحقل إلا بعد ربط نطاق مخصص (مثل yourstore.com).\n1. افتح Google Search Console وأضف نطاقك المخصص كخاصية URL-prefix.\n2. اختر طريقة التحقق \"HTML tag\".\n3. الصق وسم meta كاملاً (أو رمز content فقط) هنا واحفظ.\n4. اضغط Verify في Search Console — المتجر سيكون قد بدأ بإصدار الوسم تلقائياً.",
       "successMessage": "تم حفظ إعدادات SEO بنجاح",
       "failedMessage": "تعذّر حفظ إعدادات SEO",
       "connectionError": "تعذّر الاتصال بالخادم",
@@ -5299,7 +5301,7 @@
   "auth": {
     "login": {
       "title": "تسجيل دخول المسؤول",
-      "subtitle": "سجّل الدخول للوصول إلى منصة Force AI",
+      "subtitle": "سجّل الدخول للوصول إلى منصة ابدأ",
       "email": "عنوان البريد الإلكتروني",
       "emailPlaceholder": "you@example.com",
       "password": "كلمة المرور",
@@ -5307,8 +5309,8 @@
       "signIn": "تسجيل الدخول",
       "signingIn": "جارٍ تسجيل الدخول…",
       "loginFailed": "فشل تسجيل الدخول",
-      "footer": "لوحة إدارة منصة Force AI",
-      "brandTitle": "متجر Force AI",
+      "footer": "لوحة إدارة منصة ابدأ",
+      "brandTitle": "متجر ابدأ",
       "brandSubtitle": "أدر متاجرك الإلكترونية ومستخدميك وإعدادات المنصة من لوحة تحكم واحدة قوية.",
       "statActiveStores": "المتاجر النشطة",
       "statProducts": "المنتجات",
@@ -5577,9 +5579,9 @@
       "closeSidebar": "إغلاق الشريط الجانبي",
       "goBack": "رجوع",
       "viewStore": "عرض المتجر",
-      "forcePlatformBrand": "AI Platform",
+      "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Admin",
-      "forceBrandPrefix": "Force",
+      "forceBrandPrefix": "ابدأ",
       "languageLabel": "اللغة",
       "focusMode": {
         "enterFocusMode": "وضع التركيز",
@@ -5603,7 +5605,7 @@
       "ariaLabel": "اللغة"
     },
     "brand": {
-      "forceMediaAlt": "Force AI"
+      "forceMediaAlt": "Ebda"
     },
     "aiUsageSummaryCard": {
       "loading": "جاري تحميل رصيد الذكاء الاصطناعي...",
@@ -7243,7 +7245,7 @@
       "topQueriesTitle": "أهم الكلمات المفتاحية (آخر يوم)",
       "noTopQueries": "لا توجد بيانات كلمات مفتاحية بعد.",
       "notConnectedTitle": "لم يتم ربط Google Search Console بعد",
-      "notConnectedBody": "بمجرد إعداد وصول Force AI إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك."
+      "notConnectedBody": "بمجرد إعداد وصول ابدأ إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك."
     }
   },
   "paymentAbandonments": {
@@ -7277,7 +7279,7 @@
   "whatsappIntegration": {
     "page": {
       "title": "ربط واتساب",
-      "subtitle": "منصة Force AI للأعمال عبر واتساب · القوالب · تحديثات الطلبات · روابط الدفع",
+      "subtitle": "منصة ابدأ للأعمال عبر واتساب · القوالب · تحديثات الطلبات · روابط الدفع",
       "navAriaLabel": "إعدادات واتساب"
     },
     "tabs": {
@@ -7290,13 +7292,13 @@
       "botAnalytics": "تحليلات البوت"
     },
     "connection": {
-      "connectTitle": "ربط Force AI WhatsApp",
-      "connectDescription": "قم بلصق مفتاح الـ API الذي تم إنشاؤه في منصة Force AI WhatsApp Business الخاصة بك لربط هذا المتجر.",
-      "apiKeyLabel": "مفتاح Force AI WhatsApp API",
-      "apiKeyHint": "قم بإنشاء المفتاح من لوحة تحكم WBS ← العملاء ← أيقونة Force AI Store Bridge. الصقه هنا — سيتم التحقق من المفتاح فوراً.",
+      "connectTitle": "ربط ابدأ WhatsApp",
+      "connectDescription": "قم بلصق مفتاح الـ API الذي تم إنشاؤه في منصة ابدأ WhatsApp Business الخاصة بك لربط هذا المتجر.",
+      "apiKeyLabel": "مفتاح ابدأ WhatsApp API",
+      "apiKeyHint": "قم بإنشاء المفتاح من لوحة تحكم WBS ← العملاء ← أيقونة Ebda Bridge. الصقه هنا — سيتم التحقق من المفتاح فوراً.",
       "connecting": "جاري الربط...",
       "connect": "ربط",
-      "finishTitle": "إكمال ربط Force AI WhatsApp",
+      "finishTitle": "إكمال ربط ابدأ WhatsApp",
       "finishDescription": "تم حفظ مفتاح الـ API ولكن لم يتم تفعيل إشعارات واتساب بعد. اختر القوالب الخاصة بك أدناه وقم بالتفعيل للبدء.",
       "disconnecting": "جاري إلغاء الربط...",
       "removeKey": "إزالة المفتاح",
@@ -7307,7 +7309,7 @@
       "available": "متاح",
       "savedNotVerified": "تم الحفظ — بانتظار التحقق",
       "keyInvalid": "قد يكون مفتاح الـ API غير صالح. فشل إرسال القوالب — يرجى إلغاء الربط وإدخال المفتاح مجدداً.",
-      "cantVerify": "تعذر الاتصال بـ Force AI WhatsApp للتحقق من المفتاح. تم حفظ المفتاح ولكن لم يتم تأكيده — استخدم إعادة المحاولة.",
+      "cantVerify": "تعذر الاتصال بـ ابدأ WhatsApp للتحقق من المفتاح. تم حفظ المفتاح ولكن لم يتم تأكيده — استخدم إعادة المحاولة.",
       "retry": "إعادة المحاولة",
       "notificationsTitle": "تفعيل إشعارات واتساب",
       "notificationsDescription": "المفتاح الرئيسي لرسائل واتساب الصادرة. توجد قوالب لكل حدث وخيارات القنوات في تبويب تحديثات الطلبات.",
@@ -7319,17 +7321,17 @@
       "toastInvalidKeyTitle": "مفتاح غير صالح",
       "toastInvalidKeyBody": "تم رفض مفتاح API. أنشئ مفتاحاً جديداً في لوحة WBS.",
       "toastConnectFailedTitle": "فشل الاتصال",
-      "toastConnectFailedBody": "تعذّر الاتصال بواتساب Force AI",
+      "toastConnectFailedBody": "تعذّر الاتصال بواتساب ابدأ",
       "toastConnectedTitle": "تم الاتصال",
-      "toastConnectedAutoErr": "تم ربط واتساب Force AI — لكن فشل الإرسال التلقائي للقوالب: {error}. افتح تبويب القوالب لإعادة المحاولة.",
+      "toastConnectedAutoErr": "تم ربط واتساب ابدأ — لكن فشل الإرسال التلقائي للقوالب: {error}. افتح تبويب القوالب لإعادة المحاولة.",
       "toastConnectedSeededTitle": "تم الاتصال + إرسال القوالب",
       "toastConnectedSeededBody": "تم تجهيز {seeded} قالب، و{submitted} بانتظار موافقة Meta (~10 دقائق–24 ساعة).",
-      "toastConnectedBody": "تم ربط منصة واتساب الأعمال Force AI",
+      "toastConnectedBody": "تم ربط منصة واتساب الأعمال ابدأ",
       "toastUnexpected": "حدث خطأ غير متوقع",
       "toastDisconnectFailedTitle": "فشل قطع الاتصال",
       "toastDisconnectFailedBody": "تعذّر قطع الاتصال",
       "toastDisconnectedTitle": "تم قطع الاتصال",
-      "toastDisconnectedBody": "تمت إزالة تكامل واتساب Force",
+      "toastDisconnectedBody": "تمت إزالة تكامل واتساب ابدأ",
       "toastConnectFirstTitle": "اتصل أولاً",
       "toastConnectFirstBody": "يرجى ربط مفتاح WBS API قبل تفعيل الإشعارات",
       "toastSaveFailedTitle": "فشل الحفظ",
@@ -7341,7 +7343,7 @@
       "toastWaOnBody": "يمكن للعملاء الآن الطلب مباشرة عبر رسائل واتساب.",
       "toastWaOffBody": "تم إيقاف الطلب عبر رسائل واتساب.",
       "toastWaSaveFailedBody": "تعذّر تحديث إعداد الطلب عبر واتساب",
-      "apiKeyPlaceholder": "الصق المفتاح من لوحة تحكم WBS ← العملاء ← Force AI Store Bridge"
+      "apiKeyPlaceholder": "الصق المفتاح من لوحة تحكم WBS ← العملاء ← Ebda Bridge"
     },
     "templates": {
       "generating": "جاري الإنشاء…",
@@ -7355,7 +7357,7 @@
       "refresh": "تحديث",
       "loading": "جاري تحميل القوالب…",
       "noTemplates": "لم يتم إعداد أي قوالب بعد.",
-      "noTemplatesHint": "اضغط على إنشاء القيم الافتراضية لإضافة قوالب Force AI الأساسية الـ 12 كمسودات.",
+      "noTemplatesHint": "اضغط على إنشاء القيم الافتراضية لإضافة قوالب ابدأ الأساسية الـ 12 كمسودات.",
       "howItWorks": "طريقة العمل: اضغط على إنشاء القيم الافتراضية لإنشاء القوالب الأساسية كمسودات. ثم اضغط على مزامنة إلى Meta لإرسالها. تقوم Meta بمراجعة كل قالب؛ وعادة ما تستغرق الموافقة من 10 دقائق إلى 24 ساعة.",
       "logoLabel": "استخدم شعار متجري كترويسة لرسائل واتساب",
       "logoHint": "سيظهر شعار متجرك للعملاء في أعلى كل رسالة تحديث للطلب. يتم تطبيق هذا عند المزامنة القادمة للقوالب.",
@@ -7405,7 +7407,7 @@
     },
     "orderUpdates": {
       "notConnected": "مو متصل للحين.",
-      "notConnectedHint": "لازم تتصل بمنصة Force AI WhatsApp Business أول شي من تبويب الاتصال، وبعدين ارجع هني.",
+      "notConnectedHint": "لازم تتصل بمنصة ابدأ WhatsApp Business أول شي من تبويب الاتصال، وبعدين ارجع هني.",
       "loading": "جاري التحميل…",
       "messageLanguage": "لغة الرسالة",
       "templateNotFound": "القالب مو موجود",
@@ -7416,7 +7418,7 @@
       "bothOff": "الاثنين مغلقين — الإشعار ماراح يوصل",
       "saving": "جاري الحفظ…",
       "saveChanges": "حفظ التغييرات",
-      "howItWorks": "طريقة العمل: لما تتغير حالة طلب العميل لواحدة من هالحالات، FWB API راح يرسل قالب WhatsApp المناسب من خلال تكامل منصة Force WhatsApp Business. استخدم خانات الاختيار عشان تحدد طرق الإشعار اللي تبيها لكل حالة.",
+      "howItWorks": "طريقة العمل: لما تتغير حالة طلب العميل لواحدة من هالحالات، واجهة ابدأ راح يرسل قالب WhatsApp المناسب من خلال تكامل منصة واتساب ابدأ Business. استخدم خانات الاختيار عشان تحدد طرق الإشعار اللي تبيها لكل حالة.",
       "events": {
         "orderPaid": {
           "label": "تم دفع الطلب",
@@ -7566,8 +7568,8 @@
       "accessTokenPlaceholderRotate": "أدخل رمزاً جديداً لتحديث الرمز الحالي",
       "accessTokenPlaceholderNew": "الصق رمز مستخدم النظام الخاص بك",
       "accessTokenHint": "أنشئ مستخدم نظام في مدير أعمال Meta ← امنح صلاحية <code>catalog_management</code>. الرمز مُشفّر عند التخزين ولن يُعرض مرة أخرى بعد الحفظ.",
-      "provisionTitle": "الإعداد التلقائي · بمساعدة Force AI",
-      "provisionDescription": "يقوم بإنشاء كتالوج تجارة جديد تحت مدير أعمال Force AI ويملأ الحقول الثلاثة أعلاه تلقائياً. يوفر عليك عناء التنقل داخل مدير أعمال Meta. لا يزال يتعين عليك إرسال الكتالوج للمراجعة من قبل Meta لاحقاً.",
+      "provisionTitle": "الإعداد التلقائي · بمساعدة ابدأ",
+      "provisionDescription": "يقوم بإنشاء كتالوج تجارة جديد تحت مدير أعمال ابدأ ويملأ الحقول الثلاثة أعلاه تلقائياً. يوفر عليك عناء التنقل داخل مدير أعمال Meta. لا يزال يتعين عليك إرسال الكتالوج للمراجعة من قبل Meta لاحقاً.",
       "provisioning": "جاري الإعداد...",
       "provisionButton": "إعداد تلقائي",
       "saving": "جاري الحفظ...",
@@ -7577,7 +7579,7 @@
       "provisionError": "فشل الإعداد التلقائي لـ Meta",
       "provisionSuccess": "تم إعداد كتالوج Meta — قدّمه لمراجعة Meta بعد ذلك.",
       "confirmAlready": "يوجد معرّف كتالوج مُدخل بالفعل. امسحه أولاً إذا كنت تريد فعلاً إعداد كتالوج جديد. هل تريد المتابعة على أي حال؟",
-      "confirmNew": "سيؤدي هذا إلى استدعاء واجهة Meta Graph API لإنشاء كتالوج تجاري جديد تماماً ضمن مدير أعمال Force AI الرئيسي وتعيينه لهذا المتجر. هل تريد المتابعة؟",
+      "confirmNew": "سيؤدي هذا إلى استدعاء واجهة Meta Graph API لإنشاء كتالوج تجاري جديد تماماً ضمن مدير أعمال ابدأ الرئيسي وتعيينه لهذا المتجر. هل تريد المتابعة؟",
       "catalogIdPlaceholder": "مثال: 123456789012345",
       "businessIdPlaceholder": "مثال: 987654321098765"
     },
@@ -7985,7 +7987,7 @@
     },
     "premiumSubtitle": "إضافة مميزة",
     "featureNotEnabledTitle": "الميزة غير مفعّلة",
-    "featureNotEnabledBody": "الودجة العائمة إضافة مميزة. يجب أن يفعّلها مسؤول عام لهذا المتجر قبل أن تتمكن من إعدادها. تواصل مع Force AI لطلب الوصول.",
+    "featureNotEnabledBody": "الودجة العائمة إضافة مميزة. يجب أن يفعّلها مسؤول عام لهذا المتجر قبل أن تتمكن من إعدادها. تواصل مع ابدأ لطلب الوصول.",
     "mainSubtitle": "مجموعة أزرار ثابتة يراها عملاؤك في كل صفحة",
     "showWidgetLabel": "إظهار الودجة في واجهة المتجر",
     "showWidgetHint": "عند التعطيل، لن تظهر الودجة حتى لو كانت الميزة مفعّلة.",
@@ -8138,7 +8140,7 @@
     "walletsWithBalance": "عملاء لديهم رصيد",
     "checkoutTitle": "الدفع من المحفظة عند الشراء",
     "checkoutOn": "مفعّل — يمكن للعملاء المسجلين دفع جزء من الطلب أو كامله من رصيدهم.",
-    "checkoutOff": "غير مفعّل — يرى العملاء رصيدهم في حساباتهم لكن لا يمكنهم إنفاقه عند الشراء بعد. تواصل مع دعم Force AI لتفعيله.",
+    "checkoutOff": "غير مفعّل — يرى العملاء رصيدهم في حساباتهم لكن لا يمكنهم إنفاقه عند الشراء بعد. تواصل مع دعم ابدأ لتفعيله.",
     "checkoutAccounting": "غير متاح أثناء تفعيل المحاسبة — دفتر الحسابات لا يسجل رصيد المتجر كالتزام بعد، فستُسجَّل مدفوعات المحفظة كنقد.",
     "colCustomer": "العميل",
     "colContact": "التواصل",

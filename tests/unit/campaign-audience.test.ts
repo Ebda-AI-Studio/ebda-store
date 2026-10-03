@@ -161,9 +161,8 @@ describe('content + locale', () => {
 
   it('only advertises List-Unsubscribe for an https API origin', () => {
     expect(listUnsubscribeHeaders('http://localhost:4000', 't')).toBeUndefined();
-    expect(listUnsubscribeHeaders('https://api.force-ai.co/', 'a.b.c')).toEqual({
-      'List-Unsubscribe':
-        '<https://api.force-ai.co/api/v1/public/campaigns/unsubscribe?token=a.b.c>',
+    expect(listUnsubscribeHeaders('https://api.ebda.app/', 'a.b.c')).toEqual({
+      'List-Unsubscribe': '<https://api.ebda.app/api/v1/public/campaigns/unsubscribe?token=a.b.c>',
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     });
   });

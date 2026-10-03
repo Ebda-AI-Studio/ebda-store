@@ -11,10 +11,10 @@
  * agent's product links for the store, and `X-Store-ID`/`x-store-domain` let
  * the attacker choose ANY active store as the target.
  *
- * The fallback is now `${config.webUrl}/${store.slug}` — the same derivation
- * `order.tools.ts`'s `storefrontBaseUrl` and `payment.routes.ts` already use.
- * FM-6: the `store.domain` branch must be preserved verbatim, or every
- * custom-domain merchant's feed starts pointing at the platform path instead.
+ * The fallback is now `storefrontOrigin(store)` (`https://<slug>.ebda.app`) — the
+ * same derivation `order.tools.ts`'s `storefrontBaseUrl` and `payment.routes.ts`
+ * use. FM-6: the `store.domain` branch must be preserved verbatim, or every
+ * custom-domain merchant's feed starts pointing at the platform subdomain instead.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -29,7 +29,7 @@ vi.mock('@force/database', () => ({
 }));
 
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', apiUrl: 'https://api.force-ai.co' },
+  config: { webUrl: 'https://ebda.app', apiUrl: 'https://api.ebda.app' },
 }));
 
 vi.mock('@api/lib/product-feed', () => ({
@@ -150,13 +150,13 @@ describe('GET /public/feed/products.json — baseUrl ignores request headers', (
     const next = vi.fn();
 
     await feedHandler()(
-      reqWith({ 'x-original-host': 'attacker.example', host: 'api.force-ai.co' }),
+      reqWith({ 'x-original-host': 'attacker.example', host: 'api.ebda.app' }),
       res(),
       next
     );
 
     expect(next).not.toHaveBeenCalled();
-    expect(baseUrlPassed()).toBe('https://store.force-ai.co/demo');
+    expect(baseUrlPassed()).toBe('https://demo.ebda.app');
     expect(baseUrlPassed()).not.toContain('attacker.example');
   });
 
@@ -171,7 +171,7 @@ describe('GET /public/feed/products.json — baseUrl ignores request headers', (
 
     await feedHandler()(reqWith({ host: 'evil.example' }), res(), vi.fn());
 
-    expect(baseUrlPassed()).toBe('https://store.force-ai.co/demo');
+    expect(baseUrlPassed()).toBe('https://demo.ebda.app');
   });
 
   it('produces the SAME baseUrl for two different X-Original-Host values (cache-key completeness)', async () => {

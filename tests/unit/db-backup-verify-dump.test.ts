@@ -57,13 +57,8 @@ describe('database backup dump verification', () => {
   });
 
   it('is still called by every path that writes a backup', () => {
-    const workflow = fs.readFileSync(
-      path.join(REPO_ROOT, '.github/workflows/db-backup.yml'),
-      'utf-8'
-    );
     const localScript = fs.readFileSync(path.join(REPO_ROOT, 'scripts/backup-db.sh'), 'utf-8');
 
-    expect(workflow).toContain('scripts/verify-dump.sh');
     expect(localScript).toContain('verify-dump.sh');
   });
 });

@@ -4,7 +4,7 @@
  * OneSignal initializer for the Orders PWA.
  *
  * Mirrors apps/admin/src/components/OneSignalInit.tsx but for the Orders app's
- * OWN OneSignal app (origin orders.forcemediakw.com — OneSignal locks one app
+ * OWN OneSignal app (origin orders.ebda.app — OneSignal locks one app
  * per origin, so it can't share the admin/storefront app).
  *
  * Init flow:

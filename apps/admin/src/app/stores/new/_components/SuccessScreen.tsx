@@ -10,6 +10,7 @@ import { getPlatformStoreUrl, getStoreDisplayUrl } from '../../../../lib/store-u
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { CreatedOwner, CreatedStore, DomainStatus } from './types';
+import { BRAND } from '@force/shared';
 
 interface DnsRecordRow {
   type: string;
@@ -30,7 +31,7 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
   // Same fallback semantics as the original `.map() || fallback`: only shown
   // when the API returned no records at all (undefined/null), not an empty array.
   const dnsRows: DnsRecordRow[] = domainStatus?.dnsRecords ?? [
-    { type: 'CNAME', name: store.domain ?? '', value: 'cf.force-ai.co' },
+    { type: 'CNAME', name: store.domain ?? '', value: `cf${BRAND.domains.storeSuffix}` },
   ];
   const dnsColumns: DataTableColumn<DnsRecordRow>[] = [
     {

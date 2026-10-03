@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { API_URL } from './api';
+import { storefrontOrigin } from '@force/shared';
 
 /**
  * Resolve "which store is this request for?" for the AGENT-FACING routes —
@@ -8,9 +9,9 @@ import { API_URL } from './api';
  * All three answer the same question, three levels deep, and got it right in
  * `llms.txt/route.ts` first:
  *
- *   store.force-ai.co/<slug>/…   → middleware sets `x-store-slug`
- *   wadyaljuz.com/…              → middleware sets `x-store-domain`
- *   store.force-ai.co/…          → neither: the platform itself, no store
+ *   <slug>.ebda.app/…   → middleware sets `x-store-domain` to the host
+ *   wadyaljuz.com/…     → middleware sets `x-store-domain` to the host
+ *   ebda.app/…          → neither: the platform itself, no store
  *
  * Extracted so a new discovery document cannot re-derive it slightly
  * differently. The custom-domain branch in particular is easy to miss — omit
@@ -82,17 +83,12 @@ export async function fetchStoreByHost(host: string): Promise<AgentStore | null>
  */
 export async function resolveAgentStore(): Promise<AgentStore | null> {
   const h = await headers();
-  const slug = h.get('x-store-slug');
   const domain = h.get('x-store-domain');
 
-  if (slug) {
-    const store = await fetchStoreBySlug(slug);
-    return store && store.status === 'active' ? store : null;
-  }
-
   if (domain) {
-    // Resolve the domain, then re-load by slug so the shape matches the
-    // slug branch exactly — `/public/store/resolve` returns a thinner row.
+    // Resolve the host (`<slug>.ebda.app` or custom domain), then re-load by
+    // slug so the shape matches the by-slug payload — `/public/store/resolve`
+    // returns a thinner row.
     const resolved = await fetchStoreByHost(domain);
     const store = resolved?.slug ? ((await fetchStoreBySlug(resolved.slug)) ?? resolved) : resolved;
     // `status` is optional on the resolve payload; absent means active.
@@ -103,26 +99,16 @@ export async function resolveAgentStore(): Promise<AgentStore | null> {
 }
 
 /**
- * True when THIS request's store identity came from the sticky `x-store-slug`
- * cookie fallback rather than a URL slug segment or a custom-domain Host.
+ * Retired guard: true only if a request carries `x-store-slug-source: cookie`.
  *
- * SECOND LINE OF DEFENCE ONLY — unreachable in production today (#2174). The
- * load-bearing control is middleware.ts's `URL_KEYED_PUBLIC_PATHS` guard
- * (#1959): for `/llms.txt`, `/.well-known/acp.json`, `/.well-known/ucp` and
- * `/feeds/products.json` the middleware never reads the cookie at all, so it
- * never sets `x-store-slug-source: cookie` on these paths (and it strips any
- * client-supplied copy of that header). This function therefore returns false
- * for every real request to the agent routes. It stays so that a future
- * change which lets the cookie reach these paths degrades to `private`
- * instead of to a cross-tenant shared-cache entry — but do NOT simplify the
- * middleware guard on the strength of it: the unit tests that exercise this
- * branch inject the header directly and prove nothing about the real path.
- * The real path is pinned by tests/unit/agent-discovery-real-path.test.ts.
- *
- * Why the cookie must never make these responses shared-cacheable: the same
- * request line would answer with a different merchant depending on which
- * visitor's cookie it carried, and Cloudflare's cache ignores `Vary` outside
- * its Enterprise-only feature (apps/api/src/lib/edge-cache.ts).
+ * Store identity comes from the Host alone now — no cookie or path ever names a
+ * store — and middleware.ts strips any client-supplied `x-store-slug*` header
+ * and never sets it, so this returns false for every real request. It stays as
+ * a defensive second line: should a future change reintroduce a non-URL
+ * identity source and mark it with this header, the agent documents degrade to
+ * `private` instead of a cross-tenant shared-cache entry. Cloudflare's cache
+ * ignores `Vary` outside its Enterprise-only feature (apps/api/src/lib/edge-cache.ts),
+ * which is why the guard is on the response, not on a `Vary`.
  */
 export async function resolvedViaCookie(): Promise<boolean> {
   const h = await headers();
@@ -131,12 +117,10 @@ export async function resolvedViaCookie(): Promise<boolean> {
 
 /**
  * The public base URL for this store's storefront — its own domain when it has
- * one, otherwise its path under the platform host. Discovery documents must
- * quote absolute URLs, and an agent that follows a platform-rooted link for a
- * custom-domain merchant lands on a redirect at best.
+ * one, otherwise its `<slug>.ebda.app` origin. Discovery documents must quote
+ * absolute URLs; the answer is a pure function of the store, never of a
+ * request header.
  */
-export function storefrontBaseUrl(store: AgentStore, requestHost: string | null): string {
-  if (store.domain) return `https://${store.domain}`;
-  const host = requestHost || 'store.force-ai.co';
-  return `https://${host}/${store.slug}`;
+export function storefrontBaseUrl(store: AgentStore): string {
+  return storefrontOrigin(store);
 }

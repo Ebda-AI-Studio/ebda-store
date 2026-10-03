@@ -2,12 +2,13 @@
 
 import { PLATFORM_MARKETING_URL } from '../lib/platform';
 import { useLanguage, translations } from '../contexts/LanguageContext';
+import { BRAND } from '@force/shared';
 
 /**
- * 404 for the bare platform host (`store.force-ai.co/<unknown-slug>`).
+ * 404 for the bare platform host (`ebda.app/<unknown-slug>`).
  *
  * This used to render the full platform marketing landing. It no longer does:
- * that page moved to force-ai.co, and serving it here gave every unknown URL a
+ * that page moved to ebda.app, and serving it here gave every unknown URL a
  * 200-looking marketing page competing with the real site.
  *
  * It stays a real 404 rather than a redirect — a redirect on a non-existent URL
@@ -44,7 +45,7 @@ export function PlatformNotFound() {
         href={PLATFORM_MARKETING_URL}
         className="mt-8 inline-flex items-center rounded-sm bg-[#C04E00] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#A34200] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
       >
-        {t('Go to Force AI', translations['Go to Force AI'])}
+        {t(`Go to ${BRAND.name}`, translations['Go to Ebda'])}
       </a>
     </main>
   );

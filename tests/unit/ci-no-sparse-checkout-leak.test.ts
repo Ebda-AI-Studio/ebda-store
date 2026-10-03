@@ -1,7 +1,7 @@
 /**
  * Sparse-checkout leak on the persistent self-hosted workspace (2026-09-30).
  *
- * railway-deploy.yml's hourly probe used `actions/checkout` with
+ * A (since removed) deploy workflow's hourly probe used `actions/checkout` with
  * `sparse-checkout`. On a self-hosted runner the workspace `.git` survives the
  * job, so core.sparseCheckout stayed on, and the next job's PLAIN checkout
  * reused it: the orders PWA deploy got a tree of only `.git` + `scripts/` and
@@ -74,7 +74,7 @@ for (const d of docs) {
 
 describe('every self-hosted checkout job disables an inherited sparse config before checkout', () => {
   it('found jobs to check (guards against an empty-set pass)', () => {
-    expect(guarded.length).toBeGreaterThan(20);
+    expect(guarded.length).toBeGreaterThan(0);
   });
   it.each(guarded)('%s', (_label, guard) => {
     expect(guard.run, 'no pre-checkout guard before checkout').toBeTruthy();
@@ -123,7 +123,7 @@ describe('the guard script really un-sparses a leaked workspace', () => {
     git('sparse-checkout', 'set', '--no-cone', 'scripts/probe.sh');
     expect(existsSync(join(dir, 'package-lock.json')), 'leak not reproduced').toBe(false);
 
-    const guard = guarded.find(([l]) => l.startsWith('railway-deploy.yml'))![1];
+    const guard = guarded[0][1];
     const r = spawnSync('bash', ['-c', guard.run!], { cwd: dir, env, encoding: 'utf8' });
     expect(r.status, r.stderr).toBe(0);
     expect(existsSync(join(dir, 'package-lock.json'))).toBe(true);

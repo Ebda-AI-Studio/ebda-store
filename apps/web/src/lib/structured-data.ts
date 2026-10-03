@@ -1,6 +1,7 @@
 import type { ResolvedStore } from './store-resolver';
 import { pickMetaDescription } from './seo/meta-description';
 import type { StorefrontLocale } from './seo/resolve-locale';
+import { BRAND_MARKETING_URL, storefrontOrigin } from '@force/shared';
 
 import { minorToDecimalString, REGION } from '@force/shared';
 /**
@@ -483,7 +484,7 @@ export function storeJsonLd(s: StoreSchemaData): object {
           address: {
             '@type': 'PostalAddress',
             streetAddress: s.address,
-            addressCountry: 'EG', // Egypt — platform-wide default for Force AI Store
+            addressCountry: 'EG', // Egypt — platform-wide default for Ebda
           },
         }
       : {}),
@@ -582,50 +583,36 @@ export function reviewJsonLd(r: {
 }
 
 /**
- * Resolve the canonical site URL for this store.
+ * Resolve the canonical site URL (origin) for this store.
+ *
+ * A store's origin is its custom domain when it has one, otherwise its free
+ * `<slug>.ebda.app` address (`storefrontOrigin`) — NEVER a path under the apex.
+ * Called with no store (platform-level callers) it returns the platform origin.
+ *
+ * History worth keeping: this once preferred the platform-wide
+ * NEXT_PUBLIC_SITE_URL over `store.domain`, so every custom-domain store
+ * advertised `rel=canonical` on the platform host — a URL that resolved to the
+ * DEMO store (verified live 2026-07-29), telling Google each merchant page
+ * duplicated a demo page. The store's own origin must always win.
  */
-export function getSiteUrl(store?: Pick<ResolvedStore, 'domain'>): string {
-  // A merchant's custom domain IS that store's canonical origin, so it MUST win
-  // over the platform-wide NEXT_PUBLIC_SITE_URL.
-  //
-  // This order used to be reversed, and because NEXT_PUBLIC_SITE_URL is always
-  // set in production (`https://store.force-ai.co`, inlined at build time), the
-  // `store.domain` branch below was DEAD — every custom-domain store advertised
-  // `rel=canonical`, `og:url` and every JSON-LD `url` on the platform host. Worse,
-  // `storeAbsoluteUrl` only adds the `/<slug>` prefix when `domain` is falsy, so
-  // pecannbee.com.kw/products/X claimed a canonical of
-  // store.force-ai.co/products/X — a URL that resolves to the DEMO store
-  // (verified live 2026-07-29). That tells Google every real merchant page is a
-  // duplicate of a demo page. Platform-path stores are unaffected: no domain →
-  // still the env var → still prefixed with `/<slug>`.
-  if (store?.domain) {
-    return `https://${store.domain.trim()}`;
+export function getSiteUrl(store?: { slug?: string | null; domain?: string | null }): string {
+  if (store?.domain || store?.slug) {
+    return storefrontOrigin({ slug: store.slug ?? '', domain: store.domain });
   }
   // Whitespace defense: a stray newline in the env var silently breaks
   // every URL in robots.txt + sitemap.xml (Google then can't fetch the map).
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/$/, '');
   }
-  // Canonical platform host after the 2026-06 Cloudflare rebrand. Fallback for
-  // platform-path stores (no custom domain); drives master sitemap URLs, the
-  // robots `Sitemap:` directive, OG `og:url`/`og:image`, and `rel=canonical`.
-  // It MUST be the live canonical domain — it was still `store.forcemediakw.com`
-  // after the CF cutover, so sitemap + OG advertised the old domain on
-  // store.force-ai.co (regression fixed 2026-06-27).
-  return 'https://store.force-ai.co';
+  // Platform-level fallback (no store): the marketing apex.
+  return BRAND_MARKETING_URL;
 }
 
 /**
- * Absolute in-store URL that preserves the platform `/<slug>` path prefix.
- * `getSiteUrl()` only returns the bare custom-domain (or platform-default)
- * origin — it does NOT include the `/<slug>` path prefix that platform-path
- * stores (no custom domain, `store.domain` is falsy) need, see
- * `apps/web/src/app/sitemap.ts`'s "master sitemap" branch for the same
- * pattern. Every per-page JSON-LD `url`, breadcrumb `item`, and
- * `rel=canonical` builder MUST route through this (or `getSiteUrl()` for the
- * bare origin) instead of hand-concatenating `${getSiteUrl(store)}${path}` —
- * skipping the prefix points crawlers/agents at a URL that resolves to the
- * wrong store (or the demo store) once it hits middleware.
+ * Absolute in-store URL: the store's origin (`getSiteUrl(store)`) plus `path`.
+ * There is no `/<slug>` path prefix — every store has its own host. Every
+ * per-page JSON-LD `url`, breadcrumb `item`, and `rel=canonical` builder MUST
+ * route through this instead of hand-concatenating.
  *
  * `path` may be given with or without a leading slash; '' or '/' both
  * resolve to the store root.
@@ -634,7 +621,6 @@ export function storeAbsoluteUrl(
   store: Pick<ResolvedStore, 'slug' | 'domain'>,
   path: string
 ): string {
-  const prefix = store.domain ? '' : `/${store.slug}`;
   const normalizedPath = path && !path.startsWith('/') ? `/${path}` : path;
-  return `${getSiteUrl(store)}${prefix}${normalizedPath}`;
+  return `${getSiteUrl(store)}${normalizedPath}`;
 }

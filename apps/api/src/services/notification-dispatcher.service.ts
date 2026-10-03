@@ -4,7 +4,7 @@
  * based on feature flags, per-event config, and available credentials.
  *
  * WhatsApp is intentionally NOT a dispatcher channel — it flows through the
- * Force AI Store ↔ WBS bridge as a separate event-driven path
+ * Ebda ↔ WBS bridge as a separate event-driven path
  * (`apps/api/src/lib/inngest/functions/order-whatsapp-notify.ts`).
  *
  * IMPORTANT: dispatch() NEVER throws — all errors are caught and logged.
@@ -28,6 +28,7 @@ import {
   SMS_TEMPLATES,
   PUSH_TEMPLATES,
   renderSmsTemplate,
+  storefrontOrigin,
 } from '@force/shared';
 import type { SmsConfig } from './sms.service';
 
@@ -353,7 +354,7 @@ async function readStorefrontBase(storeId: string): Promise<{ base: string; foun
   const store = await withRlsBypass(tx =>
     tx.store.findUnique({ where: { id: storeId }, select: { domain: true, slug: true } })
   );
-  const base = store?.domain ? `https://${store.domain}` : `${config.webUrl}/${store?.slug ?? ''}`;
+  const base = store ? storefrontOrigin(store) : config.webUrl;
   return { base, found: !!store };
 }
 

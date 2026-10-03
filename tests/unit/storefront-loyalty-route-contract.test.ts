@@ -13,7 +13,7 @@
  * apps/api/src/routes/index.ts. The real resolved path was therefore
  * '/stores/public/:storeId/loyalty/my-points' — matching none of the
  * storefront's calls. Every one of those calls 404'd in production on every
- * live store (verified against api.force-ai.co 2026-09-25, see the PR body).
+ * live store (verified against api.ebda.app 2026-09-25, see the PR body).
  *
  * This test pins BOTH halves of the fix:
  *   1. The literal path string still lives in the storefront source (so a

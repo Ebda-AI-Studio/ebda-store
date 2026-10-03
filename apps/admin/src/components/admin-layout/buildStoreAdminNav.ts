@@ -48,7 +48,7 @@ export type NavLabels = {
   manageFeatures: string;
 };
 
-// Super Admin navigation (Force Media platform admin)
+// Super Admin navigation (Ebda platform admin)
 export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
   return [
     {

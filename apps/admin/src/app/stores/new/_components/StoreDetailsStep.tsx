@@ -2,7 +2,7 @@
 
 import { Input } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import { PLATFORM_STORE_HOST } from '@/lib/store-url';
+import { STORE_HOST_SUFFIX } from '@/lib/store-url';
 import type { FormData } from './types';
 
 interface StoreDetailsStepProps {
@@ -51,17 +51,21 @@ export function StoreDetailsStep({
           <div
             className={`mt-1 flex rounded-lg border overflow-hidden ${validationErrors.storeSlug ? 'border-destructive' : ''}`}
           >
-            <span className="flex items-center bg-muted px-3 text-sm text-muted-foreground border-e">
-              {PLATFORM_STORE_HOST}/
-            </span>
             <input
               id="storeSlug"
               type="text"
+              dir="ltr"
               value={formData.storeSlug}
               onChange={e => onSlugChange(e.target.value.toLowerCase())}
               placeholder={t('storeSlugPlaceholder')}
               className="flex-1 px-3 py-2 text-sm focus:outline-none"
             />
+            <span
+              dir="ltr"
+              className="flex items-center bg-muted px-3 text-sm text-muted-foreground border-s"
+            >
+              {STORE_HOST_SUFFIX}
+            </span>
           </div>
           {validationErrors.storeSlug && (
             <p className="mt-1 text-sm text-destructive-ink">{validationErrors.storeSlug}</p>

@@ -27,6 +27,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
+import { storefrontOrigin } from '@force/shared';
 import { prisma, runInTenantContext } from '@force/database';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
@@ -34,7 +35,6 @@ import {
   sendPurchaseConversion,
   isErasedCustomerOrder,
 } from '../../../services/pixels-capi.service';
-import { config } from '../../../config';
 import logger from '../../logger';
 
 export const orderCapiConversion: InngestFunction.Any = inngest.createFunction(
@@ -97,8 +97,8 @@ export const orderCapiConversion: InngestFunction.Any = inngest.createFunction(
     }
 
     // Determine the store's public URL for event_source_url:
-    //   custom domain wins, then slug-based path on the platform web URL.
-    const storeUrl = store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;
+    //   custom domain wins, then the store's free `<slug>.ebda.app` origin.
+    const storeUrl = storefrontOrigin(store);
 
     // Load the order — only need PII fields for hashing + the total.
     // runInTenantContext ensures RLS allows the read (Inngest runs without

@@ -1,4 +1,4 @@
-# Force Website Builder API - Production Dockerfile
+# Ebda API - Production Dockerfile
 FROM node:20-alpine AS base
 
 # Install ALL dependencies for building

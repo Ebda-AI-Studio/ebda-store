@@ -1,7 +1,7 @@
 /**
  * localStorage key for the compare list, namespaced per store.
  *
- * Path-based stores (store.forcemediakw.com/<slug>) share a single localStorage
+ * Path-based stores (<slug>.ebda.app) share a single localStorage
  * origin, so a flat 'compareProducts' key bled one store's compare list into a
  * sibling store. The active store id is set once by StoreContext (mirrors
  * `api.setStoreId`) and the key becomes `compareProducts:<storeId>`. Falls back

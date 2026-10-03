@@ -43,7 +43,7 @@ const files = readdirSync(WF_DIR).filter(f => f.endsWith('.yml') || f.endsWith('
 
 describe('#1883: every self-hosted job that checks out code runs the guard FIRST', () => {
   it('found workflow files (guards against an empty-set pass)', () => {
-    expect(files.length).toBeGreaterThanOrEqual(10);
+    expect(files.length).toBeGreaterThanOrEqual(3);
   });
 
   const cases: Array<{ file: string; jobName: string; job: Job }> = [];
@@ -57,7 +57,7 @@ describe('#1883: every self-hosted job that checks out code runs the guard FIRST
   }
 
   it('found at least one self-hosted checkout job to check (guards against an empty-set pass)', () => {
-    expect(cases.length).toBeGreaterThan(5);
+    expect(cases.length).toBeGreaterThan(0);
   });
 
   it.each(cases.map(c => [`${c.file} / ${c.jobName}`, c] as const))('%s', (_label, { job }) => {

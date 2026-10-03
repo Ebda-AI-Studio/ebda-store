@@ -4,6 +4,7 @@ import { StorePicker } from './StorePicker';
 import { LangToggle } from './LangToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/lib/auth';
+import { BRAND } from '@force/shared';
 
 export function AppHeader() {
   const { t } = useLanguage();
@@ -17,7 +18,7 @@ export function AppHeader() {
       >
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="Force AI Store" className="h-8 w-auto" width={38} height={32} />
+          <img src="/logo.svg" alt={BRAND.name} className="h-8 w-auto" width={38} height={32} />
           <h1 className="text-base font-bold text-foreground">{t.orders.title}</h1>
         </div>
         <div className="flex items-center gap-1.5">
