@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { BulkService } from '../services/bulk.service';
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
+import { importCsvToPlatformCsv } from '../services/csv-import';
 import { prisma, ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
@@ -273,11 +274,17 @@ router.post(
       const parsedOptions = importOptionsSchema.parse(options || {});
       const userId = req.user!.userId;
 
+      // One CSV entry point for both layouts: FWB's own template passes
+      // through (BOM stripped); a Shopify product export is grouped by Handle
+      // and converted (EGP -> piastres, strict 2 decimals) into the same
+      // platform CSV. Either way the single BulkService importer does the work.
+      const converted = importCsvToPlatformCsv(csvData);
+
       const job = await prisma.bulkImportJob.create({
         data: {
           storeId,
           userId,
-          csvData,
+          csvData: converted.csv,
           updateExisting: parsedOptions.updateExisting ?? true,
         },
         select: { id: true, status: true, createdAt: true },
@@ -293,7 +300,7 @@ router.post(
         userId,
         resourceType: 'product',
         resourceId: storeId,
-        details: { jobId: job.id },
+        details: { jobId: job.id, source: `csv:${converted.format}` },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
