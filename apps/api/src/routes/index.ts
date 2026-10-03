@@ -72,11 +72,15 @@ import staffRoutes from './staff.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
-import { tenantContext, aiRouteContext } from '../middleware/tenant-context';
+import { tenantContext, aiRouteContext, publicStoreContext } from '../middleware/tenant-context';
 
 const router = Router();
 
 // Public routes (no auth required)
+// Every /public request that names a store (X-Store-ID / x-store-domain / a UUID
+// path segment) runs in that store's RLS scope: one request transaction for
+// reads, per-query short transactions for writes. See publicStoreContext.
+router.use('/public', publicStoreContext);
 router.use('/public', publicRoutes);
 router.use('/public', publicStoreLayoutRoutes);
 
@@ -142,7 +146,7 @@ router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 // like the other fixed routers would be WRONG: it would try to open a
 // single-store RLS transaction using a user id or product id as the
 // "storeId" for the non-store routes, which would either no-op (falls the
-// UUID check) or — worse, post-force_app-cutover — silently scope every
+// UUID check) or — worse, post-ebda_app-cutover — silently scope every
 // query in that request to zero rows (current_store_id() would never match
 // any real store_id). Left unchanged; see the PR description for this ticket.
 router.use('/admin', tenantContext, adminRoutes);
