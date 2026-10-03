@@ -4,11 +4,15 @@
  * request carries only what was entered, and the confirmation never says
  * whether the address already had an account.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const { apiPost, replace } = vi.hoisted(() => ({ apiPost: vi.fn(), replace: vi.fn() }));
-vi.mock('../../lib/api', () => ({ apiPost }));
+const { apiPost, apiGet, replace } = vi.hoisted(() => ({
+  apiPost: vi.fn(),
+  apiGet: vi.fn(),
+  replace: vi.fn(),
+}));
+vi.mock('../../lib/api', () => ({ apiPost, apiGet }));
 vi.mock('../../lib/auth', () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
 }));
@@ -28,6 +32,10 @@ vi.mock('@/i18n/useT', () => {
 });
 
 import SignupPage from './page';
+
+beforeEach(() => {
+  apiGet.mockResolvedValue({ data: { token: 'tok-1' }, error: null });
+});
 
 afterEach(() => {
   cleanup();
@@ -62,6 +70,7 @@ describe('signup page', () => {
   it('posts the signup and shows the same "check your email" screen regardless of the address', async () => {
     apiPost.mockResolvedValue({ data: { emailVerificationSent: true }, error: null });
     render(<SignupPage />);
+    await act(async () => {}); // let the form-token fetch settle
     fill({ name: ' Mona Hassan ', email: 'mona@x.com', phone: '', password: 'Str0ng!Passw0rd' });
     submit();
     expect(
@@ -73,6 +82,9 @@ describe('signup page', () => {
       password: 'Str0ng!Passw0rd',
       name: 'Mona Hassan',
       language: 'en',
+      // Abuse controls: the server-signed form token and an EMPTY honeypot.
+      formToken: 'tok-1',
+      company_site: '',
     });
   });
 
@@ -100,6 +112,30 @@ describe('signup page', () => {
     submit();
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByText('onboarding.signup.errors.rateLimited')).toBeTruthy();
+  });
+
+  it('maps a disposable-domain refusal to the email field', async () => {
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { code: 'EMAIL_DOMAIN_NOT_ALLOWED', message: 'x', status: 400 },
+    });
+    render(<SignupPage />);
+    fill({ name: 'Mona', email: 'mona@mailinator.com', password: 'Str0ng!Passw0rd' });
+    submit();
+    expect(await screen.findByText('onboarding.signup.errors.emailDisposable')).toBeTruthy();
+  });
+
+  it('refetches the form token after a too-fast / expired refusal', async () => {
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { code: 'SIGNUP_TOO_FAST', message: 'x', status: 400 },
+    });
+    render(<SignupPage />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+    fill({ name: 'Mona', email: 'mona@x.com', password: 'Str0ng!Passw0rd' });
+    submit();
+    expect(await screen.findByText('onboarding.signup.errors.tooFast')).toBeTruthy();
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
   });
 
   it('resend goes to the generic resend endpoint', async () => {

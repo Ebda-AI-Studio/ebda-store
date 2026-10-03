@@ -8371,6 +8371,9 @@
         "emailInvalid": "Enter a valid email address",
         "passwordWeak": "Password needs 8+ characters, upper and lower case, a number and a symbol",
         "phoneInvalid": "Enter a valid Egyptian mobile number, or leave it empty",
+        "emailDisposable": "Please use a permanent email address, not a temporary one",
+        "tooFast": "Please wait a moment and submit again",
+        "formExpired": "This form expired. Please submit again",
         "rateLimited": "Too many attempts. Please try again in a little while.",
         "generic": "We could not create your account. Please try again."
       },

@@ -22,7 +22,12 @@ export interface SignupFields {
   password: string;
 }
 
-export type SignupErrorKey = 'nameRequired' | 'emailInvalid' | 'passwordWeak' | 'phoneInvalid';
+export type SignupErrorKey =
+  | 'nameRequired'
+  | 'emailInvalid'
+  | 'emailDisposable'
+  | 'passwordWeak'
+  | 'phoneInvalid';
 
 export function validateSignup(
   f: SignupFields

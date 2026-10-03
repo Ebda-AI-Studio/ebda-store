@@ -44,6 +44,14 @@ export const merchantSignupSchema = z.object({
       message: 'Invalid Egyptian mobile number',
     }),
   language: z.enum(['ar', 'en']).optional(),
+  /**
+   * Abuse controls (services/signup-abuse.service.ts): the hidden honeypot
+   * input (must stay empty) and the server-signed form token from
+   * `GET /auth/merchant/signup-token`. Both optional HERE so the schema stays
+   * the account shape; the route enforces them.
+   */
+  company_site: z.string().max(500).optional(),
+  formToken: z.string().max(200).optional(),
 });
 
 export type MerchantSignupInput = z.infer<typeof merchantSignupSchema>;
