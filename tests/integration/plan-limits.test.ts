@@ -379,7 +379,7 @@ describe.skipIf(!hasDb)('migration — StorePlan enum -> plan code backfill', ()
 describe.skipIf(!hasDb)('RLS — store_subscriptions is tenant-isolated', () => {
   async function asTenant<T>(storeId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>) {
     return prisma.$transaction(async tx => {
-      await tx.$executeRawUnsafe(`SET LOCAL ROLE force_app`);
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE ebda_app`);
       await tx.$executeRawUnsafe(
         `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
       );

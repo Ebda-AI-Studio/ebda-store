@@ -33,6 +33,8 @@ import { Shopper, Admin, HARNESS_ENV } from './lib/client.mjs';
 import { SCENARIOS } from './lib/scenarios.mjs';
 import { createExecutor } from './lib/inngest-executor.mjs';
 
+// The strict-RLS runtime role of the refs under test (the migration creates it NOLOGIN).
+const APP_ROLE = process.env.PARITY_APP_ROLE || 'ebda_app';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
 
@@ -437,12 +439,12 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir, e
       path.join(logDir, `${label}-migrate.log`)
     );
     // The API runs as the non-bypass RLS role, exactly like production and CI.
-    psqlExec(owner, `ALTER ROLE force_app WITH PASSWORD 'bfp-parity-force-app' LOGIN;`);
+    psqlExec(owner, `ALTER ROLE ${APP_ROLE} WITH PASSWORD 'bfp-parity-force-app' LOGIN;`);
     await redisCmd(redisUrl, 'FLUSHALL');
   }
   const appUrl = (() => {
     const u = new URL(owner);
-    u.username = 'force_app';
+    u.username = APP_ROLE;
     u.password = 'bfp-parity-force-app';
     return u.toString();
   })();

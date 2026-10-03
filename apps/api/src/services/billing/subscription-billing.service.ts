@@ -24,12 +24,7 @@
  *    after `failed` DOES settle (the money was taken).
  */
 import crypto from 'crypto';
-import {
-  prisma,
-  withStore,
-  acrossStores,
-  type Prisma,
-} from '@force/database';
+import { prisma, withStore, acrossStores, type Prisma } from '@force/database';
 import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
 import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
@@ -929,7 +924,11 @@ export async function applyWebhookEvent(
     webhookStoreId = event.providerRef
       ? await getBillingRefundStoreId(providerName, event.providerRef)
       : null;
-  } else if (event.kind !== 'ignored' && event.merchantOrderId && UUID_RE.test(event.merchantOrderId)) {
+  } else if (
+    event.kind !== 'ignored' &&
+    event.merchantOrderId &&
+    UUID_RE.test(event.merchantOrderId)
+  ) {
     webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
   }
   const apply = async (tx: Tx): Promise<WebhookResult> => {

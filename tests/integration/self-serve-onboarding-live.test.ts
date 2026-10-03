@@ -2,7 +2,7 @@
  * SP5 task 2 - the unaided E2E, over real HTTP against a running API.
  *
  * Same funnel as self-serve-onboarding.test.ts, but through the booted server
- * (CI runs it as the non-bypass `force_app` role, so every step is also proven
+ * (CI runs it as the non-bypass `ebda_app` role, so every step is also proven
  * under enforced RLS): signup -> verify -> login -> create store -> template ->
  * product -> payment -> go live -> the storefront answers at `<slug>.ebda.app`
  * (x-store-domain) with the product -> setup guide reflects it.
@@ -74,7 +74,7 @@ async function linkAfter(fromByte: number): Promise<string> {
   throw new Error('no [PLATFORM-MAIL] verification link appeared in the server log');
 }
 
-describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (force_app)', () => {
+describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_app)', () => {
   beforeAll(async () => {
     const health = await fetch(API_BASE.replace(/\/api\/v1$/, '/health')).catch(() => null);
     if (!health?.ok) throw new Error(`API not reachable at ${API_BASE}`);
