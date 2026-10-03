@@ -391,16 +391,13 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         .send({ template: 'elegant' });
       expect(tpl.status).toBe(200);
 
-      const product = await api()
-        .post(`/api/v1/stores/${storeId}/products`)
-        .set(bearer(jwt))
-        .send({
-          name: 'Cotton Scarf',
-          nameAr: 'إيشارب قطن',
-          price: 25000,
-          inventory: 10,
-          status: 'active',
-        });
+      const product = await api().post(`/api/v1/stores/${storeId}/products`).set(bearer(jwt)).send({
+        name: 'Cotton Scarf',
+        nameAr: 'إيشارب قطن',
+        price: 25000,
+        inventory: 10,
+        status: 'active',
+      });
       expect(product.status).toBe(201);
 
       const pay = await api()
