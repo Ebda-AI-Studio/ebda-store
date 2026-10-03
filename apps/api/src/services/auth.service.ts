@@ -596,7 +596,11 @@ export class AuthService {
     // Lockout key is scoped per tenant so a brute-force attempt against
     // Store A doesn't lock the same email out on Store B (or on the admin
     // app). Bare email is still used for admin (storeId NULL).
-    const lockoutKey = storeId ? `${storeId}:${email}` : email;
+    // Case-folded so `Victim@x.com` / `VICTIM@x.com` share one counter: an
+    // exact-case key let an attacker reset the 5-per-15-min budget by
+    // re-casing the address (Ebda SP5 review).
+    const lockoutEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+    const lockoutKey = storeId ? `${storeId}:${lockoutEmail}` : lockoutEmail;
     const lockStatus = await accountLockout.isLocked(lockoutKey);
     if (lockStatus.locked) {
       const remainingMinutes = Math.ceil((lockStatus.remainingMs || 0) / 60000);

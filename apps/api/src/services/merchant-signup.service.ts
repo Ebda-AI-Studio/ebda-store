@@ -30,7 +30,7 @@ const passwordSchema = z
   .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
 
 export const merchantSignupSchema = z.object({
-  email: z.string().trim().email('Invalid email address').max(254),
+  email: z.string().trim().toLowerCase().email('Invalid email address').max(254),
   password: passwordSchema,
   name: z.string().trim().min(1, 'Name is required').max(100),
   /** Optional. Must be a valid Egyptian mobile; stored as E.164. */
