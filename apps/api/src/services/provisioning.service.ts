@@ -32,6 +32,15 @@ export interface ProvisionStoreInput {
   // only provider (Vercel cancelled 2026-07); kept optional for signature compat.
   domainProvider?: 'cloudflare';
   plan?: 'free' | 'starter' | 'professional' | 'enterprise';
+  /**
+   * Initial store status. Defaults to `active` (super-admin provisioning).
+   * Self-serve onboarding creates the store `inactive` (unreachable at
+   * `<slug>.ebda.app`) and flips it live at the final step.
+   */
+  status?: 'active' | 'inactive';
+  /** Initial storefront template; defaults to the schema default. */
+  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+  storeNameAr?: string;
 
   // Owner details
   ownerEmail: string;
@@ -43,6 +52,7 @@ export interface ProvisionStoreInput {
     theme?: string;
     currency?: string;
     timezone?: string;
+    defaultLanguage?: 'ar' | 'en';
   };
 }
 
@@ -74,6 +84,9 @@ export class ProvisioningService {
       storeSlug,
       domain,
       plan = 'starter',
+      status = 'active',
+      template,
+      storeNameAr,
       ownerEmail,
       ownerName,
       ownerPassword,
@@ -184,8 +197,10 @@ export class ProvisioningService {
             slug,
             domain,
             domainProvider: input.domainProvider ?? null,
+            ...(storeNameAr ? { nameAr: storeNameAr } : {}),
             ownerId: owner.id,
-            status: 'active',
+            status,
+            ...(template ? { template } : {}),
             plan,
             ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
             settings: {

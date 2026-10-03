@@ -8288,5 +8288,212 @@
     "customDomain": "Custom domains are not included in your plan. Upgrade to connect your own domain.",
     "abandonedCartAutomation": "Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.",
     "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on."
+  },
+  "onboarding": {
+    "signup": {
+      "title": "Create your store",
+      "subtitle": "Start selling online in minutes. No card needed.",
+      "name": "Your name",
+      "namePlaceholder": "Mona Hassan",
+      "email": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "phone": "Mobile number (optional)",
+      "phonePlaceholder": "010 1234 5678",
+      "phoneHelp": "An Egyptian mobile, for order and account alerts.",
+      "password": "Password",
+      "passwordPlaceholder": "Create a password",
+      "passwordHelp": "At least 8 characters with upper and lower case letters, a number and a symbol.",
+      "submit": "Create my account",
+      "submitting": "Creating your account…",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "errors": {
+        "nameRequired": "Enter your name",
+        "emailInvalid": "Enter a valid email address",
+        "passwordWeak": "Password needs 8+ characters, upper and lower case, a number and a symbol",
+        "phoneInvalid": "Enter a valid Egyptian mobile number, or leave it empty",
+        "rateLimited": "Too many attempts. Please try again in a little while.",
+        "generic": "We could not create your account. Please try again."
+      },
+      "sent": {
+        "title": "Check your email",
+        "body": "If this address can be used, we sent a verification link to {email}. It is valid for 24 hours.",
+        "resend": "Send the link again",
+        "resending": "Sending…",
+        "resent": "If the address is eligible, a new link is on its way.",
+        "backToLogin": "Back to sign in"
+      },
+      "noAccount": "New to Ebda?",
+      "createStore": "Create your store"
+    },
+    "verify": {
+      "verifying": "Verifying your email…",
+      "successTitle": "Email verified",
+      "successBody": "Your account is ready. Let's set up your store.",
+      "continue": "Continue",
+      "failedTitle": "We could not verify your email",
+      "invalid": "This link is invalid or has already been used.",
+      "expired": "This link has expired. Request a new one below.",
+      "missing": "The verification link is incomplete.",
+      "generic": "Something went wrong. Please try again.",
+      "resendTitle": "Get a new link",
+      "email": "Email address",
+      "resend": "Send a new link",
+      "resending": "Sending…",
+      "resent": "If the address is eligible, a new link is on its way.",
+      "backToLogin": "Back to sign in"
+    },
+    "flow": {
+      "title": "Set up your store",
+      "stepOf": "Step {current} of {total}",
+      "steps": {
+        "store": "Name",
+        "template": "Look",
+        "product": "Product",
+        "payment": "Payment",
+        "live": "Launch"
+      },
+      "back": "Back",
+      "next": "Continue",
+      "skip": "Skip for now",
+      "loading": "Loading…",
+      "loadFailed": "We could not load your setup. Please refresh.",
+      "verifyGate": {
+        "title": "Verify your email to continue",
+        "body": "We sent a verification link to {email}. Open it, then come back and refresh this page.",
+        "refresh": "I verified my email",
+        "resend": "Send the link again",
+        "resent": "If the address is eligible, a new link is on its way."
+      },
+      "store": {
+        "title": "Name your store",
+        "subtitle": "Pick a name and your free store address.",
+        "name": "Store name",
+        "namePlaceholder": "My shop",
+        "slug": "Store address",
+        "slugHelp": "Latin letters, digits and hyphens only. You can add your own domain later.",
+        "checking": "Checking…",
+        "available": "{host} is available",
+        "taken": "This address is already taken",
+        "reserved": "This address is reserved. Choose another one.",
+        "tooShort": "Use at least 3 characters",
+        "tooLong": "Use at most 40 characters",
+        "invalid": "Use lowercase letters, digits and single hyphens only",
+        "nameRequired": "Enter your store name",
+        "create": "Create my store",
+        "creating": "Creating…",
+        "createFailed": "We could not create the store. Please try again.",
+        "limit": "You have reached the store limit for this account."
+      },
+      "template": {
+        "title": "Pick a look",
+        "subtitle": "Choose a template. You can change it any time.",
+        "modern": "Modern",
+        "modernDesc": "Clean lines and bold accents.",
+        "classic": "Classic",
+        "classicDesc": "Timeless serif elegance.",
+        "minimal": "Minimal",
+        "minimalDesc": "Lots of space, product first.",
+        "bold": "Bold",
+        "boldDesc": "Vibrant and energetic.",
+        "elegant": "Elegant",
+        "elegantDesc": "Refined fashion and beauty look.",
+        "selected": "Selected",
+        "saveFailed": "We could not save the template. Please try again."
+      },
+      "product": {
+        "title": "Add your first product",
+        "subtitle": "Name, price and a photo. You can add the rest later.",
+        "name": "Product name",
+        "namePlaceholder": "Cotton scarf",
+        "price": "Price (EGP)",
+        "pricePlaceholder": "250",
+        "photo": "Photo (optional)",
+        "nameRequired": "Enter the product name",
+        "priceInvalid": "Enter a price greater than zero",
+        "add": "Add product",
+        "adding": "Adding…",
+        "added": "{name} was added.",
+        "addFailed": "We could not add the product. Please try again.",
+        "limit": "You have reached your plan's product limit.",
+        "stock": "Quantity in stock",
+        "stockInvalid": "Enter a whole number, 0 or more"
+      },
+      "payment": {
+        "title": "How will customers pay?",
+        "subtitle": "Cash on delivery is on by default. More methods arrive soon.",
+        "cod": "Cash on delivery",
+        "codDesc": "Customers pay the courier when the order arrives.",
+        "instapay": "InstaPay",
+        "cards": "Cards and wallets",
+        "comingSoon": "Coming soon",
+        "saveFailed": "We could not save your payment settings. Please try again.",
+        "needOne": "Keep at least one payment method on."
+      },
+      "live": {
+        "title": "Ready to launch",
+        "subtitle": "Your store goes live at {host}.",
+        "checklistName": "Store name",
+        "checklistTemplate": "Template",
+        "checklistProduct": "Products added",
+        "checklistPayment": "Payment",
+        "noProducts": "None yet. You can add products from the dashboard.",
+        "publish": "Publish my store",
+        "publishing": "Publishing…",
+        "publishFailed": "We could not publish the store. Please try again.",
+        "doneTitle": "Your store is live",
+        "doneBody": "Share the link and start selling.",
+        "visit": "Open my store",
+        "copy": "Copy link",
+        "copied": "Copied",
+        "whatsapp": "Share on WhatsApp",
+        "whatsappText": "Visit my new store:",
+        "dashboard": "Go to dashboard"
+      }
+    },
+    "setupGuide": {
+      "title": "Setup guide",
+      "subtitle": "Finish these steps to get your first order.",
+      "progress": "{done} of {total} done",
+      "loadFailed": "We could not load the setup guide.",
+      "dismiss": "Hide guide",
+      "show": "Show the setup guide",
+      "optional": "Optional",
+      "done": "Done",
+      "markDone": "Mark as done",
+      "markUndone": "Undo",
+      "open": "Open",
+      "items": {
+        "add_product": {
+          "title": "Add a product",
+          "desc": "Add your first product with a photo and a price."
+        },
+        "brand": {
+          "title": "Set your logo and colors",
+          "desc": "Make the store look like your brand."
+        },
+        "shipping": {
+          "title": "Set shipping zones",
+          "desc": "Tell customers where you deliver and the fee."
+        },
+        "payment": {
+          "title": "Choose payment methods",
+          "desc": "Cash on delivery is on. Review or add more."
+        },
+        "domain": {
+          "title": "Connect your own domain",
+          "desc": "Use yourname.com instead of the free address."
+        },
+        "test_order": {
+          "title": "Place a test order",
+          "desc": "Open your store and order something as a customer."
+        },
+        "share": {
+          "title": "Share your store link",
+          "desc": "Send your link to customers on WhatsApp."
+        }
+      },
+      "shareText": "Visit my store:"
+    }
   }
 }

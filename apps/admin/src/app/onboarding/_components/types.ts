@@ -1,0 +1,46 @@
+export type StepKey = 'store' | 'template' | 'product' | 'payment' | 'live';
+
+export const STEP_ORDER: readonly StepKey[] = ['store', 'template', 'product', 'payment', 'live'];
+
+export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+
+export const TEMPLATE_IDS: readonly TemplateId[] = [
+  'modern',
+  'classic',
+  'minimal',
+  'bold',
+  'elegant',
+];
+
+export interface OnboardingStore {
+  id: string;
+  name: string;
+  slug: string;
+  status: 'active' | 'inactive' | 'suspended';
+  template: TemplateId;
+  host: string;
+  url: string;
+  planCode: string | null;
+}
+
+export interface OnboardingState {
+  user: { email: string; name: string; emailVerified: boolean };
+  store: OnboardingStore | null;
+  productCount: number;
+  codEnabled: boolean;
+}
+
+export type SlugCheck =
+  | { available: true; slug: string; host: string }
+  | {
+      available: false;
+      slug: string;
+      host: string;
+      reason:
+        | 'SLUG_TAKEN'
+        | 'SLUG_RESERVED'
+        | 'SLUG_TOO_SHORT'
+        | 'SLUG_TOO_LONG'
+        | 'SLUG_INVALID_CHARS'
+        | 'SLUG_INVALID_HYPHEN';
+    };

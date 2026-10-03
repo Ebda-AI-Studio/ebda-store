@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@force/ui';
 import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
@@ -13,6 +14,7 @@ const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 export default function LoginPage() {
   const t = useT('auth.login');
   const tb = useT('components.brand');
+  const tSignup = useT('onboarding.signup');
   const router = useRouter();
   const { login, completeMfaLogin, isLoading: authLoading, isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
@@ -314,6 +316,13 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            {tSignup('noAccount')}{' '}
+            <Link href="/signup" className="text-primary-ink hover:underline">
+              {tSignup('createStore')}
+            </Link>
+          </p>
 
           <p className="mt-8 text-center text-xs text-muted-foreground">{t('footer')}</p>
         </div>
