@@ -110,6 +110,24 @@ interface MyFatoorahRefundResponse {
   };
 }
 
+/**
+ * Gateway base URL. `MYFATOORAH_BASE_URL` redirects the provider to a stub
+ * (the buy-flow parity harness, runtime-agnostic: it works on Node and on a
+ * Worker, unlike a `node --import` fetch preload). Honoured only outside
+ * production, or when `PAYMENT_PROVIDER_STUB=1` explicitly opts in; in a real
+ * production deploy it is ignored so a stray variable cannot redirect payments.
+ */
+function resolveBaseUrl(isTestMode: boolean): string {
+  const override = process.env.MYFATOORAH_BASE_URL?.trim();
+  if (
+    override &&
+    (process.env.NODE_ENV !== 'production' || process.env.PAYMENT_PROVIDER_STUB === '1')
+  ) {
+    return override.replace(/\/+$/, '');
+  }
+  return isTestMode ? 'https://apitest.myfatoorah.com' : 'https://api.myfatoorah.com';
+}
+
 export class MyFatoorahPaymentProvider implements IPaymentProvider {
   readonly name = 'myfatoorah' as const;
   private config!: PaymentProviderConfig;
@@ -117,7 +135,7 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
   initialize(config: PaymentProviderConfig): void {
     this.config = {
       ...config,
-      baseUrl: config.isTestMode ? 'https://apitest.myfatoorah.com' : 'https://api.myfatoorah.com',
+      baseUrl: resolveBaseUrl(config.isTestMode),
     };
   }
 
