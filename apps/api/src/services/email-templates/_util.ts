@@ -1,4 +1,4 @@
-import { formatPrice } from '@force/shared';
+import { formatPrice, minorToDecimalString, REGION } from '@force/shared';
 
 /**
  * HTML escape for safe interpolation of user-controlled strings in email templates.
@@ -19,9 +19,9 @@ export function escapeHtml(value: unknown): string {
 
 /**
  * Money in an email, in the ORDER's currency (issue 1705). The templates used
- * `(x / 1000).toFixed(3)` with a hardcoded "KWD" / "د.ك" suffix, which prints
- * a USD order (stored in cents) as "10.000 KWD". KWD keeps its exact existing
- * rendering, so every KWD email is unchanged; any other currency goes through
+ * `minorToDecimalString(x)` with a hardcoded "EGP" / "ج.م" suffix, which prints
+ * a non-EGP order (e.g. USD stored in cents) with the wrong suffix. EGP keeps its exact existing
+ * rendering, so every EGP email is unchanged; any other currency goes through
  * the shared `formatPrice` the storefront and admin use.
  */
 export function emailMoney(
@@ -29,9 +29,9 @@ export function emailMoney(
   currency: string | null | undefined,
   locale: 'en' | 'ar'
 ): string {
-  const code = currency || 'KWD';
-  if (code === 'KWD') {
-    return `${(minor / 1000).toFixed(3)} ${locale === 'ar' ? 'د.ك' : 'KWD'}`;
+  const code = currency || REGION.currency;
+  if (code === REGION.currency) {
+    return `${minorToDecimalString(minor)} ${REGION.currencySymbol[locale]}`;
   }
   return formatPrice(minor, { currency: code });
 }

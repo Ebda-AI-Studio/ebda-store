@@ -33,7 +33,7 @@ const cursorQuerySchema = z.object({
 });
 
 const adjustSchema = z.object({
-  /** Signed fils: positive credits, negative debits. */
+  /** Signed piastres: positive credits, negative debits. */
   amount: z
     .number()
     .int()

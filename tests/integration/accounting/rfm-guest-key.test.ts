@@ -53,7 +53,7 @@ describe.skipIf(!hasDb)('RFM guest key = Customers-page key', () => {
             name: `rfm ${s}`,
             slug: `rfm-${s}`,
             template: 'modern',
-            currency: 'KWD',
+            currency: 'EGP',
             ownerId: owner.id,
             status: 'active',
           },

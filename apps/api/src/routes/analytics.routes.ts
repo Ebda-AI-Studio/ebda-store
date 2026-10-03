@@ -73,7 +73,7 @@ router.get(
 
       // A sub-query that failed is REPORTED, not just nulled (issue 2256): the
       // admin detects errors by HTTP status, so a 200 with `stats: null` used
-      // to render KWD 0.000 revenue and 0 orders with no banner. `failed`
+      // to render EGP 0.000 revenue and 0 orders with no banner. `failed`
       // names each part that did not load; the page treats a non-empty list
       // as a load error and shows the unknown values as unknown.
       const failed = [

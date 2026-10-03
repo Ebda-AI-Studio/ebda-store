@@ -76,7 +76,7 @@ describe('BundlesPageBody — feature gating (403-means-404)', () => {
       id: 'store1',
       slug: 'pecan',
       domain: undefined,
-      currency: 'KWD',
+      currency: 'EGP',
     } as unknown as ResolvedStore;
 
     const element = await BundlesPageBody({ store });
@@ -90,7 +90,7 @@ describe('BundlesPageBody — feature gating (403-means-404)', () => {
       id: 'store1',
       slug: 'pecan',
       domain: undefined,
-      currency: 'KWD',
+      currency: 'EGP',
     } as unknown as ResolvedStore;
 
     const element = await BundlesPageBody({ store });

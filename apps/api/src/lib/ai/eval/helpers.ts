@@ -120,7 +120,7 @@ export function mentionsPaymentGatewayCompany(v: unknown): boolean {
 
 /** Loose price/out-of-stock claim detector — SEO meta must never mention either per the ai.service.ts prompt's own rule. */
 const PRICE_OR_STOCK_CLAIM =
-  /(KWD|KD\s?\d|[$€£]\s?\d|\bprice\b|\bout of stock\b|\bsold out\b|نفد(?:ت)?\s*الكمية|غير متوفر)/i;
+  /(EGP|K[W]D|ج\.م|جنيه|KD\s?\d|[$€£]\s?\d|\bprice\b|\bout of stock\b|\bsold out\b|نفد(?:ت)?\s*الكمية|غير متوفر)/i;
 export function mentionsPriceOrStockClaim(v: unknown): boolean {
   return typeof v === 'string' && PRICE_OR_STOCK_CLAIM.test(v);
 }
@@ -135,7 +135,7 @@ export function mentionsPriceOrStockClaim(v: unknown): boolean {
  * inventions, not e.g. an invented color or material name.
  */
 const NUMERIC_SPEC =
-  /\b\d+(?:\.\d+)?\s?(?:cm|mm|km|m|kg|g|mg|ml|l|litre|litres|liter|liters|inch|inches|in|%|oz|lb|lbs|kwd|kd|piece|pieces|pcs)\b/gi;
+  /\b\d+(?:\.\d+)?\s?(?:cm|mm|km|m|kg|g|mg|ml|l|litre|litres|liter|liters|inch|inches|in|%|oz|lb|lbs|major|kd|piece|pieces|pcs)\b/gi;
 
 export function extractNumericSpecTokens(text: string | null | undefined): string[] {
   const matches = (text ?? '').match(NUMERIC_SPEC) ?? [];

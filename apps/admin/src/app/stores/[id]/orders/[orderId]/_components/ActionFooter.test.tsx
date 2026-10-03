@@ -82,7 +82,7 @@ function baseOrder(
     shipping: 0,
     discount: 0,
     total: 12000,
-    currency: 'KWD',
+    currency: 'EGP',
     notes: null,
     customerNotes: null,
     shippingAddress: null,

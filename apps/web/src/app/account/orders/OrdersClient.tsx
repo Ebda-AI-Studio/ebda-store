@@ -48,7 +48,7 @@ export default function OrdersClient() {
 
   // Per-tenant wrapper. Renders dates in the store's timezone using the
   // visitor's chosen language so an order placed at 23:30 UTC from a
-  // Kuwait store displays as the next day Asia/Kuwait, not the visitor's
+  // Egypt store displays as the next day Africa/Cairo, not the visitor's
   // home timezone.
   function formatDate(date: string) {
     return formatStoreDate(date, {

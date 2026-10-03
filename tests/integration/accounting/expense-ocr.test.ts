@@ -11,7 +11,7 @@ vi.mock('../../../apps/api/src/services/accounting/gemini-ai.service', () => ({
     vendor: 'Test Vendor',
     vendorAr: null,
     invoiceDate: new Date().toISOString(),
-    currency: 'KWD',
+    currency: 'EGP',
     subtotal: 50,
     taxAmount: 0,
     total: 50,
@@ -127,7 +127,7 @@ describe('expense ocr', () => {
     expect(exp!.ocrJson).not.toBeNull();
     expect(exp!.categoryAiConfidence).toBeCloseTo(0.92, 2);
 
-    // Amount: total=50 KWD → 50*1000 = 50000 fils.
-    expect(exp!.amount).toBe(50_000);
+    // Amount: total=50 EGP → 50*100 = 5000 piastres (currencyExponent: 2 decimals).
+    expect(exp!.amount).toBe(5_000);
   });
 });

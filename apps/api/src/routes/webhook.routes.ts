@@ -378,7 +378,7 @@ async function resolveStoreIdFromWebhookPayload(
 }
 
 // ==========================================
-// Kuwait Payment Provider Webhooks
+// Egypt Payment Provider Webhooks
 // Supports: Tap, MyFatoorah, Hesabe, UPayments
 // ==========================================
 

@@ -11,7 +11,7 @@ import logger from '../../lib/logger';
  *     so a partial out-of-band refund still restored all inventory and reversed
  *     the entire sale journal.
  *  2. The unknown-amount rule was then added to the webhook and not the route,
- *     so an amount-less provider response was recorded as a 0-fil PARTIAL
+ *     so an amount-less provider response was recorded as a 0-piastre PARTIAL
  *     refund — suppressing every reversal while the money had already left the
  *     gateway, and leaving the payment looking refundable so a later return
  *     could fire a second real refund.

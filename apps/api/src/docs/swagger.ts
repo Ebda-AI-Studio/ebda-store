@@ -146,7 +146,7 @@ All errors follow this format:
             slug: { type: 'string' },
             description: { type: 'string', nullable: true },
             descriptionAr: { type: 'string', nullable: true },
-            price: { type: 'integer', description: 'Price in fils (1 KWD = 1000 fils)' },
+            price: { type: 'integer', description: 'Price in piastres (1 EGP = 100 piastres)' },
             compareAtPrice: { type: 'integer', nullable: true },
             sku: { type: 'string', nullable: true },
             // Merchant-authored free-text card badge (EN + AR), same clearable
@@ -338,7 +338,7 @@ All errors follow this format:
             totalProfit: {
               type: 'integer',
               nullable: true,
-              description: 'Fils; null when sold lines have no cost price',
+              description: 'Piastres; null when sold lines have no cost price',
             },
             profitItemsMissingCost: { type: 'integer' },
             profitRevenueMissingCost: { type: 'integer' },

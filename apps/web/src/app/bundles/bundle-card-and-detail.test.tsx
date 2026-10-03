@@ -29,7 +29,7 @@ vi.mock('@/lib/api', () => ({
   api: { getPublicBundle: (...a: unknown[]) => getPublicBundle(...a) },
 }));
 vi.mock('../../hooks/useLocalePrice', () => ({
-  useLocalePrice: () => (n: number) => `${n / 1000} KWD`,
+  useLocalePrice: () => (n: number) => `${n / 1000} EGP`,
 }));
 vi.mock('../../hooks/useNumerals', () => ({
   useNumerals: () => ({ localize: (s: unknown) => String(s) }),

@@ -63,8 +63,8 @@ function harness() {
   return { server, tools };
 }
 
-const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'KWD', domain: null };
-const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'KW' };
+const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'EGP', domain: null };
+const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'EG' };
 
 async function placeOnline() {
   const { server, tools } = harness();
@@ -90,7 +90,7 @@ describe('MCP place_order (online) — orphaned gateway invoice (issue 2360)', (
       id: 'order-1',
       orderNumber: 'ORD-1',
       total: 12000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [],
     } as never);
   });

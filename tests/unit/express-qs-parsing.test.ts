@@ -66,8 +66,8 @@ describe('query + extended-urlencoded parsing shapes the storefront sends', () =
     const r = await request(app)
       .post('/b')
       .type('form')
-      .send('address[city]=Kuwait&address[block]=3&tags[]=x&tags[]=y');
-    expect(r.body).toEqual({ address: { city: 'Kuwait', block: '3' }, tags: ['x', 'y'] });
+      .send('address[city]=Egypt&address[block]=3&tags[]=x&tags[]=y');
+    expect(r.body).toEqual({ address: { city: 'Egypt', block: '3' }, tags: ['x', 'y'] });
   });
 
   it("an index past express's arrayLimit (1000) becomes an object key, not a sparse array", async () => {

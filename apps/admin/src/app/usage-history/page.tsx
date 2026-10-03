@@ -26,6 +26,7 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { useT } from '../../i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
 
+import { formatMoney } from '@force/shared';
 interface UsageStoreRow {
   storeId: string;
   slug: string;
@@ -37,7 +38,7 @@ interface UsageStoreRow {
   images: number;
   categories: number;
   orders: number;
-  /** BigInt serialised as a string (fils). */
+  /** BigInt serialised as a string (piastres). */
   revenueFils: string;
   customers: number;
   sessionsProxy: number;
@@ -56,12 +57,9 @@ interface UsagePeriod {
   stores: UsageStoreRow[];
 }
 
-/** Fils → a 3-decimal amount (KWD has 1000 fils). */
-function formatFils(fils: string): string {
-  return (Number(fils) / 1000).toLocaleString('en-GB', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  });
+/** Minor units → a fixed-decimal amount in the base currency (EGP: 2 decimals). */
+function formatFils(piastres: string): string {
+  return formatMoney(Number(piastres), 'en', { hideSymbol: true });
 }
 
 function formatMonth(periodStart: string, locale: string): string {

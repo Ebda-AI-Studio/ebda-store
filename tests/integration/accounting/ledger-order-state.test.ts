@@ -98,7 +98,7 @@ async function paidOrder(status: 'delivered' | 'refunded' | 'cancelled') {
       shipping: 0,
       discount: 0,
       total: 2000,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
       items: {

@@ -37,8 +37,8 @@ function makeRow(overrides: {
     posted_at: overrides.posted_at ?? new Date('2026-01-15'),
     order_number: overrides.order_number ?? 'ORD-001',
     customer_name: overrides.customer_name ?? 'Ahmad Sharaf',
-    tax_delta: overrides.tax_delta ?? BigInt(500), // 5% of 10 KWD
-    base_delta: overrides.base_delta ?? BigInt(10_000), // 10 KWD in fils
+    tax_delta: overrides.tax_delta ?? BigInt(500), // 5% of 10 EGP
+    base_delta: overrides.base_delta ?? BigInt(10_000), // 10 EGP in piastres
     order_total: overrides.order_total ?? BigInt(10_500),
     is_sale: overrides.is_sale ?? true,
   };
@@ -67,8 +67,8 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(result.summary.byRate).toHaveLength(0);
   });
 
-  it('computes one row correctly — fils math, taxRate derivation', async () => {
-    // 10 KWD taxable, 500 fils tax = 5% effective rate
+  it('computes one row correctly — piastres math, taxRate derivation', async () => {
+    // 10 EGP taxable, 500 piastres tax = 5% effective rate
     mockQueryRawUnsafe.mockResolvedValueOnce([
       makeRow({ base_delta: BigInt(10_000), tax_delta: BigInt(500) }),
     ]);
@@ -77,7 +77,7 @@ describe('generateTaxReport — basic aggregation', () => {
 
     expect(result.rows).toHaveLength(1);
     const row = result.rows[0];
-    expect(row.subtotal).toBe(10_000); // taxable base = subtotal - discount (fils)
+    expect(row.subtotal).toBe(10_000); // taxable base = subtotal - discount (piastres)
     expect(row.taxCollected).toBe(500);
     expect(row.taxRate).toBe('5.00');
     expect(row.orderNumber).toBe('ORD-001');
@@ -86,7 +86,7 @@ describe('generateTaxReport — basic aggregation', () => {
   });
 
   it('uses the entry revenue movement as the taxable base (discount already netted by the GL)', async () => {
-    // Sale posted 15 KWD net revenue (20 KWD gross − 5 KWD discount), tax 750 fils = 5%
+    // Sale posted 15 EGP net revenue (20 EGP gross − 5 EGP discount), tax 750 piastres = 5%
     mockQueryRawUnsafe.mockResolvedValueOnce([
       makeRow({ base_delta: BigInt(15_000), tax_delta: BigInt(750) }),
     ]);
@@ -99,7 +99,7 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(row.taxRate).toBe('5.00');
   });
 
-  it('totals sum all rows correctly — fils remain integers', async () => {
+  it('totals sum all rows correctly — piastres remain integers', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([
       makeRow({ order_number: 'ORD-001', base_delta: BigInt(10_000), tax_delta: BigInt(500) }),
       makeRow({ order_number: 'ORD-002', base_delta: BigInt(20_000), tax_delta: BigInt(1_000) }),
@@ -131,9 +131,9 @@ describe('generateTaxReport — basic aggregation', () => {
 
   it('groups by-rate breakdown — multi-rate (5% and 10%)', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([
-      // 5% rate: 10 KWD taxable, 500 fils tax
+      // 5% rate: 10 EGP taxable, 500 piastres tax
       makeRow({ order_number: 'ORD-001', base_delta: BigInt(10_000), tax_delta: BigInt(500) }),
-      // 10% rate: 20 KWD taxable, 2000 fils tax
+      // 10% rate: 20 EGP taxable, 2000 piastres tax
       makeRow({ order_number: 'ORD-002', base_delta: BigInt(20_000), tax_delta: BigInt(2_000) }),
     ]);
 
@@ -176,7 +176,7 @@ describe('generateTaxReport — basic aggregation', () => {
 
   it('nets refund/partial-return reversal rows into the summary (issue 1188)', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([
-      // Sale: 8 KWD net revenue, 900 fils tax
+      // Sale: 8 EGP net revenue, 900 piastres tax
       makeRow({ order_number: 'ORD-001', base_delta: BigInt(8_000), tax_delta: BigInt(900) }),
       // Partial-return adjustment: negative deltas, same effective rate
       makeRow({ order_number: 'ORD-001', base_delta: BigInt(-1_778), tax_delta: BigInt(-200) }),
@@ -263,10 +263,11 @@ describe('generateTaxReport — basic aggregation', () => {
   });
 
   it('row.date is the posting day in the store time zone (Ruling FRT-1)', async () => {
-    // Kuwait (UTC+3): Jan 1 00:00 local = Dec 31 21:00Z; Jan 31 23:59 local = Jan 31 20:59Z.
-    const startOfMonth = new Date('2025-12-31T21:00:00.000Z');
-    const endOfMonth = new Date('2026-01-31T20:59:59.999Z');
-    const nextMonthKw = new Date('2026-01-31T22:30:00.000Z'); // 01:30 Feb 1 in Kuwait
+    // Cairo in January is UTC+2 (DST only runs late April → late October):
+    // Jan 1 00:00 local = Dec 31 22:00Z; Jan 31 23:59 local = Jan 31 21:59Z.
+    const startOfMonth = new Date('2025-12-31T22:00:00.000Z');
+    const endOfMonth = new Date('2026-01-31T21:59:59.999Z');
+    const nextMonthKw = new Date('2026-01-31T22:30:00.000Z'); // 00:30 Feb 1 in Cairo
     mockQueryRawUnsafe.mockResolvedValueOnce([
       makeRow({ posted_at: startOfMonth, order_number: 'ORD-START' }),
       makeRow({ posted_at: endOfMonth, order_number: 'ORD-END' }),
@@ -276,13 +277,13 @@ describe('generateTaxReport — basic aggregation', () => {
     const result = await generateTaxReport(STORE_ID, {
       from: FROM,
       to: TO,
-      timeZone: 'Asia/Kuwait',
+      timeZone: 'Africa/Cairo',
     });
 
     expect(result.rows.map(r => r.date)).toEqual(['2026-01-01', '2026-01-31', '2026-02-01']);
   });
 
-  it('row.date defaults to Asia/Kuwait when no zone is passed', async () => {
+  it('row.date defaults to Africa/Cairo when no zone is passed', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([
       makeRow({ posted_at: new Date('2026-01-31T22:30:00.000Z') }),
     ]);

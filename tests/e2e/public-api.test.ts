@@ -51,7 +51,7 @@ describe('Public Storefront API', () => {
         domain: testStoreDomain,
         ownerId: user.id,
         status: 'active',
-        currency: 'KWD',
+        currency: 'EGP',
         template: 'modern',
         theme: {
           primaryColor: '26 100% 50%',

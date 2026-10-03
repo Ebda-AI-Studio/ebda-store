@@ -10,7 +10,7 @@ export interface ExpenseJournalInput {
 /**
  * Post the GL journal for an expense.
  *
- * v1 simplification: tax recovery is deferred until Kuwait VAT activates.
+ * v1 simplification: tax recovery is deferred until Egypt VAT activates.
  * The full expense total (amount + taxAmount) is debited to the merchant's
  * chosen expense account and credited from the chosen payment account.
  * When VAT becomes applicable, the tax portion should be split into a

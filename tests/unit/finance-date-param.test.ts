@@ -10,7 +10,7 @@ import { parseFinanceDate } from '../../apps/api/src/routes/finance.routes';
  * `.toISOString()` / Prisma serialization and 500'd every finance card.
  * parseFinanceDate must accept full ISO as-is and never return an Invalid Date.
  */
-const KW = 'Asia/Kuwait';
+const KW = 'Africa/Cairo';
 
 describe('parseFinanceDate', () => {
   const fallback = new Date('2026-01-01T00:00:00.000Z');

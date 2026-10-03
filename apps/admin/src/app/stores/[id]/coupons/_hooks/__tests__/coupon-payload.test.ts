@@ -1,13 +1,14 @@
 /**
- * #1569 — the coupon form's KWD money fields must round-trip.
+ * #1569 — the coupon form's EGP money fields must round-trip.
  *
- * The edit form hydrates `minOrderAmount` / `maxDiscount` as fils / 1000
- * (page.tsx: `String(coupon.minOrderAmount / 1000)`), so a 5.500 KWD minimum
- * shows as "5.5". The save used `parseInt(v) * 1000`, which sent 5000: opening
+ * The edit form hydrates `minOrderAmount` / `maxDiscount` as major units
+ * (page.tsx: `String(fromMinor(coupon.minOrderAmount))`), so a 55.50 EGP minimum
+ * shows as "55.5". The save used `parseInt(v) * 100`, which sent 5500 → 5000: opening
  * a coupon and saving ANY unrelated change silently lowered its minimum order
  * (and its percentage cap) with no server-side guard.
  */
 import { describe, it, expect } from 'vitest';
+import { fromMinor } from '@force/shared';
 import { buildCouponPayload } from '../useCoupons';
 import type { CouponFormData } from '../../_components/types';
 
@@ -21,8 +22,8 @@ function hydrate(minOrderFils: number, maxDiscountFils: number): CouponFormData 
     descriptionAr: '',
     type: 'percentage',
     value: 10,
-    minOrderAmount: minOrderFils ? String(minOrderFils / 1000) : '',
-    maxDiscount: maxDiscountFils ? String(maxDiscountFils / 1000) : '',
+    minOrderAmount: minOrderFils ? String(fromMinor(minOrderFils)) : '',
+    maxDiscount: maxDiscountFils ? String(fromMinor(maxDiscountFils)) : '',
     usageLimit: '',
     usageLimitPerUser: '',
     isActive: true,
@@ -36,19 +37,19 @@ function hydrate(minOrderFils: number, maxDiscountFils: number): CouponFormData 
   };
 }
 
-describe('buildCouponPayload — fractional KWD survives an edit-save', () => {
+describe('buildCouponPayload — fractional EGP survives an edit-save', () => {
   it.each([
     [5500, 2250],
     [2500, 750],
     [290, 1],
     [12345, 999],
-  ])('stored %i / %i fils → form → save sends the same fils', (minFils, maxFils) => {
+  ])('stored %i / %i piastres → form → save sends the same piastres', (minFils, maxFils) => {
     const body = buildCouponPayload(hydrate(minFils, maxFils), 'update');
     expect(body.minOrderAmount).toBe(minFils);
     expect(body.maxDiscount).toBe(maxFils);
   });
 
-  it('whole-dinar values are unchanged (the only case parseInt got right)', () => {
+  it('whole-pound values are unchanged (the only case parseInt got right)', () => {
     const body = buildCouponPayload(hydrate(5000, 3000), 'update');
     expect(body.minOrderAmount).toBe(5000);
     expect(body.maxDiscount).toBe(3000);
@@ -59,8 +60,8 @@ describe('buildCouponPayload — fractional KWD survives an edit-save', () => {
     expect(buildCouponPayload(hydrate(0, 0), 'create').maxDiscount).toBeUndefined();
   });
 
-  it('a typed amount like 0.29 rounds to 290, not 289', () => {
+  it('a typed amount like 0.29 rounds to 29, not 28 (0.29 * 100 === 28.999999999999996)', () => {
     const form = { ...hydrate(0, 0), minOrderAmount: '0.29' };
-    expect(buildCouponPayload(form, 'create').minOrderAmount).toBe(290);
+    expect(buildCouponPayload(form, 'create').minOrderAmount).toBe(29);
   });
 });

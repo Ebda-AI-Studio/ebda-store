@@ -7,14 +7,14 @@ import type { GoldenCase } from '../types';
  */
 export const ACCOUNTING_GOLDEN: GoldenCase[] = [
   {
-    id: 'expense-ocr-kwd-no-tax',
+    id: 'expense-ocr-major-no-tax',
     type: 'expense-ocr',
     input: { receiptUrl: 'https://example.com/receipts/sultan-center.jpg' },
     output: {
       vendor: 'The Sultan Center',
       vendorAr: 'المركز سلطان',
       invoiceDate: '2026-05-20',
-      currency: 'KWD',
+      currency: 'EGP',
       subtotal: 1.15,
       taxAmount: 0,
       total: 1.15,

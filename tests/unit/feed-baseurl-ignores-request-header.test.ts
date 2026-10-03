@@ -144,7 +144,7 @@ describe('GET /public/feed/products.json — baseUrl ignores request headers', (
       id: 'store-1',
       name: 'S',
       slug: 'demo',
-      currency: 'KWD',
+      currency: 'EGP',
       domain: null,
     });
     const next = vi.fn();
@@ -165,7 +165,7 @@ describe('GET /public/feed/products.json — baseUrl ignores request headers', (
       id: 'store-1',
       name: 'S',
       slug: 'demo',
-      currency: 'KWD',
+      currency: 'EGP',
       domain: null,
     });
 
@@ -179,7 +179,7 @@ describe('GET /public/feed/products.json — baseUrl ignores request headers', (
       id: 'store-1',
       name: 'S',
       slug: 'demo',
-      currency: 'KWD',
+      currency: 'EGP',
       domain: null,
     });
 
@@ -196,7 +196,7 @@ describe('GET /public/feed/products.json — baseUrl ignores request headers', (
       id: 'store-1',
       name: 'S',
       slug: 'demo',
-      currency: 'KWD',
+      currency: 'EGP',
       domain: 'shop.merchant.com',
     });
 

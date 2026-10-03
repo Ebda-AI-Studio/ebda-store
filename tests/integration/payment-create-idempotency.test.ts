@@ -64,7 +64,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
           name: 'pci-test-store',
           slug: `pci-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -104,7 +104,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
           provider: 'myfatoorah',
           status: 'pending',
           amount: ORDER_TOTAL,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `pci-txn-${suffix}`,
           paymentUrl: 'https://pay.example.test/invoice-1',
         },
@@ -116,7 +116,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
           provider: 'myfatoorah',
           status: 'completed',
           amount: ORDER_TOTAL,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `pci-txn-paid-${suffix}`,
         },
       });
@@ -199,7 +199,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
           provider: 'tap',
           status: 'completed',
           amount: ORDER_TOTAL,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `pci-txn-dup-${suffix}`,
         },
       })

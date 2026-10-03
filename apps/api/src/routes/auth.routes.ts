@@ -809,7 +809,7 @@ router.delete(
 // Unlike DELETE /auth/me (soft-delete that
 // leaves PII intact), this nulls/scrubs every identifying field across
 // the schema in a single transaction and preserves anonymized order
-// records for Kuwait MOF ≥5y tax retention. No request body — possession
+// records for Egypt MOF ≥5y tax retention. No request body — possession
 // of a valid auth token is the confirmation.
 router.post(
   '/me/erase',

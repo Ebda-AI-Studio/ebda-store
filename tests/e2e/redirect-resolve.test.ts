@@ -44,7 +44,7 @@ describe('GET /public/redirects/resolve', () => {
         slug: `redirect-resolve-test-store-${Date.now()}`,
         ownerId: user.id,
         status: 'active',
-        currency: 'KWD',
+        currency: 'EGP',
         template: 'modern',
       },
     });

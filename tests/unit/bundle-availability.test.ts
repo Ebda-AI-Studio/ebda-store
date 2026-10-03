@@ -16,7 +16,7 @@ const item = (quantity: number, availableStock: number, trackInventory = true) =
 
 /**
  * A minimal-but-complete mocked `bundle.findFirst` row: one untracked-free
- * product line (quantity 1, price 1000 fils, inventory 10 by default) plus
+ * product line (quantity 1, price 1000 piastres, inventory 10 by default) plus
  * the bundle-level lifecycle fields the isPurchasable tests vary.
  */
 const bundleRow = (overrides: {
@@ -33,7 +33,7 @@ const bundleRow = (overrides: {
   hasVariant?: boolean;
   /** P1 (zero-price drift): the pricing rule and the component's CURRENT
    * price, so a test can drive `computeBundlePrice` to 0. Defaults keep the
-   * original fixture (a 1000-fils component sold at a fixed 1000) so every
+   * original fixture (a 1000-piastres component sold at a fixed 1000) so every
    * pre-existing test in this file keeps its original meaning. */
   pricingType?: 'fixed_price' | 'percentage' | 'fixed';
   pricingValue?: number;
@@ -257,7 +257,7 @@ describe('resolveBundle', () => {
     // ── P1 (this task): catalogue drift can price a bundle at 0.
     //
     // `componentSum` is recomputed from CURRENT component prices on every
-    // read, so a `fixed` (fils-off) discount that was a real discount when
+    // read, so a `fixed` (piastres-off) discount that was a real discount when
     // it was saved can outgrow its own components later — a sale, a bulk
     // edit or a CSV import drops the component prices and
     // `computeBundlePrice` clamps `componentSum - pricingValue` at 0. No
@@ -565,11 +565,11 @@ describe('describeBundleContents', () => {
     const { description, descriptionAr } = describeBundleContents({
       description: null,
       descriptionAr: null,
-      componentNames: [{ name: 'Dates 500g @ 3.500 KWD', nameAr: null }],
+      componentNames: [{ name: 'Dates 500g @ 3.500 EGP', nameAr: null }],
     });
     // Not a real-world name, but proves the function itself does no price
     // formatting/lookup — it only ever echoes the name strings it's given.
-    expect(description).toBe('Includes: Dates 500g @ 3.500 KWD');
+    expect(description).toBe('Includes: Dates 500g @ 3.500 EGP');
     expect(descriptionAr).toBeUndefined();
   });
 });

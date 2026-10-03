@@ -114,7 +114,7 @@ function abandonedOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
     status: 'pending',
     paymentStatus: 'pending',
     total: 1500,
-    currency: 'KWD',
+    currency: 'EGP',
     paymentGatewayAbandonedAt: new Date('2026-09-20T10:00:00.000Z'),
     createdAt: new Date('2026-09-20T09:55:00.000Z'),
     shippingAddress: null,

@@ -9,7 +9,7 @@ import { fetchPublicShippingZones } from '../shipping-public';
  *      `/stores/public/:id/shipping`, not `/public/:id/shipping`. The helper
  *      swallows failures by design, so a 404 degraded to an empty list.
  *   2. Wrong source — it read `ShippingZone` only, but real merchants use
- *      `ShippingAreaRate` (Pecannbee: full Kuwait list, zero zones).
+ *      `ShippingAreaRate` (Pecannbee: full Egypt list, zero zones).
  *
  * Both are only observable by asserting on the URLs called and on area-rate
  * data flowing through, which is what these tests do.
@@ -44,7 +44,7 @@ describe('fetchPublicShippingZones', () => {
               data: {
                 rates: [
                   {
-                    area: 'Kuwait City',
+                    area: 'Cairo',
                     governorate: 'Capital',
                     deliveryFee: 3000,
                     freeShippingThreshold: null,

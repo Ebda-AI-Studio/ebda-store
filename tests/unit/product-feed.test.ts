@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildProductFeed, type FeedBundleInput } from '@api/lib/product-feed';
 
-const store = { id: 's1', name: 'Wady Aljuz', slug: 'wady-aljuz', currency: 'KWD' };
+const store = { id: 's1', name: 'Wady Aljuz', slug: 'wady-aljuz', currency: 'EGP' };
 const product = {
   id: 'p1',
   name: 'Olive Oil 1L',
@@ -24,7 +24,7 @@ describe('buildProductFeed', () => {
     expect(feed.store).toEqual({
       name: 'Wady Aljuz',
       url: 'https://wadyaljuz.com',
-      currency: 'KWD',
+      currency: 'EGP',
     });
     const item = feed.products[0];
     expect(item.item_id).toBe('p1');
@@ -32,8 +32,8 @@ describe('buildProductFeed', () => {
     expect(item.title_ar).toBe('زيت زيتون ١ لتر');
     expect(item.link).toBe('https://wadyaljuz.com/products/olive-oil-1l');
     expect(item.image_link).toBe('https://cdn.example/img1.jpg');
-    expect(item.price).toBe('15.000 KWD'); // compareAtPrice is the base price
-    expect(item.sale_price).toBe('12.500 KWD'); // price is what the customer pays
+    expect(item.price).toBe('150.00 EGP'); // compareAtPrice is the base price
+    expect(item.sale_price).toBe('125.00 EGP'); // price is what the customer pays
     expect(item.availability).toBe('in_stock');
     expect(item.categories).toEqual(['Pantry']);
     expect(item.updated_at).toBe('2026-07-01T00:00:00.000Z');
@@ -42,7 +42,7 @@ describe('buildProductFeed', () => {
   it('handles out of stock, backorder, and no compare-at', () => {
     const p = { ...product, compareAtPrice: null, inStock: false, acceptsBackorder: true };
     const item = buildProductFeed(store, [p], 'https://x.com').products[0];
-    expect(item.price).toBe('12.500 KWD');
+    expect(item.price).toBe('125.00 EGP');
     expect(item.sale_price).toBeUndefined();
     expect(item.availability).toBe('backorder');
     const p2 = { ...p, acceptsBackorder: false };
@@ -91,10 +91,10 @@ describe('buildProductFeed', () => {
       expect(item.title_ar).toBe('علبة رمضان');
       expect(item.is_bundle).toBe(true);
       expect(item.image_link).toBe('https://cdn.example/box.jpg');
-      // componentSum (11.000) is the "was" price; price (9.000) is what the
+      // componentSum (110.00) is the "was" price; price (90.00) is what the
       // customer actually pays for the bundle as a single item.
-      expect(item.price).toBe('11.000 KWD');
-      expect(item.sale_price).toBe('9.000 KWD');
+      expect(item.price).toBe('110.00 EGP');
+      expect(item.sale_price).toBe('90.00 EGP');
       expect(item.availability).toBe('in_stock');
       expect(item.categories).toEqual([]);
       // P2-4 (final review): `/bundles/<slug>` shipped later in this branch —
@@ -118,7 +118,7 @@ describe('buildProductFeed', () => {
     it('omits sale_price and uses price as componentSum when not discounted', () => {
       const evenBundle = { ...bundle, price: 11000, componentSum: 11000 };
       const item = buildProductFeed(store, [], 'https://x.com', [evenBundle]).products[0];
-      expect(item.price).toBe('11.000 KWD');
+      expect(item.price).toBe('110.00 EGP');
       expect(item.sale_price).toBeUndefined();
     });
 

@@ -29,7 +29,7 @@ const EN_LABELS = {
 };
 
 const BASE_ADDR = {
-  country: 'Kuwait',
+  country: 'Egypt',
   city: 'Capital',
   area: 'Salmiya',
   block: '4',

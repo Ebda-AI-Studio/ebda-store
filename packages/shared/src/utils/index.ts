@@ -1,5 +1,7 @@
 // Shared Utilities
 
+import { REGION, roundToMinor, formatMoney } from '../region';
+
 // Export utility modules
 export * from './platform';
 export * from './discount';
@@ -53,40 +55,40 @@ export { isSafeUrl, sanitizeUrl, safeInternalPath } from './safe-url';
 /**
  * Format a price value as a localised currency string.
  *
- * By default the input is in fils (1 KWD = 1000 fils) and the output uses
- * KWD with 3 decimal places.  Pass `{ unit: 'kwd' }` if the input is already
- * in the major currency unit.
+ * By default the input is in MINOR units (EGP piastres, 1 EGP = 100 piastres)
+ * and the output carries `currencyExponent(currency)` decimals. Pass
+ * `{ unit: 'major' }` if the input is already in the major currency unit.
+ * Delegates to `formatMoney` (region/index.ts) — the single formatter.
  *
- * `locale` defaults to `'en'` (Western digits, `en-US` `Intl` locale) so every
- * existing call-site that doesn't pass it renders byte-identical to before.
- * Pass `locale: 'ar'` to render with Arabic-Indic digits (`ar-KW`), matching
- * `getDiscountBadgeText`'s Arabic-locale formatting.
+ * `locale` defaults to `'en'` (`EGP 1,299.50`). `locale: 'ar'` renders
+ * `1,299.50 ج.م` with Eastern Arabic digits (`١٬٢٩٩٫٥٠ ج.م`) unless
+ * `latinDigits` is set.
  *
- * @param amount   - The price amount (in fils by default, or KWD if `unit` is `'kwd'`).
+ * @param amount   - The price amount (minor units by default, major if `unit` is `'major'`).
  * @param options  - Optional overrides for unit, currency, and locale.
  */
 export function formatPrice(
   amount: number,
   options?: {
-    unit?: 'fils' | 'kwd';
+    unit?: 'minor' | 'major';
     currency?: string;
     locale?: 'en' | 'ar';
-    /** Arabic currency symbol with Latin digits (`1.500 د.ك.`) — the admin's
+    /** Arabic currency symbol with Latin digits (`1,299.50 ج.م`) — the admin's
      *  digit policy (issue 1971). The storefront chooses per merchant. */
     latinDigits?: boolean;
   }
 ): string {
-  const { unit = 'fils', currency = 'KWD', locale = 'en', latinDigits = false } = options ?? {};
-  const decimals = currency === 'KWD' ? 3 : 2;
-  const divisor = unit === 'fils' ? (currency === 'KWD' ? 1000 : 100) : 1;
-  const intlLocale = locale === 'ar' ? (latinDigits ? 'ar-KW-u-nu-latn' : 'ar-KW') : 'en-US';
-
-  return new Intl.NumberFormat(intlLocale, {
-    style: 'currency',
+  const {
+    unit = 'minor',
+    currency = REGION.currency,
+    locale = 'en',
+    latinDigits = false,
+  } = options ?? {};
+  const minor = unit === 'minor' ? amount : roundToMinor(amount, currency);
+  return formatMoney(minor, locale, {
     currency,
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(amount / divisor);
+    easternArabicDigits: locale === 'ar' && !latinDigits,
+  });
 }
 
 /** ASCII digit → Eastern Arabic-Indic digit lookup ('0'..'9' → '٠'..'٩'). */

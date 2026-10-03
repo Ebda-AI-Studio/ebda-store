@@ -1,9 +1,10 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import type { AffiliateConfig } from './types';
 
+import { roundToMinor } from '@force/shared';
 interface AffiliateCommissionFormProps {
   config: AffiliateConfig;
   saving: boolean;
@@ -72,12 +73,12 @@ export function AffiliateCommissionForm({
             <input
               type="number"
               min="0"
-              step="0.001"
-              value={filsToKwd(config.minPayoutAmount)}
+              step="0.01"
+              value={minorToMajor(config.minPayoutAmount)}
               onChange={e =>
                 onConfigChange({
                   ...config,
-                  minPayoutAmount: Math.round((parseFloat(e.target.value) || 0) * 1000),
+                  minPayoutAmount: roundToMinor(parseFloat(e.target.value) || 0),
                 })
               }
               className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"

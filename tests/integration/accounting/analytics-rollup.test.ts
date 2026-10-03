@@ -87,7 +87,7 @@ beforeAll(
           shipping: 0,
           discount: 0,
           total: 10000 * (i + 1),
-          currency: 'KWD',
+          currency: 'EGP',
           shippingAddress: { email: `customer-${i + 1}@rollup.test`, phone: `+96599000${i}` },
           billingAddress: {},
           createdAt: orderDates[i],

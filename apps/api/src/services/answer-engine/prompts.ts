@@ -21,17 +21,18 @@
  */
 import { prisma } from '@force/database';
 
+import { REGION } from '@force/shared';
 export interface GeneratedPrompt {
   text: string;
   locale: 'en' | 'ar';
 }
 
-// Every store on this platform sells into the Kuwait market today — see
+// Every store on this platform sells into the Egypt market today — see
 // CLAUDE.md's "Arabic-first locality" pillar. Not store-configurable yet
 // (no `country` field on Store); revisit if/when multi-country expansion
 // lands.
-const COUNTRY_EN = 'Kuwait';
-const COUNTRY_AR = 'الكويت';
+const COUNTRY_EN = REGION.countryName.en;
+const COUNTRY_AR = REGION.countryName.ar;
 
 // Caps that keep the prompt set small — see file header. 2 categories + 2
 // products, EN+AR each, yields at most 8 prompts per store per scan.

@@ -3,6 +3,7 @@
 import { useT } from '@/i18n/useT';
 import type { LoyaltySettings } from './types';
 
+import { minorToDecimalString, roundToMinor } from '@force/shared';
 interface RedemptionFormProps {
   settings: LoyaltySettings;
   disabled: boolean;
@@ -11,7 +12,7 @@ interface RedemptionFormProps {
 
 /**
  * Configures how points convert back to value at checkout: point value in
- * fils, minimum redeem threshold, max percentage of order covered by points,
+ * piastres, minimum redeem threshold, max percentage of order covered by points,
  * and expiration window.
  */
 export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormProps) {
@@ -27,17 +28,15 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
           </label>
           <input
             type="number"
-            min="0.001"
-            step="0.001"
-            value={(settings.pointsValue / 1000).toFixed(3)}
-            onChange={e =>
-              onChange({ pointsValue: Math.round((parseFloat(e.target.value) || 0) * 1000) })
-            }
+            min="0.01"
+            step="0.01"
+            value={minorToDecimalString(settings.pointsValue)}
+            onChange={e => onChange({ pointsValue: roundToMinor(parseFloat(e.target.value) || 0) })}
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             disabled={disabled}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            {t('pointValueHint', { value: (settings.pointsValue / 1000).toFixed(3) })}
+            {t('pointValueHint', { value: minorToDecimalString(settings.pointsValue) })}
           </p>
         </div>
         <div>

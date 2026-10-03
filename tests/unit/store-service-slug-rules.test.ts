@@ -18,9 +18,15 @@ vi.mock('@force/database', () => ({
       findUnique: (a: unknown) => findUnique(a),
       create: (a: unknown) => storeCreate(a),
     },
+    // StoreService.create seeds the default 14% VAT TaxRate row.
+    taxRate: { create: vi.fn().mockResolvedValue({}) },
   },
   Prisma: {},
   withMoneyTx: vi.fn(),
+  // StoreService.create writes the store's subscription row (SP5 plans engine).
+  withRlsBypass: vi.fn(async (fn: (tx: unknown) => unknown) =>
+    fn({ storeSubscription: { upsert: vi.fn().mockResolvedValue({}) } })
+  ),
   StoreStatus: {},
   // the created store is returned with its owner row, read as the owner (identity-scoped)
   withUser: async (_id: string, fn: (tx: unknown) => unknown) =>

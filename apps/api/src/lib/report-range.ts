@@ -34,7 +34,7 @@ export type { ReportRange };
 
 /**
  * The time zone a store's finance reports count days in: the store's
- * `timezone` column when it is a usable IANA zone, else Asia/Kuwait
+ * `timezone` column when it is a usable IANA zone, else Africa/Cairo
  * (Ruling FRT-2). Call it bare, NOT inside its own `runInTenantContext`:
  * `stores` has RLS disabled (migration 20260609000000), so the read needs no
  * tenant GUC, and `runInTenantContext` never joins an ambient tx — wrapping

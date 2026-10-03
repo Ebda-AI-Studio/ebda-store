@@ -96,7 +96,7 @@ export default function ShippingCarriersPage() {
               ? '••••' + cfg.credentials.accountPin.slice(-4)
               : '',
             accountEntity: cfg.credentials?.accountEntity ?? '',
-            accountCountryCode: cfg.credentials?.accountCountryCode ?? 'KW',
+            accountCountryCode: cfg.credentials?.accountCountryCode ?? 'EG',
             username: cfg.credentials?.username ?? '',
             password: cfg.credentials?.password ? '••••' : '',
             pickup: {

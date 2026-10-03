@@ -7,6 +7,7 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 /**
  * Modern template — cart item list. Each row is a card with the product
  * image, name, quantity controls, and remove button, using the same
@@ -15,7 +16,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 export default function ModernCartTable({
   items,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
@@ -25,7 +26,7 @@ export default function ModernCartTable({
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
-  const format = (price: number) => `${localize((price / 1000).toFixed(3))} ${currency}`;
+  const format = (price: number) => `${localize(minorToDecimalString(price))} ${currency}`;
 
   return (
     <div className="space-y-3" dir={isRtl ? 'rtl' : 'ltr'}>

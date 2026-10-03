@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../lib/api';
 
+import { formatMoney, REGION } from '@force/shared';
 interface FinanceDashboard {
   thisMonth: { revenue: number; expenses: number; net: number };
   cash: Array<{ id: string; code: string; nameEn: string; balance: number }>;
@@ -38,11 +39,8 @@ interface Props {
   storeId: string;
 }
 
-function fmtKwd(fils: number) {
-  return (fils / 1000).toLocaleString('en-KW', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  });
+function fmtMoney(minor: number) {
+  return formatMoney(minor, 'en', { hideSymbol: true });
 }
 
 /**
@@ -104,22 +102,22 @@ export function DashboardAccountingSummary({ storeId }: Props) {
     fin && {
       href: `/stores/${storeId}/finance/dashboard`,
       label: t('revenueThisMonth'),
-      value: fmtKwd(fin.thisMonth.revenue),
-      unit: 'KWD',
+      value: fmtMoney(fin.thisMonth.revenue),
+      unit: REGION.currency,
       tone: 'primary' as const,
     },
     fin && {
       href: `/stores/${storeId}/finance/dashboard`,
       label: t('netThisMonth'),
-      value: fmtKwd(fin.thisMonth.net),
-      unit: 'KWD',
+      value: fmtMoney(fin.thisMonth.net),
+      unit: REGION.currency,
       tone: netPositive ? ('success' as const) : ('danger' as const),
     },
     (fin || stock) && {
       href: `/stores/${storeId}/stock/dashboard`,
       label: t('stockValue'),
-      value: fmtKwd(stock?.stockValue ?? fin?.stockValue ?? 0),
-      unit: 'KWD',
+      value: fmtMoney(stock?.stockValue ?? fin?.stockValue ?? 0),
+      unit: REGION.currency,
       tone: 'info' as const,
     },
     stock && {

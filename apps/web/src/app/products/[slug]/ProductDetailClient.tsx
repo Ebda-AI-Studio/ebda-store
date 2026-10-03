@@ -42,6 +42,8 @@ import {
   resolveCardBadges,
 } from '../../../templates/shared/custom-badge';
 
+import { fromMinor } from '@force/shared';
+import { REGION } from '@force/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -263,8 +265,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         contentId: product.id,
         contentName: product.name,
         contentCategory: product.categories?.[0]?.category?.name,
-        value: product.price / 1000,
-        currency: 'KWD',
+        value: fromMinor(product.price),
+        currency: REGION.currency,
       });
 
       // Fire server-side view beacon alongside the marketing pixel event.
@@ -309,8 +311,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             contentId: loadedProduct.id,
             contentName: loadedProduct.name,
             contentCategory: loadedProduct.categories?.[0]?.category?.name,
-            value: loadedProduct.price / 1000,
-            currency: 'KWD',
+            value: fromMinor(loadedProduct.price),
+            currency: REGION.currency,
           });
 
           // Server-side view beacon: fire alongside pixel for analytics rollup.
@@ -408,8 +410,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       contentId: product.id,
       contentName: product.name,
       quantity,
-      value: (selectedVariant ? selectedVariant.price : product.price) / 1000,
-      currency: 'KWD',
+      value: fromMinor(selectedVariant ? selectedVariant.price : product.price),
+      currency: REGION.currency,
     });
 
     // Record the focus target so "Continue Shopping" lands the shopper
@@ -493,7 +495,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // Variant-aware pricing
   const pricing = getProductPricing(product, selectedVariant, 'detail');
   const { displayPrice, displayCompare, minVariantPrice, maxVariantPrice } = pricing;
-  // BUG 1 fix: variant-resolved badge text (KWD or pct).
+  // BUG 1 fix: variant-resolved badge text (EGP or pct).
   const discountBadgeText = getDiscountBadgeText(
     product,
     language === 'ar',
@@ -723,7 +725,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     {pdpCustomBadgeText}
                   </Badge>
                 )}
-                {/* Discount badge — BUG 1 fix: helper text (KWD or pct).
+                {/* Discount badge — BUG 1 fix: helper text (EGP or pct).
                     Waits for variant selection on variant products
                     (displayCompare is null until a variant is picked). */}
                 {discountBadgeText && <Badge variant="destructive">{discountBadgeText}</Badge>}

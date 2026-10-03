@@ -53,7 +53,7 @@ async function paidOrder(daysAgo: number, lines: Array<[string, number, number]>
       shipping: 0,
       discount: 0,
       total: lines.reduce((s, [, q, p]) => s + q * p, 0),
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: { email, phone: '' },
       billingAddress: {},
       createdAt: new Date(Date.now() - daysAgo * DAY),

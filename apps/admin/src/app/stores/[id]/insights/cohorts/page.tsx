@@ -7,7 +7,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export default function InsightsCohortsPage() {
         const totalRevenue = data.cohorts
           .filter(c => c.cohortMonth === month)
           .reduce((sum, c) => sum + c.revenueInPeriod, 0);
-        return <span className="font-mono">{filsToKwd(totalRevenue)}</span>;
+        return <span className="font-mono">{minorToMajor(totalRevenue)}</span>;
       },
     },
     {
@@ -127,7 +127,7 @@ export default function InsightsCohortsPage() {
           .filter(c => c.cohortMonth === month)
           .reduce((sum, c) => sum + c.revenueInPeriod, 0);
         const ltv = total > 0 ? totalRevenue / total : 0;
-        return <span className="font-mono">{filsToKwd(ltv)}</span>;
+        return <span className="font-mono">{minorToMajor(ltv)}</span>;
       },
     },
   ];

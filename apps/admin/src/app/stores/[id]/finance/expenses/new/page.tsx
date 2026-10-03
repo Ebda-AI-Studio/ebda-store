@@ -5,13 +5,16 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl } from '@/lib/api';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { resolveUploadErrorMessage } from '@/lib/expense-upload-error';
 import {
   isCashOrBankAccount,
   ALLOWED_CURRENCIES,
-  convertToKwd,
+  convertToBase,
   requiresFxRate,
+  minorToDecimalString,
+  roundToMinor,
+  REGION,
 } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,7 +87,7 @@ export default function NewExpensePage() {
   const [paidFromAccountId, setPaidFromAccountId] = useState('');
   const [amount, setAmount] = useState('');
   const [taxAmount, setTaxAmount] = useState('0');
-  const [currency, setCurrency] = useState('KWD');
+  const [currency, setCurrency] = useState(REGION.currency);
   const [fxRate, setFxRate] = useState('');
   const [notes, setNotes] = useState('');
   const [notesAr, setNotesAr] = useState('');
@@ -135,7 +138,7 @@ export default function NewExpensePage() {
         setMultiCurrencyEnabled(data?.features?.['accounting.multi_currency'] === true);
       })
       .catch(() => {
-        // Feature check failure is non-fatal — default to KWD-only
+        // Feature check failure is non-fatal — default to EGP-only
       });
 
     return () => {
@@ -250,20 +253,21 @@ export default function NewExpensePage() {
 
   const rawAmount = parseFloat(amount) || 0;
   const rawTax = parseFloat(taxAmount) || 0;
-  const isNonKwd = multiCurrencyEnabled && requiresFxRate(currency);
+  const isNonBase = multiCurrencyEnabled && requiresFxRate(currency);
   const fxRateNum = Number(fxRate) || 0;
 
-  // For KWD, user types dinar → convert to fils for the live preview and payload.
-  // For non-KWD, user types minor units directly (convertToKwd already works in minor units).
-  const rawAmountFils = isNonKwd ? rawAmount : Math.round(rawAmount * 1000);
-  const rawTaxFils = isNonKwd ? rawTax : Math.round(rawTax * 1000);
+  // For EGP, user types pounds (major units) → convert to piastres for the live preview and payload.
+  // For non-EGP, user types minor units directly (convertToBase already works in minor units).
+  const rawAmountFils = isNonBase ? rawAmount : roundToMinor(rawAmount);
+  const rawTaxFils = isNonBase ? rawTax : roundToMinor(rawTax);
 
-  // Live KWD preview — for non-KWD, use convertToKwd; for KWD, already in fils
-  const kwdAmountFils =
-    isNonKwd && fxRateNum > 0 ? convertToKwd(rawAmountFils, fxRateNum) : rawAmountFils;
-  const kwdTaxFils = isNonKwd && fxRateNum > 0 ? convertToKwd(rawTaxFils, fxRateNum) : rawTaxFils;
-  const totalFilsKwd = kwdAmountFils + kwdTaxFils;
-  const totalKwd = (totalFilsKwd / 1000).toFixed(3);
+  // Live EGP preview — for non-EGP, use convertToBase; for EGP, already in piastres
+  const baseAmountFils =
+    isNonBase && fxRateNum > 0 ? convertToBase(rawAmountFils, fxRateNum, currency) : rawAmountFils;
+  const baseTaxFils =
+    isNonBase && fxRateNum > 0 ? convertToBase(rawTaxFils, fxRateNum, currency) : rawTaxFils;
+  const totalFilsBase = baseAmountFils + baseTaxFils;
+  const totalMajor = minorToDecimalString(totalFilsBase);
 
   async function submit() {
     setError(null);
@@ -283,7 +287,7 @@ export default function NewExpensePage() {
       setError(t('errorAmountRequired'));
       return;
     }
-    if (isNonKwd && (!fxRate || fxRateNum <= 0)) {
+    if (isNonBase && (!fxRate || fxRateNum <= 0)) {
       setError(t('errorFxRateRequired', { currency }));
       return;
     }
@@ -295,8 +299,8 @@ export default function NewExpensePage() {
         supplierId: supplierId || undefined,
         expenseAccountId,
         paidFromAccountId,
-        // KWD: user typed dinar → already converted to fils in rawAmountFils/rawTaxFils
-        // non-KWD: user typed minor units → rawAmountFils === rawAmount (integer)
+        // EGP: user typed major units → already converted to piastres in rawAmountFils/rawTaxFils
+        // non-EGP: user typed minor units → rawAmountFils === rawAmount (integer)
         amount: rawAmountFils,
         taxAmount: rawTaxFils,
         currency,
@@ -305,8 +309,8 @@ export default function NewExpensePage() {
         receiptUrl: receiptUrl || undefined,
       };
 
-      // Include FX fields only for non-KWD currencies
-      if (isNonKwd && fxRateNum > 0) {
+      // Include FX fields only for non-EGP currencies
+      if (isNonBase && fxRateNum > 0) {
         payload.fxRate = fxRateNum;
         payload.originalAmount = rawAmountFils;
       }
@@ -495,7 +499,7 @@ export default function NewExpensePage() {
                 ))}
               </select>
             </label>
-            {/* FX rate input — only visible when currency ≠ KWD */}
+            {/* FX rate input — only visible when currency ≠ EGP */}
             {requiresFxRate(currency) && (
               <label className="block space-y-1">
                 <span className="text-sm font-medium">
@@ -521,54 +525,54 @@ export default function NewExpensePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="block space-y-1">
             <span className="text-sm font-medium">
-              {t('amount')} {isNonKwd ? t('minorUnitsSuffix', { currency }) : ''}{' '}
+              {t('amount')} {isNonBase ? t('minorUnitsSuffix', { currency }) : ''}{' '}
               <span className="text-red-500">*</span>
             </span>
             <input
               type="number"
-              min={isNonKwd ? '1' : '0.001'}
-              step={isNonKwd ? '1' : '0.001'}
+              min={isNonBase ? '1' : '0.01'}
+              step={isNonBase ? '1' : '0.01'}
               value={amount}
               onChange={e => setAmount(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
               placeholder="0"
               required
             />
-            {isNonKwd && rawAmount > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">= {filsToKwd(kwdAmountFils)} KWD</p>
+            {isNonBase && rawAmount > 0 && fxRateNum > 0 && (
+              <p className="text-xs text-muted-foreground">= {minorToMajor(baseAmountFils)} EGP</p>
             )}
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium">
-              {t('taxAmount')} {isNonKwd ? t('minorUnitsSuffix', { currency }) : ''}
+              {t('taxAmount')} {isNonBase ? t('minorUnitsSuffix', { currency }) : ''}
             </span>
             <input
               type="number"
               min="0"
-              step={isNonKwd ? '1' : '0.001'}
+              step={isNonBase ? '1' : '0.01'}
               value={taxAmount}
               onChange={e => setTaxAmount(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
             />
-            {isNonKwd && rawTax > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">= {filsToKwd(kwdTaxFils)} KWD</p>
+            {isNonBase && rawTax > 0 && fxRateNum > 0 && (
+              <p className="text-xs text-muted-foreground">= {minorToMajor(baseTaxFils)} EGP</p>
             )}
           </label>
         </div>
 
-        {/* KWD total display */}
+        {/* EGP total display */}
         <div className="rounded-lg bg-muted/30 px-4 py-3 text-sm">
-          {isNonKwd && fxRateNum > 0 ? (
+          {isNonBase && fxRateNum > 0 ? (
             <>
               <span className="text-muted-foreground">
-                {t('totalInKwdConverted', { rate: fxRateNum })}{' '}
+                {t('totalInBaseConverted', { rate: fxRateNum })}{' '}
               </span>
-              <span className="font-semibold font-mono">{totalKwd} KWD</span>
+              <span className="font-semibold font-mono">{totalMajor} EGP</span>
             </>
           ) : (
             <>
-              <span className="text-muted-foreground">{t('totalInKwd')}: </span>
-              <span className="font-semibold font-mono">{totalKwd} KWD</span>
+              <span className="text-muted-foreground">{t('totalInBase')}: </span>
+              <span className="font-semibold font-mono">{totalMajor} EGP</span>
             </>
           )}
         </div>

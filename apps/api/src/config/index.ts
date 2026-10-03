@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { BRAND, brandUrl } from '@force/shared';
 
+import { REGION } from '@force/shared';
 dotenv.config();
 
 // Generate a random secret for development only - this is NOT secure for production
@@ -92,14 +93,14 @@ export const config = {
   encryptionKey: getRequiredSecret('ENCRYPTION_KEY', 'Encryption Key'),
 
   // ==========================================
-  // Kuwait Payment Providers
-  // Stripe doesn't work in Kuwait!
+  // Egypt Payment Providers
+  // Stripe doesn't work in Egypt!
   // ==========================================
 
   // Payment Settings
   paymentTestMode: process.env.PAYMENT_TEST_MODE === 'true',
   defaultPaymentProvider: process.env.DEFAULT_PAYMENT_PROVIDER || 'tap',
-  defaultCurrency: process.env.DEFAULT_CURRENCY || 'KWD',
+  defaultCurrency: process.env.DEFAULT_CURRENCY || REGION.currency,
 
   // Tap Payments (https://tap.company)
   tapApiKey: process.env.TAP_API_KEY || '',

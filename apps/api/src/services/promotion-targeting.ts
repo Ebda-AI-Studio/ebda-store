@@ -7,7 +7,7 @@ export interface CartItemForTargeting {
   productId: string;
   categoryIds: string[];
   quantity: number;
-  lineTotal: number; // fils
+  lineTotal: number; // piastres
 }
 
 export interface TargetingCtx {

@@ -6,7 +6,7 @@ import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { apiPost } from '@/lib/api';
-import { formatPrice, kwdToFils } from '@/lib/format';
+import { formatPrice, majorToMinor } from '@/lib/format';
 
 interface WalletAdjustModalProps {
   open: boolean;
@@ -56,13 +56,13 @@ export function WalletAdjustModal({
     }
   }, [open]);
 
-  const fils = kwdToFils(amount);
-  const signed = fils === null ? null : direction === 'credit' ? fils : -fils;
+  const piastres = majorToMinor(amount);
+  const signed = piastres === null ? null : direction === 'credit' ? piastres : -piastres;
   const preview = signed === null ? null : balance + signed;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (fils === null || fils <= 0) {
+    if (piastres === null || piastres <= 0) {
       setError(t('invalidAmount'));
       return;
     }
@@ -70,7 +70,7 @@ export function WalletAdjustModal({
       setError(t('noteRequired'));
       return;
     }
-    if (direction === 'debit' && fils > balance) {
+    if (direction === 'debit' && piastres > balance) {
       setError(t('exceedsBalance'));
       return;
     }
@@ -170,7 +170,7 @@ export function WalletAdjustModal({
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             required
           />
-          {preview !== null && fils !== null && fils > 0 && (
+          {preview !== null && piastres !== null && piastres > 0 && (
             <p
               className={`mt-1 text-xs ${preview < 0 ? 'text-destructive-ink' : 'text-muted-foreground'}`}
             >

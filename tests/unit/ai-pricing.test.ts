@@ -59,9 +59,9 @@ describe('computeCostMicros', () => {
       expect(computeCostMicros('m', 100_000, 50_000)).toBe(400_000);
     });
 
-    it('keeps sub-fils calls measurable — the reason the column is micros', () => {
+    it('keeps sub-piastres calls measurable — the reason the column is micros', () => {
       process.env.AI_MODEL_RATES = JSON.stringify({ m: { in: 0.1, out: 0.4 } });
-      // A realistic single call: 800 in / 300 out. In integer fils this would
+      // A realistic single call: 800 in / 300 out. In integer piastres this would
       // round to 0 and the column would be useless.
       const micros = computeCostMicros('m', 800, 300);
       expect(micros).toBeGreaterThan(0);

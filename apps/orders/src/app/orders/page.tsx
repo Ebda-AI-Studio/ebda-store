@@ -148,7 +148,7 @@ export default function OrdersListPage() {
         const resolved = resolvePreset(datePreset, customRange);
         // The shared report-range contract: the picked days as instants in
         // the viewer's timezone. The date-only `from`/`to` this sent were
-        // read by the API as UTC days (a Kuwait "today" started 3h late).
+        // read by the API as UTC days (an Egypt "today" started 3h late).
         const [fy, fm, fd] = resolved.from.split('-').map(Number);
         const [ty, tm, td] = resolved.to.split('-').map(Number);
         const qs = new URLSearchParams({

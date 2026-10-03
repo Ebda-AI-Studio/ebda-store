@@ -3,14 +3,14 @@
  *
  * Scans active trackInventory products for a store and generates AI-powered
  * bilingual clearance copy for dead-stock products. Designed to be called by
- * the Inngest weekly cron (Sunday 06:00 KW) or on-demand by a super_admin.
+ * the Inngest weekly cron (Sunday 06:00 Cairo) or on-demand by a super_admin.
  *
  * Algorithm (per spec Part 3.2):
  *   1. Expire old open flags (>30 days, status='expired').
  *   2. List active products with trackInventory=true and stock on hand.
  *   3. For each product: compute daysSinceSale + stockValueFils (null when the
  *      product has no cost price — value UNKNOWN, not zero).
- *   4. Flag if daysSinceSale >= 90 AND (stockValueFils >= 50000 OR value unknown).
+ *   4. Flag if daysSinceSale >= 90 AND (stockValueFils >= 500000 OR value unknown).
  *      A product that has never sold is aged from its createdAt instead, so a
  *      newly listed product is not "90 days dead" on day one.
  *      A product without a cost price used to be skipped entirely, which made
@@ -78,7 +78,8 @@ const GEMINI_CHUNK_SIZE = 20;
 const GEMINI_THROTTLE_MS = 2500;
 const EXPIRE_AFTER_DAYS = 30;
 const DEADSTOCK_DAYS_THRESHOLD = 90;
-const DEADSTOCK_VALUE_FILS_THRESHOLD = 50_000; // 50 KWD in fils (1 KWD = 1000 fils)
+// 5,000 EGP in piastres (1 EGP = 100 piastres). Re-based from FWB's 50 KWD; product to confirm.
+const DEADSTOCK_VALUE_FILS_THRESHOLD = 500_000;
 
 // ---------------------------------------------------------------------------
 // Helper: days since last paid sale for a product
@@ -130,7 +131,7 @@ function daysSince(lastSaleAt: Date | undefined): number {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: variant-aware stock value (fils), or null when unknown
+// Helper: variant-aware stock value (piastres), or null when unknown
 // ---------------------------------------------------------------------------
 
 const knownCost = (c: number | null | undefined): number | null =>
@@ -187,7 +188,7 @@ function buildGeminiPrompt(candidates: DeadstockCandidate[]): string {
     costPrice: c.costPrice,
   }));
 
-  return `You are a retail clearance copywriter for a Kuwait e-commerce store. For each
+  return `You are a retail clearance copywriter for an Egypt e-commerce store. For each
 dead-stock product below, suggest a clearance discount percentage (10-50) and
 write a short bilingual campaign copy (<=80 chars each, English + Arabic).
 

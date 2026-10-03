@@ -7,7 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ interface StatementDetail {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const kwd = filsToKwd;
+const major = minorToMajor;
 
 function fmt(iso: string | null): string {
   if (!iso) return '—';
@@ -337,10 +337,13 @@ export default function StatementDetailPage() {
               { label: t('summary.manualMatched'), value: summary.manualMatched },
               { label: t('summary.unmatched'), value: summary.unmatched },
               { label: t('summary.ignored'), value: summary.ignored },
-              { label: t('summary.matchedAmount'), value: `KWD ${kwd(summary.matchedAmountFils)}` },
+              {
+                label: t('summary.matchedAmount'),
+                value: `EGP ${major(summary.matchedAmountFils)}`,
+              },
               {
                 label: t('summary.unmatchedAmount'),
-                value: `KWD ${kwd(summary.unmatchedAmountFils)}`,
+                value: `EGP ${major(summary.unmatchedAmountFils)}`,
               },
             ].map(card => (
               <div
@@ -383,8 +386,8 @@ export default function StatementDetailPage() {
                   {t('difference.bankBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.bankBalanceFils < 0 ? '−' : ''}KWD{' '}
-                  {kwd(Math.abs(difference.bankBalanceFils))}
+                  {difference.bankBalanceFils < 0 ? '−' : ''}EGP{' '}
+                  {major(Math.abs(difference.bankBalanceFils))}
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
@@ -392,8 +395,8 @@ export default function StatementDetailPage() {
                   {t('difference.ledgerBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.ledgerBalanceFils < 0 ? '−' : ''}KWD{' '}
-                  {kwd(Math.abs(difference.ledgerBalanceFils))}
+                  {difference.ledgerBalanceFils < 0 ? '−' : ''}EGP{' '}
+                  {major(Math.abs(difference.ledgerBalanceFils))}
                 </p>
               </div>
               <div
@@ -418,7 +421,7 @@ export default function StatementDetailPage() {
                   }`}
                 >
                   {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
-                  KWD {kwd(Math.abs(difference.differenceFils))}
+                  EGP {major(Math.abs(difference.differenceFils))}
                 </p>
               </div>
             </div>
@@ -431,7 +434,7 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedBankSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-warning-ink font-mono">
-                    KWD {kwd(difference.unmatchedBankFils)}
+                    EGP {major(difference.unmatchedBankFils)}
                   </p>
                   <p className="mt-0.5 text-xs text-warning-ink">
                     {summary?.unmatched ?? 0} {t('difference.bankLines')}
@@ -442,8 +445,8 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedLedgerSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
-                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}KWD{' '}
-                    {kwd(Math.abs(difference.unmatchedLedgerFils))}
+                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}EGP{' '}
+                    {major(Math.abs(difference.unmatchedLedgerFils))}
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}
@@ -541,7 +544,7 @@ export default function StatementDetailPage() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-sm text-foreground">
-                      {kwd(tx.amountFils)}
+                      {major(tx.amountFils)}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground">
                       {tx.externalRef ?? '—'}

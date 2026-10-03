@@ -8,6 +8,7 @@ import { apiGet, apiPost, apiPut } from '@/lib/api';
 import type { Product } from './types';
 import { variantPriceToField, variantFieldToPrice } from '@/lib/variant-price';
 
+import { roundToMinor } from '@force/shared';
 // ─── local types ─────────────────────────────────────────────────────────────
 
 interface Category {
@@ -41,10 +42,10 @@ type InventoryMode = 'set' | 'adjust';
 
 const VARIANT_LOAD_CAP = 25;
 
-function kwdToFils(kwd: string): number {
-  const n = parseFloat(kwd);
+function majorToMinor(major: string): number {
+  const n = parseFloat(major);
   if (isNaN(n) || n < 0) return 0;
-  return Math.round(n * 1000);
+  return roundToMinor(n);
 }
 
 // ─── sub-components ──────────────────────────────────────────────────────────
@@ -226,8 +227,8 @@ export function MassEditModal({
       if (!isNaN(v)) {
         fields.price = {
           mode: priceMode,
-          // For 'set' mode convert KWD → fils; for adjustPct send the raw percent
-          value: priceMode === 'set' ? kwdToFils(priceValue) : v,
+          // For 'set' mode convert EGP → piastres; for adjustPct send the raw percent
+          value: priceMode === 'set' ? majorToMinor(priceValue) : v,
         };
       }
     }
@@ -453,7 +454,7 @@ export function MassEditModal({
                 </select>
                 <input
                   type="number"
-                  step={priceMode === 'set' ? '0.001' : '0.1'}
+                  step={priceMode === 'set' ? '0.01' : '0.1'}
                   placeholder={
                     priceMode === 'set' ? t('massEdit.priceValue') : t('massEdit.pricePct')
                   }
@@ -595,7 +596,7 @@ export function MassEditModal({
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.001"
+                                  step="0.01"
                                   value={edit.price}
                                   onChange={e =>
                                     setVariantEdits(prev => ({

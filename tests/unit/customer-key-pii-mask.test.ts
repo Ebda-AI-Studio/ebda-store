@@ -51,7 +51,7 @@ describe('rfmKeyFor', () => {
   });
 
   // issue 2242 — the guest key leaves the platform as the MCP `customerRef`.
-  // An UNKEYED sha256 of an 8-digit Kuwait mobile is reversible by brute
+  // An UNKEYED sha256 of an 8-digit Egypt mobile is reversible by brute
   // force; the key is now an HMAC under a server-derived secret. Mutation-
   // proof: reverting rfmKeyFor to createHash('sha256') reddens this.
   it('is NOT a plain (unkeyed) sha256 of the contact, so it cannot be brute-forced', () => {
@@ -91,7 +91,7 @@ describe('maskAddress', () => {
       street: '12',
       area: 'Salmiya',
       governorate: 'Hawally',
-      country: 'KW',
+      country: 'EG',
       phone: '+96550001234',
       email: 'sara@x.test',
     })!;
@@ -99,7 +99,7 @@ describe('maskAddress', () => {
       firstName: 'Sara',
       area: 'Salmiya',
       governorate: 'Hawally',
-      country: 'KW',
+      country: 'EG',
       phone: '+965 ****1234',
       email: 's***@x.test',
     });

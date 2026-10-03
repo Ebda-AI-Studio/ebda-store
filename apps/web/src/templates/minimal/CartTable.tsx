@@ -7,6 +7,7 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 /**
  * Minimal template — cart rendered with ultra-spare typography-first
  * layout. No borders, no backgrounds, just rows separated by
@@ -15,7 +16,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 export default function MinimalCartTable({
   items,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
@@ -24,7 +25,7 @@ export default function MinimalCartTable({
   const { isRtl: ctxIsRtl } = useLanguage();
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${localize((price / 1000).toFixed(3))} ${currency}`;
+  const format = (price: number) => `${localize(minorToDecimalString(price))} ${currency}`;
 
   return (
     <div className="space-y-10" dir={isRtl ? 'rtl' : 'ltr'}>

@@ -5,6 +5,7 @@ import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
 import { sendAlert } from '../../../services/alerts.service';
 
+import { REGION } from '@force/shared';
 interface FanoutStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }
@@ -144,7 +145,7 @@ export const warehouseReconcileSweepCron: InngestFunction.Any = inngest.createFu
     name: 'Warehouse stock reconcile — daily completeness sweep',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '0 3 * * *' }], // 06:00 KW = 03:00 UTC (Kuwait is UTC+3)
+    triggers: [{ cron: `TZ=${REGION.timezone} 0 6 * * *` }], // 06:00 Cairo (DST-aware via TZ=)
   },
   async ({ step }) => sweepAllWarehouseStores(step)
 );

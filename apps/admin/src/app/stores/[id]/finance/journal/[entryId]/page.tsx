@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,10 +179,10 @@ export default function JournalDetailPage() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-end font-mono text-xs">
-                    {line.debit > 0 ? filsToKwd(line.debit) : ''}
+                    {line.debit > 0 ? minorToMajor(line.debit) : ''}
                   </td>
                   <td className="px-3 py-2 text-end font-mono text-xs">
-                    {line.credit > 0 ? filsToKwd(line.credit) : ''}
+                    {line.credit > 0 ? minorToMajor(line.credit) : ''}
                   </td>
                 </tr>
               ))}
@@ -194,10 +194,10 @@ export default function JournalDetailPage() {
                   {t('totalLabel')}
                 </td>
                 <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
-                  {filsToKwd(totalDr)}
+                  {minorToMajor(totalDr)}
                 </td>
                 <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
-                  {filsToKwd(totalCr)}
+                  {minorToMajor(totalCr)}
                 </td>
               </tr>
             </tfoot>

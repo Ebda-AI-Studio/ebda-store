@@ -79,9 +79,9 @@ function harness() {
   return { server, tools };
 }
 
-const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'KWD', domain: null };
+const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'EGP', domain: null };
 
-const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'KW' };
+const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'EG' };
 
 describe('order.tools place_order (online) — payment-provider line items', () => {
   beforeEach(() => {
@@ -97,7 +97,7 @@ describe('order.tools place_order (online) — payment-provider line items', () 
       id: 'order-1',
       orderNumber: 'ORD-1',
       total: 12000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [
         {
           id: 'oi-1',
@@ -169,7 +169,7 @@ describe('order.tools place_order (online) — payment-provider line items', () 
       id: 'order-2',
       orderNumber: 'ORD-2',
       total: 8000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [
         { id: 'oi-4', productName: 'Rug', quantity: 2, price: 3000, sku: 'RUG-1' },
         { id: 'oi-5', productName: 'Lamp', quantity: 1, price: 2000, sku: null },
@@ -214,7 +214,7 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
       id: 'order-3',
       orderNumber: 'ORD-3',
       total: 5000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [{ id: 'oi-1', productName: 'Rug', quantity: 1, price: 5000, sku: null }],
     } as never);
   });
@@ -255,7 +255,7 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
         id: 'order-3',
         orderNumber: 'ORD-3',
         total: 5000,
-        currency: 'KWD',
+        currency: 'EGP',
         items: [{ id: 'oi-1', productName: 'Rug', quantity: 1, price: 5000, sku: null }],
       };
     }) as never);

@@ -60,7 +60,7 @@ describe.skipIf(!hasDb)('order/created fire-once idempotency', () => {
           name: 'oc-test-store',
           slug: `oc-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });

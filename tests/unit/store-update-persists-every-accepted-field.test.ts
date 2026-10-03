@@ -47,6 +47,7 @@ vi.mock('@force/database', () => ({
     (o?.storeIds ?? []).map(storeId => ({ storeId, value: { products: 0, orders: 0 } })),
 }));
 vi.mock('@force/shared', async importOriginal => ({
+  // Keep the real region config (REGION is read at import time by api config/services).
   ...(await importOriginal<typeof import('@force/shared')>()),
   slugify: (s: string) => s,
   // #1518: pulled in transitively by importing `updateStoreSchema`

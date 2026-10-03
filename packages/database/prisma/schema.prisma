@@ -221,8 +221,8 @@ model Store {
   typography            Json?       @map("typography")
   description           String?
   descriptionAr         String?     @map("description_ar")
-  currency              String      @default("KWD")
-  timezone              String      @default("Asia/Kuwait")
+  currency              String      @default("EGP")
+  timezone              String      @default("Africa/Cairo")
   settings              Json        @default("{}")
   createdAt             DateTime    @default(now()) @map("created_at")
   updatedAt             DateTime    @updatedAt @map("updated_at")
@@ -491,6 +491,7 @@ model Store {
   answerEngineChecks       AnswerEngineCheck[]
   gscDailyMetrics          GscDailyMetric[]
   usageSnapshots           StoreUsageSnapshot[]
+  subscription             StoreSubscription?
 
   @@index([ownerId])
   @@index([status])
@@ -598,11 +599,11 @@ model StoreLocation {
   storeId      String   @map("store_id")
   name         String
   nameAr       String?  @map("name_ar")
-  country      String // e.g. "Kuwait" | "U.A.E."
+  country      String // e.g. "Egypt" | "U.A.E."
   countryAr    String?  @map("country_ar")
   address      String
   addressAr    String?  @map("address_ar")
-  phone        String? // tel: target, e.g. "+96522209079"
+  phone        String? // tel: target, e.g. "+201012345678"
   whatsapp     String? // wa.me number, digits only or +<intl>
   mapsUrl      String?  @map("maps_url") // Google Maps "search" link (button target)
   mapsEmbedUrl String?  @map("maps_embed_url") // optional ...&output=embed iframe src
@@ -837,7 +838,7 @@ model Product {
   slug                 String
   description          String?
   descriptionAr        String?       @map("description_ar")
-  price                Int // Price in fils (1 KWD = 1000 fils)
+  price                Int // Price in piastres (1 EGP = 100 piastres)
   compareAtPrice       Int?          @map("compare_at_price")
   costPrice            Int?          @map("cost_price")
   sku                  String?
@@ -903,7 +904,7 @@ model Product {
   // Discount input columns — the admin enters a REGULAR (RRP) price plus a
   // discount, and the service derives price/compareAtPrice from them.
   // percentage: value is basis points (percent×100; e.g. 12.5% → 1250, range 0–10000).
-  // fixed:      value is fils (1 KWD = 1000 fils).
+  // fixed:      value is piastres (1 EGP = 100 piastres).
   // When null the product has no admin-authored discount (legacy or no discount).
   discountType         DiscountType? @map("discount_type")
   discountValue        Int?          @map("discount_value")
@@ -978,7 +979,7 @@ enum ProductStatus {
 // compareAtPrice from these two columns at save time.
 enum DiscountType {
   percentage // value is basis points (percent×100; 12.5% → 1250)
-  fixed // value is fils (1 KWD = 1000 fils)
+  fixed // value is piastres (1 EGP = 100 piastres)
 }
 
 // ==========================================
@@ -1221,9 +1222,9 @@ model CartItem {
 // ==========================================
 
 enum BundlePricingType {
-  fixed_price // value = the bundle's price in fils (e.g. 12000)
+  fixed_price // value = the bundle's price in piastres (e.g. 12000)
   percentage // value = basis points off the component sum (12.5% -> 1250)
-  fixed // value = fils off the component sum
+  fixed // value = piastres off the component sum
 }
 
 model Bundle {
@@ -1326,7 +1327,7 @@ model Order {
   // what the charge is for ("Photography deposit", "Rush fee", etc.).
   extraAmount           Int                @default(0) @map("extra_amount")
   extraAmountNote       String?            @map("extra_amount_note")
-  currency              String             @default("KWD")
+  currency              String             @default("EGP")
   couponCode            String?            @map("coupon_code")
   couponDiscount        Int                @default(0) @map("coupon_discount")
   promotionDiscount     Int                @default(0) @map("promotion_discount")
@@ -1335,12 +1336,12 @@ model Order {
   // Loyalty redemption applied at checkout. loyaltyPointsRedeemed is the
   // number of points the customer spent on this order (NULL = none redeemed
   // / pre-feature order); loyaltyDiscount is the resulting discount amount in
-  // FILS that was folded into `discount` + `total`. Both are written
+  // PIASTRES that was folded into `discount` + `total`. Both are written
   // atomically with LoyaltyService.redeemPoints inside the order-create
   // transaction, and read by reverseRedeemedPointsFromOrder on refund/cancel.
   loyaltyPointsRedeemed Int?               @map("loyalty_points_redeemed")
   loyaltyDiscount       Int                @default(0) @map("loyalty_discount")
-  // Customer-wallet (store credit) portion of this order, in FILS. `total`
+  // Customer-wallet (store credit) portion of this order, in PIASTRES. `total`
   // keeps meaning "order value"; the amount any gateway / COD courier collects
   // is `total - walletAmount`. 0 for every order that did not use the wallet
   // (the default, and every order placed before the feature), so every
@@ -1536,7 +1537,7 @@ model OrderItem {
   sku               String?
   quantity          Int
   price             Int
-  // Cost-of-goods snapshot at sale time. Stored in fils, same scale as
+  // Cost-of-goods snapshot at sale time. Stored in piastres, same scale as
   // `price`. Snapshotted because the product's cost may change later but
   // the order's profit must reflect what it cost on the day it shipped.
   // Nullable for orders placed before this column existed.
@@ -1582,7 +1583,7 @@ model Payment {
   method         String? // knet, visa, mastercard, apple_pay, etc.
   status         PaymentStatus @default(pending)
   amount         Int
-  currency       String        @default("KWD")
+  currency       String        @default("EGP")
   transactionId  String?       @map("transaction_id")
   invoiceId      String?       @map("invoice_id")
   paymentUrl     String?       @map("payment_url")
@@ -1877,10 +1878,10 @@ model PaymentConfig {
   // Provider-specific settings
   testMode            Boolean  @default(true) @map("test_mode")
   supportedMethods    String[] @default([]) @map("supported_methods") // knet, visa, apple_pay, etc.
-  supportedCurrencies String[] @default(["KWD"]) @map("supported_currencies")
+  supportedCurrencies String[] @default(["EGP"]) @map("supported_currencies")
 
   // Fees configuration
-  fixedFee      Int     @default(0) @map("fixed_fee") // in fils
+  fixedFee      Int     @default(0) @map("fixed_fee") // in piastres
   percentageFee Decimal @default(0) @map("percentage_fee") @db.Decimal(5, 2) // e.g., 2.5 for 2.5%
 
   // Status
@@ -2338,7 +2339,7 @@ model AffiliateConfig {
   storeId               String   @unique @map("store_id")
   defaultCommissionRate Decimal  @default(10) @map("default_commission_rate") @db.Decimal(5, 2)
   cookieDurationDays    Int      @default(30) @map("cookie_duration_days")
-  minPayoutAmount       Int      @default(5000) @map("min_payout_amount")
+  minPayoutAmount       Int      @default(50000) @map("min_payout_amount")
   autoApprove           Boolean  @default(false) @map("auto_approve")
   publicSignupEnabled   Boolean  @default(true) @map("public_signup_enabled")
   createdAt             DateTime @default(now()) @map("created_at")
@@ -2425,15 +2426,15 @@ model Address {
   state         String
   governorate   String   @default("") @map("governorate")
   governorateAr String   @default("") @map("governorate_ar")
-  area          String? // Kuwait-specific area/district (English)
+  area          String? // Egypt-specific area/district (English)
   areaAr        String   @default("") @map("area_ar")
-  block         String? // Kuwait-specific block
+  block         String? // Egypt-specific block
   street        String?
   building      String?
   floor         String?
   apartment     String?
   postalCode    String?  @map("postal_code")
-  country       String   @default("Kuwait")
+  country       String   @default("Egypt")
   phone         String?
   isDefault     Boolean  @default(false) @map("is_default")
   createdAt     DateTime @default(now()) @map("created_at")
@@ -2496,7 +2497,7 @@ model Coupon {
   description       String?
   descriptionAr     String?    @map("description_ar")
   type              CouponType @default(percentage)
-  value             Int // percentage (0-100) or fixed amount in fils
+  value             Int // percentage (0-100) or fixed amount in piastres
   minOrderAmount    Int?       @map("min_order_amount")
   maxDiscount       Int?       @map("max_discount") // Max discount for percentage coupons
   usageLimit        Int?       @map("usage_limit")
@@ -2539,7 +2540,7 @@ model Promotion {
   description   String?
   descriptionAr String?    @map("description_ar")
   type          CouponType @default(percentage)
-  value         Int // percentage (0-100) or fixed amount in fils
+  value         Int // percentage (0-100) or fixed amount in piastres
   maxDiscount   Int?       @map("max_discount")
   priority      Int        @default(0) // higher wins when several are eligible
   isActive      Boolean    @default(true) @map("is_active")
@@ -2585,7 +2586,7 @@ model ShippingZone {
   nameAr                String?  @map("name_ar")
   areas                 Json     @default("[]") // Array of area/city names
   areasAr               Json     @default("[]") @map("areas_ar") // Arabic area names
-  deliveryFee           Int      @default(0) @map("delivery_fee") // In fils (1 KWD = 1000 fils)
+  deliveryFee           Int      @default(0) @map("delivery_fee") // In piastres (1 EGP = 100 piastres)
   freeShippingThreshold Int?     @map("free_shipping_threshold") // Order amount for free shipping
   estimatedDays         Int?     @map("estimated_days") // Estimated delivery days
   estimatedDaysMin      Int?     @map("estimated_days_min") // Min delivery days
@@ -2605,8 +2606,8 @@ model ShippingZone {
 model ShippingAreaRate {
   id                    String   @id @default(uuid())
   storeId               String   @map("store_id")
-  country               String   @default("Kuwait")
-  countryAr             String   @default("الكويت") @map("country_ar")
+  country               String   @default("Egypt")
+  countryAr             String   @default("مصر") @map("country_ar")
   governorate           String
   governorateAr         String   @map("governorate_ar")
   area                  String
@@ -2755,7 +2756,7 @@ model CustomerWallet {
   id         String   @id @default(uuid())
   storeId    String   @map("store_id")
   customerId String   @map("customer_id")
-  /// Current balance in FILS (1 KWD = 1000). Never negative.
+  /// Current balance in PIASTRES (1 EGP = 100 piastres). Never negative.
   balance    Int      @default(0)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -2786,7 +2787,7 @@ model WalletTransaction {
   storeId        String                @map("store_id")
   walletId       String                @map("wallet_id")
   customerId     String                @map("customer_id")
-  /// Signed FILS: positive adds to the balance, negative spends it. Never 0.
+  /// Signed PIASTRES: positive adds to the balance, negative spends it. Never 0.
   amount         Int
   /// Wallet balance immediately after this entry. Never negative.
   balanceAfter   Int                   @map("balance_after")
@@ -3195,8 +3196,8 @@ model AiUsage {
   /// fact, so it is recorded at write time. NULL = row predates provenance.
   model        String?
   /// Cost in MICROS of the store's billing currency (1_000_000 micros = 1 unit).
-  /// Micros not fils: per-call AI spend is routinely a fraction of a fils, and
-  /// integer fils would round every single row to 0. NULL means "no rate was
+  /// Micros not piastres: per-call AI spend is routinely a fraction of a piastre, and
+  /// integer piastres would round every single row to 0. NULL means "no rate was
   /// configured for this model", which is deliberately distinct from 0 — a
   /// cached hit genuinely costs nothing. See lib/ai-pricing.ts.
   costMicros   Int?     @map("cost_micros")
@@ -3389,14 +3390,14 @@ model JournalLine {
   accountId      String   @map("account_id")
   debit          Int      @default(0)
   credit         Int      @default(0)
-  currency       String   @default("KWD")
-  /// FX rate: 1 unit of `currency` = fxRate KWD.
+  currency       String   @default("EGP")
+  /// FX rate: 1 unit of `currency` = fxRate EGP.
   /// Stored as exact numeric(16,8) — no float drift.
-  /// KWD lines: 1. Non-KWD: e.g. 0.30700000 for USD→KWD.
+  /// EGP lines: 1. Non-EGP: e.g. 0.30700000 for USD→EGP.
   fxRate         Decimal? @default(1) @map("fx_rate") @db.Decimal(16, 8)
-  /// Original amount in minor units of `currency` before KWD conversion.
-  /// For KWD lines this equals debit (or credit). For non-KWD lines this is
-  /// the raw foreign amount; debit/credit hold the KWD-converted fils.
+  /// Original amount in minor units of `currency` before EGP conversion.
+  /// For EGP lines this equals debit (or credit). For non-EGP lines this is
+  /// the raw foreign amount; debit/credit hold the EGP-converted piastres.
   originalAmount Int?     @default(0) @map("original_amount")
   lineMemo       String?  @map("line_memo")
   lineMemoAr     String?  @map("line_memo_ar")
@@ -3415,9 +3416,9 @@ model JournalLine {
 
 /**
  * FX Rate Registry — merchant-maintained log of exchange rates for a date.
- * Rate meaning: 1 unit of `currency` = `rate` KWD.
+ * Rate meaning: 1 unit of `currency` = `rate` EGP.
  * Example: { currency: 'USD', rate: 0.307, rateDate: '2026-06-15' }
- * means 1 USD was worth 0.307 KWD on that date.
+ * means 1 USD was worth 0.307 EGP on that date.
  * There is no unique constraint on (storeId, currency, rateDate) by design —
  * merchants may record multiple rates for the same date (intraday corrections).
  * The most recently created row for a given date is the effective rate.
@@ -3429,7 +3430,7 @@ model FxRateEntry {
   storeId    String   @map("store_id")
   /// ISO-4217 currency code (e.g. 'USD', 'EUR'). Always uppercase.
   currency   String
-  /// Rate: 1 unit of `currency` = rate KWD. numeric(16,8) — exact decimal.
+  /// Rate: 1 unit of `currency` = rate EGP. numeric(16,8) — exact decimal.
   rate       Decimal  @db.Decimal(16, 8)
   /// Date the rate applies to. Stored as a date-only timestamp (UTC midnight).
   rateDate   DateTime @map("rate_date") @db.Date
@@ -3496,7 +3497,7 @@ model Supplier {
   address         Json?
   paymentTerms    SupplierPaymentTerms @default(net0) @map("payment_terms")
   customTermsDays Int?                 @map("custom_terms_days")
-  defaultCurrency String               @default("KWD") @map("default_currency")
+  defaultCurrency String               @default("EGP") @map("default_currency")
   leadTimeDays    Int                  @default(7) @map("lead_time_days")
   apBalanceCached Int                  @default(0) @map("ap_balance_cached")
   isActive        Boolean              @default(true) @map("is_active")
@@ -3529,7 +3530,7 @@ model PurchaseOrder {
   taxAmount      Int                 @default(0) @map("tax_amount")
   shippingCost   Int                 @default(0) @map("shipping_cost")
   total          Int                 @default(0)
-  currency       String              @default("KWD")
+  currency       String              @default("EGP")
   apAccountId    String?             @map("ap_account_id")
   journalEntryId String?             @unique @map("journal_entry_id")
   notes          String?
@@ -3695,13 +3696,13 @@ model Expense {
   amount               Int
   taxAmount            Int           @default(0) @map("tax_amount")
   total                Int
-  currency             String        @default("KWD")
-  /// FX rate used to convert this expense to KWD.
+  currency             String        @default("EGP")
+  /// FX rate used to convert this expense to EGP.
   /// numeric(16,8) — exact decimal, no IEEE 754 float drift.
-  /// 1 unit of `currency` = fxRate KWD. KWD expenses: 1.
+  /// 1 unit of `currency` = fxRate EGP. EGP expenses: 1.
   fxRate               Decimal?      @default(1) @map("fx_rate") @db.Decimal(16, 8)
-  /// Original amount in minor units of `currency` (before KWD conversion).
-  /// For KWD expenses: equals `amount`. For non-KWD: the raw foreign fils/cents.
+  /// Original amount in minor units of `currency` (before EGP conversion).
+  /// For EGP expenses: equals `amount`. For non-EGP: the raw foreign piastres/cents.
   originalAmount       Int?          @default(0) @map("original_amount")
   expenseDate          DateTime      @map("expense_date")
   status               ExpenseStatus @default(draft)
@@ -3861,7 +3862,7 @@ model ProfitAnomaly {
 // ==========================================
 //
 // Three nightly snapshot tables materialized by the analytics-daily-rollup
-// Inngest cron (02:00 KW). All reads from existing Order / AbandonedCart /
+// Inngest cron (02:00 Cairo). All reads from existing Order / AbandonedCart /
 // Product / User data — no new operational events, no journal posting.
 //
 // RLS: same store_id pattern as all other tenant tables (policies in migration).
@@ -3939,7 +3940,7 @@ model CustomerRfmSnapshot {
 // Storefront View Ingest — Product Daily Views
 // ==========================================
 //
-// One aggregate row per (store, product, calendar day in KW time).
+// One aggregate row per (store, product, calendar day in Cairo time).
 // Populated by the public ingest endpoint POST /api/v1/public/:storeId/views.
 // The nightly analytics rollup reads these to populate FunnelSnapshot.productViews.
 //
@@ -3974,7 +3975,7 @@ model StoreUsageSnapshot {
 
   // ── Commerce (drives value, and support load) ─────────────────────────
   orders      Int    @default(0)
-  /// NET revenue in fils: paid AND not cancelled/refunded. Gross 'paid' alone
+  /// NET revenue in piastres: paid AND not cancelled/refunded. Gross 'paid' alone
   /// over-counts — production has paid+refunded and paid+cancelled orders.
   /// BigInt (#1057, migration 20260925120000): a monthly SUM(orders.total) can
   /// exceed the 2^31-1 ceiling of Int for a high-volume store; the writer
@@ -4005,7 +4006,7 @@ model StoreUsageSnapshot {
   aiTokensOut     BigInt @default(0) @map("ai_tokens_out")
   /// Spend in micros. NULL-costed rows contribute 0 here, so aiUnpricedCalls
   /// must be read alongside it — see lib/ai-pricing.ts. BigInt (#1057): micros
-  /// inflate the numeric range fast (1 KWD = 1000 micros of a currency unit
+  /// inflate the numeric range fast (1_000_000 micros per currency unit,
   /// already multiplied up), so this is the first of these five likely to
   /// overflow Int in practice.
   aiCostMicros    BigInt @default(0) @map("ai_cost_micros")
@@ -4374,4 +4375,88 @@ model MerchantApiKey {
   // FK-only index so the User delete RI check does not sequential-scan.
   @@index([userId])
   @@map("merchant_api_keys")
+}
+
+// ==========================================
+// Plans & subscriptions (SP5 task 1) — plans as DATA
+// ==========================================
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  canceled
+  comped
+}
+
+/// A sellable (or admin-granted) plan. Global catalog: NOT store-scoped, so no
+/// RLS — reads are public-safe config; writes only go through the super-admin
+/// `PUT /admin/plans/:code`. Prices are NULL until Ahmad sets them (null means
+/// "not set yet", never "free"). `limits` is validated by `planLimitsSchema`
+/// (@force/shared) on every write; a null numeric limit means unlimited.
+model Plan {
+  id                String    @id @default(uuid())
+  code              String    @unique
+  nameEn            String    @map("name_en")
+  nameAr            String    @map("name_ar")
+  sort              Int       @default(0)
+  /// Shown on the public pricing page / self-serve upgrade picker. `comped` is false.
+  isPublic          Boolean   @default(true) @map("is_public")
+  /// EGP piastres. NULL = not set yet.
+  priceMonthlyMinor Int?      @map("price_monthly_minor")
+  priceYearlyMinor  Int?      @map("price_yearly_minor")
+  /// Legacy StorePlan enum tier whose PLAN_BASELINE feature set a store on this
+  /// plan inherits (keeps FeatureService working while `Store.plan` is retired
+  /// — follow-up). Kept in sync onto `stores.plan` by assignPlan.
+  featureTier       StorePlan @default(free) @map("feature_tier")
+  limits            Json
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  subscriptions StoreSubscription[]
+
+  @@map("plans")
+}
+
+/// One row per store: which plan it is on and where it is in the billing cycle.
+/// Task 3 (EGP billing) owns the provider columns and the status transitions;
+/// task 1 only reads `status`/`planCode`. A store with no row resolves through
+/// its legacy `Store.plan` enum (see PlanService.getEntitlements).
+///
+/// RLS: store-scoped, 4 explicit policies in migration
+/// 20261003130000_plans_and_store_subscriptions (same shape as
+/// store_usage_snapshots). NOTE for the strict-RLS sweep: this table is
+/// written by system paths (provisioning, admin plan assignment, billing
+/// cron) that run with no tenant context.
+model StoreSubscription {
+  id                 String             @id @default(uuid())
+  storeId            String             @unique @map("store_id")
+  planCode           String             @map("plan_code")
+  status             SubscriptionStatus @default(active)
+  currentPeriodStart DateTime?          @map("current_period_start")
+  currentPeriodEnd   DateTime?          @map("current_period_end")
+  trialEndsAt        DateTime?          @map("trial_ends_at")
+  cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
+
+  // Provider fields — nullable until task 3 (Kashier/Paymob adapter) fills them.
+  provider                 String? @map("provider")
+  providerCustomerId       String? @map("provider_customer_id")
+  providerSubscriptionId   String? @map("provider_subscription_id")
+  providerPaymentMethodRef String? @map("provider_payment_method_ref")
+
+  /// First day (Cairo) of the month in which this store went OVER its monthly
+  /// order cap. Orders are never blocked at checkout (see PlanLimitService);
+  /// this is the flag the Billing page and the merchant notification read.
+  ordersOverLimitMonth      DateTime? @map("orders_over_limit_month") @db.Date
+  ordersOverLimitNotifiedAt DateTime? @map("orders_over_limit_notified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  plan  Plan  @relation(fields: [planCode], references: [code], onUpdate: Cascade, onDelete: Restrict)
+
+  @@index([planCode])
+  @@index([status])
+  @@map("store_subscriptions")
 }

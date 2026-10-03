@@ -181,7 +181,7 @@ describe('strict RLS coverage (integration)', () => {
       );
       await tx.$executeRawUnsafe(
         `INSERT INTO public.payments (id, order_id, amount, currency, provider, status, created_at, updated_at)
-         VALUES ('${pay}', '${orderB}', 10, 'KWD', 'cod', 'pending', now(), now())`
+         VALUES ('${pay}', '${orderB}', 10, 'EGP', 'cod', 'pending', now(), now())`
       );
       bulkJobB = bj;
       paymentB = pay;

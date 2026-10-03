@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert } from '../../../../../components/Alert';
 import { useT } from '@/i18n/useT';
 
+import { minorToDecimalString, roundToMinor } from '@force/shared';
 function getWebhookUrl(providerId: string): string {
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/$/, '');
   const base = apiBase.endsWith('/api/v1') ? apiBase : `${apiBase}/api/v1`;
@@ -209,12 +210,12 @@ function CodFields({
             <input
               type="number"
               min={0}
-              step={0.001}
-              value={((Number(form.fixedFee) || 0) / 1000).toFixed(3)}
+              step={0.01}
+              value={minorToDecimalString(Number(form.fixedFee) || 0)}
               onChange={e =>
                 onUpdateField(
                   'fixedFee',
-                  Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 1000))
+                  Math.max(0, roundToMinor(parseFloat(e.target.value) || 0))
                 )
               }
               placeholder={t('fixedFeePlaceholder')}

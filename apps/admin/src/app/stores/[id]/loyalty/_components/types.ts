@@ -12,7 +12,7 @@ export interface LoyaltyTier {
 export type TierKey = 'bronze' | 'silver' | 'gold' | 'platinum';
 
 export interface LoyaltySettings {
-  pointsPerDinar: number;
+  pointsPerMajorUnit: number;
   signupBonus: number;
   referralBonus: number;
   reviewBonus: number;
@@ -57,7 +57,7 @@ export const TIER_COLORS: Record<string, { bg: string; text: string; icon: strin
 export const TIER_KEYS: TierKey[] = ['bronze', 'silver', 'gold', 'platinum'];
 
 export const DEFAULT_SETTINGS: LoyaltySettings = {
-  pointsPerDinar: 10,
+  pointsPerMajorUnit: 1,
   signupBonus: 100,
   referralBonus: 200,
   reviewBonus: 50,

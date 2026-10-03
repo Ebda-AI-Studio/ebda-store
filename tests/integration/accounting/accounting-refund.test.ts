@@ -69,7 +69,7 @@ describe('refund posts a reversal journal entry', () => {
         shipping: 0,
         discount: 0,
         total: 2000,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
         items: {
@@ -158,7 +158,7 @@ describe('refund posts a reversal journal entry', () => {
         shipping: 0,
         discount: 0,
         total: 1000,
-        currency: 'KWD',
+        currency: 'EGP',
         shippingAddress: {},
         billingAddress: {},
       },

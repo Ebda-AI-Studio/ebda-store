@@ -5,7 +5,7 @@ import {
   toBundleLines,
   percentToBasisPoints,
   basisPointsToPercent,
-  kwdToFils,
+  majorToMinor,
   extractVariantOptions,
   zeroPriceWarning,
   UNTRACKED_AVAILABILITY_CAP,
@@ -95,18 +95,19 @@ describe('percentToBasisPoints / basisPointsToPercent', () => {
   });
 });
 
-describe('kwdToFils', () => {
-  it('converts a KWD decimal string to integer fils', () => {
-    expect(kwdToFils('11.999')).toBe(11999);
+describe('majorToMinor', () => {
+  it('converts a EGP decimal string to integer piastres', () => {
+    expect(majorToMinor('119.99')).toBe(11999);
   });
 
-  it('treats empty/invalid input as 0 fils, not NaN', () => {
-    expect(kwdToFils('')).toBe(0);
-    expect(kwdToFils('not a number')).toBe(0);
+  it('treats empty/invalid input as 0 piastres, not NaN', () => {
+    expect(majorToMinor('')).toBe(0);
+    expect(majorToMinor('not a number')).toBe(0);
   });
 
-  it('rounds sub-fils precision', () => {
-    expect(kwdToFils('1.0005')).toBe(1001); // 1000.5 -> rounds to 1001
+  it('rounds sub-piastres precision', () => {
+    expect(majorToMinor('1.005')).toBe(101); // 100.5 -> half up to 101 (not float 100.49999…)
+    expect(majorToMinor('1.0049')).toBe(100);
   });
 });
 

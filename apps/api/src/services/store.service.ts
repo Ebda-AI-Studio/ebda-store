@@ -11,7 +11,14 @@ import {
 import { detachStoreAuditLogs, unlinkUserAuditLogs } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
-import { slugify, slugifyWithFallback, isReservedSlug, storeHost } from '@force/shared';
+import {
+  slugify,
+  slugifyWithFallback,
+  isReservedSlug,
+  storeHost,
+  REGION,
+  LEGACY_STORE_PLAN_TO_PLAN_CODE,
+} from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -21,6 +28,8 @@ import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
+import { assertPlanAllows, assertWithinLimit } from './plan-limit.service';
+import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -354,6 +363,12 @@ export class StoreService {
       }
     }
 
+    // Plan gate (SP5): a brand-new store starts on the default plan, which
+    // decides whether it may carry a custom domain at creation.
+    if (data.domain) {
+      await assertPlanAllows(LEGACY_STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
+    }
+
     const store = await prisma.store.create({
       data: {
         name: data.name,
@@ -361,8 +376,9 @@ export class StoreService {
         domain: data.domain,
         ownerId,
         settings: data.settings || {
-          currency: 'KWD',
-          locale: 'en-KW',
+          currency: REGION.currency,
+          locale: 'ar-EG',
+          defaultLanguage: REGION.defaultLocale,
         },
         // 2026-07-12 design structural batch: new stores get the persona-chrome
         // completion + card-frame dedup ON by default (Ahmad-approved for NEW
@@ -382,7 +398,28 @@ export class StoreService {
       },
     });
 
-    // Seed Chart of Accounts (Kuwait retail template, 27 system accounts).
+    // Every store gets a subscription row from day one (SP5): the plan the
+    // enum default put it on, mapped onto a plan code. Written in the new
+    // store's own scope (store_subscriptions is under strict RLS).
+    //
+    // Default VAT (Ebda: 14%, `REGION.defaultVatBps`) is seeded in the same
+    // scope as an ACTIVE rate row so the merchant's tax page shows it and only
+    // has to flip `taxEnabled` once VAT-registered (the charge is gated on
+    // `Store.taxEnabled`, ruling TAX-1); it is editable per store like any other.
+    await withStore(store.id, async tx => {
+      await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
+      await tx.taxRate.create({
+        data: {
+          storeId: store.id,
+          name: 'VAT',
+          nameAr: 'ضريبة القيمة المضافة',
+          rate: REGION.defaultVatBps / 100,
+          isActive: true,
+        },
+      });
+    });
+
+    // Seed Chart of Accounts (Egypt retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.
     await seedCoaForStore(store.id);
 
@@ -419,6 +456,8 @@ export class StoreService {
 
     // Check domain uniqueness if changing
     if (data.domain && data.domain !== store.domain) {
+      // Plan gate (SP5): attaching a custom domain needs the plan capability.
+      await assertWithinLimit(storeId, 'customDomain');
       const existingDomain = await prisma.store.findUnique({
         where: { domain: data.domain },
       });
@@ -702,8 +741,8 @@ export class StoreService {
     // sits in 'pending' fulfillment but the customer's card was already
     // charged (Tap/MyFatoorah webhook landed the payment but a fulfillment
     // worker hasn't moved the order forward yet). Without the paymentStatus
-    // arm, dashboards showed Revenue=0 even when KWDs had been collected.
-    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, KWD 0.000 revenue.
+    // arm, dashboards showed Revenue=0 even when money had been collected.
+    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, EGP 0.000 revenue.
     const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
       [
         prisma.product.count({ where: { storeId, status: 'active' } }),

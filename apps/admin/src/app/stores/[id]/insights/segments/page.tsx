@@ -8,7 +8,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,9 +122,9 @@ export default function InsightsSegmentsPage() {
                 {t('totalMonetaryValue')}
               </p>
               <p className="text-2xl font-semibold font-mono text-green-700">
-                {filsToKwd(totalRevenue)}
+                {minorToMajor(totalRevenue)}
               </p>
-              <p className="text-xs text-muted-foreground">KWD</p>
+              <p className="text-xs text-muted-foreground">EGP</p>
             </div>
           </div>
         )}
@@ -181,7 +181,7 @@ export default function InsightsSegmentsPage() {
                     <div>
                       <p className="text-xs opacity-70">{t('revenue')}</p>
                       <p className="font-mono font-semibold">
-                        {filsToKwd(seg.totalMonetaryFils)} KWD
+                        {minorToMajor(seg.totalMonetaryFils)} EGP
                       </p>
                       <p className="text-xs opacity-60">
                         {t('shareOfTotal', { pct: revSharePct })}

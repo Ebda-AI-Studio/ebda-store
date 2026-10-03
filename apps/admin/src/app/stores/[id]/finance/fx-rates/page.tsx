@@ -4,13 +4,13 @@
  * FX Rate Registry — Admin page for multi-currency accounting.
  *
  * Allows store admins to record and view the exchange rates used for
- * non-KWD expense and journal entry conversions.
+ * non-EGP expense and journal entry conversions.
  *
  * Feature-gated: accounting.multi_currency (Enterprise).
  * If the feature is inactive, a friendly notice is shown instead.
  *
- * Rate meaning: 1 unit of the foreign currency = rate KWD.
- * Example: { currency: 'USD', rate: 0.307 } means 1 USD = 0.307 KWD.
+ * Rate meaning: 1 unit of the foreign currency = rate EGP.
+ * Example: { currency: 'USD', rate: 50 } means 1 USD = 50 EGP.
  */
 
 import { useEffect, useState } from 'react';
@@ -38,7 +38,7 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const NON_KWD_CURRENCIES = ALLOWED_CURRENCIES.filter(c => c !== 'KWD');
+const NON_BASE_CURRENCIES = ALLOWED_CURRENCIES.filter(c => c !== 'EGP');
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -190,7 +190,7 @@ export default function FxRatesPage() {
                 onChange={e => setFormCurrency(e.target.value)}
                 className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
               >
-                {NON_KWD_CURRENCIES.map(c => (
+                {NON_BASE_CURRENCIES.map(c => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -224,7 +224,7 @@ export default function FxRatesPage() {
             </label>
           </div>
 
-          {/* Live KWD preview */}
+          {/* Live EGP preview */}
           {formRate && Number(formRate) > 0 && (
             <p className="text-xs text-muted-foreground">
               {t('ratePreview', {
@@ -258,7 +258,7 @@ export default function FxRatesPage() {
               className="border border-border rounded px-2 py-1 text-xs"
             >
               <option value="">{t('allCurrencies')}</option>
-              {NON_KWD_CURRENCIES.map(c => (
+              {NON_BASE_CURRENCIES.map(c => (
                 <option key={c} value={c}>
                   {c}
                 </option>

@@ -14,7 +14,7 @@ import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay, fromMinor, REGION } from '@force/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
@@ -102,8 +102,8 @@ function SuccessContent() {
                 orderId: fetchedOrder.id,
                 contentIds: fetchedOrder.items.map(item => item.productId),
                 numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
-                value: fetchedOrder.total / 1000,
-                currency: 'KWD',
+                value: fromMinor(fetchedOrder.total),
+                currency: REGION.currency,
               })
             );
           }

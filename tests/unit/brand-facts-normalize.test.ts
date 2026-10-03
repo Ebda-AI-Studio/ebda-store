@@ -9,17 +9,17 @@ describe('normalizeBrandFacts', () => {
   it('keeps the six prompted keys in their expected shapes', () => {
     expect(
       normalizeBrandFacts({
-        location: 'Kuwait',
+        location: 'Egypt',
         region: 'GCC',
-        currency: 'KWD',
+        currency: 'EGP',
         languages: ['Arabic', 'English'],
         keyCategories: ['Nuts'],
         contactMethods: ['email'],
       })
     ).toEqual({
-      location: 'Kuwait',
+      location: 'Egypt',
       region: 'GCC',
-      currency: 'KWD',
+      currency: 'EGP',
       languages: ['Arabic', 'English'],
       keyCategories: ['Nuts'],
       contactMethods: ['email'],
@@ -29,7 +29,7 @@ describe('normalizeBrandFacts', () => {
   it('drops nested objects, nulls and unknown keys instead of persisting them', () => {
     expect(
       normalizeBrandFacts({
-        location: { city: 'Kuwait City' },
+        location: { city: 'Cairo' },
         currency: null,
         address: { line1: 'x' },
         contactMethods: [{ type: 'email', value: 'x@y.com' }, 'whatsapp'],

@@ -363,7 +363,7 @@
      pointer + hover capability. `md:opacity-0 md:group-hover:opacity-100`
      gated on VIEWPORT WIDTH instead of input capability made this
      unreachable on a touch tablet (issue #1356) — a real device for a
-     Kuwait merchant editing product images. Visible by default; the media
+     Egyptian merchant editing product images. Visible by default; the media
      query only ever hides it, never the reverse, so a browser/environment
      that can't evaluate `hover`/`pointer` (or reports them oddly) fails
      open to "always visible" rather than open to "unreachable". */

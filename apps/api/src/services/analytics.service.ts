@@ -96,7 +96,7 @@ interface DashboardStats {
   totalProfit: number | null;
   /** Order lines in the period whose cost is missing (excluded from `totalProfit`). */
   profitItemsMissingCost: number;
-  /** Revenue (fils) of those lines — the sales `totalProfit` does not cover. */
+  /** Revenue (piastres) of those lines — the sales `totalProfit` does not cover. */
   profitRevenueMissingCost: number;
   /** `null` when either period's profit is unknown or incomplete. */
   profitChange: number | null;
@@ -418,7 +418,7 @@ export class AnalyticsService {
    * through to daily grouping — `this_year` sent ~270 daily bars.
    *
    * `tzOffsetMinutes` is the viewer's UTC offset (east-positive, e.g. +180 for
-   * Kuwait). The admin resolves presets to local midnight, so bucketing by UTC
+   * Egypt). The admin resolves presets to local midnight, so bucketing by UTC
    * day put a phantom leading bucket for the previous UTC day in front of every
    * range. Buckets are computed on `created_at + offset`, so a key such as
    * `2026-09-01` is the viewer's calendar day. Weeks start on Monday (Postgres

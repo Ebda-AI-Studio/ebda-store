@@ -64,7 +64,7 @@ import {
   ALL_MERCHANT_SCOPES,
 } from '@api/mcp/merchant-auth';
 
-const STORE = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'KWD', domain: null };
+const STORE = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'EGP', domain: null };
 const OTHER_STORE_ID = 'store-2';
 
 function reqWithKey(key?: string): Request {

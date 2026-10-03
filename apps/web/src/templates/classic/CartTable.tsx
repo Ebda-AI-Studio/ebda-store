@@ -7,6 +7,7 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 /**
  * Classic template — cart list as a clean, table-style grid. Square
  * corners, thin dividers, formal typography matching Classic's
@@ -15,7 +16,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 export default function ClassicCartTable({
   items,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
@@ -24,7 +25,7 @@ export default function ClassicCartTable({
   const { isRtl: ctxIsRtl } = useLanguage();
   const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${localize((price / 1000).toFixed(3))} ${currency}`;
+  const format = (price: number) => `${localize(minorToDecimalString(price))} ${currency}`;
 
   return (
     <div

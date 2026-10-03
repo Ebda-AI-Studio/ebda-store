@@ -19,8 +19,8 @@ function StatCard({ label, value }: StatCardProps) {
 
 import { formatPrice } from '@/lib/format';
 
-/** Converts fils (integer) to a KWD display string with 3 decimal places. */
-const formatKwd = formatPrice;
+/** Converts piastres (integer) to an EGP display string (2 decimals). */
+const formatMajor = formatPrice;
 
 interface AbandonmentStatsGridProps {
   stats: AbandonmentStats | null;
@@ -34,7 +34,7 @@ export function AbandonmentStatsGrid({ stats }: AbandonmentStatsGridProps) {
       <StatCard label={t('statsTotal')} value={stats?.total ?? 0} />
       <StatCard label={t('statsLast7')} value={stats?.last7d ?? 0} />
       <StatCard label={t('statsLast30')} value={stats?.last30d ?? 0} />
-      <StatCard label={t('statsValue')} value={formatKwd(stats?.totalValue ?? 0)} />
+      <StatCard label={t('statsValue')} value={formatMajor(stats?.totalValue ?? 0)} />
     </div>
   );
 }

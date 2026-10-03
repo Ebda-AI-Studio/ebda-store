@@ -49,19 +49,19 @@ export function buildStorefrontMetadata(
 
   // Default OG/meta description when the merchant set no SEO description and no
   // store description. Kept generic + truthful — do NOT bake a shipping promise
-  // ("free delivery over 20 KWD") into the platform default: that claim isn't
+  // ("free delivery over 20 EGP") into the platform default: that claim isn't
   // true for every store and surfaced on stores that never offered it.
   const description =
     localizedDescription ||
     (preferAr
-      ? `تسوق أونلاين من ${localizedStoreName} في الكويت.`
-      : `Shop ${localizedStoreName} online in Kuwait.`);
+      ? `تسوق أونلاين من ${localizedStoreName} في مصر.`
+      : `Shop ${localizedStoreName} online in Egypt.`);
 
   const titleDefault =
     localizedTitle ||
     (preferAr
-      ? `${localizedStoreName} - تسوق أونلاين في الكويت`
-      : `${localizedStoreName} - Online Shopping in Kuwait`);
+      ? `${localizedStoreName} - تسوق أونلاين في مصر`
+      : `${localizedStoreName} - Online Shopping in Egypt`);
 
   // Resolve the og:image entry: use the merchant's explicit raster ogImage when
   // set, else the store-aware `/og?slug=<slug>` card (renders the store's logo
@@ -180,8 +180,8 @@ export function buildStorefrontMetadata(
       'e-commerce',
       'online store',
       'shopping',
-      'Kuwait',
-      'KWD',
+      'Egypt',
+      'EGP',
       'delivery',
       localizedStoreName,
     ],

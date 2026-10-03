@@ -47,7 +47,7 @@ async function seedBackorderStore() {
       slug: `backorder-rls-${suffix}`,
       ownerId: owner.id,
       status: 'active',
-      currency: 'KWD',
+      currency: 'EGP',
       marketingPixels: {},
     },
   });

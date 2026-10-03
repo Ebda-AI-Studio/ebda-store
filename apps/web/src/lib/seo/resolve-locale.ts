@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 
+import { resolveDefaultLanguage } from '@force/shared';
 /**
  * The storefront's only two render locales. Kept as its own type (rather
  * than importing `Language` from LanguageContext) so this module has zero
@@ -38,7 +39,7 @@ export async function resolveStorefrontLocale(
   const cookieStore = await cookies();
   const cookieLang = cookieStore.get('force-language')?.value;
   if (cookieLang === 'ar' || cookieLang === 'en') return cookieLang;
-  return storeDefaultLanguage === 'ar' ? 'ar' : 'en';
+  return resolveDefaultLanguage(storeDefaultLanguage);
 }
 
 /**

@@ -78,7 +78,7 @@ beforeAll(async () => {
       // higher tier.
       plan: 'starter',
       status: 'active',
-      currency: 'KWD',
+      currency: 'EGP',
     },
   });
   storeId = store.id;
@@ -163,7 +163,7 @@ describe('GET /public/feed/products.json — agent_feed add-on', () => {
     const item = body.products[0];
     expect(item.title).toBe('Olive Oil 1L');
     expect(item.link.endsWith(`/products/${ACTIVE_SLUG}`)).toBe(true);
-    expect(item.price).toMatch(/^\d+\.\d{3} KWD$/);
+    expect(item.price).toMatch(/^\d+\.\d{2} EGP$/);
     expect(item.availability).toBe('in_stock');
 
     await clearAgentFeedOverride();

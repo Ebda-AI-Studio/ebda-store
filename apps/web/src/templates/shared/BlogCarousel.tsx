@@ -95,7 +95,7 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
                   <div className="p-4">
                     {date && (
                       <p className="text-xs text-foreground/55">
-                        {new Date(date).toLocaleDateString(isRtl ? 'ar-KW' : 'en-KW', {
+                        {new Date(date).toLocaleDateString(isRtl ? 'ar-EG' : 'en-EG', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',

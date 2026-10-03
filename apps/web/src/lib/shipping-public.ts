@@ -10,7 +10,7 @@ import type { PublicShippingZone } from './structured-data';
  *
  * Real merchants overwhelmingly use AREA RATES: that is what the admin's
  * `AreaRateEditor` writes, and Pecannbee (the reference store) has a full
- * Kuwait area list with ZERO zones. Reading zones alone shipped a block that
+ * Egypt area list with ZERO zones. Reading zones alone shipped a block that
  * was silently dead for every such store — the fetch succeeded, returned an
  * empty list, and the block was correctly-but-uselessly omitted forever.
  *

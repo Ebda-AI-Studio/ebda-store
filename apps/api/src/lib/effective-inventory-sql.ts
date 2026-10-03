@@ -25,7 +25,7 @@ export const ON_HAND_SQL = Prisma.sql`CASE
 END`;
 
 /**
- * On-hand stock VALUE (fils) of one product row aliased `p` — the valuation
+ * On-hand stock VALUE (piastres) of one product row aliased `p` — the valuation
  * twin of `ON_HAND_SQL`, using the same variant rule.
  *
  * A variant product is valued per ACTIVE variant at that variant's own cost,
@@ -48,7 +48,7 @@ export const STOCK_VALUE_SQL = Prisma.sql`CASE
 END`;
 
 /**
- * Stock VALUE (fils) held on DISABLED variants of one product row aliased `p`
+ * Stock VALUE (piastres) held on DISABLED variants of one product row aliased `p`
  * — the exact inverse predicate of `STOCK_VALUE_SQL`'s variant branch
  * (issue 2146). Those units are excluded from every stock figure, so the
  * finance dashboard shows them on their own line instead of letting the
@@ -62,7 +62,7 @@ export const DISABLED_VARIANT_STOCK_VALUE_SQL = Prisma.sql`COALESCE(
 )`;
 
 /**
- * The store's on-hand stock value in fils — ONE query for the finance
+ * The store's on-hand stock value in piastres — ONE query for the finance
  * dashboard and the analytics inventory snapshot, which used to carry two
  * copies of it. Non-deleted products, valued by `STOCK_VALUE_SQL`: a disabled
  * variant that still holds units counts for nothing (owner decision

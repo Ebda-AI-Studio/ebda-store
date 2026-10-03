@@ -17,7 +17,7 @@ import {
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor, getProductCardTextSizes } from '@force/shared';
+import { resolveColor, getProductCardTextSizes, fromMinor, REGION } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -41,7 +41,7 @@ import {
 function ElegantProductCard({
   product,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   quantityInCart = 0,
   onAddToCart,
   onAddToWishlist,
@@ -113,7 +113,7 @@ function ElegantProductCard({
   // ignored. See lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
-  // BUG 1 fix: helper text for correct KWD/pct badge.
+  // BUG 1 fix: helper text for correct EGP/pct badge.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
@@ -436,7 +436,7 @@ function ElegantProductCard({
             {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />
-              <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+              <meta itemProp="price" content={String(fromMinor(pricing.displayPrice))} />
             </span>
             {priceVisible && (
               <Price

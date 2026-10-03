@@ -64,7 +64,7 @@ describe('platform root redirect', () => {
 
   it('titles the platform sentinel as a 404, not as a merchant store', () => {
     // DEFAULT_STORE is named "Force", so the shared storefront metadata builder
-    // produced "Force - Online Shopping in Kuwait" — a merchant title for a
+    // produced "Force - Online Shopping in Egypt" — a merchant title for a
     // store that does not exist, on a page whose body is a 404. The tab kept
     // making a promise the page had stopped making.
     const src = web('app/layout.tsx');

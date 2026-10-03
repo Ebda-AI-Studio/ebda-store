@@ -204,7 +204,7 @@ export async function balanceSheet(storeId: string, asOf: Date) {
     totalLiabilities,
     totalEquity,
     currentEarnings: earnings,
-    /** Assets − (Liabilities + Equity), in fils. 0 when the books balance. */
+    /** Assets − (Liabilities + Equity), in piastres. 0 when the books balance. */
     difference: totalAssets - (totalLiabilities + totalEquity),
   };
 }

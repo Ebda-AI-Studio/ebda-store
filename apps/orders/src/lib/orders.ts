@@ -28,7 +28,7 @@ export interface OrderPayment {
   paymentUrl?: string | null;
   /** Legacy alias for paymentUrl kept for backwards compatibility. */
   paymentLink?: string | null;
-  /** Fils already refunded from this payment (partial refunds accumulate). */
+  /** Piastres already refunded from this payment (partial refunds accumulate). */
   refundedAmount?: number | null;
   createdAt?: string;
 }
@@ -101,7 +101,7 @@ export interface AddressJson {
   floor?: string;
   apartment?: string;
   notes?: string;
-  // Governorate (top-level KW administrative division).
+  // Governorate (top-level Egyptian governorate (محافظة)).
   governorate?: string;
   governorateAr?: string;
   // Bilingual fallback fields stored as the customer entered them.
@@ -125,12 +125,12 @@ export interface OrderDetail extends Order {
   promotionDiscount?: number;
   /** The promotion that discounted this order, when `promotionDiscount` > 0. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
-  /** The loyalty-points redemption portion of `discount`, in fils (0 when no
+  /** The loyalty-points redemption portion of `discount`, in piastres (0 when no
    *  points were redeemed). */
   loyaltyDiscount?: number;
   /** Points redeemed for `loyaltyDiscount`; null on a pre-feature order. */
   loyaltyPointsRedeemed?: number | null;
-  /** Customer-wallet (store credit) portion of `total`, in fils (D1). The
+  /** Customer-wallet (store credit) portion of `total`, in piastres (D1). The
    *  gateway / courier collects `total - walletAmount`. 0 or absent for every
    *  order that did not use the wallet. */
   walletAmount?: number;

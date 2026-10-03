@@ -1,14 +1,12 @@
 import type { AddressJson } from './orders';
 
+import { REGION, minorToDecimalString } from '@force/shared';
 /**
- * Order money is stored in fils (1 KWD = 1000 fils) — same convention as the
- * admin's order formatMoney. Non-KWD currencies use 2 decimals / 100 minor units.
+ * Order money is stored in minor units (EGP: 1 EGP = 100 piastres) — same convention as the
+ * admin's order formatMoney. The decimals/scale come from `currencyExponent(currency)`.
  */
-export function formatMoney(minor: number, currency = 'KWD'): string {
-  const decimals = currency === 'KWD' ? 3 : 2;
-  const divisor = currency === 'KWD' ? 1000 : 100;
-  const major = (minor / divisor).toFixed(decimals);
-  return `${major} ${currency}`;
+export function formatMoney(minor: number, currency = REGION.currency): string {
+  return `${minorToDecimalString(minor, currency)} ${currency}`;
 }
 
 export function formatDateTime(iso: string | null | undefined, locale: string): string {
@@ -25,7 +23,7 @@ export function formatDateTime(iso: string | null | undefined, locale: string): 
 /**
  * Tiny `{token}` interpolation for the PWA's flat dictionary (the admin uses
  * next-intl's ICU; this is the lightweight equivalent). `fmt('Remaining: {amount}',
- * { amount: '1.500 KWD' })` → `'Remaining: 1.500 KWD'`.
+ * { amount: '1.500 EGP' })` → `'Remaining: 1.500 EGP'`.
  */
 export function fmt(template: string, vars: Record<string, string | number> = {}): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => (key in vars ? String(vars[key]) : `{${key}}`));
@@ -61,7 +59,7 @@ interface ExtendedAddressJson extends AddressJson {
 }
 
 /**
- * Build human-readable delivery address lines — richer bilingual / Kuwait-aware
+ * Build human-readable delivery address lines — richer bilingual / Egypt-aware
  * version ported from the admin order-detail `formatAddressLines`. When `locale`
  * is `'ar'`, Arabic field values (areaAr, cityAr, streetAr) are preferred over
  * their English counterparts. Legacy `state` / `address1` keys from pre-2026-06-15

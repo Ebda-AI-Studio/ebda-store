@@ -7,7 +7,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
 import { prisma } from '@force/database';
-import { KUWAIT_GOVERNORATES, BRAND } from '@force/shared';
+import { EGYPT_GOVERNORATES, minorToDecimalString, tryToMinor, REGION, BRAND } from '@force/shared';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -97,7 +97,7 @@ router.get(
 
 // GET /:storeId/shipping/area-rates/export.xlsx — download current area rates
 // as an xlsx the merchant can fill in and re-import. If the store has no rates
-// yet, exports a TEMPLATE: every canonical Kuwait area with an empty fee.
+// yet, exports a TEMPLATE: every canonical Egypt area with an empty fee.
 //
 // Literal `export.xlsx` segment, placed beside the area-rates list route and
 // BEFORE the `/:id` zone route so Express does not match it as a zone id.
@@ -125,8 +125,8 @@ router.get(
         { header: 'Governorate (AR)', key: 'governorateAr', width: 18 },
         { header: 'Area', key: 'area', width: 22 },
         { header: 'Area (AR)', key: 'areaAr', width: 22 },
-        { header: 'Delivery Fee (KWD)', key: 'deliveryFee', width: 20 },
-        { header: 'Free Shipping Over (KWD)', key: 'freeShippingThreshold', width: 24 },
+        { header: 'Delivery Fee (EGP)', key: 'deliveryFee', width: 20 },
+        { header: 'Free Shipping Over (EGP)', key: 'freeShippingThreshold', width: 24 },
         { header: 'Active', key: 'isActive', width: 10 },
       ];
       sheet.getRow(1).font = { bold: true };
@@ -136,8 +136,8 @@ router.get(
         fgColor: { argb: 'FFF1F5F9' },
       };
 
-      // Fee is stored in fils → show as KWD with 3 decimals.
-      const filsToKwd = (fils: number) => (fils / 1000).toFixed(3);
+      // Fee is stored in piastres → show as EGP with 2 decimals.
+      const minorToMajor = (piastres: number) => minorToDecimalString(piastres);
 
       if (rates.length > 0) {
         for (const r of rates) {
@@ -147,9 +147,9 @@ router.get(
               governorateAr: r.governorateAr,
               area: r.area,
               areaAr: r.areaAr,
-              deliveryFee: filsToKwd(r.deliveryFee),
+              deliveryFee: minorToMajor(r.deliveryFee),
               freeShippingThreshold:
-                r.freeShippingThreshold != null ? filsToKwd(r.freeShippingThreshold) : '',
+                r.freeShippingThreshold != null ? minorToMajor(r.freeShippingThreshold) : '',
               isActive: r.isActive ? 'Yes' : 'No',
             })
           );
@@ -157,7 +157,7 @@ router.get(
       } else {
         // Template: every canonical area, empty fee / blank Active so the
         // merchant fills it and re-imports.
-        for (const gov of KUWAIT_GOVERNORATES) {
+        for (const gov of EGYPT_GOVERNORATES) {
           for (const area of gov.areas) {
             sheet.addRow({
               governorate: gov.en,
@@ -480,10 +480,10 @@ async function parseXlsxBufferToRows(buf: Buffer): Promise<Record<string, string
 // ─── ShippingAreaRate schemas ──────────────────────────────────────────────
 
 const areaRateSchema = z.object({
-  // Country defaults to Kuwait so existing Kuwait-only payloads keep working;
+  // Country defaults to Egypt so existing Egypt-only payloads keep working;
   // a custom country/province/area is just a row with these set freely.
-  country: z.string().min(1).max(60).optional().default('Kuwait'),
-  countryAr: z.string().min(1).max(60).optional().default('الكويت'),
+  country: z.string().min(1).max(60).optional().default(REGION.countryName.en),
+  countryAr: z.string().min(1).max(60).optional().default(REGION.countryName.ar),
   governorate: z.string().min(1).max(60),
   governorateAr: z.string().min(1).max(60),
   area: z.string().min(1).max(60),
@@ -506,7 +506,7 @@ const importRowSchema = z.object({
   governorate: z.string().max(60).optional(),
   area: z.string().min(1).max(60),
   areaAr: z.string().max(60).optional(),
-  // KWD value — accept number or string ("1.500"); parsed to fils server-side.
+  // EGP value — accept number or string ("1.500"); parsed to piastres server-side.
   deliveryFee: z.union([z.number(), z.string()]).optional(),
   freeShippingThreshold: z.union([z.number(), z.string()]).optional().nullable(),
   isActive: z.union([z.boolean(), z.string()]).optional(),
@@ -524,8 +524,8 @@ interface ResolvedAreaRate {
   governorateAr: string;
   area: string;
   areaAr: string;
-  deliveryFee: number; // fils
-  freeShippingThreshold: number | null; // fils
+  deliveryFee: number; // piastres
+  freeShippingThreshold: number | null; // piastres
   isActive: boolean;
 }
 
@@ -536,16 +536,16 @@ interface RowError {
 }
 
 /**
- * Parse a KWD value (number | string like "1.500") into integer fils (×1000).
+ * Parse an EGP value (number | string like "12.50") into integer piastres.
+ * STRICT (`tryToMinor`): more than 2 decimals ("12.505") is rejected, not rounded.
  * Returns null for blank/invalid/negative so callers can flag an error.
  */
-export function parseKwdToFils(value: unknown): number | null {
+export function parseMajorToMinor(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const str = String(value).trim();
   if (str === '') return null;
-  const n = Number(str);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n * 1000);
+  const minor = tryToMinor(str);
+  return minor !== null && minor >= 0 ? minor : null;
 }
 
 /** Parse a loose truthy/falsy import cell (Yes/No/true/1/blank) → boolean. */
@@ -559,10 +559,10 @@ function parseBool(value: unknown, fallback = true): boolean {
 
 /**
  * Resolve a raw import row to a canonical area rate using the @force/shared
- * Kuwait dataset. Matching is case-insensitive on the EN area name, and also
+ * Egypt dataset. Matching is case-insensitive on the EN area name, and also
  * accepts the exact AR area name. If a `governorate` is supplied it must match
  * the resolved area's governorate (EN or AR, case-insensitive). Returns either
- * a fully canonical {value} (EN+AR names from the dataset, fee in fils) or an
+ * a fully canonical {value} (EN+AR names from the dataset, fee in piastres) or an
  * {error} describing why the row was skipped.
  *
  * Exported for unit testing the area-name → canonical resolution.
@@ -579,9 +579,9 @@ export function resolveImportRow(
   const areaLower = rawArea.toLowerCase();
 
   // Find the governorate + canonical area by EN (case-insensitive) or exact AR.
-  let matchedGov: (typeof KUWAIT_GOVERNORATES)[number] | undefined;
+  let matchedGov: (typeof EGYPT_GOVERNORATES)[number] | undefined;
   let matchedArea: { en: string; ar: string } | undefined;
-  for (const gov of KUWAIT_GOVERNORATES) {
+  for (const gov of EGYPT_GOVERNORATES) {
     const found = gov.areas.find(a => a.en.toLowerCase() === areaLower || a.ar === rawArea);
     if (found) {
       matchedGov = gov;
@@ -609,8 +609,8 @@ export function resolveImportRow(
     }
   }
 
-  const fils = parseKwdToFils(row.deliveryFee);
-  if (fils === null) {
+  const piastres = parseMajorToMinor(row.deliveryFee);
+  if (piastres === null) {
     return { error: { row: rowNumber, area: rawArea, reason: 'invalid delivery fee' } };
   }
 
@@ -620,7 +620,7 @@ export function resolveImportRow(
     row.freeShippingThreshold !== null &&
     String(row.freeShippingThreshold).trim() !== ''
   ) {
-    const parsedThreshold = parseKwdToFils(row.freeShippingThreshold);
+    const parsedThreshold = parseMajorToMinor(row.freeShippingThreshold);
     if (parsedThreshold === null) {
       return {
         error: { row: rowNumber, area: rawArea, reason: 'invalid free-shipping threshold' },
@@ -635,7 +635,7 @@ export function resolveImportRow(
       governorateAr: matchedGov.ar,
       area: matchedArea.en,
       areaAr: matchedArea.ar,
-      deliveryFee: fils,
+      deliveryFee: piastres,
       freeShippingThreshold: threshold,
       isActive: parseBool(row.isActive, true),
     },
@@ -710,8 +710,8 @@ router.put(
 
 // POST /:storeId/shipping/area-rates/import — validate rows (from an uploaded
 // CSV/xlsx file OR a JSON body) and bulk-upsert. With dryRun=true returns a
-// preview WITHOUT writing. Rows resolve to canonical Kuwait areas; fees are
-// KWD → fils. Same upsert key (storeId, governorate, area) as the bulk PUT.
+// preview WITHOUT writing. Rows resolve to canonical Egypt areas; fees are
+// EGP → piastres. Same upsert key (storeId, governorate, area) as the bulk PUT.
 //
 // Two call shapes (both produce the same response):
 //   (a) multipart/form-data: file=<xlsx|csv>, dryRun=<true|false>  ← admin now uses this
@@ -827,16 +827,16 @@ router.post(
               where: {
                 storeId_country_governorate_area: {
                   storeId,
-                  // Import is Kuwait-only today; the column default keeps the key stable.
-                  country: 'Kuwait',
+                  // Import is Egypt-only today; the column default keeps the key stable.
+                  country: REGION.countryName.en,
                   governorate: rate.governorate,
                   area: rate.area,
                 },
               },
               create: {
                 storeId,
-                country: 'Kuwait',
-                countryAr: 'الكويت',
+                country: REGION.countryName.en,
+                countryAr: REGION.countryName.ar,
                 governorate: rate.governorate,
                 governorateAr: rate.governorateAr,
                 area: rate.area,

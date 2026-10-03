@@ -379,15 +379,15 @@ const bulkAiFaqAeoFn = inngest.createFunction(
           logger.info({ jobId, storeId }, 'bulk-ai-faq-aeo: cleared non-manual FAQs (force=true)');
         }
 
-        const prompt = `You are an SEO + AEO expert helping a Kuwait-based e-commerce store author its FAQ page.
+        const prompt = `You are an SEO + AEO expert helping an Egypt-based e-commerce store author its FAQ page.
 
 Store name: "${store.name}"${store.nameAr ? ` / "${store.nameAr}"` : ''}
 Description: ${store.description ?? 'Not provided.'}
 Sample categories: ${catNames}
 Sample products: ${prodNames}
 
-Draft exactly ${count} FAQs that real customers in Kuwait would ask. Cover:
-- Delivery / shipping (Kuwait city, governorates, GCC)
+Draft exactly ${count} FAQs that real customers in Egypt would ask. Cover:
+- Delivery / shipping (Egypt city, governorates, GCC)
 - Payment methods. This store accepts EXACTLY: ${paymentMethodsList}. List those method names; do NOT name payment-gateway companies (Tap, MyFatoorah, Hesabe, UPayments) — customers tap KNET / Visa / Mastercard / Apple Pay buttons, they don't know which back-end gateway processes them.
 - Returns and exchanges policy
 - Product care / usage relevant to this store's category
@@ -681,7 +681,7 @@ const bulkAiHowtoAeoFn = inngest.createFunction(
             .map(p => p.name)
             .join(', ') || 'none';
 
-        const prompt = `You are an AEO (Answer Engine Optimisation) expert writing HowTo guides for a Kuwait-based e-commerce store.
+        const prompt = `You are an AEO (Answer Engine Optimisation) expert writing HowTo guides for an Egypt-based e-commerce store.
 
 Store name: "${store.name}"${store.nameAr ? ` / "${store.nameAr}"` : ''}
 Categories: ${catNames}
@@ -691,7 +691,7 @@ Write exactly ${count} HowTo guides that help customers understand this store's 
 - How to place an order
 - How to choose the right size / variant
 - How to return or exchange an item
-- How to track your delivery in Kuwait
+- How to track your delivery in Egypt
 - How to care for [material/product type relevant to this store]
 - How to use [a specific product or service]
 

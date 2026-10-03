@@ -30,7 +30,7 @@ export function buildTagsPrompt(input: SuggestProductTagsInput): string {
   const existingList =
     existingTagNames.length > 0 ? existingTagNames.join(', ') : '(no tags yet in this store)';
 
-  return `You suggest product tags for a Kuwait-based e-commerce store called ${storeName}.
+  return `You suggest product tags for an Egypt-based e-commerce store called ${storeName}.
 
 Product name: ${product.name}
 Product description: ${product.description || '(none)'}

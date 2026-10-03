@@ -68,7 +68,7 @@ const StoreCatalogSchema = z.object({
         nameAr: z.string(), // '' not null — WBS uses this for AR menus
         descriptionAr: z.string(),
         slug: z.string(),
-        price: z.number().int().nonnegative(), // fils — integer
+        price: z.number().int().nonnegative(), // piastres — integer
         compareAtPrice: z.number().int().nonnegative().optional(),
         currency: z.string(),
         categoryIds: z.array(z.string().uuid()),
@@ -173,7 +173,7 @@ const MOCK_STORE = {
   slug: 'test-store',
   name: 'Test Store EN',
   nameAr: 'متجر اختبار',
-  currency: 'KWD',
+  currency: 'EGP',
   wbsEnabled: true,
   wbsClientId: 'client-uuid-123',
   wbsApiKey: 'encrypted:' + TEST_WBS_API_KEY, // encryption mock returns the suffix
@@ -357,7 +357,7 @@ describe('contract: GET /wa-bridge/store-catalog (FWB → WBS consumer)', () => 
     expect(typeof product.id).toBe('string');
     expect(typeof product.name).toBe('string');
     expect(typeof product.nameAr).toBe('string'); // '' not null — WBS uses this
-    expect(typeof product.price).toBe('number'); // fils integer
+    expect(typeof product.price).toBe('number'); // piastres integer
     expect(typeof product.inStock).toBe('boolean');
     expect(Array.isArray(product.categoryIds)).toBe(true);
     expect(Array.isArray(product.variants)).toBe(true);

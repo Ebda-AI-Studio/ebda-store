@@ -24,7 +24,7 @@ function order(overrides: Partial<OrderDetail>): OrderDetail {
     id: 'o1',
     storeId: 's1',
     orderNumber: 'ORD-1',
-    currency: 'KWD',
+    currency: 'EGP',
     subtotal: 10000,
     tax: 0,
     shipping: 0,
@@ -67,7 +67,7 @@ describe('orders PWA SummaryCard — loyalty redemption line (issue 197)', () =>
     const labels = rowLabels();
     expect(labels).toContain('loyaltyPoints (250)');
     expect(labels).toContain('discount');
-    // #2261 — the percentage is of the 300 fils on this row (3% of 10,000),
+    // #2261 — the percentage is of the 300 piastres on this row (3% of 10,000),
     // not the whole-order 8%.
     expect(screen.getByText(/\(3%\)/)).toBeTruthy();
     expect(screen.queryByText(/\(8%\)/)).toBeNull();

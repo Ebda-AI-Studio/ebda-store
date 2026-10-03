@@ -197,7 +197,7 @@ function mockHappyPathUpToEffects() {
       displayName: null,
       displayNameAr: null,
       supportedMethods: ['knet'],
-      supportedCurrencies: ['KWD'],
+      supportedCurrencies: ['EGP'],
       fixedFee: 0,
       percentageFee: 0,
     },

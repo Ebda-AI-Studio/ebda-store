@@ -208,7 +208,7 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
 
 Store name: "${store.name}"${store.nameAr ? ` / "${store.nameAr}"` : ''}
 Store URL: ${storeUrl}
-Description: ${store.description || 'Kuwait-based online store.'}
+Description: ${store.description || 'Egypt-based online store.'}
 
 Categories (${categories.length} total):
 ${catList || '(none yet)'}
@@ -716,22 +716,22 @@ const bulkAiBrandFactsFn = inngest.createFunction(
               .filter(Boolean)
               .join(', ') || 'not specified';
 
-          const prompt = `You are generating structured brand facts JSON for a Kuwait-based e-commerce store. This will be used for Schema.org Organization JSON-LD to improve LLM citations.
+          const prompt = `You are generating structured brand facts JSON for an Egypt-based e-commerce store. This will be used for Schema.org Organization JSON-LD to improve LLM citations.
 
 Store: "${store.name}"${store.nameAr ? ` / "${store.nameAr}"` : ''}
-Description: ${store.description || 'Kuwait-based online store.'}
+Description: ${store.description || 'Egypt-based online store.'}
 Categories: ${catNames}
 Contact: ${contactMethods}
-Location: Kuwait
+Location: Egypt
 
 Generate a JSON object with the following structure:
 {
-  "location": "Kuwait",
+  "location": "Egypt",
   "keyCategories": ["category1", "category2", ...],
   "languages": ["Arabic", "English"],
   "contactMethods": ["email", "whatsapp"],
   "region": "GCC",
-  "currency": "KWD"
+  "currency": "EGP"
 }
 
 Populate using only the information provided above. For keyCategories, use the category names. For contactMethods, only include what was explicitly stated. Keep it concise. Return ONLY the raw JSON object — no markdown, no code fences.`;

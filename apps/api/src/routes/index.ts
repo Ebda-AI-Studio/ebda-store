@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import merchantSignupRoutes from './merchant-signup.routes';
+import onboardingRoutes from './onboarding.routes';
+import setupGuideRoutes from './setup-guide.routes';
 import mfaRoutes from './mfa.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
@@ -69,6 +72,7 @@ import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
 import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
+import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
@@ -101,6 +105,7 @@ router.use('/mcp', mcpRoutes);
 // `/auth/` prefix does NOT exempt its PUT from CSRF: only the credential-less
 // auth entry points are exempt (`isCsrfExemptAuthPath`, issue 2425).
 router.use('/auth/me/sms-consent', smsConsentAccountRoutes);
+router.use('/auth/merchant', merchantSignupRoutes);
 router.use('/auth', authRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
@@ -256,6 +261,8 @@ router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 // ownership guard reuses an ambient context via
 // assertStoreOwnsInTenantScope — issue 2057. reconcileCountSession's own
 // runInTenantContext is what still blocks this router.)
+router.use('/onboarding', onboardingRoutes);
+router.use('/stores', tenantContext, setupGuideRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
@@ -459,6 +466,9 @@ router.use('/stores', tenantContext, botAnalyticsRoutes);
 
 // Staff management — store owners add / remove staff members
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
+
+// Merchant billing — plan, subscription, usage vs limits (SP5)
+router.use('/stores/:storeId/billing', tenantContext, billingRoutes);
 
 // Payment-gateway abandonment retargeting (Enterprise — payment_abandonment)
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);

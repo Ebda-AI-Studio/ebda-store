@@ -18,6 +18,7 @@ import {
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -482,8 +483,8 @@ export class AuthService {
     });
 
     // Send verification email
-    const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
     if (storeId) {
+      const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
       await EmailService.sendEmailVerification(
         storeId,
         {
@@ -495,11 +496,18 @@ export class AuthService {
         language
       );
     } else {
-      // Admin accounts (no storeId) skip the branded email path — they
-      // don't belong to a store and verification flow is admin-only.
-      logger.info(
-        { userId, email: maskEmail(email) },
-        'Skipping branded verification email — no storeId (admin account)'
+      // Accounts with no storeId are merchants (self-serve signup): no store
+      // exists yet, so the branded per-store sender is unavailable. They get
+      // the platform-sender mail with a link to the admin app's verify page.
+      // Outside production this is captured, never sent (platform-mailer).
+      await sendMerchantVerificationEmail(
+        {
+          email,
+          name,
+          verificationUrl: `${config.adminUrl}/verify-email?token=${token}`,
+          expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
+        },
+        language
       );
     }
   }
@@ -667,7 +675,11 @@ export class AuthService {
     // Lockout key is scoped per tenant so a brute-force attempt against
     // Store A doesn't lock the same email out on Store B (or on the admin
     // app). Bare email is still used for admin (storeId NULL).
-    const lockoutKey = storeId ? `${storeId}:${email}` : email;
+    // Case-folded so `Victim@x.com` / `VICTIM@x.com` share one counter: an
+    // exact-case key let an attacker reset the 5-per-15-min budget by
+    // re-casing the address (Ebda SP5 review).
+    const lockoutEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+    const lockoutKey = storeId ? `${storeId}:${lockoutEmail}` : lockoutEmail;
     const lockStatus = await accountLockout.isLocked(lockoutKey);
     if (lockStatus.locked) {
       const remainingMinutes = Math.ceil((lockStatus.remainingMs || 0) / 60000);
@@ -1576,7 +1588,7 @@ export class AuthService {
    * rows that have no audit/financial basis (addresses, push subs, cart,
    * wishlist, abandoned-cart, refresh tokens). Orders + reviews + returns
    * keep their structure but lose their tie to the now-anonymized user
-   * (orders preserve totals/line-items/order-number for Kuwait MOF's ≥5y
+   * (orders preserve totals/line-items/order-number for Egypt MOF's ≥5y
    * invoice-retention requirement; shipping/billing address JSON snapshots
    * are scrubbed since they store the same PII as the addresses table).
    * The merchant-CRM copy of the same shopper (`customers` +
@@ -1678,7 +1690,7 @@ export class AuthService {
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
 
     const anonymize = async (tx: Prisma.TransactionClient) => {
-      // Orders: preserve for tax records (Kuwait MOF ≥5y), drop the PII.
+      // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
       // the user row is deactivated. Address JSON snapshots get scrubbed
@@ -1751,7 +1763,7 @@ export class AuthService {
         // The previous `OR: [{phone}, {email}]` was destructive in one
         // direction: two shoppers in the same store sharing a phone — a
         // household mobile, a landline given at checkout, the same contact
-        // number typed onto two rows, all ordinary in KW/GCC — meant erasing
+        // number typed onto two rows, all ordinary in Egypt — meant erasing
         // shopper A hard-deleted shopper B's `customer_addresses` and
         // overwrote B's name/email/phone/notes with "Erased User". That is
         // irreversible destruction of a SECOND data subject's record from a
@@ -1814,7 +1826,7 @@ export class AuthService {
 
         const crmRows = [...crmIdSet].map(id => ({ id }));
         if (crmRows.length === 0) {
-          // Previously silent. A differently-normalised phone (+965… vs 965…)
+          // Previously silent. A differently-normalised phone (+20… vs 20…)
           // and a changed email match nothing, so the shopper stays readable in
           // the customers list, group queries and the bot while the audit row
           // records a completed erasure.
@@ -1830,7 +1842,7 @@ export class AuthService {
           await tx.customerAddress.deleteMany({ where: { customerId: { in: crmIds } } });
           // The row itself is scrubbed rather than deleted: totalOrders /
           // totalSpent / groupId are merchant analytics over orders that
-          // are themselves retained for Kuwait MOF, and carry no PII once
+          // are themselves retained for Egypt MOF, and carry no PII once
           // the identity fields are gone. Each row gets its OWN anonymized
           // email (keyed on the customer id, not the user id) so the
           // composite-unique (storeId, email) cannot collide when a

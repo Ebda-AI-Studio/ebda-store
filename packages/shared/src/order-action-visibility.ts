@@ -12,7 +12,7 @@ export interface OrderActionPayment {
   transactionId?: string | null;
   paymentUrl?: string | null;
   paymentLink?: string | null;
-  /** Fils. Needed (with refundedAmount) for refundViaProviderRemaining. */
+  /** Piastres. Needed (with refundedAmount) for refundViaProviderRemaining. */
   amount?: number | null;
   refundedAmount?: number | null;
   createdAt?: string | Date | null;
@@ -38,7 +38,7 @@ export interface OrderActionVisibility {
 }
 
 /**
- * What `POST /orders/:id/refund-via-provider` would send, in fils: the NEWEST
+ * What `POST /orders/:id/refund-via-provider` would send, in piastres: the NEWEST
  * `completed` / `partially_refunded` payment's `amount - refundedAmount` — the
  * row and figure that route and PaymentService.refund use when no amount is
  * given (#2069). The order total overstates it after a partial refund.

@@ -1,5 +1,5 @@
 import { prisma } from '@force/database';
-import { groupOrderLinesForDisplay, orderTaxPlacement } from '@force/shared';
+import { groupOrderLinesForDisplay, orderTaxPlacement, REGION } from '@force/shared';
 import { emailMoney } from './email-templates/_util';
 import {
   EMAIL_COLORS,
@@ -177,10 +177,10 @@ export class InvoiceService {
 
     // The order's OWN currency (issue 1705): a local `/1000 + toFixed(3)`
     // printed "10.000 USD" for a USD order the storefront, admin and gateway
-    // all show as $100.00. KWD keeps its exact "X.XXX KWD" rendering; any
+    // all show as $100.00. EGP keeps its exact "X.XXX EGP" rendering; any
     // other currency goes through the shared `formatPrice` — the same
     // `emailMoney` helper the order emails use.
-    const currency = order.currency || order.store.currency || 'KWD';
+    const currency = order.currency || order.store.currency || REGION.currency;
     const taxPlacement = orderTaxPlacement(order);
     const formatPrice = (minor: number) => emailMoney(minor, currency, 'en');
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
@@ -246,20 +246,20 @@ export class InvoiceService {
       refunded: labels.statusRefunded,
     }[statusClass];
 
-    // Render the invoice date in the store's timezone so a Kuwait merchant's
+    // Render the invoice date in the store's timezone so an Egypt merchant's
     // invoice doesn't show the UTC day on edge-of-midnight orders. Falls back
-    // to Asia/Kuwait when a tenant hasn't set a timezone yet (matches the
+    // to Africa/Cairo when a tenant hasn't set a timezone yet (matches the
     // storefront default).
-    const dateLocale = ar ? 'ar-KW' : 'en-US';
+    const dateLocale = ar ? 'ar-EG' : 'en-US';
     const dateText = new Date(order.createdAt).toLocaleDateString(dateLocale, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      timeZone: order.store.timezone || 'Asia/Kuwait',
+      timeZone: order.store.timezone || 'Africa/Cairo',
     });
 
     // Bundle boxes collapse to ONE row each — see groupOrderLinesForDisplay.
-    // A customer's invoice must show "Ramadan Box · 12.000 KWD", never the
+    // A customer's invoice must show "Ramadan Box · 12.000 EGP", never the
     // per-component allocated shares that fund that one price; those exist
     // only for the merchant's own P&L. `bundleName`/`bundleNameAr` are
     // snapshotted at order time, so a bundle renamed or deleted since still
@@ -744,7 +744,7 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
       ? ((order.store.theme as { primaryColor?: string }).primaryColor ?? null)
       : null
   );
-  const currency = order.currency || order.store.currency || 'KWD';
+  const currency = order.currency || order.store.currency || REGION.currency;
   // Amounts stay an LTR run on the Arabic invoice so a leading minus stays in
   // front of the figure (same rule as the printable page).
   const money = (minor: number) =>
@@ -763,11 +763,11 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
   }[status];
   const tone = status === 'paid' ? 'success' : status === 'unpaid' ? 'warning' : 'danger';
 
-  const dateText = new Date(order.createdAt).toLocaleDateString(ar ? 'ar-KW' : 'en-US', {
+  const dateText = new Date(order.createdAt).toLocaleDateString(ar ? 'ar-EG' : 'en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    timeZone: order.store.timezone || 'Asia/Kuwait',
+    timeZone: order.store.timezone || 'Africa/Cairo',
   });
 
   const table = (inner: string, style = '') =>

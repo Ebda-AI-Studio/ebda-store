@@ -503,7 +503,7 @@
         },
         "price": "Price",
         "priceMode": {
-          "set": "Set price (KWD)",
+          "set": "Set price (EGP)",
           "adjustPct": "Adjust by %"
         },
         "priceValue": "Price value",
@@ -524,7 +524,7 @@
         "variantGridProduct": "Product",
         "variantGridVariant": "Variant",
         "variantGridInventory": "Inventory",
-        "variantGridPrice": "Price (KWD)",
+        "variantGridPrice": "Price (EGP)",
         "variantSaving": "Saving...",
         "variantSaveAll": "Save variant changes",
         "toast": {
@@ -656,14 +656,14 @@
         "excerptArPlaceholder": "ملخص من جملة أو جملتين لنتائج البحث وبطاقات المشاركة...",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
-        "price": "Price (KWD)",
-        "costPrice": "Cost (KWD)",
+        "price": "Price (EGP)",
+        "costPrice": "Cost (EGP)",
         "profitLabel": "Profit margin per unit:",
         "pricePlaceholder": "0.000",
         "discountLabel": "Discount",
         "discountNone": "None",
         "discountPercentage": "Percentage (%)",
-        "discountFixed": "Fixed (KWD)",
+        "discountFixed": "Fixed (EGP)",
         "discountValuePlaceholder": "0",
         "discountPercentagePlaceholder": "0.0",
         "discountPreviewLabel": "Preview price after discount",
@@ -823,9 +823,9 @@
         "descriptionMultiAxis": "This product has multi-axis variants (e.g. Size × Color). You can edit price, stock, and the image of each combination, but the names are locked because creating new combinations needs both axes.",
         "colName": "Name",
         "colNameAr": "Name (Arabic)",
-        "colPrice": "Price (KWD)",
-        "colCompareAt": "Compare-at (KWD)",
-        "colCost": "Cost (KWD)",
+        "colPrice": "Price (EGP)",
+        "colCompareAt": "Compare-at (EGP)",
+        "colCost": "Cost (EGP)",
         "colStock": "Stock",
         "colImage": "Image",
         "namePlaceholder": "e.g. Medium",
@@ -877,14 +877,14 @@
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
-        "price": "Price (KWD)",
+        "price": "Price (EGP)",
         "pricePlaceholder": "0.000",
-        "costPrice": "Cost (KWD)",
-        "pricingHint": "Enter prices in KWD. The discount dropdown auto-sets the compare-at price on the storefront.",
+        "costPrice": "Cost (EGP)",
+        "pricingHint": "Enter prices in EGP. The discount dropdown auto-sets the compare-at price on the storefront.",
         "discountLabel": "Discount",
         "discountNone": "None",
         "discountPercentage": "Percentage (%)",
-        "discountFixed": "Fixed (KWD)",
+        "discountFixed": "Fixed (EGP)",
         "discountValuePlaceholder": "0",
         "discountPercentagePlaceholder": "0.0",
         "discountPreviewLabel": "Preview price after discount",
@@ -1006,7 +1006,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} KWD",
+        "totalValue": "{amount} EGP",
         "moreItems": "+{count} more",
         "agentBadge": "Agent"
       },
@@ -1110,10 +1110,10 @@
         "viaAreaRate": "area rate",
         "viaZone": "zone",
         "viaSource": "(via {source})",
-        "noRateConfigured": "No rate configured for this area — set a fee below or the order will save with 0 KWD shipping.",
-        "overrideLabel": "Shipping fee override (KWD) — leave blank to use the calculated fee",
+        "noRateConfigured": "No rate configured for this area — set a fee below or the order will save with 0 EGP shipping.",
+        "overrideLabel": "Shipping fee override (EGP) — leave blank to use the calculated fee",
         "overridePlaceholder": "e.g. 1.500",
-        "overrideActive": "Override active: {price} ({fils} fils) will be used instead of the calculated fee."
+        "overrideActive": "Override active: {price} ({piastres} piastres) will be used instead of the calculated fee."
       },
       "productsSection": {
         "heading": "Products",
@@ -2017,7 +2017,7 @@
           "directionLabel": "Change",
           "credit": "Add credit",
           "debit": "Deduct",
-          "amountLabel": "Amount (KWD)",
+          "amountLabel": "Amount (EGP)",
           "amountPlaceholder": "0.000",
           "noteLabel": "Reason",
           "notePlaceholder": "Why is this balance changing? Only your team sees this.",
@@ -2025,7 +2025,7 @@
           "newBalance": "New balance: {amount}",
           "submit": "Save adjustment",
           "cancel": "Cancel",
-          "invalidAmount": "Enter an amount greater than 0 with at most 3 decimals.",
+          "invalidAmount": "Enter an amount greater than 0 with at most 2 decimals.",
           "noteRequired": "A reason is required.",
           "exceedsBalance": "You cannot deduct more than the current balance.",
           "successTitle": "Wallet updated",
@@ -2243,7 +2243,7 @@
       },
       "whatsappPaymentLink": {
         "title": "WhatsApp Payment Link",
-        "description": "Send a customer a one-tap payment link via WhatsApp — Kuwait alternative to WhatsApp Pay"
+        "description": "Send a customer a one-tap payment link via WhatsApp — Egypt alternative to WhatsApp Pay"
       },
       "whatsappOrderUpdates": {
         "title": "Order Updates",
@@ -2264,6 +2264,10 @@
       "merchantKeys": {
         "title": "Merchant MCP keys",
         "description": "Issue keys so you can run this store from Claude Code or any MCP client"
+      },
+      "billing": {
+        "title": "Billing",
+        "description": "Plan, usage and limits"
       }
     },
     "metaCatalogCard": {
@@ -2532,12 +2536,12 @@
       "whatsapp": "WhatsApp Number",
       "phone": "Phone",
       "phoneAr": "Phone (Arabic Display)",
-      "phonePlaceholder": "+965 XXXX XXXX",
+      "phonePlaceholder": "+20 1XX XXX XXXX",
       "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
       "address": "Address",
       "addressAr": "Address (Arabic)",
-      "addressPlaceholder": "123 Street, City, Kuwait",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت",
+      "addressPlaceholder": "123 Street, City, Egypt",
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، مصر",
       "addressUrl": "Map link",
       "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
       "addressUrlHint": "Paste a Google or Apple Maps link to your storefront's pin. The footer address will become clickable and open this URL in a new tab.",
@@ -2590,12 +2594,12 @@
       "fieldPublished": "Published (visible on storefront)",
       "phName": "e.g. Main Branch",
       "phNameAr": "e.g. Main Branch",
-      "phCountry": "e.g. Kuwait",
-      "phCountryAr": "e.g. Kuwait",
+      "phCountry": "e.g. Egypt",
+      "phCountryAr": "e.g. Egypt",
       "phAddress": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
       "phAddressAr": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
-      "phPhone": "e.g. +965 2222 2222",
-      "phWhatsapp": "e.g. +96599999999",
+      "phPhone": "e.g. +20 2 2222 2222",
+      "phWhatsapp": "e.g. +201012345678",
       "phHours": "e.g. Sat–Thu 9am–10pm",
       "phHoursAr": "e.g. Sat–Thu 9am–10pm",
       "phMapsUrl": "https://maps.google.com/...",
@@ -2690,10 +2694,10 @@
       "descriptionArPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
       "typeLabel": "Discount Type *",
       "valuePercentageLabel": "Percentage (%) *",
-      "valueAmountLabel": "Amount (KWD) *",
-      "minOrderLabel": "Minimum Order (KWD)",
+      "valueAmountLabel": "Amount (EGP) *",
+      "minOrderLabel": "Minimum Order (EGP)",
       "minOrderPlaceholder": "10.000",
-      "maxDiscountLabel": "Max Discount (KWD)",
+      "maxDiscountLabel": "Max Discount (EGP)",
       "maxDiscountPlaceholder": "50.000",
       "usageLimitLabel": "Total Usage Limit",
       "usageLimitPlaceholder": "100",
@@ -2731,10 +2735,10 @@
       "typePercentage": "Percentage",
       "typeFixed": "Fixed amount",
       "valueLabelPercentage": "Value (%)",
-      "valueLabelFixed": "Value (KWD)",
+      "valueLabelFixed": "Value (EGP)",
       "valuePercentage": "{value}%",
-      "valueFixed": "{value} fils",
-      "maxDiscount": "Max discount (KWD)",
+      "valueFixed": "{value} piastres",
+      "maxDiscount": "Max discount (EGP)",
       "priority": "Priority",
       "startsAt": "Start date",
       "expiresAt": "Expiry date",
@@ -2742,7 +2746,7 @@
       "targetingHeading": "Targeting",
       "customerGroup": "Customer group",
       "allCustomers": "All customers",
-      "minOrderAmount": "Minimum order amount (KWD)",
+      "minOrderAmount": "Minimum order amount (EGP)",
       "minQuantity": "Minimum quantity",
       "firstOrderOnlyLabel": "First order only",
       "scopeProducts": "Specific products",
@@ -2792,9 +2796,9 @@
       "pricingTypeFixedPrice": "Fixed price",
       "pricingTypePercentage": "Percentage off",
       "pricingTypeFixed": "Fixed amount off",
-      "pricingValueLabelFixedPrice": "Bundle price (KWD)",
+      "pricingValueLabelFixedPrice": "Bundle price (EGP)",
       "pricingValueLabelPercentage": "Discount (%)",
-      "pricingValueLabelFixed": "Discount amount (KWD)",
+      "pricingValueLabelFixed": "Discount amount (EGP)",
       "activeLabel": "Bundle is active",
       "startsAt": "Start date",
       "expiresAt": "Expiry date",
@@ -2869,7 +2873,7 @@
       },
       "icarry": {
         "title": "iCarry",
-        "subtitle": "Kuwait delivery via iCarry",
+        "subtitle": "Egypt delivery via iCarry",
         "fields": {
           "apiKey": "API Key",
           "merchantId": "Merchant ID"
@@ -2894,7 +2898,7 @@
           "accountNumber": "Aramex account number",
           "accountPin": "Account PIN",
           "accountEntity": "e.g. KWI",
-          "accountCountryCode": "e.g. KW",
+          "accountCountryCode": "e.g. EG",
           "username": "Aramex account username",
           "password": "Aramex account password"
         }
@@ -2976,7 +2980,7 @@
     },
     "page": {
       "title": "Delivery areas & fees",
-      "subtitle": "Set per-area delivery fees for every Kuwait district",
+      "subtitle": "Set per-area delivery fees for every Egypt district",
       "intro": "A shipping zone is a group of areas you charge a single rate to deliver to. Define a zone for each region you ship to so checkout can quote the right delivery fee.",
       "carriersBannerTitle": "Shipping Carriers enabled",
       "carriersBannerHint": "Configure iCarry & Aramex credentials, test connections, and view shipments.",
@@ -3005,7 +3009,7 @@
       "status": "Status",
       "actions": "Actions",
       "moreAreas": "+{count} more",
-      "freeShippingOver": "Over {amount} KWD",
+      "freeShippingOver": "Over {amount} EGP",
       "dashPlaceholder": "-",
       "daysRange": "{min}-{max} days",
       "daysSingle": "{days} days",
@@ -3013,7 +3017,7 @@
       "inactive": "Inactive",
       "edit": "Edit",
       "delete": "Delete",
-      "priceWithCurrency": "{amount} KWD"
+      "priceWithCurrency": "{amount} EGP"
     },
     "modal": {
       "editTitle": "Edit Shipping Zone",
@@ -3025,12 +3029,12 @@
       "zoneNameArPlaceholder": "e.g., منطقة العاصمة",
       "areasLabel": "Areas",
       "areasPlaceholder": "Separate areas with commas: Capital, Hawalli, Farwaniya",
-      "addAllKuwaitGovernorates": "+ Add All Kuwait Governorates",
+      "addAllEgyptGovernorates": "+ Add All Egypt Governorates",
       "areasArLabel": "Areas (Arabic)",
       "areasArPlaceholder": "العاصمة، حولي، الفروانية",
-      "deliveryFeeLabel": "Delivery Fee (KWD)",
+      "deliveryFeeLabel": "Delivery Fee (EGP)",
       "deliveryFeePlaceholder": "1.000",
-      "freeShippingLabel": "Free Shipping Over (KWD)",
+      "freeShippingLabel": "Free Shipping Over (EGP)",
       "freeShippingPlaceholder": "25.000",
       "estimatedDaysLabel": "Estimated Delivery Time (Days)",
       "estimatedDaysMinPlaceholder": "Min days",
@@ -3043,7 +3047,7 @@
     },
     "areaRates": {
       "sectionTitle": "Delivery areas & fees",
-      "sectionSubtitle": "Set a fee per Kuwait area. This is the recommended way to price per-area delivery.",
+      "sectionSubtitle": "Set a fee per Egypt area. This is the recommended way to price per-area delivery.",
       "applyAll": "Apply fee to all areas:",
       "applyBtn": "Apply",
       "applyAllGlobal": "Apply to all areas (all governorates)",
@@ -3055,7 +3059,7 @@
       "freeOver": "Free over",
       "freeOverLabel": "Free-shipping threshold",
       "optional": "optional",
-      "currency": "KWD",
+      "currency": "EGP",
       "save": "Save area rates",
       "saving": "Saving…",
       "savedTitle": "Saved",
@@ -3206,7 +3210,7 @@
       "lowStock": "Low Stock",
       "outOfStock": "Out of Stock",
       "stockValue": "Stock Value",
-      "kwdValue": "{value} KWD"
+      "baseValue": "{value} EGP"
     },
     "alertBanner": {
       "needAttention": "{count, plural, =1 {{count, number, latn} product needs attention} other {{count, number, latn} products need attention}}",
@@ -3229,7 +3233,7 @@
       "empty": "No products tracked",
       "emptyDescription": "Inventory rows appear here for each product with stock tracking enabled. Add a product to start managing stock levels.",
       "adjustAction": "Adjust",
-      "kwdValue": "{value} KWD",
+      "baseValue": "{value} EGP",
       "filters": {
         "all": "All"
       },
@@ -3438,7 +3442,7 @@
       "inviteInstagramLabel": "Instagram (optional)",
       "inviteTiktokLabel": "TikTok (optional)",
       "inviteNotesLabel": "Internal Notes (optional)",
-      "inviteNotesPlaceholder": "e.g. Kuwait fashion micro-influencer, 50K followers",
+      "inviteNotesPlaceholder": "e.g. Egypt fashion micro-influencer, 50K followers",
       "inviteSubmit": "Add Affiliate",
       "inviting": "Adding…",
       "inviteCancel": "Cancel",
@@ -3502,8 +3506,8 @@
       "fields": {
         "defaultCommissionRate": "Default Commission Rate (%)",
         "cookieDurationDays": "Cookie Duration (days)",
-        "minPayoutAmount": "Min Payout Amount (KWD)",
-        "minPayoutEquivalent": "{amount} KWD equivalent"
+        "minPayoutAmount": "Min Payout Amount (EGP)",
+        "minPayoutEquivalent": "{amount} EGP equivalent"
       },
       "toggles": {
         "autoApprove": {
@@ -3526,7 +3530,7 @@
         "available": "Available balance:"
       },
       "fields": {
-        "amount": "Amount (KWD)",
+        "amount": "Amount (EGP)",
         "method": "Method",
         "notes": "Notes",
         "notesPlaceholder": "Optional notes for this payout"
@@ -3621,7 +3625,7 @@
       "instructionsTitle": "How to Import Products",
       "step1": "Download the CSV template using the button below",
       "step2": "Fill in your product data following the template format",
-      "step3": "Prices are in KWD (e.g. 12.500)",
+      "step3": "Prices are in EGP (e.g. 12.500)",
       "step4": "For multiple categories/tags/images, separate with commas within quotes",
       "step5": "Upload the completed CSV file and click Import",
       "downloadTemplate": "Download Template",
@@ -3672,7 +3676,7 @@
         "allFields": "All product fields are included in the export",
         "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
         "reImport": "The exported file can be edited and re-imported to update products",
-        "pricesInFils": "Prices are in KWD (e.g. 12.500)"
+        "pricesInFils": "Prices are in EGP (e.g. 12.500)"
       }
     },
     "errors": {
@@ -3861,7 +3865,7 @@
       "recovered": "Ordered later",
       "recoveryRate": "Ordered-later rate",
       "recoveredRevenue": "Revenue from later orders",
-      "kwdValue": "{amount} KWD",
+      "baseValue": "{amount} EGP",
       "recoveryNotTracked": "Not tracked"
     },
     "status": {
@@ -3892,7 +3896,7 @@
         "maxDiscount": "Max Discount",
         "expiry": "Expiry",
         "noLimit": "No limit",
-        "kwd": "KWD",
+        "major": "EGP",
         "hours": "hours"
       }
     },
@@ -4518,7 +4522,7 @@
     },
     "earning": {
       "title": "Point Earning",
-      "pointsPerDinar": "Points per 1 KWD Spent",
+      "pointsPerMajorUnit": "Points per 1 EGP Spent",
       "signupBonus": "Signup Bonus",
       "referralBonus": "Referral Bonus",
       "reviewBonus": "Review Bonus",
@@ -4535,8 +4539,8 @@
     },
     "redemption": {
       "title": "Redemption",
-      "pointValue": "Point Value (KWD)",
-      "pointValueHint": "1 point = {value} KWD",
+      "pointValue": "Point Value (EGP)",
+      "pointValueHint": "1 point = {value} EGP",
       "minRedeem": "Min Points to Redeem",
       "maxPercent": "Max % of Order",
       "expirationMonths": "Expiration (months)",
@@ -4662,9 +4666,9 @@
       "displayNamePlaceholder": "Cash on Delivery",
       "displayNameArLabel": "Display Name (Arabic)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
-      "fixedFeeLabel": "Surcharge Fee (KWD)",
+      "fixedFeeLabel": "Surcharge Fee (EGP)",
       "fixedFeePlaceholder": "0.000",
-      "fixedFeeEquals": "= {amount} KWD",
+      "fixedFeeEquals": "= {amount} EGP",
       "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
       "fixedFeeHelpZero": "0",
       "fixedFeeHelpSuffix": "for free COD.",
@@ -4750,9 +4754,9 @@
       "preview": "Preview",
       "content": "Content",
       "textEnglish": "Announcement Text (English)",
-      "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",
+      "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
       "textArabic": "Announcement Text (Arabic)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ د.ك!",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ ج.م!",
       "linkUrl": "Link URL (optional)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "The entire bar will link to this URL when clicked",
@@ -4911,15 +4915,15 @@
       "arBadge": "AR",
       "advanced": "Advanced",
       "metaTitle": "Meta Title",
-      "metaTitlePlaceholder": "My Store — Best Products in Kuwait",
+      "metaTitlePlaceholder": "My Store — Best Products in Egypt",
       "metaTitleHint": "Appears in browser tabs and search results. Keep under {max} characters for best results.",
       "metaDescription": "Meta Description",
-      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Kuwait...",
+      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Egypt...",
       "metaDescriptionHint": "Shown in search result snippets. Keep under {max} characters for best results.",
       "metaTitleAr": "Meta Title (Arabic)",
-      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في الكويت",
+      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في مصر",
       "metaDescriptionAr": "Meta Description (Arabic)",
-      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت...",
+      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في مصر...",
       "ogImage": "OG Image URL",
       "ogImagePlaceholder": "https://example.com/og-image.jpg",
       "ogImageHint": "Image shown when your store is shared on social media. Recommended: 1200×630px. Leave empty and we auto-generate one from your store logo + name.",
@@ -4935,10 +4939,10 @@
       "aeoTitle": "Answer Engine Optimization",
       "aeoHint": "Conversational copy for AI answer engines (Perplexity, Google AI Overview, Bing Copilot). Auto-filled by the AEO sweep; you can edit per-entity.",
       "aeoLabelEn": "AEO meta description (EN)",
-      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is a Kuwait-based online grocery store specializing in…»",
+      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is an Egypt-based online grocery store specializing in…»",
       "aeoHintText": "Direct-answer style, 130–160 chars. Leave blank to let the AEO sweep fill it.",
       "aeoLabelAr": "AEO meta description (AR)",
-      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني كويتي متخصص في…»",
+      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني مصري متخصص في…»",
       "senderPrefixPlaceholder": "noreply",
       "senderPrefix": "Email sender prefix",
       "senderPrefixHint": "The part before the @ on outgoing emails. Default: noreply. Examples: hello, orders, support. Letters/digits/dot/hyphen/underscore only.",
@@ -5459,7 +5463,8 @@
         "staff": "Staff & roles",
         "announcement": "Announcement bar",
         "agentKey": "AI agent key",
-        "merchantKeys": "Merchant MCP keys"
+        "merchantKeys": "Merchant MCP keys",
+        "billing": "Billing"
       }
     },
     "notificationBell": {
@@ -5594,7 +5599,8 @@
       "staffBadge": "Staff",
       "staffBadgeHint": "Limited access",
       "hubSectionsAriaLabel": "Hub sections",
-      "navPlatformUsageHistory": "Usage history (platform)"
+      "navPlatformUsageHistory": "Usage history (platform)",
+      "navPlatformPlans": "Plans (platform)"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -5857,7 +5863,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
-      "disabledVariantStockValue": "Held on disabled variants: {amount} KWD — not counted as stock",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} EGP — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",
@@ -5907,9 +5913,9 @@
       "date": "Date",
       "vendor": "Vendor",
       "category": "Category",
-      "amount": "Amount (KWD)",
-      "tax": "Tax (KWD)",
-      "total": "Total (KWD)",
+      "amount": "Amount (EGP)",
+      "tax": "Tax (EGP)",
+      "total": "Total (EGP)",
       "status": "Status",
       "allStatuses": "All statuses",
       "receiptOnly": "Receipt drafts only (any date)",
@@ -5940,9 +5946,9 @@
         "selectSupplier": "(no vendor)",
         "selectExpenseAccount": "Select expense category",
         "selectPaidFromAccount": "Select paid-from account",
-        "amount": "Amount (KWD)",
-        "taxAmount": "Tax (KWD)",
-        "totalInKwd": "Total (KWD)",
+        "amount": "Amount (EGP)",
+        "taxAmount": "Tax (EGP)",
+        "totalInBase": "Total (EGP)",
         "notes": "Notes (English)",
         "notesAr": "Notes (Arabic)",
         "receiptUrl": "Receipt URL",
@@ -5962,7 +5968,7 @@
         "expenseCategoryLabel": "Expense Category",
         "paidFromAccountLabel": "Paid From Account",
         "currencyLabel": "Currency",
-        "fxRateLabel": "FX Rate (1 {currency} = ? KWD)",
+        "fxRateLabel": "FX Rate (1 {currency} = ? EGP)",
         "fxRateHint": "Enter the exchange rate from your bank or receipt date.",
         "fxRatePlaceholder": "e.g. 0.30700",
         "errorExpenseDateRequired": "Expense date is required",
@@ -5972,7 +5978,7 @@
         "errorFxRateRequired": "FX rate is required for {currency} expenses and must be a positive number",
         "uploadFailedGeneric": "Upload failed ({status})",
         "uploadFailedRetry": "Upload failed. Please try again.",
-        "totalInKwdConverted": "Total in KWD (converted @ {rate} rate):",
+        "totalInBaseConverted": "Total in EGP (converted @ {rate} rate):",
         "minorUnitsSuffix": "({currency} minor units)"
       }
     },
@@ -6016,7 +6022,7 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
-        "unbalanced": "Out of balance by {amount} KWD — Assets ≠ Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} EGP — Assets ≠ Liabilities + Equity",
         "currentEarnings": "Retained & current earnings",
         "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },
@@ -6070,8 +6076,8 @@
         "manualMatched": "Manual-matched",
         "unmatched": "Unmatched",
         "ignored": "Ignored",
-        "matchedAmount": "Matched amount (KWD)",
-        "unmatchedAmount": "Unmatched amount (KWD)"
+        "matchedAmount": "Matched amount (EGP)",
+        "unmatchedAmount": "Unmatched amount (EGP)"
       },
       "import": {
         "title": "Import Bank Statement",
@@ -6091,7 +6097,7 @@
       "tx": {
         "date": "Date",
         "description": "Description",
-        "amount": "Amount (KWD)",
+        "amount": "Amount (EGP)",
         "direction": "Direction",
         "ref": "Ref",
         "matchStatus": "Match Status",
@@ -6148,17 +6154,17 @@
     },
     "fxRates": {
       "title": "FX Rate Registry",
-      "subtitle": "Record exchange rates for non-KWD transactions",
+      "subtitle": "Record exchange rates for non-EGP transactions",
       "multiCurrencyAccounting": "Multi-Currency Accounting",
       "featureInactive": "Feature not active",
       "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Contact your account manager to enable it on an Enterprise plan.",
       "recordNewRate": "Record a New Rate",
-      "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate KWD.",
-      "rateExample": "Example: USD at 0.307 means 1 USD = 0.307 KWD (307 fils).",
+      "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate EGP.",
+      "rateExample": "Example: USD at 0.307 means 1 USD = 0.307 EGP (307 piastres).",
       "currencyLabel": "Currency",
-      "rateLabel": "Rate (KWD per 1 {currency})",
+      "rateLabel": "Rate (EGP per 1 {currency})",
       "rateDateLabel": "Rate Date",
-      "ratePreview": "Preview: 1 {currency} = {rate} KWD | 100 {currency} = {rate100} KWD",
+      "ratePreview": "Preview: 1 {currency} = {rate} EGP | 100 {currency} = {rate100} EGP",
       "saving": "Saving…",
       "saveRate": "Save Rate",
       "rateSaved": "Rate saved successfully.",
@@ -6169,7 +6175,7 @@
       "allCurrencies": "All currencies",
       "noRates": "No rates recorded yet. Add the first rate above.",
       "colCurrency": "Currency",
-      "colRate": "Rate (KWD)",
+      "colRate": "Rate (EGP)",
       "colDate": "Date",
       "colRecorded": "Recorded",
       "loading": "Loading…"
@@ -6297,7 +6303,7 @@
       "type": "Type",
       "status": "Status",
       "date": "Date",
-      "impact": "Value Impact (KWD)",
+      "impact": "Value Impact (EGP)",
       "types": {
         "cycle_count": "Cycle Count",
         "damage": "Damage",
@@ -6412,7 +6418,7 @@
       "status": "Status",
       "expectedDate": "Expected",
       "receivedDate": "Received",
-      "total": "Total (KWD)",
+      "total": "Total (EGP)",
       "createdDate": "Created",
       "statuses": {
         "draft": "Draft",
@@ -6427,8 +6433,8 @@
         "expectedDateLabel": "Expected receipt date",
         "addItem": "+ Add line item",
         "qty": "Qty",
-        "unitCost": "Unit cost (KWD)",
-        "lineTotal": "Line total (KWD)",
+        "unitCost": "Unit cost (EGP)",
+        "lineTotal": "Line total (EGP)",
         "subtotal": "Subtotal",
         "submit": "Create draft PO",
         "notesLabel": "Notes (English)",
@@ -6495,7 +6501,7 @@
       "description": "AI-powered reorder suggestions based on velocity + lead time + open backorders.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
-      "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 KW.",
+      "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 Cairo time.",
       "comingSoon": "AI-powered reorder suggestions are coming in Batch 3.",
       "explainer": "We'll compute weekly velocity × supplier lead time + safety stock + open backorders to surface 'reorder N units of X' cards. One click to draft a PO pre-filled with quantities and the best supplier.",
       "notify": "Notify me when ready",
@@ -6518,9 +6524,9 @@
       "description": "Slow-moving SKUs with AI-suggested clearance.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
-      "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least KWD 50 at cost — or has no cost price set, in which case its value is shown as unknown.",
+      "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least EGP 5,000 at cost — or has no cost price set, in which case its value is shown as unknown.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
-      "explainer": "We'll flag products with 0 sales in 90 days and stock value above KWD 50, with AI-generated bilingual clearance copy and suggested discount %.",
+      "explainer": "We'll flag products with 0 sales in 90 days and stock value above EGP 5,000, with AI-generated bilingual clearance copy and suggested discount %.",
       "notify": "Notify me when ready",
       "card": {
         "daysSinceSale": "Last sold {days} days ago",
@@ -6612,7 +6618,7 @@
       "topSkus": "Top 5 SKUs (last 7 days)",
       "yesterdayFunnel": "Yesterday's funnel",
       "aiCallout": "AI:",
-      "noDataYet": "Insights will populate after the first nightly rollup at 02:00 KW.",
+      "noDataYet": "Insights will populate after the first nightly rollup at 02:00 Cairo time.",
       "asOf": "As of",
       "repeatPurchaseBasis": "of {count, plural, one {{count, number, latn} buyer} other {{count, number, latn} buyers}} re-ordered (last 30 days)",
       "repeatPurchaseUnknown": "No identifiable buyers in the last 30 days",
@@ -6632,9 +6638,9 @@
       "aiLabel": "AI:",
       "retentionMatrixTitle": "Retention Matrix",
       "ltvByCohortTitle": "Cumulative LTV by Cohort",
-      "colTotalRevenue": "Total Revenue (KWD)",
+      "colTotalRevenue": "Total Revenue (EGP)",
       "colLtvPerCustomer": "LTV / Customer",
-      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 KW."
+      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time."
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -6648,14 +6654,14 @@
       "checkouts": "Checkouts Started",
       "completed": "Orders Completed",
       "abandoned": "Abandoned",
-      "revenue": "Revenue (KWD)",
+      "revenue": "Revenue (EGP)",
       "dropoff": "Drop-off",
       "aiLabel": "AI:",
       "overviewTitle": "Funnel Overview",
       "abandonedUnit": "carts",
       "dailyBreakdownTitle": "Daily Breakdown",
       "colDate": "Date",
-      "noDataYet": "No funnel data yet for this window. Insights populate after the first nightly rollup at 02:00 KW."
+      "noDataYet": "No funnel data yet for this window. Insights populate after the first nightly rollup at 02:00 Cairo time."
     },
     "segments": {
       "title": "Customer Segments (RFM)",
@@ -6674,7 +6680,7 @@
       "recommendedAction": "Recommended Action",
       "totalSegmentedCustomers": "Total Segmented Customers",
       "totalMonetaryValue": "Total Monetary Value",
-      "noSegmentData": "No segment data yet. Insights populate after the first nightly rollup at 02:00 KW.",
+      "noSegmentData": "No segment data yet. Insights populate after the first nightly rollup at 02:00 Cairo time.",
       "aiLabel": "AI:",
       "shareOfCustomers": "{pct}% of customers",
       "shareOfTotal": "{pct}% of total",
@@ -7781,7 +7787,7 @@
       "noWindowsYet": "No delivery windows yet — add one above.",
       "minOrderSectionTitle": "Minimum order value",
       "minOrderSectionHint": "Customers can't check out with an items subtotal below this amount. Leave empty or 0 to disable.",
-      "minOrderLabel": "Minimum order (KWD)",
+      "minOrderLabel": "Minimum order (EGP)",
       "minOrderPlaceholder": "e.g. 5.000",
       "invoiceEmailSectionTitle": "Order invoice email",
       "invoiceEmailSectionHint": "Every order in this store also emails the invoice to this address (e.g. the store owner). Leave empty to disable.",
@@ -8172,6 +8178,322 @@
       "carts": "Carts with items",
       "aiCalls": "AI calls / spend",
       "aiUnpriced": "+{count} unpriced — spend is a floor"
+    }
+  },
+  "plans": {
+    "title": "Plans",
+    "subtitle": "Edit the plans merchants subscribe to: limits, visibility and prices. Prices stay empty until set.",
+    "loading": "Loading plans…",
+    "loadError": "Failed to load plans.",
+    "edit": "Edit",
+    "editTitle": "Edit plan {code}",
+    "public": "Public",
+    "hidden": "Hidden",
+    "unlimited": "Unlimited",
+    "priceNotSet": "Not set",
+    "priceHint": "Prices are in EGP (stored as piastres). A blank price means not set yet, not free.",
+    "save": "Save plan",
+    "saving": "Saving…",
+    "table": {
+      "plan": "Plan",
+      "visibility": "Visibility",
+      "monthly": "Monthly price",
+      "yearly": "Yearly price",
+      "stores": "Stores",
+      "actions": "Actions"
+    },
+    "form": {
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "sort": "Sort order",
+      "isPublic": "Shown on the public pricing page",
+      "priceMonthly": "Monthly price (EGP)",
+      "priceYearly": "Yearly price (EGP)",
+      "limitsTitle": "Limits",
+      "bpsHint": "Fees are in basis points (100 = 1%). Online and cash-on-delivery fees are set separately."
+    },
+    "limits": {
+      "maxProducts": "Products",
+      "maxStaff": "Staff members",
+      "maxOrdersPerMonth": "Orders per month",
+      "maxStorageMb": "Storage (MB)",
+      "customDomain": "Custom domain",
+      "platformFeeBps": "Platform fee, online orders (bps)",
+      "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
+      "abandonedCartAutomation": "Abandoned-cart recovery",
+      "whatsappAutomation": "WhatsApp automation"
+    },
+    "errors": {
+      "invalidNumber": "Enter valid numbers for the price and sort order.",
+      "saveFailed": "Could not save the plan."
+    },
+    "toasts": {
+      "savedTitle": "Plan saved",
+      "savedDesc": "Plan {code} was updated.",
+      "errorTitle": "Error"
+    }
+  },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Your plan, what it includes, and how much of it you have used.",
+    "loading": "Loading billing…",
+    "loadError": "Failed to load billing.",
+    "currentPlan": "Current plan",
+    "unlimited": "Unlimited",
+    "usageTitle": "Usage",
+    "ordersThisMonth": "Orders this month",
+    "usedOf": "{used} of {limit}",
+    "storageNotTracked": "Up to {limit} MB (usage is not tracked yet)",
+    "includedTitle": "Included in your plan",
+    "included": "Included",
+    "notIncluded": "Not included",
+    "platformFee": "Platform fee (online orders)",
+    "codFee": "Platform fee (cash on delivery)",
+    "trialEnds": "Trial ends",
+    "renewsOn": "Renews on",
+    "endsOn": "Ends on",
+    "status": {
+      "none": "Active",
+      "trialing": "Trial",
+      "active": "Active",
+      "past_due": "Payment overdue",
+      "canceled": "Canceled",
+      "comped": "Complimentary"
+    },
+    "overLimit": {
+      "title": "You passed this month's order limit",
+      "body": "Your plan includes {limit} orders a month. Your customers can still order and nothing is blocked. Upgrade to stay within your plan."
+    },
+    "upgradeTitle": "Upgrade",
+    "upgradeBody": "Move to a bigger plan for more products, staff and orders, a custom domain and automation.",
+    "upgradeCta": "Upgrade plan",
+    "upgradeSoon": "Online upgrade is coming soon. Contact support to change your plan now.",
+    "priceTbd": "Price to be announced",
+    "perMonth": "/ month",
+    "adminTitle": "Platform admin",
+    "adminPlanLabel": "Assign plan",
+    "adminApply": "Apply plan",
+    "assigning": "Applying…",
+    "toasts": {
+      "errorTitle": "Could not change the plan",
+      "assignedTitle": "Plan updated",
+      "assignedDesc": "This store is now on {code}."
+    }
+  },
+  "planLimit": {
+    "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
+    "maxStaff": "Your plan allows up to {limit} staff members. Upgrade to add more.",
+    "maxOrdersPerMonth": "Your plan allows up to {limit} orders per month. Upgrade to keep growing.",
+    "maxStorageMb": "Your plan allows up to {limit} MB of storage. Upgrade to add more.",
+    "customDomain": "Custom domains are not included in your plan. Upgrade to connect your own domain.",
+    "abandonedCartAutomation": "Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.",
+    "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on."
+  },
+  "onboarding": {
+    "signup": {
+      "title": "Create your store",
+      "subtitle": "Start selling online in minutes. No card needed.",
+      "name": "Your name",
+      "namePlaceholder": "Mona Hassan",
+      "email": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "phone": "Mobile number (optional)",
+      "phonePlaceholder": "010 1234 5678",
+      "phoneHelp": "An Egyptian mobile, for order and account alerts.",
+      "password": "Password",
+      "passwordPlaceholder": "Create a password",
+      "passwordHelp": "At least 8 characters with upper and lower case letters, a number and a symbol.",
+      "submit": "Create my account",
+      "submitting": "Creating your account…",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "errors": {
+        "nameRequired": "Enter your name",
+        "emailInvalid": "Enter a valid email address",
+        "passwordWeak": "Password needs 8+ characters, upper and lower case, a number and a symbol",
+        "phoneInvalid": "Enter a valid Egyptian mobile number, or leave it empty",
+        "rateLimited": "Too many attempts. Please try again in a little while.",
+        "generic": "We could not create your account. Please try again."
+      },
+      "sent": {
+        "title": "Check your email",
+        "body": "If this address can be used, we sent a verification link to {email}. It is valid for 24 hours.",
+        "resend": "Send the link again",
+        "resending": "Sending…",
+        "resent": "If the address is eligible, a new link is on its way.",
+        "backToLogin": "Back to sign in"
+      },
+      "noAccount": "New to Ebda?",
+      "createStore": "Create your store"
+    },
+    "verify": {
+      "verifying": "Verifying your email…",
+      "successTitle": "Email verified",
+      "successBody": "Your account is ready. Let's set up your store.",
+      "continue": "Continue",
+      "failedTitle": "We could not verify your email",
+      "invalid": "This link is invalid or has already been used.",
+      "expired": "This link has expired. Request a new one below.",
+      "missing": "The verification link is incomplete.",
+      "generic": "Something went wrong. Please try again.",
+      "resendTitle": "Get a new link",
+      "email": "Email address",
+      "resend": "Send a new link",
+      "resending": "Sending…",
+      "resent": "If the address is eligible, a new link is on its way.",
+      "backToLogin": "Back to sign in"
+    },
+    "flow": {
+      "title": "Set up your store",
+      "stepOf": "Step {current} of {total}",
+      "steps": {
+        "store": "Name",
+        "template": "Look",
+        "product": "Product",
+        "payment": "Payment",
+        "live": "Launch"
+      },
+      "back": "Back",
+      "next": "Continue",
+      "skip": "Skip for now",
+      "loading": "Loading…",
+      "loadFailed": "We could not load your setup. Please refresh.",
+      "verifyGate": {
+        "title": "Verify your email to continue",
+        "body": "We sent a verification link to {email}. Open it, then come back and refresh this page.",
+        "refresh": "I verified my email",
+        "resend": "Send the link again",
+        "resent": "If the address is eligible, a new link is on its way."
+      },
+      "store": {
+        "title": "Name your store",
+        "subtitle": "Pick a name and your free store address.",
+        "name": "Store name",
+        "namePlaceholder": "My shop",
+        "slug": "Store address",
+        "slugHelp": "Latin letters, digits and hyphens only. You can add your own domain later.",
+        "checking": "Checking…",
+        "available": "{host} is available",
+        "taken": "This address is already taken",
+        "reserved": "This address is reserved. Choose another one.",
+        "tooShort": "Use at least 3 characters",
+        "tooLong": "Use at most 40 characters",
+        "invalid": "Use lowercase letters, digits and single hyphens only",
+        "nameRequired": "Enter your store name",
+        "create": "Create my store",
+        "creating": "Creating…",
+        "createFailed": "We could not create the store. Please try again.",
+        "limit": "You have reached the store limit for this account."
+      },
+      "template": {
+        "title": "Pick a look",
+        "subtitle": "Choose a template. You can change it any time.",
+        "modern": "Modern",
+        "modernDesc": "Clean lines and bold accents.",
+        "classic": "Classic",
+        "classicDesc": "Timeless serif elegance.",
+        "minimal": "Minimal",
+        "minimalDesc": "Lots of space, product first.",
+        "bold": "Bold",
+        "boldDesc": "Vibrant and energetic.",
+        "elegant": "Elegant",
+        "elegantDesc": "Refined fashion and beauty look.",
+        "selected": "Selected",
+        "saveFailed": "We could not save the template. Please try again."
+      },
+      "product": {
+        "title": "Add your first product",
+        "subtitle": "Name, price and a photo. You can add the rest later.",
+        "name": "Product name",
+        "namePlaceholder": "Cotton scarf",
+        "price": "Price (EGP)",
+        "pricePlaceholder": "250",
+        "photo": "Photo (optional)",
+        "nameRequired": "Enter the product name",
+        "priceInvalid": "Enter a price greater than zero",
+        "add": "Add product",
+        "adding": "Adding…",
+        "added": "{name} was added.",
+        "addFailed": "We could not add the product. Please try again.",
+        "limit": "You have reached your plan's product limit.",
+        "stock": "Quantity in stock",
+        "stockInvalid": "Enter a whole number, 0 or more"
+      },
+      "payment": {
+        "title": "How will customers pay?",
+        "subtitle": "Cash on delivery is on by default. More methods arrive soon.",
+        "cod": "Cash on delivery",
+        "codDesc": "Customers pay the courier when the order arrives.",
+        "instapay": "InstaPay",
+        "cards": "Cards and wallets",
+        "comingSoon": "Coming soon",
+        "saveFailed": "We could not save your payment settings. Please try again.",
+        "needOne": "Keep at least one payment method on."
+      },
+      "live": {
+        "title": "Ready to launch",
+        "subtitle": "Your store goes live at {host}.",
+        "checklistName": "Store name",
+        "checklistTemplate": "Template",
+        "checklistProduct": "Products added",
+        "checklistPayment": "Payment",
+        "noProducts": "None yet. You can add products from the dashboard.",
+        "publish": "Publish my store",
+        "publishing": "Publishing…",
+        "publishFailed": "We could not publish the store. Please try again.",
+        "doneTitle": "Your store is live",
+        "doneBody": "Share the link and start selling.",
+        "visit": "Open my store",
+        "copy": "Copy link",
+        "copied": "Copied",
+        "whatsapp": "Share on WhatsApp",
+        "whatsappText": "Visit my new store:",
+        "dashboard": "Go to dashboard"
+      }
+    },
+    "setupGuide": {
+      "title": "Setup guide",
+      "subtitle": "Finish these steps to get your first order.",
+      "progress": "{done} of {total} done",
+      "loadFailed": "We could not load the setup guide.",
+      "dismiss": "Hide guide",
+      "show": "Show the setup guide",
+      "optional": "Optional",
+      "done": "Done",
+      "markDone": "Mark as done",
+      "markUndone": "Undo",
+      "open": "Open",
+      "items": {
+        "add_product": {
+          "title": "Add a product",
+          "desc": "Add your first product with a photo and a price."
+        },
+        "brand": {
+          "title": "Set your logo and colors",
+          "desc": "Make the store look like your brand."
+        },
+        "shipping": {
+          "title": "Set shipping zones",
+          "desc": "Tell customers where you deliver and the fee."
+        },
+        "payment": {
+          "title": "Choose payment methods",
+          "desc": "Cash on delivery is on. Review or add more."
+        },
+        "domain": {
+          "title": "Connect your own domain",
+          "desc": "Use yourname.com instead of the free address."
+        },
+        "test_order": {
+          "title": "Place a test order",
+          "desc": "Open your store and order something as a customer."
+        },
+        "share": {
+          "title": "Share your store link",
+          "desc": "Send your link to customers on WhatsApp."
+        }
+      },
+      "shareText": "Visit my store:"
     }
   }
 }

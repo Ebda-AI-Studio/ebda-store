@@ -43,7 +43,7 @@ async function seed() {
         name: 'erasecap',
         slug: `${PREFIX}${uniq}`,
         template: 'modern',
-        currency: 'KWD',
+        currency: 'EGP',
         ownerId: owner.id,
       },
     });

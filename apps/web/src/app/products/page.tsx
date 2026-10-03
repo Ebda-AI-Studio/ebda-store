@@ -6,7 +6,7 @@ import { ProductsPageBody } from './ProductsPageBody';
 export const metadata: Metadata = {
   title: 'Products',
   description:
-    'Browse our full catalog of products. Find the best deals with fast delivery in Kuwait.',
+    'Browse our full catalog of products. Find the best deals with fast delivery in Egypt.',
 };
 
 export default async function ProductsPage({

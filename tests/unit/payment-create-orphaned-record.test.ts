@@ -83,7 +83,7 @@ const request: CreatePaymentRequest = {
   orderId: 'order-1',
   orderNumber: 'ORD-2370',
   amount: 5000,
-  currency: 'KWD',
+  currency: 'EGP',
   customer: { id: 'c1', name: 'Customer', email: '' },
   items: [{ name: 'Item', quantity: 1, unitPrice: 5000 }],
   callbackUrl: 'https://store.test/checkout/success',
@@ -106,7 +106,7 @@ beforeEach(() => {
       displayName: null,
       displayNameAr: null,
       supportedMethods: ['knet'],
-      supportedCurrencies: ['KWD'],
+      supportedCurrencies: ['EGP'],
       fixedFee: 0,
       percentageFee: 0,
     },
@@ -143,7 +143,7 @@ describe('PaymentService.createPayment — orphaned invoice on a failed record w
       provider: 'myfatoorah',
       transactionId: 'txn-2370',
       amount: 5000,
-      currency: 'KWD',
+      currency: 'EGP',
       source: 'record',
     });
   });

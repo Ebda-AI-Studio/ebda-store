@@ -11,6 +11,7 @@ import {
 } from '@force/database';
 import { ensureAdminUser } from '../lib/definer';
 import { bustStoreCaches } from './store.service';
+import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -21,6 +22,7 @@ import { maskEmail } from '../lib/pii-mask';
 import {
   isValidTimeZone,
   slugifyWithFallback,
+  REGION,
   storefrontOrigin,
   isReservedSlug,
 } from '@force/shared';
@@ -39,6 +41,15 @@ export interface ProvisionStoreInput {
   // only provider (Vercel cancelled 2026-07); kept optional for signature compat.
   domainProvider?: 'cloudflare';
   plan?: 'free' | 'starter' | 'professional' | 'enterprise';
+  /**
+   * Initial store status. Defaults to `active` (super-admin provisioning).
+   * Self-serve onboarding creates the store `inactive` (unreachable at
+   * `<slug>.ebda.app`) and flips it live at the final step.
+   */
+  status?: 'active' | 'inactive';
+  /** Initial storefront template; defaults to the schema default. */
+  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+  storeNameAr?: string;
 
   // Owner details
   ownerEmail: string;
@@ -50,6 +61,7 @@ export interface ProvisionStoreInput {
     theme?: string;
     currency?: string;
     timezone?: string;
+    defaultLanguage?: 'ar' | 'en';
   };
 }
 
@@ -81,6 +93,9 @@ export class ProvisioningService {
       storeSlug,
       domain,
       plan = 'starter',
+      status = 'active',
+      template,
+      storeNameAr,
       ownerEmail,
       ownerName,
       ownerPassword,
@@ -176,14 +191,20 @@ export class ProvisioningService {
             slug,
             domain,
             domainProvider: input.domainProvider ?? null,
+            ...(storeNameAr ? { nameAr: storeNameAr } : {}),
             ownerId: owner.id,
-            status: 'active',
+            status,
+            ...(template ? { template } : {}),
             plan,
             ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
             settings: {
               theme: settingsRest.theme || 'default',
-              currency: settingsRest.currency || 'USD',
+              currency: settingsRest.currency || REGION.currency,
               ...settingsRest,
+              // Arabic-first unless the caller said otherwise (spread above wins if present).
+              defaultLanguage:
+                (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
+                REGION.defaultLocale,
             },
           },
         });
@@ -191,6 +212,24 @@ export class ProvisioningService {
         // The store exists now: from here the transaction acts as it, so the rows
         // below satisfy the strict store policies (set_config, transaction-local).
         await setTenantGucs(tx, { storeId: store.id });
+
+        // Subscription row for the plan the operator chose (SP5 plans engine).
+        // Super-admin provisioning is platform-controlled, so a custom domain
+        // here is NOT plan-gated (the operator is assigning the plan).
+        await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
+
+        // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an ACTIVE
+        // editable rate. The charge itself stays gated on `Store.taxEnabled`
+        // (ruling TAX-1), which the merchant flips once VAT-registered.
+        await tx.taxRate.create({
+          data: {
+            storeId: store.id,
+            name: 'VAT',
+            nameAr: 'ضريبة القيمة المضافة',
+            rate: REGION.defaultVatBps / 100,
+            isActive: true,
+          },
+        });
 
         // Create default category
         await tx.category.create({
@@ -217,7 +256,7 @@ export class ProvisioningService {
             displayNameAr: 'الدفع عند الاستلام',
             testMode: false,
             supportedMethods: ['cod'],
-            supportedCurrencies: ['KWD'],
+            supportedCurrencies: [REGION.currency],
             fixedFee: 0,
             percentageFee: 0,
           },

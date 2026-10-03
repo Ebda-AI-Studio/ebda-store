@@ -111,7 +111,7 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
           name: 'rls-test-store',
           slug: `rls-test-${uniqueSuffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -141,7 +141,7 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
           shipping: 0,
           discount: 0,
           total: 1000,
-          currency: 'KWD',
+          currency: 'EGP',
           shippingAddress: {},
           billingAddress: {},
         },

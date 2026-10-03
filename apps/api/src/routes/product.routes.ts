@@ -67,14 +67,14 @@ const createProductSchema = z.object({
   // Nullable so the admin form can explicitly clear an existing value
   // (Prisma treats `undefined` as "leave alone"; we need `null` to clear).
   compareAtPrice: z.number().int().min(0).optional().nullable(),
-  // Cost-of-goods in fils, used for profit reporting. Nullable so the
+  // Cost-of-goods in piastres, used for profit reporting. Nullable so the
   // admin form can clear a previously-set value.
   costPrice: z.number().int().min(0).optional().nullable(),
   // Admin-authored discount input. The service derives price/compareAtPrice
   // from these at save time. null clears a previously-set discount.
   discountType: z.enum(['percentage', 'fixed']).optional().nullable(),
   // percentage → basis points (percent×100, e.g. 12.5%→1250, range 0–10000)
-  // fixed      → fils
+  // fixed      → piastres
   discountValue: z.number().int().min(0).optional().nullable(),
   sku: z.string().optional().nullable(),
   inventory: z.number().int().min(0).optional(),
@@ -697,19 +697,19 @@ const bulkUpdateSchema = z.object({
       price: z
         .object({
           mode: z.enum(['set', 'adjustPct']),
-          // For 'set': fils (integer, ≥0, ≤ Postgres int4 max ~2.1B)
+          // For 'set': piastres (integer, ≥0, ≤ Postgres int4 max ~2.1B)
           // For 'adjustPct': percent in range -99..+10000 (avoids int4 overflow
-          //   from an unbounded multiplier against large fils values)
+          //   from an unbounded multiplier against large piastres values)
           value: z
             .number()
             .min(-99, 'adjustPct must be ≥ -99 (up to 99% off)')
             .max(2_147_483_647, 'price value too large'),
         })
-        // `set` is an absolute fils price → must be a non-negative integer.
+        // `set` is an absolute piastres price → must be a non-negative integer.
         // Without this, `{ mode:'set', value:-50 }` passes the shared min(-99)
         // and the service silently clamps it to 0, zeroing every product's price.
         .refine(p => p.mode !== 'set' || (Number.isInteger(p.value) && p.value >= 0), {
-          message: 'set price must be a non-negative integer (fils)',
+          message: 'set price must be a non-negative integer (piastres)',
           path: ['value'],
         })
         .optional(),

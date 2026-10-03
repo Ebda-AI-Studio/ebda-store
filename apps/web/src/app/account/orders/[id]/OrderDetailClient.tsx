@@ -39,7 +39,7 @@ interface OrderDetail {
    *  (null/0 when no redemption applied). #197. */
   loyaltyDiscount?: number;
   loyaltyPointsRedeemed?: number | null;
-  /** Part of `total` paid from the customer wallet (D1), in fils. */
+  /** Part of `total` paid from the customer wallet (D1), in piastres. */
   walletAmount?: number;
   notes?: string;
   customerNotes?: string;
@@ -1057,7 +1057,7 @@ export default function OrderDetailClient() {
                         dateTime={row.at}
                         className="mt-0.5 block text-xs text-muted-foreground"
                       >
-                        {new Date(row.at).toLocaleString(language === 'ar' ? 'ar-KW' : 'en-US', {
+                        {new Date(row.at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', {
                           dateStyle: 'medium',
                           timeStyle: 'short',
                         })}

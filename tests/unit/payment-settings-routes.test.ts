@@ -153,7 +153,7 @@ function baseConfig(overrides: Partial<Record<string, unknown>> = {}) {
     webhookSecret: 'CIPHERTEXT(whsec_abcdef)',
     testMode: false,
     supportedMethods: ['card'],
-    supportedCurrencies: ['KWD'],
+    supportedCurrencies: ['EGP'],
     fixedFee: 0,
     percentageFee: 0,
     healthStatus: 'unknown',

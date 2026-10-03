@@ -27,12 +27,15 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import {
   ALLOWED_CURRENCIES,
-  convertToKwd,
+  convertToBase,
   requiresFxRate,
   zonedDayEnd,
   zonedDayStart,
   zonedIsoDay,
   zonedMonthStartDay,
+  fromMinor,
+  REGION,
+  excelMoneyFormat,
 } from '@force/shared';
 import { storeTimeZone } from '../lib/report-range';
 import {
@@ -67,7 +70,7 @@ const router = Router({ mergeParams: true });
  * first or last millisecond; full ISO values are instants and used as-is.
  * Owner decision 2026-10-01 (Ruling FRT-1): Finance Reports count days in the
  * store's time zone, like the finance dashboard — before this a date-only
- * value was a SERVER-local day (UTC on Railway), so a Kuwait posting between
+ * value was a SERVER-local day (UTC on Railway), so an Egypt posting between
  * 00:00 and 03:00 landed on the previous day, and on the last day of a month
  * in the previous month.
  *
@@ -232,24 +235,24 @@ router.get(
 const lineSchema = z
   .object({
     accountId: z.string().uuid(),
-    /** KWD fils when currency=KWD. Foreign minor units when currency≠KWD. */
+    /** EGP piastres when currency=EGP. Foreign minor units when currency≠EGP. */
     debit: z.number().int().nonnegative(),
     credit: z.number().int().nonnegative(),
     lineMemo: z.string().optional(),
-    /** ISO-4217 code. Defaults to 'KWD'. */
+    /** ISO-4217 code. Defaults to 'EGP'. */
     currency: z.enum(ALLOWED_CURRENCIES).optional(),
     /**
-     * FX rate: 1 unit of `currency` = fxRate KWD.
-     * Required when currency !== 'KWD'. The route converts debit/credit to
-     * KWD fils and stores originalAmount before passing to postEntry.
+     * FX rate: 1 unit of `currency` = fxRate EGP.
+     * Required when currency !== 'EGP'. The route converts debit/credit to
+     * EGP piastres and stores originalAmount before passing to postEntry.
      */
     fxRate: z.number().positive().finite().optional(),
     /** Original amount in foreign minor units (derived from debit|credit when absent). */
     originalAmount: z.number().int().nonnegative().optional(),
   })
   .superRefine((line, ctx) => {
-    const currency = (line.currency ?? 'KWD').toUpperCase();
-    if (currency !== 'KWD' && line.fxRate === undefined) {
+    const currency = (line.currency ?? REGION.currency).toUpperCase();
+    if (currency !== REGION.currency && line.fxRate === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['fxRate'],
@@ -294,24 +297,24 @@ router.post(
 
       const body = parsed.data;
 
-      // Convert non-KWD lines to KWD fils before passing to postEntry.
-      // postEntry only validates DR=CR on KWD amounts; FX metadata is stored
-      // alongside but the accounting invariant is always in KWD.
+      // Convert non-EGP lines to EGP piastres before passing to postEntry.
+      // postEntry only validates DR=CR on EGP amounts; FX metadata is stored
+      // alongside but the accounting invariant is always in EGP.
       const resolvedLines = body.lines.map(l => {
-        const currency = (l.currency ?? 'KWD').toUpperCase();
+        const currency = (l.currency ?? REGION.currency).toUpperCase();
         if (!requiresFxRate(currency) || l.fxRate == null) {
-          // KWD line or no rate provided — pass through unchanged
+          // EGP line or no rate provided — pass through unchanged
           return { ...l, currency: currency };
         }
         const origDebit = l.debit;
         const origCredit = l.credit;
-        const kwdDebit = origDebit > 0 ? convertToKwd(origDebit, l.fxRate) : 0;
-        const kwdCredit = origCredit > 0 ? convertToKwd(origCredit, l.fxRate) : 0;
+        const baseDebit = origDebit > 0 ? convertToBase(origDebit, l.fxRate, currency) : 0;
+        const baseCredit = origCredit > 0 ? convertToBase(origCredit, l.fxRate, currency) : 0;
         return {
           ...l,
           currency,
-          debit: kwdDebit,
-          credit: kwdCredit,
+          debit: baseDebit,
+          credit: baseCredit,
           fxRate: l.fxRate,
           originalAmount: l.originalAmount ?? (origDebit || origCredit),
         };
@@ -606,7 +609,7 @@ router.get(
  * Accepts optional `from` and `to` ISO date query params to set the P&L
  * window. Defaults to the current calendar month when omitted.
  * Cash accounts are those whose code starts with '10' (asset accounts in the
- * 1000-1099 range per Kuwait COA — bank + petty cash).
+ * 1000-1099 range per Egypt COA — bank + petty cash).
  */
 router.get(
   '/:storeId/finance/dashboard',
@@ -673,7 +676,7 @@ router.get(
 
 // ─── XLSX exports for finance reports ────────────────────────────────────────
 // Each mirrors the JSON endpoint above — same auth chain, same data, streamed
-// as a formatted Excel workbook (bold header, KWD three-decimal numFmt).
+// as a formatted Excel workbook (bold header, EGP two-decimal numFmt).
 
 // GET /:storeId/finance/reports/trial-balance.xlsx
 router.get(
@@ -701,17 +704,32 @@ router.get(
           { header: 'Account Code', key: 'code', width: 16 },
           { header: 'Account Name (EN)', key: 'nameEn', width: 34 },
           { header: 'Account Name (AR)', key: 'nameAr', width: 34 },
-          { header: 'Debit (KWD)', key: 'debit', width: 16, numFmt: '#,##0.000' },
-          { header: 'Credit (KWD)', key: 'credit', width: 16, numFmt: '#,##0.000' },
-          { header: 'Balance (KWD)', key: 'balance', width: 16, numFmt: '#,##0.000' },
+          {
+            header: 'Debit (EGP)',
+            key: 'debit',
+            width: 16,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
+          {
+            header: 'Credit (EGP)',
+            key: 'credit',
+            width: 16,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
+          {
+            header: 'Balance (EGP)',
+            key: 'balance',
+            width: 16,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
         ],
         rows: rows.map(r => ({
           code: r.code,
           nameEn: r.nameEn,
           nameAr: r.nameAr ?? '',
-          debit: r.debitTotal / 1000,
-          credit: r.creditTotal / 1000,
-          balance: r.balance / 1000,
+          debit: fromMinor(r.debitTotal),
+          credit: fromMinor(r.creditTotal),
+          balance: fromMinor(r.balance),
         })),
       });
     } catch (err) {
@@ -751,20 +769,20 @@ router.get(
           type: 'Account',
           code: r.code,
           name: r.nameEn,
-          amount: (r.creditTotal - r.debitTotal) / 1000,
+          amount: fromMinor(r.creditTotal - r.debitTotal),
         })),
-        { type: 'Total', code: '', name: 'Total Revenue', amount: raw.totalRevenue / 1000 },
+        { type: 'Total', code: '', name: 'Total Revenue', amount: fromMinor(raw.totalRevenue) },
         { type: '', code: '', name: '', amount: '' },
         { type: 'Section', code: '', name: 'Expenses', amount: '' },
         ...raw.expenses.map(r => ({
           type: 'Account',
           code: r.code,
           name: r.nameEn,
-          amount: (r.debitTotal - r.creditTotal) / 1000,
+          amount: fromMinor(r.debitTotal - r.creditTotal),
         })),
-        { type: 'Total', code: '', name: 'Total Expenses', amount: raw.totalExpenses / 1000 },
+        { type: 'Total', code: '', name: 'Total Expenses', amount: fromMinor(raw.totalExpenses) },
         { type: '', code: '', name: '', amount: '' },
-        { type: 'Net', code: '', name: 'Net Income', amount: raw.netIncome / 1000 },
+        { type: 'Net', code: '', name: 'Net Income', amount: fromMinor(raw.netIncome) },
       ];
 
       // Name the days in the store's zone — the zone parseFinanceDate
@@ -779,7 +797,12 @@ router.get(
           { header: 'Type', key: 'type', width: 12 },
           { header: 'Account Code', key: 'code', width: 16 },
           { header: 'Account Name', key: 'name', width: 34 },
-          { header: 'Amount (KWD)', key: 'amount', width: 18, numFmt: '#,##0.000' },
+          {
+            header: 'Amount (EGP)',
+            key: 'amount',
+            width: 18,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
         ],
         rows,
       });
@@ -817,13 +840,13 @@ router.get(
           section: label,
           code: r.code,
           name: r.nameEn,
-          amount: (r.balance * sign) / 1000,
+          amount: fromMinor(r.balance * sign),
         })),
         {
           section: 'Total',
           code: '',
           name: totalLabel,
-          amount: accounts.reduce((s, r) => s + r.balance * sign, 0) / 1000,
+          amount: fromMinor(accounts.reduce((s, r) => s + r.balance * sign, 0)),
         },
         { section: '', code: '', name: '', amount: '' },
       ];
@@ -843,7 +866,12 @@ router.get(
           { header: 'Section', key: 'section', width: 14 },
           { header: 'Account Code', key: 'code', width: 16 },
           { header: 'Account Name', key: 'name', width: 34 },
-          { header: 'Amount (KWD)', key: 'amount', width: 18, numFmt: '#,##0.000' },
+          {
+            header: 'Amount (EGP)',
+            key: 'amount',
+            width: 18,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
         ],
         rows,
       });
@@ -977,10 +1005,10 @@ router.get(
         date: r.date,
         orderNumber: r.orderNumber,
         customer: r.customerName ?? '',
-        subtotal: r.subtotal / 1000,
+        subtotal: fromMinor(r.subtotal),
         taxRate: `${r.taxRate}%`,
-        taxCollected: r.taxCollected / 1000,
-        total: r.total === null ? '' : r.total / 1000,
+        taxCollected: fromMinor(r.taxCollected),
+        total: r.total === null ? '' : fromMinor(r.total),
       }));
 
       // Summary section
@@ -1000,9 +1028,9 @@ router.get(
           date: '',
           orderNumber: `Orders: ${report.summary.orderCount} — Entries (sales + refunds): ${report.summary.transactionCount}`,
           customer: '',
-          subtotal: report.summary.totalTaxableSales / 1000,
+          subtotal: fromMinor(report.summary.totalTaxableSales),
           taxRate: '',
-          taxCollected: report.summary.totalTaxCollected / 1000,
+          taxCollected: fromMinor(report.summary.totalTaxCollected),
           total: '',
         },
         {
@@ -1022,9 +1050,9 @@ router.get(
           date: '',
           orderNumber: '',
           customer: `${byRate.taxRate}% — ${byRate.transactionCount} entr${byRate.transactionCount === 1 ? 'y' : 'ies'}`,
-          subtotal: byRate.totalSubtotal / 1000,
+          subtotal: fromMinor(byRate.totalSubtotal),
           taxRate: `${byRate.taxRate}%`,
-          taxCollected: byRate.totalTaxCollected / 1000,
+          taxCollected: fromMinor(byRate.totalTaxCollected),
           total: '',
         });
       }
@@ -1040,10 +1068,25 @@ router.get(
           { header: 'Date', key: 'date', width: 14 },
           { header: 'Order Number', key: 'orderNumber', width: 20 },
           { header: 'Customer', key: 'customer', width: 28 },
-          { header: 'Taxable Base (KWD)', key: 'subtotal', width: 20, numFmt: '#,##0.000' },
+          {
+            header: 'Taxable Base (EGP)',
+            key: 'subtotal',
+            width: 20,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
           { header: 'Tax Rate', key: 'taxRate', width: 12 },
-          { header: 'Tax Collected (KWD)', key: 'taxCollected', width: 22, numFmt: '#,##0.000' },
-          { header: 'Order Total (KWD)', key: 'total', width: 20, numFmt: '#,##0.000' },
+          {
+            header: 'Tax Collected (EGP)',
+            key: 'taxCollected',
+            width: 22,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
+          {
+            header: 'Order Total (EGP)',
+            key: 'total',
+            width: 20,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
         ],
         rows: [...txRows, ...summaryRows],
       });
@@ -1056,7 +1099,7 @@ router.get(
 // ─── FX Rate Registry (Multi-Currency — Enterprise) ──────────────────────────
 //
 // Simple merchant-maintained rate log. Merchants record the day's rate for a
-// currency pair and the system uses it for non-KWD expense/journal entry
+// currency pair and the system uses it for non-EGP expense/journal entry
 // creation. There is no automatic rate fetch — manual entry is intentional
 // (auditable, no external API dependency, correct for small merchants).
 //
@@ -1065,9 +1108,9 @@ router.get(
 //   POST /:storeId/finance/fx-rates        — record a rate for a given date
 
 const fxRateCreateSchema = z.object({
-  /** ISO-4217 code (must be in ALLOWED_CURRENCIES, not KWD). */
-  currency: z.enum(ALLOWED_CURRENCIES.filter(c => c !== 'KWD') as [string, ...string[]]),
-  /** Rate: 1 unit of `currency` = rate KWD. Must be positive. */
+  /** ISO-4217 code (must be in ALLOWED_CURRENCIES, not EGP). */
+  currency: z.enum(ALLOWED_CURRENCIES.filter(c => c !== 'EGP') as [string, ...string[]]),
+  /** Rate: 1 unit of `currency` = rate EGP. Must be positive. */
   rate: z.number().positive().finite(),
   /** Date the rate applies to. ISO date string e.g. "2026-06-15". Defaults to today. */
   rateDate: z.string().optional(),

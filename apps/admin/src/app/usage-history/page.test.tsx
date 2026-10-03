@@ -69,9 +69,9 @@ describe('super-admin usage history page (issue 1058)', () => {
 
     const beta = await screen.findByText('Beta');
     const alpha = screen.getByText('Alpha');
-    // Revenue desc: Beta (980.500) before Alpha (120.000).
+    // Revenue desc: Beta (9,805.00) before Alpha (1,200.00).
     expect(beta.compareDocumentPosition(alpha) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('980.500')).toBeTruthy();
+    expect(screen.getByText('9,805.00')).toBeTruthy();
     expect(screen.getByText('table.aiUnpriced:{"count":"3"}')).toBeTruthy();
     expect(String(apiGet.mock.calls[0][0])).toContain('/admin/super-admin/usage-history');
 

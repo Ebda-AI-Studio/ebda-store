@@ -17,7 +17,7 @@ import {
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor, getProductCardTextSizes } from '@force/shared';
+import { resolveColor, getProductCardTextSizes, fromMinor, REGION } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
@@ -41,7 +41,7 @@ import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/Product
 function BoldProductCard({
   product,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   quantityInCart = 0,
   onAddToCart,
   urlPrefix = '',
@@ -95,7 +95,7 @@ function BoldProductCard({
   // Item 10 — normalize images.
   const normalizeImages = store.theme?.normalizeProductImages === true;
 
-  // BUG 1 fix: use helper for correct KWD/pct badge text.
+  // BUG 1 fix: use helper for correct EGP/pct badge text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
@@ -379,7 +379,7 @@ function BoldProductCard({
             {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />
-              <meta itemProp="price" content={String(product.price / 1000)} />
+              <meta itemProp="price" content={String(fromMinor(product.price))} />
             </span>
             {priceVisible && (
               <Price

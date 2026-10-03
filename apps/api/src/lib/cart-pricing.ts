@@ -1,5 +1,5 @@
 /**
- * Unit price (in fils) for a single cart / order line.
+ * Unit price (in piastres) for a single cart / order line.
  *
  * When the line has a chosen variant, the customer is charged THAT variant's
  * price; only variant-less products fall back to the parent product price.

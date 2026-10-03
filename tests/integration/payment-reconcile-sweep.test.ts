@@ -45,7 +45,7 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
           name: 'prs-test-store',
           slug: `prs-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -72,7 +72,7 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
             provider: 'myfatoorah',
             status: 'completed',
             amount: 5000,
-            currency: 'KWD',
+            currency: 'EGP',
             transactionId: `prs-txn-${suffix}`,
           },
         })
@@ -98,7 +98,7 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
           provider: 'myfatoorah',
           status: 'completed',
           amount: 5000,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `prs-txn-ok-${suffix}`,
         },
       });

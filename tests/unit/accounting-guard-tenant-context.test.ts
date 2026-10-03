@@ -149,7 +149,7 @@ describe('#1241 — the tenant-ownership guard runs INSIDE a tenant-scoped conte
         expenseAccountId: 'acct-1',
         paidFromAccountId: 'acct-2',
         amount: 1000,
-        currency: 'KWD',
+        currency: 'EGP',
         date: new Date(),
       } as never)
     ).rejects.toBe(STOP);
@@ -175,7 +175,7 @@ describe('#1241 — the tenant-ownership guard runs INSIDE a tenant-scoped conte
         expenseAccountId: 'acct-1',
         paidFromAccountId: 'acct-2',
         amount: 1000,
-        currency: 'KWD',
+        currency: 'EGP',
         expenseDate: new Date().toISOString(),
       } as never)
     ).rejects.toBe(STOP);

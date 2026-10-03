@@ -146,9 +146,9 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const pathname = usePathname();
 
   // Tenant-aware date formatter for review timestamps. Uses the store's
-  // timezone so a 23:30 UTC review from a Kuwait store reads "Jan 5"
-  // (Asia/Kuwait), not "Jan 4" (UTC). Switches to Arabic numerals for
-  // ar-KW visitors.
+  // timezone so a 23:30 UTC review from an Egypt store reads "Jan 5"
+  // (Africa/Cairo), not "Jan 4" (UTC). Switches to Arabic numerals for
+  // ar-EG visitors.
   const formatDate = (dateStr: string) =>
     formatStoreDate(dateStr, {
       timezone: store.timezone,

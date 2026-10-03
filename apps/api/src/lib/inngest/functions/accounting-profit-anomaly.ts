@@ -5,8 +5,9 @@ import { inngest } from '../client';
 import { runProfitAnomalyScan } from '../../../services/accounting/profit-anomaly.service';
 import { featureService } from '../../../services/feature.service';
 
+import { REGION } from '@force/shared';
 /**
- * Daily profit anomaly scan — runs at 06:30 Kuwait time (03:30 UTC).
+ * Daily profit anomaly scan — runs at 06:30 Egypt time (03:30 UTC).
  *
  * For every store with accountingEnabled + aiFeaturesEnabled, calls
  * runProfitAnomalyScan() which:
@@ -25,7 +26,7 @@ export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFu
     name: 'Profit anomaly scan — daily cron (AI)',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '30 3 * * *' }], // 06:30 KW = 03:30 UTC (Kuwait is UTC+3)
+    triggers: [{ cron: `TZ=${REGION.timezone} 30 6 * * *` }], // 06:30 Cairo (DST-aware via TZ=)
   },
   async ({ step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the

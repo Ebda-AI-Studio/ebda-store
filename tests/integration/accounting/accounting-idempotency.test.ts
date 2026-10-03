@@ -52,7 +52,7 @@ describe('webhook / inngest re-fire does not double-post', () => {
           shipping: 0,
           discount: 0,
           total: 1000,
-          currency: 'KWD',
+          currency: 'EGP',
           shippingAddress: {},
           billingAddress: {},
           items: {

@@ -5,6 +5,7 @@ import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { BRAND_MARKETING_URL, BRAND } from '@force/shared';
 
+import { normalizeEgyptianMobile } from '@force/shared';
 /**
  * Branded "we'll be back soon" page rendered when the resolved store has
  * `status === 'suspended'`. Replaces the normal storefront chrome on every
@@ -52,9 +53,13 @@ export function StoreMaintenance() {
   const poweredByLabel = t(`Powered by ${BRAND.name}`, `مدعوم من ${BRAND.nameAr}`);
 
   // Normalize the WhatsApp number to digits so wa.me works regardless of the
-  // format the merchant typed (the admin form accepts "+965 9999 1234",
-  // "0096599991234", etc.).
-  const whatsappDigits = store.whatsapp ? store.whatsapp.replace(/\D/g, '') : '';
+  // format the merchant typed (the admin form accepts "+20 101 234 5678",
+  // "01012345678", "0020 1012345678", etc.). An Egyptian mobile is promoted to
+  // its international form (wa.me needs the country code); anything else keeps
+  // just its digits.
+  const whatsappDigits = store.whatsapp
+    ? (normalizeEgyptianMobile(store.whatsapp)?.slice(1) ?? store.whatsapp.replace(/\D/g, ''))
+    : '';
   const hasContact = !!(store.email || store.phone || whatsappDigits);
 
   return (

@@ -72,7 +72,7 @@ async function seedStore(suffix: string, withFeature: boolean): Promise<Fixture>
         name: `merchant-mcp ${suffix}`,
         slug: `merchant-mcp-${suffix}`,
         template: 'modern',
-        currency: 'KWD',
+        currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
       },

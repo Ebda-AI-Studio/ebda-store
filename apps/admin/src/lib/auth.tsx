@@ -75,6 +75,17 @@ export function postLoginDestination(): string {
   return dest;
 }
 
+/**
+ * Pages reachable with no session. `/login` plus the self-serve funnel
+ * (`/signup`, `/verify-email`): a visitor must be able to create an account
+ * and open the emailed link before any session exists.
+ */
+export const PUBLIC_PATHS: readonly string[] = ['/login', '/signup', '/verify-email'];
+
+export function isPublicPath(pathname: string | null | undefined): boolean {
+  return !!pathname && PUBLIC_PATHS.includes(pathname.replace(/\/+$/, '') || '/');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const t = useT('auth.login');
   const [user, setUser] = useState<User | null>(null);
@@ -174,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // were kicked from, not the dashboard. Intentional logout() pushes a bare
   // /login — only the unauthenticated kick preserves location.
   useEffect(() => {
-    if (!isLoading && !user && pathname !== '/login') {
+    if (!isLoading && !user && !isPublicPath(pathname)) {
       const here =
         typeof window !== 'undefined'
           ? `${window.location.pathname}${window.location.search}`

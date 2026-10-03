@@ -1,7 +1,8 @@
 import type { AddressJson } from './types';
 
-export function formatMoney(fils: number, currency = 'KWD'): string {
-  const major = (fils / 1000).toFixed(3);
+import { minorToDecimalString, REGION } from '@force/shared';
+export function formatMoney(piastres: number, currency = REGION.currency): string {
+  const major = minorToDecimalString(piastres);
   return `${major} ${currency}`;
 }
 
@@ -84,7 +85,7 @@ export function formatAddressLines(
   if (street) blockBits.push(`${labels.street} ${street}`);
   if (a.avenue) blockBits.push(`${labels.avenue} ${a.avenue}`);
   if (a.house) blockBits.push(`${labels.house} ${a.house}`);
-  // Fallback: when no structured Kuwait fields (block/street) are present,
+  // Fallback: when no structured Egypt fields (block/street) are present,
   // use `address1` (the free-text "Block & Street" field from the storefront
   // checkout form) verbatim so the admin sees the full delivery address.
   if (blockBits.length === 0 && a.address1) {

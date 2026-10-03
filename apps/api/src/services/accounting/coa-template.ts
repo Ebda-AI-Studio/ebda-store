@@ -9,7 +9,7 @@ export interface CoaTemplateRow {
 }
 
 /**
- * Kuwait small-retail Chart of Accounts. All rows in this template are seeded
+ * Egypt small-retail Chart of Accounts. All rows in this template are seeded
  * with isSystem=true and cannot be renamed or deleted by the merchant; they
  * may add custom child accounts (e.g. 5210 "Meta Ads" under 5200 Marketing).
  *
@@ -18,7 +18,7 @@ export interface CoaTemplateRow {
  * future system accounts within each band without renumbering.
  */
 export const COA_TEMPLATE: CoaTemplateRow[] = [
-  { code: '1000', nameEn: 'Cash KNET', nameAr: 'كاش كي نت', type: 'asset' },
+  { code: '1000', nameEn: 'Cash Online', nameAr: 'كاش مدفوعات إلكترونية', type: 'asset' },
   { code: '1010', nameEn: 'Cash Card', nameAr: 'كاش بطاقات', type: 'asset' },
   { code: '1020', nameEn: 'Cash COD', nameAr: 'كاش الدفع عند الاستلام', type: 'asset' },
   { code: '1030', nameEn: 'Bank Main', nameAr: 'بنك رئيسي', type: 'asset' },

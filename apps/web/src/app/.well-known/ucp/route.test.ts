@@ -28,7 +28,7 @@ const STORE = {
   id: 'store_1',
   name: 'Test Store',
   slug: 'test-store',
-  currency: 'KWD',
+  currency: 'EGP',
   enabledFeatures: ['agent_checkout'],
 };
 

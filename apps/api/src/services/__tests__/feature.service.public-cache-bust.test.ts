@@ -71,6 +71,9 @@ vi.mock('@force/database', () => ({
     fn({
       store: { findUnique: mockStoreFindUnique },
       storeFeature: { findMany: mockStoreFeatureFindMany, upsert: mockStoreFeatureUpsert },
+      // plans engine (SP5): no subscription row -> the plan resolves from the legacy enum
+      storeSubscription: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
+      plan: { findUnique: vi.fn().mockResolvedValue(null) },
     })
   ),
 }));
@@ -91,6 +94,9 @@ describe('FeatureService — public cache bust (audit-followup #1668)', () => {
       fn({
         storeFeature: { upsert: mockStoreFeatureUpsert, findMany: mockStoreFeatureFindMany },
         store: { findUnique: mockStoreFindUnique },
+        // plans engine (SP5): no subscription row -> the plan resolves from the legacy enum
+        storeSubscription: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
+        plan: { findUnique: vi.fn().mockResolvedValue(null) },
       })
     );
   });

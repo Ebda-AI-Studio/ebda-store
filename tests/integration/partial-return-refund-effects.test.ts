@@ -77,7 +77,7 @@ describe.skipIf(!hasDb)('partial-return refund effects', () => {
           name: 'prt-test-store',
           slug: `prt-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -359,7 +359,7 @@ describe.skipIf(!hasDb)('partial-return refund effects', () => {
           provider: 'myfatoorah',
           status: 'completed',
           amount: 10500,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `prt-txn-${suffix}`,
         },
       })

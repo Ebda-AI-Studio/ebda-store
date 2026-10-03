@@ -5,7 +5,7 @@ import { API_URL } from '../../../lib/api';
 import { publicLayoutUrl } from '../../../lib/preview-draft';
 import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
 import { fetchPublicShippingZones } from '../../../lib/shipping-public';
-import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
+import { resolveLayoutSettings, type StoreLayoutSettings, fromMinor, REGION } from '@force/shared';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
 import { buildOgImages } from '../../../lib/seo/og-images';
 import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';
@@ -93,8 +93,8 @@ export function buildProductMetadata(
   const description =
     rawDescription?.slice(0, 160) ||
     (locale === 'ar'
-      ? `تسوق ${localizedName} من ${localizedStoreName}. توصيل سريع في الكويت.`
-      : `Buy ${localizedName} at ${localizedStoreName}. Fast delivery in Kuwait.`);
+      ? `تسوق ${localizedName} من ${localizedStoreName}. توصيل سريع في مصر.`
+      : `Buy ${localizedName} at ${localizedStoreName}. Fast delivery in Egypt.`);
   const ogImage = product.images?.[0]?.url;
   const category = product.categories?.[0]?.category?.name;
   // Platform-path stores need the `/<slug>` prefix (see storeAbsoluteUrl doc
@@ -135,8 +135,8 @@ export function buildProductMetadata(
     },
     other: {
       ...(category ? { 'product:category': category } : {}),
-      'product:price:amount': String(product.price / 1000),
-      'product:price:currency': 'KWD',
+      'product:price:amount': String(fromMinor(product.price)),
+      'product:price:currency': REGION.currency,
     },
   };
 }

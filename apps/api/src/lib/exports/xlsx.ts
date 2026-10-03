@@ -7,7 +7,7 @@
  * build for CSV — guarantees the two outputs stay in sync.
  *
  * Column `numFmt` examples:
- *   '#,##0.000'  → KWD three-decimal amounts
+ *   '#,##0.00'   → EGP two-decimal amounts (use `excelMoneyFormat` from @force/shared)
  *   '@'          → force text cell (prevents Excel from mangling phone numbers)
  */
 import ExcelJS from 'exceljs';
@@ -43,7 +43,7 @@ export interface XlsxColumn {
   header: string;
   key: string;
   width?: number;
-  numFmt?: string; // e.g. '#,##0.000' for KWD amounts
+  numFmt?: string; // e.g. excelMoneyFormat({ grouped: true }) for EGP amounts
 }
 
 export interface StreamXlsxOpts {

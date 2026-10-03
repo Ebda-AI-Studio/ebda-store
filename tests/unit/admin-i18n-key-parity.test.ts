@@ -39,7 +39,12 @@ const arFlat = flatten(ar as Messages);
 
 // Reviewed exceptions where en === ar is correct, not a missed translation.
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
-  // Numeric amount example (0.000 KWD), same digits in both locales.
+  // Self-serve onboarding: LTR example values (email address, Egyptian mobile
+  // in local format, a price in EGP) shown inside dir="ltr" inputs.
+  'onboarding.signup.emailPlaceholder',
+  'onboarding.signup.phonePlaceholder',
+  'onboarding.flow.product.pricePlaceholder',
+  // Numeric amount example (0.000 EGP), same digits in both locales.
   'customers.detail.wallet.modal.amountPlaceholder',
   // Page-builder example placeholders for bilingual content fields, restored
   // from main (2026-09-25): identical on main by design.

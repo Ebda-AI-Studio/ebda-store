@@ -43,7 +43,7 @@ import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { computeBundlePrice, isAllocatable, type BundlePricingType } from '@force/shared';
 import { useT } from '@/i18n/useT';
-import { formatPrice, filsToKwd } from '@/lib/format';
+import { formatPrice, minorToMajor } from '@/lib/format';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
@@ -57,7 +57,7 @@ import {
   toBundleLines,
   percentToBasisPoints,
   basisPointsToPercent,
-  kwdToFils,
+  majorToMinor,
   extractVariantOptions,
   zeroPriceWarning,
   UNTRACKED_AVAILABILITY_CAP,
@@ -110,7 +110,7 @@ interface FormState {
   descriptionAr: string;
   image: string;
   pricingType: BundlePricingType;
-  /** Percent (e.g. "12.5") for 'percentage'; KWD (e.g. "11.999") otherwise. */
+  /** Percent (e.g. "12.5") for 'percentage'; EGP (e.g. "11.999") otherwise. */
   pricingValueInput: string;
   isActive: boolean;
   startsAt: string;
@@ -272,7 +272,7 @@ export default function BundlesPage() {
         pricingValueInput:
           detail.pricingType === 'percentage'
             ? String(basisPointsToPercent(detail.pricingValue))
-            : filsToKwd(detail.pricingValue),
+            : minorToMajor(detail.pricingValue),
         isActive: detail.isActive,
         startsAt: dateTimeLocalValue(detail.startsAt),
         expiresAt: dateTimeLocalValue(detail.expiresAt),
@@ -296,7 +296,7 @@ export default function BundlesPage() {
     () =>
       form.pricingType === 'percentage'
         ? percentToBasisPoints(parseFloat(form.pricingValueInput) || 0)
-        : kwdToFils(form.pricingValueInput),
+        : majorToMinor(form.pricingValueInput),
     [form.pricingType, form.pricingValueInput]
   );
   const derivedPrice = useMemo(
@@ -343,7 +343,7 @@ export default function BundlesPage() {
     setForm(f => ({
       ...f,
       pricingType: 'fixed_price',
-      pricingValueInput: filsToKwd(suggestedFils),
+      pricingValueInput: minorToMajor(suggestedFils),
     }));
     setAllocationSuggestion(null);
   };
@@ -664,7 +664,7 @@ export default function BundlesPage() {
                     min={0}
                     // The ceiling the SERVER enforces, shown before the
                     // merchant saves: 100% for a percentage, and the
-                    // components' own total for either fils-denominated type
+                    // components' own total for either piastres-denominated type
                     // (`assertPriceWithinComponentSum` in bundle.routes.ts
                     // 422s above it). Left undefined while there are no
                     // components — a `max` of 0.000 on an empty picker reads
@@ -676,10 +676,10 @@ export default function BundlesPage() {
                       form.pricingType === 'percentage'
                         ? 100
                         : componentSum > 0
-                          ? filsToKwd(componentSum)
+                          ? minorToMajor(componentSum)
                           : undefined
                     }
-                    step={form.pricingType === 'percentage' ? 0.01 : 0.001}
+                    step={form.pricingType === 'percentage' ? 0.01 : 0.01}
                     value={form.pricingValueInput}
                     onChange={e => setForm({ ...form, pricingValueInput: e.target.value })}
                     className="w-full rounded-md border px-3 py-2 text-sm"
@@ -767,8 +767,8 @@ export default function BundlesPage() {
                 >
                   <p>
                     {t('priceNotAllocatable', {
-                      price: filsToKwd(derivedPrice),
-                      suggested: filsToKwd(allocationSuggestion),
+                      price: minorToMajor(derivedPrice),
+                      suggested: minorToMajor(allocationSuggestion),
                     })}
                   </p>
                   <button
@@ -776,7 +776,7 @@ export default function BundlesPage() {
                     onClick={() => applySuggestedPrice(allocationSuggestion)}
                     className="mt-1.5 rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium hover:bg-destructive/10"
                   >
-                    {t('useSuggested', { suggested: filsToKwd(allocationSuggestion) })}
+                    {t('useSuggested', { suggested: minorToMajor(allocationSuggestion) })}
                   </button>
                 </div>
               )}

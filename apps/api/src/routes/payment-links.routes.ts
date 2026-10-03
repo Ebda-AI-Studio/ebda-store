@@ -42,12 +42,15 @@ import { featureService } from '../services/feature.service';
 import logger from '../lib/logger';
 import type { Currency } from '../services/payment-providers/types';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 const router = Router({ mergeParams: true });
 
 const bodySchema = z
   .object({
     // Customer's phone in E.164 format
-    customerPhone: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +96512345678)'),
+    customerPhone: z
+      .string()
+      .regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +201012345678)'),
     customerName: z.string().min(1).max(100).optional(),
     // Items from the catalogue (productId references). Optional when an
     // extraAmount is provided — a payment link can be ALL custom charge
@@ -61,7 +64,7 @@ const bodySchema = z
       )
       .max(50)
       .optional(),
-    // Out-of-catalogue charge in fils. Baked into Order.total + persisted
+    // Out-of-catalogue charge in piastres. Baked into Order.total + persisted
     // as Order.extraAmount. Use for custom quotes, deposits, service fees
     // that don't map to a Product. Either items OR extraAmount (or both)
     // must be provided.
@@ -283,7 +286,7 @@ router.post(
           total: totalFils,
           extraAmount: extraFils,
           extraAmountNote: extraAmountNote || null,
-          currency: store.currency || 'KWD',
+          currency: store.currency || REGION.currency,
           shippingAddress: {
             phone: customerPhone,
             firstName: customer.firstName,
@@ -392,8 +395,8 @@ router.post(
         return;
       }
 
-      const currencyDisplay = language === 'ar' ? 'د.ك' : store.currency || 'KWD';
-      const totalDisplay = (totalFils / 1000).toFixed(3);
+      const currencyDisplay = language === 'ar' ? 'ج.م' : store.currency || REGION.currency;
+      const totalDisplay = minorToDecimalString(totalFils);
       const storeName = language === 'ar' ? store.nameAr || store.name : store.name;
       const customerDisplay = customerName || (language === 'ar' ? 'العميل' : 'Customer');
 
@@ -491,7 +494,7 @@ router.post(
           orderNumber: draftOrder.orderNumber,
           invoiceId: result.invoiceId ?? null,
           totalFils,
-          currency: store.currency || 'KWD',
+          currency: store.currency || REGION.currency,
           messageId: wbsBody.messageId,
           expiresAt: new Date(Date.now() + PAYMENT_LINK_TTL_MS).toISOString(),
         },

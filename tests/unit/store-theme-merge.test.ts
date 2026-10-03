@@ -45,6 +45,7 @@ vi.mock('@force/database', () => ({
 }));
 
 vi.mock('@force/shared', async importOriginal => ({
+  // Keep the real region config (REGION is read at import time by api config/services).
   ...(await importOriginal<typeof import('@force/shared')>()),
   slugify: (s: string) => s,
 }));

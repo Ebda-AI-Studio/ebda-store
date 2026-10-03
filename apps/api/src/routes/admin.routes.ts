@@ -13,6 +13,7 @@ import { invalidateCached } from '../lib/public-cache';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
+import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
@@ -33,10 +34,18 @@ import {
   OrderStatus,
   OrderPaymentStatus,
 } from '@force/database';
-import { csvField, isValidTimeZone } from '@force/shared';
+import {
+  csvField,
+  isValidTimeZone,
+  fromMinor,
+  excelMoneyFormat,
+  updatePlanSchema,
+  assignSubscriptionSchema,
+} from '@force/shared';
 import { userContext } from '../middleware/tenant-context';
 import { getEntityStoreId, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
+import { planService } from '../services/plan.service';
 
 const router = Router();
 
@@ -124,7 +133,7 @@ const provisionStoreSchema = z.object({
       theme: z.string().optional(),
       currency: z.string().optional(),
       // Governs the store's tax periods — reject a non-IANA name rather than
-      // silently falling back to Kuwait days (issue 2412).
+      // silently falling back to Egypt days (issue 2412).
       timezone: z
         .string()
         .refine(isValidTimeZone, { message: 'timezone must be a valid IANA time zone' })
@@ -322,6 +331,70 @@ router.patch(
 );
 
 /**
+ * GET /admin/plans — every plan (incl. non-public) with subscriber counts.
+ * PUT /admin/plans/:code — edit names, order, visibility, prices (null = not
+ * set) and the limits JSON (validated by `planLimitsSchema`).
+ * PUT /admin/stores/:id/subscription — put a store on a plan (e.g. `comped`).
+ */
+router.get(
+  '/plans',
+  requireRole('super_admin'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ success: true, data: { plans: await planService.listPlans() } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/plans/:code',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = updatePlanSchema.parse(req.body);
+      const plan = await planService.updatePlan(req.params.code, input);
+      await auditLog({
+        action: 'plan.updated',
+        userId: req.user!.userId,
+        resourceType: 'plan',
+        resourceId: plan.code,
+        details: { limits: plan.limits, isPublic: plan.isPublic },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { plan } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/stores/:id/subscription',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = assignSubscriptionSchema.parse(req.body);
+      const result = await planService.assignPlan(req.params.id, input);
+      await auditLog({
+        action: 'store.plan_assigned',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: req.params.id,
+        details: { ...result },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * PUT /admin/stores/:id
  * Update store details
  */
@@ -365,7 +438,11 @@ router.put(
       // the public keys made the very next public request re-seed them from
       // the STALE feature map (issue 2172), so the feature cache is dropped
       // FIRST, exactly as `featureService.setStorePlan` does.
-      if (plan !== undefined) await featureService.invalidateCache(store.id);
+      // Keep the subscription (limits) on the same plan the enum now names.
+      if (plan !== undefined) {
+        await withRlsBypass(tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
+        await featureService.invalidateCache(store.id);
+      }
       await bustStoreCaches(store.id, store.slug, store.domain);
       if (before?.slug && before.slug !== store.slug) {
         await invalidateCached(`public:store:${before.slug}`);
@@ -1817,7 +1894,7 @@ router.get(
           storeName: o.store?.name ?? '',
           status: o.status,
           paymentStatus: o.paymentStatus,
-          total: o.total / 1000,
+          total: fromMinor(o.total),
           customerEmail: o.customer?.email ?? '',
           customerName: o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : '',
           shippingCountry: addr?.country ?? '',
@@ -1854,7 +1931,12 @@ router.get(
           { header: 'Store Name', key: 'storeName', width: 30 },
           { header: 'Status', key: 'status', width: 16 },
           { header: 'Payment Status', key: 'paymentStatus', width: 18 },
-          { header: 'Total (KWD)', key: 'total', width: 14, numFmt: '#,##0.000' },
+          {
+            header: 'Total (EGP)',
+            key: 'total',
+            width: 14,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
           { header: 'Customer Email', key: 'customerEmail', width: 34 },
           { header: 'Customer Name', key: 'customerName', width: 28 },
           { header: 'Shipping Country', key: 'shippingCountry', width: 18 },

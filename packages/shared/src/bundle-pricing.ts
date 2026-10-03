@@ -1,5 +1,5 @@
 /**
- * Bundle price + allocation. Integer fils throughout — no floats, ever.
+ * Bundle price + allocation. Integer piastres throughout — no floats, ever.
  *
  * Allocation runs on UNIT shares, not line totals, because OrderItem stores
  * both a unit `price` and a `total`. A line total that is not divisible by its
@@ -14,7 +14,7 @@ export type BundlePricingType = 'fixed_price' | 'percentage' | 'fixed';
 
 export interface BundleLine {
   key: string;
-  unitPrice: number; // fils, the component's effective unit price
+  unitPrice: number; // piastres, the component's effective unit price
   quantity: number; // >= 1
 }
 
@@ -52,7 +52,7 @@ function assertValidLines(lines: BundleLine[]): void {
   }
 }
 
-/** Price of the bundle in fils, given the sum of its components. */
+/** Price of the bundle in piastres, given the sum of its components. */
 export function computeBundlePrice(
   componentSum: number,
   pricingType: BundlePricingType,
@@ -65,7 +65,7 @@ export function computeBundlePrice(
       break;
     case 'percentage':
       // basis points: 12.5% -> 1250. Floor the discount so rounding favours
-      // the merchant rather than silently discounting an extra fil.
+      // the merchant rather than silently discounting an extra piastre.
       price = componentSum - Math.floor((componentSum * pricingValue) / 10000);
       break;
     case 'fixed':

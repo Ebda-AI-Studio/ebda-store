@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { normalizeEgyptianMobile } from '@force/shared';
 import { derivedSecret } from './derived-secret';
 
 /**
@@ -11,20 +12,22 @@ import { derivedSecret } from './derived-secret';
  * Canonical, digits-only form of a phone number, used to match a consent row
  * to the number an SMS is about to go to.
  *
- *   "+965 5123 4567" → "96551234567"
- *   "0096551234567"  → "96551234567"
- *   "5123 4567"      → "96551234567"   (an 8-digit Kuwait mobile/landline)
+ *   "+20 10 1234 5678" → "201012345678"
+ *   "0020 1012345678"  → "201012345678"
+ *   "010 1234 5678"    → "201012345678"   (an Egyptian mobile, 0 + 10 digits)
+ *   "1012345678"       → "201012345678"
  *
- * The 8-digit rule is the checkout's own Kuwait format
- * (`^(965)?[24569]\d{7}$`, CheckoutClient.tsx): the same shopper types the
- * number with and without the country code, and both must reach ONE consent.
+ * The Egyptian-mobile rule is the one `REGION.phone.mobileRegex` (shared with
+ * the checkout form): the same shopper types the number with and without the
+ * country code / trunk 0, and all of them must reach ONE consent.
  * Anything shorter than 7 digits is not a phone → null (no consent can match).
  */
 export function smsConsentPhoneKey(phone: string | null | undefined): string | null {
   if (typeof phone !== 'string') return null;
+  const egypt = normalizeEgyptianMobile(phone);
+  if (egypt) return egypt.slice(1); // "+201012345678" → "201012345678"
   let digits = phone.replace(/\D/g, '');
   if (digits.startsWith('00')) digits = digits.slice(2);
-  if (/^[24569]\d{7}$/.test(digits)) digits = `965${digits}`;
   return digits.length >= 7 && digits.length <= 15 ? digits : null;
 }
 

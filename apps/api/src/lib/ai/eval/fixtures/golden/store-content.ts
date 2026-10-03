@@ -11,8 +11,8 @@ export const STORE_CONTENT_GOLDEN: GoldenCase[] = [
   {
     id: 'translation-meta-title-ar-to-en',
     type: 'translation',
-    input: { text: 'أفضل متجر إلكتروني في الكويت', from: 'ar', to: 'en', kind: 'meta-title' },
-    output: { translation: 'Best Online Store in Kuwait' },
+    input: { text: 'أفضل متجر إلكتروني في مصر', from: 'ar', to: 'en', kind: 'meta-title' },
+    output: { translation: 'Best Online Store in Egypt' },
   },
   {
     id: 'seo-meta-product',
@@ -26,9 +26,9 @@ export const STORE_CONTENT_GOLDEN: GoldenCase[] = [
       title: 'Handmade Ceramic Mug | Wady Aljuz',
       titleAr: 'كوب سيراميك يدوي الصنع | وادي الجوز',
       description:
-        'Shop our handmade 350ml ceramic mug, dishwasher safe and perfect for everyday use in Kuwait.',
+        'Shop our handmade 350ml ceramic mug, dishwasher safe and perfect for everyday use in Egypt.',
       descriptionAr:
-        'تسوق كوب السيراميك يدوي الصنع بسعة 350 مل، آمن لغسالة الصحون ومثالي للاستخدام اليومي في الكويت.',
+        'تسوق كوب السيراميك يدوي الصنع بسعة 350 مل، آمن لغسالة الصحون ومثالي للاستخدام اليومي في مصر.',
       keywords: ['ceramic mug kuwait', 'handmade mug', 'كوب سيراميك', 'kitchenware kuwait'],
     },
   },

@@ -46,6 +46,7 @@ import { PaymentService } from '../services/payment-providers/payment.factory';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import type { PaymentProvider } from '../services/payment-providers/types';
 
+import { fromMinor } from '@force/shared';
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the
@@ -107,8 +108,8 @@ const addBundleToCartSchema = z.object({
   quantity: z.number().int().min(1).max(1000).default(1),
 });
 
-// Kuwait-friendly address schema: see notes in order.routes.ts. State and
-// postalCode are optional (Kuwait has no postal codes for delivery and the
+// Egypt-friendly address schema: see notes in order.routes.ts. State and
+// postalCode are optional (Egypt has no postal codes for delivery and the
 // "state" field is repurposed to hold the selected delivery area). We trim
 // whitespace on required fields so a stray space doesn't trip min(1), and we
 // add generous max lengths to bound abuse without rejecting normal Arabic or
@@ -118,22 +119,28 @@ export const shippingAddressSchema = z.object({
   lastName: z.string().trim().min(1).max(100),
   address1: z.string().trim().min(1).max(500),
   address2: z.string().max(500).optional(),
-  // City is NOT required: Kuwait addresses have no "city" — the locality is the
-  // area/district, which the storefront sends in `state`. The checkout form
-  // always sends city:'' (KW model), so requiring it here 400'd EVERY order
+  // City is NOT required: the locality is the governorate + area/district, which
+  // the storefront sends in `area`/`state`. The checkout form always sends
+  // city:'' (Egypt model), so requiring it here 400'd EVERY order
   // ("خطأ في الدفع" → bounce back to the info step). Accept empty.
   city: z.string().trim().max(150).optional().default(''),
-  // Governorate (محافظة) — top-level KW administrative division (Capital, Hawally,
-  // Farwaniya, Ahmadi, Jahra, Mubarak Al-Kabeer). Explicit field added 2026-06-18
+  // Governorate (محافظة) — one of the 27 Egyptian governorates (REGION.governorates,
+  // e.g. Cairo, Giza, Alexandria). Explicit field added 2026-06-18
   // alongside sub-area; legacy orders used `state` or `area` for this concept.
   governorate: z.string().max(60).optional().default(''),
   governorateAr: z.string().max(60).optional().default(''),
-  // Sub-area / district (منطقة) within the governorate, e.g. Salmiya, Rumaithiya.
+  // Sub-area / district (منطقة) within the governorate, e.g. Maadi, Nasr City.
   // The shipping-fee calculator matches on this value first, then falls back to governorate.
   area: z.string().max(150).optional().default(''),
   areaAr: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
+  // Structured Egyptian delivery details (also folded into address1 by the
+  // storefront for display back-compat). Optional so older clients still pass.
+  street: z.string().max(200).optional(),
+  building: z.string().max(100).optional(),
+  floor: z.string().max(50).optional(),
+  apartment: z.string().max(50).optional(),
   country: z.string().trim().min(2).max(60),
   phone: z.string().max(40).optional(),
   // Email is optional. The form sends '' when the buyer leaves it blank;
@@ -1225,9 +1232,9 @@ router.get(
           id: item.product.id,
           name: item.product.name,
           slug: item.product.slug,
-          price: item.product.price / 1000,
+          price: fromMinor(item.product.price),
           compareAtPrice: item.product.compareAtPrice
-            ? item.product.compareAtPrice / 1000
+            ? fromMinor(item.product.compareAtPrice)
             : undefined,
           images: item.product.images.map(img => img.url),
           status: item.product.status,

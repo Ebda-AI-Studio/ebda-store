@@ -56,6 +56,7 @@ import { returnConfirmationTemplate } from '@api/services/email-templates/return
 import { returnStatusUpdateTemplate } from '@api/services/email-templates/return-status-update';
 import { reviewRequestTemplate } from '@api/services/email-templates/review-request';
 import { lowStockAlertTemplate } from '@api/services/email-templates/low-stock-alert';
+import { planLimitReachedTemplate } from '@api/services/email-templates/plan-limit-reached';
 
 type Locale = 'en' | 'ar';
 
@@ -65,7 +66,7 @@ const STORE = (locale: Locale): EmailStoreContext => ({
   theme: { primaryColor: '28 55% 30%' },
   email: 'hello@pecannbee.test',
   phone: '+965 5555 1234',
-  address: 'Kuwait City',
+  address: 'Cairo',
   defaultLanguage: locale,
 });
 
@@ -76,7 +77,7 @@ const addr = {
   city: 'Salmiya',
   state: 'Hawalli',
   postalCode: '22000',
-  country: 'Kuwait',
+  country: 'Egypt',
 };
 const orderData = {
   orderNumber: 'ORD-1',
@@ -121,6 +122,10 @@ const any = {
     },
   ],
   adminUrl: 'https://admin.test',
+  planName: 'Free',
+  limit: 100,
+  used: 120,
+  billingUrl: 'https://admin.test/stores/s1/billing',
 };
 
 type Tpl = Record<Locale, (...a: never[]) => string>;
@@ -140,6 +145,7 @@ const TEMPLATES: Record<string, Tpl> = {
   returnStatusUpdate: returnStatusUpdateTemplate,
   reviewRequest: reviewRequestTemplate,
   lowStockAlert: lowStockAlertTemplate,
+  planLimitReached: planLimitReachedTemplate,
 };
 
 function invoiceOrder(locale: Locale) {
@@ -147,7 +153,7 @@ function invoiceOrder(locale: Locale) {
     id: 'o1',
     orderNumber: 'ORD-TM67JC-2Q6XK',
     locale,
-    currency: 'KWD',
+    currency: 'EGP',
     status: 'processing',
     paymentStatus: 'paid',
     createdAt: new Date('2026-09-29T10:00:00Z'),
@@ -165,7 +171,7 @@ function invoiceOrder(locale: Locale) {
     notes: null,
     shippingAddress: addr,
     billingAddress: null,
-    store: { ...STORE(locale), currency: 'KWD', timezone: 'Asia/Kuwait' },
+    store: { ...STORE(locale), currency: 'EGP', timezone: 'Africa/Cairo' },
     customer: null,
     items: [
       {

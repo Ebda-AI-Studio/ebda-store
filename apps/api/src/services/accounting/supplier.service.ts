@@ -1,6 +1,7 @@
 import { prisma } from '@force/database';
 import type { Prisma, Supplier, SupplierPaymentTerms } from '@prisma/client';
 
+import { REGION } from '@force/shared';
 export interface CreateSupplierInput {
   storeId: string;
   name: string;
@@ -29,7 +30,7 @@ export async function createSupplier(input: CreateSupplierInput): Promise<Suppli
       address: (input.address ?? {}) as Prisma.InputJsonValue,
       paymentTerms: input.paymentTerms ?? 'net0',
       customTermsDays: input.customTermsDays,
-      defaultCurrency: input.defaultCurrency ?? 'KWD',
+      defaultCurrency: input.defaultCurrency ?? REGION.currency,
       leadTimeDays: input.leadTimeDays ?? 7,
       notes: input.notes,
       notesAr: input.notesAr,

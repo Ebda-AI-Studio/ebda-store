@@ -9,7 +9,7 @@ import { StorageService } from '../services/storage.service';
 import { enforceMaxDimensions } from '../services/image-resize.service';
 import { runInTenantContext } from '@force/database';
 import { inngest } from '../lib/inngest/client';
-import { ALLOWED_CURRENCIES } from '@force/shared';
+import { ALLOWED_CURRENCIES, REGION } from '@force/shared';
 import logger from '../lib/logger';
 import {
   createExpense,
@@ -48,14 +48,14 @@ const createSchema = z
     // z.coerce.date() converts either form to a Date; the service stores it as a
     // DB timestamp so both are safe. Fixes the 422 on every manual expense save.
     expenseDate: z.coerce.date(),
-    /** ISO-4217 currency code. Defaults to 'KWD' when absent. */
+    /** ISO-4217 currency code. Defaults to 'EGP' when absent. */
     currency: z
       .enum(ALLOWED_CURRENCIES)
       .optional()
-      .transform(v => v?.toUpperCase() ?? 'KWD'),
+      .transform(v => v?.toUpperCase() ?? REGION.currency),
     /**
-     * FX rate: 1 unit of `currency` = fxRate KWD.
-     * Required when currency !== 'KWD'. Positive finite number.
+     * FX rate: 1 unit of `currency` = fxRate EGP.
+     * Required when currency !== 'EGP'. Positive finite number.
      */
     fxRate: z.number().positive().finite().optional(),
     /**
@@ -68,12 +68,12 @@ const createSchema = z
     notesAr: z.string().max(1000).optional(),
   })
   .superRefine((data, ctx) => {
-    const currency = (data.currency ?? 'KWD').toUpperCase();
-    // fxRate is required for non-KWD currencies when the expense is NOT an
+    const currency = (data.currency ?? REGION.currency).toUpperCase();
+    // fxRate is required for non-EGP currencies when the expense is NOT an
     // OCR-created draft (those omit fxRate and store a placeholder).
     // We enforce this at the API boundary so callers don't silently store
-    // a 1:1 rate for a genuinely non-KWD amount.
-    if (currency !== 'KWD' && data.fxRate === undefined) {
+    // a 1:1 rate for a genuinely non-EGP amount.
+    if (currency !== REGION.currency && data.fxRate === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['fxRate'],

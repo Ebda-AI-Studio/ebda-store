@@ -5,11 +5,12 @@ import { Button, Modal, useToast } from '@force/ui';
 import { apiPost } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+import { minorToDecimalString } from '@force/shared';
 interface RefundButtonProps {
   storeId: string;
   orderId: string;
   orderNumber: string;
-  /** Fils the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
+  /** Piastres the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
   total: number;
   currency: string;
   /** Re-fetch the parent order after a successful refund. */
@@ -75,7 +76,7 @@ export function RefundButton({
       // faster but still asynchronous on the provider side.
       toastSuccess(
         t('toastSuccessBody', {
-          amount: (data.refundAmount / 1000).toFixed(3),
+          amount: minorToDecimalString(data.refundAmount),
           currency,
           provider: data.provider,
         })
@@ -117,7 +118,7 @@ export function RefundButton({
         <p className="text-sm text-muted-foreground">
           {t.rich('modalBodyIntro', {
             b: chunks => <strong className="text-foreground">{chunks}</strong>,
-            amount: (total / 1000).toFixed(3),
+            amount: minorToDecimalString(total),
             currency,
           })}
         </p>

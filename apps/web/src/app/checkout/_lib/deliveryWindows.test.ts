@@ -193,9 +193,9 @@ describe('resolveDeliverySelection', () => {
 
 describe('getNowMinutesInTimezone', () => {
   it('derives store-local minutes-since-midnight for a fixed instant', () => {
-    // 2026-07-15T10:30:00Z is 13:30 in Asia/Kuwait (UTC+3).
+    // 2026-07-15T10:30:00Z is 13:30 in Africa/Cairo (UTC+3).
     const now = new Date('2026-07-15T10:30:00Z');
-    expect(getNowMinutesInTimezone('Asia/Kuwait', now)).toBe(13 * 60 + 30);
+    expect(getNowMinutesInTimezone('Africa/Cairo', now)).toBe(13 * 60 + 30);
   });
 
   it('honors a different timezone for the same instant', () => {

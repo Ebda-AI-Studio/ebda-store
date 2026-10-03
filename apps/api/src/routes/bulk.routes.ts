@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { BulkService } from '../services/bulk.service';
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
+import { importCsvToPlatformCsv } from '../services/csv-import';
 import { prisma, ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
@@ -12,6 +13,7 @@ import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { tenantContext } from '../middleware/tenant-context';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 
+import { fromMinor, excelMoneyFormat } from '@force/shared';
 const router = Router();
 
 // Mounted at the bare '/stores' prefix in routes/index.ts, so Express does
@@ -142,9 +144,9 @@ router.get(
         slug: p.slug,
         description: p.description ?? '',
         descriptionAr: p.descriptionAr ?? '',
-        price: p.price / 1000,
-        compareAtPrice: p.compareAtPrice != null ? p.compareAtPrice / 1000 : '',
-        costPrice: p.costPrice != null ? p.costPrice / 1000 : '',
+        price: fromMinor(p.price),
+        compareAtPrice: p.compareAtPrice != null ? fromMinor(p.compareAtPrice) : '',
+        costPrice: p.costPrice != null ? fromMinor(p.costPrice) : '',
         sku: p.sku ?? '',
         barcode: p.barcode ?? '',
         inventory: p.inventory,
@@ -184,14 +186,24 @@ router.get(
           { header: 'Slug', key: 'slug', width: 24 },
           { header: 'Description', key: 'description', width: 40 },
           { header: 'Description (AR)', key: 'descriptionAr', width: 40 },
-          { header: 'Price (KWD)', key: 'price', width: 14, numFmt: '#,##0.000' },
           {
-            header: 'Compare At Price (KWD)',
+            header: 'Price (EGP)',
+            key: 'price',
+            width: 14,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
+          {
+            header: 'Compare At Price (EGP)',
             key: 'compareAtPrice',
             width: 22,
-            numFmt: '#,##0.000',
+            numFmt: excelMoneyFormat({ grouped: true }),
           },
-          { header: 'Cost Price (KWD)', key: 'costPrice', width: 18, numFmt: '#,##0.000' },
+          {
+            header: 'Cost Price (EGP)',
+            key: 'costPrice',
+            width: 18,
+            numFmt: excelMoneyFormat({ grouped: true }),
+          },
           { header: 'SKU', key: 'sku', width: 16 },
           { header: 'Barcode', key: 'barcode', width: 16 },
           { header: 'Inventory', key: 'inventory', width: 12 },
@@ -262,11 +274,17 @@ router.post(
       const parsedOptions = importOptionsSchema.parse(options || {});
       const userId = req.user!.userId;
 
+      // One CSV entry point for both layouts: FWB's own template passes
+      // through (BOM stripped); a Shopify product export is grouped by Handle
+      // and converted (EGP -> piastres, strict 2 decimals) into the same
+      // platform CSV. Either way the single BulkService importer does the work.
+      const converted = importCsvToPlatformCsv(csvData);
+
       const job = await prisma.bulkImportJob.create({
         data: {
           storeId,
           userId,
-          csvData,
+          csvData: converted.csv,
           updateExisting: parsedOptions.updateExisting ?? true,
         },
         select: { id: true, status: true, createdAt: true },
@@ -282,7 +300,7 @@ router.post(
         userId,
         resourceType: 'product',
         resourceId: storeId,
-        details: { jobId: job.id },
+        details: { jobId: job.id, source: `csv:${converted.format}` },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });

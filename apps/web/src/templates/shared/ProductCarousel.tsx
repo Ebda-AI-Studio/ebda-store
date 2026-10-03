@@ -26,7 +26,7 @@ import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
-import { getProductCardTextSizes, resolveColor } from '@force/shared';
+import { getProductCardTextSizes, resolveColor, minorToDecimalString, REGION } from '@force/shared';
 import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
@@ -61,7 +61,7 @@ export function ProductCarousel({
   showSubtitleLines,
   seeAllHref,
   isRtl,
-  currency = 'KWD',
+  currency = REGION.currency,
   onAddToCart,
   urlPrefix = '',
   pack,
@@ -509,7 +509,7 @@ export function ProductCarousel({
                             </svg>
                           </div>
                         )}
-                        {/* BUG 1 fix: use helper for KWD/pct text.
+                        {/* BUG 1 fix: use helper for EGP/pct text.
                             BUG 2 fix: show when OOS too. Corner + color are
                             merchant-configurable via
                             productCardDefaults.discountBadge (default
@@ -658,12 +658,14 @@ export function ProductCarousel({
                                     {carouselPricing.mode === 'fromMin'
                                       ? `${isRtl ? 'من ' : 'From '}`
                                       : ''}
-                                    {localize((carouselPricing.displayPrice / 1000).toFixed(3))}{' '}
+                                    {localize(minorToDecimalString(carouselPricing.displayPrice))}{' '}
                                     {currency}
                                   </span>
                                   {carouselPricing.displayCompare && (
                                     <span className="text-sm text-muted-foreground line-through">
-                                      {localize((carouselPricing.displayCompare / 1000).toFixed(3))}
+                                      {localize(
+                                        minorToDecimalString(carouselPricing.displayCompare)
+                                      )}
                                     </span>
                                   )}
                                 </div>

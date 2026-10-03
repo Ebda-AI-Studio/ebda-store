@@ -4,13 +4,14 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 
+import { REGION } from '@force/shared';
 /**
  * Cross-check: SUM(Order.total where paymentStatus='paid' AND createdAt in last 24h)
  * MUST equal SUM(JournalLine.credit where account.code IN ('4000','4010','2100')
  * AND postedAt in same window) per store. If they diverge, the GL has missed
  * a post — fire P0 alert.
  *
- * Runs at 22:30 UTC = 01:30 KW, after daily-close.
+ * Runs at 01:30 Cairo (`TZ=` cron), after daily-close.
  */
 export const accountingPeriodReconciliation: InngestFunction.Any = inngest.createFunction(
   {
@@ -18,7 +19,7 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
     name: 'Accounting period reconciliation',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '30 22 * * *' }],
+    triggers: [{ cron: `TZ=${REGION.timezone} 30 1 * * *` }],
   },
   async ({ step }) => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -91,7 +92,7 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
             store: { id: store.id, name: store.name, slug: store.slug ?? undefined },
             source: 'cron.accounting-period-reconciliation',
             title: `GL/operational drift — ${store.name}`,
-            body: `Store ${store.slug}: Orders.total=${opsTotal} fils, GL credits=${gl} fils, drift=${drift}`,
+            body: `Store ${store.slug}: Orders.total=${opsTotal} piastres, GL credits=${gl} piastres, drift=${drift}`,
           })
         );
       }

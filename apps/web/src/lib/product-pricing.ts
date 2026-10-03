@@ -1,3 +1,4 @@
+import { formatMoney } from '@force/shared';
 /**
  * Variant-aware pricing helpers for storefront + admin product cards.
  *
@@ -5,7 +6,7 @@
  * the product has variants — but those parent-level values are usually
  * stale defaults from before the merchant configured variants (see the
  * Wady Aljuz olive-oil consolidation: parent retained a pre-fold
- * compareAtPrice of 20 KWD that no variant inherited, producing a
+ * compareAtPrice of 20 EGP that no variant inherited, producing a
  * fake "20% OFF" badge on the storefront card).
  *
  * Rules these helpers enforce, applied uniformly across every card
@@ -31,7 +32,7 @@ interface VariantLike {
 /**
  * Minimal product shape required by getDiscountBadgeText.
  * Callers pass a product (or a product-like subset) that includes
- * discountType + discountValue so the helper can distinguish KWD-fixed
+ * discountType + discountValue so the helper can distinguish EGP-fixed
  * from percentage discounts.
  */
 interface DiscountProductLike {
@@ -45,8 +46,8 @@ interface DiscountProductLike {
  * Return the badge text for a sale badge, or null when no sale applies.
  *
  * Two forms:
- *   - Fixed-KWD discount (`discountType === 'fixed'`):
- *       EN: "Save KWD 2.000"   AR: "وفّر ٢٫٠٠٠ د.ك"
+ *   - Fixed-EGP discount (`discountType === 'fixed'`):
+ *       EN: "Save EGP 20.00"   AR: "وفّر ٢٠٫٠٠ ج.م"
  *   - Percentage / legacy (anything else with compareAtPrice):
  *       EN: "-17%"             AR: "-17%"  (unchanged from prior behaviour)
  *
@@ -57,8 +58,8 @@ interface DiscountProductLike {
  *
  * @param product    - Product row (needs price, compareAtPrice, discountType, discountValue).
  * @param isRtl      - Whether the storefront is in RTL/Arabic mode.
- * @param displayPrice   - Optional override (variant-resolved price, in fils).
- * @param displayCompare - Optional override (variant-resolved compareAtPrice, in fils).
+ * @param displayPrice   - Optional override (variant-resolved price, in piastres).
+ * @param displayCompare - Optional override (variant-resolved compareAtPrice, in piastres).
  */
 export function getDiscountBadgeText(
   product: DiscountProductLike,
@@ -73,19 +74,13 @@ export function getDiscountBadgeText(
   if (!effectiveCompare || effectiveCompare <= effectivePrice) return null;
 
   if (product.discountType === 'fixed' && product.discountValue && product.discountValue > 0) {
-    // Saving = difference in fils, rendered as KWD (3 decimal places).
-    const savingFils = effectiveCompare - effectivePrice;
-    const savingKwd = (savingFils / 1000).toFixed(3);
-
+    // Saving = difference in piastres, rendered in EGP (2 decimals).
+    const savingMinor = effectiveCompare - effectivePrice;
     if (isRtl) {
-      // Arabic numeral formatting via Intl + Arabic "وفّر" prefix.
-      const formatted = new Intl.NumberFormat('ar-KW', {
-        minimumFractionDigits: 3,
-        maximumFractionDigits: 3,
-      }).format(savingFils / 1000);
-      return `وفّر ${formatted} د.ك`;
+      // Arabic "وفّر" prefix + the single money formatter (Eastern digits, ج.م).
+      return `وفّر ${formatMoney(savingMinor, 'ar', { easternArabicDigits: true })}`;
     }
-    return `Save KWD ${savingKwd}`;
+    return `Save ${formatMoney(savingMinor, 'en')}`;
   }
 
   // Percentage / legacy path — same inline text the templates previously computed.

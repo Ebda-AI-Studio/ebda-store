@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, useToast } from '@force/ui';
-import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
+import {
+  recommendedSizeTextForTemplate,
+  type TemplateId,
+  minorToDecimalString,
+  roundToMinor,
+} from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../../lib/api';
@@ -40,9 +45,9 @@ interface Row {
   /** The option value (e.g. "4 liters"). Locked when multi-axis. */
   value: string;
   valueAr: string;
-  priceKwd: string;
-  compareAtKwd: string;
-  costKwd: string;
+  priceMajor: string;
+  compareAtMajor: string;
+  costMajor: string;
   inventory: string;
   imageUrl: string;
 }
@@ -51,8 +56,8 @@ function newRowId(): string {
   return `r${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function filsToKwd(fils: number | null): string {
-  return fils !== null ? (fils / 1000).toFixed(3) : '';
+function minorToMajor(piastres: number | null): string {
+  return piastres !== null ? minorToDecimalString(piastres) : '';
 }
 
 function rowFromVariant(variant: Variant, primaryOptionId: string | null, multiAxis: boolean): Row {
@@ -70,9 +75,9 @@ function rowFromVariant(variant: Variant, primaryOptionId: string | null, multiA
     variantId: variant.id,
     value,
     valueAr,
-    priceKwd: filsToKwd(variant.price),
-    compareAtKwd: filsToKwd(variant.compareAtPrice),
-    costKwd: filsToKwd(variant.costPrice),
+    priceMajor: minorToMajor(variant.price),
+    compareAtMajor: minorToMajor(variant.compareAtPrice),
+    costMajor: minorToMajor(variant.costPrice),
     inventory: String(Math.max(0, variant.inventory ?? 0)),
     imageUrl: variant.imageUrl ?? '',
   };
@@ -83,20 +88,20 @@ function emptyRow(): Row {
     rowId: newRowId(),
     value: '',
     valueAr: '',
-    priceKwd: '',
-    compareAtKwd: '',
-    costKwd: '',
+    priceMajor: '',
+    compareAtMajor: '',
+    costMajor: '',
     inventory: '0',
     imageUrl: '',
   };
 }
 
-function kwdInputToFils(input: string): number | null {
+function majorInputToMinor(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
   const n = parseFloat(trimmed);
   if (!Number.isFinite(n)) return null;
-  return Math.round(n * 1000);
+  return roundToMinor(n);
 }
 
 export function SimpleVariantsForm({
@@ -222,8 +227,8 @@ export function SimpleVariantsForm({
       }
     }
     for (const r of populated) {
-      if (!r.priceKwd.trim()) return t('errorPriceRequired', { name: r.value.trim() || '—' });
-      const price = parseFloat(r.priceKwd);
+      if (!r.priceMajor.trim()) return t('errorPriceRequired', { name: r.value.trim() || '—' });
+      const price = parseFloat(r.priceMajor);
       if (!Number.isFinite(price) || price < 0)
         return t('errorPriceInvalid', { name: r.value.trim() || '—' });
     }
@@ -234,9 +239,9 @@ export function SimpleVariantsForm({
     const { error } = await apiPut(
       `/api/v1/stores/${storeId}/products/${productId}/variants/${variantId}`,
       {
-        price: kwdInputToFils(row.priceKwd),
-        compareAtPrice: kwdInputToFils(row.compareAtKwd),
-        costPrice: kwdInputToFils(row.costKwd),
+        price: majorInputToMinor(row.priceMajor),
+        compareAtPrice: majorInputToMinor(row.compareAtMajor),
+        costPrice: majorInputToMinor(row.costMajor),
         inventory: parseInt(row.inventory) || 0,
         imageUrl: row.imageUrl || null,
       }
@@ -430,10 +435,10 @@ export function SimpleVariantsForm({
                   <Input
                     id={`variant-price-${row.rowId}`}
                     type="number"
-                    step="0.001"
-                    value={row.priceKwd}
-                    onChange={e => updateRow(row.rowId, { priceKwd: e.target.value })}
-                    placeholder="0.000"
+                    step="0.01"
+                    value={row.priceMajor}
+                    onChange={e => updateRow(row.rowId, { priceMajor: e.target.value })}
+                    placeholder="0.00"
                   />
                 </div>
                 <div>
@@ -443,9 +448,9 @@ export function SimpleVariantsForm({
                   <Input
                     id={`variant-compare-at-${row.rowId}`}
                     type="number"
-                    step="0.001"
-                    value={row.compareAtKwd}
-                    onChange={e => updateRow(row.rowId, { compareAtKwd: e.target.value })}
+                    step="0.01"
+                    value={row.compareAtMajor}
+                    onChange={e => updateRow(row.rowId, { compareAtMajor: e.target.value })}
                     placeholder="—"
                   />
                 </div>
@@ -456,9 +461,9 @@ export function SimpleVariantsForm({
                   <Input
                     id={`variant-cost-${row.rowId}`}
                     type="number"
-                    step="0.001"
-                    value={row.costKwd}
-                    onChange={e => updateRow(row.rowId, { costKwd: e.target.value })}
+                    step="0.01"
+                    value={row.costMajor}
+                    onChange={e => updateRow(row.rowId, { costMajor: e.target.value })}
                     placeholder="—"
                   />
                 </div>

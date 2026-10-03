@@ -30,7 +30,7 @@ import { auditLog } from '../../../middleware/security';
 
 const ABANDONED_CART_RETENTION_DAYS = 30;
 const SOFT_DELETED_USER_RETENTION_DAYS = 365;
-// Kuwait MOF tax record retention is 5 years from invoice issue.
+// Egypt MOF tax record retention is 5 years from invoice issue.
 // After that the order row is no longer required for tax compliance
 // and its PII snapshots (already nullified at customer-erase time,
 // but not for orders whose customer never asked to be erased) need
@@ -174,7 +174,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
 /**
  * Order anonymization at 5 years.
  *
- * Kuwait MOF requires invoice retention ≥5 years for tax compliance.
+ * Egypt MOF requires invoice retention ≥5 years for tax compliance.
  * After that window the order ROW can still survive (financial record)
  * but its PII snapshots must go (applicable GCC data-protection law +
  * GDPR Art. 5(1)(e) storage limitation — see
@@ -196,7 +196,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
 export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunction(
   {
     id: 'order-anonymize-5y-monthly',
-    name: 'Anonymize orders older than 5 years (Kuwait MOF retention window)',
+    name: 'Anonymize orders older than 5 years (Egypt MOF retention window)',
     retries: 2,
     triggers: [{ cron: '30 3 1 * *' }],
   },

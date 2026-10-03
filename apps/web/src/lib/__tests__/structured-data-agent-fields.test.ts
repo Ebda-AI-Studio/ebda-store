@@ -18,9 +18,9 @@ const store = {
   id: 's1',
   name: 'Pecannbee',
   slug: 'pecannbee',
-  currency: 'KWD',
+  currency: 'EGP',
   status: 'active',
-  timezone: 'Asia/Kuwait',
+  timezone: 'Africa/Cairo',
   template: 'modern',
   theme: {},
   socialLinks: {},
@@ -37,7 +37,7 @@ describe('productJsonLd — agent-readable fields', () => {
 
 describe('shippingDetailsJsonLd', () => {
   const zone = {
-    name: 'Kuwait City',
+    name: 'Cairo',
     deliveryFee: 1500,
     freeShippingThreshold: 20000,
     estimatedDaysMin: 1,
@@ -45,20 +45,20 @@ describe('shippingDetailsJsonLd', () => {
     estimatedDays: null,
   };
 
-  it('advertises the CHEAPEST zone rate and converts fils to KWD', () => {
+  it('advertises the CHEAPEST zone rate and converts piastres to EGP', () => {
     const dear = { ...zone, name: 'Far', deliveryFee: 4000 };
-    const out = shippingDetailsJsonLd([dear, zone], { currency: 'KWD' })!;
-    expect(out.shippingRate).toMatchObject({ value: '1.500', currency: 'KWD' });
+    const out = shippingDetailsJsonLd([dear, zone], { currency: 'EGP' })!;
+    expect(out.shippingRate).toMatchObject({ value: '15.00', currency: 'EGP' });
   });
 
   it('emits a delivery time window from min/max days', () => {
-    const out = shippingDetailsJsonLd([zone], { currency: 'KWD' })!;
+    const out = shippingDetailsJsonLd([zone], { currency: 'EGP' })!;
     expect(out.deliveryTime?.transitTime).toMatchObject({ minValue: 1, maxValue: 3 });
   });
 
   it('falls back to a flat estimatedDays when min/max are absent', () => {
     const flat = { ...zone, estimatedDaysMin: null, estimatedDaysMax: null, estimatedDays: 2 };
-    const out = shippingDetailsJsonLd([flat], { currency: 'KWD' })!;
+    const out = shippingDetailsJsonLd([flat], { currency: 'EGP' })!;
     expect(out.deliveryTime?.transitTime).toMatchObject({ minValue: 2, maxValue: 2 });
   });
 
@@ -69,19 +69,19 @@ describe('shippingDetailsJsonLd', () => {
       estimatedDaysMax: null,
       estimatedDays: null,
     };
-    expect(shippingDetailsJsonLd([noEta], { currency: 'KWD' })).not.toHaveProperty('deliveryTime');
+    expect(shippingDetailsJsonLd([noEta], { currency: 'EGP' })).not.toHaveProperty('deliveryTime');
   });
 
   it('returns null for no zones rather than implying free shipping', () => {
     // A 0 rate here would claim free delivery we cannot honour at checkout.
-    expect(shippingDetailsJsonLd([], { currency: 'KWD' })).toBeNull();
+    expect(shippingDetailsJsonLd([], { currency: 'EGP' })).toBeNull();
   });
 });
 
 describe('productJsonLd — shippingDetails wiring', () => {
   const zones = [
     {
-      name: 'Kuwait City',
+      name: 'Cairo',
       deliveryFee: 1500,
       freeShippingThreshold: null,
       estimatedDaysMin: 1,

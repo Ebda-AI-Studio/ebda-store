@@ -4,12 +4,13 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 
+import { REGION } from '@force/shared';
 /**
  * Nightly trial-balance integrity scan. For every store with accounting
  * enabled, sum SUM(DR) and SUM(CR) across ALL posted journal lines. If they
  * diverge by any amount, fire a P0 Telegram alert — the GL has drifted.
  *
- * Runs at 22:00 UTC = 01:00 KW (Kuwait is UTC+3).
+ * Runs at 01:00 Cairo (`TZ=` cron; Egypt observes DST).
  */
 export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
   {
@@ -17,7 +18,7 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
     name: 'Accounting daily close',
     retries: 2,
     concurrency: { limit: 1 }, // serialize across all stores
-    triggers: [{ cron: '0 22 * * *' }],
+    triggers: [{ cron: `TZ=${REGION.timezone} 0 1 * * *` }], // 01:00 Cairo (DST-aware via TZ=)
   },
   async ({ step }) => {
     // FORCE RLS: cross-tenant cron — use withRlsBypass to enumerate stores.
@@ -59,7 +60,7 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
             store: { id: store.id, name: store.name, slug: store.slug ?? undefined },
             source: 'cron.accounting-daily-close',
             title: `Trial balance drift — ${store.name}`,
-            body: `Store ${store.slug}: DR=${result.dr} CR=${result.cr} (drift ${result.drift} fils)`,
+            body: `Store ${store.slug}: DR=${result.dr} CR=${result.cr} (drift ${result.drift} piastres)`,
           })
         );
       }

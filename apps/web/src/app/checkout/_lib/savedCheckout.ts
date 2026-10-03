@@ -16,12 +16,11 @@ export interface SavedCheckout {
   governorateAr: string;
   area: string;
   areaAr: string;
-  block: string;
   street: string;
-  avenue: string;
-  house: string;
+  building: string;
   floor: string;
   apartment: string;
+  landmark: string;
   notes: string;
 }
 

@@ -9,7 +9,7 @@ import { inngest } from '../client';
  * Mirrors the manual `scripts/archive-audit-logs.mjs --apply --export`
  * invocation but on a cron so we don't have to remember to run it.
  *
- * Trigger: every Sunday at 03:00 UTC (06:00 Asia/Kuwait — middle of
+ * Trigger: every Sunday at 03:00 UTC (06:00 Africa/Cairo — middle of
  * the night, well after the night-shift admins finish for the day).
  *
  * Why archive AND delete: dropping the rows shrinks the working set

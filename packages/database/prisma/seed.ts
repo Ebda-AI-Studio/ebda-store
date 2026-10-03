@@ -12,6 +12,7 @@
 import { createPrismaClient } from '../src/client';
 import * as bcrypt from 'bcryptjs';
 
+import { roundToMinor, REGION } from '@force/shared';
 const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 // ============================================
@@ -25,8 +26,13 @@ function generateSlug(name: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-function priceInFils(kwd: number): number {
-  return Math.round(kwd * 1000);
+// Demo prices below were authored in KWD; Ebda seeds EGP, so scale them up
+// (rough 1 KWD ≈ 100 EGP — demo data only, not a conversion rate).
+const DEMO_PRICE_FACTOR = 100;
+
+/** Demo major-unit price (KWD-era numbers) → integer EGP piastres. */
+function priceInFils(major: number): number {
+  return roundToMinor(major * DEMO_PRICE_FACTOR);
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -294,7 +300,7 @@ async function seedDemoStore(ownerId: string) {
       plan: 'professional',
       description: 'A demo store showcasing the platform features',
       descriptionAr: 'متجر تجريبي يعرض ميزات المنصة',
-      currency: 'KWD',
+      currency: REGION.currency,
       template: 'modern',
       theme: {
         primaryColor: '26 100% 50%',
@@ -307,18 +313,18 @@ async function seedDemoStore(ownerId: string) {
       socialLinks: {
         instagram: 'https://instagram.com/demo',
         twitter: 'https://twitter.com/demo',
-        whatsapp: '+965-1234-5678',
+        whatsapp: '+20-101-234-5678',
       },
       email: 'contact@demostore.com',
-      phone: '+965 1234 5678',
-      phoneAr: '+٩٦٥ ١٢٣٤ ٥٦٧٨',
-      whatsapp: '+96512345678',
-      address: 'Kuwait City, Kuwait',
-      addressAr: 'مدينة الكويت، الكويت',
+      phone: '+20 101 234 5678',
+      phoneAr: '+٢٠ ١٠١ ٢٣٤ ٥٦٧٨',
+      whatsapp: '+201012345678',
+      address: 'Cairo, Egypt',
+      addressAr: 'القاهرة، مصر',
       announcementBar: {
         enabled: true,
-        text: 'Free shipping on orders over 25 KWD!',
-        textAr: 'شحن مجاني للطلبات فوق 25 د.ك!',
+        text: 'Free shipping on orders over 2,500 EGP!',
+        textAr: 'شحن مجاني للطلبات فوق 2,500 ج.م!',
         bgColor: '26 100% 50%',
         textColor: '0 0% 100%',
       },
@@ -455,25 +461,25 @@ async function seedDemoCustomers(storeId: string) {
   }
 
   const customers = [
-    { firstName: 'Ahmed', lastName: 'Al-Sabah', email: 'ahmed@example.com', phone: '+96599001234' },
+    { firstName: 'Ahmed', lastName: 'Hassan', email: 'ahmed@example.com', phone: '+201001234567' },
     {
       firstName: 'Fatima',
-      lastName: 'Al-Rashid',
+      lastName: 'Mahmoud',
       email: 'fatima@example.com',
-      phone: '+96599002345',
+      phone: '+201112345678',
     },
     {
       firstName: 'Mohammed',
-      lastName: 'Al-Mutawa',
+      lastName: 'Ibrahim',
       email: 'mohammed@example.com',
-      phone: '+96599003456',
+      phone: '+201223456789',
     },
-    { firstName: 'Sara', lastName: 'Al-Essa', email: 'sara@example.com', phone: '+96599004567' },
+    { firstName: 'Sara', lastName: 'Salem', email: 'sara@example.com', phone: '+201004567890' },
     {
       firstName: 'Khalid',
-      lastName: 'Al-Fahad',
+      lastName: 'Farouk',
       email: 'khalid@example.com',
-      phone: '+96599005678',
+      phone: '+201515678901',
     },
   ];
 
@@ -542,13 +548,13 @@ async function seedCoupons(storeId: string) {
       usageLimit: 100,
     },
     {
-      code: 'SAVE5KD',
-      name: 'Save 5 KWD',
-      nameAr: 'وفر 5 د.ك',
+      code: 'SAVE500',
+      name: 'Save 500 EGP',
+      nameAr: 'وفر 500 ج.م',
       type: 'fixed' as const,
       value: priceInFils(5),
-      description: '5 KWD off your order',
-      descriptionAr: 'خصم 5 د.ك على طلبك',
+      description: '500 EGP off your order',
+      descriptionAr: 'خصم 500 ج.م على طلبك',
       minOrderAmount: priceInFils(30),
     },
     {

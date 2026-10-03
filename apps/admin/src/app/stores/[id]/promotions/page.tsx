@@ -19,6 +19,7 @@ import { dateTimeLocalValue } from '@/lib/form-text';
 import { ScopePicker } from '../_components/ScopePicker';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
+import { fromMinor, roundToMinor } from '@force/shared';
 type PromotionType = 'percentage' | 'fixed';
 
 interface Promotion {
@@ -148,17 +149,17 @@ export default function PromotionsPage() {
       description: promo.description ?? '',
       descriptionAr: promo.descriptionAr ?? '',
       type: promo.type,
-      // `fixed` promotions are stored in fils → show as KWD (÷1000) in the
+      // `fixed` promotions are stored in piastres → show as EGP (÷1000) in the
       // form. `percentage` promotions store the raw percent, shown as-is.
-      value: String(promo.type === 'fixed' ? promo.value / 1000 : promo.value),
-      maxDiscount: promo.maxDiscount != null ? String(promo.maxDiscount / 1000) : '',
+      value: String(promo.type === 'fixed' ? fromMinor(promo.value) : promo.value),
+      maxDiscount: promo.maxDiscount != null ? String(fromMinor(promo.maxDiscount)) : '',
       priority: String(promo.priority),
       isActive: promo.isActive,
       startsAt: dateTimeLocalValue(promo.startsAt),
       expiresAt: dateTimeLocalValue(promo.expiresAt),
       customerGroupId: promo.customerGroupId ?? '',
       firstOrderOnly: promo.firstOrderOnly,
-      minOrderAmount: promo.minOrderAmount != null ? String(promo.minOrderAmount / 1000) : '',
+      minOrderAmount: promo.minOrderAmount != null ? String(fromMinor(promo.minOrderAmount)) : '',
       minQuantity: promo.minQuantity != null ? String(promo.minQuantity) : '',
       scopeProductIds: promo.scopeProductIds ?? [],
       scopeCategoryIds: promo.scopeCategoryIds ?? [],
@@ -176,23 +177,21 @@ export default function PromotionsPage() {
         description: form.description.trim() || null,
         descriptionAr: form.descriptionAr.trim() || null,
         type: form.type,
-        // `fixed` promotions: the input is in KWD (dinar) → store as fils
-        // (×1000). `percentage` promotions: the value is a percent (e.g. 5 =
+        // `fixed` promotions: the input is in EGP → store as piastres
+        // (×100, via roundToMinor). `percentage` promotions: the value is a percent (e.g. 5 =
         // 5%), stored as-is — NOT money.
         value:
           form.type === 'fixed'
-            ? Math.round((parseFloat(form.value) || 0) * 1000)
+            ? roundToMinor(parseFloat(form.value) || 0)
             : parseInt(form.value, 10) || 0,
-        maxDiscount: form.maxDiscount ? Math.round(parseFloat(form.maxDiscount) * 1000) : null,
+        maxDiscount: form.maxDiscount ? roundToMinor(parseFloat(form.maxDiscount)) : null,
         priority: form.priority ? parseInt(form.priority, 10) : 0,
         isActive: form.isActive,
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
         expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
         customerGroupId: form.customerGroupId || null,
         firstOrderOnly: form.firstOrderOnly,
-        minOrderAmount: form.minOrderAmount
-          ? Math.round(parseFloat(form.minOrderAmount) * 1000)
-          : null,
+        minOrderAmount: form.minOrderAmount ? roundToMinor(parseFloat(form.minOrderAmount)) : null,
         minQuantity: form.minQuantity ? parseInt(form.minQuantity, 10) : null,
         scopeProductIds: form.scopeProductIds,
         scopeCategoryIds: form.scopeCategoryIds,
@@ -419,7 +418,7 @@ export default function PromotionsPage() {
                     type="number"
                     min={0}
                     max={form.type === 'percentage' ? 100 : undefined}
-                    step={form.type === 'percentage' ? 1 : 0.001}
+                    step={form.type === 'percentage' ? 1 : 0.01}
                     value={form.value}
                     onChange={e => setForm({ ...form, value: e.target.value })}
                     className="w-full rounded-md border px-3 py-2 text-sm"
@@ -431,7 +430,7 @@ export default function PromotionsPage() {
                     <input
                       type="number"
                       min={0}
-                      step={0.001}
+                      step={0.01}
                       value={form.maxDiscount}
                       onChange={e => setForm({ ...form, maxDiscount: e.target.value })}
                       className="w-full rounded-md border px-3 py-2 text-sm"
@@ -506,7 +505,7 @@ export default function PromotionsPage() {
                   <input
                     type="number"
                     min={0}
-                    step={0.001}
+                    step={0.01}
                     value={form.minOrderAmount}
                     onChange={e => setForm({ ...form, minOrderAmount: e.target.value })}
                     className="w-full rounded-md border px-3 py-2 text-sm"

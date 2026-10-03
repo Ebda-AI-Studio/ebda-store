@@ -69,7 +69,7 @@ function authAs(store: FixtureStore, overrides: Partial<{ slug: string; currency
     id: store.storeId,
     slug: overrides.slug ?? 'test-store',
     name: 'Test Store',
-    currency: overrides.currency ?? 'KWD',
+    currency: overrides.currency ?? 'EGP',
     wbsClientId: 'wbs-client-test',
   };
 }

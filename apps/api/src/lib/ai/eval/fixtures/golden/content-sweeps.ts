@@ -5,7 +5,7 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
   {
     id: 'store-faq-payment-methods',
     type: 'store-faq',
-    input: { storeDescription: 'Kuwait-based online store for handmade home goods.' },
+    input: { storeDescription: 'Egypt-based online store for handmade home goods.' },
     output: [
       {
         question: 'What payment methods do you accept?',
@@ -14,10 +14,10 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
         answerAr: 'نقبل الدفع عبر كي نت وفيزا وماستركارد وآبل باي.',
       },
       {
-        question: 'Do you deliver outside Kuwait City?',
-        questionAr: 'هل توصلون خارج مدينة الكويت؟',
-        answer: 'Yes, we deliver to all Kuwait governorates within 2-4 business days.',
-        answerAr: 'نعم، نوصل إلى جميع محافظات الكويت خلال 2 إلى 4 أيام عمل.',
+        question: 'Do you deliver outside Cairo?',
+        questionAr: 'هل توصلون خارج القاهرة؟',
+        answer: 'Yes, we deliver to all Egypt governorates within 2-4 business days.',
+        answerAr: 'نعم، نوصل إلى جميع محافظات مصر خلال 2 إلى 4 أيام عمل.',
       },
     ],
   },
@@ -50,11 +50,11 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
     input: {
       kind: 'store',
       name: 'Wady Aljuz',
-      description: 'Kuwait-based online store for handmade home goods.',
+      description: 'Egypt-based online store for handmade home goods.',
     },
     output: {
-      en: 'Wady Aljuz is a Kuwait-based online store specialising in handmade home goods, from ceramics to textiles.',
-      ar: 'وادي الجوز هو متجر إلكتروني كويتي متخصص في المنتجات المنزلية اليدوية، من السيراميك إلى المنسوجات.',
+      en: 'Wady Aljuz is an Egypt-based online store specialising in handmade home goods, from ceramics to textiles.',
+      ar: 'وادي الجوز هو متجر إلكتروني مصري متخصص في المنتجات المنزلية اليدوية، من السيراميك إلى المنسوجات.',
     },
   },
   {
@@ -72,7 +72,7 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
     // A golden fixture asserting the dead shape would let that regression
     // pass this eval gate again.
     output:
-      '# Wady Aljuz\n\n> Kuwait-based online store for handmade home goods.\n\n## Store pages\n- Home: https://ebda.app/wady-aljuz\n\n## Product categories\n- Kitchen & Dining: https://ebda.app/wady-aljuz/products?category=kitchen-dining\n- Home Decor: https://ebda.app/wady-aljuz/products?category=home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency KWD, ships within Kuwait.',
+      '# Wady Aljuz\n\n> Egypt-based online store for handmade home goods.\n\n## Store pages\n- Home: https://wady-aljuz.ebda.app\n\n## Product categories\n- Kitchen & Dining: https://wady-aljuz.ebda.app/products?category=kitchen-dining\n- Home Decor: https://wady-aljuz.ebda.app/products?category=home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency EGP, ships within Egypt.',
   },
   {
     id: 'citation-copy-mug',
@@ -91,12 +91,12 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
     type: 'brand-facts',
     input: { categoryNames: ['Kitchen & Dining', 'Home Decor'], hasEmail: true, hasPhone: false },
     output: {
-      location: 'Kuwait',
+      location: 'Egypt',
       keyCategories: ['Kitchen & Dining', 'Home Decor'],
       languages: ['Arabic', 'English'],
       contactMethods: ['email'],
       region: 'GCC',
-      currency: 'KWD',
+      currency: 'EGP',
     },
   },
   {

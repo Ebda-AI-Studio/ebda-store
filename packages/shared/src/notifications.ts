@@ -80,8 +80,8 @@ export const SMS_TEMPLATES: Record<NotificationEvent, SmsTemplate> = {
     ar: 'مرحباً {name}، تمت معالجة استرداد {amount} للطلب رقم #{number}. قد يستغرق 3-5 أيام عمل.',
   },
   cart_abandoned_step1: {
-    en: 'Hi {name}, you left {cartItemCount} items ({cartTotal} KWD) in your cart at {storeName}. Complete your order: {cartUrl}',
-    ar: 'مرحباً {name}، تركت {cartItemCount} عناصر ({cartTotal} د.ك) في سلتك في {storeName}. أكمل طلبك: {cartUrl}',
+    en: 'Hi {name}, you left {cartItemCount} items ({cartTotal} EGP) in your cart at {storeName}. Complete your order: {cartUrl}',
+    ar: 'مرحباً {name}، تركت {cartItemCount} عناصر ({cartTotal} ج.م) في سلتك في {storeName}. أكمل طلبك: {cartUrl}',
   },
   cart_abandoned_step2: {
     en: 'Hi {name}, your items are still waiting! Complete your order now: {cartUrl}',
@@ -188,8 +188,8 @@ export const PUSH_TEMPLATES: Record<NotificationEvent, PushTemplate> = {
       ar: 'تركت شيئاً خلفك!',
     },
     body: {
-      en: 'Hi {name}, you have {cartItemCount} items worth {cartTotal} KWD waiting in your cart.',
-      ar: 'مرحباً {name}، لديك {cartItemCount} عناصر بقيمة {cartTotal} د.ك بانتظارك في سلتك.',
+      en: 'Hi {name}, you have {cartItemCount} items worth {cartTotal} EGP waiting in your cart.',
+      ar: 'مرحباً {name}، لديك {cartItemCount} عناصر بقيمة {cartTotal} ج.م بانتظارك في سلتك.',
     },
   },
   cart_abandoned_step2: {

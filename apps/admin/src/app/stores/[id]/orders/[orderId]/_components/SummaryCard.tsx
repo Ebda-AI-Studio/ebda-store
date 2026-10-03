@@ -32,7 +32,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
   );
   // The percentage of the amount SHOWN on the remainder row — the whole-order
   // `discount / subtotal` printed next to only the remainder labelled e.g.
-  // 0.500 KWD as "50%" once coupon/promotion/loyalty were split out (#2261).
+  // 0.500 EGP as "50%" once coupon/promotion/loyalty were split out (#2261).
   const otherDiscountPct =
     order.subtotal > 0 ? Math.round((otherDiscount / order.subtotal) * 100) : 0;
   // I5 (final review): reporting-only, NOT a component of `discount` — the

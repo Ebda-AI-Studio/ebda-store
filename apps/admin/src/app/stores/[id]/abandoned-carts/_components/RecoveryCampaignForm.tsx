@@ -1,9 +1,10 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import type { AbandonedCartConfig } from './types';
 
+import { roundToMinor } from '@force/shared';
 interface ToggleProps {
   checked: boolean;
   onChange: (val: boolean) => void;
@@ -164,23 +165,23 @@ export function RecoveryCampaignForm({
                     <input
                       type="number"
                       min={0}
-                      step={0.001}
+                      step={0.01}
                       value={
                         config.couponMaxDiscount !== null && config.couponMaxDiscount !== undefined
-                          ? filsToKwd(config.couponMaxDiscount)
+                          ? minorToMajor(config.couponMaxDiscount)
                           : ''
                       }
                       onChange={e =>
                         onPatch({
                           couponMaxDiscount: e.target.value
-                            ? Math.round(parseFloat(e.target.value) * 1000)
+                            ? roundToMinor(parseFloat(e.target.value))
                             : null,
                         })
                       }
                       placeholder={t('autoCoupon.noLimit')}
                       className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                     />
-                    <span className="text-sm text-muted-foreground">{t('autoCoupon.kwd')}</span>
+                    <span className="text-sm text-muted-foreground">{t('autoCoupon.major')}</span>
                   </div>
                 </div>
                 <div>

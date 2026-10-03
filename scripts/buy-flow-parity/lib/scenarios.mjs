@@ -12,31 +12,30 @@ import { MF_WEBHOOK_SECRET, OWNER_EMAIL, OWNER_PASSWORD } from './fixture.mjs';
 
 const CUSTOMER_PASSWORD = 'BfpCustomer!Parity2026';
 
-export const ADDRESS_SALMIYA = {
+export const ADDRESS_NASR_CITY = {
   firstName: 'Parity',
   lastName: 'Buyer',
-  address1: 'Block 1, Street 2, House 3',
+  address1: '12 Abbas El Akkad St, Building 3',
   address2: '',
-  area: 'Salmiya',
-  areaAr: 'السالمية',
-  governorate: 'Hawalli',
-  governorateAr: 'حولي',
-  block: '1',
-  street: '2',
-  avenue: '',
-  house: '3',
-  floor: '',
+  area: 'Nasr City',
+  areaAr: 'مدينة نصر',
+  governorate: 'Cairo',
+  governorateAr: 'القاهرة',
+  street: 'Abbas El Akkad St',
+  building: '3',
+  floor: '2',
+  apartment: '5',
   city: '',
-  country: 'Kuwait',
-  phone: '+96550000001',
+  country: 'Egypt',
+  phone: '+201012345678',
   email: 'buyer@bfp-parity.test',
 };
-export const ADDRESS_SHARQ = {
-  ...ADDRESS_SALMIYA,
-  area: 'Sharq',
-  areaAr: 'شرق',
-  governorate: 'Capital',
-  governorateAr: 'العاصمة',
+export const ADDRESS_GIZA = {
+  ...ADDRESS_NASR_CITY,
+  area: 'Dokki',
+  areaAr: 'الدقي',
+  governorate: 'Giza',
+  governorateAr: 'الجيزة',
 };
 
 /** Storefront add-to-cart (apps/web api.addToCart). */
@@ -55,7 +54,7 @@ async function add(shopper, step, productId, quantity = 1, variantId) {
 async function checkout(
   ctx,
   shopper,
-  { provider, address = ADDRESS_SALMIYA, couponCode, orderExtra = {} }
+  { provider, address = ADDRESS_NASR_CITY, couponCode, orderExtra = {} }
 ) {
   const cartRes = await shopper.call('checkout.cart', 'GET', '/public/cart');
   const cart = cartRes.body?.data?.cart;
@@ -126,8 +125,8 @@ async function webhook(ctx, step, { invoiceId, status, value, secret = MF_WEBHOO
       InvoiceId: invoiceId,
       InvoiceStatus: status,
       InvoiceValue: value,
-      Currency: 'KWD',
-      PaymentMethod: 'KNET',
+      Currency: 'EGP',
+      PaymentMethod: 'VISA/MASTER',
     },
   });
   const sig = crypto.createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
@@ -239,7 +238,7 @@ export const SCENARIOS = [
   {
     id: 'guest-cod-fee-fixed-coupon',
     title:
-      'Guest, COD with COD fee, fixed coupon, Sharq rate; payments/create replayed (fee must not stack)',
+      'Guest, COD with COD fee, fixed coupon, Giza rate; payments/create replayed (fee must not stack)',
     fixture: {
       products: { cap: { price: 4000, inventory: 10 } },
       coupons: { FIX2: { type: 'fixed', value: 2000 } },
@@ -249,7 +248,7 @@ export const SCENARIOS = [
       await add(s, 'cart.add', ctx.p('cap'), 2);
       const { order } = await checkout(ctx, s, {
         provider: 'cod',
-        address: ADDRESS_SHARQ,
+        address: ADDRESS_GIZA,
         couponCode: ctx.c('FIX2'),
       });
       if (!order) return;
@@ -276,7 +275,7 @@ export const SCENARIOS = [
   },
   {
     id: 'vat-store-mf-pct-coupon',
-    title: 'Store with VAT 5% on, percentage coupon, MyFatoorah → verify Paid',
+    title: 'Store with VAT 14% on, percentage coupon, MyFatoorah → verify Paid',
     store: 'vat',
     fixture: {
       products: { box: { price: 12345, inventory: 10 } },
@@ -415,7 +414,7 @@ export const SCENARIOS = [
       await checkout(ctx, s, {
         provider: 'cod',
         address: {
-          ...ADDRESS_SALMIYA,
+          ...ADDRESS_NASR_CITY,
           area: 'Nowhere',
           areaAr: 'لا مكان',
           governorate: 'Nowhere',

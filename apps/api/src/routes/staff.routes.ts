@@ -20,6 +20,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
+import { assertWithinLimit } from '../services/plan-limit.service';
 
 const router = Router({ mergeParams: true });
 
@@ -92,6 +93,9 @@ router.post(
     try {
       const { storeId } = req.params;
       const input = inviteStaffSchema.parse(req.body);
+
+      // Plan ceiling (SP5): one more seat must fit the store's maxStaff.
+      await assertWithinLimit(storeId, 'maxStaff');
 
       // The admin namespace (users.store_id NULL) is not visible from a store's
       // scope, so find-or-create goes through the `ebda_admin_user_ensure`

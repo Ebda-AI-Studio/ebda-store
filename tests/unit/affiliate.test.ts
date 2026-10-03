@@ -171,10 +171,10 @@ describe('AffiliateService', () => {
     });
   });
 
-  // ---- 2. Commission: 10% of 1000 fils = 100 fils ----
+  // ---- 2. Commission: 10% of 1000 piastres = 100 piastres ----
 
   describe('commission calculation', () => {
-    it('calculates 10% commission on a 1000 fils order', async () => {
+    it('calculates 10% commission on a 1000 piastres order', async () => {
       const referral = {
         id: 'ref-1',
         storeId: STORE_ID,

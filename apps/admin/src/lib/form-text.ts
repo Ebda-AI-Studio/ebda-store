@@ -42,10 +42,10 @@ export function textFieldValue(
 
 /**
  * Same clear-on-empty convention as {@link textFieldValue}, for a numeric
- * input backed by a string form field (money in fils, integer counts).
+ * input backed by a string form field (money in piastres, integer counts).
  *
  * `parse` runs ONLY when the field is non-empty, so a field-specific
- * transform (e.g. dinar → fils `v => Math.round(parseFloat(v) * 1000)`) never has to
+ * transform (e.g. EGP → piastres `v => roundToMinor(parseFloat(v))`) never has to
  * reimplement the null/undefined ternary at the call site — a coupon's
  * `minOrderAmount` sending `undefined` on an emptied field made the merchant
  * unable to remove an already-set minimum, the numeric sibling of the text
@@ -106,7 +106,7 @@ export function dateFieldValue(
  * instant: the instant's LOCAL wall-clock time, `YYYY-MM-DDTHH:mm`.
  *
  * `iso.slice(0, 16)` renders the UTC wall-clock instead, which
- * {@link dateFieldValue} then re-reads as local — in Kuwait (UTC+3) each
+ * {@link dateFieldValue} then re-reads as local — in Egypt (UTC+3) each
  * edit-save walked a coupon's expiry three hours earlier (#1570). This is the
  * inverse that makes stored → hydrate → save return the same instant.
  */

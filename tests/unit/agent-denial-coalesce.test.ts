@@ -96,7 +96,7 @@ vi.mock('@api/lib/logger', () => ({
 import { auditAgentWrite, type McpAgentContext } from '@api/mcp/agent-auth';
 import { classifyAgentDenials, type AgentDenialRow } from '@api/mcp/agent-denial-alerts';
 
-const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'KWD', domain: null };
+const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'EGP', domain: null };
 
 const context: McpAgentContext = {
   storeSlug: 'demo',

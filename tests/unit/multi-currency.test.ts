@@ -1,118 +1,133 @@
 /**
- * Unit tests for multi-currency accounting helpers.
+ * Unit tests for multi-currency accounting helpers (base currency = EGP).
  *
  * Critical money-path tests — no external dependencies, no DB.
  * Tests:
- *   1. convertToKwd — rounding (half-up), precision, edge values
- *   2. KWD passthrough — fxRate=1 leaves amount unchanged (regression guard)
- *   3. requiresFxRate — correct for KWD and non-KWD codes
- *   4. ALLOWED_CURRENCIES — KWD is first; list is non-empty; all 3-char ISO codes
+ *   1. convertToBase — rounding (half-up), precision, edge values, exponent-awareness
+ *   2. EGP passthrough — fxRate=1 leaves amount unchanged (regression guard)
+ *   3. requiresFxRate — correct for EGP and non-EGP codes
+ *   4. ALLOWED_CURRENCIES — EGP is first; list is non-empty; all 3-char ISO codes
  */
 import { describe, it, expect } from 'vitest';
-import { convertToKwd, requiresFxRate, ALLOWED_CURRENCIES } from '@force/shared';
+import {
+  convertToBase,
+  convertMinor,
+  requiresFxRate,
+  ALLOWED_CURRENCIES,
+  currencyExponent,
+  REGION,
+} from '@force/shared';
 
-// ─── convertToKwd ─────────────────────────────────────────────────────────────
+// ─── convertToBase ────────────────────────────────────────────────────────────
 
-describe('convertToKwd — basic multiplication with half-up rounding', () => {
-  it('100 USD cents @ 0.307 KWD/USD → 31 fils', () => {
-    // 100 * 0.307 = 30.7 → round half-up → 31
-    expect(convertToKwd(100, 0.307)).toBe(31);
+describe('convertToBase — basic multiplication with half-up rounding', () => {
+  it('100 USD cents @ 50.5 EGP/USD → 5050 piastres', () => {
+    // 1.00 USD * 50.5 = 50.50 EGP = 5050 piastres
+    expect(convertToBase(100, 50.5, 'USD')).toBe(5050);
   });
 
-  it('1000 USD cents @ 0.307 → 307 fils', () => {
-    // 1000 * 0.307 = 307 exactly
-    expect(convertToKwd(1000, 0.307)).toBe(307);
+  it('1000 USD cents @ 50 → 50000 piastres', () => {
+    expect(convertToBase(1000, 50, 'USD')).toBe(50_000);
   });
 
-  it('150 SAR halalas @ 0.081 → 12 fils (exact: 12.15 → rounds to 12)', () => {
-    // 150 * 0.081 = 12.15 → Math.round → 12
-    expect(convertToKwd(150, 0.081)).toBe(12);
+  it('1 USD cent @ 50.25 → 50 piastres (exact: 50.25 → rounds down)', () => {
+    expect(convertToBase(1, 50.25, 'USD')).toBe(50);
   });
 
-  it('155 SAR halalas @ 0.081 → 13 fils (exact: 12.555 → rounds up to 13)', () => {
-    // 155 * 0.081 = 12.555 → Math.round (half-up) → 13
-    expect(convertToKwd(155, 0.081)).toBe(13);
+  it('1 USD cent @ 50.5 → 51 piastres (exact: 50.5 → half rounds UP)', () => {
+    expect(convertToBase(1, 50.5, 'USD')).toBe(51);
   });
 
-  it('AED fils @ 0.102 KWD/AED', () => {
-    // 500 * 0.102 = 51 exactly
-    expect(convertToKwd(500, 0.102)).toBe(51);
+  it('SAR halalas @ 13.33 EGP/SAR', () => {
+    // 150 halalas * 13.33 = 1999.5 → half-up → 2000
+    expect(convertToBase(150, 13.33, 'SAR')).toBe(2000);
   });
 
   it('large amount does not overflow JS safe integer', () => {
-    // 10_000_000 cents (100_000 USD) @ 0.307 → 3_070_000 fils (3070 KWD)
-    const result = convertToKwd(10_000_000, 0.307);
-    expect(result).toBe(3_070_000);
+    // 10_000_000 cents (100_000 USD) @ 50 → 500_000_000 piastres (5,000,000 EGP)
+    const result = convertToBase(10_000_000, 50, 'USD');
+    expect(result).toBe(500_000_000);
     expect(Number.isSafeInteger(result)).toBe(true);
   });
 
   it('fractional rate producing 0.5 → rounds up to 1 (half-up)', () => {
-    // 1 * 0.5 = 0.5 → Math.round → 1 (half-up)
-    expect(convertToKwd(1, 0.5)).toBe(1);
+    // 1 * 0.5 = 0.5 → half-up → 1
+    expect(convertToBase(1, 0.5)).toBe(1);
+  });
+
+  it('is exponent-aware: a 3-decimal currency (KWD fils) → EGP piastres divides by 10', () => {
+    // 1.000 KWD = 1000 fils @ 165 EGP/KWD = 165.00 EGP = 16500 piastres
+    expect(convertToBase(1000, 165, 'KWD')).toBe(16_500);
+    // and the same amount treated as piastres (the old FWB bug) would be 165000
+    expect(convertMinor(1000, 165, 'EGP', 'EGP')).toBe(165_000);
   });
 });
 
-describe('convertToKwd — zero amount', () => {
+describe('convertToBase — zero amount', () => {
   it('zero originalAmount → 0 regardless of fxRate', () => {
-    expect(convertToKwd(0, 0.307)).toBe(0);
-    expect(convertToKwd(0, 100)).toBe(0);
+    expect(convertToBase(0, 0.307)).toBe(0);
+    expect(convertToBase(0, 100)).toBe(0);
   });
 });
 
-describe('convertToKwd — KWD passthrough (regression guard)', () => {
-  it('fxRate=1 returns amount unchanged — KWD fils pass through', () => {
-    const amount = 5000; // 5.000 KWD in fils
-    expect(convertToKwd(amount, 1)).toBe(amount);
+describe('convertToBase — EGP passthrough (regression guard)', () => {
+  it('fxRate=1 returns amount unchanged — EGP piastres pass through', () => {
+    const amount = 5000; // 50.00 EGP in piastres
+    expect(convertToBase(amount, 1)).toBe(amount);
   });
 
-  it('fxRate=1 with large KWD amount is identity', () => {
+  it('fxRate=1 with large EGP amount is identity', () => {
     const amount = 1_234_567;
-    expect(convertToKwd(amount, 1)).toBe(amount);
+    expect(convertToBase(amount, 1)).toBe(amount);
   });
 
   it('fxRate=1 with Prisma Decimal-like object (toString)', () => {
-    // Prisma Decimal serializes to a string — convertToKwd must handle it
+    // Prisma Decimal serializes to a string — convertToBase must handle it
     const decimalLike = { toString: () => '1.000000000' };
-    expect(convertToKwd(5000, decimalLike)).toBe(5000);
+    expect(convertToBase(5000, decimalLike)).toBe(5000);
   });
 
-  it('fxRate as string-like Decimal for non-KWD (USD @ 0.307)', () => {
-    const decimalLike = { toString: () => '0.30700000' };
-    expect(convertToKwd(1000, decimalLike)).toBe(307);
+  it('fxRate as string-like Decimal for non-EGP (USD @ 50.5)', () => {
+    const decimalLike = { toString: () => '50.50000000' };
+    expect(convertToBase(100, decimalLike, 'USD')).toBe(5050);
   });
 });
 
-describe('convertToKwd — invalid inputs throw', () => {
+describe('convertToBase — invalid inputs throw', () => {
   it('negative fxRate throws RangeError', () => {
-    expect(() => convertToKwd(100, -0.307)).toThrow(RangeError);
+    expect(() => convertToBase(100, -0.307)).toThrow(RangeError);
   });
 
   it('zero fxRate throws RangeError', () => {
-    expect(() => convertToKwd(100, 0)).toThrow(RangeError);
+    expect(() => convertToBase(100, 0)).toThrow(RangeError);
   });
 
   it('NaN fxRate throws RangeError', () => {
-    expect(() => convertToKwd(100, NaN)).toThrow(RangeError);
+    expect(() => convertToBase(100, NaN)).toThrow(RangeError);
   });
 
   it('Infinity fxRate throws RangeError', () => {
-    expect(() => convertToKwd(100, Infinity)).toThrow(RangeError);
+    expect(() => convertToBase(100, Infinity)).toThrow(RangeError);
   });
 
   it('negative originalAmount throws RangeError', () => {
-    expect(() => convertToKwd(-1, 0.307)).toThrow(RangeError);
+    expect(() => convertToBase(-1, 0.307)).toThrow(RangeError);
   });
 });
 
 // ─── requiresFxRate ────────────────────────────────────────────────────────────
 
 describe('requiresFxRate', () => {
-  it('returns false for KWD (exact match)', () => {
-    expect(requiresFxRate('KWD')).toBe(false);
+  it('returns false for EGP (exact match)', () => {
+    expect(requiresFxRate('EGP')).toBe(false);
   });
 
-  it('returns false for lowercase kwd', () => {
-    expect(requiresFxRate('kwd')).toBe(false);
+  it('returns false for lowercase egp', () => {
+    expect(requiresFxRate('egp')).toBe(false);
+  });
+
+  it('returns true for KWD (no longer the base)', () => {
+    expect(requiresFxRate('KWD')).toBe(true);
   });
 
   it('returns true for USD', () => {
@@ -139,8 +154,15 @@ describe('ALLOWED_CURRENCIES', () => {
     expect(ALLOWED_CURRENCIES.length).toBeGreaterThan(0);
   });
 
-  it('KWD is included as the base currency', () => {
-    expect(ALLOWED_CURRENCIES).toContain('KWD');
+  it('EGP is included as the base currency, first in the list', () => {
+    expect(ALLOWED_CURRENCIES[0]).toBe(REGION.currency);
+    expect(ALLOWED_CURRENCIES).toContain('EGP');
+  });
+
+  it('every allowed currency has a defined exponent (no silent default for a listed code)', () => {
+    for (const code of ALLOWED_CURRENCIES) {
+      expect([0, 2, 3]).toContain(currencyExponent(code));
+    }
   });
 
   it('all codes are exactly 3 uppercase characters (ISO 4217)', () => {
@@ -154,93 +176,89 @@ describe('ALLOWED_CURRENCIES', () => {
   });
 });
 
-// ─── KWD expense create does not alter existing KWD behaviour (regression) ───
+// ─── EGP expense create does not alter existing behaviour (regression) ───────
 
-describe('KWD expense — service-layer amount contract', () => {
+describe('EGP expense — service-layer amount contract', () => {
   /**
    * This test does NOT mock Prisma — it validates the pure math that the service
-   * applies to KWD amounts before writing.  The service contract when currency='KWD':
-   *   amountKwd = input.amount (no conversion)
-   *   total = amountKwd + taxAmount
+   * applies to EGP amounts before writing.  The service contract when currency='EGP':
+   *   amountBase = input.amount (no conversion)
+   *   total = amountBase + taxAmount
    *   fxRate stored = 1
    *   originalAmount stored = input.amount
-   *
-   * We simulate the service logic inline to prove it's unchanged from the KWD-only
-   * baseline without needing a DB.
    */
-  function simulateKwdExpenseCreate(amountFils: number, taxFils: number) {
-    const currency = 'KWD';
+  function simulateBaseExpenseCreate(amountMinor: number, taxMinor: number) {
+    const currency = 'EGP';
     const fxRate = 1;
-    // KWD path: no conversion
-    const amountKwd = amountFils;
-    const taxAmountKwd = taxFils;
-    const total = amountKwd + taxAmountKwd;
+    // Base path: no conversion
+    const amountBase = amountMinor;
+    const taxAmountBase = taxMinor;
+    const total = amountBase + taxAmountBase;
     return {
       currency,
       fxRate,
-      amountKwd,
-      taxAmountKwd,
+      amountBase,
+      taxAmountBase,
       total,
-      originalAmount: amountFils + taxFils,
+      originalAmount: amountMinor + taxMinor,
     };
   }
 
-  it('10 KWD expense (10000 fils) is stored unchanged', () => {
-    const result = simulateKwdExpenseCreate(10_000, 0);
-    expect(result.amountKwd).toBe(10_000);
+  it('100 EGP expense (10000 piastres) is stored unchanged', () => {
+    const result = simulateBaseExpenseCreate(10_000, 0);
+    expect(result.amountBase).toBe(10_000);
     expect(result.total).toBe(10_000);
     expect(result.fxRate).toBe(1);
-    expect(result.currency).toBe('KWD');
+    expect(result.currency).toBe('EGP');
   });
 
   it('expense with tax: total = amount + tax', () => {
-    const result = simulateKwdExpenseCreate(10_000, 500);
-    expect(result.total).toBe(10_500);
-    expect(result.amountKwd).toBe(10_000);
-    expect(result.taxAmountKwd).toBe(500);
+    const result = simulateBaseExpenseCreate(10_000, 1400);
+    expect(result.total).toBe(11_400);
+    expect(result.amountBase).toBe(10_000);
+    expect(result.taxAmountBase).toBe(1400);
   });
 });
 
-// ─── non-KWD expense conversion (simulate service logic) ─────────────────────
+// ─── non-EGP expense conversion (simulate service logic) ─────────────────────
 
-describe('non-KWD expense — FX conversion contract', () => {
-  function simulateNonKwdExpenseCreate(opts: {
+describe('non-EGP expense — FX conversion contract', () => {
+  function simulateNonBaseExpenseCreate(opts: {
     originalAmount: number;
     taxOriginal: number;
     fxRate: number;
     currency: string;
   }) {
-    const kwdAmount = convertToKwd(opts.originalAmount, opts.fxRate);
-    const kwdTax = convertToKwd(opts.taxOriginal, opts.fxRate);
+    const baseAmount = convertToBase(opts.originalAmount, opts.fxRate, opts.currency);
+    const baseTax = convertToBase(opts.taxOriginal, opts.fxRate, opts.currency);
     return {
       currency: opts.currency,
-      amountKwd: kwdAmount,
-      taxAmountKwd: kwdTax,
-      total: kwdAmount + kwdTax,
+      amountBase: baseAmount,
+      taxAmountBase: baseTax,
+      total: baseAmount + baseTax,
       originalAmount: opts.originalAmount + opts.taxOriginal,
       fxRate: opts.fxRate,
     };
   }
 
-  it('100 USD @ 0.307 → 31 fils amount, 307 fils total for 1000 cents', () => {
-    const result = simulateNonKwdExpenseCreate({
+  it('10.00 USD (1000 cents) @ 50 → 50000 piastres', () => {
+    const result = simulateNonBaseExpenseCreate({
       originalAmount: 1000, // 10.00 USD in cents
       taxOriginal: 0,
-      fxRate: 0.307,
+      fxRate: 50,
       currency: 'USD',
     });
-    expect(result.amountKwd).toBe(307);
-    expect(result.total).toBe(307);
+    expect(result.amountBase).toBe(50_000);
+    expect(result.total).toBe(50_000);
     expect(result.originalAmount).toBe(1000);
     expect(result.currency).toBe('USD');
   });
 
-  it('non-KWD debit/credit are in KWD fils in postEntry (journal balance holds)', () => {
-    // If we have 2000 USD cents DR @ 0.307 → 614 KWD fils
-    // The credit side must also be 614 fils for DR=CR
-    const drKwd = convertToKwd(2000, 0.307); // 614
-    const crKwd = drKwd; // forced equal
-    expect(drKwd).toBe(crKwd);
-    expect(drKwd).toBe(614);
+  it('non-EGP debit/credit are in EGP piastres in postEntry (journal balance holds)', () => {
+    // 2000 USD cents DR @ 50 → 100000 piastres; the credit side must equal it for DR=CR
+    const drBase = convertToBase(2000, 50, 'USD');
+    const crBase = drBase; // forced equal
+    expect(drBase).toBe(crBase);
+    expect(drBase).toBe(100_000);
   });
 });

@@ -57,7 +57,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
           name: 'rtb-test-store',
           slug: `rtb-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });

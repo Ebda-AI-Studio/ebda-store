@@ -72,7 +72,7 @@ const STORE = {
   nameAr: 'متجر',
   domain: 'shop.example',
   slug: 'shop',
-  currency: 'KWD',
+  currency: 'EGP',
   wbsEnabled: true,
   wbsApiKey: 'enc-key',
 };

@@ -49,17 +49,21 @@ import {
   REFUND_RECONCILED_EVENT,
 } from './refund-outcome';
 
+import { REGION } from '@force/shared';
 // ==========================================
 // Payment Factory
-// Database-driven configuration for Kuwait payment providers
+// Database-driven configuration for payment providers
 // Supports both global and per-store configurations
 // ==========================================
 
-/** Money-integrity F3 (2026-07-02 audit): reconciliation tolerance (fils)
- *  for a provider-reported paid amount vs the expected `Payment.amount`.
- *  See the `isAmountUnderpaid` check in `handleWebhook` for the unit
- *  verification note (both sides are fils; every provider's
- *  parseWebhook/getPaymentStatus round-trips via `Math.round(x * 1000)`). */
+/** Money-integrity F3 (2026-07-02 audit): reconciliation tolerance (minor
+ *  units = piastres) for a provider-reported paid amount vs the expected
+ *  `Payment.amount`. See the `isAmountUnderpaid` check in `handleWebhook` for
+ *  the unit note (both sides are minor units). 5 piastres (0.05 EGP) of
+ *  rounding allowance, same bound as payment-confirm.service.ts.
+ *  SP6: the legacy KWD adapters (tap/myfatoorah/hesabe/upayments) still convert
+ *  with a hard-coded ×1000; every Egyptian adapter must use `toMinor` /
+ *  `fromMinor` (single currencyExponent) instead. */
 const AMOUNT_TOLERANCE_FILS = 5;
 
 interface ProviderConfig {
@@ -539,7 +543,7 @@ export async function alertIfDuplicateCapture(
       },
       source: 'payment.duplicate_capture',
       title: 'payment.duplicate_capture',
-      body: `Order ${orderId}: payment ${paymentId} (${provider}) completed while payment ${duplicate.id} (${duplicate.provider}, ${duplicate.amount} fils) is already captured. The customer likely paid twice — refund the duplicate before it becomes a dispute.`,
+      body: `Order ${orderId}: payment ${paymentId} (${provider}) completed while payment ${duplicate.id} (${duplicate.provider}, ${duplicate.amount} piastres) is already captured. The customer likely paid twice — refund the duplicate before it becomes a dispute.`,
       context: { orderId, paymentId, duplicatePaymentId: duplicate.id, provider },
     });
   } catch (err) {
@@ -694,7 +698,7 @@ export class PaymentService {
    */
   static async getPaymentMethods(
     amount: number,
-    currency: Currency = 'KWD',
+    currency: Currency = REGION.currency as Currency,
     provider?: PaymentProvider,
     storeId?: string
   ): Promise<
@@ -1303,7 +1307,7 @@ export class PaymentService {
         kind: 'partial_no_gl',
         store: { id: moneyStoreId, name: payment.order?.store?.name ?? moneyStoreId },
         orderRef,
-        body: `Order ${orderRef}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return, but the provider returned no refund id, so it was NOT booked here (a made-up key would double-book it when the provider's settle notice arrives). Check the provider dashboard; if no settle notice books it, book it by hand.`,
+        body: `Order ${orderRef}: a partial refund of ${amountToRefund} piastres was sent to the provider outside a return, but the provider returned no refund id, so it was NOT booked here (a made-up key would double-book it when the provider's settle notice arrives). Check the provider dashboard; if no settle notice books it, book it by hand.`,
         context: { paymentId: payment.id, orderId: payment.orderId, claimId },
       });
     } else if (!flipsOrder && !request.refundKey && moneyStoreId && payment.orderId) {
@@ -1325,7 +1329,7 @@ export class PaymentService {
           kind: 'partial_no_gl',
           store: { id: moneyStoreId, name: payment.order?.store?.name ?? moneyStoreId },
           orderRef,
-          body: `Order ${orderRef}: a partial refund of ${amountToRefund} fils was sent to the provider outside a return, but its ledger event could not be queued — nothing books it: book it by hand.`,
+          body: `Order ${orderRef}: a partial refund of ${amountToRefund} piastres was sent to the provider outside a return, but its ledger event could not be queued — nothing books it: book it by hand.`,
           context: { paymentId: payment.id, orderId: payment.orderId, refundId: response.refundId },
         });
       }
@@ -1618,7 +1622,7 @@ export class PaymentService {
       // reading `partially_refunded` counted as "handled", so once a first
       // out-of-band refund left it in that state, the refund that finally
       // SETTLED the payment was written as terminal while every effect was
-      // suppressed: 5000 then 4400 of a 9400-fil payment refunded in the
+      // suppressed: 5000 then 4400 of a 9400-piastre payment refunded in the
       // provider's dashboard promoted the row to `refunded`, and the order sat
       // at `delivered`/`paid` with its inventory unrestored, its coupon,
       // loyalty and affiliate effects unreversed, its sale journal — revenue,
@@ -1638,7 +1642,7 @@ export class PaymentService {
       // and ReturnService explicitly accepts that status as a still-refundable
       // source. Running the whole-order fanout anyway would restore ALL
       // inventory, reverse coupon/loyalty and post the FULL GL reversal for a
-      // 2000-fil refund on a 5000-fil payment while leaving 3000 refundable —
+      // 2000-piastre refund on a 5000-piastre payment while leaving 3000 refundable —
       // a later partial return would then execute a second real gateway refund
       // and restore the same units again, because the two paths guard on
       // different idempotency markers (order-level vs refundKey). Whole-order
@@ -1868,7 +1872,7 @@ export class PaymentService {
             kind: 'held_provenance_unknown',
             store: alertStore,
             orderRef: payment.order.orderNumber,
-            body: `Order ${payment.order.orderNumber}: the provider reported refund ${webhookData.refund.refundId} (${webhookData.refund.amount ?? '?'} fils) as completed, but this payment predates the per-refund ledger, so the amount was NOT added to the refunded total. Check the provider dashboard: if this is a NEW refund, the payment's refundable balance is overstated and a later return could pay it out again.`,
+            body: `Order ${payment.order.orderNumber}: the provider reported refund ${webhookData.refund.refundId} (${webhookData.refund.amount ?? '?'} piastres) as completed, but this payment predates the per-refund ledger, so the amount was NOT added to the refunded total. Check the provider dashboard: if this is a NEW refund, the payment's refundable balance is overstated and a later return could pay it out again.`,
             context: {
               paymentId: payment.id,
               refundId: webhookData.refund.refundId,
@@ -1885,15 +1889,15 @@ export class PaymentService {
     // Paid-amount reconciliation (money-integrity audit F3, 2026-07-02).
     // A 'completed' webhook only proves the provider says the invoice is
     // paid — never on its own that the AMOUNT paid matches `order.total`.
-    // `webhookData.amount` is already normalized to fils by every
-    // provider's `parseWebhook` (`Math.round(providerValue * 1000)` — see
+    // `webhookData.amount` is already normalized to piastres by every
+    // provider's `parseWebhook` (`Math.round(providerValue * 1000)` in the legacy KWD adapters — see
     // myfatoorah/tap/hesabe/upayments `.provider.ts`), the same unit as
     // `payment.amount` (set from `order.total` at payment creation — see
     // `PaymentService.createPayment`), so this is a direct same-unit
     // comparison, not a currency-major-vs-minor mismatch. Gate on the
     // currencies matching too, as a belt-and-braces guard against a
     // provider reporting a foreign-currency settlement value we can't
-    // meaningfully compare. A short-fall beyond a 5-fils rounding
+    // meaningfully compare. A short-fall beyond a 5-piastre rounding
     // tolerance means: partial capture, reused/mis-configured invoice, or
     // a tampered total — none of which should ship goods. We deliberately
     // do NOT flip payment/order status in that case; we just log +
@@ -1945,7 +1949,7 @@ export class PaymentService {
         },
         source: 'payment.webhook.amount_mismatch',
         title: 'payment.webhook.amount_mismatch',
-        body: `Order ${payment.orderId}: ${provider} webhook reports paid ${webhookData.amount} fils but the order total is ${payment.amount} fils. Order was NOT marked as paid — investigate before fulfilling.`,
+        body: `Order ${payment.orderId}: ${provider} webhook reports paid ${webhookData.amount} piastres but the order total is ${payment.amount} piastres. Order was NOT marked as paid — investigate before fulfilling.`,
         context: {
           orderId: payment.orderId,
           paymentId: payment.id,

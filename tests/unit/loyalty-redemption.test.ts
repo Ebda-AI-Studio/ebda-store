@@ -3,10 +3,10 @@
  *
  * computeRedemption is the SERVER-SIDE source of truth that turns a customer's
  * *requested* point count into the points actually burned + the discount in
- * fils. It never trusts a client-sent discount. These tests pin the money
+ * piastres. It never trusts a client-sent discount. These tests pin the money
  * rules: minimum gate, balance clamp, subtotal cap, percentage cap, and that
  * the burned points always equal discount / pointsValue exactly (no orphaned
- * points). All money is in fils (integers).
+ * points). All money is in piastres (integers).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -22,7 +22,7 @@ const settings = {
 
 describe('computeRedemption', () => {
   it('redeems the requested points when within balance, minimum, and caps', () => {
-    // 1000 points * 1 fil = 1000 fils discount; subtotal 10000, 50% cap = 5000
+    // 1000 points * 1 fil = 1000 piastres discount; subtotal 10000, 50% cap = 5000
     const q = computeRedemption(settings, 1000, 10_000, 5000);
     expect(q.applied).toBe(true);
     expect(q.pointsToRedeem).toBe(1000);
@@ -46,8 +46,8 @@ describe('computeRedemption', () => {
   });
 
   it('caps the discount at the subtotal and reduces burned points to match', () => {
-    // pointsValue 10 fils, subtotal 3000 (3 KWD), 100% cap → discount capped
-    // at 3000 fils → 300 points burned, not the 1000 requested.
+    // pointsValue 10 piastres, subtotal 3000 (3 EGP), 100% cap → discount capped
+    // at 3000 piastres → 300 points burned, not the 1000 requested.
     const s = { ...settings, pointsValue: 10, minRedeemPoints: 100, maxRedeemPercentage: 100 };
     const q = computeRedemption(s, 1000, 3000, 1000);
     expect(q.applied).toBe(true);
@@ -58,7 +58,7 @@ describe('computeRedemption', () => {
   });
 
   it('caps the discount at maxRedeemPercentage of the subtotal', () => {
-    // 50% of 10000 = 5000 fils cap. Customer has 9000 points @ 1 fil.
+    // 50% of 10000 = 5000 piastres cap. Customer has 9000 points @ 1 fil.
     const q = computeRedemption(settings, 9000, 10_000, 9000);
     expect(q.applied).toBe(true);
     expect(q.discountFils).toBe(5000);
@@ -66,7 +66,7 @@ describe('computeRedemption', () => {
   });
 
   it('honors pointsValue > 1 fil per point', () => {
-    // 5 fils/point, 600 points = 3000 fils; subtotal 10000, 50% = 5000 cap.
+    // 5 piastres/point, 600 points = 3000 piastres; subtotal 10000, 50% = 5000 cap.
     const s = { ...settings, pointsValue: 5 };
     const q = computeRedemption(s, 600, 10_000, 600);
     expect(q.applied).toBe(true);
@@ -81,7 +81,7 @@ describe('computeRedemption', () => {
   });
 
   it('returns nothing when the cap pushes burned points below the minimum', () => {
-    // 50% of a 600-fil subtotal = 300 fils cap → 300 points @ 1 fil, but the
+    // 50% of a 600-fil subtotal = 300 piastres cap → 300 points @ 1 fil, but the
     // minimum is 500 → nothing redeems rather than a sub-minimum amount.
     const q = computeRedemption(settings, 1000, 600, 1000);
     expect(q.applied).toBe(false);
@@ -95,7 +95,7 @@ describe('computeRedemption', () => {
   });
 
   it('floors fractional point caps (never over-discounts)', () => {
-    // pointsValue 3 fils, 50% of 1000 = 500 fils cap → 166 points (498 fils),
+    // pointsValue 3 piastres, 50% of 1000 = 500 piastres cap → 166 points (498 piastres),
     // floor() means we discount 498 not 500.
     const s = { ...settings, pointsValue: 3, minRedeemPoints: 1, maxRedeemPercentage: 50 };
     const q = computeRedemption(s, 1000, 1000, 1000);

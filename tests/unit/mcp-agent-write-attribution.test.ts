@@ -98,8 +98,8 @@ function harness(register: (s: McpServer, store: never) => void) {
   return tools;
 }
 
-const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'KWD', domain: null };
-const customer = { name: 'Sara Ali', address: 'Block 1', country: 'KW' };
+const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'EGP', domain: null };
+const customer = { name: 'Sara Ali', address: 'Block 1', country: 'EG' };
 
 /** The single auditLog call whose `action` matches. */
 function rowFor(action: string) {
@@ -120,7 +120,7 @@ describe('place_order — attribution', () => {
       orderNumber: 'ORD-1',
       status: 'pending',
       total: 3000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [],
     } as never);
   });
@@ -245,7 +245,7 @@ describe('place_order (cod) — writes after the order commits', () => {
       orderNumber: 'ORD-1',
       status: 'pending',
       total: 3000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [],
     } as never);
     vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);

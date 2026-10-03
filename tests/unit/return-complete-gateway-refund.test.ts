@@ -482,12 +482,12 @@ describe('ReturnService.complete — piecewise returns on a zero-shipping order'
       id: 'pay-1',
       transactionId: 'txn-1',
       amount: 8900,
-      refundedAmount: 8800, // only 100 fils left, the piece is worth far more
+      refundedAmount: 8800, // only 100 piastres left, the piece is worth far more
       status: 'partially_refunded',
     });
 
     await expect(ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'gateway')).rejects.toThrow(
-      /only 0\.100 KWD is left on the payment/i
+      /only 1\.00 EGP is left on the payment/i
     );
 
     expect(providerRefund).not.toHaveBeenCalled();
@@ -516,7 +516,7 @@ describe('ReturnService.complete — piecewise returns on a zero-shipping order'
 
     expect(err.code).toBe('PARTIAL_REFUND_EXCEEDS_PAYMENT');
     expect(err.message).toMatch(/store credit or bank transfer/i);
-    expect(err.message).toMatch(/4\.945 KWD/);
+    expect(err.message).toMatch(/49\.45 EGP/);
     expect(err.details).toEqual({ refundAmount: 4945, refundableRemaining: 100 });
     // A manual method is the stated way out, and it does complete.
     vi.resetAllMocks();

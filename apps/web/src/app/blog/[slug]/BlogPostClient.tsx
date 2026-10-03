@@ -72,7 +72,7 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
                 </Link>
                 <p className="mt-6 text-xs text-foreground/55">
                   {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
-                    isRtl ? 'ar-KW' : 'en-KW',
+                    isRtl ? 'ar-EG' : 'en-EG',
                     { year: 'numeric', month: 'long', day: 'numeric' }
                   )}
                 </p>

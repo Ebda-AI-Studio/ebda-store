@@ -59,7 +59,7 @@ async function seedConvertedReferral() {
       shipping: 0,
       discount: 0,
       total: 10_000,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
     },
@@ -92,7 +92,7 @@ describe('affiliate commission under duplicate Inngest delivery', () => {
 
     expect(results.filter(r => r !== null)).toHaveLength(1);
     const affiliate = await prisma.affiliate.findUniqueOrThrow({ where: { id: affiliateId } });
-    expect(affiliate.totalEarned).toBe(1_000); // 10% of 10.000 KWD, once
+    expect(affiliate.totalEarned).toBe(1_000); // 10% of 10.000 EGP, once
     expect(affiliate.pendingBalance).toBe(1_000);
 
     const events = await prisma.affiliateEvent.findMany({
@@ -125,7 +125,7 @@ describe('affiliate commission under duplicate Inngest delivery', () => {
   it('two concurrent payouts that each fit the balance cannot both be paid out of it', async () => {
     const { affiliateId, orderId } = await seedConvertedReferral();
     await runInTenantContext(storeId, () => affiliateService.processCommission(storeId, orderId));
-    // pendingBalance is now 1.000 KWD; ask for 0.600 twice at once.
+    // pendingBalance is now 1.000 EGP; ask for 0.600 twice at once.
 
     const results = await Promise.allSettled(
       [1, 2].map(() =>

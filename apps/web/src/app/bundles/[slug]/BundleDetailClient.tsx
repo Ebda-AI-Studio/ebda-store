@@ -20,6 +20,7 @@ import {
   pickBundleComponentNames,
 } from '@/lib/bundle-locale';
 
+import { fromMinor, REGION } from '@force/shared';
 function BundleSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
@@ -151,8 +152,8 @@ export default function BundleDetailClient({ initialBundle }: BundleDetailClient
       contentId: bundle.id,
       contentName: bundle.name,
       quantity,
-      value: bundle.price / 1000,
-      currency: 'KWD',
+      value: fromMinor(bundle.price),
+      currency: REGION.currency,
     });
   };
 
