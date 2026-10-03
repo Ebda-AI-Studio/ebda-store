@@ -122,7 +122,10 @@ describe.skipIf(!hasDb)('DELETE campaign — the sent-history guard against a re
     const res = await request(app).delete(`/stores/${storeId}/campaigns/${id}`);
 
     expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('CAMPAIGN_NOT_DELETABLE');
+    // Issue 2082 split the refusal: a deletable status with sent mail is
+    // CAMPAIGN_HAS_SEND_HISTORY (the admin translates it separately from the
+    // wrong-status CAMPAIGN_NOT_DELETABLE asserted below).
+    expect(res.body.error.code).toBe('CAMPAIGN_HAS_SEND_HISTORY');
     expect(await counts(id)).toEqual({ campaigns: 1, recipients: 2 });
   });
 
@@ -146,6 +149,7 @@ describe.skipIf(!hasDb)('DELETE campaign — the sent-history guard against a re
     const id = await seedCampaign(storeId, 'sent', [{ sentAt: null }]);
     const res = await request(app).delete(`/stores/${storeId}/campaigns/${id}`);
     expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CAMPAIGN_NOT_DELETABLE');
     expect(await counts(id)).toEqual({ campaigns: 1, recipients: 1 });
   });
 });

@@ -333,6 +333,24 @@ describe.skipIf(!hasDb)('order search: guest contact', () => {
         for (const { relname } of others) {
           await tx.$executeRawUnsafe(`DROP INDEX public."${relname}"`);
         }
+        // The planner's other candidate is a no-qual scan of one whole partial
+        // trigram index (it satisfies `customer_id IS NULL` alone and filters
+        // the rest). On a handful of rows that scan is CHEAPER than four
+        // probes, so which one wins flipped with index bloat and statistics
+        // (red on main 2026-10-03 on a reused DB). Make the whole-index scan
+        // lose by volume, not by luck: fill the transaction with guest rows
+        // (rolled back with the rest) so the full scan costs thousands while
+        // the four selective probes stay flat, then ANALYZE so the estimate
+        // is current rather than whatever autovacuum last saw.
+        await tx.$executeRaw`
+          INSERT INTO public.orders
+            (id, store_id, order_number, subtotal, total, shipping_address, billing_address, updated_at)
+          SELECT 'plan-fill-' || ${tag} || '-' || g, ${storeId}, 'PF-' || ${tag} || '-' || g, 1, 1,
+                 jsonb_build_object('firstName', md5('f' || g), 'lastName', md5('l' || g),
+                                    'email', md5('e' || g) || '@fill.test', 'phone', md5('p' || g)),
+                 '{}'::jsonb, now()
+          FROM generate_series(1, 20000) g`;
+        await tx.$executeRaw`ANALYZE public.orders`;
         await tx.$executeRaw`SET LOCAL enable_seqscan = off`;
         const rows = await tx.$queryRaw<Array<{ 'QUERY PLAN': string }>>(
           Prisma.sql`EXPLAIN (COSTS OFF) ${guestOrderIdsSql(storeId, `zq${tag.slice(-6)}`)}`
