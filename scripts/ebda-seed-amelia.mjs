@@ -94,14 +94,16 @@ try {
       currency: 'EGP',
       timezone: 'Africa/Cairo',
       status: 'active',
-      // TODO(SP5 plans engine): there is no "free + unlimited" flag today. `enterprise`
-      // is the plan whose baseline enables every feature (bulk_operations included) and
-      // has no product/order caps, so the founding merchant is unrestricted. Replace
-      // with the engine's comped/unlimited grant once SP5 lands; do not copy this to
-      // other merchants.
-      plan: 'enterprise',
     },
   });
+
+  // Merchant #1 is on the admin-granted `comped` plan: every limit unlimited,
+  // no platform fee, every feature on. Done BEFORE the import so the product
+  // ceiling never applies to the catalogue load. Do not copy this to other
+  // merchants (use scripts/ebda-comp-store.mjs deliberately).
+  const { planService } = await import('../apps/api/src/services/plan.service.ts');
+  await planService.assignPlan(store.id, { planCode: 'comped' });
+  store = await prisma.store.findUniqueOrThrow({ where: { id: store.id } });
 
   // ---- import (same path as the admin Bulk import) ---------------------------
   const converted = importCsvToPlatformCsv(decodeCsvBytes(readFileSync(csvPath)));

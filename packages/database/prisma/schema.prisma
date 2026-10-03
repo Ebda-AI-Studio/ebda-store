@@ -484,6 +484,7 @@ model Store {
   answerEngineChecks       AnswerEngineCheck[]
   gscDailyMetrics          GscDailyMetric[]
   usageSnapshots           StoreUsageSnapshot[]
+  subscription             StoreSubscription?
 
   @@index([ownerId])
   @@index([status])
@@ -4367,4 +4368,88 @@ model MerchantApiKey {
   // FK-only index so the User delete RI check does not sequential-scan.
   @@index([userId])
   @@map("merchant_api_keys")
+}
+
+// ==========================================
+// Plans & subscriptions (SP5 task 1) — plans as DATA
+// ==========================================
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  canceled
+  comped
+}
+
+/// A sellable (or admin-granted) plan. Global catalog: NOT store-scoped, so no
+/// RLS — reads are public-safe config; writes only go through the super-admin
+/// `PUT /admin/plans/:code`. Prices are NULL until Ahmad sets them (null means
+/// "not set yet", never "free"). `limits` is validated by `planLimitsSchema`
+/// (@force/shared) on every write; a null numeric limit means unlimited.
+model Plan {
+  id                String    @id @default(uuid())
+  code              String    @unique
+  nameEn            String    @map("name_en")
+  nameAr            String    @map("name_ar")
+  sort              Int       @default(0)
+  /// Shown on the public pricing page / self-serve upgrade picker. `comped` is false.
+  isPublic          Boolean   @default(true) @map("is_public")
+  /// EGP piastres. NULL = not set yet.
+  priceMonthlyMinor Int?      @map("price_monthly_minor")
+  priceYearlyMinor  Int?      @map("price_yearly_minor")
+  /// Legacy StorePlan enum tier whose PLAN_BASELINE feature set a store on this
+  /// plan inherits (keeps FeatureService working while `Store.plan` is retired
+  /// — follow-up). Kept in sync onto `stores.plan` by assignPlan.
+  featureTier       StorePlan @default(free) @map("feature_tier")
+  limits            Json
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  subscriptions StoreSubscription[]
+
+  @@map("plans")
+}
+
+/// One row per store: which plan it is on and where it is in the billing cycle.
+/// Task 3 (EGP billing) owns the provider columns and the status transitions;
+/// task 1 only reads `status`/`planCode`. A store with no row resolves through
+/// its legacy `Store.plan` enum (see PlanService.getEntitlements).
+///
+/// RLS: store-scoped, 4 explicit policies in migration
+/// 20261003130000_plans_and_store_subscriptions (same shape as
+/// store_usage_snapshots). NOTE for the strict-RLS sweep: this table is
+/// written by system paths (provisioning, admin plan assignment, billing
+/// cron) that run with no tenant context.
+model StoreSubscription {
+  id                 String             @id @default(uuid())
+  storeId            String             @unique @map("store_id")
+  planCode           String             @map("plan_code")
+  status             SubscriptionStatus @default(active)
+  currentPeriodStart DateTime?          @map("current_period_start")
+  currentPeriodEnd   DateTime?          @map("current_period_end")
+  trialEndsAt        DateTime?          @map("trial_ends_at")
+  cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
+
+  // Provider fields — nullable until task 3 (Kashier/Paymob adapter) fills them.
+  provider                 String? @map("provider")
+  providerCustomerId       String? @map("provider_customer_id")
+  providerSubscriptionId   String? @map("provider_subscription_id")
+  providerPaymentMethodRef String? @map("provider_payment_method_ref")
+
+  /// First day (Cairo) of the month in which this store went OVER its monthly
+  /// order cap. Orders are never blocked at checkout (see PlanLimitService);
+  /// this is the flag the Billing page and the merchant notification read.
+  ordersOverLimitMonth      DateTime? @map("orders_over_limit_month") @db.Date
+  ordersOverLimitNotifiedAt DateTime? @map("orders_over_limit_notified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  plan  Plan  @relation(fields: [planCode], references: [code], onUpdate: Cascade, onDelete: Restrict)
+
+  @@index([planCode])
+  @@index([status])
+  @@map("store_subscriptions")
 }

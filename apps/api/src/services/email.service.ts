@@ -39,6 +39,10 @@ import { returnConfirmationTemplate } from './email-templates/return-confirmatio
 import { returnStatusUpdateTemplate } from './email-templates/return-status-update';
 import { reviewRequestTemplate, type ReviewRequestData } from './email-templates/review-request';
 import { lowStockAlertTemplate, type LowStockAlertItem } from './email-templates/low-stock-alert';
+import {
+  planLimitReachedTemplate,
+  type PlanLimitReachedData,
+} from './email-templates/plan-limit-reached';
 import { BRAND, brandFrom, poweredByBrand } from '@force/shared';
 
 import { resolveDefaultLanguage } from '@force/shared';
@@ -900,6 +904,24 @@ export class EmailService {
     const subject = lowStockAlertTemplate.subject[lang](alertData);
     const content = lowStockAlertTemplate[lang](alertData);
     await this.sendForStore(storeId, { to: data.to, subject, content, language: lang });
+  }
+
+  /**
+   * Merchant notice: the store passed its plan's monthly order cap (SP5).
+   * Recipient is resolved by the caller (the store owner's email).
+   */
+  static async sendPlanLimitReached(
+    storeId: string,
+    data: PlanLimitReachedData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const lang: 'en' | 'ar' = language ?? 'en';
+    await this.sendForStore(storeId, {
+      to: data.to,
+      subject: planLimitReachedTemplate.subject[lang](data),
+      content: planLimitReachedTemplate[lang](data),
+      language: lang,
+    });
   }
 
   // ---------------------------------------------------------------------------

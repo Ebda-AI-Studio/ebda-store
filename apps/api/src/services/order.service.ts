@@ -44,6 +44,7 @@ import {
   invalidateCustomersCache,
 } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { noteOrderCreated } from './plan-limit.service';
 import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
@@ -1675,6 +1676,10 @@ export class OrderService {
     // the storefront product caches so a sold-out item stops showing "in stock".
     await bustProductCaches(storeId);
 
+    // Monthly order cap (SP5): NEVER blocks checkout. Flags the store over its
+    // plan and notifies the merchant once a month — see `noteOrderCreated`.
+    void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
+
     return order;
   }
 
@@ -2814,6 +2819,9 @@ export class OrderService {
       },
       '[Admin-Order] created on behalf of customer'
     );
+
+    // Same soft monthly-cap policy as storefront checkout (SP5).
+    void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
 
     return order;
   }

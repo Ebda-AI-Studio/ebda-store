@@ -1,0 +1,137 @@
+/**
+ * Plan entitlements — resolve what a store is allowed to do (SP5 task 1).
+ *
+ * Read-only and dependency-light on purpose: `FeatureService` imports this to
+ * layer the plan's automation flags into the feature map, so it must NOT import
+ * `feature.service` (or anything that does). Writes and the enforcement guard
+ * live in `plan.service.ts` / `plan-limit.service.ts`.
+ *
+ * Resolution order:
+ *   1. `store_subscriptions` row -> `plans` row. A `canceled` subscription falls
+ *      back to the free plan's limits (the store keeps its data, loses the paid
+ *      ceiling). `trialing`/`active`/`past_due`/`comped` use the plan's own limits.
+ *   2. No subscription row (a store created before the migration, or by a path
+ *      that has not been taught to create one) -> FWB's legacy `Store.plan` enum
+ *      mapped onto a plan code. The migration backfills every existing store, so
+ *      this is the safety net, not the normal path.
+ *   3. A plan row that is missing or whose `limits` JSON fails the zod schema
+ *      falls back to the seed numbers for that code (logged at error level) —
+ *      an unreadable limits blob must never make a store unlimited by accident
+ *      (unknown code -> the FREE seed) nor lock it out.
+ *
+ * Reads go through `withRlsBypass`: trusted, internal, already scoped by
+ * `storeId` — same posture as FeatureService, and it keeps working when
+ * `store_subscriptions` moves to strict RLS (no tenant context needed).
+ */
+
+import { withRlsBypass, type Prisma } from '@force/database';
+import {
+  DEFAULT_PLAN_SEEDS,
+  FALLBACK_PLAN_CODE,
+  LEGACY_STORE_PLAN_TO_PLAN_CODE,
+  planLimitsSchema,
+  type PlanLimits,
+  type SubscriptionStatus,
+} from '@force/shared';
+import logger from '../lib/logger';
+
+type Tx = Prisma.TransactionClient;
+
+export interface Entitlements {
+  storeId: string;
+  /** The plan whose limits apply (after the canceled -> free fallback). */
+  planCode: string;
+  /** The plan the subscription row names (differs from planCode only when canceled). */
+  subscribedPlanCode: string;
+  status: SubscriptionStatus | 'none';
+  limits: PlanLimits;
+  planNameEn: string;
+  planNameAr: string;
+  /** True when no subscription row exists and the legacy enum decided the plan. */
+  derivedFromLegacyPlan: boolean;
+  currentPeriodEnd: Date | null;
+  trialEndsAt: Date | null;
+  cancelAtPeriodEnd: boolean;
+  ordersOverLimitMonth: Date | null;
+}
+
+function seedFor(code: string) {
+  return (
+    DEFAULT_PLAN_SEEDS.find(p => p.code === code) ??
+    DEFAULT_PLAN_SEEDS.find(p => p.code === FALLBACK_PLAN_CODE)!
+  );
+}
+
+/** Parse a stored limits blob; fall back to the seed for `code` when it is corrupt. */
+export function parseLimits(raw: unknown, code: string): PlanLimits {
+  const parsed = planLimitsSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  logger.error(
+    { planCode: code, issues: parsed.error.issues },
+    '[plan-entitlements] plans.limits failed validation — using seed limits for this plan code'
+  );
+  return seedFor(code).limits;
+}
+
+async function loadPlan(tx: Tx, code: string) {
+  return tx.plan.findUnique({ where: { code } });
+}
+
+export async function getEntitlements(storeId: string, tx?: Tx): Promise<Entitlements | null> {
+  const run = async (db: Tx): Promise<Entitlements | null> => {
+    const store = await db.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+    if (!store) return null;
+    const sub = await db.storeSubscription.findUnique({ where: { storeId } });
+
+    const subscribedPlanCode = sub?.planCode ?? LEGACY_STORE_PLAN_TO_PLAN_CODE[store.plan];
+    const status: SubscriptionStatus | 'none' = sub?.status ?? 'none';
+    const effectiveCode = status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;
+
+    const plan = await loadPlan(db, effectiveCode);
+    const seed = seedFor(effectiveCode);
+    return {
+      storeId,
+      planCode: plan?.code ?? seed.code,
+      subscribedPlanCode,
+      status,
+      limits: plan ? parseLimits(plan.limits, effectiveCode) : seed.limits,
+      planNameEn: plan?.nameEn ?? seed.nameEn,
+      planNameAr: plan?.nameAr ?? seed.nameAr,
+      derivedFromLegacyPlan: !sub,
+      currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+      trialEndsAt: sub?.trialEndsAt ?? null,
+      cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+      ordersOverLimitMonth: sub?.ordersOverLimitMonth ?? null,
+    };
+  };
+  return tx ? run(tx) : withRlsBypass(run);
+}
+
+/**
+ * The two automation flags FeatureService layers over PLAN_BASELINE (and under
+ * a StoreFeature override). `null` = no plan decision (unknown store).
+ */
+export async function getAutomationFlags(
+  storeId: string,
+  tx?: Tx
+): Promise<Pick<PlanLimits, 'abandonedCartAutomation' | 'whatsappAutomation'> | null> {
+  const e = await getEntitlements(storeId, tx);
+  if (!e) return null;
+  return {
+    abandonedCartAutomation: e.limits.abandonedCartAutomation,
+    whatsappAutomation: e.limits.whatsappAutomation,
+  };
+}
+
+/**
+ * Platform fee (basis points) for SP6's per-order fee. A getter only — nothing
+ * computes or charges a fee yet. COD orders use `codPlatformFeeBps` (default 0).
+ */
+export async function getPlatformFeeBps(
+  storeId: string,
+  opts: { cod: boolean }
+): Promise<number | null> {
+  const e = await getEntitlements(storeId);
+  if (!e) return null;
+  return opts.cod ? e.limits.codPlatformFeeBps : e.limits.platformFeeBps;
+}

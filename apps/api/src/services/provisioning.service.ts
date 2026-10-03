@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma, Prisma, StoreStatus, withMoneyTx, withRlsBypass } from '@force/database';
 import { bustStoreCaches } from './store.service';
+import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -198,6 +199,11 @@ export class ProvisioningService {
             },
           },
         });
+
+        // Subscription row for the plan the operator chose (SP5 plans engine).
+        // Super-admin provisioning is platform-controlled, so a custom domain
+        // here is NOT plan-gated (the operator is assigning the plan).
+        await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
 
         // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an ACTIVE
         // editable rate. The charge itself stays gated on `Store.taxEnabled`

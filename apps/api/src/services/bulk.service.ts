@@ -2,6 +2,7 @@ import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@for
 import { csvField, slugifyWithFallback } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
+import { assertWithinLimit } from './plan-limit.service';
 import {
   bundleFkViolationKind,
   planBundlePinnedVariantSkips,
@@ -866,6 +867,16 @@ export class BulkService {
         result.failed += skipped.length;
         result.errors.push({ row: 0, error: skip.message });
       }
+    }
+
+    // ---- Phase 2.9: plan ceiling for the WHOLE batch (SP5) ----
+    // Counted once, here, BEFORE Phase 3 writes anything (categories, tags) and
+    // before any product row: an over-limit import is rejected whole with a 402
+    // rather than creating the first N rows and failing the rest. Only rows
+    // that CREATE a product count; updates of existing products do not.
+    const newProductCount = validRows.filter(r => !r.existing).length;
+    if (newProductCount > 0) {
+      await assertWithinLimit(storeId, 'maxProducts', { delta: newProductCount });
     }
 
     // ---- Phase 3: Batch-create new categories and tags ----

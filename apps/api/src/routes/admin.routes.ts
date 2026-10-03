@@ -13,6 +13,7 @@ import { invalidateCached } from '../lib/public-cache';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
+import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
@@ -30,7 +31,15 @@ import {
   OrderStatus,
   OrderPaymentStatus,
 } from '@force/database';
-import { csvField, isValidTimeZone, fromMinor, excelMoneyFormat } from '@force/shared';
+import {
+  csvField,
+  isValidTimeZone,
+  fromMinor,
+  excelMoneyFormat,
+  updatePlanSchema,
+  assignSubscriptionSchema,
+} from '@force/shared';
+import { planService } from '../services/plan.service';
 
 const router = Router();
 
@@ -294,6 +303,70 @@ router.patch(
 );
 
 /**
+ * GET /admin/plans — every plan (incl. non-public) with subscriber counts.
+ * PUT /admin/plans/:code — edit names, order, visibility, prices (null = not
+ * set) and the limits JSON (validated by `planLimitsSchema`).
+ * PUT /admin/stores/:id/subscription — put a store on a plan (e.g. `comped`).
+ */
+router.get(
+  '/plans',
+  requireRole('super_admin'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ success: true, data: { plans: await planService.listPlans() } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/plans/:code',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = updatePlanSchema.parse(req.body);
+      const plan = await planService.updatePlan(req.params.code, input);
+      await auditLog({
+        action: 'plan.updated',
+        userId: req.user!.userId,
+        resourceType: 'plan',
+        resourceId: plan.code,
+        details: { limits: plan.limits, isPublic: plan.isPublic },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { plan } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/stores/:id/subscription',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = assignSubscriptionSchema.parse(req.body);
+      const result = await planService.assignPlan(req.params.id, input);
+      await auditLog({
+        action: 'store.plan_assigned',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: req.params.id,
+        details: { ...result },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * PUT /admin/stores/:id
  * Update store details
  */
@@ -337,7 +410,11 @@ router.put(
       // the public keys made the very next public request re-seed them from
       // the STALE feature map (issue 2172), so the feature cache is dropped
       // FIRST, exactly as `featureService.setStorePlan` does.
-      if (plan !== undefined) await featureService.invalidateCache(store.id);
+      // Keep the subscription (limits) on the same plan the enum now names.
+      if (plan !== undefined) {
+        await withRlsBypass(tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
+        await featureService.invalidateCache(store.id);
+      }
       await bustStoreCaches(store.id, store.slug, store.domain);
       if (before?.slug && before.slug !== store.slug) {
         await invalidateCached(`public:store:${before.slug}`);

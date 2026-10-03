@@ -40,10 +40,17 @@ vi.mock('@api/services/feature.service', () => ({
   },
 }));
 vi.mock('@api/lib/public-cache', () => ({ invalidateCached: vi.fn() }));
+// SP5: a plan change also re-points the store's subscription (own DB write, not under test here).
+vi.mock('@api/services/plan-sync', () => ({
+  syncSubscriptionFromLegacyPlan: vi.fn(async () => {
+    calls.push('syncSubscription');
+  }),
+}));
 vi.mock('@force/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
+    withRlsBypass: async (fn: (tx: unknown) => unknown) => fn({}),
     prisma: {
       store: {
         findUnique: vi.fn().mockResolvedValue({ slug: 'demo' }),
@@ -80,7 +87,11 @@ describe('PUT /admin/stores/:id — plan change cache order (issue 2172)', () =>
   it('drops the feature cache BEFORE busting the public store caches', async () => {
     const res = await request(app()).put('/admin/stores/store-1').send({ plan: 'professional' });
     expect(res.status).toBe(200);
-    expect(calls).toEqual(['featureService.invalidateCache', 'bustStoreCaches']);
+    expect(calls).toEqual([
+      'syncSubscription',
+      'featureService.invalidateCache',
+      'bustStoreCaches',
+    ]);
   });
 
   it('a non-plan edit does not touch the feature cache', async () => {

@@ -14,6 +14,7 @@ import logger from '../lib/logger';
 import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
+import { assertWithinLimit } from '../services/plan-limit.service';
 import { bustCorsCache } from '../lib/cors-cache';
 import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
@@ -1243,6 +1244,10 @@ router.put(
       }
 
       if (domain && domain !== oldDomain) {
+        // Plan gate (SP5): custom domains are a plan capability. Clearing or
+        // keeping a domain is always allowed; only attaching a new one is gated.
+        await assertWithinLimit(id, 'customDomain');
+
         // Check platform configuration first — domain feature is unusable
         // without the resolved provider's API credentials configured on the API
         if (!domainSvc.isConfigured()) {
