@@ -20,6 +20,7 @@ import { assertWithinLimit } from '../services/plan-limit.service';
 import { auditLog } from '../middleware/security';
 import {
   isSafeUrl,
+  normalizeEgyptianMobile,
   isValidTimeZone,
   parseStoreHost,
   storeSlugSchema,
@@ -230,12 +231,36 @@ const seoSchema = z
   })
   .strip();
 
+// Store WhatsApp number (free-tier `wa.me` chat target, SP8). Must be an
+// Egyptian mobile; saved as E.164 (`+201012345678`). An empty value CLEARS it
+// (null) so the storefront hides every wa.me button — unlike `optionalStr`,
+// where '' would be "no change".
+const optionalWhatsappNumber = z.preprocess(
+  v => (typeof v === 'string' && v.trim() === '' ? null : v),
+  z
+    .string()
+    .max(50)
+    .transform((v, ctx) => {
+      const e164 = normalizeEgyptianMobile(v);
+      if (!e164) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Enter a valid Egyptian mobile number (010, 011, 012 or 015)',
+        });
+        return z.NEVER;
+      }
+      return e164;
+    })
+    .nullable()
+    .optional()
+);
+
 const contactSchema = z
   .object({
     email: optionalEmail,
     phone: optionalStr(50),
     phoneAr: optionalStr(50),
-    whatsapp: optionalStr(50),
+    whatsapp: optionalWhatsappNumber,
     address: optionalStr(500),
     addressAr: optionalStr(500),
     // Phase D.6 — WhatsApp bot "Locations & Hours" branch

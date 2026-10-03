@@ -26,3 +26,4 @@ export * from './order-action-visibility';
 export * from './order-status-transitions';
 export * from './order-tax-display';
 export * from './setup-guide';
+export * from './whatsapp';

@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { formatAddressLines, formatDateTime, type AddressLabels } from './format';
 import type { OrderDetail } from './types';
+import { useMessageCustomerHref } from './useMessageCustomer';
 
 interface DeliveryCardProps {
   order: OrderDetail;
@@ -42,7 +43,7 @@ export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
 
   const phoneDigits = recipientPhone.replace(/\D/g, '');
   const callHref = phoneDigits ? `tel:${phoneDigits}` : null;
-  const waHref = phoneDigits ? `https://wa.me/${phoneDigits}` : null;
+  const waHref = useMessageCustomerHref(order, recipientPhone, recipientName);
   const mailHref = recipientEmail ? `mailto:${recipientEmail}` : null;
 
   return (

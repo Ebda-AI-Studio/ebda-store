@@ -2545,7 +2545,17 @@
       "addressUrl": "Map link",
       "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
       "addressUrlHint": "Paste a Google or Apple Maps link to your storefront's pin. The footer address will become clickable and open this URL in a new tab.",
-      "addressClickable": "Make address clickable on storefront"
+      "addressClickable": "Make address clickable on storefront",
+      "whatsappHint": "Customers chat with you on WhatsApp through a free click-to-chat link. Egyptian mobile (010, 011, 012, 015).",
+      "whatsappInvalid": "Enter a valid Egyptian mobile number, e.g. 01012345678.",
+      "waMeTitle": "WhatsApp buttons",
+      "waMeNeedsNumber": "Add your WhatsApp number above to turn these buttons on.",
+      "waMeProductShare": "Product share / ask button",
+      "waMeProductShareHint": "A WhatsApp button on every product page, prefilled with the product name, price and link.",
+      "waMeOrderQuestion": "\"Ask about this order\" button",
+      "waMeOrderQuestionHint": "Lets customers message you about an order from the order page.",
+      "waMeCodConfirm": "Cash-on-delivery confirmation prompt",
+      "waMeCodConfirmHint": "After a cash-on-delivery order, shows a \"Confirm on WhatsApp\" button and adds it to the order email."
     },
     "social": {
       "instagram": "Instagram",
@@ -8513,7 +8523,6 @@
         "copy": "Copy link",
         "copied": "Copied",
         "whatsapp": "Share on WhatsApp",
-        "whatsappText": "Visit my new store:",
         "dashboard": "Go to dashboard"
       }
     },
@@ -8558,8 +8567,7 @@
           "title": "Share your store link",
           "desc": "Send your link to customers on WhatsApp."
         }
-      },
-      "shareText": "Visit my store:"
+      }
     }
   },
   "billingEvents": {

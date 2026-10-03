@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import {
   SETUP_GUIDE_ITEMS,
-  whatsappShareUrl,
+  buildStoreShareMessage,
+  resolveDefaultLanguage,
+  waMeShareLink,
+  type WaMeLocale,
   type SetupGuideKey,
   type SetupGuideState,
 } from '@force/shared';
@@ -18,7 +21,18 @@ import { useT } from '@/i18n/useT';
  * shipping zones, ...); only `payment`, `domain` and `share` can be ticked by
  * hand. Hiding the guide persists on the store, not in the browser.
  */
-export function SetupGuideCard({ storeId, storeUrl }: { storeId: string; storeUrl: string }) {
+export function SetupGuideCard({
+  storeId,
+  storeUrl,
+  storeName = '',
+  locale = resolveDefaultLanguage(undefined),
+}: {
+  storeId: string;
+  storeUrl: string;
+  storeName?: string;
+  /** Language of the share text — the store's default language (customers read it). */
+  locale?: WaMeLocale;
+}) {
   const t = useT('onboarding.setupGuide');
   const [guide, setGuide] = useState<SetupGuideState | null>(null);
   const [failed, setFailed] = useState(false);
@@ -155,7 +169,9 @@ export function SetupGuideCard({ storeId, storeUrl }: { storeId: string; storeUr
               <div className="flex shrink-0 items-center gap-2">
                 {item.key === 'share' ? (
                   <a
-                    href={whatsappShareUrl(storeUrl, t('shareText'))}
+                    href={waMeShareLink(
+                      buildStoreShareMessage({ locale, storeName, url: storeUrl })
+                    )}
                     target="_blank"
                     rel="noreferrer"
                     onClick={() => {

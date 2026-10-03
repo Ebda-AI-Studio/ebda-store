@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import type { OrderDetail } from './types';
+import { useMessageCustomerHref } from './useMessageCustomer';
 
 interface CustomerCardProps {
   order: OrderDetail;
@@ -10,13 +11,16 @@ interface CustomerCardProps {
 export function CustomerCard({ order }: CustomerCardProps) {
   const t = useT('orders.detail');
   const customer = order.customer;
+  const phone = customer?.phone || order.shippingAddress?.phone || '';
+  const name = `${customer?.firstName ?? ''} ${customer?.lastName ?? ''}`.trim();
+  // Hook must run before the early returns below.
+  const waHref = useMessageCustomerHref(order, phone, name);
   // Guest orders fall through DeliveryCard's recipient block — rendering
   // them here as well duplicates name/phone/email + the call/WA buttons,
   // which clutters the mobile detail page. Show this card only when the
   // order is linked to a real customer account.
   if (!customer) return null;
 
-  const phone = customer.phone || order.shippingAddress?.phone || '';
   // Hide the synthetic placeholder email created for WhatsApp-initiated
   // customers (User.email is non-nullable in the schema, so the
   // payment-link flow mints `wa-<digits>@placeholder.forcestore.kw`).
@@ -24,13 +28,11 @@ export function CustomerCard({ order }: CustomerCardProps) {
   // real address and there's nothing to send to.
   const rawEmail = customer.email || order.shippingAddress?.email || '';
   const email = rawEmail.endsWith('@placeholder.forcestore.kw') ? '' : rawEmail;
-  const name = `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim();
 
   if (!phone && !email && !name) return null;
 
   const digits = phone.replace(/\D/g, '');
   const callHref = digits ? `tel:${digits}` : null;
-  const waHref = digits ? `https://wa.me/${digits}` : null;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">

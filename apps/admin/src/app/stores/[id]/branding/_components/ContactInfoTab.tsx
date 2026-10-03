@@ -1,5 +1,6 @@
 'use client';
 
+import { hasWaMeNumber, normalizeEgyptianMobile } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import type { StoreBranding } from './types';
 
@@ -13,6 +14,14 @@ interface ContactInfoTabProps {
  */
 export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
   const t = useT('branding.contact');
+  const waValue = branding.whatsapp?.trim() ?? '';
+  const waInvalid = waValue !== '' && normalizeEgyptianMobile(waValue) === null;
+  const waReady = hasWaMeNumber(waValue);
+  const toggles = [
+    ['waMeProductShare', 'waMeProductShare', 'waMeProductShareHint'],
+    ['waMeOrderQuestion', 'waMeOrderQuestion', 'waMeOrderQuestionHint'],
+    ['waMeCodConfirm', 'waMeCodConfirm', 'waMeCodConfirmHint'],
+  ] as const;
 
   return (
     <div className="bg-card rounded-xl border p-6 space-y-6">
@@ -34,10 +43,41 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.whatsapp || ''}
             onChange={e => onChange({ ...branding, whatsapp: e.target.value })}
             placeholder={t('phonePlaceholder')}
+            aria-invalid={waInvalid}
+            dir="ltr"
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
+          <p
+            className={`mt-1 text-xs ${waInvalid ? 'text-destructive-ink' : 'text-muted-foreground'}`}
+            role={waInvalid ? 'alert' : undefined}
+          >
+            {waInvalid ? t('whatsappInvalid') : t('whatsappHint')}
+          </p>
         </div>
       </div>
+
+      <fieldset className="space-y-3 rounded-xl border p-4" data-testid="wa-me-toggles">
+        <legend className="px-1 text-sm font-semibold text-foreground">{t('waMeTitle')}</legend>
+        {!waReady && <p className="text-xs text-muted-foreground">{t('waMeNeedsNumber')}</p>}
+        {toggles.map(([key, label, hint]) => (
+          <label key={key} className="flex cursor-pointer items-center justify-between gap-4">
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-foreground">{t(label)}</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">{t(hint)}</span>
+            </span>
+            <input
+              type="checkbox"
+              disabled={!waReady}
+              checked={waReady && branding.theme[key] !== false}
+              onChange={e =>
+                onChange({ ...branding, theme: { ...branding.theme, [key]: e.target.checked } })
+              }
+              aria-label={t(label)}
+              className="h-5 w-5 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </label>
+        ))}
+      </fieldset>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>

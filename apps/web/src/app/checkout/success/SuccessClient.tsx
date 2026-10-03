@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
+import { WaMeCodConfirmButton } from '../../../templates/shared/WaMeButtons';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
@@ -207,6 +208,10 @@ function SuccessContent() {
                 )}
               </p>
             </div>
+          )}
+
+          {isCod && order && (
+            <WaMeCodConfirmButton order={order} className="mx-auto mt-6 max-w-md" />
           )}
 
           <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm text-left">

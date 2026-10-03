@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@force/ui';
-import { whatsappShareUrl } from '@force/shared';
+import { buildStoreShareMessage, resolveDefaultLanguage, waMeShareLink } from '@force/shared';
 import { apiPost } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import type { OnboardingStore } from './types';
@@ -79,7 +79,13 @@ export function LiveStep({
             {copied ? t('copied') : t('copy')}
           </Button>
           <a
-            href={whatsappShareUrl(live.url, t('whatsappText'))}
+            href={waMeShareLink(
+              buildStoreShareMessage({
+                locale: resolveDefaultLanguage(undefined),
+                storeName: live.name,
+                url: live.url,
+              })
+            )}
             target="_blank"
             rel="noreferrer"
             className="sm:col-span-2"

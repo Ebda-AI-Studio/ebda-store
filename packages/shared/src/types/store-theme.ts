@@ -466,6 +466,14 @@ export interface StoreTheme {
    */
   showBranchesInFooter?: boolean;
   /**
+   * Free-tier WhatsApp (`wa.me` click-to-chat, SP8) toggles. Each is ON unless
+   * explicitly `false`, and every one needs a valid `Store.whatsapp` number —
+   * without one no button renders. Edited in Branding → Contact.
+   */
+  waMeProductShare?: boolean;
+  waMeOrderQuestion?: boolean;
+  waMeCodConfirm?: boolean;
+  /**
    * Issue #1998 (owner, 2026-09-30) — keep the LEGACY sale-badge corner.
    * Unset/false (every store by default): a product card's sale badge whose
    * corner the merchant has NOT chosen is pinned to the image's top corner on

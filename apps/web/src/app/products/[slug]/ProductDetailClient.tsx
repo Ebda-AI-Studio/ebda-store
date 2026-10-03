@@ -34,6 +34,7 @@ import { toTemplateProduct } from '../../../templates/adapters';
 import { ProductCarousel } from '../../../templates/shared/ProductCarousel';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
+import { WaMeProductButton } from '../../../templates/shared/WaMeButtons';
 import { SpecTable } from '../../../templates/shared/SpecTable';
 import { OosImageDim, OutOfStockRibbon } from '../../../templates/shared/ProductCardCta';
 import {
@@ -892,6 +893,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 </div>
               )}
 
+              <WaMeProductButton
+                product={product}
+                priceMinor={displayPrice}
+                className="mt-6 w-full sm:w-auto"
+              />
               <ShareProductRow
                 productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
                 url={typeof window !== 'undefined' ? window.location.href : ''}
