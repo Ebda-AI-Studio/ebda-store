@@ -47,7 +47,6 @@ REPO_ROOT_OVERRIDE="${3:-}"
 # ---------------------------------------------------------------------------
 # Tool checks
 # ---------------------------------------------------------------------------
-command -v gh     >/dev/null || { echo "blast-radius: gh CLI missing" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "blast-radius: python3 missing" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
@@ -109,6 +108,7 @@ _read_lines_into_array() {
 }
 
 if is_pr_number "$PR_REF"; then
+  command -v gh >/dev/null || { echo "blast-radius: gh CLI missing (needed for PR lookup)" >&2; exit 1; }
   PR_NUMBER="$PR_REF"
   PR_LABEL="$REPO_SLUG#$PR_NUMBER"
   _read_lines_into_array CHANGED_FILES \
