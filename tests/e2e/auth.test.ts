@@ -23,12 +23,31 @@ const testUser = {
   lastName: 'User',
 };
 
+// Customers live in a store (the admin namespace is not self-registrable): the flow runs
+// against a fixture store, passed as `storeId` on register and login.
+let fixtureStoreId = '';
+let fixtureOwnerId = '';
 let createdUserId: string | null = null;
 let authToken: string | null = null;
 let refreshToken: string | null = null;
 
 describe('Authentication Flow', () => {
   beforeAll(async () => {
+    const tag = `e2e-auth-${Date.now()}`;
+    const owner = await prisma.user.create({
+      data: {
+        email: `e2e-owner-${tag}@example.com`,
+        passwordHash: 'x',
+        firstName: 'O',
+        lastName: 'W',
+        role: 'store_admin',
+      },
+    });
+    fixtureOwnerId = owner.id;
+    fixtureStoreId = (
+      await prisma.store.create({ data: { name: tag, slug: tag, ownerId: owner.id } })
+    ).id;
+
     // Delete refresh tokens for test users first to avoid FK constraint
     await prisma.refreshToken.deleteMany({
       where: { user: { email: { startsWith: 'test-' } } },
@@ -45,12 +64,16 @@ describe('Authentication Flow', () => {
       await prisma.refreshToken.deleteMany({ where: { userId: createdUserId } }).catch(() => {});
       await prisma.user.delete({ where: { id: createdUserId } }).catch(() => {});
     }
+    await prisma.store.delete({ where: { id: fixtureStoreId } }).catch(() => {});
+    await prisma.user.delete({ where: { id: fixtureOwnerId } }).catch(() => {});
     await prisma.$disconnect();
   });
 
   describe('POST /auth/register', () => {
     it('should register a new user successfully', async () => {
-      const res = await request(app).post('/auth/register').send(testUser);
+      const res = await request(app)
+        .post('/auth/register')
+        .send({ ...testUser, storeId: fixtureStoreId });
 
       // Post T1-4 enumeration hardening: register always returns 200 with
       // { emailVerificationSent: true } regardless of whether the email
@@ -64,7 +87,9 @@ describe('Authentication Flow', () => {
       // Post T1-4: duplicate email returns the same 200 + emailVerificationSent
       // shape as a new registration. A "registration attempt" notice is sent
       // to the rightful owner's inbox instead of leaking a 409.
-      const res = await request(app).post('/auth/register').send(testUser);
+      const res = await request(app)
+        .post('/auth/register')
+        .send({ ...testUser, storeId: fixtureStoreId });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -112,6 +137,7 @@ describe('Authentication Flow', () => {
       const res = await request(app).post('/auth/login').send({
         email: testUser.email,
         password: testUser.password,
+        storeId: fixtureStoreId,
       });
 
       expect(res.status).toBe(200);
