@@ -125,7 +125,7 @@ function abandonedOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
       email: 'sara@example.com',
       phone: '+965 9876 5432',
     },
-    payments: [{ provider: 'tap', paymentUrl: 'https://pay.tap.company/x', status: 'pending' }],
+    payments: [{ provider: 'kashier', paymentUrl: 'https://pay.tap.company/x', status: 'pending' }],
     items: [
       {
         id: 'item-1',
@@ -196,7 +196,7 @@ describe('GET /payment-abandonments — masked contact, never the raw value', ()
 
     expect(res.status).toBe(200);
     const row = res.body.data.abandoners[0];
-    expect(row.gateway).toBe('tap');
+    expect(row.gateway).toBe('kashier');
     expect(row.itemCount).toBe(1);
     expect(row.items).toEqual([
       {

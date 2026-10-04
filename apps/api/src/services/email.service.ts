@@ -468,7 +468,7 @@ export class EmailService {
 
   /**
    * Order Refund Email — sent when a refund is issued (gateway-initiated,
-   * admin "Refund via MyFatoorah", or status-button refund). Always fires
+   * admin "Refund via provider", or status-button refund). Always fires
    * from the order/refunded Inngest fanout AFTER the DB transaction
    * settled, so a Resend outage can't roll the refund back.
    */

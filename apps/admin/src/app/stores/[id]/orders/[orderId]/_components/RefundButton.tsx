@@ -19,7 +19,7 @@ interface RefundButtonProps {
 }
 
 /**
- * Admin-initiated refund via the payment provider (MyFatoorah / Tap / etc.).
+ * Admin-initiated refund via the payment provider (Paymob / Kashier / Fawry).
  * Calls the store-scoped refund endpoint which:
  *   1. hits the provider's refund API
  *   2. flips Payment.status -> refunded and Order.status -> refunded
@@ -70,10 +70,8 @@ export function RefundButton({
         toastError(t('toastFailedTitle'), error?.message ?? '');
         return;
       }
-      // MyFatoorah refunds are queued for their finance team's review,
-      // so "issued" is misleading — the customer's card hasn't moved yet.
-      // Same wording works for Tap/Hesabe/UPayments which are typically
-      // faster but still asynchronous on the provider side.
+      // A gateway may queue or review a refund, so "issued" is misleading —
+      // the customer's card hasn't necessarily moved yet.
       toastSuccess(
         t('toastSuccessBody', {
           amount: minorToDecimalString(data.refundAmount),

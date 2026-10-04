@@ -725,7 +725,7 @@ jobs:
       - name: Run integration tests
         # Also run the colocated regression tests under apps/**/__tests__ — they
         # were never executed by CI before (the unit job globs only tests/unit),
-        # so the regression tests for the MyFatoorah empty-email P0 + the Sentry
+        # so the regression tests for the gateway empty-email P0 + the Sentry
         # 4xx-gate were dead weight. They run HERE (not the unit job) because the
         # shared test setup connects to Postgres + Redis, which only this job has.
         #

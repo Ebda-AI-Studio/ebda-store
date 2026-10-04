@@ -15,7 +15,7 @@ import { sweepAcrossStores } from '../../cross-store';
  * Auto-cancel stale unpaid orders — daily cron (03:00 UTC).
  *
  * Finds orders left status=pending / paymentStatus=unpaid past
- * AUTO_CANCEL_UNPAID_DAYS (default 2 — matches the MyFatoorah payment-link
+ * AUTO_CANCEL_UNPAID_DAYS (default 2 — matches the payment-link
  * 2-day validity, after which the link is dead and the order will never be
  * paid) and cancels them.
  *
@@ -27,7 +27,7 @@ import { sweepAcrossStores } from '../../cross-store';
  * and the merchant's manual "Refresh payment" button. All three can miss the
  * same order at once:
  *
- *   customer pays → webhook is lost (dropped, or — for MyFatoorah — never fires
+ *   customer pays → webhook is lost (dropped, or — for a gateway that never fires
  *   per-invoice because it is configured account-level) AND the customer never
  *   lands back on the success page (closed the tab, dead battery, lost signal)
  *

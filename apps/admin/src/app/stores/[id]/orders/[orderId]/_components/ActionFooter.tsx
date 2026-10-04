@@ -133,7 +133,7 @@ export function ActionFooter({
             )}
           </button>
         )}
-        {/* Payment Link — surface existing MyFatoorah/Tap URL when the
+        {/* Payment Link — surface the existing payment URL when the
             order already has one (WhatsApp-origin orders mint a link
             at creation), otherwise open the issue-new modal. Picks the
             most recent non-paid Payment row with a usable URL. */}
@@ -186,7 +186,7 @@ export function ActionFooter({
           />
         )}
         {/* Refresh refund status — diagnostic. Re-check provider status
-            for an already-submitted refund. MyFatoorah refunds queue
+            for an already-submitted refund. A gateway may queue refunds
             for 1-3 days; this button confirms when the finance team
             has actually executed the refund (so the customer's card
             reflects the credit). Same safety-net pattern as Refresh

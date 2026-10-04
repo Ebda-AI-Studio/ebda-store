@@ -28,6 +28,13 @@ import {
   type WebhookHeaders,
 } from '@api/services/payment-providers/types';
 
+export interface SignedWebhook {
+  rawBody: string;
+  headers: WebhookHeaders;
+}
+
+export type WebhookState = 'pending' | 'paid' | 'failed' | 'expired';
+
 export interface ContractControl {
   /** The customer pays at the provider. */
   capture(providerRef: string): Promise<void> | void;
@@ -35,11 +42,22 @@ export interface ContractControl {
   paymentWebhook(
     providerRef: string,
     opts?: {
-      state?: 'pending' | 'paid' | 'failed' | 'expired';
+      state?: WebhookState;
       amountMinor?: number;
+      /** Forces a DIFFERENT delivery of the same payment (a new event identity). */
       eventId?: string;
     }
-  ): { rawBody: string; headers: WebhookHeaders };
+  ): SignedWebhook;
+  /** Which `state`s the provider can report besides `paid` (the status-mapping test covers these). */
+  webhookStates: ReadonlyArray<Exclude<WebhookState, 'paid'>>;
+  /** The same delivery with a WRONG signature (wherever this provider carries it). */
+  badSignature(w: SignedWebhook): SignedWebhook;
+  /** The same delivery with the signature REMOVED. */
+  noSignature(w: SignedWebhook): SignedWebhook;
+  /** The delivery with the signed amount changed to `amountMinor`, the ORIGINAL signature kept. */
+  tamperAmount(w: SignedWebhook, amountMinor: number): SignedWebhook;
+  /** A paid delivery rewritten as failed, the ORIGINAL signature kept. */
+  tamperStatus(w: SignedWebhook): SignedWebhook;
   /** The next provider call misbehaves. */
   injectNextCall(fault: 'timeout' | 'unavailable' | 'rejected'): void;
   /** How many payments the provider side holds (the "no state change" probe). */
@@ -225,19 +243,17 @@ export function runPaymentProviderContract(label: string, make: () => ContractTa
 
         it('refuses a bad signature', async () => {
           const created = await t.provider.createPayment(baseRequest(), t.creds);
-          const { rawBody } = ctl().paymentWebhook(created.providerRef);
-          const err = thrownSync(() =>
-            t.provider.verifyWebhook(rawBody, { 'x-stub-signature': 'deadbeef' }, t.creds)
-          );
+          const w = ctl().badSignature(ctl().paymentWebhook(created.providerRef));
+          const err = thrownSync(() => t.provider.verifyWebhook(w.rawBody, w.headers, t.creds));
           expect(err.code).toBe('WEBHOOK_BAD_SIGNATURE');
         });
 
         it('refuses a missing signature', async () => {
           const created = await t.provider.createPayment(baseRequest(), t.creds);
-          const { rawBody } = ctl().paymentWebhook(created.providerRef);
-          expect(thrownSync(() => t.provider.verifyWebhook(rawBody, {}, t.creds)).code).toBe(
-            'WEBHOOK_BAD_SIGNATURE'
-          );
+          const w = ctl().noSignature(ctl().paymentWebhook(created.providerRef));
+          expect(
+            thrownSync(() => t.provider.verifyWebhook(w.rawBody, w.headers, t.creds)).code
+          ).toBe('WEBHOOK_BAD_SIGNATURE');
         });
 
         it('refuses a body signed with another merchant secret', async () => {
@@ -258,18 +274,21 @@ export function runPaymentProviderContract(label: string, make: () => ContractTa
             t.creds
           );
           await ctl().capture(created.providerRef);
-          const { rawBody, headers } = ctl().paymentWebhook(created.providerRef);
+          const original = ctl().paymentWebhook(created.providerRef);
           // Swap the amount for a cheaper one, keep the old signature.
-          const tampered = rawBody.replace('"amount":"500.00"', '"amount":"5.00"');
-          expect(tampered).not.toBe(rawBody);
-          expect(thrownSync(() => t.provider.verifyWebhook(tampered, headers, t.creds)).code).toBe(
-            'WEBHOOK_BAD_SIGNATURE'
-          );
+          const tampered = ctl().tamperAmount(original, 500);
+          expect(tampered.rawBody).not.toBe(original.rawBody);
+          expect(
+            thrownSync(() => t.provider.verifyWebhook(tampered.rawBody, tampered.headers, t.creds))
+              .code
+          ).toBe('WEBHOOK_BAD_SIGNATURE');
           // ... and a re-signed-by-nobody status flip.
-          const flipped = rawBody.replace('"state":"paid"', '"state":"failed"');
-          expect(thrownSync(() => t.provider.verifyWebhook(flipped, headers, t.creds)).code).toBe(
-            'WEBHOOK_BAD_SIGNATURE'
-          );
+          const flipped = ctl().tamperStatus(original);
+          expect(flipped.rawBody).not.toBe(original.rawBody);
+          expect(
+            thrownSync(() => t.provider.verifyWebhook(flipped.rawBody, flipped.headers, t.creds))
+              .code
+          ).toBe('WEBHOOK_BAD_SIGNATURE');
         });
 
         it('a replayed delivery verifies to the IDENTICAL event id, so the inbox dedupes it to a no-op', async () => {
@@ -280,7 +299,7 @@ export function runPaymentProviderContract(label: string, make: () => ContractTa
           const replay = t.provider.verifyWebhook(rawBody, headers, t.creds);
           expect(replay).toEqual(first);
           // Distinct events never share an id (else the inbox would drop a real one).
-          const other = ctl().paymentWebhook(created.providerRef);
+          const other = ctl().paymentWebhook(created.providerRef, { eventId: 'another-delivery' });
           expect(t.provider.verifyWebhook(other.rawBody, other.headers, t.creds).eventId).not.toBe(
             first.eventId
           );
@@ -288,12 +307,13 @@ export function runPaymentProviderContract(label: string, make: () => ContractTa
 
         it('maps provider states to PaymentStatus', async () => {
           const created = await t.provider.createPayment(baseRequest(), t.creds);
-          const states: Array<['pending' | 'failed' | 'expired', PaymentStatus]> = [
-            ['pending', 'pending'],
-            ['failed', 'failed'],
-            ['expired', 'expired'],
-          ];
-          for (const [state, expected] of states) {
+          const expectedByState: Record<string, PaymentStatus> = {
+            pending: 'pending',
+            failed: 'failed',
+            expired: 'expired',
+          };
+          for (const state of ctl().webhookStates) {
+            const expected = expectedByState[state];
             const { rawBody, headers } = ctl().paymentWebhook(created.providerRef, { state });
             const ev = t.provider.verifyWebhook(rawBody, headers, t.creds);
             expect(ev.kind === 'payment' && ev.status).toBe(expected);

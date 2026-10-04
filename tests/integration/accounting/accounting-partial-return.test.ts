@@ -123,7 +123,7 @@ async function seedOrder(tag: string, overrides?: { discount?: number; tax?: num
       payments: {
         create: [
           {
-            provider: 'myfatoorah',
+            provider: 'paymob',
             status: 'completed',
             amount: 9000 - discount + tax + 500,
             paidAt: new Date(),
@@ -285,7 +285,7 @@ describe.skipIf(!hasDb)('partial-return pro-rata GL adjustment', () => {
     // Revenue/cash adjustment entry:
     //   returned gross = 2000; discount share = floor(1000×2000/9000) = 222
     //   tax share      = floor(900×2000/9000) = 200
-    //   DR revenue 1778, DR tax 200, CR cash 1978 (myfatoorah → 1000 Cash Online)
+    //   DR revenue 1778, DR tax 200, CR cash 1978 (paymob → 1000 Cash Online)
     const adj = await prisma.journalEntry.findFirst({
       where: { storeId, source: 'order', sourceId: `${order.id}:partial:${refundKey}` },
       include: { lines: true },

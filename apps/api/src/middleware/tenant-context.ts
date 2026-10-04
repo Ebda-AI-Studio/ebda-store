@@ -226,6 +226,22 @@ export function aiRouteContext(req: Request, res: Response, next: NextFunction):
 }
 
 /**
+ * The orders router's context, chosen PER REQUEST (SP6b): everything stays on ONE request
+ * transaction except `POST /:orderId/payment-link`, which calls a payment gateway. That one
+ * runs under store scope, so the gateway call holds no transaction and no pooled connection:
+ * short read, call, then a short transaction to record the payment.
+ */
+const PAYMENT_LINK_PATH = /^\/[^/]+\/payment-link\/?$/;
+
+export function orderRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (req.method === 'POST' && PAYMENT_LINK_PATH.test(req.path)) {
+    storeScopeContext(req, res, next);
+    return;
+  }
+  tenantContext(req, res, next);
+}
+
+/**
  * Merchant billing router context (SP5 task 3): reads (GET/HEAD) share ONE
  * request transaction; writes (checkout, change-plan, cancel, resume) call the
  * payment gateway, so they run under a store scope instead — the billing

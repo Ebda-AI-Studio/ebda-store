@@ -176,7 +176,7 @@ type PaymentWebhookReceivedEvent = EventPayload & {
   data: {
     /// PK of the WebhookEvent inbox row persisted by the route before send.
     webhookEventId: string;
-    /// 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'
+    /// 'paymob' | 'kashier' | 'fawry'
     provider: string;
     /// Idempotency key (also the inbox row's unique key) for log correlation.
     idempotencyKey: string;

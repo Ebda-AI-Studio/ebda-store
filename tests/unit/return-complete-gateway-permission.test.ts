@@ -1,7 +1,7 @@
 /**
  * Issue 2024 — `POST /stores/:storeId/returns/admin/:id/complete` gated only
  * on `returns:write`, which staff hold, while a gateway refund method reaches
- * `PaymentService.refund` — a real, irreversible Tap/MyFatoorah/KNET refund.
+ * `PaymentService.refund` — a real, irreversible the gateway refund.
  * Staff deliberately lack `orders:refund` (rbac.ts), so a gateway completion
  * now also requires it; non-gateway methods (store credit, bank transfer,
  * cash, manual) record money only and stay open to `returns:write`. The

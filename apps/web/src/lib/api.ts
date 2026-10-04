@@ -1256,11 +1256,10 @@ class ApiClient {
   /**
    * Verify-on-return: ask the API to re-check this order's payment with the
    * provider and reconcile our DB. The reliable primary confirmation path
-   * (MyFatoorah's portal webhook is account-level and doesn't fire per
-   * invoice). Idempotent + guest-safe — see the API route for the authz
-   * model. `paymentId` is the identifier MyFatoorah appends to the success
-   * URL on return (audit-only; authorization rides on the order UUID +
-   * the provider's own status answer).
+   * (a gateway's webhook can be late or lost). Idempotent + guest-safe — see
+   * the API route for the authz model. `paymentId` is an identifier a gateway
+   * may append to the success URL on return (audit-only; authorization rides
+   * on the order UUID + the provider's own status answer).
    */
   async verifyOrderPayment(orderId: string, paymentId?: string) {
     return this.request<{

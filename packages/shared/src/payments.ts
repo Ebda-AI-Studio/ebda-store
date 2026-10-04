@@ -105,3 +105,69 @@ export const codSettingsSchema = z.object({
   percentBps: z.number().int().min(0).max(5000).default(0),
 });
 export type CodSettings = z.infer<typeof codSettingsSchema>;
+
+// ---------------------------------------------------------------------------
+// Egyptian gateways (SP6b). Per-merchant, per-store. The SECRETS of each gateway
+// are in the encrypted `payment_configs` columns (api_key / secret_key /
+// merchant_id / webhook_secret); only the NON-secret parts live in `settings`:
+//
+//   Paymob   api_key = Secret key (Intention API `Token`), webhook_secret = HMAC
+//            secret; settings = public key + the integration id of each method.
+//   Kashier  merchant_id = MID, api_key = Payment API key (also signs webhooks),
+//            secret_key = Secret key; settings = allowed methods, page language.
+//   Fawry    merchant_id = merchant code, api_key = secure key (signs requests and
+//            webhooks); settings = enabled methods, reference-code lifetime.
+// ---------------------------------------------------------------------------
+
+/** Customer-facing methods a Paymob integration id can enable. */
+export const PAYMOB_METHODS = ['card', 'meeza', 'wallet', 'valu'] as const;
+export type PaymobMethod = (typeof PAYMOB_METHODS)[number];
+
+const integrationId = z.number().int().positive().max(2_147_483_647);
+
+export const paymobSettingsBaseSchema = z.object({
+  /** Public key of the Paymob account (shown in the checkout URL, not a secret). */
+  publicKey: z.string().trim().min(8).max(200).optional(),
+  /** Integration id per method (Paymob dashboard -> Payment Integrations). A method with no id is not offered. */
+  integrationIds: z
+    .object({
+      card: integrationId.optional(),
+      meeza: integrationId.optional(),
+      wallet: integrationId.optional(),
+      valu: integrationId.optional(),
+    })
+    .default({}),
+});
+export const paymobSettingsSchema = paymobSettingsBaseSchema.refine(
+  v => Boolean(v.publicKey) && Object.values(v.integrationIds).some(id => id !== undefined),
+  { message: 'Provide the Paymob public key and at least one integration id', path: ['publicKey'] }
+);
+export type PaymobSettings = z.infer<typeof paymobSettingsBaseSchema>;
+
+export const KASHIER_METHODS = ['card', 'wallet'] as const;
+export const kashierSettingsSchema = z.object({
+  /** Which methods the hosted page offers; default both. */
+  methods: z
+    .array(z.enum(KASHIER_METHODS))
+    .min(1)
+    .default([...KASHIER_METHODS]),
+  /** Language of the hosted payment page. */
+  display: z.enum(['en', 'ar']).default('ar'),
+});
+export type KashierSettings = z.infer<typeof kashierSettingsSchema>;
+
+export const FAWRY_METHODS = ['payatfawry', 'card'] as const;
+export const FAWRY_DEFAULT_EXPIRY_HOURS = 72;
+export const fawrySettingsSchema = z.object({
+  methods: z
+    .array(z.enum(FAWRY_METHODS))
+    .min(1)
+    .default([...FAWRY_METHODS]),
+  /** How long the reference code stays payable at a Fawry outlet. */
+  expiryHours: z.number().int().min(1).max(720).default(FAWRY_DEFAULT_EXPIRY_HOURS),
+});
+export type FawrySettings = z.infer<typeof fawrySettingsSchema>;
+
+/** The Egyptian gateway adapters (online payment providers). */
+export const EGYPT_GATEWAY_PROVIDERS = ['paymob', 'kashier', 'fawry'] as const;
+export type EgyptGatewayProvider = (typeof EGYPT_GATEWAY_PROVIDERS)[number];

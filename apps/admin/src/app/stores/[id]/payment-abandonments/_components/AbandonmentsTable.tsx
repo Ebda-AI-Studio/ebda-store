@@ -21,11 +21,9 @@ function formatDate(iso: string): string {
 function gatewayLabel(provider: string | null): string {
   if (!provider) return '—';
   const map: Record<string, string> = {
-    tap: 'Tap',
-    myfatoorah: 'MyFatoorah',
-    hesabe: 'Hesabe',
-    upayments: 'UPayments',
-    stripe: 'Stripe',
+    paymob: 'Paymob',
+    kashier: 'Kashier',
+    fawry: 'Fawry',
   };
   return map[provider.toLowerCase()] ?? provider;
 }

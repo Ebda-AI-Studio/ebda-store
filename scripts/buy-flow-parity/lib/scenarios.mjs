@@ -8,7 +8,7 @@
  * reported as SKIPPED, never as PASS.
  */
 import crypto from 'node:crypto';
-import { MF_WEBHOOK_SECRET, OWNER_EMAIL, OWNER_PASSWORD } from './fixture.mjs';
+import { PM_HMAC_SECRET, OWNER_EMAIL, OWNER_PASSWORD } from './fixture.mjs';
 
 const CUSTOMER_PASSWORD = 'BfpCustomer!Parity2026';
 
@@ -54,11 +54,21 @@ async function add(shopper, step, productId, quantity = 1, variantId) {
 async function checkout(
   ctx,
   shopper,
-  { provider, address = ADDRESS_NASR_CITY, couponCode, orderExtra = {} }
+  {
+    provider,
+    address = ADDRESS_NASR_CITY,
+    couponCode,
+    orderExtra = {},
+    // The status /payments/create must answer. A payment endpoint that 404s (a route that is
+    // gone, or a read RLS hides from the app role) is never an expected outcome: the run is an
+    // ERROR, so a scenario cannot PASS merely because both sides were equally broken.
+    createPaymentStatus = [200],
+  }
 ) {
   const cartRes = await shopper.call('checkout.cart', 'GET', '/public/cart');
   const cart = cartRes.body?.data?.cart;
   await shopper.call('checkout.payments-config', 'GET', '/payments/config');
+  ctx.expect('checkout.payments-config', [200]);
   if (cart) {
     await shopper.call(
       'checkout.shipping-quote',
@@ -102,37 +112,90 @@ async function checkout(
     successUrl: `/checkout/success?orderId=${order.id}`,
     errorUrl: `/checkout/error?orderId=${order.id}`,
   });
+  ctx.expect('checkout.create-payment', createPaymentStatus);
   return { orderRes, order, paymentRes };
 }
 
 /** Customer returns from the gateway: success page verify-on-return + order read. */
 async function returnFromGateway(ctx, shopper, orderId, { paid }) {
-  const invoiceId = ctx.stub.lastInvoiceId();
-  ctx.stub.setInvoiceStatus(invoiceId, paid ? 'Paid' : 'Failed');
+  const gatewayOrderId = ctx.stub.lastOrderId();
+  ctx.stub.setPaymentStatus(gatewayOrderId, paid ? 'Paid' : 'Failed');
   await shopper.call('return.verify-payment', 'POST', `/public/orders/${orderId}/verify-payment`, {
-    paymentId: `PAY-${invoiceId}`,
+    paymentId: `PAY-${gatewayOrderId}`,
   });
+  ctx.expect('return.verify-payment', [200]);
   await ctx.settle();
   await shopper.call('return.get-order', 'GET', `/public/orders/${orderId}`);
 }
 
-/** Gateway → API webhook, signed exactly as PaymentService verifies it. */
-async function webhook(ctx, step, { invoiceId, status, value, secret = MF_WEBHOOK_SECRET }) {
-  const raw = JSON.stringify({
-    Event: 'TransactionsStatusChanged',
-    EventType: 1,
-    Data: {
-      InvoiceId: invoiceId,
-      InvoiceStatus: status,
-      InvoiceValue: value,
-      Currency: 'EGP',
-      PaymentMethod: 'VISA/MASTER',
-    },
-  });
-  const sig = crypto.createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
-  const r = await ctx.gateway.call(step, 'POST', '/webhooks/payment/myfatoorah', raw, {
-    'x-myfatoorah-signature': sig,
-  });
+/**
+ * Gateway → API webhook: Paymob's "transaction processed" callback, signed exactly as the adapter
+ * verifies it (HMAC-SHA512 over the 20 documented fields, in the `hmac` QUERY parameter).
+ */
+const HMAC_FIELDS = [
+  'amount_cents',
+  'created_at',
+  'currency',
+  'error_occured',
+  'has_parent_transaction',
+  'id',
+  'integration_id',
+  'is_3d_secure',
+  'is_auth',
+  'is_capture',
+  'is_refunded',
+  'is_standalone_payment',
+  'is_voided',
+  'order.id',
+  'owner',
+  'pending',
+  'source_data.pan',
+  'source_data.sub_type',
+  'source_data.type',
+  'success',
+];
+function pmHmac(obj, secret) {
+  const pick = path => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  const text = v =>
+    v === undefined || v === null ? '' : typeof v === 'boolean' ? String(v) : String(v);
+  return crypto
+    .createHmac('sha512', secret)
+    .update(HMAC_FIELDS.map(f => text(pick(f))).join(''), 'utf8')
+    .digest('hex');
+}
+
+async function webhook(ctx, step, { orderId, success, amount, secret = PM_HMAC_SECRET }) {
+  // The transaction the callback is about: the one the stub holds for this order when it has one,
+  // otherwise a fresh id from the scenario's range.
+  const order = ctx.stub.state.orders.get(String(orderId));
+  const txn = order?.txnId ? ctx.stub.state.txns.get(order.txnId) : null;
+  const obj = {
+    id: txn?.id ?? ctx.stub.state.nextTxn++,
+    pending: false,
+    amount_cents: amount,
+    success,
+    is_auth: false,
+    is_capture: false,
+    is_standalone_payment: true,
+    is_voided: false,
+    is_refunded: false,
+    is_3d_secure: true,
+    integration_id: 11,
+    has_parent_transaction: false,
+    error_occured: !success,
+    owner: 1234,
+    currency: 'EGP',
+    created_at: '2026-10-04T10:00:00.000000',
+    order: { id: Number(orderId), merchant_order_id: order?.merchantRef ?? '' },
+    source_data: { pan: '2346', sub_type: 'MasterCard', type: 'card' },
+  };
+  const raw = JSON.stringify({ type: 'TRANSACTION', obj });
+  const r = await ctx.gateway.call(
+    step,
+    'POST',
+    `/webhooks/payment/paymob?hmac=${pmHmac(obj, secret)}`,
+    raw
+  );
   await ctx.settle();
   return r;
 }
@@ -159,31 +222,31 @@ async function adminLogin(ctx) {
 
 export const SCENARIOS = [
   {
-    id: 'guest-mf-single-verify-paid',
+    id: 'guest-pm-single-verify-paid',
     title:
-      'Guest, 1 simple item, per-area shipping, MyFatoorah invoice → return → verify-on-return Paid',
+      'Guest, 1 simple item, per-area shipping, Paymob payment → return → verify-on-return Paid',
     fixture: { products: { tee: { price: 7500, inventory: 10 } } },
     async run(ctx) {
       const s = ctx.shopper('guest-1');
       await add(s, 'cart.add', ctx.p('tee'));
-      const { order } = await checkout(ctx, s, { provider: 'myfatoorah' });
+      const { order } = await checkout(ctx, s, { provider: 'paymob' });
       if (order) await returnFromGateway(ctx, s, order.id, { paid: true });
     },
   },
   {
-    id: 'guest-mf-multiqty-webhook-paid',
-    title: 'Guest, multi-qty, MyFatoorah → signed webhook Paid (+ duplicate replay)',
+    id: 'guest-pm-multiqty-webhook-paid',
+    title: 'Guest, multi-qty, Paymob → signed webhook Paid (+ duplicate replay)',
     fixture: { products: { mug: { price: 3250, inventory: 10 } } },
     async run(ctx) {
       const s = ctx.shopper('guest-2');
       await add(s, 'cart.add', ctx.p('mug'), 3);
-      const { order } = await checkout(ctx, s, { provider: 'myfatoorah' });
+      const { order } = await checkout(ctx, s, { provider: 'paymob' });
       if (!order) return;
-      const invoiceId = ctx.stub.lastInvoiceId();
-      ctx.stub.setInvoiceStatus(invoiceId, 'Paid');
-      const value = ctx.stub.state.invoices.get(String(invoiceId))?.value;
-      await webhook(ctx, 'gateway.webhook-paid', { invoiceId, status: 'Paid', value });
-      await webhook(ctx, 'gateway.webhook-paid-duplicate', { invoiceId, status: 'Paid', value });
+      const orderId = ctx.stub.lastOrderId();
+      ctx.stub.setPaymentStatus(orderId, 'Paid');
+      const amount = ctx.stub.state.orders.get(String(orderId)).amount;
+      await webhook(ctx, 'gateway.webhook-paid', { orderId, success: true, amount });
+      await webhook(ctx, 'gateway.webhook-paid-duplicate', { orderId, success: true, amount });
       await s.call('return.get-order', 'GET', `/public/orders/${order.id}`);
     },
   },
@@ -195,14 +258,14 @@ export const SCENARIOS = [
     async run(ctx) {
       const s = ctx.shopper('guest-forged');
       await add(s, 'cart.add', ctx.p('ring'));
-      const { order } = await checkout(ctx, s, { provider: 'myfatoorah' });
+      const { order } = await checkout(ctx, s, { provider: 'paymob' });
       if (!order) return;
-      const invoiceId = ctx.stub.lastInvoiceId();
-      const value = ctx.stub.state.invoices.get(String(invoiceId))?.value;
+      const orderId = ctx.stub.lastOrderId();
+      const amount = ctx.stub.state.orders.get(String(orderId)).amount;
       await webhook(ctx, 'attacker.webhook-forged-paid', {
-        invoiceId,
-        status: 'Paid',
-        value,
+        orderId,
+        success: true,
+        amount,
         secret: 'not-the-secret',
       });
       await s.call('after-forgery.get-order', 'GET', `/public/orders/${order.id}`);
@@ -210,9 +273,9 @@ export const SCENARIOS = [
     },
   },
   {
-    id: 'customer-mf-variant-pct-coupon',
+    id: 'customer-pm-variant-pct-coupon',
     title:
-      'Signed-in customer, variant product + simple item, percentage coupon, MyFatoorah → verify Paid',
+      'Signed-in customer, variant product + simple item, percentage coupon, Paymob → verify Paid',
     fixture: {
       products: {
         shoe: {
@@ -229,7 +292,7 @@ export const SCENARIOS = [
       await add(s, 'cart.add-variant', ctx.p('shoe'), 2, ctx.v('shoe:L'));
       await add(s, 'cart.add-simple', ctx.p('sock'), 1);
       const { order } = await checkout(ctx, s, {
-        provider: 'myfatoorah',
+        provider: 'paymob',
         couponCode: ctx.c('PCT10'),
       });
       if (order) await returnFromGateway(ctx, s, order.id, { paid: true });
@@ -274,8 +337,8 @@ export const SCENARIOS = [
     },
   },
   {
-    id: 'vat-store-mf-pct-coupon',
-    title: 'Store with VAT 14% on, percentage coupon, MyFatoorah → verify Paid',
+    id: 'vat-store-pm-pct-coupon',
+    title: 'Store with VAT 14% on, percentage coupon, Paymob → verify Paid',
     store: 'vat',
     fixture: {
       products: { box: { price: 12345, inventory: 10 } },
@@ -285,15 +348,15 @@ export const SCENARIOS = [
       const s = ctx.shopper('guest-6', 'vat');
       await add(s, 'cart.add', ctx.p('box'), 2);
       const { order } = await checkout(ctx, s, {
-        provider: 'myfatoorah',
+        provider: 'paymob',
         couponCode: ctx.c('PCT15'),
       });
       if (order) await returnFromGateway(ctx, s, order.id, { paid: true });
     },
   },
   {
-    id: 'mf-create-fails-rollback',
-    title: 'MyFatoorah invoice creation fails → order rolled back (stock + coupon returned)',
+    id: 'pm-create-fails-rollback',
+    title: 'Paymob intention creation fails → order rolled back (stock + coupon returned)',
     fixture: {
       products: { pen: { price: 900, inventory: 5 } },
       coupons: { PCT20: { type: 'percentage', value: 20, usageLimit: 5 } },
@@ -301,30 +364,32 @@ export const SCENARIOS = [
     async run(ctx) {
       const s = ctx.shopper('guest-7');
       await add(s, 'cart.add', ctx.p('pen'), 4);
-      ctx.stub.state.failSendPayment = true;
+      ctx.stub.state.failIntention = true;
       const { order } = await checkout(ctx, s, {
-        provider: 'myfatoorah',
+        provider: 'paymob',
         couponCode: ctx.c('PCT20'),
+        // The gateway refused the intention: the API answers 502 (rejected) / 503 (unavailable), never a 404.
+        createPaymentStatus: [502, 503],
       });
-      ctx.stub.state.failSendPayment = false;
+      ctx.stub.state.failIntention = false;
       await ctx.settle();
       if (order) await s.call('after.get-cart', 'GET', '/public/cart');
     },
   },
   {
-    id: 'mf-payment-failed',
+    id: 'pm-payment-failed',
     title:
-      'MyFatoorah invoice → customer returns with a FAILED payment (verify-on-return) → then signed webhook Failed',
+      'Paymob payment → customer returns with a FAILED payment (verify-on-return) → then signed webhook Failed',
     fixture: { products: { bag: { price: 15000, inventory: 4 } } },
     async run(ctx) {
       const s = ctx.shopper('guest-8');
       await add(s, 'cart.add', ctx.p('bag'));
-      const { order } = await checkout(ctx, s, { provider: 'myfatoorah' });
+      const { order } = await checkout(ctx, s, { provider: 'paymob' });
       if (!order) return;
       await returnFromGateway(ctx, s, order.id, { paid: false });
-      const invoiceId = ctx.stub.lastInvoiceId();
-      const value = ctx.stub.state.invoices.get(String(invoiceId))?.value;
-      await webhook(ctx, 'gateway.webhook-failed', { invoiceId, status: 'Failed', value });
+      const orderId = ctx.stub.lastOrderId();
+      const amount = ctx.stub.state.orders.get(String(orderId)).amount;
+      await webhook(ctx, 'gateway.webhook-failed', { orderId, success: false, amount });
       await s.call('after.get-order', 'GET', `/public/orders/${order.id}`);
     },
   },
@@ -363,7 +428,7 @@ export const SCENARIOS = [
         orderTotal: 999999,
       });
       const { order } = await checkout(ctx, s, {
-        provider: 'myfatoorah',
+        provider: 'paymob',
         couponCode: ctx.c('FIX5'),
         orderExtra: {
           subtotal: 1,
@@ -378,8 +443,8 @@ export const SCENARIOS = [
     },
   },
   {
-    id: 'bundle-checkout-mf',
-    title: 'Bundle (fixed-price box) checkout, MyFatoorah → verify Paid',
+    id: 'bundle-checkout-pm',
+    title: 'Bundle (fixed-price box) checkout, Paymob → verify Paid',
     fixture: {
       products: { soap: { price: 2500, inventory: 10 }, towel: { price: 6500, inventory: 10 } },
       bundles: {
@@ -400,7 +465,7 @@ export const SCENARIOS = [
         quantity: 2,
       });
       await add(s, 'cart.add-loose', ctx.p('soap'), 1);
-      const { order } = await checkout(ctx, s, { provider: 'myfatoorah' });
+      const { order } = await checkout(ctx, s, { provider: 'paymob' });
       if (order) await returnFromGateway(ctx, s, order.id, { paid: true });
     },
   },
@@ -425,12 +490,12 @@ export const SCENARIOS = [
   },
   {
     id: 'paid-refund-via-provider',
-    title: 'Paid MyFatoorah order → admin full refund via provider → refund pending',
+    title: 'Paid Paymob order → admin full refund via provider → refund pending',
     fixture: { products: { desk: { price: 30000, inventory: 3 } } },
     async run(ctx) {
       const s = ctx.shopper('guest-13');
       await add(s, 'cart.add', ctx.p('desk'));
-      const { order } = await checkout(ctx, s, { provider: 'myfatoorah' });
+      const { order } = await checkout(ctx, s, { provider: 'paymob' });
       if (!order) return;
       await returnFromGateway(ctx, s, order.id, { paid: true });
       const admin = await adminLogin(ctx);
@@ -448,12 +513,12 @@ export const SCENARIOS = [
   },
   {
     id: 'paid-cancel-then-refund',
-    title: 'Paid MyFatoorah order → admin cancels → admin refunds via provider',
+    title: 'Paid Paymob order → admin cancels → admin refunds via provider',
     fixture: { products: { chair: { price: 18000, inventory: 3 } } },
     async run(ctx) {
       const s = ctx.shopper('guest-14');
       await add(s, 'cart.add', ctx.p('chair'));
-      const { order } = await checkout(ctx, s, { provider: 'myfatoorah' });
+      const { order } = await checkout(ctx, s, { provider: 'paymob' });
       if (!order) return;
       await returnFromGateway(ctx, s, order.id, { paid: true });
       const admin = await adminLogin(ctx);

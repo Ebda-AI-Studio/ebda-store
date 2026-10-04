@@ -1,11 +1,15 @@
 /**
  * Registry of v2 provider adapters. The factory (`payment.factory.ts`) stays the
  * one place that resolves a provider for a store; v2 adapters register here and
- * the factory asks this registry first. COD and InstaPay (no network) are built
- * in; 6b registers Paymob / Kashier / Fawry the same way.
+ * the factory builds each online provider from this registry (through the v1
+ * bridge, `v2-bridge.ts`). COD and InstaPay (no network) are built in, and so are the
+ * three Egyptian gateways: Paymob, Kashier, Fawry.
  */
 import { codProvider } from './cod.provider';
+import { fawryProvider } from './fawry.provider';
 import { instapayProvider } from './instapay.provider';
+import { kashierProvider } from './kashier.provider';
+import { paymobProvider } from './paymob.provider';
 import type { PaymentProvider, PaymentProviderV2 } from './types';
 
 const adapters = new Map<PaymentProvider, PaymentProviderV2>();
@@ -27,3 +31,6 @@ export const MANUAL_PROVIDERS: ReadonlySet<string> = new Set(['cod', 'instapay']
 
 registerProviderV2(codProvider);
 registerProviderV2(instapayProvider);
+registerProviderV2(paymobProvider);
+registerProviderV2(kashierProvider);
+registerProviderV2(fawryProvider);

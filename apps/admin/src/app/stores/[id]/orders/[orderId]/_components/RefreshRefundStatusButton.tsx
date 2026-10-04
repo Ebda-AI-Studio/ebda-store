@@ -15,13 +15,13 @@ interface RefreshRefundStatusButtonProps {
 
 /**
  * Manual sync of refund status with the provider. Use after submitting
- * a refund via "Refund via provider" — MyFatoorah refunds aren't
- * instant (their finance team executes them in 1-3 business days), so
+ * a refund via "Refund via provider" — a gateway may not execute
+ * a refund instantly (some review it first, for 1-3 business days), so
  * this button asks "is the refund actually settled at the card network?"
  * without waiting for the webhook.
  *
  * Acts as the safety-net counterpart to the automatic webhook. The
- * webhook still fires when MyFatoorah executes the refund — this is
+ * webhook still fires when the gateway executes the refund — this is
  * here for the case where the webhook didn't arrive or the merchant
  * wants to confirm before notifying the customer.
  */

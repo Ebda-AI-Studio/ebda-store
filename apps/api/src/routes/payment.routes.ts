@@ -10,7 +10,7 @@ import { prisma, runInTenantContext, withStore } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
 import { getAuthUser, resolvePublicStoreId } from '../utils/store-helpers';
-import { getOrderStoreId } from '../lib/definer';
+import { getOrderStoreId, getPaymentStoreId, resolvePaymentEventsStore } from '../lib/definer';
 import { OrderService } from '../services/order.service';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import logger from '../lib/logger';
@@ -25,6 +25,7 @@ import { AppError } from '../middleware/error-handler';
 import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';
 import { computeCodCharge, codProvider } from '../services/payment-providers/cod.provider';
 import { isProviderAvailable } from '../services/payment-providers/provider-health';
+import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
 const router = Router();
 
@@ -53,7 +54,12 @@ function platformUrlOrRelative(url: string): boolean {
 
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
-  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod', 'instapay']).optional(),
+  provider: z.enum(['cod', 'instapay', 'paymob', 'kashier', 'fawry']).optional(),
+  /**
+   * Which of the provider's methods the customer picked (Fawry: reference code or card;
+   * Paymob: one integration). Absent = the provider's own page offers them all.
+   */
+  method: z.enum(['card', 'meeza', 'wallet', 'valu', 'payatfawry']).optional(),
   // Accept relative paths (preferred — server absolutifies against the order's
   // store domain) OR absolute URLs on the platform origin. We do NOT chain
   // `.url()` because that rejects relative paths; the refinement handles both
@@ -120,11 +126,25 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
 async function loadCheckoutPaymentConfig(storeId: string | undefined) {
   const allProviders = await PaymentService.getAvailableProviders(storeId);
   const unavailable: string[] = [];
+  // Which of each gateway's methods this merchant turned on (Paymob integration ids, Fawry
+  // reference code / card, Kashier card / wallet): the storefront labels the choices from it.
+  const methodsByProvider: Record<
+    string,
+    Array<{ code: string; name: string; nameAr: string }>
+  > = {};
   const providers = allProviders.filter(p => {
     const ok = !storeId || isProviderAvailable(storeId, p);
     if (!ok) unavailable.push(p);
     return ok;
   });
+  for (const p of providers) {
+    const settings = await PaymentService.getProviderSettings(p, storeId);
+    methodsByProvider[p] = enabledMethods(p, settings).map(code => ({
+      code,
+      name: METHOD_LABELS[code]?.name ?? code,
+      nameAr: METHOD_LABELS[code]?.nameAr ?? code,
+    }));
+  }
 
   // Check if COD is enabled for this store (or globally)
   let codConfig: { fixedFee: number; displayName: string; displayNameAr: string | null } | null =
@@ -179,14 +199,16 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
 
   return {
     providers,
+    /** Per online provider, the methods the merchant enabled. */
+    methods: methodsByProvider,
     cod: codConfig,
     instapay: instapayConfig,
     /** Methods that are configured but down right now (open circuit); they come back by themselves. */
     unavailable,
     defaultProvider,
     defaultCurrency: config.defaultCurrency,
-    supportedCurrencies: ['EGP', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
-    supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'google_pay', 'samsung_pay'],
+    supportedCurrencies: ['EGP'],
+    supportedMethods: ['card', 'meeza', 'wallet', 'valu', 'payatfawry', 'instapay', 'cod'],
     testMode: config.paymentTestMode,
   };
 }
@@ -344,14 +366,21 @@ router.post(
           });
           return;
         }
-        if (existingPayment.provider === data.provider && existingPayment.paymentUrl) {
+        const existingInstruction = (
+          (existingPayment.metadata ?? {}) as { instruction?: { kind?: string } }
+        ).instruction;
+        if (
+          existingPayment.provider === data.provider &&
+          (existingPayment.paymentUrl || existingInstruction)
+        ) {
           // Same provider, live invoice already minted — hand back the
-          // existing paymentUrl instead of creating a second invoice.
+          // existing paymentUrl (or Fawry reference code) instead of creating a second invoice.
           res.json({
             success: true,
             data: {
               transactionId: existingPayment.transactionId ?? existingPayment.id,
-              paymentUrl: existingPayment.paymentUrl,
+              paymentUrl: existingPayment.paymentUrl ?? '',
+              ...(existingInstruction ? { instruction: existingInstruction } : {}),
               provider: existingPayment.provider,
             },
           });
@@ -621,7 +650,7 @@ router.post(
         });
       } else {
         // ==========================================
-        // Online payment providers (Tap, MyFatoorah, Paymob, ...)
+        // Online payment providers (Paymob, Kashier, Fawry)
         // ==========================================
 
         // Resolve the correct storefront URL for payment callbacks
@@ -668,7 +697,7 @@ router.post(
           customer: (() => {
             // Guest checkout has order.customer = null but the checkout
             // form's name/email/phone live on order.shippingAddress (JSON).
-            // Providers like MyFatoorah reject empty emails (400 "must be a
+            // Gateways may reject empty emails (400 "must be a
             // valid email") so always fall through to the shippingAddress
             // values before defaulting to a blank — guests are the common
             // case on storefronts, not the exception.
@@ -699,6 +728,7 @@ router.post(
               : data.errorUrl
             : `${storefrontBaseUrl}/checkout/error`,
           webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
+          ...(data.method ? { metadata: { method: data.method } } : {}),
         };
 
         // THE PROVIDER CALL — no transaction is open. It throws on provider-not-
@@ -759,6 +789,8 @@ router.post(
               data: {
                 transactionId: result.transactionId,
                 paymentUrl: result.paymentUrl,
+                // What the customer does next when it is not a redirect (a Fawry reference code).
+                instruction: result.instruction,
                 provider: result.provider,
                 paymentMethods: result.paymentMethods,
               },
@@ -799,14 +831,33 @@ router.post(
       // Independent of the rollback: an order that was not rolled back (no
       // session header) still has no Payment row behind a live invoice.
       if (acceptedInvoice) await alertOrphanedProviderInvoice(acceptedInvoice);
-      // A provider outage reaches the client as a 503 with a code the checkout
-      // maps to "choose another method"; any other provider error keeps its shape.
-      if (error instanceof PaymentProviderError && error.isOutage) {
+      // A provider outage (or a gateway the merchant has not finished setting up) reaches the client
+      // as a 503 with a code the checkout maps to "choose another method"; a gateway that REFUSED
+      // the request is a 502 with a generic message (the gateway's own reason stays in the log).
+      // Nothing here is the customer's to fix, so none of it is a 500 "internal error".
+      if (
+        error instanceof PaymentProviderError &&
+        (error.isOutage || error.code === 'PROVIDER_MISCONFIGURED')
+      ) {
         next(
           new AppError(
             503,
             'PAYMENT_METHOD_UNAVAILABLE',
             'This payment method is temporarily unavailable. Please choose another method.'
+          )
+        );
+        return;
+      }
+      if (error instanceof PaymentProviderError) {
+        logger.warn(
+          { err: error, orderId: req.body?.orderId },
+          '[PAYMENT] provider refused create'
+        );
+        next(
+          new AppError(
+            502,
+            'PAYMENT_PROVIDER_ERROR',
+            'The payment provider could not start this payment. Please try again or choose another method.'
           )
         );
         return;
@@ -1030,11 +1081,17 @@ router.post(
       const user = getAuthUser(req);
       const provider = req.body.provider as PaymentProvider | undefined;
 
-      // Verify the payment belongs to user's order
-      const payment = await prisma.payment.findUnique({
-        where: { id: paymentId },
-        include: { order: true },
-      });
+      // The store is not known yet (strict RLS shows a contextless read nothing): a definer
+      // maps the payment id to its store, then the ownership check reads inside that scope.
+      const paymentStoreId = await getPaymentStoreId(paymentId);
+      const payment = paymentStoreId
+        ? await withStore(paymentStoreId, () =>
+            prisma.payment.findUnique({
+              where: { id: paymentId },
+              include: { order: true },
+            })
+          )
+        : null;
 
       if (!payment || payment.order.customerId !== user.userId) {
         res.status(404).json({
@@ -1053,9 +1110,9 @@ router.post(
         sessionId: req.headers['x-session-id'] as string | undefined,
       });
 
-      const result = await runInTenantContext(payment.order.storeId, () =>
-        PaymentService.retryPayment(paymentId, provider)
-      );
+      // No request transaction: the service reads in a short scope, calls the gateway with
+      // nothing held, then records in a short transaction.
+      const result = await PaymentService.retryPayment(paymentId, provider, payment.order.storeId);
 
       res.json({
         success: true,
@@ -1134,15 +1191,11 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
     const user = getAuthUser(req);
     const { id: paymentId } = req.params;
 
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-      select: {
-        id: true,
-        order: { select: { store: { select: { id: true, ownerId: true } } } },
-      },
-    });
-
-    if (!payment) {
+    // The payment's store is found by a GUARDED definer (an active super_admin, or the owner /
+    // staff of that payment's store; anyone else sees "not found"), then the events are read
+    // inside that store's scope. Under strict RLS a contextless read would see no row at all.
+    const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, paymentId });
+    if (!owner) {
       res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'Payment not found' },
@@ -1150,34 +1203,27 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
       return;
     }
 
-    const isOwner = payment.order.store.ownerId === user.userId;
-    if (user.role !== 'super_admin' && !isOwner) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Payment not found' },
-      });
-      return;
-    }
-
-    const events = await prisma.paymentEvent.findMany({
-      where: { paymentId },
-      orderBy: { occurredAt: 'desc' },
-      select: {
-        id: true,
-        eventType: true,
-        fromStatus: true,
-        toStatus: true,
-        provider: true,
-        // providerPayload is intentionally omitted from the LIST shape —
-        // payloads can be large + may contain PII. The single-event
-        // endpoint below returns it gated to super_admin.
-        details: true,
-        triggeredByUserId: true,
-        occurredAt: true,
-        createdAt: true,
-      },
-      take: 200,
-    });
+    const events = await withStore(owner.storeId, () =>
+      prisma.paymentEvent.findMany({
+        where: { paymentId: owner.paymentId },
+        orderBy: { occurredAt: 'desc' },
+        select: {
+          id: true,
+          eventType: true,
+          fromStatus: true,
+          toStatus: true,
+          provider: true,
+          // providerPayload is intentionally omitted from the LIST shape —
+          // payloads can be large + may contain PII. The single-event
+          // endpoint below returns it gated to super_admin.
+          details: true,
+          triggeredByUserId: true,
+          occurredAt: true,
+          createdAt: true,
+        },
+        take: 200,
+      })
+    );
 
     res.json({ success: true, data: { events } });
   } catch (error) {
@@ -1190,7 +1236,7 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
  * Returns the raw provider_payload for a single payment_events row.
  * Super-admin only because raw payloads may contain customer PII +
  * provider-internal references we don't want to leak to store_admin
- * dashboards by default.
+ * dashboards by default. The event's store is found by the same guarded definer.
  */
 router.get(
   '/events/:eventId/payload',
@@ -1206,17 +1252,22 @@ router.get(
         return;
       }
       const { eventId } = req.params;
-      const event = await prisma.paymentEvent.findUnique({
-        where: { id: eventId },
-        select: {
-          id: true,
-          paymentId: true,
-          eventType: true,
-          provider: true,
-          providerPayload: true,
-          occurredAt: true,
-        },
-      });
+      const owner = await resolvePaymentEventsStore({ actorUserId: user.userId, eventId });
+      const event = owner
+        ? await withStore(owner.storeId, () =>
+            prisma.paymentEvent.findUnique({
+              where: { id: eventId },
+              select: {
+                id: true,
+                paymentId: true,
+                eventType: true,
+                provider: true,
+                providerPayload: true,
+                occurredAt: true,
+              },
+            })
+          )
+        : null;
       if (!event) {
         res.status(404).json({
           success: false,

@@ -17,7 +17,7 @@ interface PayoutsHistoryProps {
   onSubmit: (e: React.FormEvent) => void;
 }
 
-const PAYOUT_METHODS = ['bank_transfer', 'knet', 'cash', 'manual'] as const;
+const PAYOUT_METHODS = ['bank_transfer', 'instapay', 'wallet', 'cash', 'manual'] as const;
 
 /**
  * Payout creation modal. Collects amount (EGP), method, and optional notes

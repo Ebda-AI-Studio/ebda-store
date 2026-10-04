@@ -13,7 +13,7 @@ import { REGION } from '@force/shared';
  * Finds orders that:
  *   - are still status=pending / paymentStatus=unpaid
  *   - have a Payment row with a non-null paymentUrl (customer was redirected
- *     to an online gateway — Tap / MyFatoorah / Hesabe / UPayments)
+ *     to an online gateway — Paymob / Kashier / Fawry)
  *   - were created more than PAYMENT_ABANDON_MINUTES ago (default 30 min)
  *   - have NOT yet been stamped as an abandoner (paymentGatewayAbandonedAt IS NULL)
  *   - the store has the 'payment_abandonment' Enterprise feature enabled

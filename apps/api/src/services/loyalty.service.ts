@@ -532,7 +532,7 @@ export class LoyaltyService {
    *
    * Called from `OrderService.applyRefundEffects` so every refund path —
    * status-button refund, gateway-initiated webhook refund, manual admin
-   * "Refund via MyFatoorah" — reverses the loyalty credit consistently.
+   * "Refund via provider" — reverses the loyalty credit consistently.
    */
   static async reverseEarnedPointsFromOrder(
     storeId: string,

@@ -1,17 +1,18 @@
 /**
  * Provider outage isolation (SP6a, Review Focus 5) and "no external call inside a
  * request transaction", against a real Postgres with the code under test bound to
- * a real `ebda_app` login.
+ * a real `ebda_app` login, and the REAL Paymob and Kashier adapters talking to local
+ * gateway stubs over loopback HTTP (SP6b).
  *
- *   - a gateway that times out disables ONLY that method, for ONLY that store;
- *   - checkout keeps offering COD and InstaPay and they keep working;
+ *   - Paymob down (hung, refused) disables ONLY Paymob, for ONLY that store;
+ *   - checkout keeps offering Kashier, COD and InstaPay and they keep working;
  *   - the merchant sees the health (circuit + persisted `health_status`);
- *   - the provider is called with NO transaction open (create order -> commit ->
- *     call provider -> short transaction to record).
+ *   - the gateway is asked with NO transaction open: at the moment the stub receives the
+ *     call, no `ebda_app` session is `idle in transaction` (create order -> commit -> call
+ *     provider -> short transaction to record).
  *
- * Mutation proof (commit body): put the provider call back inside
- * `runInTenantContext` in routes/payment.routes.ts -> "the provider is called with
- * no transaction open" goes red.
+ * Mutation proof (commit body): put the provider call back inside `runInTenantContext` in
+ * routes/payment.routes.ts -> "the gateway is asked with NO transaction open" goes red.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
@@ -24,38 +25,9 @@ import {
   runWithRequestDb,
   type AppPrismaClient,
 } from '@force/database';
-
-const h = vi.hoisted(() => ({
-  mode: 'ok' as 'ok' | 'hang' | 'reject',
-  calls: 0,
-  ambientTxAtCall: [] as boolean[],
-}));
-
-// The MyFatoorah adapter is replaced by one that can hang, reject or succeed, and
-// records whether a transaction was open at the moment it was called.
-vi.mock('@api/services/payment-providers/myfatoorah.provider', async () => {
-  const { hasTenantContext: inTx } = await import('@force/database');
-  const { ProviderRejectedError } = await import('@api/services/payment-providers/refund-outcome');
-  return {
-    MyFatoorahPaymentProvider: class {
-      name = 'myfatoorah';
-      initialize = () => undefined;
-      createPayment = async (req: { orderId: string; amount: number }) => {
-        h.calls += 1;
-        h.ambientTxAtCall.push(inTx());
-        if (h.mode === 'hang') await new Promise(() => undefined);
-        if (h.mode === 'reject') throw new ProviderRejectedError('invalid email', 400);
-        return {
-          success: true,
-          provider: 'myfatoorah',
-          transactionId: `mf-${req.orderId.slice(0, 8)}`,
-          invoiceId: 'inv-1',
-          paymentUrl: 'https://pay.test/inv-1',
-        };
-      };
-    },
-  };
-});
+import { KashierStub, KASHIER_STUB } from '../stubs/kashier-stub';
+import { PaymobStub, PAYMOB_STUB } from '../stubs/paymob-stub';
+import { serveStub, type ServedStub } from '../stubs/serve';
 
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { config } from '@api/config';
@@ -77,6 +49,13 @@ const BYPASS = `outage-bypass-${run}`;
 process.env.LOAD_TEST_BYPASS_TOKEN = BYPASS;
 process.env.PAYMENT_PROVIDER_TIMEOUT_MS = '60';
 const TOTAL = 12_345;
+
+const paymob = new PaymobStub();
+const kashier = new KashierStub();
+/** Open `ebda_app` transactions seen at the moment each gateway call arrived. */
+const idleTxAtGatewayCall: number[] = [];
+let paymobServer: ServedStub;
+let kashierServer: ServedStub;
 
 function appUrl(): string {
   const u = new URL(OWNER_URL);
@@ -129,10 +108,24 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
       data: [
         {
           storeId: store.id,
-          provider: 'myfatoorah',
+          provider: 'paymob',
           isEnabled: true,
           isDefault: true,
-          apiKey: encryption.encrypt('mf-key'),
+          apiKey: encryption.encrypt(PAYMOB_STUB.secretKey),
+          webhookSecret: encryption.encrypt(PAYMOB_STUB.hmacSecret),
+          settings: {
+            publicKey: PAYMOB_STUB.publicKey,
+            integrationIds: PAYMOB_STUB.integrationIds,
+          },
+        },
+        {
+          storeId: store.id,
+          provider: 'kashier',
+          isEnabled: true,
+          merchantId: encryption.encrypt(KASHIER_STUB.merchantId),
+          apiKey: encryption.encrypt(KASHIER_STUB.apiKey),
+          secretKey: encryption.encrypt(KASHIER_STUB.secretKey),
+          settings: { methods: ['card', 'wallet'], display: 'en' },
         },
         { storeId: store.id, provider: 'cod', isEnabled: true, fixedFee: 500 },
         {
@@ -199,9 +192,24 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
   const checkoutConfig = (s: { id: string }) =>
     asApp(async () => http().get('/api/v1/payments/config').set('x-store-id', s.id));
 
+  /** How many `ebda_app` sessions are sitting `idle in transaction` right now. */
+  const idleAppTransactions = async (): Promise<number> => {
+    const rows = await owner.$queryRaw<Array<{ n: bigint }>>`
+      SELECT count(*)::bigint AS n FROM pg_stat_activity
+      WHERE usename = 'ebda_app' AND datname = current_database() AND state = 'idle in transaction'`;
+    return Number(rows[0]?.n ?? 0);
+  };
+
   beforeAll(async () => {
     vi.spyOn(OneSignalService, 'notifyAdminsOfInstapay').mockResolvedValue();
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    const record = async () => {
+      idleTxAtGatewayCall.push(await idleAppTransactions());
+    };
+    paymobServer = await serveStub(paymob.fetch, record);
+    kashierServer = await serveStub(kashier.fetch, record);
+    process.env.PAYMOB_BASE_URL = paymobServer.url;
+    process.env.KASHIER_BASE_URL = kashierServer.url;
     await redis.connect().catch(() => undefined);
     app = express();
     app.set('trust proxy', true);
@@ -211,9 +219,11 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
     app.use(errorHandler);
   });
   beforeEach(() => {
-    h.mode = 'ok';
-    h.calls = 0;
-    h.ambientTxAtCall = [];
+    paymob.faults.down = null;
+    kashier.faults.down = null;
+    idleTxAtGatewayCall.length = 0;
+    paymob.requests.length = 0;
+    kashier.requests.length = 0;
     resetProviderHealthForTests();
     PaymentService.clearCache();
     vi.spyOn(OneSignalService, 'notifyAdminsOfInstapay').mockResolvedValue();
@@ -240,59 +250,75 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
       .catch(() => undefined);
     await owner.$disconnect();
     await redis.disconnect().catch(() => undefined);
+    await paymobServer.close();
+    await kashierServer.close();
   });
 
-  it('the provider is called with NO transaction open, then the payment is recorded', async () => {
+  it('the gateway is asked with NO transaction open, then the payment is recorded', async () => {
     const s = await mkStore('notx');
     const o = await mkOrder(s);
-    const res = await create(o.id, 'myfatoorah');
+    const res = await create(o.id, 'paymob');
     expect(res.status).toBe(200);
-    expect(res.body.data.paymentUrl).toBe('https://pay.test/inv-1');
-    expect(h.calls).toBe(1);
-    expect(h.ambientTxAtCall).toEqual([false]); // nothing was holding a transaction open
+    expect(res.body.data.paymentUrl).toContain('/unifiedcheckout/?publicKey=');
+    // The gateway was called once, and when it was, no ebda_app session was holding a transaction
+    // open (the request's own would show up as `idle in transaction` while it waited).
+    expect(paymob.requests.filter(r => r.path === '/v1/intention/')).toHaveLength(1);
+    expect(idleTxAtGatewayCall).toEqual([0]);
     expect(hasTenantContext()).toBe(false);
     const [p] = await owner.payment.findMany({ where: { orderId: o.id } });
-    expect(p).toMatchObject({ provider: 'myfatoorah', status: 'pending', amount: TOTAL });
+    expect(p).toMatchObject({ provider: 'paymob', status: 'pending', amount: TOTAL });
+    // The wire amount is the piastre integer, not a converted number.
+    expect(paymob.requests.find(r => r.path === '/v1/intention/')?.body.amount).toBe(TOTAL);
   });
 
-  it('a hanging gateway times out as a 503 and records NO payment', async () => {
+  it('a hanging Paymob times out as a 503 and records NO payment', async () => {
     const s = await mkStore('hang1');
     const o = await mkOrder(s);
-    h.mode = 'hang';
-    const res = await create(o.id, 'myfatoorah');
+    paymob.faults.down = 'timeout';
+    const res = await create(o.id, 'paymob');
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe('PAYMENT_METHOD_UNAVAILABLE');
     expect(await owner.payment.count({ where: { orderId: o.id } })).toBe(0);
   });
 
-  it('three outages disable ONLY that method for THAT store; COD and InstaPay keep working; other stores are unaffected', async () => {
+  it('Paymob down: checkout still offers Kashier, COD and InstaPay, and they work; other stores are unaffected', async () => {
     const a = await mkStore('iso-a');
     const b = await mkStore('iso-b');
-    h.mode = 'hang';
+    paymob.faults.down = 'timeout';
     for (let i = 0; i < 3; i += 1) {
       const o = await mkOrder(a);
-      expect((await create(o.id, 'myfatoorah')).status).toBe(503);
+      expect((await create(o.id, 'paymob')).status).toBe(503);
     }
-    expect(h.calls).toBe(3);
+    const intentions = () => paymob.requests.filter(r => r.path === '/v1/intention/').length;
+    expect(intentions()).toBe(3);
 
-    // The 4th does not even call the provider: it fails fast.
+    // The 4th does not even call the gateway: it fails fast.
     const fast = await mkOrder(a);
     const t0 = Date.now();
-    const res = await create(fast.id, 'myfatoorah');
+    const res = await create(fast.id, 'paymob');
     expect(res.status).toBe(503);
-    expect(h.calls).toBe(3);
+    expect(intentions()).toBe(3);
     expect(Date.now() - t0).toBeLessThan(2_000);
 
-    // Checkout config: the gateway is hidden for A, COD and InstaPay are still offered.
+    // Checkout config: Paymob is hidden for A; Kashier, COD and InstaPay are still offered.
     const cfgA = await checkoutConfig(a);
     expect(cfgA.status).toBe(200);
-    expect(cfgA.body.data.providers).not.toContain('myfatoorah');
-    expect(cfgA.body.data.unavailable).toContain('myfatoorah');
+    expect(cfgA.body.data.providers).not.toContain('paymob');
+    expect(cfgA.body.data.providers).toContain('kashier');
+    expect(cfgA.body.data.unavailable).toContain('paymob');
+    expect(cfgA.body.data.methods.kashier.map((m: { code: string }) => m.code)).toEqual([
+      'card',
+      'wallet',
+    ]);
     expect(cfgA.body.data.cod).toMatchObject({ fixedFee: 500 });
     expect(cfgA.body.data.instapay).toMatchObject({ expiryHours: 48 });
-    expect(cfgA.body.data.defaultProvider).not.toBe('myfatoorah');
+    expect(cfgA.body.data.defaultProvider).not.toBe('paymob');
 
-    // COD and InstaPay on the SAME store still work.
+    // Kashier, COD and InstaPay on the SAME store still work.
+    const kOrder = await mkOrder(a);
+    const k = await create(kOrder.id, 'kashier');
+    expect(k.status).toBe(200);
+    expect(k.body.data.paymentUrl).toContain('payments.kashier.stub/session/');
     const codOrder = await mkOrder(a);
     const cod = await create(codOrder.id, 'cod');
     expect(cod.status).toBe(200);
@@ -303,35 +329,36 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
     expect(ip.body.data.instapay).toMatchObject({ handle: 'out@instapay', amountMinor: TOTAL });
 
     // Another store with the same gateway is untouched.
-    h.mode = 'ok';
+    paymob.faults.down = null;
     const cfgB = await checkoutConfig(b);
-    expect(cfgB.body.data.providers).toContain('myfatoorah');
+    expect(cfgB.body.data.providers).toContain('paymob');
     expect(cfgB.body.data.unavailable).toEqual([]);
     const bOrder = await mkOrder(b);
-    expect((await create(bOrder.id, 'myfatoorah')).status).toBe(200);
+    expect((await create(bOrder.id, 'paymob')).status).toBe(200);
   });
 
-  it('a gateway that REJECTS the request is not an outage: it never disables the method', async () => {
+  it('a gateway that REFUSES the request is not an outage: it never disables the method', async () => {
     const s = await mkStore('reject');
-    h.mode = 'reject';
+    paymob.faults.down = 'rejected';
     for (let i = 0; i < 5; i += 1) {
       const o = await mkOrder(s);
-      const res = await create(o.id, 'myfatoorah');
-      expect(res.status).not.toBe(503);
+      const res = await create(o.id, 'paymob');
+      expect(res.status).toBe(502);
+      expect(res.body.error.code).toBe('PAYMENT_PROVIDER_ERROR');
     }
     const cfg = await checkoutConfig(s);
-    expect(cfg.body.data.providers).toContain('myfatoorah');
+    expect(cfg.body.data.providers).toContain('paymob');
     expect(cfg.body.data.unavailable).toEqual([]);
   });
 
   it('shows the merchant the method is down: live circuit and persisted health', async () => {
     const s = await mkStore('health');
-    h.mode = 'hang';
-    for (let i = 0; i < 3; i += 1) await create((await mkOrder(s)).id, 'myfatoorah');
+    paymob.faults.down = 'timeout';
+    for (let i = 0; i < 3; i += 1) await create((await mkOrder(s)).id, 'paymob');
 
     await vi.waitFor(async () => {
       const row = await owner.paymentConfig.findFirstOrThrow({
-        where: { storeId: s.id, provider: 'myfatoorah' },
+        where: { storeId: s.id, provider: 'paymob' },
       });
       expect(row.healthStatus).toBe('down');
       expect(row.lastHealthCheck).not.toBeNull();
@@ -343,31 +370,33 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
         .set('Authorization', `Bearer ${s.jwt}`)
     );
     expect(list.status).toBe(200);
-    const mf = (list.body.data.storeConfigs as Array<Record<string, unknown>>).find(
-      c => c.provider === 'myfatoorah'
+    const pm = (list.body.data.storeConfigs as Array<Record<string, unknown>>).find(
+      c => c.provider === 'paymob'
     )!;
-    expect(mf.circuit).toBe('down');
-    expect(mf.healthStatus).toBe('down');
+    expect(pm.circuit).toBe('down');
+    expect(pm.healthStatus).toBe('down');
     // and the secrets are masked, not echoed
-    expect(JSON.stringify(list.body)).not.toContain('mf-key');
-    expect(mf.apiKey).toMatch(/^\*{4}/);
+    expect(JSON.stringify(list.body)).not.toContain(PAYMOB_STUB.secretKey);
+    expect(JSON.stringify(list.body)).not.toContain(PAYMOB_STUB.hmacSecret);
+    expect(pm.apiKey).toMatch(/^\*{4}/);
+    expect(pm.webhookSecret).toBe('****');
   });
 
   it('recovers by itself: after the cool-down the next success closes the circuit', async () => {
     const s = await mkStore('recover');
-    h.mode = 'hang';
-    for (let i = 0; i < 3; i += 1) await create((await mkOrder(s)).id, 'myfatoorah');
-    expect((await checkoutConfig(s)).body.data.providers).not.toContain('myfatoorah');
+    paymob.faults.down = 'timeout';
+    for (let i = 0; i < 3; i += 1) await create((await mkOrder(s)).id, 'paymob');
+    expect((await checkoutConfig(s)).body.data.providers).not.toContain('paymob');
 
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 61_000);
     try {
-      h.mode = 'ok';
-      const res = await create((await mkOrder(s)).id, 'myfatoorah');
+      paymob.faults.down = null;
+      const res = await create((await mkOrder(s)).id, 'paymob');
       expect(res.status).toBe(200);
     } finally {
       vi.useRealTimers();
     }
-    expect((await checkoutConfig(s)).body.data.providers).toContain('myfatoorah');
+    expect((await checkoutConfig(s)).body.data.providers).toContain('paymob');
   });
 });

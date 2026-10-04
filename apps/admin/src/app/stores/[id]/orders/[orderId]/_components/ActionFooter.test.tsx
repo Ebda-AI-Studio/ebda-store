@@ -5,7 +5,7 @@
  * guard a money-integrity path that has no other test coverage:
  *
  *   - `showManualMarkPaid` must be false whenever the order has a real
- *     payment-provider row (MyFatoorah/Tap/Hesabe/UPayments) — letting a
+ *     payment-provider row (Paymob/Kashier/Fawry) — letting a
  *     merchant manually flip a provider-tracked order to "paid" would create
  *     a false paid record for money that was never actually captured.
  *   - `showRefundViaProvider` must require BOTH `paymentStatus === 'paid'`
@@ -133,7 +133,7 @@ describe('ActionFooter — money-safety button visibility (renders the real DOM 
       paymentStatus: 'paid',
       payments: [
         payment({
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           transactionId: 'txn_123',
         }),
@@ -151,7 +151,7 @@ describe('ActionFooter — money-safety button visibility (renders the real DOM 
       paymentStatus: 'paid',
       payments: [
         payment({
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           transactionId: 'txn_123',
         }),
@@ -171,7 +171,7 @@ describe('ActionFooter — money-safety button visibility (renders the real DOM 
       status: 'pending',
       paymentStatus: 'unpaid',
       payments: [
-        payment({ provider: 'myfatoorah', status: 'pending', paymentUrl: 'https://pay.example/x' }),
+        payment({ provider: 'paymob', status: 'pending', paymentUrl: 'https://pay.example/x' }),
       ],
     });
     renderFooter(order);

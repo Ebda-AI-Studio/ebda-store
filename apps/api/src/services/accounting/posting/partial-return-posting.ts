@@ -112,7 +112,7 @@ export async function postPartialReturnJournal(
       // nothing, `provider` falls back to 'cod' and the entry credits 1020
       // (COD Clearing) instead of the real gateway account. The entry still
       // balances, so the trial balance and every direct-call test pass while
-      // KNET stays permanently overstated.
+      // the card/online account stays permanently overstated.
       payments: {
         where: { status: { in: ['completed', 'partially_refunded', 'refunded'] } },
         orderBy: { createdAt: 'desc' },

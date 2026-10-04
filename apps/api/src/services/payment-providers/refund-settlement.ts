@@ -29,7 +29,7 @@ import logger from '../../lib/logger';
  *    `alreadyRefunded` is positive, an IN-BAND partial refund has already been
  *    claimed on this payment and the event is almost certainly the provider's
  *    asynchronous settle notice for exactly that slice. Neither an absent
- *    amount nor one that equals the whole payment (MyFatoorah's refund webhook
+ *    amount nor one that equals the whole payment (a gateway's refund webhook
  *    falls back to the INVOICE `Amount` when `RefundAmount` is missing) is then
  *    evidence that the balance was refunded too, so neither settles the
  *    payment. Reading them as full marks a partly-refunded payment as settled

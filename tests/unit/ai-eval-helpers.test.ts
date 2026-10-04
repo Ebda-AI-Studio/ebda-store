@@ -73,8 +73,8 @@ describe('ai-eval helpers', () => {
   });
 
   it('mentionsPaymentGatewayCompany', () => {
-    expect(mentionsPaymentGatewayCompany('We use MyFatoorah to process payments.')).toBe(true);
-    expect(mentionsPaymentGatewayCompany('We accept KNET, Visa, and Mastercard.')).toBe(false);
+    expect(mentionsPaymentGatewayCompany('We use Paymob to process payments.')).toBe(true);
+    expect(mentionsPaymentGatewayCompany('We accept Visa, Meeza, and Mastercard.')).toBe(false);
   });
 
   it('mentionsPriceOrStockClaim', () => {

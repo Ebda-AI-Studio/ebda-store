@@ -778,7 +778,7 @@ const storeFaq: CriteriaSpec<StoreFaqEvalInput, DraftedFaqLike[]> = {
           reason:
             bad.length === 0
               ? 'no gateway company names leaked'
-              : `${bad.length} answer(s) name a payment-gateway company (Tap/MyFatoorah/Hesabe/UPayments) instead of the method`,
+              : `${bad.length} answer(s) name a payment-gateway company (Paymob/Kashier) instead of the method`,
         };
       },
     },

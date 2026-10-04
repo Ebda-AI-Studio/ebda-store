@@ -9,6 +9,7 @@ import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { WaMeCodConfirmButton } from '../../../templates/shared/WaMeButtons';
 import { InstapayCard } from './InstapayCard';
+import { FawryReferenceCard } from './FawryReferenceCard';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
@@ -21,7 +22,7 @@ import { groupOrderLinesForDisplay, fromMinor, REGION } from '@force/shared';
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
 //   paid      → provider confirmed PAID
-//   pending   → provider hasn't reported a final status yet (KNET delay)
+//   pending   → provider hasn't reported a final status yet
 //   failed    → provider reported failed/expired/cancelled
 //   cod       → cash on delivery (no gateway to verify)
 //   awaiting  → InstaPay: the customer transfers, the merchant confirms (no gateway)
@@ -33,7 +34,11 @@ function SuccessContent() {
   const orderId = searchParams?.get('orderId');
   const isCod = searchParams?.get('cod') === '1';
   const isInstapay = searchParams?.get('instapay') === '1';
-  // MyFatoorah appends its PaymentId to the success URL on return; the
+  // A Fawry reference code (the customer pays it in cash at an outlet, hours later). A plain
+  // code only: anything else in the URL is ignored.
+  const rawRef = searchParams?.get('ref') ?? '';
+  const fawryRef = /^[A-Za-z0-9-]{4,32}$/.test(rawRef) ? rawRef : null;
+  // A gateway may append its payment id to the success URL on return; the
   // casing varies (`paymentId` vs `Id`). Forward it to the API for the
   // audit trail — authorization rides on the order UUID, not this value.
   const returnPaymentId = searchParams?.get('paymentId') || searchParams?.get('Id') || undefined;
@@ -47,7 +52,7 @@ function SuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);
   const [paymentState, setPaymentState] = useState<PaymentState>(
-    isCod ? 'cod' : isInstapay ? 'awaiting' : 'verifying'
+    isCod ? 'cod' : isInstapay || fawryRef ? 'awaiting' : 'verifying'
   );
 
   useEffect(() => {
@@ -75,15 +80,19 @@ function SuccessContent() {
           const verify = await api.verifyOrderPayment(orderId!, returnPaymentId);
           if (!cancelled && verify.success && verify.data) {
             const s = verify.data.paymentStatus;
-            setPaymentState(s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : 'pending');
+            // An unpaid Fawry reference code is not "being confirmed": it is waiting for the
+            // customer to pay it at an outlet.
+            setPaymentState(
+              s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : fawryRef ? 'awaiting' : 'pending'
+            );
           } else if (!cancelled) {
-            setPaymentState('pending');
+            setPaymentState(fawryRef ? 'awaiting' : 'pending');
           }
         } catch {
           // Verification network error — show pending (truthful: we don't
           // know yet). The webhook backup + the customer's order page will
           // still reflect the real status once it settles.
-          if (!cancelled) setPaymentState('pending');
+          if (!cancelled) setPaymentState(fawryRef ? 'awaiting' : 'pending');
         }
       }
 
@@ -131,39 +140,46 @@ function SuccessContent() {
 
   // Truthful headline + sub-copy per verified state.
   const heading =
-    paymentState === 'awaiting'
-      ? t('Waiting for your transfer', 'بانتظار التحويل')
-      : paymentState === 'failed'
-        ? t('Payment not completed', 'لم يكتمل الدفع')
-        : paymentState === 'pending'
-          ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
-          : t('Thank you for your order!', 'شكراً لطلبك!');
+    paymentState === 'awaiting' && fawryRef
+      ? t('Waiting for your payment', 'بانتظار الدفع')
+      : paymentState === 'awaiting'
+        ? t('Waiting for your transfer', 'بانتظار التحويل')
+        : paymentState === 'failed'
+          ? t('Payment not completed', 'لم يكتمل الدفع')
+          : paymentState === 'pending'
+            ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
+            : t('Thank you for your order!', 'شكراً لطلبك!');
 
   const subCopy =
-    paymentState === 'awaiting'
+    paymentState === 'awaiting' && fawryRef
       ? t(
-          'Your order is held for you. Transfer the amount below and the store will confirm it.',
-          'طلبك محجوز لك. حوّل المبلغ الموضّح أدناه وسيؤكده المتجر.'
+          'Your order is held for you. Pay the reference code below at any Fawry outlet.',
+          'طلبك محجوز لك. ادفع كود الدفع الموضّح أدناه في أي منفذ فوري.'
         )
-      : paymentState === 'failed'
+      : paymentState === 'awaiting'
         ? t(
-            'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
-            'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
+            'Your order is held for you. Transfer the amount below and the store will confirm it.',
+            'طلبك محجوز لك. حوّل المبلغ الموضّح أدناه وسيؤكده المتجر.'
           )
-        : paymentState === 'pending'
+        : paymentState === 'failed'
           ? t(
-              'Your payment is being confirmed. This page will update, or check your order status shortly.',
-              'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
+              'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
+              'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
             )
-          : isCod
+          : paymentState === 'pending'
             ? t(
-                'Your order has been placed. Please have the payment ready when your order is delivered.',
-                'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+                'Your payment is being confirmed. This page will update, or check your order status shortly.',
+                'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
               )
-            : t(
-                'Your payment is confirmed and your order will be shipped soon.',
-                'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
-              );
+            : isCod
+              ? t(
+                  'Your order has been placed. Please have the payment ready when your order is delivered.',
+                  'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+                )
+              : t(
+                  'Your payment is confirmed and your order will be shipped soon.',
+                  'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
+                );
 
   return (
     <MinimalChrome>
@@ -233,6 +249,8 @@ function SuccessContent() {
               }
             />
           )}
+
+          {fawryRef && <FawryReferenceCard code={fawryRef} />}
 
           {isCod && order && (
             <WaMeCodConfirmButton order={order} className="mx-auto mt-6 max-w-md" />

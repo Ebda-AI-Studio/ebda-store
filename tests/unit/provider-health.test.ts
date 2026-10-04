@@ -42,20 +42,20 @@ afterEach(() => vi.useRealTimers());
 
 describe('provider health circuit', () => {
   it('three outages open the circuit for THAT store and provider only', async () => {
-    for (let i = 0; i < 3; i += 1) await fail(A, 'myfatoorah');
-    expect(isProviderAvailable(A, 'myfatoorah')).toBe(false);
-    expect(providerHealth(A, 'myfatoorah')).toBe('down');
+    for (let i = 0; i < 3; i += 1) await fail(A, 'paymob');
+    expect(isProviderAvailable(A, 'paymob')).toBe(false);
+    expect(providerHealth(A, 'paymob')).toBe('down');
     // another store, another provider, and the manual methods are untouched
-    expect(isProviderAvailable(B, 'myfatoorah')).toBe(true);
-    expect(isProviderAvailable(A, 'tap')).toBe(true);
+    expect(isProviderAvailable(B, 'paymob')).toBe(true);
+    expect(isProviderAvailable(A, 'kashier')).toBe(true);
     expect(isProviderAvailable(A, 'cod')).toBe(true);
     expect(isProviderAvailable(A, 'instapay')).toBe(true);
   });
 
   it('fails fast with PROVIDER_UNAVAILABLE and never calls the provider while open', async () => {
-    for (let i = 0; i < 3; i += 1) await fail(A, 'tap');
+    for (let i = 0; i < 3; i += 1) await fail(A, 'kashier');
     const op = vi.fn().mockResolvedValue('ok');
-    const err = await callThroughBreaker(A, 'tap', op).catch(e => e);
+    const err = await callThroughBreaker(A, 'kashier', op).catch(e => e);
     expect(err).toBeInstanceOf(PaymentProviderError);
     expect(err.code).toBe('PROVIDER_UNAVAILABLE');
     expect(op).not.toHaveBeenCalled();
@@ -63,12 +63,12 @@ describe('provider health circuit', () => {
 
   it('a rejection (the provider ANSWERED no) is not an outage and never opens the circuit', async () => {
     for (let i = 0; i < 10; i += 1) {
-      await fail(A, 'tap', new PaymentProviderError('PROVIDER_REJECTED', 'bad amount'));
-      await fail(A, 'tap', new ProviderRejectedError('invalid email', 400));
-      await fail(A, 'tap', new AppError(422, 'VALIDATION_ERROR', 'no'));
+      await fail(A, 'kashier', new PaymentProviderError('PROVIDER_REJECTED', 'bad amount'));
+      await fail(A, 'kashier', new ProviderRejectedError('invalid email', 400));
+      await fail(A, 'kashier', new AppError(422, 'VALIDATION_ERROR', 'no'));
     }
-    expect(isProviderAvailable(A, 'tap')).toBe(true);
-    expect(providerHealth(A, 'tap')).toBe('healthy');
+    expect(isProviderAvailable(A, 'kashier')).toBe(true);
+    expect(providerHealth(A, 'kashier')).toBe('healthy');
   });
 
   it('classifies errors: timeouts, unreachable, 5xx and unknown throws are outages', () => {
@@ -81,20 +81,20 @@ describe('provider health circuit', () => {
 
   it('half-open after the cool-down: one success closes it again', async () => {
     vi.useFakeTimers();
-    for (let i = 0; i < 3; i += 1) await fail(A, 'tap');
-    expect(isProviderAvailable(A, 'tap')).toBe(false);
+    for (let i = 0; i < 3; i += 1) await fail(A, 'kashier');
+    expect(isProviderAvailable(A, 'kashier')).toBe(false);
     vi.advanceTimersByTime(61_000);
-    expect(isProviderAvailable(A, 'tap')).toBe(true); // probe allowed
-    await callThroughBreaker(A, 'tap', async () => 'ok');
-    expect(providerHealth(A, 'tap')).toBe('healthy');
+    expect(isProviderAvailable(A, 'kashier')).toBe(true); // probe allowed
+    await callThroughBreaker(A, 'kashier', async () => 'ok');
+    expect(providerHealth(A, 'kashier')).toBe('healthy');
   });
 
   it('a failed probe re-opens it', async () => {
     vi.useFakeTimers();
-    for (let i = 0; i < 3; i += 1) await fail(A, 'tap');
+    for (let i = 0; i < 3; i += 1) await fail(A, 'kashier');
     vi.advanceTimersByTime(61_000);
-    await fail(A, 'tap');
-    expect(isProviderAvailable(A, 'tap')).toBe(false);
+    await fail(A, 'kashier');
+    expect(isProviderAvailable(A, 'kashier')).toBe(false);
   });
 
   it('COD and InstaPay are never breakered, whatever they throw', async () => {
@@ -105,16 +105,16 @@ describe('provider health circuit', () => {
   });
 
   it('surfaces health to the merchant: persisted per store+provider, only when it changes', async () => {
-    await fail(A, 'myfatoorah'); // degraded
+    await fail(A, 'paymob'); // degraded
     await vi.waitFor(() => expect(h.updateMany).toHaveBeenCalledTimes(1));
     expect(h.updateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        where: { storeId: A, provider: 'myfatoorah' },
+        where: { storeId: A, provider: 'paymob' },
         data: expect.objectContaining({ healthStatus: 'degraded' }),
       })
     );
-    await fail(A, 'myfatoorah'); // still degraded: no new write
-    await fail(A, 'myfatoorah'); // down
+    await fail(A, 'paymob'); // still degraded: no new write
+    await fail(A, 'paymob'); // down
     await vi.waitFor(() => expect(h.updateMany).toHaveBeenCalledTimes(2));
     expect(h.updateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ healthStatus: 'down' }) })

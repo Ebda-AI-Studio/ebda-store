@@ -70,7 +70,7 @@ describe('webhook / inngest re-fire does not double-post', () => {
           payments: {
             create: [
               {
-                provider: 'myfatoorah',
+                provider: 'paymob',
                 status: 'completed',
                 amount: 1000,
                 paidAt: new Date(),

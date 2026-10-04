@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge, Button } from '@force/ui';
+import { Button } from '@force/ui';
 import { apiPut } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 
@@ -74,17 +74,8 @@ export function PaymentStep({
             />
           </button>
         </li>
-        {(['instapay', 'cards'] as const).map(key => (
-          <li
-            key={key}
-            aria-disabled="true"
-            className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border p-3 opacity-70"
-          >
-            <p className="text-sm font-medium text-foreground">{t(key)}</p>
-            <Badge variant="secondary">{t('comingSoon')}</Badge>
-          </li>
-        ))}
       </ul>
+      <p className="text-sm text-muted-foreground">{t('moreLater')}</p>
       {!cod && <p className="text-sm text-destructive-ink">{t('needOne')}</p>}
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={onBack}>

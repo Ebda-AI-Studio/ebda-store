@@ -14,7 +14,7 @@ interface RefreshPaymentButtonProps {
 }
 
 /**
- * Manual sync of payment status with the provider (MyFatoorah etc.).
+ * Manual sync of payment status with the provider (Paymob / Kashier / Fawry).
  * Use when a webhook didn't fire (provider portal misconfigured,
  * signature mismatch, network blip) but the customer says they paid.
  * Mirrors webhook handler's state-transition logic so the order /

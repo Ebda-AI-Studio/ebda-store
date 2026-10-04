@@ -29,10 +29,9 @@ import {
 } from './types';
 import { callThroughBreaker } from './provider-health';
 import { withProviderDeadline } from './provider-call';
-import { TapPaymentProvider } from './tap.provider';
-import { MyFatoorahPaymentProvider } from './myfatoorah.provider';
-import { HesabePaymentProvider } from './hesabe.provider';
-import { UPaymentsProvider } from './upayments.provider';
+import { getProviderV2, MANUAL_PROVIDERS } from './registry';
+import { V2ProviderBridge } from './v2-bridge';
+import { PaymentProviderError, type WebhookPayload } from './types';
 import {
   resolveRefundSettlement,
   readAccountedRefundEventIds,
@@ -64,9 +63,8 @@ import { REGION } from '@force/shared';
  *  `Payment.amount`. See the `isAmountUnderpaid` check in `handleWebhook` for
  *  the unit note (both sides are minor units). 5 piastres (0.05 EGP) of
  *  rounding allowance, same bound as payment-confirm.service.ts.
- *  SP6: the legacy KWD adapters (tap/myfatoorah/hesabe/upayments) still convert
- *  with a hard-coded ×1000; every Egyptian adapter must use `toMinor` /
- *  `fromMinor` (single currencyExponent) instead. */
+ *  Every Egyptian adapter converts with `toMinor` / `minorToDecimalString`
+ *  (single currencyExponent, integer string math) at its own edge. */
 const AMOUNT_TOLERANCE_FILS = 5;
 
 interface ProviderConfig {
@@ -84,6 +82,8 @@ interface ProviderConfig {
   supportedCurrencies: string[];
   fixedFee: number;
   percentageFee: number;
+  /** Non-secret per-provider settings (Paymob integration ids, Fawry methods, ...). */
+  settings: Record<string, unknown>;
 }
 
 interface CachedProviders {
@@ -172,15 +172,12 @@ class PaymentFactory {
         );
       }
 
-      // Fall back to environment variables ONLY for platform-level lookups
-      // (storeId === null). For any specific store, providers must come from
-      // a paymentConfig row created via admin settings — otherwise a globally-
-      // set TAP_API_KEY env var would leak Tap as "available" to every tenant
-      // even though they never enabled it. Per-store configuration is the
-      // explicit requirement; don't reintroduce a cross-tenant fallback.
+      // There is NO environment-variable fallback: providers come only from a
+      // paymentConfig row the merchant saved in settings (their own keys), so a
+      // platform-level key can never make a gateway "available" to a tenant that did
+      // not enable it.
       if (dbConfigs.length === 0 && storeId === null) {
-        logger.info('[PAYMENT] No database config found, using environment variables');
-        this.initializeFromEnv(providers, configs);
+        logger.info('[PAYMENT] No platform-level paymentConfig rows');
       } else if (dbConfigs.length === 0) {
         logger.info(
           { storeId },
@@ -207,7 +204,16 @@ class PaymentFactory {
               supportedCurrencies: dbConfig.supportedCurrencies,
               fixedFee: Number(dbConfig.fixedFee),
               percentageFee: Number(dbConfig.percentageFee),
+              settings:
+                dbConfig.settings &&
+                typeof dbConfig.settings === 'object' &&
+                !Array.isArray(dbConfig.settings)
+                  ? (dbConfig.settings as Record<string, unknown>)
+                  : {},
             };
+
+            // COD and InstaPay have no gateway behind them: they are not factory providers.
+            if (MANUAL_PROVIDERS.has(dbConfig.provider)) continue;
 
             if (!providerConfig.apiKey) {
               logger.warn(
@@ -256,180 +262,39 @@ class PaymentFactory {
         timestamp: Date.now(),
       });
     } catch (error) {
+      // A failed read is cached for 5 s only (not the full window): a transient error must
+      // not hide every provider for five minutes, and there is no env fallback to cover it.
       logger.error({ err: error }, '[PAYMENT] Failed to initialize providers');
-
-      // Initialize from env as fallback
-      this.initializeFromEnv(providers, configs);
-
-      if (providers.size > 0) {
-        defaultProvider = providers.keys().next().value || null;
-      }
-
       this.cache.set(storeId, {
-        providers,
-        configs,
-        defaultProvider,
-        timestamp: Date.now(),
+        providers: new Map(),
+        configs: new Map(),
+        defaultProvider: null,
+        timestamp: Date.now() - this.cacheTimeout + 5_000,
       });
     }
   }
 
   /**
-   * Initialize from environment variables (fallback)
-   */
-  private initializeFromEnv(
-    providers: Map<PaymentProvider, IPaymentProvider>,
-    configs: Map<PaymentProvider, ProviderConfig>
-  ): void {
-    // Initialize Tap Payments
-    if (config.tapApiKey) {
-      const providerConfig: ProviderConfig = {
-        provider: 'tap',
-        apiKey: config.tapApiKey,
-        secretKey: config.tapSecretKey,
-        webhookSecret: config.tapWebhookSecret,
-        isTestMode: config.paymentTestMode,
-        isEnabled: true,
-        isDefault: true,
-        supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay'],
-        supportedCurrencies: ['KWD', 'USD', 'SAR', 'AED', 'BHD'],
-        fixedFee: 0,
-        percentageFee: 2.5,
-      };
-      const tap = this.createProvider(providerConfig);
-      if (tap) {
-        providers.set('tap', tap);
-        configs.set('tap', providerConfig);
-      }
-    }
-
-    // Initialize MyFatoorah
-    if (config.myfatoorahApiKey) {
-      const providerConfig: ProviderConfig = {
-        provider: 'myfatoorah',
-        apiKey: config.myfatoorahApiKey,
-        webhookSecret: config.myfatoorahWebhookSecret || undefined,
-        isTestMode: config.paymentTestMode,
-        isEnabled: true,
-        isDefault: false,
-        supportedMethods: ['knet', 'visa', 'mastercard'],
-        supportedCurrencies: ['KWD', 'USD', 'SAR', 'AED', 'BHD'],
-        fixedFee: 0,
-        percentageFee: 2.0,
-      };
-      const myfatoorah = this.createProvider(providerConfig);
-      if (myfatoorah) {
-        providers.set('myfatoorah', myfatoorah);
-        configs.set('myfatoorah', providerConfig);
-      }
-    }
-
-    // Initialize Hesabe
-    if (config.hesabeApiKey) {
-      const providerConfig: ProviderConfig = {
-        provider: 'hesabe',
-        apiKey: config.hesabeApiKey,
-        secretKey: config.hesabeSecretKey,
-        merchantId: config.hesabeMerchantId,
-        webhookSecret: config.hesabeWebhookSecret,
-        isTestMode: config.paymentTestMode,
-        isEnabled: true,
-        isDefault: false,
-        supportedMethods: ['knet', 'visa', 'mastercard'],
-        supportedCurrencies: ['KWD'],
-        fixedFee: 0,
-        percentageFee: 2.5,
-      };
-      const hesabe = this.createProvider(providerConfig);
-      if (hesabe) {
-        providers.set('hesabe', hesabe);
-        configs.set('hesabe', providerConfig);
-      }
-    }
-
-    // Initialize UPayments
-    if (config.upaymentsApiKey) {
-      const providerConfig: ProviderConfig = {
-        provider: 'upayments',
-        apiKey: config.upaymentsApiKey,
-        secretKey: config.upaymentsSecretKey,
-        merchantId: config.upaymentsMerchantId,
-        webhookSecret: config.upaymentsWebhookSecret,
-        isTestMode: config.paymentTestMode,
-        isEnabled: true,
-        isDefault: false,
-        supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'samsung_pay'],
-        supportedCurrencies: ['KWD'],
-        fixedFee: 0,
-        percentageFee: 2.5,
-      };
-      const upayments = this.createProvider(providerConfig);
-      if (upayments) {
-        providers.set('upayments', upayments);
-        configs.set('upayments', providerConfig);
-      }
-    }
-  }
-
-  /**
-   * Create a provider instance from config
+   * Build the provider for one merchant's config. The Egyptian gateways are v2 adapters
+   * (`registry.ts`) wrapped by the bridge with THIS merchant's decrypted credentials; there
+   * is no platform-level fallback, so no gateway is ever reachable with a key that is not the
+   * merchant's own.
    */
   private createProvider(config: ProviderConfig): IPaymentProvider | null {
     try {
-      let provider: IPaymentProvider;
-
-      switch (config.provider) {
-        case 'tap':
-          provider = new TapPaymentProvider();
-          provider.initialize({
-            apiKey: config.apiKey,
-            secretKey: config.secretKey,
-            baseUrl: '',
-            isTestMode: config.isTestMode,
-            webhookSecret: config.webhookSecret,
-          });
-          break;
-
-        case 'myfatoorah':
-          provider = new MyFatoorahPaymentProvider();
-          provider.initialize({
-            apiKey: config.apiKey,
-            baseUrl: '',
-            isTestMode: config.isTestMode,
-            webhookSecret: config.webhookSecret,
-          });
-          break;
-
-        case 'hesabe':
-          provider = new HesabePaymentProvider();
-          provider.initialize({
-            apiKey: config.apiKey,
-            secretKey: config.secretKey,
-            merchantId: config.merchantId,
-            baseUrl: '',
-            isTestMode: config.isTestMode,
-            webhookSecret: config.webhookSecret,
-          });
-          break;
-
-        case 'upayments':
-          provider = new UPaymentsProvider();
-          provider.initialize({
-            apiKey: config.apiKey,
-            secretKey: config.secretKey,
-            merchantId: config.merchantId,
-            baseUrl: '',
-            isTestMode: config.isTestMode,
-            webhookSecret: config.webhookSecret,
-          });
-          break;
-
-        default:
-          logger.warn({ provider: config.provider }, '[PAYMENT] Unknown provider');
-          return null;
+      const adapter = getProviderV2(config.provider);
+      if (!adapter || MANUAL_PROVIDERS.has(config.provider)) {
+        logger.warn({ provider: config.provider }, '[PAYMENT] Unknown provider');
+        return null;
       }
-
-      return provider;
+      return new V2ProviderBridge(adapter, {
+        apiKey: config.apiKey || undefined,
+        secretKey: config.secretKey,
+        merchantId: config.merchantId,
+        webhookSecret: config.webhookSecret,
+        mode: config.isTestMode ? 'sandbox' : 'live',
+        settings: config.settings,
+      });
     } catch (error) {
       logger.error(
         { err: error, provider: config.provider },
@@ -710,7 +575,20 @@ export class PaymentService {
   }
 
   /**
-   * Get payment methods for a specific provider
+   * Non-secret, per-provider settings of a store's config (Paymob integration ids, Fawry
+   * methods, ...). Never returns a credential: `ProviderConfig` holds the DECRYPTED keys.
+   */
+  static async getProviderSettings(
+    provider: PaymentProvider,
+    storeId?: string
+  ): Promise<Record<string, unknown>> {
+    return (await factory.getProviderConfig(provider, storeId))?.settings ?? {};
+  }
+
+  /**
+   * Get payment methods for a specific provider. Only what a customer may see: the provider's
+   * name, its methods, and the merchant's fees. The decrypted credentials the factory holds
+   * are NEVER part of this answer: it is returned by a public route.
    */
   static async getPaymentMethods(
     amount: number,
@@ -718,13 +596,17 @@ export class PaymentService {
     provider?: PaymentProvider,
     storeId?: string
   ): Promise<
-    { provider: PaymentProvider; methods: AvailablePaymentMethod[]; config?: ProviderConfig }[]
+    {
+      provider: PaymentProvider;
+      methods: AvailablePaymentMethod[];
+      config?: { fixedFee: number; percentageFee: number };
+    }[]
   > {
     const providers = provider ? [provider] : await factory.getAvailableProviders(storeId);
     const results: {
       provider: PaymentProvider;
       methods: AvailablePaymentMethod[];
-      config?: ProviderConfig;
+      config?: { fixedFee: number; percentageFee: number };
     }[] = [];
 
     for (const p of providers) {
@@ -732,7 +614,13 @@ export class PaymentService {
         const providerInstance = await factory.getProvider(p, storeId);
         const methods = await providerInstance.getPaymentMethods(amount, currency);
         const providerConfig = await factory.getProviderConfig(p, storeId);
-        results.push({ provider: p, methods, config: providerConfig });
+        results.push({
+          provider: p,
+          methods,
+          config: providerConfig
+            ? { fixedFee: providerConfig.fixedFee, percentageFee: providerConfig.percentageFee }
+            : undefined,
+        });
       } catch (error) {
         logger.error(
           { err: error, provider: p },
@@ -745,10 +633,15 @@ export class PaymentService {
   }
 
   /**
-   * Create a payment: the provider call, then the record. Kept for callers that
-   * own a transaction boundary themselves (payment links, the agent's place_order).
-   * The checkout calls the two halves separately so NO transaction is open during
-   * the provider call (see `requestProviderPayment`).
+   * Create a payment: the provider call, then the record, for callers that have NO request
+   * transaction open (an admin payment link, the agent's `place_order`, a retry): the provider
+   * call runs with nothing held, then ONE short tenant transaction records the Payment row and
+   * its audit event. The checkout calls the two halves itself (`requestProviderPayment`,
+   * `recordProviderPayment`) because it also writes an audit log in the same short transaction.
+   *
+   * Never call this from inside `tenantContext` / `runInTenantContext`: the gateway call would
+   * then hold that transaction (and a pooled connection) for as long as the gateway takes, and
+   * Prisma expires it 30 s after BEGIN. Mount the route on `storeScopeContext` instead.
    */
   static async createPayment(
     request: CreatePaymentRequest,
@@ -760,16 +653,29 @@ export class PaymentService {
       provider,
       storeId
     );
-    await PaymentService.recordProviderPayment(providerName, request, response, storeId);
+    // Short record transaction. Without a store there is nothing to scope (platform tests).
+    if (storeId) {
+      await runInTenantContext(storeId, () =>
+        PaymentService.recordProviderPayment(providerName, request, response, storeId)
+      );
+    } else {
+      await PaymentService.recordProviderPayment(providerName, request, response, storeId);
+    }
     return response;
   }
 
   /**
    * HALF 1: ask the provider to open a payment. Writes NOTHING (the provider's
-   * config is read in its own short store scope) and must be called with no
+   * config and the attempt count are read in short store scopes) and must be called with no
    * request transaction open. Bounded by a deadline and run behind the
    * per-(store, provider) circuit breaker, so a slow or dead gateway fails one
    * method fast instead of holding a connection or stalling checkout.
+   *
+   * The adapter is idempotent on `metadata.idempotencyKey`. When the caller gives none, it is
+   * `<order>:<provider>:<attempt>` where attempt is the number of payments the order already
+   * has with this provider plus one: a retry of an attempt that timed out (no row written)
+   * reuses the key, so it can never mint a second invoice, while a retry after a recorded
+   * failure gets a fresh one.
    */
   static async requestProviderPayment(
     request: CreatePaymentRequest,
@@ -777,8 +683,23 @@ export class PaymentService {
     storeId?: string
   ): Promise<{ providerName: PaymentProvider; response: PaymentResponse }> {
     const p = await factory.getProvider(provider, storeId);
+    let keyed = request;
+    if (!request.metadata?.idempotencyKey) {
+      const prior = storeId
+        ? await withStore(storeId, () =>
+            prisma.payment.count({ where: { orderId: request.orderId, provider: p.name } })
+          )
+        : 0;
+      keyed = {
+        ...request,
+        metadata: {
+          ...request.metadata,
+          idempotencyKey: `${request.orderId}:${p.name}:${prior + 1}`,
+        },
+      };
+    }
     const call = () =>
-      withProviderDeadline(`${p.name}.createPayment`, () => p.createPayment(request));
+      withProviderDeadline(`${p.name}.createPayment`, () => p.createPayment(keyed));
     const response = storeId ? await callThroughBreaker(storeId, p.name, call) : await call();
     return { providerName: p.name, response };
   }
@@ -834,13 +755,14 @@ export class PaymentService {
         status: 'pending',
         transactionId: response.transactionId,
         invoiceId: response.invoiceId,
-        paymentUrl: response.paymentUrl,
+        // A reference-code payment (Fawry) has no URL: the instruction is in the metadata.
+        paymentUrl: response.paymentUrl || null,
         metadata: {
           provider: providerName,
           invoiceId: response.invoiceId,
-          paymentUrl: response.paymentUrl,
+          paymentUrl: response.paymentUrl || null,
           ...response.metadata,
-        },
+        } as Prisma.InputJsonValue,
       },
       include: { order: { select: { storeId: true } } },
     });
@@ -876,7 +798,7 @@ export class PaymentService {
       include: { order: { include: { store: true } } },
     });
 
-    const providerName = provider || (payment?.provider as PaymentProvider) || 'tap';
+    const providerName = provider || (payment?.provider as PaymentProvider) || undefined;
     const effectiveStoreId = storeId || payment?.order?.storeId;
     return (await factory.getProvider(providerName, effectiveStoreId)).getPaymentStatus(
       transactionId
@@ -1455,12 +1377,37 @@ export class PaymentService {
     if (!signature) {
       throw new AppError(400, 'MISSING_SIGNATURE', 'Webhook signature is required');
     }
+    let webhookData: WebhookPayload;
     {
       // Verify against the raw body string when available (required for a
       // correct HMAC). Fall back to the payload object for providers that do
       // not use raw-body HMAC.
       const verifyTarget: unknown = rawBody !== undefined ? rawBody : payload;
-      if (!p.verifyWebhook(verifyTarget, signature)) {
+      let verified: WebhookPayload | null = null;
+      let signatureOk: boolean;
+      if (p.verifyAndParseWebhook) {
+        // v2 adapter (Paymob / Kashier / Fawry): verify and parse in one step, over the raw
+        // body when we have it (the three gateways sign parsed fields, so a re-serialised
+        // payload verifies the same).
+        try {
+          verified = p.verifyAndParseWebhook(
+            typeof verifyTarget === 'string' ? verifyTarget : JSON.stringify(verifyTarget),
+            signature
+          );
+          signatureOk = true;
+        } catch (verifyError) {
+          if (
+            verifyError instanceof PaymentProviderError &&
+            verifyError.code === 'WEBHOOK_MALFORMED'
+          ) {
+            throw new AppError(400, 'WEBHOOK_MALFORMED', 'Webhook body is not a valid delivery');
+          }
+          signatureOk = false;
+        }
+      } else {
+        signatureOk = p.verifyWebhook(verifyTarget, signature);
+      }
+      if (!signatureOk) {
         // HMAC verification failed — could be a single misconfigured test
         // webhook (noise) or a real attacker / rotated credential (signal).
         // Throttle via redis counter: 3+ failures from the same provider
@@ -1499,10 +1446,9 @@ export class PaymentService {
         }
         throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature');
       }
+      // Parse webhook using the structured payload object (v2: parsed with the verification).
+      webhookData = verified ?? p.parseWebhook(payload);
     }
-
-    // Parse webhook using the structured payload object
-    const webhookData = p.parseWebhook(payload);
 
     // Find and update payment. Include `order.customer` + `order.store` so we
     // can render the customer's name and store name in the post-status
@@ -1528,9 +1474,14 @@ export class PaymentService {
       where: {
         AND: [
           {
+            // Only the references the webhook actually carries: Prisma drops an `undefined`
+            // filter, and `{ invoiceId: undefined }` inside an OR would match EVERY payment.
             OR: [
-              { transactionId: webhookData.transactionId },
-              { invoiceId: webhookData.invoiceId },
+              ...(webhookData.transactionId ? [{ transactionId: webhookData.transactionId }] : []),
+              ...(webhookData.invoiceId ? [{ invoiceId: webhookData.invoiceId }] : []),
+              ...(!webhookData.transactionId && !webhookData.invoiceId
+                ? [{ id: '00000000-0000-0000-0000-000000000000' }]
+                : []),
             ],
           },
           ...(storeId ? [{ order: { storeId } }] : []),
@@ -1622,9 +1573,8 @@ export class PaymentService {
       throw new AppError(400, 'STORE_MISMATCH', 'Webhook payload does not match resolved store');
     }
 
-    // Refund webhook short-circuit. MyFatoorah delivers "RefundStatusChanged"
-    // events when their finance team executes (Refunded) or rejects (Canceled)
-    // a previously-submitted MakeRefund. parseWebhook tags these with the
+    // Refund webhook short-circuit. A gateway delivers a refund event when it
+    // executes or rejects a previously-submitted refund. The adapter tags these with the
     // `refund` field. Route them through a separate path so we don't
     // re-mutate the order's payment lifecycle every time a refund updates.
     if (webhookData.refund) {
@@ -1659,7 +1609,7 @@ export class PaymentService {
       // Out-of-band refund detection: if Payment.status was not already
       // 'refunded' / 'partially_refunded' when the executed webhook arrived,
       // the admin Refund-via-provider button never ran — someone refunded
-      // directly in MyFatoorah's portal. Fire applyRefundEffects so the
+      // directly in the gateway's portal. Fire applyRefundEffects so the
       // side-effects (inventory restore, coupon decrement, loyalty reversal,
       // customer email) still happen. When the admin button DID run, we
       // skip — the side-effects fired the moment they clicked.
@@ -1857,7 +1807,7 @@ export class PaymentService {
           // admits an ALREADY-partially-refunded row on purpose, so a second, genuinely
           // out-of-band partial refund can still raise the total. That is only
           // safe because resolveRefundSettlement refuses to read an unreported
-          // amount — or MyFatoorah's `RefundAmount ?? Amount` invoice echo — as
+          // amount — or a gateway's invoice-amount echo — as
           // settling a payment that already has a refund accounted. Without
           // that, the async settle webhook for an IN-BAND partial return would
           // land here and mark the payment fully refunded at its full amount,
@@ -1949,8 +1899,7 @@ export class PaymentService {
     // A 'completed' webhook only proves the provider says the invoice is
     // paid — never on its own that the AMOUNT paid matches `order.total`.
     // `webhookData.amount` is already normalized to piastres by every
-    // provider's `parseWebhook` (`Math.round(providerValue * 1000)` in the legacy KWD adapters — see
-    // myfatoorah/tap/hesabe/upayments `.provider.ts`), the same unit as
+    // adapter (`toMinor`, integer string math, in each Egyptian adapter), the same unit as
     // `payment.amount` (set from `order.total` at payment creation — see
     // `PaymentService.createPayment`), so this is a direct same-unit
     // comparison, not a currency-major-vs-minor mismatch. Gate on the
@@ -2238,26 +2187,32 @@ export class PaymentService {
   }
 
   /**
-   * Retry failed payment
+   * Retry a failed payment: a SHORT read in the store's scope, then the provider call with no
+   * transaction open (behind the breaker), then one short transaction to record. Call it with
+   * no request transaction held (the route resolves the store through a definer and calls this
+   * bare); `storeId` is the payment's own store.
    */
   static async retryPayment(
     paymentId: string,
-    provider?: PaymentProvider
+    provider: PaymentProvider | undefined,
+    storeId: string
   ): Promise<PaymentResponse> {
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: {
-        order: {
-          include: {
-            items: { include: { product: true } },
-            customer: true,
-            store: true,
+    const payment = await withStore(storeId, () =>
+      prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: {
+          order: {
+            include: {
+              items: { include: { product: true } },
+              customer: true,
+              store: true,
+            },
           },
         },
-      },
-    });
+      })
+    );
 
-    if (!payment) {
+    if (!payment || payment.order.storeId !== storeId) {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
     }
 
@@ -2268,9 +2223,9 @@ export class PaymentService {
     const order = payment.order;
 
     // Guest orders carry customer details on order.shippingAddress (JSON),
-    // not on order.customer (which is null for guests). Same provider-side
-    // validation that rejects empty CustomerEmail (MyFatoorah 400) applies on
-    // retry — fall through to shippingAddress fields before defaulting.
+    // not on order.customer (which is null for guests). A provider that rejects an
+    // empty CustomerEmail applies on retry too — fall through to shippingAddress
+    // fields before defaulting.
     const retryShipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
     return this.createPayment(
       {

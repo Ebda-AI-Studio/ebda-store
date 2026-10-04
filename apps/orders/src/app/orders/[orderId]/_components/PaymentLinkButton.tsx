@@ -17,16 +17,18 @@ interface PaymentLinkButtonProps {
 
 interface PaymentLinkResult {
   paymentUrl: string;
+  /** Fawry: the reference code the customer pays at an outlet (no URL). */
+  instruction?: { kind: string; code?: string };
   invoiceId?: string;
-  notifyVia: 'link' | 'email' | 'all';
-  customerEmail?: string;
+  notifyVia: 'link';
 }
 
 /**
- * "Issue MyFatoorah payment link" button + modal — ported from the admin
- * PaymentLinkButton to the PWA's ToastContext + plain elements. When the order
- * already has a payment URL it's surfaced directly with copy/open; otherwise the
- * modal lets the merchant generate one (copy-link or email channel).
+ * "Issue payment link" button + modal — ported from the admin PaymentLinkButton
+ * to the PWA's ToastContext + plain elements. When the order already has a
+ * payment URL it's surfaced directly with copy/open; otherwise the modal lets the
+ * merchant generate one with the store's gateway and copy it (the only channel:
+ * none of the Egyptian gateways sends the customer a message for us).
  */
 export function PaymentLinkButton({
   storeId,
@@ -51,21 +53,18 @@ export function PaymentLinkButton({
     }
   };
 
-  const issue = async (notifyVia: 'link' | 'email') => {
+  const issue = async () => {
     setIsIssuing(true);
     try {
       const { data, error: apiError } = await apiPost<PaymentLinkResult>(
         `/api/v1/stores/${storeId}/orders/${orderId}/payment-link`,
-        { notifyVia }
+        { notifyVia: 'link' }
       );
       if (apiError || !data) {
         notify(apiError?.message || ta.issueLinkFailed, 'error');
         return;
       }
       setResult(data);
-      if (notifyVia === 'email') {
-        notify(fmt(ta.emailSent, { email: data.customerEmail ?? '' }), 'success');
-      }
     } catch (e) {
       notify(e instanceof Error ? e.message : ta.issueLinkFailed, 'error');
     } finally {
@@ -203,21 +202,12 @@ export function PaymentLinkButton({
                 <div className="space-y-3">
                   <button
                     type="button"
-                    onClick={() => issue('link')}
+                    onClick={() => issue()}
                     disabled={isIssuing}
                     className="w-full rounded-xl border-2 border-primary bg-primary/5 p-4 text-start active:bg-primary/10 disabled:opacity-60"
                   >
                     <p className="font-semibold text-foreground">{ta.copyLink}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{ta.copyLinkDesc}</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => issue('email')}
-                    disabled={isIssuing}
-                    className="w-full rounded-xl border-2 border-border bg-background p-4 text-start active:bg-info/5 disabled:opacity-60"
-                  >
-                    <p className="font-semibold text-foreground">{ta.sendEmail}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{ta.sendEmailDesc}</p>
                   </button>
                 </div>
                 {isIssuing && (
@@ -227,11 +217,7 @@ export function PaymentLinkButton({
             ) : (
               <div className="space-y-4">
                 <div className="rounded-xl border border-success/20 bg-success/10 p-4">
-                  <p className="text-sm font-semibold text-success-ink">
-                    {result.notifyVia === 'email'
-                      ? fmt(ta.emailSent, { email: result.customerEmail ?? '' })
-                      : ta.linkGenerated}
-                  </p>
+                  <p className="text-sm font-semibold text-success-ink">{ta.linkGenerated}</p>
                 </div>
                 <div>
                   <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -241,14 +227,14 @@ export function PaymentLinkButton({
                     <input
                       type="text"
                       readOnly
-                      value={result.paymentUrl}
+                      value={result.paymentUrl || result.instruction?.code || ''}
                       onFocus={e => e.currentTarget.select()}
                       dir="ltr"
                       className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground focus:outline-none"
                     />
                     <button
                       type="button"
-                      onClick={() => copy(result.paymentUrl)}
+                      onClick={() => copy(result.paymentUrl || result.instruction?.code || '')}
                       className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground active:bg-primary/90"
                     >
                       {ta.copyLink}

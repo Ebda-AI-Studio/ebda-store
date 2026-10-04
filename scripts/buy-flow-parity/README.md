@@ -53,15 +53,15 @@ role**, the same way production and CI run it. The scenarios then run over HTTP.
   production `DATABASE_URL` cannot reach the process under test.
 - **Network boundary** (`lib/preload.mjs`, loaded with `node --import`, identical
   for both refs):
-  - MyFatoorah (`api.`/`apitest.myfatoorah.com`) is rewritten to the local stub
-    (`lib/stub.mjs`). The stub answers InitiatePayment, SendPayment,
-    GetPaymentStatus, MakeRefund and GetRefundStatus, and records every request.
+  - Paymob (`accept.paymob.com`) is rewritten to the local stub
+    (`lib/stub.mjs`). The stub answers the Intention API, transaction inquiry,
+    refund and void, and records every request.
     The snapshot therefore contains the exact amount, currency, customer fields,
-    callback URLs and bearer key the API sent.
+    callback URLs and `Token` key the API sent.
   - **Every other non-loopback call is refused** (fetch and http/https). No real
     gateway, email, push or analytics call can happen.
-- **Webhooks** are sent to the real `/webhooks/payment/myfatoorah` route and
-  HMAC-signed with the per-store webhook secret seeded into `payment_configs`,
+- **Webhooks** are sent to the real `/webhooks/payment/paymob` route (HMAC-SHA512 over
+  the transaction fields, in `?hmac=`) signed with the per-store HMAC secret seeded into `payment_configs`,
   which is exactly what `PaymentService.handleWebhook` verifies.
 - **Inngest runs for real** (`lib/inngest-executor.mjs`). Events go to the stub.
   The executor then drives the API's own `/api/v1/inngest` endpoint with the SDK
@@ -89,7 +89,7 @@ Per scenario, after normalisation:
 | `db.inventory`, `db.inventoryHistory`              | product + variant stock after the scenario and each history row                                                         |
 | `db.coupons`                                       | `usage_count` of every coupon the scenario owns                                                                         |
 | `db.webhookEvents`                                 | inbox rows for the scenario's invoices                                                                                  |
-| `gateway.myfatoorah`                               | every request the gateway stub received                                                                                 |
+| `gateway.paymob`                                   | every request the gateway stub received                                                                                 |
 | `gateway.inngestEvents`, `inngestRuns`             | events emitted (name + data), and each background function run's outcome and step sequence                              |
 
 Normalisation replaces only values that are random by construction: generated
@@ -109,7 +109,7 @@ cannot cascade into another's stock or usage counts.
 `node scripts/buy-flow-parity/run.mjs --list`. They cover guest and signed-in
 customers; a single item, multi-qty, a variant product and a bundle;
 percentage/fixed coupons; per-area shipping and the free-shipping threshold; a
-VAT 5% store; COD with fee (and a replayed payments/create); MyFatoorah create →
+VAT 5% store; COD with fee (and a replayed payments/create); Paymob create →
 verify-on-return Paid, create → signed webhook Paid (+ duplicate replay), a forged
 webhook signature, and create → gateway rejection → rollback; a failed payment;
 out-of-stock (cart and order level); price/total tampering; an undeliverable
@@ -184,10 +184,10 @@ harness cannot inject it):
 | `ENCRYPTION_KEY`                                      | harness key (default in `run.mjs`; or `--encryption-key`)                             |
 | `LOAD_TEST_BYPASS_TOKEN`                              | `bfp-parity-load-test-token`                                                          |
 | `INNGEST_BASE_URL` and `INNGEST_DEV`                  | `http://127.0.0.1:4690` (the harness stub)                                            |
-| `MYFATOORAH_BASE_URL`                                 | `http://127.0.0.1:4690/mf`                                                            |
+| `PAYMOB_BASE_URL`                                     | `http://127.0.0.1:4690/paymob`                                                        |
 | `NODE_ENV=development` (or `PAYMENT_PROVIDER_STUB=1`) | required for the override to be honoured                                              |
 
-`MYFATOORAH_BASE_URL` (documented in `docs/ENVIRONMENT.md`) is the runtime-agnostic
+`PAYMOB_BASE_URL` (documented in `docs/ENVIRONMENT.md`) is the runtime-agnostic
 replacement for the `node --import` preload: the provider calls the stub directly,
 so it works on a Worker. The harness runs the stub (`lib/stub.mjs`) as a loopback
 HTTP server in its own process (`--stub-port`, 4690) and records the same requests
@@ -205,16 +205,24 @@ node scripts/buy-flow-parity/run.mjs \
 
 Always read `out/<stamp>/result.json` (`rows[].verdict`), not just the exit code.
 
-### Results (2026-10-03, Linux, Postgres 16 + Redis 7)
+### Payment endpoints must be real (guard)
+
+Two sides that are equally broken diff clean: the 2026-10-03 run reported 16/16 PASS
+while every `/payments/create` answered 404 on both sides. `lib/guards.mjs`
+(`paymentEndpointProblems`) therefore fails a scenario that is otherwise a PASS when
+any step on `/payments*` or `/webhooks/payment*` answered 404, or when an expectation
+declared with `ctx.expect(step, [codes])` is unmet (step never ran, or another
+status). The verdict is then ERROR with the reason, and the guard has a unit test
+(`tests/unit/buy-flow-parity-guards.test.ts`).
+
+### Results (2026-10-04, Linux, Postgres 16 + Redis 7)
 
 - Both sides = the Node-Express API built from the same commit, two instances
-  (:4611 / :4612), two databases (`bfp_a` / `bfp_b`): **16/16 PASS**.
-- Negative control: head instance with the COD fixed fee raised by 1 EGP (+100
-  piastres in `payment.routes.js`, built output only, reverted): **DIFF** in
-  `guest-cod-fee-fixed-coupon`, `customer-cod-free-shipping-threshold`,
-  `cod-cancel-restock` (e.g. `db.orders[0].total` 8500 -> 8600,
-  `...create-payment.body.data.codFee` 500 -> 600) and `out-of-stock`; the other 12
-  stayed PASS. After the revert the suite is 16/16 PASS again.
-- Known finding: the MyFatoorah provider still converts with a fils-era `/ 1000`
-  (the stub records `InvoiceValue: 9` for a 9000-piastre order). Parity does not
-  fail on it (both sides do the same); it is the EGP provider hand-off item.
+  (:4611 / :4612), two fresh databases (`sp6b_a` / `sp6b_b`), api-url mode:
+  **16/16 PASS**, with real 200s on the payment endpoints (head: `create-payment` 200 x14
+  (+1 deliberate gateway refusal -> 502), `create-payment-replay` 200, `verify-payment` 200 x9,
+  signed webhook paid / duplicate / failed 200, admin refund-via-provider 200 x2).
+- Negative control (guard): both instances run with the payments router mounted at a
+  wrong path (built output only, reverted): every scenario **ERROR**, exit 1 ("payment
+  endpoint answered 404 ..."), although the two sides were identical. After the revert
+  the suite is 16/16 PASS again.

@@ -39,7 +39,7 @@ import { InstapayService } from '../services/payment-providers/instapay.service'
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
-import type { Currency } from '../services/payment-providers/types';
+import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
@@ -1068,7 +1068,7 @@ router.post(
  * POST /stores/:storeId/orders/:orderId/refresh-payment-status
  *
  * Manual sync — admin clicks "refresh" on the order detail page to
- * re-check payment status with the provider (MyFatoorah / Tap /
+ * re-check payment status with the provider (Paymob / Kashier /
  * etc.) and update our DB accordingly. Use when a webhook didn't
  * fire (provider portal misconfigured, signature mismatch, etc.)
  * but the customer says they paid.
@@ -1117,7 +1117,7 @@ router.post(
       // from the stored payment row).
       const status = await PaymentService.getPaymentStatus(
         payment.transactionId,
-        payment.provider as 'tap' | 'myfatoorah' | 'hesabe' | 'upayments',
+        payment.provider as PaymentProvider,
         storeId
       );
 
@@ -1193,7 +1193,7 @@ router.post(
  * arrive (provider portal misconfigured, signature mismatch, the merchant
  * issued the refund out-of-band in the provider portal).
  *
- * MyFatoorah refunds start as Pending → finance team executes →
+ * Some gateways queue a refund as Pending → finance executes →
  * "Refunded" (or rejects → "Canceled"). The provider notifies us via
  * webhook, but this endpoint is the pull-side equivalent.
  */
@@ -1240,7 +1240,7 @@ router.post(
       const status = await runInTenantContext(storeId, () =>
         PaymentService.getRefundStatus(
           payment.refundId!,
-          payment.provider as 'tap' | 'myfatoorah' | 'hesabe' | 'upayments',
+          payment.provider as PaymentProvider,
           storeId
         )
       );
@@ -1471,7 +1471,7 @@ router.post(
  * POST /stores/:storeId/orders/:orderId/refund-via-provider
  *
  * Admin-initiated refund. Calls the payment provider's refund API
- * (MyFatoorah / Tap / etc.), then PaymentService.refund handles the
+ * (Paymob / Kashier / Fawry), then PaymentService.refund handles the
  * DB transaction (Payment.status -> refunded, Order.status -> refunded)
  * and OrderService.applyRefundEffects fans out side effects:
  *   - inventory restore (track_inventory products)
@@ -1558,10 +1558,7 @@ router.post(
       // chain must surface as a non-2xx — this used to catch only the
       // provider-call error and swallow everything else into an HTTP 200
       // (money-integrity audit F2: operator gets no signal a refund
-      // broke). We still enrich the message with a MyFatoorah-specific
-      // hint (the #1 first-time failure mode is the "Refund" API
-      // permission not being enabled on the merchant account) and forward
-      // to `next(err)` instead of writing the response ourselves, so every
+      // broke). We forward to `next(err)` instead of writing the response ourselves, so every
       // failure mode in the chain — not just the provider call — reaches
       // the client as a real error.
       let result;
@@ -1587,11 +1584,7 @@ router.post(
           },
           '[Refund] admin-initiated provider refund failed'
         );
-        const hint =
-          payment.provider === 'myfatoorah'
-            ? ' (verify Refund permission is enabled on this account in the MyFatoorah portal: Settings → API Permissions → MakeRefund)'
-            : '';
-        next(new AppError(502, 'REFUND_FAILED', `${refundMessage}${hint}`));
+        next(new AppError(502, 'REFUND_FAILED', refundMessage));
         return;
       }
 
@@ -1658,7 +1651,7 @@ const adminOrderSchema = z
     billingAddress: z.record(z.unknown()).optional(),
     items: z.array(adminOrderItemSchema).min(1),
     paymentMethod: z.enum(['online', 'cod']).optional(),
-    paymentProvider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
+    paymentProvider: z.enum(['paymob', 'kashier', 'fawry', 'instapay', 'cod']).optional(),
     notes: z.string().optional(),
     couponCode: z.string().optional(),
     currency: z.string().optional(),
@@ -1725,25 +1718,28 @@ router.post(
 /**
  * POST /stores/:storeId/orders/:orderId/payment-link
  *
- * Issue a MyFatoorah payment link for an existing order. Used by the
- * merchant when a customer couldn't complete checkout on the original
- * payment flow (e.g. KNET timeout, gateway blocked, customer abandoned
- * and asked for the link via WhatsApp).
+ * Issue a payment link for an existing order, through one of the store's own gateways (Paymob,
+ * Kashier, Fawry). Used by the merchant when a customer couldn't complete checkout on the
+ * original payment flow (gateway blocked, customer abandoned and asked for the link).
  *
  * Body:
- *   - notifyVia: 'link' | 'email' | 'all'  (default 'link')
- *     'link'  → return URL only, merchant copies + sends manually
- *     'email' → MyFatoorah sends email to the customer
- *     'all'   → MyFatoorah sends SMS + email (NB: SMS not surfaced in
- *               UI yet, but the provider supports it natively)
+ *   - provider: 'paymob' | 'kashier' | 'fawry'   (default: the store's default online provider)
+ *   - method:   which of the provider's methods to offer (default: all it has enabled)
+ *   - notifyVia: 'link' (the only channel: the merchant copies and shares the link; none of the
+ *     Egyptian gateways sends the customer a message for us)
  *
- * The endpoint reuses the same `PaymentService.createPayment` path as
- * the public checkout — same per-store credentials, same callback +
- * webhook URLs — so a paid link still triggers the existing webhook +
- * order-status pipeline.
+ * The endpoint reuses the same `PaymentService.createPayment` path as the public checkout:
+ * same per-store credentials, same callback and webhook URLs, so a paid link still triggers the
+ * webhook and order-status pipeline.
+ *
+ * NO REQUEST TRANSACTION: this route runs under store scope (`orderRouteContext`), so the
+ * gateway call holds no transaction or connection. The order is read in a short scope, the
+ * gateway is called, then one short transaction records the payment.
  */
 const issuePaymentLinkSchema = z.object({
   notifyVia: z.enum(['link', 'email', 'all']).optional().default('link'),
+  provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
+  method: z.enum(['card', 'meeza', 'wallet', 'valu', 'payatfawry']).optional(),
 });
 
 router.post(
@@ -1756,7 +1752,19 @@ router.post(
     try {
       const { storeId, orderId } = req.params;
       const user = getAuthUser(req);
-      const { notifyVia } = issuePaymentLinkSchema.parse(req.body ?? {});
+      const { notifyVia, provider, method } = issuePaymentLinkSchema.parse(req.body ?? {});
+
+      if (notifyVia !== 'link') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NOTIFY_NOT_SUPPORTED',
+            message:
+              'The payment gateways do not send the link to the customer. Copy the link and share it.',
+          },
+        });
+        return;
+      }
 
       const order = await prisma.order.findFirst({
         where: { id: orderId, storeId, deletedAt: null },
@@ -1790,6 +1798,19 @@ router.post(
         return;
       }
 
+      // The gateway to use: the merchant's choice, else the store's default online provider.
+      const providerName = provider ?? (await PaymentService.getDefaultProvider(storeId));
+      if (!providerName) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'PAYMENT_NOT_CONFIGURED',
+            message: 'Set up a payment gateway in Settings → Payments before issuing a link.',
+          },
+        });
+        return;
+      }
+
       // Same storefront URL resolution the public checkout uses, so the
       // payment-success / payment-error callbacks land on the correct
       // tenant domain whether they have a custom domain or platform slug.
@@ -1802,21 +1823,6 @@ router.post(
         }`.trim() || 'Customer';
       const customerEmail = order.customer?.email || shipping.email || '';
       const customerPhone = order.customer?.phone || shipping.phone || undefined;
-
-      // MyFatoorah rejects empty email with 400 — bail early with a
-      // friendly error so the merchant knows they need an email on the
-      // order before they can issue a link.
-      if (notifyVia !== 'link' && !customerEmail) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'NO_CUSTOMER_EMAIL',
-            message:
-              'Cannot send the link via email — this order has no customer email on file. Pick "Copy link" and share it manually.',
-          },
-        });
-        return;
-      }
 
       const result = await PaymentService.createPayment(
         {
@@ -1836,10 +1842,11 @@ router.post(
           items: buildPaymentLineItems(order.items),
           callbackUrl: `${storefrontBaseUrl}/checkout/success`,
           errorUrl: `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/myfatoorah`,
+          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
           notifyVia,
+          ...(method ? { metadata: { method } } : {}),
         },
-        'myfatoorah',
+        providerName,
         storeId
       );
 
@@ -1850,7 +1857,7 @@ router.post(
         resourceId: orderId,
         details: {
           orderNumber: order.orderNumber,
-          notifyVia,
+          provider: providerName,
           invoiceId: result.invoiceId ?? null,
         },
         ip: req.ip,
@@ -1858,7 +1865,7 @@ router.post(
       });
 
       logger.info(
-        { orderId, orderNumber: order.orderNumber, notifyVia, invoiceId: result.invoiceId },
+        { orderId, orderNumber: order.orderNumber, provider: providerName },
         '[Payment-Link] issued by merchant'
       );
 
@@ -1866,9 +1873,11 @@ router.post(
         success: true,
         data: {
           paymentUrl: result.paymentUrl,
+          // Fawry: the reference code the customer pays with at an outlet.
+          instruction: result.instruction,
           invoiceId: result.invoiceId,
+          provider: providerName,
           notifyVia,
-          customerEmail: notifyVia !== 'link' ? customerEmail : undefined,
         },
       });
     } catch (error) {

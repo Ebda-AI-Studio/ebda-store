@@ -58,10 +58,10 @@ export default function FeaturesSection() {
     },
     {
       icon: CreditCard,
-      title: t('Kuwait payments, connected', 'مدفوعات الكويت، موصولة'),
+      title: t('Egypt payments, connected', 'مدفوعات مصر، موصولة'),
       body: t(
-        'Tap, MyFatoorah, Hesabe, and UPayments are wired in out of the box — KNET and cards work on day one, KWD is the first-class currency, and every payment is verified server-side when the customer returns.',
-        'Tap وMyFatoorah وHesabe وUPayments مدمجة من اليوم الأول — KNET والبطاقات تعمل فوراً، والدينار الكويتي هو العملة الرئيسية، ويُتحقَّق من كل دفعة على الخادم عند عودة العميل.'
+        'Paymob, Kashier, and Fawry are wired in with your own account keys — cards, Meeza, mobile wallets, valU, Pay at Fawry, InstaPay, and cash on delivery work from day one, EGP is the first-class currency, and every payment is verified server-side when the customer returns.',
+        'Paymob وKashier وفوري مدمجة بمفاتيح حسابك أنت — البطاقات وميزة والمحافظ الإلكترونية وفاليو والدفع في فوري وإنستاباي والدفع عند الاستلام تعمل من اليوم الأول، والجنيه المصري هو العملة الرئيسية، ويُتحقَّق من كل دفعة على الخادم عند عودة العميل.'
       ),
     },
     {

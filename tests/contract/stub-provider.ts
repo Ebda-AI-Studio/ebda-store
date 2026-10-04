@@ -132,7 +132,7 @@ function header(headers: WebhookHeaders, name: string): string | undefined {
 
 export function createStubProvider(gateway: StubGateway, timeoutMs = 50): PaymentProviderV2 {
   return {
-    name: 'tap', // any member of the PaymentProvider union: the stub is not registered anywhere
+    name: 'paymob', // any member of the PaymentProvider union: the stub is not registered anywhere
     capabilities: {
       methods: ['card', 'meeza', 'wallet'],
       instructions: ['redirect', 'iframe', 'reference-code'],
@@ -306,6 +306,17 @@ export function createStubControl(gateway: StubGateway): ContractControl {
         amount: minorToDecimalString(opts.amountMinor ?? toMinor(p.amount)),
       });
     },
+    webhookStates: ['pending', 'failed', 'expired'],
+    badSignature: w => ({ ...w, headers: { 'x-stub-signature': 'deadbeef' } }),
+    noSignature: w => ({ ...w, headers: {} }),
+    tamperAmount: (w, amountMinor) => ({
+      ...w,
+      rawBody: w.rawBody.replace(
+        /"amount":"[0-9.]+"/,
+        `"amount":"${minorToDecimalString(amountMinor)}"`
+      ),
+    }),
+    tamperStatus: w => ({ ...w, rawBody: w.rawBody.replace('"state":"paid"', '"state":"failed"') }),
     injectNextCall: fault => gateway.injectNextCall(fault),
     providerPaymentCount: () => gateway.createdCount,
   };

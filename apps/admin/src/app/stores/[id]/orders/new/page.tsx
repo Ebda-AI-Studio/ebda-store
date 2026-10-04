@@ -64,7 +64,7 @@ interface ShippingPreview {
  * Admin-side order creation. Phone-order MVP — merchant enters customer
  * info + picks products via search + sets quantities, submits. After
  * save lands on the order detail page where the existing "Payment Link"
- * button generates a MyFatoorah link. Ahmad 2026-05-16: "land an order
+ * button generates a payment link. Ahmad 2026-05-16: "land an order
  * from admin and copy the payment link."
  */
 export default function NewOrderPage() {

@@ -7,13 +7,6 @@ order: 7
 
 Ebda receives webhooks from payment and billing gateways. Verification always runs over the **exact raw bytes** the gateway sent, so the routes are mounted before the JSON body parser.
 
-<Callout type="soon" title="Provider status">
-  The Egyptian card and wallet providers are still being integrated. The payment webhook route today
-  carries the gateway adapters inherited from the platform's origin (Tap, MyFatoorah, Hesabe,
-  UPayments). Subscription billing has a Kashier adapter and a stub provider for tests. New
-  providers follow the same envelope described here.
-</Callout>
-
 ## Subscription billing webhooks
 
 `POST /api/v1/webhooks/billing/:provider`
@@ -37,7 +30,15 @@ For Kashier the payload must list the signed fields in `data.signatureKeys`, and
 
 `POST /api/v1/webhooks/payment/:provider`
 
-The request must carry the provider's signature header (`x-signature`, or the provider-specific `x-tap-signature`, `x-myfatoorah-signature`, `x-hesabe-signature`, `x-upayments-signature`, `tap-signature`). Without one the API answers `401`-class `MISSING_SIGNATURE` and records the attempt. The HMAC is then verified against the **per-store webhook secret** over the raw body.
+Each merchant connects their own Paymob, Kashier or Fawry account, and each gateway signs its webhook differently. Every delivery must be signed; without a signature the API answers `401`-class `MISSING_SIGNATURE` and records the attempt. The signature is then verified against the **per-store secret** the merchant saved:
+
+| Provider  | Where the signature is           | Scheme                                                                                                                     |
+| --------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `paymob`  | the `hmac` query parameter       | HMAC-SHA512 (hex) over 20 callback fields in a fixed order (amount, ids, success / pending / voided / refunded flags, ...) |
+| `kashier` | the `x-kashier-signature` header | HMAC-SHA256 (hex) over the fields named in `data.signatureKeys`, which must cover the order, amount, currency and status   |
+| `fawry`   | `messageSignature` in the body   | SHA-256 over the notification fields with the merchant's secure key appended (a plain hash, not an HMAC)                   |
+
+The payment is matched to its store by the provider's own reference (an exact match through a narrow database lookup), and a verified delivery is recorded before it is acted on, so a replay is a no-op. A signature that does not verify never moves money.
 
 | Status                       | Meaning                                                                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |

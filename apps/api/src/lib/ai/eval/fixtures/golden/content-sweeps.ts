@@ -10,8 +10,8 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
       {
         question: 'What payment methods do you accept?',
         questionAr: 'ما هي طرق الدفع المتاحة؟',
-        answer: 'We accept KNET, Visa, Mastercard, and Apple Pay.',
-        answerAr: 'نقبل الدفع عبر كي نت وفيزا وماستركارد وآبل باي.',
+        answer: 'We accept Visa, Mastercard, Meeza, mobile wallets, and cash on delivery.',
+        answerAr: 'نقبل الدفع عبر فيزا وماستركارد وميزة والمحافظ الإلكترونية والدفع عند الاستلام.',
       },
       {
         question: 'Do you deliver outside Cairo?',

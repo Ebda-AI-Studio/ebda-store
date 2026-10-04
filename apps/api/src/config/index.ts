@@ -103,31 +103,8 @@ export const config = {
 
   // Payment Settings
   paymentTestMode: process.env.PAYMENT_TEST_MODE === 'true',
-  defaultPaymentProvider: process.env.DEFAULT_PAYMENT_PROVIDER || 'tap',
+  defaultPaymentProvider: process.env.DEFAULT_PAYMENT_PROVIDER || 'paymob',
   defaultCurrency: process.env.DEFAULT_CURRENCY || REGION.currency,
-
-  // Tap Payments (https://tap.company)
-  tapApiKey: process.env.TAP_API_KEY || '',
-  tapSecretKey: process.env.TAP_SECRET_KEY || '',
-  tapWebhookSecret: process.env.TAP_WEBHOOK_SECRET || '',
-
-  // MyFatoorah (https://myfatoorah.com)
-  myfatoorahApiKey: process.env.MYFATOORAH_API_KEY || '',
-  myfatoorahTestMode: process.env.MYFATOORAH_TEST_MODE === 'true',
-  myfatoorahCountryCode: process.env.MYFATOORAH_COUNTRY_CODE || 'KWT',
-  myfatoorahWebhookSecret: process.env.MYFATOORAH_WEBHOOK_SECRET || '',
-
-  // Hesabe (https://hesabe.com)
-  hesabeApiKey: process.env.HESABE_API_KEY || '',
-  hesabeSecretKey: process.env.HESABE_SECRET_KEY || '', // Format: "ivKey:encryptionKey"
-  hesabeMerchantId: process.env.HESABE_MERCHANT_ID || '',
-  hesabeWebhookSecret: process.env.HESABE_WEBHOOK_SECRET || '',
-
-  // UPayments (https://upayments.com)
-  upaymentsApiKey: process.env.UPAYMENTS_API_KEY || '',
-  upaymentsSecretKey: process.env.UPAYMENTS_SECRET_KEY || '',
-  upaymentsMerchantId: process.env.UPAYMENTS_MERCHANT_ID || '',
-  upaymentsWebhookSecret: process.env.UPAYMENTS_WEBHOOK_SECRET || '',
 
   // Storage (S3-compatible)
   storageEndpoint: process.env.STORAGE_ENDPOINT || '',
@@ -289,11 +266,8 @@ export const config = {
 if (config.nodeEnv === 'production') {
   // Payment-provider warning removed 2026-05-20 — FWB uses per-store
   // PaymentConfig table rows (encrypted via ENCRYPTION_KEY) for every real
-  // checkout. The TAP_* / MYFATOORAH_* / HESABE_* / UPAYMENTS_* env vars
-  // only feed the legacy platform-level fallback path, which is never hit
-  // in production (no super-admin payment without a store context). The
-  // boot-time warning was misleading — it shouted about an unused code path
-  // and looked like a P0 in railway logs every cold start.
+  // checkout. There are no platform-level gateway env vars at all (SP6b):
+  // Paymob, Kashier and Fawry keys exist only as encrypted per-store rows.
 
   // Validate JWT secret strength
   if (config.jwtSecret.length < 32) {

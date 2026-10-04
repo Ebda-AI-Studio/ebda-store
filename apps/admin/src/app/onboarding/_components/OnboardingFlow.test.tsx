@@ -228,11 +228,11 @@ describe('onboarding stepper', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: 'onboarding.flow.next' }));
 
-    // Payment: COD on by default, gateways are disabled "coming soon" placeholders.
+    // Payment: COD on by default; the gateways are set up later in Settings > Payments.
     await screen.findByText('onboarding.flow.payment.title');
     const cod = screen.getByRole('switch', { name: 'onboarding.flow.payment.cod' });
     expect(cod.getAttribute('aria-checked')).toBe('true');
-    expect(screen.getAllByText('onboarding.flow.payment.comingSoon')).toHaveLength(2);
+    expect(screen.getByText('onboarding.flow.payment.moreLater')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
     await waitFor(() =>
       expect(apiPut).toHaveBeenCalledWith('/api/v1/onboarding/stores/s1/payment-methods', {

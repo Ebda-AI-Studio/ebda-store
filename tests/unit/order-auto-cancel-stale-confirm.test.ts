@@ -64,7 +64,7 @@ const gatewayOrder = (id: string) => ({
     {
       id: `p-${id}`,
       status: 'pending',
-      provider: 'tap',
+      provider: 'kashier',
       metadata: {},
       amount: 1000,
       currency: 'EGP',

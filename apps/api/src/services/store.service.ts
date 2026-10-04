@@ -766,7 +766,7 @@ export class StoreService {
     // Revenue = orders that are EITHER confirmed-and-beyond by fulfillment
     // status OR paid by payment status. Captures the case where an order
     // sits in 'pending' fulfillment but the customer's card was already
-    // charged (Tap/MyFatoorah webhook landed the payment but a fulfillment
+    // charged (a gateway webhook landed the payment but a fulfillment
     // worker hasn't moved the order forward yet). Without the paymentStatus
     // arm, dashboards showed Revenue=0 even when money had been collected.
     // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, EGP 0.000 revenue.

@@ -8,9 +8,9 @@ describe('safeDecryptJson', () => {
   });
 
   it('throws a typed AppError on malformed JSON instead of a raw SyntaxError', () => {
-    expect(() => safeDecryptJson('not json', 'hesabe')).toThrow(AppError);
+    expect(() => safeDecryptJson('not json', 'paymob')).toThrow(AppError);
     try {
-      safeDecryptJson('not json', 'hesabe');
+      safeDecryptJson('not json', 'paymob');
     } catch (e) {
       expect(e).toBeInstanceOf(AppError);
       expect((e as AppError).code).toBe('CREDENTIAL_DECRYPT_FAILED');

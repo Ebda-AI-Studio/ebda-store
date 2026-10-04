@@ -47,7 +47,7 @@ const baseOrderData = {
     country: 'EG',
     phone: '96550000000',
   },
-  paymentMethod: 'myfatoorah',
+  paymentMethod: 'paymob',
 };
 
 describe.skipIf(!hasDb)('customer wallet — integration', () => {

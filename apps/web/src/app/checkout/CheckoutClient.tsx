@@ -567,6 +567,8 @@ export default function CheckoutClient() {
             : Promise.resolve(null),
           api.get<{
             providers: (PaymentProvider | string)[];
+            /** Per online provider, the methods the merchant turned on. */
+            methods?: Record<string, Array<{ code: string; name: string; nameAr: string }>>;
             defaultProvider?: string;
             cod?: { fixedFee: number; displayName: string; displayNameAr: string | null };
             instapay?: { displayName: string; displayNameAr: string | null; expiryHours: number };
@@ -600,13 +602,28 @@ export default function CheckoutClient() {
         }
 
         if (paymentResult.success && paymentResult.data) {
-          // API returns providers as a string[] (e.g. ["myfatoorah"]) — normalize
+          // API returns providers as a string[] (e.g. ["paymob"]) — normalize
           // each entry to the {id, name} object the PaymentStep map expects.
           // PaymentStep falls back to DEFAULT_PAYMENT_PROVIDERS for display info.
+          //
+          // Paymob and Fawry offer several methods the customer chooses between here (card,
+          // Meeza, wallet, valU / Pay at Fawry, card): each becomes its own option with the id
+          // `<provider>:<method>`. Kashier's hosted page offers its methods itself, so it stays one
+          // option.
           const rawProviders = paymentResult.data.providers || [];
-          const allProviders: PaymentProvider[] = rawProviders.map(p =>
-            typeof p === 'string' ? { id: p, name: p } : p
-          );
+          const allProviders: PaymentProvider[] = rawProviders.flatMap(p => {
+            if (typeof p !== 'string') return [p];
+            const methods = paymentResult.data?.methods?.[p] ?? [];
+            if ((p === 'paymob' || p === 'fawry') && methods.length > 0) {
+              return methods.map(m => ({
+                id: `${p}:${m.code}`,
+                name: m.name,
+                nameAr: m.nameAr,
+                methods: [m.code],
+              }));
+            }
+            return [{ id: p, name: p === 'kashier' ? 'Card / wallet' : p }];
+          });
 
           // Add COD as a provider option if enabled
           if (paymentResult.data.cod) {
@@ -636,7 +653,10 @@ export default function CheckoutClient() {
 
           setPaymentProviders(allProviders);
           if (paymentResult.data.defaultProvider) {
-            setSelectedProvider(paymentResult.data.defaultProvider);
+            // The default is a provider id; a provider shown as several methods starts on its first.
+            const def = paymentResult.data.defaultProvider;
+            const first = allProviders.find(o => o.id === def || o.id.startsWith(`${def}:`));
+            setSelectedProvider(first?.id ?? def);
           }
         } else {
           // Payment config genuinely failed to load (network/5xx) — surface it
@@ -1289,7 +1309,8 @@ export default function CheckoutClient() {
           phone: formData.phone,
           email: formData.email,
         },
-        paymentMethod: selectedProvider,
+        // The provider only: the method (card / Meeza / ...) belongs to /payments/create.
+        paymentMethod: selectedProvider.split(':')[0],
         notes: notesWithDelivery,
         couponCode: appliedCoupon?.code,
         // Only send a redemption request when the customer opted in AND the
@@ -1344,15 +1365,18 @@ export default function CheckoutClient() {
       // resolved storefront base url (custom domain or slug). Sending absolute
       // urls with the store's custom domain trips the schema's platform-origin
       // refinement, which is intended to block open-redirect attacks.
-      const paymentResult = await api.post<{ paymentUrl?: string; cod?: boolean }>(
-        '/payments/create',
-        {
-          orderId: order.id,
-          provider: selectedProvider,
-          successUrl: `/checkout/success?orderId=${order.id}`,
-          errorUrl: `/checkout/error?orderId=${order.id}`,
-        }
-      );
+      const [selectedProviderId, selectedMethod] = selectedProvider.split(':');
+      const paymentResult = await api.post<{
+        paymentUrl?: string;
+        cod?: boolean;
+        instruction?: { kind: string; code?: string; expiresAt?: string };
+      }>('/payments/create', {
+        orderId: order.id,
+        provider: selectedProviderId,
+        ...(selectedMethod ? { method: selectedMethod } : {}),
+        successUrl: `/checkout/success?orderId=${order.id}`,
+        errorUrl: `/checkout/error?orderId=${order.id}`,
+      });
 
       // Success clears the saved checkout form and promo code before leaving
       // the page, so they don't leak into the next order. A failure keeps
@@ -1372,6 +1396,10 @@ export default function CheckoutClient() {
         goToCodSuccess: () => router.push(storeUrl(`/checkout/success?orderId=${order.id}&cod=1`)),
         goToInstapay: () =>
           router.push(storeUrl(`/checkout/success?orderId=${order.id}&instapay=1`)),
+        goToReferenceCode: code =>
+          router.push(
+            storeUrl(`/checkout/success?orderId=${order.id}&ref=${encodeURIComponent(code)}`)
+          ),
         goToGateway: paymentUrl => {
           window.location.href = paymentUrl;
         },
@@ -1470,6 +1498,12 @@ export default function CheckoutClient() {
           friendly = t(
             'Cash on delivery is currently unavailable. Please choose another payment method.',
             'الدفع عند الاستلام غير متاح حالياً. يرجى اختيار طريقة دفع أخرى.'
+          );
+          break;
+        case 'PAYMENT_PROVIDER_ERROR':
+          friendly = t(
+            'We could not start your payment. Please try again or choose another payment method.',
+            'تعذّر بدء عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار طريقة دفع أخرى.'
           );
           break;
         case 'PAYMENT_METHOD_UNAVAILABLE':

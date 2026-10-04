@@ -16,7 +16,7 @@
  *
  * Amounts are chosen so nothing divides evenly (1333 × 3 + 777 × 2, discount
  * 101, tax 277, shipping 250). Only the provider is stubbed
- * (`TapPaymentProvider.prototype.refund`) and the Inngest send. Self-skips
+ * (`V2ProviderBridge.prototype.refund`) and the Inngest send. Self-skips
  * without a real DATABASE_URL; every fixture id is per call (retry-safe).
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
@@ -34,7 +34,7 @@ import {
   postPartialReturnJournal,
 } from '@api/services/accounting/posting/partial-return-posting';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
-import { TapPaymentProvider } from '@api/services/payment-providers/tap.provider';
+import { V2ProviderBridge } from '@api/services/payment-providers/v2-bridge';
 import { ReturnService } from '@api/services/return.service';
 import { OrderService } from '@api/services/order.service';
 import { WalletService } from '@api/services/wallet.service';
@@ -82,7 +82,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
     await prisma.paymentConfig.create({
       data: {
         storeId,
-        provider: 'tap',
+        provider: 'kashier',
         isEnabled: true,
         isDefault: true,
         apiKey: 'sk_test_omd',
@@ -205,7 +205,7 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
         payments: {
           create: [
             {
-              provider: 'tap',
+              provider: 'kashier',
               status: 'completed',
               amount: total - walletAmount,
               transactionId: `chg_${n}`,
@@ -263,9 +263,9 @@ describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
   }
 
   function providerPays(refundId: string) {
-    return vi.spyOn(TapPaymentProvider.prototype, 'refund').mockImplementation(async req => ({
+    return vi.spyOn(V2ProviderBridge.prototype, 'refund').mockImplementation(async req => ({
       success: true,
-      provider: 'tap',
+      provider: 'kashier',
       refundId,
       transactionId: req.transactionId,
       amount: req.amount ?? 0,

@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { orderActionVisibility, refundViaProviderRemaining } from '../order-action-visibility';
 
 const card = (status: string, extra: Record<string, unknown> = {}) => ({
-  provider: 'myfatoorah',
+  provider: 'paymob',
   status,
   transactionId: 'txn_1',
   ...extra,
@@ -30,7 +30,7 @@ describe('orderActionVisibility', () => {
       status: 'pending',
       paymentStatus: 'unpaid',
       payments: [
-        { provider: 'tap', status: 'pending', transactionId: null, paymentUrl: 'https://pay' },
+        { provider: 'kashier', status: 'pending', transactionId: null, paymentUrl: 'https://pay' },
       ],
     });
     expect(v.showMarkPaid).toBe(true);
@@ -87,7 +87,7 @@ describe('orderActionVisibility', () => {
 
 describe('refundViaProviderRemaining (#2069)', () => {
   const pay = (over: Record<string, unknown>) => ({
-    provider: 'tap',
+    provider: 'kashier',
     status: 'completed',
     transactionId: 'tx',
     amount: 5000,
@@ -125,7 +125,7 @@ describe('refundViaProviderRemaining (#2069)', () => {
       refundViaProviderRemaining({
         status: 'delivered',
         paymentStatus: 'paid',
-        payments: [{ provider: 'tap', status: 'completed', transactionId: 'tx' }],
+        payments: [{ provider: 'kashier', status: 'completed', transactionId: 'tx' }],
       })
     ).toBeNull();
     expect(refundViaProviderRemaining({ status: 'x', paymentStatus: 'paid' })).toBeNull();

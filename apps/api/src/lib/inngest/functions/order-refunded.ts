@@ -107,7 +107,7 @@ function releasedChannels(meta: Record<string, unknown>): RefundNotifyChannel[] 
 /**
  * Fans out side effects when an order is refunded — fires from
  * `OrderService.applyRefundEffects` so EVERY refund path (gateway-driven
- * webhook, admin "Refund via MyFatoorah", manual status-button) lands
+ * webhook, admin "Refund via provider", manual status-button) lands
  * the same reversals + customer-facing notifications without bespoke wiring
  * at each callsite.
  *

@@ -1603,8 +1603,8 @@ model OrderItem {
 model Payment {
   id             String        @id @default(uuid())
   orderId        String        @map("order_id")
-  provider       String        @default("tap") // tap, myfatoorah, hesabe, upayments
-  method         String? // knet, visa, mastercard, apple_pay, etc.
+  provider       String // paymob, kashier, fawry, instapay, cod
+  method         String? // card, meeza, wallet, valu, payatfawry, etc.
   status         PaymentStatus @default(pending)
   amount         Int
   currency       String        @default("EGP")
@@ -1659,7 +1659,7 @@ model PaymentEvent {
   /// Null when an event was informational (e.g. webhook received but no
   /// state change — duplicate, signature replay, etc.).
   toStatus          PaymentStatus? @map("to_status")
-  /// Provider name when the event is webhook-driven: 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'.
+  /// Provider name when the event is webhook-driven: 'paymob' | 'kashier' | 'fawry'.
   provider          String?
   /// Raw provider POST body when event_type='webhook'. Lets us replay
   /// a dispute 6+ months later even if metadata on Payment has been
@@ -1713,7 +1713,7 @@ model PaymentEvent {
 model WebhookEvent {
   id String @id @default(uuid())
 
-  /// 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'
+  /// 'paymob' | 'kashier' | 'fawry'
   provider String
 
   /// Same idempotency key the route derives from the provider transaction id
@@ -1901,7 +1901,7 @@ model PaymentConfig {
 
   // Provider-specific settings
   testMode            Boolean  @default(true) @map("test_mode")
-  supportedMethods    String[] @default([]) @map("supported_methods") // knet, visa, apple_pay, etc.
+  supportedMethods    String[] @default([]) @map("supported_methods") // card, meeza, wallet, valu, instapay, ...
   supportedCurrencies String[] @default(["EGP"]) @map("supported_currencies")
 
   // Non-secret, provider-specific settings (InstaPay handle / phone / expiry,
@@ -1931,12 +1931,11 @@ model PaymentConfig {
 }
 
 enum PaymentProvider {
-  tap
-  myfatoorah
-  hesabe
-  upayments
   cod
   instapay
+  paymob
+  kashier
+  fawry
 }
 
 enum ProviderHealthStatus {

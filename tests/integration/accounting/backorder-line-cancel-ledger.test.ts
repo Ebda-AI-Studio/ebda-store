@@ -87,9 +87,7 @@ async function seedOrder(opts: { shipping?: number; qtyFulfilledC?: number } = {
         })),
       },
       payments: {
-        create: [
-          { provider: 'myfatoorah', status: 'completed', amount: total, paidAt: new Date() },
-        ],
+        create: [{ provider: 'paymob', status: 'completed', amount: total, paidAt: new Date() }],
       },
     },
     include: { items: true },

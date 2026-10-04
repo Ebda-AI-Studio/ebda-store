@@ -207,6 +207,7 @@ describe('scripts/ci-affected.mjs', () => {
     // root manifest / cf-* scripts hit every Worker app
     expect(run('package-lock.json').workers.sort()).toEqual([
       'admin',
+      'api',
       'marketing',
       'orders',
       'status',

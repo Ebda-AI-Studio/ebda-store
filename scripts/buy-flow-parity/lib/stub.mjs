@@ -1,47 +1,31 @@
 /**
- * Network stub shared by both refs: a fake MyFatoorah v2 API, a fake Inngest
- * event endpoint, and a sink for any other outbound call. Every request is
- * recorded so the snapshot can include EXACTLY what the API sent to the
- * gateway (amounts, currency, customer fields, callback URLs, auth header).
+ * Network stub shared by both sides: a fake Paymob (Accept, Intention API), a fake
+ * Inngest event endpoint, and a sink for any other outbound call. Every request is
+ * recorded so the snapshot can include EXACTLY what the API sent to the gateway
+ * (amount in cents == piastres, currency, items, billing data, callback URLs, the
+ * `Token` auth header).
  *
- * Invoice / refund ids are deterministic: `setScenario(index)` resets the
- * counters to a per-scenario base, so the same scenario gets the same ids on
- * both refs even when run with --only.
+ * Order / transaction ids are deterministic: `setScenario(index)` resets the
+ * counters to a per-scenario base, so the same scenario gets the same ids on both
+ * sides even when run with --only.
+ *
+ * The shapes mirror tests/stubs/paymob-stub.ts (the unit-test twin the adapter's
+ * contract suite runs against); both are what `paymob.provider.ts` ASSUMES about
+ * Paymob, and 6c checks those assumptions against a real sandbox.
  */
 import http from 'node:http';
 
-const PAYMENT_METHODS = [
-  {
-    PaymentMethodId: 1,
-    PaymentMethodAr: 'ميزة',
-    PaymentMethodEn: 'Meeza',
-    PaymentMethodCode: 'ms',
-    IsDirectPayment: false,
-    ServiceCharge: 0,
-    TotalAmount: 0,
-    CurrencyIso: 'EGP',
-    ImageUrl: 'https://stub.invalid/ms.png',
-  },
-  {
-    PaymentMethodId: 2,
-    PaymentMethodAr: 'فيزا / ماستر',
-    PaymentMethodEn: 'VISA/MASTER',
-    PaymentMethodCode: 'vm',
-    IsDirectPayment: false,
-    ServiceCharge: 0,
-    TotalAmount: 0,
-    CurrencyIso: 'EGP',
-    ImageUrl: 'https://stub.invalid/vm.png',
-  },
-];
+/** Integration id per method the fixture enables (settings.integrationIds). */
+export const PAYMOB_INTEGRATIONS = { card: 11, meeza: 22, wallet: 33, valu: 44 };
 
-export function createStub() {
+export function createStub({ secretKey }) {
   const state = {
     requests: [],
-    invoices: new Map(), // invoiceId -> { status, value, customerReference }
-    nextInvoice: 0,
-    nextRefund: 0,
-    failSendPayment: false,
+    orders: new Map(), // orderId -> { amount, merchantRef, txnId, status }
+    txns: new Map(), // txnId -> { id, orderId, amount_cents, success, pending, is_voided, refunded }
+    nextOrder: 0,
+    nextTxn: 0,
+    failIntention: false,
     // Inngest: function configs captured from the SDK's registration call, and
     // the FIFO of received events the harness executor drains (inngest-executor.mjs).
     functions: [],
@@ -62,101 +46,96 @@ export function createStub() {
     res.end(s);
   }
 
-  function handleMf(path, body, res) {
+  function txnView(order) {
+    const t = order.txnId ? state.txns.get(order.txnId) : null;
+    const orderRef = {
+      id: order.id,
+      amount_cents: order.amount,
+      merchant_order_id: order.merchantRef,
+    };
+    if (!t) {
+      return {
+        id: null,
+        success: false,
+        pending: true,
+        amount_cents: order.amount,
+        is_voided: false,
+        is_refunded: false,
+        refunded_amount_cents: 0,
+        currency: 'EGP',
+        order: orderRef,
+      };
+    }
+    return { ...t, currency: 'EGP', order: orderRef };
+  }
+
+  function handlePaymob(path, body, headers, res) {
+    if (headers.authorization !== `Token ${secretKey}`) {
+      return json(res, 401, { detail: 'Authentication credentials were not provided.' });
+    }
     switch (path) {
-      case '/v2/InitiatePayment':
-        return json(res, 200, {
-          IsSuccess: true,
-          Message: '',
-          Data: { PaymentMethods: PAYMENT_METHODS },
-        });
-      case '/v2/SendPayment': {
-        if (state.failSendPayment) {
-          return json(res, 400, {
-            IsSuccess: false,
-            Message: 'Invalid data',
-            ValidationErrors: [{ Name: 'CustomerMobile', Error: 'stubbed gateway rejection' }],
-            Data: null,
-          });
+      case '/v1/intention/': {
+        if (state.failIntention) {
+          return json(res, 400, { detail: 'stubbed gateway rejection' });
         }
-        const id = state.nextInvoice++;
-        state.invoices.set(String(id), {
+        const items = Array.isArray(body?.items) ? body.items : [];
+        const total = items.reduce((n, i) => n + i.amount * i.quantity, 0);
+        if (!Number.isInteger(body?.amount) || body.amount <= 0 || total !== body.amount) {
+          return json(res, 400, { detail: 'amount / items mismatch' });
+        }
+        const id = state.nextOrder++;
+        state.orders.set(String(id), {
+          id,
+          amount: body.amount,
+          merchantRef: body.special_reference ?? '',
+          txnId: null,
           status: 'Pending',
-          value: body?.InvoiceValue,
-          customerReference: body?.CustomerReference,
         });
-        return json(res, 200, {
-          IsSuccess: true,
-          Message: 'Invoice Created Successfully!',
-          ValidationErrors: null,
-          Data: {
-            InvoiceId: id,
-            InvoiceURL: `https://stub-gateway.invalid/pay/${id}`,
-            CustomerReference: body?.CustomerReference ?? '',
-            UserDefinedField: body?.UserDefinedField ?? '',
-          },
+        return json(res, 201, {
+          id: `pi_stub_${id}`,
+          client_secret: `stub_csk_${id}`,
+          intention_order_id: id,
+          intention_detail: { amount: body.amount },
         });
       }
-      case '/v2/GetPaymentStatus': {
-        const inv = state.invoices.get(String(body?.Key));
-        if (!inv)
-          return json(res, 400, { IsSuccess: false, Message: 'Invoice not found', Data: null });
-        const paid = inv.status === 'Paid';
-        return json(res, 200, {
-          IsSuccess: true,
-          Message: '',
-          Data: {
-            InvoiceId: Number(body.Key),
-            InvoiceStatus: inv.status,
-            InvoiceReference: `INVREF-${body.Key}`,
-            CustomerReference: inv.customerReference ?? '',
-            InvoiceValue: inv.value,
-            CustomerName: '',
-            CustomerMobile: '',
-            CustomerEmail: '',
-            TransactionStatus: paid ? 'Succss' : inv.status,
-            PaymentMethod: paid ? 'VISA/MASTER' : '',
-            PaymentId: paid ? `PAY-${body.Key}` : '',
-            PaidCurrency: 'EGP',
-            PaidCurrencyValue: paid ? inv.value : 0,
-            InvoiceTransactions: [],
-          },
-        });
+      case '/api/ecommerce/orders/transaction_inquiry': {
+        const order = state.orders.get(String(body?.order_id));
+        if (!order) return json(res, 404, { detail: 'order not found' });
+        return json(res, 200, txnView(order));
       }
-      case '/v2/MakeRefund': {
-        const id = state.nextRefund++;
-        return json(res, 200, {
-          IsSuccess: true,
-          Message: 'Refund request submitted',
-          Data: {
-            Key: String(body?.Key ?? ''),
-            RefundId: id,
-            Amount: body?.Amount,
-            RefundReference: `RFREF-${id}`,
-          },
-        });
+      case '/api/acceptance/void_refund/void':
+      case '/api/acceptance/void_refund/refund': {
+        const t = state.txns.get(Number(body?.transaction_id));
+        if (!t || !t.success) return json(res, 400, { detail: 'transaction not captured' });
+        const isVoid = path.endsWith('/void');
+        const amount = isVoid ? t.amount_cents : body?.amount_cents;
+        if (
+          !Number.isInteger(amount) ||
+          amount <= 0 ||
+          t.is_voided ||
+          amount > t.amount_cents - t.refunded
+        ) {
+          return json(res, 400, { detail: 'not refundable' });
+        }
+        t.refunded += amount;
+        if (isVoid) t.is_voided = true;
+        const id = state.nextTxn++;
+        const r = {
+          id,
+          orderId: t.orderId,
+          amount_cents: amount,
+          success: true,
+          pending: false,
+          is_voided: isVoid,
+          is_refunded: !isVoid,
+          parent_transaction: t.id,
+          refunded_amount_cents: 0,
+        };
+        state.txns.set(id, { ...r, refunded: 0 });
+        return json(res, 200, r);
       }
-      case '/v2/GetRefundStatus':
-        return json(res, 200, {
-          IsSuccess: true,
-          Data: {
-            RefundStatusResult: [
-              {
-                RefundId: Number(body?.Key),
-                RefundStatus: 'Pending',
-                InvoiceId: 0,
-                Amount: 0,
-                RefundReference: '',
-                RefundAmount: 0,
-              },
-            ],
-          },
-        });
       default:
-        return json(res, 404, {
-          IsSuccess: false,
-          Message: `stub: unknown MyFatoorah endpoint ${path}`,
-        });
+        return json(res, 404, { detail: `stub: unknown Paymob endpoint ${path}` });
     }
   }
 
@@ -174,16 +153,16 @@ export function createStub() {
       const url = new URL(req.url, 'http://stub');
       const path = url.pathname;
 
-      if (path.startsWith('/mf/')) {
-        const mfPath = path.slice(3);
+      if (path.startsWith('/paymob/')) {
+        const pmPath = path.slice('/paymob'.length);
         record({
-          service: 'myfatoorah',
+          service: 'paymob',
           method: req.method,
-          path: mfPath,
+          path: pmPath,
           authorization: req.headers.authorization ?? null,
           body,
         });
-        return handleMf(mfPath, body, res);
+        return handlePaymob(pmPath, body, req.headers, res);
       }
 
       if (path.startsWith('/__outbound/')) {
@@ -238,17 +217,36 @@ export function createStub() {
     /** Reset per-scenario state. Ids are derived from the scenario index. */
     setScenario(index) {
       state.requests = [];
-      state.nextInvoice = 7000000 + index * 100;
-      state.nextRefund = 8000000 + index * 100;
-      state.failSendPayment = false;
+      state.nextOrder = 7000000 + index * 100;
+      state.nextTxn = 8000000 + index * 100;
+      state.failIntention = false;
     },
-    setInvoiceStatus(invoiceId, status) {
-      const inv = state.invoices.get(String(invoiceId));
-      if (!inv) throw new Error(`stub: no invoice ${invoiceId}`);
-      inv.status = status;
+    /** The customer pays (or the payment fails) at Paymob: a transaction on the order. */
+    setPaymentStatus(orderId, outcome) {
+      const order = state.orders.get(String(orderId));
+      if (!order) throw new Error(`stub: no order ${orderId}`);
+      const id = state.nextTxn++;
+      const paid = outcome === 'Paid';
+      state.txns.set(id, {
+        id,
+        orderId: order.id,
+        amount_cents: order.amount,
+        success: paid,
+        pending: false,
+        is_voided: false,
+        is_refunded: false,
+        refunded_amount_cents: 0,
+        refunded: 0,
+        parent_transaction: null,
+        created_at: '2026-10-04T10:00:00.000000',
+      });
+      order.txnId = id;
+      order.status = outcome;
+      return state.txns.get(id);
     },
-    lastInvoiceId() {
-      return state.nextInvoice - 1;
+    /** The id of the Paymob order the last /v1/intention/ call created. */
+    lastOrderId() {
+      return state.nextOrder - 1;
     },
     takeRequests() {
       const r = state.requests;

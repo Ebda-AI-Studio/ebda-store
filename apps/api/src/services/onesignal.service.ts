@@ -28,7 +28,7 @@ interface NotifyOrderInput {
   customerName: string;
   total: number; // piastres
   currency: string;
-  /** Payment method the customer chose at checkout (e.g. 'cod', 'knet',
+  /** Payment method the customer chose at checkout (e.g. 'cod', 'paymob',
    *  'visa'). Surfaced in the super_admin push body so platform staff can
    *  triage at a glance — COD orders need active warehouse handling
    *  whereas card-paid orders can wait. */
@@ -45,14 +45,16 @@ function formatPaymentMethod(method: string | undefined): string {
     cod: 'Cash on Delivery',
     cash: 'Cash on Delivery',
     cash_on_delivery: 'Cash on Delivery',
-    knet: 'KNET',
+    instapay: 'InstaPay',
+    paymob: 'Paymob',
+    kashier: 'Kashier',
+    fawry: 'Fawry',
     visa: 'Visa',
     mastercard: 'Mastercard',
+    meeza: 'Meeza',
+    wallet: 'Mobile wallet',
+    valu: 'valU',
     apple_pay: 'Apple Pay',
-    google_pay: 'Google Pay',
-    benefit: 'Benefit',
-    mada: 'Mada',
-    stc_pay: 'STC Pay',
   };
   if (labels[normalized]) return labels[normalized];
   // Title-case fallback for unknown methods.
@@ -697,7 +699,7 @@ export class OneSignalService {
   /**
    * Push a refund-issued notification to admins of the store + super_admins.
    * Fired from the order/refunded Inngest fan-out so every refund path
-   * (gateway-driven, admin "Refund via MyFatoorah", status-button) lands
+   * (gateway-driven, admin "Refund via provider", status-button) lands
    * the same merchant push. Customer notification rides the same fan-out
    * via EmailService.sendOrderRefunded.
    */

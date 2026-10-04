@@ -114,7 +114,7 @@ describe.skipIf(!hasDb)(
         body: JSON.stringify({
           shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
           // Non-COD: keeps the COD notification fanout out of a test about RLS.
-          paymentMethod: 'myfatoorah',
+          paymentMethod: 'paymob',
         }),
       });
       const body = (await res.json()) as {

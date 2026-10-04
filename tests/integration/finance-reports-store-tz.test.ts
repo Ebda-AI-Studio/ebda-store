@@ -115,7 +115,7 @@ beforeAll(async () => {
         },
         payments: {
           create: [
-            { provider: 'myfatoorah', status: 'completed', amount: total, paidAt: new Date(o.at) },
+            { provider: 'paymob', status: 'completed', amount: total, paidAt: new Date(o.at) },
           ],
         },
       },
