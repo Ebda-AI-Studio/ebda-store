@@ -1,6 +1,6 @@
 // Client side of the AuthState Durable Object: shard routing + one-call `apply`.
 import { cfBindings, type DurableObjectStubLike } from './bindings';
-import type { Op } from './auth-state';
+import type { Op } from './auth-state-core';
 
 /** Shards the key space is spread over. A key always maps to the same shard. */
 export const AUTH_STATE_SHARDS = 32;

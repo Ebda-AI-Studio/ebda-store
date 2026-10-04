@@ -17,7 +17,7 @@
  */
 import { cfBindings, type KVNamespaceLike } from './bindings';
 import { applyOn, applyOnAll, shardOf } from './auth-state-client';
-import type { Op, SetOptions } from './auth-state';
+import type { Op, SetOptions } from './auth-state-core';
 
 const KV_PREFIX = 'cache:';
 /** Workers KV rejects an expirationTtl below 60 s. */
