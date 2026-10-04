@@ -18,6 +18,7 @@ import { ItemsCard } from './_components/ItemsCard';
 import { PlatformCard } from './_components/PlatformCard';
 import { CustomerCard } from './_components/CustomerCard';
 import { NotesCard } from './_components/NotesCard';
+import { ShipmentCard } from './_components/ShipmentCard';
 import { ActionFooter } from './_components/ActionFooter';
 import { OrderLifecycleTimeline } from '../../../../../components/order-timeline/OrderLifecycleTimeline';
 import type { OrderDetail } from './_components/types';
@@ -258,6 +259,7 @@ export default function OrderDetailPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
                 <DeliveryCard order={order} locale={locale} />
+                <ShipmentCard storeId={storeId} orderId={orderId} onChanged={fetchOrder} />
                 <PaymentCard order={order} userRole={user?.role} />
                 <CustomerCard order={order} />
                 <NotesCard order={order} />

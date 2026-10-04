@@ -232,6 +232,7 @@ export const HUBS: HubDefinition[] = [
       '/payment-settings',
       '/shipping',
       '/shipping-carriers',
+      '/cod-reconciliation',
       '/tax',
       '/pwa',
       '/language',

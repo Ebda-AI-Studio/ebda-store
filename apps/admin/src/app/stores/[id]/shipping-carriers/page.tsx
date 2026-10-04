@@ -10,11 +10,14 @@ import { useT } from '@/i18n/useT';
 import { ShippingCarriersEmptyState } from './_components/ShippingCarriersEmptyState';
 import { ICarryCarrierCard } from './_components/ICarryCarrierCard';
 import { AramexCarrierCard } from './_components/AramexCarrierCard';
+import { BostaCarrierCard } from './_components/BostaCarrierCard';
+import { ManualCarrierCard } from './_components/ManualCarrierCard';
 import { ShipmentsTable } from './_components/ShipmentsTable';
 import { type PickupAddress } from './_components/PickupAddressForm';
 import {
   DEFAULT_CONFIGS,
   type AramexConfig,
+  type BostaConfig,
   type CarrierConfigApiRow,
   type CarrierConfigs,
   type CarrierKey,
@@ -28,7 +31,26 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 const CARRIER_NAME_KEYS: Record<CarrierKey, string> = {
   icarry: 'carrierNames.icarry',
   aramex: 'carrierNames.aramex',
+  bosta: 'carrierNames.bosta',
 };
+
+// The pickup address is stored in the carrier's non-secret `settings` (same keys for every carrier).
+const pickupFromSettings = (
+  settings: Record<string, string | boolean | undefined> | undefined
+) => ({
+  name: String(settings?.pickupName ?? ''),
+  phone: String(settings?.pickupPhone ?? ''),
+  line1: String(settings?.pickupLine1 ?? ''),
+  city: String(settings?.pickupCity ?? 'Cairo'),
+  area: String(settings?.pickupArea ?? ''),
+});
+const pickupToSettings = (p: PickupAddress) => ({
+  pickupName: p.name,
+  pickupPhone: p.phone,
+  pickupLine1: p.line1,
+  pickupCity: p.city,
+  pickupArea: p.area,
+});
 
 export default function ShippingCarriersPage() {
   const { gate } = useRequireFeature('shipping_carriers');
@@ -51,9 +73,11 @@ export default function ShippingCarriersPage() {
   const [savingCarrier, setSavingCarrier] = useState<CarrierKey | null>(null);
   const [testingCarrier, setTestingCarrier] = useState<CarrierKey | null>(null);
   const [settingDefault, setSettingDefault] = useState<CarrierKey | null>(null);
+  const [rotating, setRotating] = useState(false);
   const [testStatus, setTestStatus] = useState<Record<CarrierKey, TestStatus>>({
     icarry: 'idle',
     aramex: 'idle',
+    bosta: 'idle',
   });
 
   // Shipments state
@@ -73,38 +97,36 @@ export default function ShippingCarriersPage() {
     if (data?.configs) {
       const merged: CarrierConfigs = { ...DEFAULT_CONFIGS };
       for (const cfg of data.configs) {
-        const code = cfg.carrierCode as CarrierKey;
+        const code = cfg.carrier as CarrierKey;
+        const base = { enabled: cfg.enabled ?? false, isDefault: cfg.isDefault ?? false };
+        const pickup = pickupFromSettings(cfg.settings);
         if (code === 'icarry') {
           merged.icarry = {
-            enabled: cfg.enabled ?? false,
-            isDefault: cfg.isDefault ?? false,
-            apiKey: cfg.credentials?.apiKey ? '••••' + cfg.credentials.apiKey.slice(-4) : '',
+            ...base,
+            apiKey: cfg.credentials?.apiKey ?? '',
             merchantId: cfg.credentials?.merchantId ?? '',
-            pickup: {
-              area: cfg.settings?.pickupArea ?? '',
-              block: cfg.settings?.pickupBlock ?? '',
-              street: cfg.settings?.pickupStreet ?? '',
-              building: cfg.settings?.pickupBuilding ?? '',
-            },
+            pickup,
+          };
+        } else if (code === 'bosta') {
+          merged.bosta = {
+            ...base,
+            apiKey: cfg.credentials?.apiKey ?? '',
+            businessLocationId: cfg.credentials?.businessLocationId ?? '',
+            sandbox: cfg.settings?.sandbox === true,
+            pickup,
           };
         } else if (code === 'aramex') {
           merged.aramex = {
-            enabled: cfg.enabled ?? false,
-            isDefault: cfg.isDefault ?? false,
+            ...base,
+            sandbox: cfg.settings?.sandbox === true,
+            codEgpConfirmed: cfg.settings?.codEgpConfirmed === true,
             accountNumber: cfg.credentials?.accountNumber ?? '',
-            accountPin: cfg.credentials?.accountPin
-              ? '••••' + cfg.credentials.accountPin.slice(-4)
-              : '',
+            accountPin: cfg.credentials?.accountPin ?? '',
             accountEntity: cfg.credentials?.accountEntity ?? '',
             accountCountryCode: cfg.credentials?.accountCountryCode ?? 'EG',
             username: cfg.credentials?.username ?? '',
-            password: cfg.credentials?.password ? '••••' : '',
-            pickup: {
-              area: cfg.settings?.pickupArea ?? '',
-              block: cfg.settings?.pickupBlock ?? '',
-              street: cfg.settings?.pickupStreet ?? '',
-              building: cfg.settings?.pickupBuilding ?? '',
-            },
+            password: cfg.credentials?.password ?? '',
+            pickup,
           };
         }
       }
@@ -118,8 +140,17 @@ export default function ShippingCarriersPage() {
     if (statusFilter !== 'all') qs.set('status', statusFilter);
     const { data } = await apiGet<ShipmentsData>(`/api/v1/stores/${storeId}/shipments?${qs}`);
     if (data) {
-      setShipments(data.shipments || []);
-      setShipmentsTotal(data.total || 0);
+      setShipments(
+        (data.shipments || []).map(row => ({
+          id: row.id,
+          orderNumber: row.order?.orderNumber ?? '',
+          carrierCode: row.carrier,
+          trackingNumber: row.trackingNumber,
+          status: row.status,
+          createdAt: row.createdAt,
+        }))
+      );
+      setShipmentsTotal(data.meta?.total ?? 0);
     }
   }, [storeId, shipmentsPage, shipmentsLimit, carrierFilter, statusFilter]);
 
@@ -152,6 +183,7 @@ export default function ShippingCarriersPage() {
     setSavingCarrier(carrier);
     try {
       const cfg = configs[carrier];
+      const settings = pickupToSettings(cfg.pickup);
       const body =
         carrier === 'icarry'
           ? {
@@ -160,30 +192,33 @@ export default function ShippingCarriersPage() {
                 apiKey: (cfg as ICarryConfig).apiKey,
                 merchantId: (cfg as ICarryConfig).merchantId,
               },
-              settings: {
-                pickupArea: cfg.pickup.area,
-                pickupBlock: cfg.pickup.block,
-                pickupStreet: cfg.pickup.street,
-                pickupBuilding: cfg.pickup.building,
-              },
+              settings,
             }
-          : {
-              enabled: cfg.enabled,
-              credentials: {
-                accountNumber: (cfg as AramexConfig).accountNumber,
-                accountPin: (cfg as AramexConfig).accountPin,
-                accountEntity: (cfg as AramexConfig).accountEntity,
-                accountCountryCode: (cfg as AramexConfig).accountCountryCode,
-                username: (cfg as AramexConfig).username,
-                password: (cfg as AramexConfig).password,
-              },
-              settings: {
-                pickupArea: cfg.pickup.area,
-                pickupBlock: cfg.pickup.block,
-                pickupStreet: cfg.pickup.street,
-                pickupBuilding: cfg.pickup.building,
-              },
-            };
+          : carrier === 'bosta'
+            ? {
+                enabled: cfg.enabled,
+                credentials: {
+                  apiKey: (cfg as BostaConfig).apiKey,
+                  businessLocationId: (cfg as BostaConfig).businessLocationId,
+                },
+                settings: { ...settings, sandbox: (cfg as BostaConfig).sandbox },
+              }
+            : {
+                enabled: cfg.enabled,
+                credentials: {
+                  accountNumber: (cfg as AramexConfig).accountNumber,
+                  accountPin: (cfg as AramexConfig).accountPin,
+                  accountEntity: (cfg as AramexConfig).accountEntity,
+                  accountCountryCode: (cfg as AramexConfig).accountCountryCode,
+                  username: (cfg as AramexConfig).username,
+                  password: (cfg as AramexConfig).password,
+                },
+                settings: {
+                  ...settings,
+                  sandbox: (cfg as AramexConfig).sandbox,
+                  codEgpConfirmed: (cfg as AramexConfig).codEgpConfirmed,
+                },
+              };
 
       const { error } = await apiPut(
         `/api/v1/stores/${storeId}/shipping-carriers/configs/${carrier}`,
@@ -245,6 +280,7 @@ export default function ShippingCarriersPage() {
         setConfigs(prev => ({
           icarry: { ...prev.icarry, isDefault: carrier === 'icarry' },
           aramex: { ...prev.aramex, isDefault: carrier === 'aramex' },
+          bosta: { ...prev.bosta, isDefault: carrier === 'bosta' },
         }));
         toastSuccess(
           tToast('defaultSetTitle'),
@@ -270,6 +306,32 @@ export default function ShippingCarriersPage() {
   function updateAramex(patch: Partial<AramexConfig>) {
     setConfigs(prev => ({ ...prev, aramex: { ...prev.aramex, ...patch } }));
   }
+
+  function updateBosta(patch: Partial<BostaConfig>) {
+    setConfigs(prev => ({ ...prev, bosta: { ...prev.bosta, ...patch } }));
+  }
+
+  function updateBostaPickup(patch: Partial<PickupAddress>) {
+    setConfigs(prev => ({
+      ...prev,
+      bosta: { ...prev.bosta, pickup: { ...prev.bosta.pickup, ...patch } },
+    }));
+  }
+
+  const handleRotateSecret = async () => {
+    setRotating(true);
+    try {
+      const { error } = await apiPost(
+        `/api/v1/stores/${storeId}/shipping-carriers/webhook-secret/bosta/rotate`
+      );
+      if (!error) toastSuccess(tToast('rotatedTitle'), tToast('rotatedDescription'));
+      else showError(tToast('errorTitle'), error.message || tToast('rotateFailed'));
+    } catch {
+      showError(tToast('errorTitle'), tToast('rotateFailed'));
+    } finally {
+      setRotating(false);
+    }
+  };
 
   function updateICarryPickup(patch: Partial<PickupAddress>) {
     setConfigs(prev => ({
@@ -301,6 +363,21 @@ export default function ShippingCarriersPage() {
         <ShippingCarriersEmptyState />
       ) : (
         <div className="space-y-6">
+          <BostaCarrierCard
+            config={configs.bosta}
+            saving={savingCarrier === 'bosta'}
+            testing={testingCarrier === 'bosta'}
+            settingDefault={settingDefault === 'bosta'}
+            rotating={rotating}
+            testStatus={testStatus.bosta}
+            onConfigChange={updateBosta}
+            onPickupChange={updateBostaPickup}
+            onSave={() => handleSaveCarrier('bosta')}
+            onTest={() => handleTestConnection('bosta')}
+            onSetDefault={() => handleSetDefault('bosta')}
+            onRotateSecret={handleRotateSecret}
+          />
+
           <ICarryCarrierCard
             config={configs.icarry}
             saving={savingCarrier === 'icarry'}
@@ -326,6 +403,8 @@ export default function ShippingCarriersPage() {
             onTest={() => handleTestConnection('aramex')}
             onSetDefault={() => handleSetDefault('aramex')}
           />
+
+          <ManualCarrierCard storeId={storeId} />
 
           <ShipmentsTable
             shipments={shipments}

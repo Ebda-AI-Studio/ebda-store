@@ -367,11 +367,10 @@ router.use('/stores', tenantContext, recommendationRoutes);
 router.use('/public', publicRecommendationRoutes);
 
 // Shipping carrier routes (admin + public tracking at /stores/public/...).
-// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
-// createShipmentForOrder / cancelShipment / updateShipmentStatus /
-// testConnection all call external courier APIs (Aramex, iCarry) in-request —
-// slow third-party calls have no place inside a 30s RLS transaction.
-router.use('/stores', tenantContext, shippingCarrierRoutes);
+// Scoped PER REQUEST inside the router (`router.param('storeId', shippingCarrierRouteContext)`):
+// reads share one request transaction, while booking / cancelling / tracking / label calls to the
+// courier APIs run under store scope so no transaction is held across a slow third party.
+router.use('/stores', shippingCarrierRoutes);
 
 // Affiliate routes (admin + public apply/track)
 router.use('/stores', tenantContext, affiliateRoutes);

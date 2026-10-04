@@ -21,8 +21,9 @@ interface AramexCarrierCardProps {
 
 /**
  * Aramex carrier settings card. Fields: accountNumber, accountPin,
- * accountEntity, accountCountryCode, username, password, and the shared
- * pickup-address block. PIN and password are masked via type=password.
+ * accountEntity, accountCountryCode, username, password, the sandbox switch, the
+ * "COD in EGP confirmed" switch (Aramex COD is refused until the merchant has Aramex's
+ * written confirmation) and the shared pickup-address block. PIN and password are masked.
  */
 export function AramexCarrierCard({
   config,
@@ -152,6 +153,25 @@ export function AramexCarrierCard({
             placeholder={t('placeholders.password')}
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           />
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <label className="flex items-center justify-between gap-3">
+          <span className="text-sm text-foreground">{t('fields.sandbox')}</span>
+          <Toggle checked={config.sandbox} onChange={val => onConfigChange({ sandbox: val })} />
+        </label>
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3">
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">
+              {t('fields.codEgpConfirmed')}
+            </span>
+            <Toggle
+              checked={config.codEgpConfirmed}
+              onChange={val => onConfigChange({ codEgpConfirmed: val })}
+            />
+          </label>
+          <p className="mt-2 text-xs text-muted-foreground">{t('codNotice')}</p>
         </div>
       </div>
 

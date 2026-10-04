@@ -10,7 +10,12 @@ import { prisma, runInTenantContext, withStore } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
 import { getAuthUser, resolvePublicStoreId } from '../utils/store-helpers';
-import { getOrderStoreId, getPaymentStoreId, resolvePaymentEventsStore } from '../lib/definer';
+import {
+  getOrderStoreId,
+  getPaymentStoreId,
+  resolvePaymentEventsStore,
+  resolveStoreFromWebhookRef,
+} from '../lib/definer';
 import { OrderService } from '../services/order.service';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import logger from '../lib/logger';
@@ -922,44 +927,48 @@ router.get(
       const { transactionId } = req.params;
       const user = getAuthUser(req);
       const provider = req.query.provider as PaymentProvider | undefined;
+      const notFound = () =>
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Payment not found' },
+        });
+
+      // Strict RLS: a contextless read sees nothing, so the owning store is resolved from the
+      // provider reference through the definer, and every read below runs inside that store.
+      const statusStoreId = await resolveStoreFromWebhookRef({ transactionId });
+      if (!statusStoreId) {
+        notFound();
+        return;
+      }
 
       // Verify authorization: customers can only see their own payments,
       // store_admins can only see payments from their stores.
-      if (user.role === 'super_admin') {
-        // Super admin can view any payment
-      } else if (user.role === 'store_admin') {
-        // Store admin must own the store the order belongs to
-        const order = await prisma.order.findFirst({
-          where: {
-            payments: { some: { transactionId } },
-            store: { ownerId: user.userId },
-          },
-        });
-        if (!order) {
-          res.status(404).json({
-            success: false,
-            error: { code: 'NOT_FOUND', message: 'Payment not found' },
-          });
-          return;
+      const allowed = await withStore(statusStoreId, async () => {
+        if (user.role === 'super_admin') return true; // super admin can view any payment
+        if (user.role === 'store_admin') {
+          // Store admin must own the store the order belongs to
+          return !!(await prisma.order.findFirst({
+            where: {
+              payments: { some: { transactionId } },
+              store: { ownerId: user.userId },
+            },
+            select: { id: true },
+          }));
         }
-      } else {
-        // Customer — must own the order
-        const order = await prisma.order.findFirst({
-          where: {
-            customerId: user.userId,
-            payments: { some: { transactionId } },
-          },
-        });
-        if (!order) {
-          res.status(404).json({
-            success: false,
-            error: { code: 'NOT_FOUND', message: 'Payment not found' },
-          });
-          return;
-        }
+        // Customer: must own the order
+        return !!(await prisma.order.findFirst({
+          where: { customerId: user.userId, payments: { some: { transactionId } } },
+          select: { id: true },
+        }));
+      });
+      if (!allowed) {
+        notFound();
+        return;
       }
 
-      const status = await PaymentService.getPaymentStatus(transactionId, provider);
+      const status = await withStore(statusStoreId, () =>
+        PaymentService.getPaymentStatus(transactionId, provider, statusStoreId)
+      );
 
       res.json({
         success: true,
@@ -984,14 +993,20 @@ router.post(
       const data = refundSchema.parse(req.body);
       const user = getAuthUser(req);
 
-      // Bootstrap lookup OUTSIDE runInTenantContext — we don't yet
-      // know the storeId. Same query whether the caller is super_admin
-      // or store_admin so we can derive storeId either way; ownership
-      // check follows below.
-      const paymentRow = await prisma.payment.findFirst({
-        where: { transactionId: data.transactionId },
-        include: { order: { include: { store: { select: { id: true, ownerId: true } } } } },
+      // Bootstrap lookup OUTSIDE runInTenantContext: the store is not known yet and a
+      // contextless read shows nothing under strict RLS, so the definer maps the provider
+      // reference to its store and the payment is read inside that store. Ownership follows.
+      const resolvedRefundStore = await resolveStoreFromWebhookRef({
+        transactionId: data.transactionId,
       });
+      const paymentRow = resolvedRefundStore
+        ? await withStore(resolvedRefundStore, () =>
+            prisma.payment.findFirst({
+              where: { transactionId: data.transactionId },
+              include: { order: { include: { store: { select: { id: true, ownerId: true } } } } },
+            })
+          )
+        : null;
       if (!paymentRow) {
         res.status(404).json({
           success: false,
@@ -1136,21 +1151,25 @@ router.get(
       const { orderId } = req.params;
       const user = getAuthUser(req);
 
-      // Verify authorization based on role — derive access from the order itself.
-      let order;
-      if (user.role === 'super_admin') {
-        order = await prisma.order.findUnique({ where: { id: orderId } });
-      } else if (user.role === 'store_admin') {
-        // Store admin can only see orders from stores they own
-        order = await prisma.order.findFirst({
-          where: { id: orderId, store: { ownerId: user.userId } },
-        });
-      } else {
-        // Customer — can only see their own orders
-        order = await prisma.order.findFirst({
-          where: { id: orderId, customerId: user.userId },
-        });
-      }
+      // Verify authorization based on role — derive access from the order itself. The order's
+      // store comes from the definer (strict RLS hides a contextless read), then every read
+      // runs inside that store.
+      const orderStoreId = await getOrderStoreId(orderId);
+      const order = orderStoreId
+        ? await withStore(orderStoreId, () => {
+            if (user.role === 'super_admin') {
+              return prisma.order.findUnique({ where: { id: orderId } });
+            }
+            if (user.role === 'store_admin') {
+              // Store admin can only see orders from stores they own
+              return prisma.order.findFirst({
+                where: { id: orderId, store: { ownerId: user.userId } },
+              });
+            }
+            // Customer: can only see their own orders
+            return prisma.order.findFirst({ where: { id: orderId, customerId: user.userId } });
+          })
+        : null;
 
       if (!order) {
         res.status(404).json({
@@ -1160,7 +1179,9 @@ router.get(
         return;
       }
 
-      const payment = await PaymentService.getPaymentByOrderId(orderId);
+      const payment = await withStore(order.storeId, () =>
+        PaymentService.getPaymentByOrderId(orderId)
+      );
 
       res.json({
         success: true,

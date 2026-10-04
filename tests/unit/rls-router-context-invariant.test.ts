@@ -178,7 +178,6 @@ describe('RLS Phase 1a — router.param context wiring (audit F2)', () => {
     'store.routes.ts', // (b) domain provisioning calls Vercel/Cloudflare/Resend APIs in-request
     'newsletter.routes.ts', // (b) chunked loop of ResendService.sendBrandedEmail calls in-request
     'bot-analytics.routes.ts', // (b) external fetch to WBS backend (10s timeout) in-request
-    'shipping-carrier.routes.ts', // (b) external courier API calls (Aramex/iCarry) in-request
   ];
 
   it.each(phase2ContextLessFiles)(
@@ -190,10 +189,27 @@ describe('RLS Phase 1a — router.param context wiring (audit F2)', () => {
     }
   );
 
+  // SP7: the shipping-carrier router calls courier APIs in-request AND must run under strict
+  // RLS, so it picks its context per request (`shippingCarrierRouteContext`: reads one
+  // transaction, carrier calls and writes store scope) and registers it itself.
+  const scopedByOwnContextFiles = ['shipping-carrier.routes.ts'];
+
+  it.each(scopedByOwnContextFiles)(
+    '%s registers router.param(storeId, shippingCarrierRouteContext)',
+    file => {
+      const source = readFileSync(path.join(ROUTES_DIR, file), 'utf-8');
+      expect(source).toMatch(
+        /router\.param\(\s*['"]storeId['"]\s*,[\s\S]*?shippingCarrierRouteContext\(/
+      );
+    }
+  );
+
   it('kept-set + phase2 context-less set together account for every router touched by PR #499', () => {
     // admin.routes.ts is intentionally excluded from both lists — it was
     // never fixed (see the comment in routes/index.ts above the '/admin'
     // mount) because it reuses ':id' for unrelated cross-tenant entities.
-    expect(storeIdFixedFiles.length + phase2ContextLessFiles.length).toBe(30);
+    expect(
+      storeIdFixedFiles.length + phase2ContextLessFiles.length + scopedByOwnContextFiles.length
+    ).toBe(30);
   });
 });

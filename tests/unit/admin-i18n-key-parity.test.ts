@@ -134,6 +134,10 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'promotions.page.valuePercentage',
   'shipping.carriers.icarry.title',
   'shipping.carriers.aramex.title',
+  // SP7: Bosta is a brand name; the phone example is a local-format number, LTR in both locales.
+  'shipping.carriers.bosta.title',
+  'shipping.carriers.shipments.carrierNames.bosta',
+  'shipping.carriers.pickup.placeholders.phone',
   'shipping.carriers.shipments.carrierNames.icarry',
   'shipping.carriers.shipments.carrierNames.aramex',
   'shipping.table.dashPlaceholder',

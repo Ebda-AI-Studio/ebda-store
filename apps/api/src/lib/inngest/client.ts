@@ -171,6 +171,16 @@ type InsightsRollupRequestedEvent = EventPayload & {
   };
 };
 
+type ShipmentCreateRequestedEvent = EventPayload & {
+  name: 'shipment/create.requested';
+  data: {
+    storeId: string;
+    orderId: string;
+    /** Absent = the store's default carrier. */
+    carrier?: string;
+  };
+};
+
 type PaymentWebhookReceivedEvent = EventPayload & {
   name: 'payment/webhook.received';
   data: {
@@ -317,6 +327,7 @@ export type AppEvent =
   | AccountingExpenseOcrProcessEvent
   | InsightsRollupRequestedEvent
   | PaymentWebhookReceivedEvent
+  | ShipmentCreateRequestedEvent
   | BulkAiBalanceDescriptionsEvent
   | BulkAiRevertBalanceEvent
   | BulkAiCategorizeEvent

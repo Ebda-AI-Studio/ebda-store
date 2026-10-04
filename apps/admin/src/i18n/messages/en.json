@@ -1278,6 +1278,42 @@
         "noReference": "The customer has not entered a reference yet.",
         "payTo": "Paid to",
         "orderRef": "Quote in the transfer note"
+      },
+      "shipment": {
+        "title": "Shipment",
+        "errorTitle": "Error",
+        "failed": "Something went wrong. Please try again.",
+        "created": "Shipment created",
+        "cancelled": "Shipment cancelled",
+        "cod": "Cash on delivery: {amount}",
+        "codWillCollect": "The courier will collect {amount} on delivery.",
+        "printLabel": "Print label",
+        "refresh": "Refresh tracking",
+        "cancel": "Cancel shipment",
+        "keep": "Keep",
+        "moveTo": "Update status",
+        "chooseStatus": "Choose a status",
+        "timeline": "Tracking",
+        "timelineEmpty": "No tracking updates yet.",
+        "failedTitle": "The carrier could not book this shipment",
+        "failedHint": "The order is placed and unaffected. It was tried {attempts} time(s) and will be retried automatically; you can retry now or ship it another way.",
+        "creating": "Booking with the carrier…",
+        "wasCancelled": "The previous shipment was cancelled. You can create a new one.",
+        "blocked": {
+          "instapay": "This InstaPay order cannot be shipped until you confirm the transfer arrived.",
+          "status": "This order cannot be shipped in its current status."
+        },
+        "carrier": "Carrier",
+        "manualOption": "Manual (other courier)",
+        "manualName": "Courier name",
+        "manualTracking": "Tracking number",
+        "create": "Create shipment",
+        "retry": "Retry booking",
+        "confirmCancelTitle": "Cancel this shipment?",
+        "confirmCancelDescription": "The carrier is asked to cancel the parcel and the order goes back to processing.",
+        "forceCancelTitle": "The carrier did not cancel it",
+        "forceCancelDescription": "The courier may already have the parcel. You can stop tracking it here anyway, but the parcel may still be delivered.",
+        "forceCancel": "Cancel here anyway"
       }
     },
     "layout": {
@@ -2878,11 +2914,11 @@
     "carriers": {
       "page": {
         "title": "Shipping Carriers",
-        "subtitle": "Configure iCarry and Aramex delivery integrations"
+        "subtitle": "Connect Bosta or Aramex, or ship with any courier by hand"
       },
       "empty": {
         "title": "Shipping Carriers not enabled",
-        "description": "Enable the Shipping Carriers feature in your store features to configure iCarry and Aramex delivery integrations."
+        "description": "Enable the Shipping Carriers feature in your store features to configure Bosta, Aramex and manual delivery."
       },
       "shared": {
         "enabled": "Enabled",
@@ -2906,37 +2942,42 @@
       },
       "aramex": {
         "title": "Aramex",
-        "subtitle": "International delivery via Aramex",
+        "subtitle": "Delivery via Aramex (tracking is checked automatically)",
         "fields": {
           "accountNumber": "Account Number",
           "accountPin": "PIN",
           "accountEntity": "Entity",
           "accountCountryCode": "Country Code",
           "username": "Username",
-          "password": "Password"
+          "password": "Password",
+          "sandbox": "Use the Aramex test environment",
+          "codEgpConfirmed": "COD in EGP confirmed by Aramex"
         },
         "placeholders": {
           "accountNumber": "Aramex account number",
           "accountPin": "Account PIN",
-          "accountEntity": "e.g. KWI",
+          "accountEntity": "e.g. CAI",
           "accountCountryCode": "e.g. EG",
           "username": "Aramex account username",
           "password": "Aramex account password"
-        }
+        },
+        "codNotice": "Aramex may only accept cash-on-delivery amounts in US dollars. Until Aramex confirms in writing that your account collects COD in EGP and you switch this on, cash-on-delivery orders cannot be shipped with Aramex (prepaid orders are not affected)."
       },
       "pickup": {
         "title": "Pickup Address",
         "fields": {
-          "area": "Area",
-          "block": "Block",
-          "street": "Street",
-          "building": "Building"
+          "area": "District",
+          "name": "Contact name",
+          "phone": "Phone",
+          "line1": "Address",
+          "city": "Governorate"
         },
         "placeholders": {
-          "area": "e.g. Salmiya",
-          "block": "e.g. 12",
-          "street": "e.g. Gulf Road",
-          "building": "e.g. Al Hamra"
+          "area": "e.g. Dokki",
+          "name": "Store or contact name",
+          "phone": "01012345678",
+          "line1": "e.g. 12 Tahrir St",
+          "city": "e.g. Cairo"
         }
       },
       "shipments": {
@@ -2951,7 +2992,9 @@
         },
         "carrierNames": {
           "icarry": "iCarry",
-          "aramex": "Aramex"
+          "aramex": "Aramex",
+          "bosta": "Bosta",
+          "manual": "Manual"
         },
         "statuses": {
           "created": "Created",
@@ -2961,7 +3004,9 @@
           "delivered": "Delivered",
           "failed": "Failed",
           "returned": "Returned",
-          "cancelled": "Cancelled"
+          "cancelled": "Cancelled",
+          "creating": "Booking",
+          "creation_failed": "Booking failed"
         },
         "columns": {
           "orderNumber": "Order #",
@@ -2996,7 +3041,30 @@
         "testFailedRetry": "Test connection failed.",
         "defaultSetTitle": "Default Set",
         "defaultSetDescription": "{carrier} is now the default carrier.",
-        "defaultSetFailed": "Failed to set default carrier."
+        "defaultSetFailed": "Failed to set default carrier.",
+        "rotatedTitle": "Secret rotated",
+        "rotatedDescription": "The old callback address no longer works; new deliveries use the new one.",
+        "rotateFailed": "Could not rotate the secret. Save the Bosta settings first."
+      },
+      "bosta": {
+        "title": "Bosta",
+        "subtitle": "Delivery and cash on delivery via Bosta",
+        "fields": {
+          "apiKey": "API key",
+          "businessLocationId": "Pickup location ID",
+          "sandbox": "Use the Bosta test environment"
+        },
+        "placeholders": {
+          "apiKey": "Bosta API key",
+          "businessLocationId": "Your Bosta pickup location ID"
+        },
+        "webhookNotice": "Tracking updates reach us automatically: every delivery is booked with a private callback address for your store. Rotate the secret below if you think it has leaked.",
+        "rotateSecret": "Rotate webhook secret"
+      },
+      "manual": {
+        "title": "Manual carrier",
+        "description": "Always available on the order page for a courier without an integration: type the courier name and the tracking number it gave you, then move the shipment along yourself. Cash on delivery is tracked the same way.",
+        "codLink": "Open COD reconciliation"
       }
     },
     "page": {
@@ -8694,5 +8762,63 @@
       "monthly": "monthly",
       "yearly": "yearly"
     }
+  },
+  "codReconciliation": {
+    "title": "COD reconciliation",
+    "subtitle": "What your carriers should have collected against what they report and remit",
+    "errorTitle": "Error",
+    "importFailed": "The statement could not be imported.",
+    "imported": "Imported {count} line(s)",
+    "totals": "Totals",
+    "owed": "Owed (COD)",
+    "collected": "Collected",
+    "fees": "Carrier fees",
+    "net": "Remitted (net)",
+    "outstanding": "Still to receive",
+    "over": "Over-remitted",
+    "unmatched": "Unmatched lines",
+    "flagged": "Shipments needing attention",
+    "identity": "Owed minus collected always equals still to receive minus over-remitted, to the piastre. Collected equals fees plus remitted.",
+    "importTitle": "Import a carrier statement",
+    "importHelp": "Upload the COD settlement CSV from your carrier. It needs a tracking number column and the collected amount (or net amount and fee), in EGP. Uploading the same statement again changes nothing.",
+    "carrier": "Carrier",
+    "file": "CSV file",
+    "paste": "Statement text",
+    "pastePlaceholder": "…or paste the statement here",
+    "import": "Import",
+    "importResult": "{inserted} new, {duplicates} already imported, {unmatched} not matching any shipment.",
+    "rejectedLine": "Line {line}: {reason}",
+    "filterStatus": "Filter by status",
+    "allStatuses": "All statuses",
+    "filterCarrier": "Filter by carrier",
+    "allCarriers": "All carriers",
+    "statuses": {
+      "flagged": "Needs attention",
+      "awaiting": "Awaiting remittance",
+      "partial": "Partly remitted",
+      "settled": "Settled",
+      "over_remitted": "Over-remitted",
+      "mismatch": "Mismatch"
+    },
+    "tableLabel": "COD shipments",
+    "empty": "No COD shipments yet.",
+    "lines": "{count} remittances",
+    "columns": {
+      "order": "Order #",
+      "carrier": "Carrier",
+      "tracking": "Tracking #",
+      "owed": "Owed",
+      "collected": "Collected",
+      "fees": "Fees",
+      "net": "Remitted",
+      "open": "Open",
+      "status": "Status",
+      "date": "Date"
+    },
+    "page": "Page {page} of {pages}",
+    "previous": "Previous",
+    "next": "Next",
+    "unmatchedTitle": "Lines matching no shipment",
+    "unmatchedHelp": "These statement lines name a tracking number that is not one of your shipments. They match automatically if that shipment appears."
   }
 }

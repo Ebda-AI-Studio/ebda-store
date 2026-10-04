@@ -242,6 +242,26 @@ export function orderRouteContext(req: Request, res: Response, next: NextFunctio
 }
 
 /**
+ * The shipping-carrier router's context, chosen PER REQUEST (SP7). Reads stay on ONE request
+ * transaction; everything that calls a carrier (booking, cancelling, refreshing tracking, testing
+ * credentials, fetching a label) or writes runs under store scope, so a slow courier API holds no
+ * transaction and no pooled connection. Registered with `router.param('storeId', ...)` inside the
+ * router, because it is mounted at the bare `/stores` prefix (which never sees the param).
+ *
+ * Before this the router was CONTEXT-LESS: under strict RLS every read returned nothing and every
+ * write was rejected, so the carrier settings page and the order shipping actions could not work.
+ */
+const SHIPPING_EXTERNAL_GET = /^\/[^/]+\/shipments\/[^/]+\/label\/?$/;
+
+export function shippingCarrierRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (SAFE_METHODS.has(req.method) && !SHIPPING_EXTERNAL_GET.test(req.path)) {
+    tenantContext(req, res, next);
+    return;
+  }
+  storeScopeContext(req, res, next);
+}
+
+/**
  * Merchant billing router context (SP5 task 3): reads (GET/HEAD) share ONE
  * request transaction; writes (checkout, change-plan, cancel, resume) call the
  * payment gateway, so they run under a store scope instead — the billing

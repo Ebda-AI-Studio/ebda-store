@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   dispatch: vi.fn(),
   earnPoints: vi.fn(),
   processCommission: vi.fn(),
+  inngestSend: vi.fn(),
   createShipment: vi.fn(),
   isFeatureEnabled: vi.fn(),
   // Spy (not an inline passthrough) so tests can assert the FORCE-RLS side
@@ -53,7 +54,9 @@ vi.mock('@api/services/shipping-carrier.service', () => ({
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: h.isFeatureEnabled },
 }));
-vi.mock('@api/lib/inngest/client', () => ({ inngest: { createFunction: vi.fn(() => ({})) } }));
+vi.mock('@api/lib/inngest/client', () => ({
+  inngest: { createFunction: vi.fn(() => ({})), send: h.inngestSend },
+}));
 vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { handleOrderStatusChanged } from '@api/lib/inngest/functions/order-status-changed';
@@ -123,12 +126,15 @@ describe('order-status-changed fanout', () => {
     expect(h.earnPoints).toHaveBeenCalledWith('s1', 'c1', 'o1', 5000);
   });
 
-  it('confirmed + shipping enabled → auto-ship runs INSIDE runInTenantContext', async () => {
+  it('confirmed → booking is handed to the retried shipment-create job, never run inline', async () => {
     h.isFeatureEnabled.mockResolvedValue(true);
     await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
-    expect(h.createShipment).toHaveBeenCalledWith('s1', 'o1');
-    // load-order + load-store + auto-ship (wraps both the feature check + create).
-    expect(h.runInTenant.mock.calls.filter(c => c[0] === 's1').length).toBeGreaterThanOrEqual(3);
+    // a carrier outage must never fail or hold up the fanout: the booking is an event
+    expect(h.inngestSend).toHaveBeenCalledWith({
+      name: 'shipment/create.requested',
+      data: { storeId: 's1', orderId: 'o1' },
+    });
+    expect(h.createShipment).not.toHaveBeenCalled();
   });
 
   it('shipped → shipped email + dispatch(order_shipped)', async () => {
@@ -138,7 +144,7 @@ describe('order-status-changed fanout', () => {
     expect(h.processCommission).not.toHaveBeenCalled();
   });
 
-  it('confirmed → payment-success email (auto-ship skipped when feature off)', async () => {
+  it('confirmed → payment-success email, and the shipment event is sent (the job checks the feature flag)', async () => {
     await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
     expect(h.sendPaymentSuccess).toHaveBeenCalled();
     expect(h.createShipment).not.toHaveBeenCalled();
