@@ -1,12 +1,5 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  DeleteObjectCommand,
-  DeleteObjectsCommand,
-  GetObjectCommand,
-  ListObjectsV2Command,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { S3Client } from '@aws-sdk/client-s3';
+import { loadS3, loadS3Presigner } from '../lib/lazy-modules';
 import { randomUUID } from 'node:crypto';
 import path from 'path';
 import { config } from '../config';
@@ -91,12 +84,13 @@ export class StorageService {
   /**
    * Get S3 client (lazy initialization)
    */
-  private static getClient(): S3Client {
+  private static async getClient(): Promise<S3Client> {
     if (!this.client) {
       if (!config.storageEndpoint || !config.storageAccessKey || !config.storageSecretKey) {
         throw new AppError(503, 'STORAGE_NOT_CONFIGURED', 'Storage service is not configured');
       }
 
+      const { S3Client } = await loadS3(); // first use, not boot (SP4 Stage 2)
       this.client = new S3Client({
         endpoint: config.storageEndpoint,
         region: 'auto',
@@ -165,10 +159,10 @@ export class StorageService {
       ext,
     });
 
-    const client = this.getClient();
+    const client = await this.getClient();
 
     await client.send(
-      new PutObjectCommand({
+      new (await loadS3()).PutObjectCommand({
         Bucket: config.storageBucket,
         Key: key,
         Body: buffer,
@@ -199,10 +193,10 @@ export class StorageService {
    * Delete a file
    */
   static async delete(key: string): Promise<void> {
-    const client = this.getClient();
+    const client = await this.getClient();
 
     await client.send(
-      new DeleteObjectCommand({
+      new (await loadS3()).DeleteObjectCommand({
         Bucket: config.storageBucket,
         Key: key,
       })
@@ -241,14 +235,14 @@ export class StorageService {
       // Guard: never allow an empty or bucket-wide prefix to wipe everything.
       throw new AppError(400, 'INVALID_PREFIX', 'deleteByPrefix requires a scoped prefix');
     }
-    const client = this.getClient();
+    const client = await this.getClient();
     let deleted = 0;
     const failedKeys: string[] = [];
     let continuationToken: string | undefined;
 
     do {
       const listed = await client.send(
-        new ListObjectsV2Command({
+        new (await loadS3()).ListObjectsV2Command({
           Bucket: config.storageBucket,
           Prefix: prefix,
           ContinuationToken: continuationToken,
@@ -271,7 +265,7 @@ export class StorageService {
         // invisible and the returned count was fiction — a purge could report
         // success having deleted nothing.
         const res = await client.send(
-          new DeleteObjectsCommand({
+          new (await loadS3()).DeleteObjectsCommand({
             Bucket: config.storageBucket,
             Delete: { Objects: objects, Quiet: false },
           })
@@ -292,7 +286,7 @@ export class StorageService {
         const batch = retrying.slice(i, i + 1000).map(Key => ({ Key }));
         try {
           const res = await client.send(
-            new DeleteObjectsCommand({
+            new (await loadS3()).DeleteObjectsCommand({
               Bucket: config.storageBucket,
               Delete: { Objects: batch, Quiet: false },
             })
@@ -311,7 +305,7 @@ export class StorageService {
     let verifyToken: string | undefined;
     do {
       const check = await client.send(
-        new ListObjectsV2Command({
+        new (await loadS3()).ListObjectsV2Command({
           Bucket: config.storageBucket,
           Prefix: prefix,
           ContinuationToken: verifyToken,
@@ -338,13 +332,14 @@ export class StorageService {
    * Generate a signed URL for private file access
    */
   static async getSignedUrl(key: string, expiresIn = 3600): Promise<string> {
-    const client = this.getClient();
+    const client = await this.getClient();
 
-    const command = new GetObjectCommand({
+    const command = new (await loadS3()).GetObjectCommand({
       Bucket: config.storageBucket,
       Key: key,
     });
 
+    const { getSignedUrl } = await loadS3Presigner();
     return getSignedUrl(client, command, { expiresIn });
   }
 
@@ -367,14 +362,15 @@ export class StorageService {
       ext,
     });
 
-    const client = this.getClient();
+    const client = await this.getClient();
 
-    const command = new PutObjectCommand({
+    const command = new (await loadS3()).PutObjectCommand({
       Bucket: config.storageBucket,
       Key: key,
       ContentType: contentType,
     });
 
+    const { getSignedUrl } = await loadS3Presigner();
     const uploadUrl = await getSignedUrl(client, command, { expiresIn });
 
     return {

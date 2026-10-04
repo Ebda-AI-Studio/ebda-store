@@ -6,15 +6,16 @@
 // runtime:
 //   - Node (Express API, vitest, scripts): a process-wide singleton, see
 //     `request-db.ts`;
-//   - Cloudflare Workers (workerd): one client PER REQUEST with `max: 1`,
-//     disconnected through `ctx.waitUntil`, see `runWithRequestDb`.
+//   - Cloudflare Workers (workerd): a small pool of clients per isolate, each leased to one
+//     request at a time and reused, over a leased driver adapter; the pg connection is per
+//     request, see `client-pool.ts` and `createIsolateDb`.
 // workerd forbids reusing an I/O object (socket, stream) created in one request
-// from another, and a pg Pool caches sockets, so a module-global client cannot
-// work there. Hyperdrive / the pooler holds the real server connections, which
+// from another, and a pg Pool caches sockets, so the CONNECTION cannot be shared; the client can. Hyperdrive / the pooler holds the real server connections, which
 // is what makes a client-per-request cheap (spikes/workers-api/README.md).
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import type { SqlDriverAdapterFactory } from '@prisma/driver-adapter-utils';
 
 // Options are extracted so the client's TYPE can be derived from them. A global
 // `omit` narrows PrismaClient's generic, so a plain `PrismaClient` annotation
@@ -176,7 +177,7 @@ function retypeUnsupportedFields(r: pg.QueryResult | undefined): void {
   }
 }
 
-class TextFallbackClient extends pg.Client {
+export class TextFallbackClient extends pg.Client {
   constructor(config?: string | pg.ClientConfig) {
     super(config);
     // A late socket error (the read loop of a closing socket: workerd's "Network connection
@@ -233,9 +234,20 @@ export function createPrismaClient(opts: CreatePrismaClientOptions): AppPrismaCl
         console.error(`[database] idle pool client error: ${err.message}`);
       }),
   });
+  return createPrismaClientWithAdapter(adapter, opts.log);
+}
+
+/**
+ * The same client over any driver adapter factory (or an adapter). The Worker shell passes the
+ * leased factory from `client-pool.ts`, once per pooled client.
+ */
+export function createPrismaClientWithAdapter(
+  adapter: PrismaPg | SqlDriverAdapterFactory,
+  log?: CreatePrismaClientOptions['log']
+): AppPrismaClient {
   return new PrismaClient({
     ...prismaOptions,
-    ...(opts.log ? { log: opts.log } : {}),
+    ...(log ? { log } : {}),
     adapter,
   }) as unknown as AppPrismaClient;
 }

@@ -20,3 +20,6 @@ TAP_WEBHOOK_SECRET=dev-only-tap-webhook-secret
 # Dev mode (NODE_ENV != production) sends events to http://localhost:8288; scripts/stage1-exit-test.mjs
 # starts a stand-in for it there (a failing outbound fetch from `wrangler dev` is noisy and slow).
 INNGEST_EVENT_KEY=local-dev-event-key
+# Dev-only diagnostics routes GET /__dev/stats and /__dev/probe (src/cf/dev-stats.ts): isolate pool counters for the
+# Stage 2 burst / soak runs and the workerd db-scope tests. Never set in wrangler.jsonc or a deployed Worker.
+DEV_STATS=1

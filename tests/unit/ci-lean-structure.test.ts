@@ -204,6 +204,8 @@ describe('scripts/ci-affected.mjs', () => {
     expect(run('apps/orders/package.json').workers).toEqual(['orders']);
     expect(run('apps/web/sentry-worker-entry.ts').workers).toEqual(['web']);
     expect(run('apps/status/src/index.ts').workers).toEqual(['status']);
+    // the API is a Worker app since SP4 Stage 1 (apps/api/wrangler.jsonc)
+    expect(run('apps/api/wrangler.jsonc').workers).toEqual(['api']);
     // root manifest / cf-* scripts hit every Worker app
     expect(run('package-lock.json').workers.sort()).toEqual([
       'admin',

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lib/lazy-modules';
 import {
   neutralizeRowObject,
   addFiltersSheet,
@@ -220,7 +221,7 @@ router.get(
       const orders = truncated ? fetched.slice(0, MAX_ORDERS_SCANNED) : fetched;
 
       // ---- Build workbook ----
-      const workbook = new ExcelJS.Workbook();
+      const workbook = new (await loadExcelJS()).Workbook();
       workbook.creator = BRAND.name;
       workbook.created = new Date();
 

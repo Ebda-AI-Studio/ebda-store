@@ -9,9 +9,18 @@ import { baseClient } from './request-db';
 // live in ./client and ./request-db. Everything below resolves its client
 // through `basePrisma()`: the request-bound client when a Worker bound one with
 // `runWithRequestDb`, else the lazily created Node singleton.
-export { createPrismaClient, resolvePoolConfig } from './client';
+export { createPrismaClient, createPrismaClientWithAdapter, resolvePoolConfig } from './client';
 export type { AppPrismaClient, DbClient, CreatePrismaClientOptions } from './client';
-export { runWithRequestDb, hasRequestDb, type RunWithRequestDbOptions } from './request-db';
+export {
+  runWithRequestDb,
+  createIsolateDb,
+  hasRequestDb,
+  type RunWithRequestDbOptions,
+  type IsolateDb,
+  type IsolateDbOptions,
+} from './request-db';
+export { ClientPool, ClientPoolTimeout, ConnectionScope } from './client-pool';
+export type { ClientLease, ClientPoolOptions } from './client-pool';
 
 const basePrisma = (): AppPrismaClient => baseClient();
 

@@ -1,6 +1,7 @@
 // The Ebda API on Cloudflare Workers (R-EBDA-001, docs/ebda/design/cloudflare-backend.md).
 // Express runs through `httpServerHandler` (`cloudflare:node`, nodejs_compat); each request
-// gets its own Prisma client over Hyperdrive. NO SECRETS HERE: local secrets live in
+// leases a pooled Prisma client (packages/database/src/client-pool.ts) and its own pg
+// connections over Hyperdrive. NO SECRETS HERE: local secrets live in
 // `.dev.vars` (see `.dev.vars.example`), deployed ones in `wrangler secret put`.
 {
   "$schema": "node_modules/wrangler/config-schema.json",

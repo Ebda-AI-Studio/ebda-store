@@ -43,6 +43,7 @@ import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
 import { invalidateCustomersCache } from '../lib/public-cache';
+import { cfWaitUntil } from '../cf/bindings';
 import { assertValidTransition } from './order-status-machine';
 
 /**
@@ -313,44 +314,47 @@ export async function confirmPaymentFromProviderStatus(
     // so the order lookup survives FORCE RLS (no HTTP middleware on the admin
     // refresh / guest verify paths' provider callbacks) and a push glitch
     // never affects the reconciliation result we return to the caller.
-    void runInTenantContext(order.storeId, async () => {
-      const detail = await prisma.order.findUnique({
-        where: { id: order.id },
-        select: {
-          orderNumber: true,
-          total: true,
-          currency: true,
-          customer: { select: { firstName: true, lastName: true, email: true } },
-          shippingAddress: true,
-        },
-      });
-      if (!detail) return;
-      const shippingAddress = detail.shippingAddress as Record<string, unknown> | null;
-      const guestFirstName =
-        typeof shippingAddress?.firstName === 'string' ? shippingAddress.firstName : '';
-      const guestLastName =
-        typeof shippingAddress?.lastName === 'string' ? shippingAddress.lastName : '';
-      const customerName =
-        `${detail.customer?.firstName || guestFirstName} ${detail.customer?.lastName || guestLastName}`.trim() ||
-        detail.customer?.email ||
-        'Customer';
-      const store = await prisma.store
-        .findUnique({ where: { id: order.storeId }, select: { name: true } })
-        .catch(() => null);
-      await OneSignalService.notifyAdminsOfPaymentSuccess({
-        orderId: order.id,
-        orderNumber: detail.orderNumber,
-        storeId: order.storeId,
-        storeName: store?.name ?? order.storeId,
-        customerName,
-        total: detail.total,
-        currency: detail.currency,
-        paymentMethod: payment.provider,
-      });
-    }).catch((err: unknown) =>
-      logger.error(
-        { err, orderId: order.id, source },
-        '[PAYMENT CONFIRM] payment-received push failed'
+    // `cfWaitUntil`: a bare floating promise is cancelled with the response on a Worker.
+    cfWaitUntil(
+      runInTenantContext(order.storeId, async () => {
+        const detail = await prisma.order.findUnique({
+          where: { id: order.id },
+          select: {
+            orderNumber: true,
+            total: true,
+            currency: true,
+            customer: { select: { firstName: true, lastName: true, email: true } },
+            shippingAddress: true,
+          },
+        });
+        if (!detail) return;
+        const shippingAddress = detail.shippingAddress as Record<string, unknown> | null;
+        const guestFirstName =
+          typeof shippingAddress?.firstName === 'string' ? shippingAddress.firstName : '';
+        const guestLastName =
+          typeof shippingAddress?.lastName === 'string' ? shippingAddress.lastName : '';
+        const customerName =
+          `${detail.customer?.firstName || guestFirstName} ${detail.customer?.lastName || guestLastName}`.trim() ||
+          detail.customer?.email ||
+          'Customer';
+        const store = await prisma.store
+          .findUnique({ where: { id: order.storeId }, select: { name: true } })
+          .catch(() => null);
+        await OneSignalService.notifyAdminsOfPaymentSuccess({
+          orderId: order.id,
+          orderNumber: detail.orderNumber,
+          storeId: order.storeId,
+          storeName: store?.name ?? order.storeId,
+          customerName,
+          total: detail.total,
+          currency: detail.currency,
+          paymentMethod: payment.provider,
+        });
+      }).catch((err: unknown) =>
+        logger.error(
+          { err, orderId: order.id, source },
+          '[PAYMENT CONFIRM] payment-received push failed'
+        )
       )
     );
 
