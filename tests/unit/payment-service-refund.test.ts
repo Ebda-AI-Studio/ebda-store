@@ -72,6 +72,8 @@ vi.mock('@force/database', () => ({
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
+  // The factory reads a store's provider configs inside that store's scope.
+  withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
 }));
 
 vi.mock('@api/config', () => ({

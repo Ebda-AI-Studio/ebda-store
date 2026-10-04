@@ -30,6 +30,7 @@ vi.mock('@force/database', () => ({
   },
   Prisma: {},
   runInTenantContext: (_s: unknown, fn: () => Promise<unknown>) => fn(),
+  withStore: (_s: unknown, fn: () => Promise<unknown>) => fn(),
 }));
 vi.mock('@api/config', () => ({ config: { paymentTestMode: true } }));
 vi.mock('@api/services/encryption.service', () => ({

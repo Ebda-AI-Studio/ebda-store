@@ -40,7 +40,10 @@ vi.mock('@force/database', () => ({
     store: { findUnique: (...a: unknown[]) => h.storeFindUnique(...a) },
   },
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
+  withStore: async (_s: string, fn: () => unknown) => fn(),
 }));
+// The route resolves the order's store through a SECURITY DEFINER lookup, then reads inside that scope.
+vi.mock('@api/lib/definer', () => ({ getOrderStoreId: async () => 'store-from-order' }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: any, _res: any, next: any) => next(),
   optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
@@ -54,7 +57,16 @@ vi.mock('@api/middleware/security', () => ({
 }));
 vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
-  PaymentService: { createPayment: (...a: unknown[]) => h.createPayment(...a) },
+  // The route calls the provider in two halves (no transaction open during the call).
+  PaymentService: {
+    requestProviderPayment: async (...a: unknown[]) => ({
+      providerName: 'tap',
+      response: await h.createPayment(...a),
+    }),
+    recordProviderPayment: vi.fn().mockResolvedValue(undefined),
+    getDefaultProvider: async () => 'tap',
+    getAvailableProviders: async () => [],
+  },
 }));
 vi.mock('@api/services/payment-providers/orphaned-invoice-alert', () => ({
   alertOrphanedProviderInvoice: vi.fn(),

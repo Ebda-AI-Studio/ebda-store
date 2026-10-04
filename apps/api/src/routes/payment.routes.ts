@@ -6,10 +6,11 @@ import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@force/database';
 import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
-import { getAuthUser } from '../utils/store-helpers';
+import { getAuthUser, resolvePublicStoreId } from '../utils/store-helpers';
+import { getOrderStoreId } from '../lib/definer';
 import { OrderService } from '../services/order.service';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import logger from '../lib/logger';
@@ -19,7 +20,12 @@ import {
   type OrphanedProviderInvoice,
 } from '../services/payment-providers/orphaned-invoice-alert';
 
-import { REGION, codFeeMinor } from '@force/shared';
+import { REGION, instapayReferenceSchema } from '@force/shared';
+import { AppError } from '../middleware/error-handler';
+import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';
+import { computeCodCharge, codProvider } from '../services/payment-providers/cod.provider';
+import { isProviderAvailable } from '../services/payment-providers/provider-health';
+import { PaymentProviderError } from '../services/payment-providers/types';
 const router = Router();
 
 // ==========================================
@@ -47,7 +53,7 @@ function platformUrlOrRelative(url: string): boolean {
 
 const createPaymentSchema = z.object({
   orderId: z.string().uuid(),
-  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
+  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod', 'instapay']).optional(),
   // Accept relative paths (preferred — server absolutifies against the order's
   // store domain) OR absolute URLs on the platform origin. We do NOT chain
   // `.url()` because that rejects relative paths; the refinement handles both
@@ -90,59 +96,100 @@ const refundSchema = z.object({
  */
 router.get('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const storeId = req.headers['x-store-id'] as string | undefined;
-    const providers = await PaymentService.getAvailableProviders(storeId);
+    // Under strict RLS a read with no store scope sees nothing, so the store is
+    // resolved first (validated X-Store-ID / host, the same resolver the public
+    // routes use) and every read below runs inside its scope.
+    const storeId = await resolvePublicStoreId(req);
 
-    // Check if COD is enabled for this store (or globally)
-    let codConfig: { fixedFee: number; displayName: string; displayNameAr: string | null } | null =
-      null;
-    const codRecord = await prisma.paymentConfig.findFirst({
-      where: {
-        OR: [
-          ...(storeId ? [{ storeId, provider: 'cod' as const, isEnabled: true }] : []),
-          { storeId: null, provider: 'cod' as const, isEnabled: true },
-        ],
-      },
-      orderBy: { storeId: 'desc' },
-    });
-    if (codRecord) {
-      codConfig = {
-        fixedFee: codRecord.fixedFee ? Number(codRecord.fixedFee) : 0,
-        displayName: codRecord.displayName || 'Cash on Delivery',
-        displayNameAr: codRecord.displayNameAr,
-      };
-    }
+    const data = await (storeId
+      ? withStore(storeId, () => loadCheckoutPaymentConfig(storeId))
+      : loadCheckoutPaymentConfig(undefined));
 
-    // Compute a defaultProvider that's actually offerable. If the global env
-    // default is in the returned providers list, use it. Otherwise fall back
-    // to the first listed provider, or 'cod' if available, or null. Returning
-    // a default the storefront can't actually submit (e.g. 'tap' when only
-    // cod is offered) auto-selects the broken option and 500s on click.
-    // providers is a PaymentProvider[] (string union), not objects.
-    const offerable = new Set<string>(providers as unknown as string[]);
-    if (codConfig) offerable.add('cod');
-    const envDefault = config.defaultPaymentProvider;
-    const defaultProvider =
-      envDefault && offerable.has(envDefault)
-        ? envDefault
-        : (providers[0] ?? (codConfig ? 'cod' : null));
-
-    res.json({
-      success: true,
-      data: {
-        providers,
-        cod: codConfig,
-        defaultProvider,
-        defaultCurrency: config.defaultCurrency,
-        supportedCurrencies: ['EGP', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
-        supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'google_pay', 'samsung_pay'],
-        testMode: config.paymentTestMode,
-      },
-    });
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 });
+
+/**
+ * What the checkout may offer THIS store right now. A method whose provider is
+ * in an outage (open circuit) is left out of `providers`/`methods` and named in
+ * `unavailable`, so the checkout keeps working with COD / InstaPay / the other
+ * gateways instead of offering a button that cannot succeed (Review Focus 5).
+ */
+async function loadCheckoutPaymentConfig(storeId: string | undefined) {
+  const allProviders = await PaymentService.getAvailableProviders(storeId);
+  const unavailable: string[] = [];
+  const providers = allProviders.filter(p => {
+    const ok = !storeId || isProviderAvailable(storeId, p);
+    if (!ok) unavailable.push(p);
+    return ok;
+  });
+
+  // Check if COD is enabled for this store (or globally)
+  let codConfig: { fixedFee: number; displayName: string; displayNameAr: string | null } | null =
+    null;
+  const codRecord = await prisma.paymentConfig.findFirst({
+    where: {
+      OR: [
+        ...(storeId ? [{ storeId, provider: 'cod' as const, isEnabled: true }] : []),
+        { storeId: null, provider: 'cod' as const, isEnabled: true },
+      ],
+    },
+    orderBy: { storeId: 'desc' },
+  });
+  if (codRecord) {
+    codConfig = {
+      fixedFee: codRecord.fixedFee ? Number(codRecord.fixedFee) : 0,
+      displayName: codRecord.displayName || 'Cash on Delivery',
+      displayNameAr: codRecord.displayNameAr,
+    };
+  }
+
+  // InstaPay (manual transfer). Only that it is on, its name and its hold window:
+  // the merchant's handle and phone are shown after the order exists, not to
+  // every visitor of the checkout.
+  let instapayConfig: {
+    displayName: string;
+    displayNameAr: string | null;
+    expiryHours: number;
+  } | null = null;
+  if (storeId) {
+    const ip = await InstapayService.getConfig(storeId);
+    if (ip) {
+      const hours = Number((ip.settings as { expiryHours?: unknown } | null)?.expiryHours);
+      instapayConfig = {
+        displayName: ip.displayName || 'InstaPay',
+        displayNameAr: ip.displayNameAr ?? 'إنستاباي',
+        expiryHours: Number.isFinite(hours) && hours > 0 ? hours : 48,
+      };
+    }
+  }
+
+  // A default the storefront can actually submit: the env default if offerable,
+  // else the first listed provider, else COD, else InstaPay, else null.
+  const offerable = new Set<string>(providers as unknown as string[]);
+  if (codConfig) offerable.add('cod');
+  if (instapayConfig) offerable.add('instapay');
+  const envDefault = config.defaultPaymentProvider;
+  const defaultProvider =
+    envDefault && offerable.has(envDefault)
+      ? envDefault
+      : (providers[0] ?? (codConfig ? 'cod' : instapayConfig ? 'instapay' : null));
+
+  return {
+    providers,
+    cod: codConfig,
+    instapay: instapayConfig,
+    /** Methods that are configured but down right now (open circuit); they come back by themselves. */
+    unavailable,
+    defaultProvider,
+    defaultCurrency: config.defaultCurrency,
+    supportedCurrencies: ['EGP', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'BHD'],
+    supportedMethods: ['knet', 'visa', 'mastercard', 'apple_pay', 'google_pay', 'samsung_pay'],
+    testMode: config.paymentTestMode,
+  };
+}
 
 /**
  * GET /payments/methods
@@ -153,7 +200,7 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
     const amount = parseInt(req.query.amount as string) || 1000;
     const currency = (req.query.currency as Currency) || REGION.currency;
     const provider = req.query.provider as PaymentProvider | undefined;
-    const storeId = req.headers['x-store-id'] as string | undefined;
+    const storeId = await resolvePublicStoreId(req);
 
     const methods = await PaymentService.getPaymentMethods(amount, currency, provider, storeId);
 
@@ -169,6 +216,17 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
 /**
  * POST /payments/create
  * Create a payment for an order
+ *
+ * Three shapes, one rule: NO external call ever runs inside a request transaction
+ * (a provider call under a 30 s interactive transaction is how a slow gateway
+ * turns into P2028 and a half-written order).
+ *
+ *  - COD / InstaPay: no network at all, so ONE short tenant transaction writes
+ *    the payment (and, for InstaPay, puts the order on hold).
+ *  - Online gateways: short transaction(s) to read -> the provider call with NO
+ *    transaction open, behind the per-(store, provider) circuit breaker -> a short
+ *    transaction to record the payment. The order itself was committed earlier by
+ *    /public/orders.
  */
 router.post(
   '/create',
@@ -177,8 +235,9 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     let rollbackContext: { orderId: string; storeId: string; sessionId: string } | null = null;
     // Set the moment the gateway ACCEPTS an invoice, cleared with the rollback
-    // once the wrap COMMITs. Still set in the catch = the provider holds a live
-    // invoice whose Payment row died with the failed COMMIT (issue 2360).
+    // once the recording transaction COMMITs. Still set in the catch = the
+    // provider holds a live invoice whose Payment row never became durable
+    // (issue 2360).
     let acceptedInvoice: OrphanedProviderInvoice | null = null;
 
     try {
@@ -200,16 +259,24 @@ router.post(
       // guard on /public/orders already wrote customerId=null on the
       // order they're now paying for.
       const isCustomer = req.user?.role === 'customer';
-      const order = await prisma.order.findFirst({
-        where: isCustomer
-          ? { id: data.orderId, customerId: req.user!.userId }
-          : { id: data.orderId, customerId: null },
-        include: {
-          items: { include: { product: true } },
-          customer: true,
-          store: { select: { domain: true, slug: true } },
-        },
-      });
+      // The store is not known yet: it is resolved from the order id through the
+      // SECURITY DEFINER lookup (strict RLS shows a contextless read nothing), then
+      // every read happens inside that store's scope.
+      const orderStoreId = await getOrderStoreId(data.orderId);
+      const order = orderStoreId
+        ? await withStore(orderStoreId, () =>
+            prisma.order.findFirst({
+              where: isCustomer
+                ? { id: data.orderId, customerId: req.user!.userId }
+                : { id: data.orderId, customerId: null },
+              include: {
+                items: { include: { product: true } },
+                customer: true,
+                store: { select: { domain: true, slug: true } },
+              },
+            })
+          )
+        : null;
 
       if (!order) {
         res.status(404).json({
@@ -226,13 +293,15 @@ router.post(
       // another live gateway invoice the customer could ALSO pay (undetected
       // double capture). Terminal-failure payments (failed/cancelled/expired)
       // are excluded so a legitimate retry after a failed attempt still works.
-      const existingPayment = await prisma.payment.findFirst({
-        where: {
-          orderId: order.id,
-          status: { notIn: ['failed', 'cancelled', 'expired'] },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      const existingPayment = await withStore(order.storeId, () =>
+        prisma.payment.findFirst({
+          where: {
+            orderId: order.id,
+            status: { notIn: ['failed', 'cancelled', 'expired'] },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      );
       if (existingPayment) {
         const settled = ['completed', 'refunded', 'partially_refunded', 'disputed'].includes(
           existingPayment.status
@@ -258,6 +327,19 @@ router.post(
               provider: 'cod',
               cod: true,
               codFee: typeof meta.codFee === 'number' ? meta.codFee : 0,
+            },
+          });
+          return;
+        }
+        if (existingPayment.provider === 'instapay' && data.provider === 'instapay') {
+          // Same InstaPay hold, same instructions: nothing is created twice.
+          const view = await InstapayService.getInstructions(order.storeId, order.id);
+          res.json({
+            success: true,
+            data: {
+              transactionId: existingPayment.id,
+              provider: 'instapay',
+              instapay: view.instructions,
             },
           });
           return;
@@ -311,38 +393,80 @@ router.post(
         };
       }
 
-      // From here on every Prisma write touches tenant-scoped tables
-      // (Order, Payment, AuditLog with storeId). Wrap in a single
-      // runInTenantContext so RLS policies enforce isolation under the
-      // ebda_app role — without this the SELECTs the provider call
-      // makes (e.g. PaymentConfig lookup, store row) silently fall
-      // through to the "current_store_id() IS NULL → see all rows"
-      // branch of the policies, which works but defeats the purpose
-      // of RLS. Bootstrap order lookup above stays OUTSIDE the wrap
-      // because we don't yet know the storeId at that point.
+      // COMMIT BEFORE RESPOND. Every shape below RETURNS the response instead of
+      // sending it, and the send happens after Postgres has COMMITted. `payments/*`
+      // is mounted bare (no `tenantContext`), so it does not get the middleware
+      // lifecycle in `middleware/request-transaction.ts`; it has to do this itself.
       //
-      // COMMIT BEFORE RESPOND. This callback RETURNS the response instead of
-      // sending it, and the send happens after `runInTenantContext` resolves —
-      // i.e. after Postgres has COMMITted. `payments/*` is mounted bare (no
-      // `tenantContext`), so it does not get the middleware lifecycle in
-      // `middleware/request-transaction.ts`; it has to do this itself.
-      //
-      // Measured before this change (2026-09-08, local Postgres): the 200
-      // reached the client 0.376ms BEFORE its own COMMIT landed, so a caller
-      // that read the payment row back immediately could miss it — on the
-      // money path, where a 200 means "your payment is recorded". CI caught it
-      // as a real, non-deterministic failure of
-      // `tests/integration/export-response-lifecycle.test.ts`. Same defect
-      // class as #1596, one layer down. Do not move a `res.*` call back inside
-      // this callback.
-      const paymentResponse = await runInTenantContext<{
-        status: number;
-        body: Record<string, unknown>;
-      }>(order.storeId, async () => {
-        // ==========================================
-        // COD (Cash on Delivery) — skip payment gateway
-        // ==========================================
-        if (data.provider === 'cod') {
+      // Measured (2026-09-08, local Postgres): the 200 reached the client
+      // 0.376ms BEFORE its own COMMIT landed, so a caller that read the payment
+      // row back immediately could miss it — on the money path, where a 200
+      // means "your payment is recorded". Same defect class as #1596. Do not
+      // move a `res.*` call back inside a transaction callback.
+      let paymentResponse: { status: number; body: Record<string, unknown> };
+      // Work that may only run once the transaction above COMMITs (the InstaPay
+      // merchant notification). This router is mounted bare, so it drains its own queue.
+      const afterCommit: Array<{ name: string; task: () => Promise<unknown> }> = [];
+
+      if (data.provider === 'cod' || data.provider === 'instapay') {
+        // No network: one short tenant transaction.
+        paymentResponse = await runInTenantContext<{
+          status: number;
+          body: Record<string, unknown>;
+        }>(order.storeId, async () => {
+          // ==========================================
+          // InstaPay — manual transfer, merchant confirms
+          // ==========================================
+          if (data.provider === 'instapay') {
+            const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
+            const { payment, instructions, created } = await InstapayService.initiate({
+              storeId: order.storeId,
+              order: {
+                id: order.id,
+                orderNumber: order.orderNumber,
+                total: order.total,
+                walletAmount,
+                currency: order.currency,
+                status: order.status,
+              },
+              customer: {
+                name:
+                  `${order.customer?.firstName ?? shipping.firstName ?? ''} ${order.customer?.lastName ?? shipping.lastName ?? ''}`.trim() ||
+                  'Customer',
+                email: order.customer?.email || shipping.email || '',
+                phone: shipping.phone || undefined,
+              },
+              userId: req.user?.userId ?? null,
+              postCommit: (name, task) => afterCommit.push({ name, task }),
+            });
+            if (created) {
+              await auditLog({
+                action: 'payment.created',
+                userId: req.user?.userId,
+                resourceType: 'payment',
+                resourceId: payment.id,
+                details: {
+                  orderId: order.id,
+                  amount: instructions.amountMinor,
+                  provider: 'instapay',
+                  ...(walletAmount > 0 ? { walletAmount } : {}),
+                },
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+              });
+            }
+            return {
+              status: 200,
+              body: {
+                success: true,
+                data: { transactionId: payment.id, provider: 'instapay', instapay: instructions },
+              },
+            };
+          }
+
+          // ==========================================
+          // COD (Cash on Delivery) — skip payment gateway
+          // ==========================================
           // Look up COD config for fee
           const codConfig = await prisma.paymentConfig.findFirst({
             where: {
@@ -379,30 +503,52 @@ router.post(
             };
           }
 
-          // COD fee in integer piastres via the single helper (fixed fee today; a
-          // percentage, if ever configured, rounds half up to the piastre).
-          const codFee = codFeeMinor(order.total, { fixedMinor: Number(codConfig.fixedFee) || 0 });
-
-          // Add the COD fee to order.total only when NO prior COD payment row
-          // exists for this order — a prior row (even a failed/cancelled one,
-          // which the idempotency guard above lets through) means the fee was
-          // already folded into order.total once and must not stack.
+          // The COD fee in integer piastres via the single helper (fixed fee plus an
+          // optional percentage, rounded half up to the piastre). It is added to
+          // order.total only when NO prior COD payment row exists for this order — a
+          // prior row (even a failed/cancelled one, which the idempotency guard above
+          // lets through) means the fee was already folded into order.total once and
+          // must not stack. What the courier collects is the order value (incl. any
+          // COD fee) less the part already paid from the wallet.
           const priorCodPayment = await prisma.payment.findFirst({
             where: { orderId: order.id, provider: 'cod' },
             select: { id: true },
           });
-          const applyFee = codFee > 0 && !priorCodPayment;
-          const chargedTotal = applyFee ? order.total + codFee : order.total;
+          const percentBps = Number(
+            (codConfig.settings as { percentBps?: unknown } | null)?.percentBps ?? 0
+          );
+          const {
+            feeMinor: codFee,
+            applyFee,
+            chargedTotalMinor: chargedTotal,
+            collectMinor: collectAmount,
+          } = computeCodCharge({
+            orderTotalMinor: order.total,
+            walletMinor: walletAmount,
+            fixedFeeMinor: Number(codConfig.fixedFee) || 0,
+            percentBps: Number.isFinite(percentBps) ? percentBps : 0,
+            feeAlreadyApplied: Boolean(priorCodPayment),
+          });
           if (applyFee) {
             await prisma.order.update({
               where: { id: order.id },
               data: { total: chargedTotal },
             });
           }
-          // What the courier collects: the order value (incl. any COD fee)
-          // less the part already paid from the wallet. === chargedTotal when
-          // the wallet was not used.
-          const collectAmount = chargedTotal - walletAmount;
+          // The provider-shaped COD adapter validates the charge (positive integer
+          // piastres, EGP) and builds the instruction; no network.
+          await codProvider.createPayment(
+            {
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              amountMinor: collectAmount,
+              currency: order.currency as 'EGP',
+              customer: { name: '', email: '' },
+              returnUrls: { success: '', failure: '' },
+              idempotencyKey: `${order.id}:cod`,
+            },
+            { mode: 'live' }
+          );
 
           // Create payment record with cod_pending status
           const payment = await prisma.payment.create({
@@ -472,20 +618,21 @@ router.post(
               },
             },
           };
-        }
-
+        });
+      } else {
         // ==========================================
-        // Online payment providers (Tap, MyFatoorah, etc.)
+        // Online payment providers (Tap, MyFatoorah, Paymob, ...)
         // ==========================================
 
         // Resolve the correct storefront URL for payment callbacks
         const storefrontBaseUrl = order.store ? storefrontOrigin(order.store) : config.webUrl;
 
         // Card-testing guard (SP5 task 4): per-store / per-IP attempt budgets and
-        // the per-session decline block. Online providers only — the COD branch
-        // above returned already, so COD is never counted or blocked. A refusal
-        // is a 429 AppError: the catch below rolls the pending order back (cart +
-        // stock restored) exactly as for a failed provider call.
+        // the per-session decline block. Online providers only — the COD/InstaPay
+        // branch above never reaches here, so they are never counted or blocked. A
+        // refusal is a 429 AppError: the catch below rolls the pending order back
+        // (cart + stock restored) exactly as for a failed provider call. Redis only:
+        // no transaction is open.
         await CardTestingGuard.assertAllowed({
           storeId: order.storeId,
           orderId: order.id,
@@ -495,63 +642,77 @@ router.post(
           sessionId: sessionIdHeader,
         });
 
-        // Create payment. PaymentService.createPayment throws on provider-not-
-        // configured / provider-error / validation-failure — the catch block at
-        // the end of this handler runs the rollback so the customer's cart is
-        // restored and inventory isn't drained by a failed attempt.
-        const result = await PaymentService.createPayment(
-          {
-            orderId: order.id,
-            orderNumber: order.orderNumber,
-            // Amount due — see the wallet note above. === order.total when the
-            // wallet was not used.
-            amount: order.total - walletAmount,
-            currency: order.currency as Currency,
-            customer: (() => {
-              // Guest checkout has order.customer = null but the checkout
-              // form's name/email/phone live on order.shippingAddress (JSON).
-              // Providers like MyFatoorah reject empty emails (400 "must be a
-              // valid email") so always fall through to the shippingAddress
-              // values before defaulting to a blank — guests are the common
-              // case on storefronts, not the exception.
-              const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
-              return {
-                // Stable id so providers hashing the customer for 3D-Secure /
-                // fraud scoring see a consistent value across retries.
-                id: req.user?.userId ?? `guest-${order.id}`,
-                name:
-                  `${order.customer?.firstName ?? shipping.firstName ?? ''} ${order.customer?.lastName ?? shipping.lastName ?? ''}`.trim() ||
-                  'Customer',
-                email: order.customer?.email || shipping.email || '',
-                phone: shipping.phone || undefined,
-              };
-            })(),
-            items: buildPaymentLineItems(order.items),
-            // Resolve relative paths against the order's storefront base URL so
-            // payment providers always receive an absolute URL that points back
-            // at the correct tenant domain (custom domain or platform slug).
-            callbackUrl: data.successUrl
-              ? data.successUrl.startsWith('/')
-                ? `${storefrontBaseUrl}${data.successUrl}`
-                : data.successUrl
-              : `${storefrontBaseUrl}/checkout/success`,
-            errorUrl: data.errorUrl
-              ? data.errorUrl.startsWith('/')
-                ? `${storefrontBaseUrl}${data.errorUrl}`
-                : data.errorUrl
-              : `${storefrontBaseUrl}/checkout/error`,
-            webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${data.provider}`,
-          },
-          data.provider,
-          order.storeId
-        );
+        const providerName =
+          data.provider ?? (await PaymentService.getDefaultProvider(order.storeId));
+        if (!providerName) {
+          throw new AppError(500, 'PAYMENT_NOT_CONFIGURED', 'No payment providers configured');
+        }
+        // Outage isolation (Review Focus 5): a method whose circuit is open fails
+        // fast instead of making the customer wait out another timeout. Only THIS
+        // method is affected; the checkout still offers COD / InstaPay / the rest.
+        if (!isProviderAvailable(order.storeId, providerName)) {
+          throw new AppError(
+            503,
+            'PAYMENT_METHOD_UNAVAILABLE',
+            'This payment method is temporarily unavailable. Please choose another method.'
+          );
+        }
 
-        // Provider accepted — but the rollback context is NOT cleared here
-        // (issue 2306, same class as the agent path in mcp/tools/order.tools.ts):
-        // the Payment row is only durable after this wrap COMMITs, so a COMMIT
-        // failure/timeout must still roll the order back in the outer catch.
-        // That rollback does NOT reach the gateway: the invoice stays live, so
-        // the catch raises a P1 naming it for an operator to void (issue 2360,
+        const paymentRequest = {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          // Amount due — see the wallet note above. === order.total when the
+          // wallet was not used.
+          amount: order.total - walletAmount,
+          currency: order.currency as Currency,
+          customer: (() => {
+            // Guest checkout has order.customer = null but the checkout
+            // form's name/email/phone live on order.shippingAddress (JSON).
+            // Providers like MyFatoorah reject empty emails (400 "must be a
+            // valid email") so always fall through to the shippingAddress
+            // values before defaulting to a blank — guests are the common
+            // case on storefronts, not the exception.
+            const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
+            return {
+              // Stable id so providers hashing the customer for 3D-Secure /
+              // fraud scoring see a consistent value across retries.
+              id: req.user?.userId ?? `guest-${order.id}`,
+              name:
+                `${order.customer?.firstName ?? shipping.firstName ?? ''} ${order.customer?.lastName ?? shipping.lastName ?? ''}`.trim() ||
+                'Customer',
+              email: order.customer?.email || shipping.email || '',
+              phone: shipping.phone || undefined,
+            };
+          })(),
+          items: buildPaymentLineItems(order.items),
+          // Resolve relative paths against the order's storefront base URL so
+          // payment providers always receive an absolute URL that points back
+          // at the correct tenant domain (custom domain or platform slug).
+          callbackUrl: data.successUrl
+            ? data.successUrl.startsWith('/')
+              ? `${storefrontBaseUrl}${data.successUrl}`
+              : data.successUrl
+            : `${storefrontBaseUrl}/checkout/success`,
+          errorUrl: data.errorUrl
+            ? data.errorUrl.startsWith('/')
+              ? `${storefrontBaseUrl}${data.errorUrl}`
+              : data.errorUrl
+            : `${storefrontBaseUrl}/checkout/error`,
+          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
+        };
+
+        // THE PROVIDER CALL — no transaction is open. It throws on provider-not-
+        // configured / provider-error / outage / validation-failure — the catch
+        // block at the end of this handler runs the rollback so the customer's
+        // cart is restored and inventory isn't drained by a failed attempt.
+        const { providerName: acceptedBy, response: result } =
+          await PaymentService.requestProviderPayment(paymentRequest, providerName, order.storeId);
+
+        // Provider accepted — the invoice is live at the gateway from here, and
+        // the rollback context stays armed until the Payment row is durable (issue
+        // 2306): a failure to record it must roll the order back in the outer
+        // catch. That rollback does NOT reach the gateway: the invoice stays live,
+        // so the catch raises a P1 naming it for an operator to void (issue 2360,
         // ruling PAY-ORPH-1). The client never receives this paymentUrl.
         acceptedInvoice = {
           storeId: order.storeId,
@@ -564,35 +725,47 @@ router.post(
           source: 'checkout',
         };
 
-        // Audit log
-        await auditLog({
-          action: 'payment.created',
-          userId: req.user?.userId,
-          resourceType: 'payment',
-          resourceId: result.transactionId,
-          details: {
-            orderId: order.id,
-            amount: order.total - walletAmount,
-            provider: result.provider,
-            ...(walletAmount > 0 ? { walletAmount } : {}),
-          },
-          ip: req.ip,
-          userAgent: req.headers['user-agent'],
-        });
+        // Short transaction to record: the Payment row + its audit event + the audit log.
+        paymentResponse = await runInTenantContext<{
+          status: number;
+          body: Record<string, unknown>;
+        }>(order.storeId, async () => {
+          await PaymentService.recordProviderPayment(
+            acceptedBy,
+            paymentRequest,
+            result,
+            order.storeId
+          );
 
-        return {
-          status: 200,
-          body: {
-            success: true,
-            data: {
-              transactionId: result.transactionId,
-              paymentUrl: result.paymentUrl,
+          await auditLog({
+            action: 'payment.created',
+            userId: req.user?.userId,
+            resourceType: 'payment',
+            resourceId: result.transactionId,
+            details: {
+              orderId: order.id,
+              amount: order.total - walletAmount,
               provider: result.provider,
-              paymentMethods: result.paymentMethods,
+              ...(walletAmount > 0 ? { walletAmount } : {}),
             },
-          },
-        };
-      });
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          });
+
+          return {
+            status: 200,
+            body: {
+              success: true,
+              data: {
+                transactionId: result.transactionId,
+                paymentUrl: result.paymentUrl,
+                provider: result.provider,
+                paymentMethods: result.paymentMethods,
+              },
+            },
+          };
+        });
+      }
 
       // COMMITTED. The payment (or the COD-unavailable rollback the callback
       // already ran) is durable, so the compensating rollback is disarmed only
@@ -601,6 +774,7 @@ router.post(
       // row (issue 2306).
       rollbackContext = null;
       acceptedInvoice = null;
+      await runPostCommit(afterCommit);
 
       // Only now do the bytes go out, so a 200 here means the payment row is
       // durable and visible to every other connection.
@@ -625,6 +799,61 @@ router.post(
       // Independent of the rollback: an order that was not rolled back (no
       // session header) still has no Payment row behind a live invoice.
       if (acceptedInvoice) await alertOrphanedProviderInvoice(acceptedInvoice);
+      // A provider outage reaches the client as a 503 with a code the checkout
+      // maps to "choose another method"; any other provider error keeps its shape.
+      if (error instanceof PaymentProviderError && error.isOutage) {
+        next(
+          new AppError(
+            503,
+            'PAYMENT_METHOD_UNAVAILABLE',
+            'This payment method is temporarily unavailable. Please choose another method.'
+          )
+        );
+        return;
+      }
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /payments/instapay/:orderId
+ * The customer's view of an InstaPay order: the merchant's handle/phone, the exact
+ * amount in piastres, the reference to quote, the deadline and its status. Public
+ * by order id (an unguessable v4 UUID, like /payments/create).
+ */
+router.get(
+  '/instapay/:orderId',
+  paymentLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      const storeId = await getOrderStoreId(orderId);
+      if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      const view = await InstapayService.getInstructions(storeId, orderId);
+      res.json({ success: true, data: view });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /payments/instapay/:orderId/reference
+ * The customer enters the transfer reference. Only while the order is still waiting.
+ */
+router.post(
+  '/instapay/:orderId/reference',
+  paymentLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      const { reference } = z.object({ reference: instapayReferenceSchema }).parse(req.body);
+      const storeId = await getOrderStoreId(orderId);
+      if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      const result = await InstapayService.submitReference(storeId, orderId, reference);
+      res.json({ success: true, data: result });
+    } catch (error) {
       next(error);
     }
   }

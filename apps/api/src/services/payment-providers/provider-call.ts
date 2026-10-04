@@ -8,13 +8,18 @@
  */
 import { PaymentProviderError, type Currency } from './types';
 
-/** Default per-call budget. Well under the 30 s tenant-transaction limit, and no call runs inside one anyway. */
-export const PROVIDER_CALL_TIMEOUT_MS = 10_000;
+/**
+ * Default per-call budget. Well under the 30 s tenant-transaction limit, and no call
+ * runs inside one anyway. `PAYMENT_PROVIDER_TIMEOUT_MS` overrides it (tests, ops).
+ */
+export const DEFAULT_PROVIDER_CALL_TIMEOUT_MS = 10_000;
+export const providerCallTimeoutMs = (): number =>
+  Number(process.env.PAYMENT_PROVIDER_TIMEOUT_MS) || DEFAULT_PROVIDER_CALL_TIMEOUT_MS;
 
 export async function callProvider<T>(
   op: string,
   fn: (signal: AbortSignal) => Promise<T>,
-  timeoutMs: number = PROVIDER_CALL_TIMEOUT_MS
+  timeoutMs: number = providerCallTimeoutMs()
 ): Promise<T> {
   const ctrl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -60,3 +65,32 @@ export function assertRefundAmount(amountMinor: number): void {
 }
 
 export const EGP: Currency = 'EGP';
+
+/**
+ * A deadline for a call into a LEGACY (v1) adapter, which takes no abort signal:
+ * rejects with `PROVIDER_TIMEOUT` if it has not settled in time (the underlying
+ * request is abandoned, not cancelled). Any other failure is passed through
+ * UNCHANGED, so the callers' existing error handling and messages are untouched.
+ * v2 adapters use `callProvider`.
+ */
+export async function withProviderDeadline<T>(
+  op: string,
+  fn: () => Promise<T>,
+  timeoutMs: number = providerCallTimeoutMs()
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new PaymentProviderError('PROVIDER_TIMEOUT', `${op} timed out after ${timeoutMs}ms`)
+        ),
+      timeoutMs
+    );
+  });
+  try {
+    return await Promise.race([fn(), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
