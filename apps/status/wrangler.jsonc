@@ -1,0 +1,20 @@
+// status.ebda.app: its OWN Worker + Durable Object. Independent of apps/api: no shared code,
+// database, queue or host. Deploy wiring is intentionally NOT in CI yet (SP9 part 2 builds it).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ebda-status",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "triggers": { "crons": ["* * * * *"] },
+  "durable_objects": {
+    "bindings": [{ "name": "STATUS_STORE", "class_name": "StatusStore" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatusStore"] }],
+  "vars": {
+    // Consecutive failed probes before an incident opens / consecutive successes before it resolves.
+    "FAIL_THRESHOLD": "3",
+    "RECOVER_THRESHOLD": "2",
+  },
+  // STATUS_SECRET (shared secret for POST /api/incidents*) is set with `wrangler secret put`.
+  "routes": [{ "pattern": "status.ebda.app", "custom_domain": true }],
+}
