@@ -216,7 +216,7 @@ export function InstapayCard({
                 <span dir="ltr">{ins.customerReference ?? reference}</span>
               </p>
             )}
-            {refError && <p className="mt-1 text-xs text-destructive">{refError}</p>}
+            {refError && <p className="mt-1 text-xs text-destructive-ink">{refError}</p>}
           </div>
         </>
       )}

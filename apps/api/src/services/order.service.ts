@@ -495,14 +495,17 @@ export class OrderService {
 
     // InstaPay (SP6a): what the merchant needs to match the transfer against their
     // InstaPay app: the reference the customer entered and the hold deadline. A
-    // derived summary, never the raw payment metadata.
-    let instapay: {
-      customerReference: string | null;
-      customerReferenceAt: string | null;
-      handle: string | null;
-      expiresAt: string | null;
-    } | null = null;
-    if (order.payments.some(p => p.provider === 'instapay')) {
+    // derived summary, never the raw payment metadata. Only present on an InstaPay
+    // order, so every other order keeps exactly the shape it always had.
+    const result: typeof order & {
+      instapay?: {
+        customerReference: string | null;
+        customerReferenceAt: string | null;
+        handle: string | null;
+        expiresAt: string | null;
+      };
+    } = order;
+    if (order.payments?.some(p => p.provider === 'instapay')) {
       const ip = await prisma.payment.findFirst({
         where: { orderId, provider: 'instapay' },
         orderBy: { createdAt: 'desc' },
@@ -510,7 +513,7 @@ export class OrderService {
       });
       const m = (ip?.metadata ?? {}) as Record<string, unknown>;
       const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
-      instapay = {
+      result.instapay = {
         customerReference: str(m.customerReference),
         customerReferenceAt: str(m.customerReferenceAt),
         handle: str(m.handle),
@@ -518,7 +521,7 @@ export class OrderService {
       };
     }
 
-    return { ...order, instapay };
+    return result;
   }
 
   static async getByOrderNumber(storeId: string, orderNumber: string) {
