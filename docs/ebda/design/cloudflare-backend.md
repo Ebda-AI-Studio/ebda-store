@@ -3,6 +3,7 @@
 **Status:** decided under Ahmad's "do not stop" instruction (2026-10-03). The plan put an approval gate here, so this is recorded as Ruling R-EBDA-001 for Ahmad to review after the fact. Reversal cost is low until SP4 Stage 1 lands (see §8).
 
 **Evidence base (all on this branch):**
+
 - `docs/design/cloudflare-backend-inventory.md`: every FWB API dependency, Redis group, timer, hook, Inngest trigger and the spike candidates, with file:line references.
 - `spikes/workers-api/`: Prisma 6.19.3 + `@prisma/adapter-pg` on workerd, through pgbouncer in **transaction mode** (pool of 2, so connections are reused across tenants). Results: 17/17 tests, 0 cross-tenant leaks in 300 interleaved requests, and the mutation check goes red when `set_config(..., true)` becomes session-level or is removed.
 - `docs/design/express-on-workerd-experiment.md`: FWB's **unchanged** Express app boots on workerd via `httpServerHandler` (`cloudflare:node`). `request-transaction.ts` commit-before-respond works and AsyncLocalStorage propagates. The bundle is 3.03 MB gzip. One blocker is open: 3+ concurrent requests in one isolate hang because the pg Pool/Prisma client is shared across requests. The RLS spike already solved this, with a per-request client.
@@ -15,10 +16,10 @@
 
 Why not the alternatives:
 
-| Option | Verdict | Reason |
-|---|---|---|
-| A. Express on workerd (chosen) | **Go** | Boots unchanged; the remaining blocker is framework-independent and already solved in the spike. It keeps Ebda's API code shape identical to FWB, so fixes stay portable through `scripts/twin-diff.sh`. |
-| B. Hono rewrite | No | 143k lines and 74 route files means weeks of work, and it would hit the same per-request I/O issue. It would also break twin-path portability with FWB permanently. New Ebda-only surfaces (status page, marketing APIs) may use Hono. |
+| Option                                     | Verdict           | Reason                                                                                                                                                                                                                                                         |
+| ------------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Express on workerd (chosen)             | **Go**            | Boots unchanged; the remaining blocker is framework-independent and already solved in the spike. It keeps Ebda's API code shape identical to FWB, so fixes stay portable through `scripts/twin-diff.sh`.                                                       |
+| B. Hono rewrite                            | No                | 143k lines and 74 route files means weeks of work, and it would hit the same per-request I/O issue. It would also break twin-path portability with FWB permanently. New Ebda-only surfaces (status page, marketing APIs) may use Hono.                         |
 | C. Cloudflare Containers (Express on Node) | **Fallback only** | No code change, but an always-on container costs about $40/mo per FWB's measurement (`backend-cf-migration-plan.md` §2). Scale-to-zero means cold starts on checkout, and it still needs a TCP Redis (Upstash). Use it only if Stage 1's exit test (§8) fails. |
 
 ## 2. Request path
@@ -57,27 +58,27 @@ client ─▶ Cloudflare edge
 
 Consistency requirements come from the inventory's Redis grouping (§2.2).
 
-| FWB today | Ebda on Cloudflare | Consistency |
-|---|---|---|
-| ioredis: token denylist (`jti`), `tv` revocation, MFA/lockout counters | **Durable Object** `AuthState`, sharded by user id | Strong. KV's ~60 s staleness would let a revoked token through. |
-| ioredis: rate limits (express-rate-limit store) | Workers **Rate Limiting binding** for coarse per-IP limits; DO `RateLimiter` for auth's 5/15 min per IP+email | Approximate is fine for coarse limits; strong for auth |
-| ioredis: locks / leader election | **Dropped** for jobs that move to cron (a single fire needs no leader); DO `Lock` for the remaining mutexes | Strong |
-| ioredis: caches (store, product, public payloads) | **KV** (TTL ≥ 120 s) plus the Cache API; purge on write | Eventual, which is acceptable for caches |
-| ioredis: reminder sentinels (abandoned cart 1h/4h/24h) | Rows in Postgres, or Inngest `step.sleep` | Strong |
-| ioredis: campaign pacer (Lua) | DO `Pacer` | Strong |
-| email/SMS queue (LPUSH/RPOP + setInterval) | **Cloudflare Queues** with retries and a DLQ; the super-admin replay pages read the DLQ | At-least-once, an upgrade on today's at-most-once |
-| 7 setInterval loops | Inngest cron (already used for 29 crons) or **Cron Triggers** | Single fire |
-| socket.io (admin/orders realtime) | DO `StoreRealtime` with WebSocket Hibernation, one per store; clients reconnect with the same events | n/a |
-| Inngest (95 functions) | Keep Inngest and serve from the Worker (`inngest/cloudflare` or the generic fetch handler; confirm in v4). Watch CPU per step on `bulk-*` and `campaign-send`. | n/a |
-| sharp | Cloudflare Images (resize on delivery) for uploads to R2 | n/a |
-| @aws-sdk/s3 | R2 binding | n/a |
-| multer | `Request.formData()` adapter middleware | n/a |
-| @sentry/node, OpenTelemetry, pino transports | `@sentry/cloudflare`, Workers Logs + Logpush, a tail Worker for alerts; pino becomes a console JSON logger | n/a |
-| imapflow (Gmail alert poller) | **Dropped.** It was FWB ops plumbing; Ebda alerts come from Sentry and the status page. | n/a |
-| `http`/`https`, `dns`/`net` SSRF guard (`lib/safe-fetch.ts`) | Rewrite on `fetch`, with DNS checks through DoH and an IP blocklist | n/a |
-| compression middleware | Removed, because the edge compresses (it broke bodies on workerd) | n/a |
-| swagger-ui-express | Moves to `docs.ebda.app` (SP9) | n/a |
-| web-push | Rewrite on WebCrypto (VAPID), or OneSignal-equivalent HTTP | n/a |
+| FWB today                                                              | Ebda on Cloudflare                                                                                                                                             | Consistency                                                     |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| ioredis: token denylist (`jti`), `tv` revocation, MFA/lockout counters | **Durable Object** `AuthState`, sharded by user id                                                                                                             | Strong. KV's ~60 s staleness would let a revoked token through. |
+| ioredis: rate limits (express-rate-limit store)                        | Workers **Rate Limiting binding** for coarse per-IP limits; DO `RateLimiter` for auth's 5/15 min per IP+email                                                  | Approximate is fine for coarse limits; strong for auth          |
+| ioredis: locks / leader election                                       | **Dropped** for jobs that move to cron (a single fire needs no leader); DO `Lock` for the remaining mutexes                                                    | Strong                                                          |
+| ioredis: caches (store, product, public payloads)                      | **KV** (TTL ≥ 120 s) plus the Cache API; purge on write                                                                                                        | Eventual, which is acceptable for caches                        |
+| ioredis: reminder sentinels (abandoned cart 1h/4h/24h)                 | Rows in Postgres, or Inngest `step.sleep`                                                                                                                      | Strong                                                          |
+| ioredis: campaign pacer (Lua)                                          | DO `Pacer`                                                                                                                                                     | Strong                                                          |
+| email/SMS queue (LPUSH/RPOP + setInterval)                             | **Cloudflare Queues** with retries and a DLQ; the super-admin replay pages read the DLQ                                                                        | At-least-once, an upgrade on today's at-most-once               |
+| 7 setInterval loops                                                    | Inngest cron (already used for 29 crons) or **Cron Triggers**                                                                                                  | Single fire                                                     |
+| socket.io (admin/orders realtime)                                      | DO `StoreRealtime` with WebSocket Hibernation, one per store; clients reconnect with the same events                                                           | n/a                                                             |
+| Inngest (95 functions)                                                 | Keep Inngest and serve from the Worker (`inngest/cloudflare` or the generic fetch handler; confirm in v4). Watch CPU per step on `bulk-*` and `campaign-send`. | n/a                                                             |
+| sharp                                                                  | Cloudflare Images (resize on delivery) for uploads to R2                                                                                                       | n/a                                                             |
+| @aws-sdk/s3                                                            | R2 binding                                                                                                                                                     | n/a                                                             |
+| multer                                                                 | `Request.formData()` adapter middleware                                                                                                                        | n/a                                                             |
+| @sentry/node, OpenTelemetry, pino transports                           | `@sentry/cloudflare`, Workers Logs + Logpush, a tail Worker for alerts; pino becomes a console JSON logger                                                     | n/a                                                             |
+| imapflow (Gmail alert poller)                                          | **Dropped.** It was FWB ops plumbing; Ebda alerts come from Sentry and the status page.                                                                        | n/a                                                             |
+| `http`/`https`, `dns`/`net` SSRF guard (`lib/safe-fetch.ts`)           | Rewrite on `fetch`, with DNS checks through DoH and an IP blocklist                                                                                            | n/a                                                             |
+| compression middleware                                                 | Removed, because the edge compresses (it broke bodies on workerd)                                                                                              | n/a                                                             |
+| swagger-ui-express                                                     | Moves to `docs.ebda.app` (SP9)                                                                                                                                 | n/a                                                             |
+| web-push                                                               | Rewrite on WebCrypto (VAPID), or OneSignal-equivalent HTTP                                                                                                     | n/a                                                             |
 
 ## 6. Payments and webhooks
 
@@ -95,14 +96,15 @@ Each stage ends with tests green on workerd (the SP3 spike suite, ported) plus b
 1. **Stage 1, boot:** the Ebda API on workerd with a per-request client, strict RLS, and Hyperdrive with no cache. Redis groups are swapped in the order auth-state, then rate limits, then caches, then queues. Timers move to cron. Socket.io moves to the DO.
    - **Exit test:** 200 concurrent mixed requests across 2 stores give 0 errors and 0 leaks, and buy-flow parity is green.
    - If concurrency still fails after the per-request client, fall back to Option C (Containers) for the API only. The frontends stay on Workers either way.
+   - **Status (2026-10-04):** the concurrency and leak half passes (0 errors, 0 leaks, 3 of 3 runs); buy-flow parity is not done. Numbers, findings (isolate memory) and the list of what is left: `stage1-exit-test.md`.
 2. **Stage 2, harden:** remove the remaining stubs, run the deployed-Hyperdrive proof (real pooler, CPU and bundle on the edge), and set up observability.
 3. **Parity harness:** it spawns Express from two git refs (no `--api-url`) and hard-codes loopback, and its MyFatoorah stub is a Node preload. SP4 adds an `--api-url` mode plus a provider base-URL env override, so the same 16 scenarios run against `wrangler dev`. MyFatoorah scenarios become EGP-provider scenarios in SP6.
 
 ## 9. Not proven yet (named, owned)
 
-| Gap | Proof | When |
-|---|---|---|
+| Gap                                                                     | Proof                                                                              | When                                     |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------- |
 | Real Hyperdrive pooler (not pgbouncer) preserves transaction-local GUCs | Re-run the spike suite against a deployed Worker with Hyperdrive and a Neon branch | SP4, needs a CF token and a Neon project |
-| CPU/startup on the edge for the full Express bundle (3 MB gzip) | Deploy, then measure cold start and p50/p95 | SP4 |
-| Inngest v4 serve on workerd | Smoke test one event and one cron | SP4 |
-| Buy-flow parity against a Worker | Harness `--api-url` mode | SP4 |
+| CPU/startup on the edge for the full Express bundle (3 MB gzip)         | Deploy, then measure cold start and p50/p95                                        | SP4                                      |
+| Inngest v4 serve on workerd                                             | Smoke test one event and one cron                                                  | SP4                                      |
+| Buy-flow parity against a Worker                                        | Harness `--api-url` mode                                                           | SP4                                      |
