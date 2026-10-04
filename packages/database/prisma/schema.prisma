@@ -1388,6 +1388,12 @@ model Order {
   // opt customers in silently.
   smsOptIn Boolean @default(false) @map("sms_opt_in")
 
+  // InstaPay manual orders: the moment the awaiting-confirmation hold runs out.
+  // Set when the order enters `awaiting_payment_confirmation`, read by the
+  // expiry cron and by the confirm guard (a confirm after this instant is
+  // refused). NULL for every other order.
+  paymentConfirmationExpiresAt DateTime? @map("payment_confirmation_expires_at")
+
   // Webhook idempotency - prevents duplicate processing
   idempotencyKey     String?   @unique @map("idempotency_key")
   webhookProcessedAt DateTime? @map("webhook_processed_at")
@@ -1478,6 +1484,8 @@ model Order {
   // Payment-gateway abandoners list (Enterprise).
   // Added 20260622130000.
   @@index([storeId, paymentGatewayAbandonedAt])
+  // InstaPay expiry sweep: the awaiting orders whose hold has run out.
+  @@index([paymentConfirmationExpiresAt])
   // FK-only index for the Promotion delete RI trigger, which filters on
   // `applied_promotion_id` alone. `orders` is the largest table in the schema,
   // so the unindexed variant of this scan is the worst of the five.
@@ -1532,6 +1540,9 @@ enum OrderPaymentStatus {
 
 enum OrderStatus {
   pending
+  /// InstaPay manual transfer: stock is held, nothing ships and no revenue is
+  /// booked until the merchant confirms the money arrived (or the hold expires).
+  awaiting_payment_confirmation
   confirmed
   processing
   shipped
@@ -1893,6 +1904,10 @@ model PaymentConfig {
   supportedMethods    String[] @default([]) @map("supported_methods") // knet, visa, apple_pay, etc.
   supportedCurrencies String[] @default(["EGP"]) @map("supported_currencies")
 
+  // Non-secret, provider-specific settings (InstaPay handle / phone / expiry,
+  // COD percentage). Never credentials: those stay in the encrypted columns.
+  settings Json @default("{}")
+
   // Fees configuration
   fixedFee      Int     @default(0) @map("fixed_fee") // in piastres
   percentageFee Decimal @default(0) @map("percentage_fee") @db.Decimal(5, 2) // e.g., 2.5 for 2.5%
@@ -1921,6 +1936,7 @@ enum PaymentProvider {
   hesabe
   upayments
   cod
+  instapay
 }
 
 enum ProviderHealthStatus {

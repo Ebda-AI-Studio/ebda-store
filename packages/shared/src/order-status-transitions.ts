@@ -14,6 +14,10 @@
  * PR #770). `shipped → processing` models a cancelled carrier shipment.
  */
 export const ORDER_STATUS_TRANSITIONS: Readonly<Record<string, readonly string[]>> = {
+  // InstaPay manual orders (SP6): never ship from here. Only the dedicated
+  // confirm (-> confirmed, with the payment recorded) or a cancel/expiry leaves
+  // this state, so processing/shipped/delivered are deliberately absent.
+  awaiting_payment_confirmation: ['confirmed', 'cancelled'],
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
@@ -33,6 +37,10 @@ export function orderStatusOptions(order: {
   paymentStatus?: string | null;
 }): string[] {
   const all = [...(ORDER_STATUS_TRANSITIONS[order.status] ?? [])];
+  // An awaiting-confirmation order becomes `confirmed` only through the
+  // "payment received" action (it must also record the payment), never from the
+  // generic status picker.
+  if (order.status === 'awaiting_payment_confirmation') return all.filter(s => s !== 'confirmed');
   const unpaid = order.paymentStatus !== 'paid';
   if (unpaid && (order.status === 'pending' || order.status === 'cancelled')) {
     return all.filter(s => s !== 'refunded');

@@ -11,6 +11,7 @@ import { type ReportRange, reportRangeParams, parseReportRange } from './report-
 
 export const ORDER_LIST_STATUSES = [
   'pending',
+  'awaiting_payment_confirmation',
   'confirmed',
   'processing',
   'shipped',
