@@ -5,8 +5,8 @@
  * Brand values come from `BRAND` in packages/shared/src/brand — see
  * docs/TWIN-PATHS.md for how the two codebases relate.
  *
- * Scope: text files under apps/<app>/src, apps/<app>/public and
- * packages/<pkg>/src. docs/, tests/, scripts/ and migrations are NOT scanned
+ * Scope: text files under apps/<app>/src, apps/<app>/public, apps/<app>/content
+ * (the docs/help MDX that ships to users) and packages/<pkg>/src. docs/, tests/, scripts/ and migrations are NOT scanned
  * (inherited FWB docs / immutable history live there on purpose).
  *
  * To cite upstream in a comment, add the file to ALLOWLIST with a reason.
@@ -33,7 +33,7 @@ function roots(): string[] {
   for (const group of ['apps', 'packages']) {
     const dir = path.join(ROOT, group);
     for (const name of readdirSync(dir)) {
-      const subs = group === 'apps' ? ['src', 'public'] : ['src'];
+      const subs = group === 'apps' ? ['src', 'public', 'content'] : ['src'];
       for (const sub of subs) {
         const p = path.join(dir, name, sub);
         try {

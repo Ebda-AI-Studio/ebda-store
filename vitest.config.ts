@@ -18,7 +18,15 @@ export default defineConfig({
     // `.claude/worktrees/**` houses temporary git worktrees from
     // subagent runs; their stale tests would otherwise be picked up
     // and either fail (missing deps) or duplicate the live tests.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.claude/**', 'tests/smoke/**'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.next/**',
+      '**/.claude/**',
+      'tests/smoke/**',
+      // apps/status runs on workerd via @cloudflare/vitest-pool-workers (npm run test:status).
+      'apps/status/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

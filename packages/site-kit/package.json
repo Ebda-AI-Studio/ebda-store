@@ -1,0 +1,36 @@
+{
+  "name": "@force/site-kit",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Shared build + gate tooling for the static Ebda sites (docs, help): MDX renderer, page shell, client-side search, axe and Lighthouse gates.",
+  "exports": {
+    "./gates/a11y": "./src/gates/a11y.mjs",
+    "./gates/lighthouse": "./src/gates/lighthouse.mjs",
+    "./gates/serve-static": "./src/gates/serve-static.mjs",
+    "./build/mdx": "./src/build/mdx.mjs",
+    "./build/shell": "./src/build/shell.mjs",
+    "./build/search": "./src/build/search.mjs",
+    "./build/site": "./src/build/site.mjs",
+    "./search-core": "./src/search-core.mjs",
+    "./css/site.css": "./src/css/site.css",
+    "./gates/search": "./src/gates/search.mjs"
+  },
+  "scripts": {
+    "lint": "eslint src --ext .mjs",
+    "lint:fix": "eslint src --ext .mjs --fix"
+  },
+  "dependencies": {
+    "@mdx-js/mdx": "^3.1.0",
+    "axe-core": "^4.10.0",
+    "chrome-launcher": ">=0.13.4",
+    "esbuild": "^0.28.2",
+    "lighthouse": "^12.6.1",
+    "minisearch": "^7.1.2",
+    "playwright-core": "1.60.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remark-gfm": "^4.0.1"
+  }
+}

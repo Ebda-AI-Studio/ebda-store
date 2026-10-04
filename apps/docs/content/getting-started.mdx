@@ -1,0 +1,56 @@
+---
+title: Getting started
+description: Make your first Ebda API call in a few minutes.
+section: Start
+order: 2
+---
+
+## Base URL
+
+All endpoints live under one versioned prefix:
+
+```text
+https://api.ebda.app/api/v1
+```
+
+Requests and responses are JSON (`Content-Type: application/json`). A health probe is available at `GET /api/v1/public/health`.
+
+## Your first call: list a store's products
+
+The public storefront endpoints need no login. They only need to know **which store** you mean, via the `x-store-domain` header (the storefront host) or `x-store-id`.
+
+```bash
+curl https://api.ebda.app/api/v1/public/products \
+  -H "x-store-domain: amelia.ebda.app"
+```
+
+A successful response uses the standard envelope:
+
+```json
+{
+  "success": true,
+  "data": {
+    "products": [],
+    "meta": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 }
+  }
+}
+```
+
+## Envelope and errors
+
+Every response carries `success`. Failures never change shape:
+
+```json
+{
+  "success": false,
+  "error": { "code": "STORE_NOT_RESOLVED", "message": "Unable to resolve store context." }
+}
+```
+
+Branch on `error.code`, not on the message text. Messages are for humans and may be reworded.
+
+## Next steps
+
+- Sign in and call authenticated endpoints: [Authentication](/authentication/).
+- Understand the store hosts you will address: [Hosts and domains](/hosts/).
+- All prices are integers in piastres: [Money](/money/).

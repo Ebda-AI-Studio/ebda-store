@@ -1,0 +1,42 @@
+---
+title: Merchant API
+description: Authenticated store-management endpoints and the merchant admin MCP surface.
+section: Reference
+order: 31
+---
+
+The merchant dashboard is a client of the same API. Everything under `https://api.ebda.app/api/v1` that is not `/public/*` needs a signed-in user (see [Authentication](/authentication/)) and is scoped to the stores that user may access.
+
+## Account
+
+| Method | Path              | Notes                                                       |
+| ------ | ----------------- | ----------------------------------------------------------- |
+| `POST` | `/auth/register`  | Create an account (also used by the self-serve signup form) |
+| `POST` | `/auth/login`     | Sign in; sets the access and refresh cookies                |
+| `POST` | `/auth/refresh`   | New access token from the refresh cookie                    |
+| `POST` | `/auth/logout`    | End the session                                             |
+| `GET`  | `/auth/me`        | Current user                                                |
+| `GET`  | `/auth/me/export` | Export your own data                                        |
+
+New merchants verify their email before onboarding: the link is single use and valid for 24 hours (`POST /auth/verify-email`).
+
+## Multi-factor authentication
+
+| Method | Path                     | Notes                                                 |
+| ------ | ------------------------ | ----------------------------------------------------- |
+| `POST` | `/auth/mfa/enroll/begin` | Start TOTP enrolment; returns the secret              |
+| `POST` | `/auth/mfa/verify`       | Verify a 6-digit TOTP code, or a one-time backup code |
+| `POST` | `/auth/mfa/disable`      | Turn MFA off (requires a valid code)                  |
+
+Completing enrolment returns one-time backup codes. They are shown once.
+
+## Merchant admin MCP
+
+`POST /api/v1/mcp/admin/:storeSlug` speaks the Model Context Protocol so that scripts and AI assistants can read and operate one store. It requires an `x-merchant-key` and the scopes your key was minted with. See [Authentication](/authentication/#merchant-api-keys) for minting and revoking keys.
+
+<Callout type="soon" title="Not yet documented here">
+  Store, product, order and inventory management routes exist (the dashboard uses them) but are not
+  annotated for OpenAPI yet, so they are not in the [generated reference](/api-reference/). Until
+  they are, treat the dashboard network calls as unstable and prefer the merchant MCP surface for
+  automation.
+</Callout>

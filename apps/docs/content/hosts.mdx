@@ -1,0 +1,33 @@
+---
+title: Hosts and domains
+description: The Ebda hosts, store subdomains, custom domains and reserved names.
+section: Concepts
+order: 4
+---
+
+## Platform hosts
+
+| Host              | Purpose                                                    |
+| ----------------- | ---------------------------------------------------------- |
+| `ebda.app`        | Marketing site                                             |
+| `app.ebda.app`    | Merchant dashboard (sign up, onboarding, store management) |
+| `api.ebda.app`    | The HTTP API described in these docs                       |
+| `docs.ebda.app`   | This site                                                  |
+| `help.ebda.app`   | Merchant help centre (Arabic and English)                  |
+| `status.ebda.app` | Service status and incident history                        |
+
+## Store hosts
+
+Every store is served at `<slug>.ebda.app`. A slug is lowercase letters, digits and hyphens, 3 to 40 characters when created in onboarding. Platform names such as `app`, `api`, `docs`, `help`, `status` and `www`, and brand-protected names, are reserved and can never be a store; asking for one answers `404 STORE_NOT_FOUND`.
+
+Pass the storefront host in `x-store-domain` when calling [public endpoints](/storefront-api/).
+
+## Custom domains
+
+A merchant can attach their own domain (a plan feature). It follows a claim, not an ownership assumption:
+
+1. **Pending.** The merchant enters the domain. It is a claim only and is never used to route traffic or for CORS yet.
+2. **Verified.** Once the DNS challenge passes (the provider reports the hostname verified), the domain becomes active and the store is served on it.
+3. **Released.** A claim still pending after 72 hours is released automatically so nobody can squat a name. A domain active on another store can never be claimed.
+
+Until a domain is active, keep addressing the store by its `<slug>.ebda.app` host.

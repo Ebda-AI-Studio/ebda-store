@@ -1,0 +1,38 @@
+---
+title: Products and CSV import
+description: Add products one by one or import a CSV, including a Shopify export. Prices use EGP with two decimals.
+section: Selling
+order: 2
+appPath: /stores
+keywords: csv shopify import export bulk xlsx price piastres
+---
+
+## Add a product
+
+From your store in the dashboard, open Products and add a name, price, stock quantity and photos. Prices are in Egyptian pounds with up to **two decimals** (EGP 249.50).
+
+## Import many products
+
+Use **Bulk import** to upload a CSV or XLSX file.
+
+1. Download the CSV template from the import page.
+2. Fill it in, one product per row. Variants are linked to their parent product by `parentSku`.
+3. Upload the file and click Import.
+
+In Ebda's own template the `price` column is written in **piastres** (whole numbers: 100 piastres = EGP 1, so EGP 249.50 is `24950`).
+
+## Import from Shopify
+
+Export your products from Shopify and upload that CSV as it is. Ebda recognises the Shopify layout (`Handle`, `Title`, `Body (HTML)`, ...) and groups rows by `Handle` into products with variants.
+
+- Shopify prices are in pounds: write `4850.00`, not `4,850.00`. A thousands separator makes the row invalid.
+- At most **two decimals**. A third decimal is reported as a row error and is never silently rounded.
+- Image links (`Image Src`) are kept as links to the original image. They are not copied into Ebda storage yet, so keep the original images online.
+
+## When a row has a problem
+
+A bad row does not stop the import. The rest of the file is imported and each problem row is reported against its line number in your file, so you can fix and re-upload just those rows.
+
+## Export
+
+You can export your products to CSV at any time from the same area.
