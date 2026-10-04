@@ -8,6 +8,7 @@ function actions() {
     a: {
       clearSavedCheckout: vi.fn(() => calls.push('clear')),
       goToCodSuccess: vi.fn(() => calls.push('cod')),
+      goToInstapay: vi.fn(() => calls.push('instapay')),
       goToGateway: vi.fn((url: string) => calls.push(`gateway:${url}`)),
     },
   };
@@ -52,5 +53,16 @@ describe('handlePaymentCreateResult', () => {
     const { a, calls } = actions();
     handlePaymentCreateResult({ success: true, data: { paymentUrl: 'https://pay.test/x' } }, a);
     expect(calls).toEqual(['clear', 'gateway:https://pay.test/x']);
+  });
+
+  // SP6a — InstaPay is a manual transfer: no gateway URL, the success page shows the details.
+  it('clears the saved form, then goes to the InstaPay instructions', () => {
+    const { a, calls } = actions();
+    handlePaymentCreateResult(
+      { success: true, data: { instapay: { handle: 'amelia@instapay', amountMinor: 12345 } } },
+      a
+    );
+    expect(calls).toEqual(['clear', 'instapay']);
+    expect(a.goToGateway).not.toHaveBeenCalled();
   });
 });

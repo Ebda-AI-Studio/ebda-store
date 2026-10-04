@@ -569,6 +569,7 @@ export default function CheckoutClient() {
             providers: (PaymentProvider | string)[];
             defaultProvider?: string;
             cod?: { fixedFee: number; displayName: string; displayNameAr: string | null };
+            instapay?: { displayName: string; displayNameAr: string | null; expiryHours: number };
           }>('/payments/config'),
         ]);
 
@@ -619,6 +620,17 @@ export default function CheckoutClient() {
                 : undefined,
               description: 'Pay when your order is delivered',
               descriptionAr: 'ادفع عند استلام طلبك',
+            });
+          }
+
+          // InstaPay (manual transfer; the merchant confirms) when the store offers it.
+          if (paymentResult.data.instapay) {
+            allProviders.push({
+              id: 'instapay',
+              name: paymentResult.data.instapay.displayName || 'InstaPay',
+              nameAr: paymentResult.data.instapay.displayNameAr || 'إنستاباي',
+              description: 'Transfer with InstaPay, the store confirms when it arrives',
+              descriptionAr: 'حوّل عبر إنستاباي ويؤكد المتجر طلبك عند وصول المبلغ',
             });
           }
 
@@ -1358,6 +1370,8 @@ export default function CheckoutClient() {
           }
         },
         goToCodSuccess: () => router.push(storeUrl(`/checkout/success?orderId=${order.id}&cod=1`)),
+        goToInstapay: () =>
+          router.push(storeUrl(`/checkout/success?orderId=${order.id}&instapay=1`)),
         goToGateway: paymentUrl => {
           window.location.href = paymentUrl;
         },
@@ -1456,6 +1470,19 @@ export default function CheckoutClient() {
           friendly = t(
             'Cash on delivery is currently unavailable. Please choose another payment method.',
             'الدفع عند الاستلام غير متاح حالياً. يرجى اختيار طريقة دفع أخرى.'
+          );
+          break;
+        case 'PAYMENT_METHOD_UNAVAILABLE':
+          // One method is down (circuit open): the cart was restored, the others still work.
+          friendly = t(
+            'This payment method is temporarily unavailable. Please choose another one, such as cash on delivery or InstaPay.',
+            'طريقة الدفع هذه غير متاحة مؤقتاً. يرجى اختيار طريقة أخرى مثل الدفع عند الاستلام أو إنستاباي.'
+          );
+          break;
+        case 'INSTAPAY_NOT_AVAILABLE':
+          friendly = t(
+            'InstaPay is not available for this store right now. Please choose another payment method.',
+            'إنستاباي غير متاح لهذا المتجر حالياً. يرجى اختيار طريقة دفع أخرى.'
           );
           break;
         case 'PAYMENT_PROVIDER_NOT_CONFIGURED':
