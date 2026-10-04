@@ -20,10 +20,78 @@
  * TLS SNI for the https CDN URLs these are in practice. Resolve-and-block is the
  * proportionate, standard mitigation for the merchant-URL threat model.
  */
-import { promises as dns } from 'dns';
-import { isIP } from 'net';
+import { isWorkers } from './runtime';
 
 const MAX_REDIRECTS = 3;
+
+/**
+ * 4 / 6 / 0 for an IPv4 literal, an IPv6 literal, or neither. `node:net`'s `isIP` semantics
+ * without `node:net` (this module also runs on Workers, where `dns` / `net` are not the
+ * way to reach a resolver, R-EBDA-001 section 5).
+ */
+function isIP(s: string): 0 | 4 | 6 {
+  if (/^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(s))
+    return 4;
+  if (s.includes(':') && /^[0-9a-fA-F:.]+$/.test(s)) {
+    try {
+      // The WHATWG URL parser validates and normalises IPv6 literals.
+      return new URL(`http://[${s}]/`).hostname ? 6 : 0;
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}
+
+/** Every address `host` resolves to. Node: the OS resolver. Workers: DNS over HTTPS. */
+export type HostResolver = (host: string) => Promise<Array<{ address: string }>>;
+
+const DOH_ENDPOINT = 'https://cloudflare-dns.com/dns-query';
+
+/** A (1) and AAAA (28) answers for a name, through Cloudflare's DoH JSON API. */
+export async function resolveViaDoh(
+  host: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<Array<{ address: string }>> {
+  const query = async (type: 'A' | 'AAAA'): Promise<string[]> => {
+    const res = await fetchImpl(`${DOH_ENDPOINT}?name=${encodeURIComponent(host)}&type=${type}`, {
+      headers: { accept: 'application/dns-json' },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) throw new Error(`DoH ${type} lookup answered ${res.status}`);
+    const body = (await res.json()) as {
+      Status?: number;
+      Answer?: Array<{ type: number; data: string }>;
+    };
+    // Status 3 = NXDOMAIN: no addresses, not a failure. Anything else non-zero is a failed lookup.
+    if (body.Status !== undefined && body.Status !== 0 && body.Status !== 3) {
+      throw new Error(`DoH ${type} lookup status ${body.Status}`);
+    }
+    const want = type === 'A' ? 1 : 28;
+    return (body.Answer ?? []).filter(a => a.type === want).map(a => a.data);
+  };
+  const [v4, v6] = await Promise.allSettled([query('A'), query('AAAA')]);
+  // Both families failing is a failed lookup; one failing alone must NOT hide the other's
+  // answers, and must not let an unchecked family through: it is reported as failed too.
+  if (v4.status === 'rejected' || v6.status === 'rejected') {
+    throw new Error('DoH lookup failed');
+  }
+  return [...v4.value, ...v6.value].map(address => ({ address }));
+}
+
+async function nodeLookup(host: string): Promise<Array<{ address: string }>> {
+  const { promises: dns } = await import('node:dns');
+  return dns.lookup(host, { all: true });
+}
+
+let resolver: HostResolver = isWorkers ? host => resolveViaDoh(host) : nodeLookup;
+
+/** Test seam: replace the resolver (and get the previous one back). */
+export function setHostResolver(next: HostResolver): HostResolver {
+  const prev = resolver;
+  resolver = next;
+  return prev;
+}
 
 // IPv4 ranges that must never be reachable from a server-side fetch:
 // unspecified, private (RFC1918), CGNAT, loopback, link-local (metadata!),
@@ -106,7 +174,7 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
 
   let addrs: Array<{ address: string }>;
   try {
-    addrs = await dns.lookup(host, { all: true });
+    addrs = await resolver(host);
   } catch {
     // The lookup itself failed (NXDOMAIN, resolver timeout/unreachable) —
     // distinct from a lookup that SUCCEEDED with zero records, which used to
