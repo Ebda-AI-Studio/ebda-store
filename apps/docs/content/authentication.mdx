@@ -1,0 +1,69 @@
+---
+title: Authentication
+description: Access tokens, how public endpoints find the store, and merchant API keys with scopes.
+section: Concepts
+order: 3
+---
+
+Ebda has three ways of identifying a caller. Which one applies depends on the surface you call.
+
+| Surface                         | Credential                                           | Used for                                                |
+| ------------------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
+| Public storefront (`/public/*`) | None for reads; store named by header                | Catalogue, categories, cart                             |
+| Merchant dashboard API          | JWT access token (cookie or `Authorization: Bearer`) | Managing a store as a signed-in user                    |
+| Merchant admin MCP              | `x-merchant-key` merchant API key                    | Scripts, CI jobs and AI assistants acting for one store |
+
+## Access tokens
+
+`POST /api/v1/auth/login` signs a user in. The access token is a short-lived JWT (about 30 minutes) set as an HTTP-only cookie; send it back either way:
+
+```text
+Authorization: Bearer <access-token>
+```
+
+`POST /api/v1/auth/refresh` exchanges the refresh cookie for a new access token. Browsers handle this transparently. Sign-in is rate limited and an account is locked for 15 minutes after 5 failed attempts (see [Rate limits](/rate-limits/)).
+
+Multi-factor authentication (TOTP) is optional for merchants and enforced for platform super-admin accounts, which get `403 MFA_SETUP_REQUIRED` on protected routes until they enrol.
+
+## How public endpoints find the store
+
+Storefront requests carry no user. They name the store with one of:
+
+- `x-store-domain`: the storefront host, for example `amelia.ebda.app` or a verified custom domain. `<slug>.ebda.app` resolves by slug; any other host resolves by custom domain. Reserved and malformed hosts resolve to nothing, never to a default store.
+- `x-store-id`: the store's UUID.
+
+If neither resolves to an active store the API answers `400 STORE_NOT_RESOLVED`.
+
+## Merchant API keys
+
+A merchant API key authenticates **one store's admin MCP endpoint**, `POST /api/v1/mcp/admin/:storeSlug`. It is a device credential: one per laptop, CI job or teammate, so that revoking one never signs out the others.
+
+- Send it in the `x-merchant-key` header. Keys look like `fwbm_` followed by 43 URL-safe characters.
+- It is shown **once**, when minted. Only a SHA-256 hash is stored, so a lost key is rotated, never recovered.
+- Keys carry scopes. The default is read only.
+
+| Scope                  | Allows                        |
+| ---------------------- | ----------------------------- |
+| `merchant:read`        | Reporting and listing tools   |
+| `merchant:write`       | Creating and updating records |
+| `merchant:destructive` | Deleting records              |
+
+- A store may hold at most 20 active keys. A key can have an expiry of 1 to 730 days.
+- The surface is off by default (`merchant_mcp` feature flag). A missing store, a disabled feature and a wrong or revoked key all return the same `404 NOT_FOUND`, so a prober learns nothing.
+
+### Managing keys
+
+Keys are managed by a signed-in store admin (or platform admin) with access to the store:
+
+| Method   | Path                                                   | Purpose                                                                                      |
+| -------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/stores/:id/integrations/merchant-keys`        | List keys (metadata only, never the secret)                                                  |
+| `POST`   | `/api/v1/stores/:id/integrations/merchant-keys`        | Mint a key; body `{ name, scopes?, expiresInDays? }`. The plaintext is in this response only |
+| `DELETE` | `/api/v1/stores/:id/integrations/merchant-keys/:keyId` | Revoke                                                                                       |
+
+```bash
+curl -X POST https://api.ebda.app/api/v1/stores/$STORE_ID/integrations/merchant-keys \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "ci-reporting", "scopes": ["merchant:read"], "expiresInDays": 90 }'
+```

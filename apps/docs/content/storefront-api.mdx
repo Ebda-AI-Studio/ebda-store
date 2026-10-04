@@ -1,0 +1,45 @@
+---
+title: Public storefront API
+description: Unauthenticated storefront endpoints for catalogue, categories and cart.
+section: Reference
+order: 30
+---
+
+Base: `https://api.ebda.app/api/v1/public`. Name the store with the `x-store-domain` (or `x-store-id`) header, see [Authentication](/authentication/). Reads are rate limited at 300 requests per minute per IP.
+
+## Catalogue
+
+| Method | Path                  | Notes                                                                                                                                                                                                          |
+| ------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`             | Liveness and database check. `200`, or `503` when the database is unreachable                                                                                                                                  |
+| `GET`  | `/products`           | Paginated. Query: `page`, `limit` (max 100), `category`, `search` (2+ characters), `featured`, `sort` (`newest`, `price_asc`, `price_desc`, `best_seller`), `minPrice`, `maxPrice` (piastres), `cursor`, `ids` |
+| `GET`  | `/products/:slugOrId` | One product with variants and images                                                                                                                                                                           |
+| `GET`  | `/categories`         | Category tree                                                                                                                                                                                                  |
+| `GET`  | `/feed/products.json` | AI product feed (needs the `agent_feed` feature, paid plans)                                                                                                                                                   |
+| `GET`  | `/redirects/resolve`  | Resolve a renamed store slug                                                                                                                                                                                   |
+| `GET`  | `/stores`             | Active stores, paginated (`page`, `limit` up to 100)                                                                                                                                                           |
+| `GET`  | `/stores/:slugOrId`   | Public store profile. Reserved slugs return `404 STORE_NOT_FOUND`                                                                                                                                              |
+
+## Cart
+
+Cart endpoints are limited to 30 per minute.
+
+| Method   | Path          | Notes                               |
+| -------- | ------------- | ----------------------------------- |
+| `GET`    | `/cart`       | Current cart                        |
+| `POST`   | `/cart/items` | Add an item                         |
+| `POST`   | `/cart/sync`  | Replace the cart from a client copy |
+| `DELETE` | `/cart`       | Empty the cart                      |
+
+Product prices in responses are integer piastres, see [Money](/money/).
+
+```bash
+curl "https://api.ebda.app/api/v1/public/products?limit=5&sort=newest" \
+  -H "x-store-domain: amelia.ebda.app"
+```
+
+<Callout title="Machine-readable reference">
+  Only part of this surface carries OpenAPI annotations today. The [generated
+  reference](/api-reference/) lists exactly what is annotated and is rebuilt from the source on
+  every docs build.
+</Callout>

@@ -1,0 +1,31 @@
+---
+title: Money and currency
+description: All amounts are integers in piastres. EGP has two decimals.
+section: Concepts
+order: 5
+---
+
+Every monetary amount in the API is an **integer count of piastres** (the minor unit of the Egyptian pound; 100 piastres = 1 EGP). There are no floating-point prices anywhere in requests or responses.
+
+| You mean     | You send or read |
+| ------------ | ---------------- |
+| EGP 1.00     | `100`            |
+| EGP 249.50   | `24950`          |
+| EGP 4,850.00 | `485000`         |
+
+## Rules
+
+- Convert at the edge of your system, not in the middle. Store and compute in piastres; format for display last.
+- Never round-trip through floats. `249.50 * 100` is not safe in many languages; parse the decimal string instead.
+- EGP has exactly two decimal places. A value with three decimals is invalid and is rejected, never rounded.
+- Discounts, VAT and refunds are computed in piastres and rounded to the piastre by the server. Do not recompute totals client side; display what the API returns.
+
+## Imports use major units where noted
+
+The product CSV importer accepts the Shopify export format, where prices are written in **major EGP** (`4850.00`, not `485000`, and not `4,850.00` with a thousands separator). The importer converts strictly: two decimals at most, and a row with a third decimal is reported as a row error instead of being rounded. Ebda's own CSV template uses integer piastres. Details are in the [help centre](https://help.ebda.app/en/products-and-csv-import/).
+
+```js
+// Display only
+const egp = new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' });
+egp.format(24950 / 100); // two-decimal display of 249.50
+```

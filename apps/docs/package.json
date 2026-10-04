@@ -1,0 +1,30 @@
+{
+  "name": "@force/docs",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "openapi": "tsx scripts/gen-openapi.ts",
+    "build": "npm run openapi && tsx scripts/build.mjs",
+    "start": "node ../../packages/site-kit/src/gates/serve-static.mjs out 3006",
+    "lint": "eslint scripts --ext .ts,.mjs",
+    "lint:fix": "eslint scripts --ext .ts,.mjs --fix",
+    "check:a11y": "node scripts/a11y-check.mjs",
+    "check:lighthouse": "node scripts/lighthouse-check.mjs",
+    "check": "npm run build && npm run check:a11y && npm run check:search",
+    "clean": "rm -rf out .generated node_modules",
+    "check:search": "node scripts/search-check.mjs"
+  },
+  "dependencies": {
+    "@force/site-kit": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.59.1",
+    "wrangler": "4.116.0"
+  }
+}

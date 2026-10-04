@@ -1,0 +1,64 @@
+---
+title: Webhooks
+description: Payment and billing webhooks, signature verification, idempotency and what status codes mean.
+section: Concepts
+order: 7
+---
+
+Ebda receives webhooks from payment and billing gateways. Verification always runs over the **exact raw bytes** the gateway sent, so the routes are mounted before the JSON body parser.
+
+<Callout type="soon" title="Provider status">
+  The Egyptian card and wallet providers are still being integrated. The payment webhook route today
+  carries the gateway adapters inherited from the platform's origin (Tap, MyFatoorah, Hesabe,
+  UPayments). Subscription billing has a Kashier adapter and a stub provider for tests. New
+  providers follow the same envelope described here.
+</Callout>
+
+## Subscription billing webhooks
+
+`POST /api/v1/webhooks/billing/:provider`
+
+Order of operations: **verify the signature, de-duplicate by the provider's event id, then settle**, all inside one database transaction.
+
+| Provider          | Header                | Scheme                                                                                                      |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `kashier`         | `x-kashier-signature` | HMAC-SHA256 (hex) keyed by the payment API key, over the fields named in the payload's `data.signatureKeys` |
+| stub (tests only) | `x-stub-signature`    | `hex(HMAC-SHA256(secret, rawBody))`                                                                         |
+
+For Kashier the payload must list the signed fields in `data.signatureKeys`, and that list must cover the required identifying fields, otherwise the event is refused. The signature comparison is constant time.
+
+| Status                  | Meaning                                                                 |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `200`                   | Processed, or a replay (`duplicate: true`), or an ignored event         |
+| `401 INVALID_SIGNATURE` | Bad or missing signature. Nothing was parsed or stored                  |
+| `500`                   | Processing failed. The gateway should retry; nothing was marked as seen |
+
+## Payment webhooks
+
+`POST /api/v1/webhooks/payment/:provider`
+
+The request must carry the provider's signature header (`x-signature`, or the provider-specific `x-tap-signature`, `x-myfatoorah-signature`, `x-hesabe-signature`, `x-upayments-signature`, `tap-signature`). Without one the API answers `401`-class `MISSING_SIGNATURE` and records the attempt. The HMAC is then verified against the **per-store webhook secret** over the raw body.
+
+| Status                       | Meaning                                                                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `200`                        | Accepted. Work is queued durably; a duplicate delivery answers `200 Webhook already processed` so the gateway stops retrying |
+| `400 MISSING_TRANSACTION_ID` | The payload has no transaction id we recognise, so it cannot be de-duplicated safely                                         |
+| `400 INVALID_PROVIDER`       | Unknown provider segment                                                                                                     |
+
+## Receiving your own events
+
+Ebda does not yet send outbound webhooks to merchants. If you need order events, use the [merchant API](/merchant-api/) or ask support.
+
+## Implementing a verifier (your own endpoint)
+
+If you build a service that receives gateway callbacks in the same style, the safe pattern is:
+
+```js
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verify(rawBody, signatureHex, secret) {
+  const expected = createHmac('sha256', secret).update(rawBody).digest();
+  const given = Buffer.from(signatureHex.trim().toLowerCase(), 'hex');
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+```
