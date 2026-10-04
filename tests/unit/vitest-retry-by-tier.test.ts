@@ -33,9 +33,15 @@ describe('vitest retry is scoped by tier, not a global default', () => {
 
   it('the required Unit Tests job does not opt back into masking retries', () => {
     const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
-    const unitRun = ci.split('\n').find(l => l.includes('vitest run tests/unit'));
-    expect(unitRun, "ci.yml's unit command moved — re-point this test").toBeTruthy();
+    const unitRun = ci
+      .split('\n')
+      .find(l => l.includes('vitest run tests/unit packages/shared/src'));
+    expect(unitRun, "ci.yml's main-lane unit command moved — re-point this test").toBeTruthy();
     expect(unitRun, 'the unit tier must never request retry > 0').not.toMatch(/--retry=[1-9]/);
+    // The PR lane's affected-paths run is the same tier: also no masking retry.
+    const prRun = ci.split('\n').find(l => l.includes('vitest run $UNIT_PATHS'));
+    expect(prRun, "ci.yml's PR-lane unit command moved — re-point this test").toBeTruthy();
+    expect(prRun, 'the PR unit tier must never request retry > 0').toMatch(/--retry=0(\s|$)/);
   });
 
   it('the network/DB-backed tiers explicitly opt into one retry at the call site', () => {

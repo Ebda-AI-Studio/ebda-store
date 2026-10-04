@@ -110,8 +110,8 @@ describe('the retry budget fits inside the job budget', () => {
     return Number(m![1].replace(/_/g, ''));
   };
 
-  // Measured, not guessed. A cold `npm ci` on the umbra guest is 268s (ci.yml
-  // records it on the Lint job's timeout note); warm runs are 21-64s.
+  // Measured, not guessed. A cold `npm ci` on a slow runner is 268s (measured; see
+  // the Security Audit timeout in ci.yml); warm runs are 21-64s.
   // checkout + setup-node + jq + trufflehog measured 3-22s across 30 recent
   // Security Audit runs — 120s allows the occasional slow scan.
   const COLD_INSTALL_S = 268;

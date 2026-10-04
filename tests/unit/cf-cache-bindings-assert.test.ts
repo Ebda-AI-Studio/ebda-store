@@ -2,7 +2,7 @@
  * scripts/cf-setup-local.sh (the generator) + scripts/assert-cf-cache-bindings.sh
  * (the assertion), EXECUTED together in a scratch copy of the repo layout.
  *
- * Issues 2089/2152/2154: ci.yml's cf-build-check built the COMMITTED worker
+ * Issues 2089/2152/2154: ci.yml's worker-dry-run (formerly cf-build-check) built the COMMITTED worker
  * config, which the generator overwrites on every deploy, and never ran the
  * binding assertion — so it proved nothing about the config that ships. Both
  * cf-deploy.yml and cf-build-check now run generator → assertion.
@@ -102,29 +102,34 @@ describe('cf-setup-local.sh → assert-cf-cache-bindings.sh', () => {
   );
 });
 
-describe('ci.yml cf-build-check runs generator → assertion', () => {
+describe('ci.yml worker-dry-run runs generator → assertion → build → dry-run', () => {
   const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
-  const cfBuildCheck = ci.slice(
-    ci.indexOf('\n  cf-build-check:\n'),
-    ci.indexOf('\n  test-unit:\n')
-  );
+  const job = ci.slice(ci.indexOf('\n  worker-dry-run:\n'), ci.indexOf('\n  build:\n'));
 
-  it('cf-build-check generates the config before building, then asserts it (issues 2089/2152/2154)', () => {
-    const setupAt = cfBuildCheck.indexOf('bash scripts/cf-setup-local.sh ${{ matrix.app }}');
-    const assertAt = cfBuildCheck.indexOf(
-      'bash scripts/assert-cf-cache-bindings.sh ${{ matrix.app }}'
-    );
-    const buildAt = cfBuildCheck.indexOf('bash scripts/cf-build.sh ${{ matrix.app }}');
-    expect(setupAt, 'cf-build-check never runs the generator').toBeGreaterThan(0);
-    expect(assertAt, 'cf-build-check never asserts the generated config').toBeGreaterThan(setupAt);
-    expect(buildAt, 'cf-build-check builds before generating').toBeGreaterThan(assertAt);
-    expect(cfBuildCheck).toMatch(/OPENNEXT_CACHE: \$\{\{ vars\.OPENNEXT_CACHE \}\}/);
+  it('generates the config before building, then asserts it (issues 2089/2152/2154)', () => {
+    const setupAt = job.indexOf('bash scripts/cf-setup-local.sh ${{ matrix.app }}');
+    const assertAt = job.indexOf('bash scripts/assert-cf-cache-bindings.sh ${{ matrix.app }}');
+    const buildAt = job.indexOf('bash scripts/cf-build.sh ${{ matrix.app }}');
+    const dryRunAt = job.indexOf('npx wrangler deploy --dry-run');
+    expect(setupAt, 'worker-dry-run never runs the generator').toBeGreaterThan(0);
+    expect(assertAt, 'worker-dry-run never asserts the generated config').toBeGreaterThan(setupAt);
+    expect(buildAt, 'worker-dry-run builds before generating').toBeGreaterThan(assertAt);
+    expect(dryRunAt, 'worker-dry-run never starts wrangler').toBeGreaterThan(buildAt);
+    expect(job).toMatch(/OPENNEXT_CACHE: \$\{\{ vars\.OPENNEXT_CACHE \}\}/);
   });
 
-  it('cf-build-check is sized for contention: serialized legs and a 3x budget (issue 2155)', () => {
-    expect(cfBuildCheck).toMatch(/max-parallel: 1/);
-    const t = Number(/timeout-minutes: (\d+)/.exec(cfBuildCheck)?.[1]);
-    // 25 min budgeted for ONE app's install+build; 3x for contention.
-    expect(t).toBeGreaterThanOrEqual(45);
+  it('runs wrangler on Node 22 (wrangler >= 4.110 needs it) and only for apps with a config', () => {
+    expect(ci).toMatch(/NODE_VERSION: '22'/);
+    expect(job).toMatch(/node-version: \$\{\{ env\.NODE_VERSION \}\}/);
+    // The matrix comes from scripts/ci-affected.mjs, which only lists apps that
+    // have a wrangler config, so an app without one is skipped, not failed.
+    expect(job).toMatch(/app: \$\{\{ fromJSON\(needs\.changes\.outputs\.workers\) \}\}/);
+    expect(job).toMatch(/if: needs\.changes\.outputs\.has_workers == 'true'/);
+  });
+
+  it('each leg is its own hosted runner: no max-parallel, a roomy budget (issue 2155)', () => {
+    expect(job).not.toMatch(/max-parallel/);
+    const t = Number(/timeout-minutes: (\d+)/.exec(job)?.[1]);
+    expect(t).toBeGreaterThanOrEqual(25);
   });
 });

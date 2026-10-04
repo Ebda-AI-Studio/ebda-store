@@ -1,16 +1,32 @@
 name: CI
 
+# LEAN CI (SP4 task 9, Ahmad's decision). Ebda is a private repo on GitHub Free
+# (2,000 GitHub-hosted Actions minutes/month), so the work is split into lanes
+# by how often it can afford to run. Budget arithmetic: docs/ebda/ci.md.
+#
+#   PR lane (pull_request): only lint, typecheck and unit tests for the
+#     workspaces the PR changed (scripts/ci-affected.mjs decides), the repo
+#     guards, and a `wrangler deploy --dry-run` when a Worker's own config
+#     changed. gitleaks.yml and blast-radius.yml run beside it.
+#   Push to main: the repo guards only (migration-order post-merge arm, action
+#     pins, secret scan), because the merge commit already passed the PR lane.
+#   Nightly (Mon-Sat 01:17 UTC): the ebda_app strict-RLS proof.
+#   Weekly (Sunday 01:17 UTC) and manual dispatch: the full lane. Build + full
+#     lint/typecheck, full unit with coverage, orphan-test check, integration,
+#     RLS proof, payload parity, e2e, dependency/secret audit, and the mutation
+#     tests (stryker + defence mutations). semgrep.yml runs on the same
+#     Sunday cron. A manual dispatch runs everything except mutation, which
+#     needs its `mutation` input ticked.
+#
+# Every `runs-on` is `ubuntu-latest`: no custom runner label and no runner-
+# selection variable. tests/unit/workflow-hosted-runners-only.test.ts fails the
+# build if one appears.
 on:
   push:
-    # main-only (2026-06-13): the staging environment + branch were retired
-    # (worktree→PR→CI→main is the only flow; staging drained Neon + Railway
-    # 24/7 for zero use). develop was never active either.
+    # main-only: worktree -> PR -> CI -> main is the only flow.
     branches: [main]
-    # .gitleaksignore / .gitleaks.toml REMOVED from this list 2026-09-02
-    # (adversarial audit, P2): a docs-only-looking push that weakens the
-    # secret-scanning config used to skip this ENTIRE workflow, including
-    # the gitleaks job itself — a security-gate config change is a code
-    # change, not a docs change.
+    # .gitleaksignore / .gitleaks.toml are deliberately NOT listed (adversarial
+    # audit, 2026-09-02): a security-gate config change is a code change.
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -18,221 +34,107 @@ on:
       - '.vscode/**'
       - '.editorconfig'
   pull_request:
-    # main-only (2026-06-13): staging/develop retired (see push trigger above).
-    # NO paths-ignore here (2026-06-27): with it, a docs-only PR skipped the
-    # WHOLE workflow, so the REQUIRED checks (Lint / Type Check / Security Audit)
-    # never reported and branch protection blocked the PR forever. The workflow
-    # now always runs; the heavy build + test jobs are gated on the `changes`
-    # job below, so a docs-only PR runs only the 3 fast required jobs.
+    # No paths-ignore here: with it a docs-only PR skipped the whole workflow,
+    # so required checks never reported and branch protection blocked the PR.
+    # The `changes` job gates the expensive jobs instead.
     branches: [main]
+  schedule:
+    # 01:17 UTC (off the :00 mark, where scheduled runs queue). Two entries so a
+    # job can tell the Sunday full run (`github.event.schedule`) from the
+    # Mon-Sat nightly. Keep the strings in sync with the `if:` conditions below.
+    - cron: '17 1 * * 1-6'
+    - cron: '17 1 * * 0'
   workflow_dispatch:
     inputs:
-      force_cloud:
-        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+      mutation:
+        description: 'Also run the mutation tests (stryker + defence mutations; slow)'
         type: boolean
         default: false
 
-# CRITICAL: cancel superseded runs. Without this, multiple pushes to main
-# in quick succession all run to completion, burning GitHub Actions minutes.
-# Set 2026-05-25 after a session burned ~25 minutes on stale stuck runs.
+# Cancel superseded PR runs (a newer push supersedes the older sha). A main
+# push or nightly gets a group of its own: GitHub keeps only ONE pending run
+# per group, so a shared group would cancel a queued main validation (the same
+# trap gitleaks.yml documents, issue 2454).
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  NODE_VERSION: '20'
+  # wrangler >= 4.110 needs Node >= 22, and cf-deploy runs wrangler on 22.
+  NODE_VERSION: '22'
 
 # Least-privilege default: the workflow GITHUB_TOKEN is read-only. No job here
-# needs write (artifact upload uses the runner session token, not GITHUB_TOKEN).
-# A job that ever needs write must override upward with its own `permissions:`.
+# needs write. A job that ever needs write must override upward itself.
 permissions:
   contents: read
 
 jobs:
-  # Detects whether a PR touches any non-docs file. The heavy build + test jobs
-  # gate on this (so docs-only PRs stay cheap), while the REQUIRED jobs
-  # (Lint / Type Check / Security Audit — no `needs`) still run + report on
-  # every PR so branch protection is always satisfied. (2026-06-27)
+  # ---------------------------------------------------------------------------
+  # PR lane
+  # ---------------------------------------------------------------------------
+
+  # Which workspaces does this PR touch (plus their dependents)? See
+  # scripts/ci-affected.mjs for the rules: a change to packages/shared,
+  # packages/database or any root config file means ALL workspaces; docs-only
+  # changes mean none.
   changes:
-    name: Detect code changes
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    name: Detect affected workspaces
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      code: ${{ steps.filter.outputs.code }}
-      cf: ${{ steps.cf-filter.outputs.cf }}
+      code: ${{ steps.affected.outputs.code }}
+      lint: ${{ steps.affected.outputs.lint }}
+      typecheck: ${{ steps.affected.outputs.typecheck }}
+      unit: ${{ steps.affected.outputs.unit }}
+      status_tests: ${{ steps.affected.outputs.status_tests }}
+      workers: ${{ steps.affected.outputs.workers }}
+      has_workers: ${{ steps.affected.outputs.has_workers }}
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - id: filter
-        name: Detect non-docs changes
-        # .gitleaksignore / .gitleaks.toml REMOVED from the docs-only pattern
-        # 2026-09-02 (adversarial audit, P2): a PR that only weakens the
-        # secret-scanning allowlist used to read as docs-only here, which
-        # skips Build/Unit/Integration/E2E/RLS-proof — while the gitleaks
-        # job on that same PR runs WITH the weakened config, so the one gate
-        # actually reviewing the change is the weakened one. A security-gate
-        # config change is a code change.
-        env:
-          # GitHub-controlled SHA (not user text); bound via env per workflow-injection hygiene.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          # Push events have no PR base → run the full pipeline.
-          if [ -z "$BASE_SHA" ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only "$BASE_SHA" HEAD \
-              | grep -qvE '^(docs/|.*\.md$|\.github/ISSUE_TEMPLATE/|\.vscode/|\.editorconfig$)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-      - id: cf-filter
-        name: Detect changes that could move the Cloudflare Worker bundle
-        # audit-followup #1632: the `build` job above only proves `next build`
-        # succeeds — it never exercises the pinned `@opennextjs/cloudflare`
-        # adapter that actually ships to production (`scripts/cf-build.sh`,
-        # invoked only at deploy time by cf-deploy.yml). A `next`/adapter
-        # version bump, or an edit to the adapter config itself, can move the
-        # Worker bundle while `next build` stays green. Narrowly scoped to
-        # the files that can affect that bundle so an unrelated PR doesn't pay
-        # for 3 extra OpenNext builds.
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          # No PR base = a push to main or a manual run. cf-deploy.yml already
-          # runs this exact adapter build on every main push, so repeating it
-          # here would only add three more OpenNext builds to the busy
-          # self-hosted runners.
-          if [ -z "$BASE_SHA" ]; then
-            echo "cf=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only "$BASE_SHA" HEAD | grep -qE \
-              '^(package-lock\.json|package\.json|scripts/cf-build\.sh|scripts/cf-setup-local\.sh|apps/(web|admin|orders)/(package\.json|wrangler\.jsonc|open-next\.config\.ts|next\.config\.js))$'; then
-            echo "cf=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "cf=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  lint:
-    name: Lint
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    # 20 (was 8, was 5). 8 was marginal and finally broke main on 2026-08-11
-    # (run 31492893725, the #1072 merge): the job was killed at exactly 8m22s
-    # with `Check formatting` only 47s in, which skipped Build, Unit,
-    # Integration, E2E and the RLS proof — so main merged without ever being
-    # fully validated. Measured on the umbra guest: install 268s + eslint 165s
-    # left prettier no room, total need ~12-13m.
-    #
-    # It is NOT a constant cost, which is what made it flaky: the same job took
-    # 4m19s on the PR run minutes earlier, because `Install dependencies` is
-    # ~4.5m cold and much faster warm. Budget for the cold case.
-    timeout-minutes: 20
-    steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): actions/setup-node's built-in
-          # npm cache restore hits GitHub's remote Actions Cache backend, and on
-          # our self-hosted runners (now the umbra guest fwb-ci6-*) that
-          # restore has been
-          # intermittently stalling at 0% for 5-8+ minutes before timing out
-          # ("Failed to restore: The operation cannot be completed in timeout"),
-          # burning the whole job timeout and reporting Lint/Security Audit as a
-          # cancelled (red) required check even though eslint/npm audit never ran.
-          # Confirmed via job logs across ~40% of recent CI runs (2026-07-04/05).
-          # The self-hosted runner's own $HOME persists between jobs on the same
-          # machine, so npm's native ~/.npm package cache stays warm anyway —
-          # dropping this wrapper removes the flaky network dependency with no
-          # real cache-loss cost here.
+      - id: affected
+        name: Compute affected workspaces
+        env:
+          # GitHub-controlled SHA (not user text); bound via env per workflow-injection hygiene.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/ci-affected.mjs --base "$BASE_SHA"
+
+  # Always-on, cheap repo guards. Runs on every PR (docs-only included) and on
+  # every main push, so it has no `needs` and no `if`.
+  guards:
+    name: Repo guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Prettier-on-changed-files below diffs against the PR base.
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       # Migration ordering (Ruling MIG-ORD-1): a PR may not add a migration
       # folder whose 14-digit timestamp sorts at or before main's newest, and
-      # no two folders may share a timestamp (two prod-applied collisions are
-      # grandfathered by exact folder set inside the script). Runs here because
-      # Lint is a required job with no `needs`, so it reports on every PR,
-      # docs-only included. On a PR the checkout is the merge commit, so the
-      # tree already holds main's folders plus the PR's. After setup-node (the
-      # self-hosted runner has no node on the run: PATH — exit 127 otherwise),
-      # before `npm ci`. Fails CLOSED (exit 2) if origin/main cannot be read.
+      # no two folders may share a timestamp. Runs before `npm ci`; fails CLOSED
+      # (exit 2) if origin/main cannot be read.
       - name: Migration ordering gate
         # The fetch lives INSIDE the script (--fetch), which only uses
         # --depth=1 when CI=true and GITHUB_ACTIONS=true. A bare
-        # `git fetch --depth=1` here was copied/run by hand in the shared
-        # developer repo and made every worktree shallow, twice (2026-09-30).
+        # `git fetch --depth=1` here made every worktree shallow, twice.
         #
         # Two arms (issue 2355). PR: compare against current main. PUSH to main:
         # compare against the PRE-push tip (`github.event.before`) — on a push,
         # origin/main IS the pushed commit, so the PR arm would compare nothing.
-        # The push arm catches two PRs that each passed against the same old main
-        # and then both merged: the second one's folder now sorts at/before the
-        # first's, and main goes red instead of drifting silently.
+        # Scheduled and manual runs take the PR arm.
         env:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
@@ -243,127 +145,78 @@ jobs:
             node scripts/check-migration-order.mjs --fetch --base origin/main
           fi
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run ESLint
-        run: npm run lint --if-present
-
-      # Deterministic gate for the "an emptied admin field must clear" class:
-      # `X || undefined` inside an apiPut/apiPatch body serializes to an
-      # ABSENT key, and every write path here reads an absent key as "leave
-      # the stored value alone" — so the save succeeds and the merchant's
-      # clear is discarded (it shipped as a store's order-invoice address that
-      # could not be removed). ESLint can't host it: the admin config's
-      # `no-restricted-syntax` entries are deliberately `warn` for the ~143
-      # known Tailwind-token violations, and flat config can't mix severities
-      # within one rule — an `error` block here would silently downgrade or
-      # promote those. AST-based (typescript, already a devDependency), not
-      # grep, and it carries a documented `clear-gate-allow:` waiver form.
-      - name: Clear-on-empty payload gate
-        run: npm run check:clear-on-empty
-
-      - name: Check formatting
-        run: npm run format:check --if-present
-
-  # Client trust-boundary guard (Builder Reality Audit Lens K): the frontend is a
-  # display layer, not a trust layer. gitleaks/trufflehog scan the repo for committed
-  # secrets; this scans what actually ships to the BROWSER (client source + built
-  # bundle) for high-signal secret material + server-only env access. Pure bash —
-  # no node/build — so it's fast and runs on every PR.
-  client-secret-scan:
-    name: Client secret scan
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 3
-    steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Client trust-boundary guard: scans client source + any built bundle for
+      # high-signal secret material. Pure bash, no build.
       - name: Scan client for secret leakage
         run: bash scripts/scan-bundle-secrets.sh
-      # #1517: nothing verified that every `uses:` ref stays pinned to a
-      # 40-hex SHA (the 2026-09 pin sweep, PR #1515) — the next workflow edit
-      # could reintroduce a mutable tag with no reviewer able to tell from a
-      # `@v4` line alone, in exactly the workflows holding
-      # CLOUDFLARE_API_TOKEN/RAILWAY_TOKEN/AI_FIX_PAT. Pure bash, no install —
-      # fits this job's fast, every-PR budget.
+
+      # #1517: every `uses:` ref stays pinned to a 40-hex commit SHA.
       - name: Verify every GitHub Action is pinned to a commit SHA
         run: bash scripts/check-action-pins.sh
 
+      # A push to main already passed these on its PR, so it stays lite (no
+      # install): the migration arm above, the pin check and the secret scan.
+      - name: Install dependencies
+        if: github.event_name != 'push'
+        run: npm ci
+
+      # Ebda must not ship FWB / Force AI branding; always cheap, always run.
+      - name: No-FWB-branding test
+        if: github.event_name != 'push'
+        run: npx vitest run tests/unit/no-fwb-branding.test.ts --reporter=verbose --retry=0
+
+      # Prettier on the files the PR changed (the main lane checks the whole
+      # tree). `--diff-filter=d` skips deletions; prettier skips .prettierignore.
+      - name: Check formatting (changed files)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --name-only --diff-filter=d "$BASE_SHA" HEAD \
+            | grep -E '\.(ts|tsx|js|jsx|json|md)$' \
+            | xargs -r npx prettier --check
+
+  lint:
+    name: Lint
+    needs: [changes]
+    if: needs.changes.outputs.lint != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Only the affected workspaces: `-w apps/web -w packages/ui ...`.
+      - name: Run ESLint (affected workspaces)
+        env:
+          LINT_WORKSPACES: ${{ needs.changes.outputs.lint }}
+        run: npm run lint --if-present $LINT_WORKSPACES
+
+      # Deterministic gate for the "an emptied admin field must clear" class
+      # (`X || undefined` inside an apiPut/apiPatch body). AST-based and cheap.
+      - name: Clear-on-empty payload gate
+        run: npm run check:clear-on-empty
+
   typecheck:
     name: Type Check
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 30
+    needs: [changes]
+    if: needs.changes.outputs.typecheck != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
-          # was intermittently stalling for minutes on our self-hosted runners
-          # and eating job timeouts (cancelled Lint/Security Audit). See the
-          # full explanation on the Lint job above (~line 93).
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -374,179 +227,85 @@ jobs:
       - name: Build database package
         run: npm run build -w packages/database
 
-      - name: Type check API
-        run: npx tsc --noEmit -p apps/api/tsconfig.json
-
-      - name: Type check Admin
-        run: npx tsc --noEmit -p apps/admin/tsconfig.json
-
-      - name: Type check Web
-        run: npx tsc --noEmit -p apps/web/tsconfig.json
-
-      - name: Type check Orders PWA
-        run: npx tsc --noEmit -p apps/orders/tsconfig.json
-
-      - name: Type check shared packages
-        run: npx tsc --noEmit -p packages/shared/tsconfig.json
-
-  build:
-    name: Build
-    # Skip on docs-only PRs (the required Lint/Type Check/Security Audit still
-    # run). On push events `changes.code` is 'true', so build always runs there.
-    if: needs.changes.outputs.code == 'true'
-    # build runs on self-hosted by default; force_cloud overrides to ubuntu-latest.
-    # inputs.force_cloud is falsy (not set) for push/pull_request triggers — safe.
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    # 35 (was 15). Every timeout in this file is now budgeted for CONTENTION,
-    # not for a job running alone. The umbra guest is 4 CPU / 4 GiB and a full
-    # FWB run drives it to load ~15, so jobs take roughly 2.5-3x their
-    # measured-alone duration. Build measured 7m46s alone and was killed at 20m
-    # mid-`Build all packages` on main (run 31504612064), which skipped Unit,
-    # Integration, E2E and the RLS proof — main went unvalidated twice in a row.
-    #
-    # Sizing rule if you touch these: take the alone-duration, multiply by 3,
-    # then add headroom. Budgets sized against alone-durations fail
-    # INTERMITTENTLY, which is the worst failure mode — it reads as a flaky test.
-    #
-    # This is a stopgap. The real fix is guest capacity (host is 10 cores/16 GB,
-    # guest gets 4/4). Do NOT "add a second runner" — the guest is CPU-bound, so
-    # another runner adds contention, not throughput.
-    timeout-minutes: 35
-    needs: [lint, typecheck, changes]
-    steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
-          # was intermittently stalling for minutes on our self-hosted runners
-          # and eating job timeouts (cancelled Lint/Security Audit). See the
-          # full explanation on the Lint job above (~line 93).
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npm run db:generate
-
-      - name: Build database package
-        run: npm run build -w packages/database
-
-      - name: Build all packages
-        run: npm run build
+      # One tsc per affected workspace; keep going so a PR sees every failure.
+      - name: Type check (affected workspaces)
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:4000
+          TSCONFIGS: ${{ needs.changes.outputs.typecheck }}
+        run: |
+          status=0
+          for p in $TSCONFIGS; do
+            echo "::group::tsc --noEmit -p $p"
+            npx tsc --noEmit -p "$p" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
 
-  # audit-followup #1632: `build` above only proves `next build` succeeds.
-  # web/admin/orders actually ship as Cloudflare Workers through the pinned
-  # `@opennextjs/cloudflare` adapter (`scripts/cf-build.sh`), which rewrites
-  # Next's build output — exactly the surface a `next` or adapter version
-  # bump moves. Before this job, that adapter build ran ONLY at deploy time
-  # (cf-deploy.yml), so a green CI here proved nothing about the Worker
-  # bundle a `next` minor bump actually ships. Gated on `changes.outputs.cf`
-  # (package.json/lockfile/adapter-config changes only) so an unrelated PR
-  # doesn't pay for 3 extra OpenNext builds.
-  #
-  # It builds the config that DEPLOYS, not the committed one (issues 2089/
-  # 2152/2154): cf-deploy.yml runs scripts/cf-setup-local.sh first, which
-  # overwrites apps/<app>/{open-next.config.ts,wrangler.jsonc} and, for web
-  # with OPENNEXT_CACHE=true, adds the DO tag cache/queue + R2 incremental
-  # cache and a generated cache-worker-entry.ts. This job runs the same
-  # generator and the same assertion (scripts/assert-cf-cache-bindings.sh),
-  # so an adapter bump that breaks the DO/tag-cache overrides fails HERE, not
-  # at deploy on main. Keep the two in lockstep. Not reproduced: the
-  # NEXT_PUBLIC_* .env.production.local write — this build inlines only
-  # NEXT_PUBLIC_API_URL, which moves no adapter surface.
-  #
-  # Budget (issue 2155), by this file's own sizing rule (see `build`): the
-  # deploy path gives ONE app's install + build + deploy 25 min on this
-  # runner, so a leg gets 45; `max-parallel: 1` serializes the three legs so
-  # three concurrent Next+OpenNext builds cannot OOM a 4 GiB guest that is
-  # also running build/unit/integration/e2e. Never add this matrix to branch
-  # protection's required checks: it is conditionally skipped (see the
-  # paths-ignore trap at the top of this file).
-  cf-build-check:
-    name: Cloudflare Worker Build Check (${{ matrix.app }})
-    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.cf == 'true'
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 45
-    needs: [lint, typecheck, changes]
+  # Unit tests for the affected paths. tests/unit (the cross-app source and
+  # workflow pins) runs whenever any code changed; app/package suites run when
+  # their workspace (or a dependency) changed. No coverage here: the coverage
+  # threshold is enforced by the main lane on the full suite.
+  unit:
+    name: Unit Tests (affected)
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build -w packages/database
+
+      - name: Build shared package
+        run: npm run build -w packages/shared
+
+      - name: Run unit tests (affected paths)
+        env:
+          UNIT_PATHS: ${{ needs.changes.outputs.unit }}
+          NODE_OPTIONS: --max-old-space-size=2048
+        run: npx vitest run $UNIT_PATHS --reporter=verbose --retry=0
+
+      # apps/status runs on workerd via @cloudflare/vitest-pool-workers, outside
+      # the root vitest config.
+      - name: Run status worker tests
+        if: needs.changes.outputs.status_tests == 'true'
+        run: npm run test:status
+
+  # `wrangler deploy --dry-run` for each changed Worker app, on the Node the
+  # deploy uses (a plain build never starts wrangler, so it passed while real
+  # deploys died on the Node floor, 2026-10-03). `changes` only lists apps that
+  # HAVE a wrangler config, so an app without one (apps/api today) is skipped.
+  # web/admin/orders ship through the pinned OpenNext adapter: this runs the
+  # same generator + assertion as cf-deploy.yml (issues 2089/2152/2154) so an
+  # adapter or `next` bump that breaks the DO/tag-cache overrides fails here.
+  worker-dry-run:
+    name: Worker dry-run (${{ matrix.app }})
+    needs: [changes]
+    if: needs.changes.outputs.has_workers == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        app: [web, admin, orders]
+        app: ${{ fromJSON(needs.changes.outputs.workers) }}
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # Must match cf-deploy.yml's NODE_VERSION: the deploy runs wrangler there,
-          # and wrangler enforces its own Node floor at startup.
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -561,6 +320,7 @@ jobs:
         run: npm run build -w packages/shared
 
       - name: Generate the ${{ matrix.app }} worker config (same generator as cf-deploy)
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
         env:
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
           # The pinned adapter + wrangler are already installed by `npm ci`.
@@ -568,73 +328,90 @@ jobs:
         run: bash scripts/cf-setup-local.sh ${{ matrix.app }}
 
       - name: Assert the generated config matches OPENNEXT_CACHE (same assertion as cf-deploy)
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
         env:
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
         run: bash scripts/assert-cf-cache-bindings.sh ${{ matrix.app }}
 
       - name: Build ${{ matrix.app }} for Cloudflare (OpenNext adapter)
+        if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
         run: bash scripts/cf-build.sh ${{ matrix.app }}
 
-      # The build above never starts wrangler, so it passed while every real
-      # deploy died at `wrangler deploy` on the Node version (2026-10-03, run
-      # 37113844110). A dry run starts the same binary with the same config on
-      # the same Node, without uploading anything.
+      # marketing (static export) and api build with their own script; status's
+      # build script IS its dry-run, so it needs no second one.
+      - name: Build ${{ matrix.app }}
+        if: contains(fromJSON('["marketing","api","status"]'), matrix.app)
+        run: npm run build -w apps/${{ matrix.app }}
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+
       - name: Dry-run the ${{ matrix.app }} deploy (wrangler starts on the deploy's Node)
+        if: matrix.app != 'status'
         working-directory: apps/${{ matrix.app }}
         run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/wrangler-dry-${{ matrix.app }}"
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
-  test-unit:
-    name: Unit Tests
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    # 15 (was 10): measured 6m51s on the umbra guest — 69% of the old budget,
-    # the next-tightest job after Lint. It pays the same ~4.5m cold
-    # `Install dependencies` that pushed Lint over, so raise it now rather than
-    # wait for it to fail the same way.
-    timeout-minutes: 30
-    needs: [build]
+  # ---------------------------------------------------------------------------
+  # Scheduled / manual lanes. Never on a pull request or a push.
+  #   FULL    = Sunday cron or a manual dispatch
+  #   NIGHTLY = any cron or a manual dispatch
+  # ---------------------------------------------------------------------------
+
+  build:
+    name: Build
+    # FULL lane: Sunday cron or manual dispatch.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
-          # was intermittently stalling for minutes on our self-hosted runners
-          # and eating job timeouts (cancelled Lint/Security Audit). See the
-          # full explanation on the Lint job above (~line 93).
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build -w packages/database
+
+      # The PR lane lints/typechecks only what changed; the full lane checks
+      # everything once, in the same job as the build so `npm ci` runs once.
+      - name: Run ESLint
+        run: npm run lint --if-present
+
+      - name: Clear-on-empty payload gate
+        run: npm run check:clear-on-empty
+
+      - name: Check formatting
+        run: npm run format:check --if-present
+
+      - name: Type check (all workspaces)
+        run: npm run typecheck
+
+      - name: Build all packages
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -686,6 +463,10 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
+      # apps/status runs on workerd, outside the root vitest config.
+      - name: Run status worker tests
+        run: npm run test:status
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -710,52 +491,16 @@ jobs:
     # any file present in the first set but not the second. A gate that cannot
     # fail must not report success — this one can, and does today if a colocated
     # test lands outside every job's glob again.
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    # 20, not 10 — npm ci alone measured ~268s cold on the self-hosted runner
-    # (see the Lint job's 2026-08-11 budget post-mortem above), and this job
-    # additionally builds 2 packages and runs 2 full vitest collections. A
-    # 10-minute budget would cancel cold-cache runs with a timeout error —
-    # the same false-signal class this job exists to eliminate (#1138).
-    timeout-minutes: 20
-    needs: [build, changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -816,9 +561,8 @@ jobs:
             // the tree as an orphan — 268 of them on one occasion, including
             // tests/unit files that are plainly inside the covered globs — and
             // that reads as a code regression rather than as \"the second
-            // vitest list collected nothing\". Observed on one runner of the
-            // self-hosted pair while the same commit collected 269/269 locally
-            // and passed on the other runner.
+            // vitest list collected nothing\". Observed on one runner while the same
+            // commit collected 269/269 locally and passed on another.
             //
             // The covered set is a FILTERED subset of the same universe, so it
             // should be within a whisker of `all`. Anything below half means
@@ -844,8 +588,8 @@ jobs:
 
   test-integration:
     name: Integration Tests
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 35
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [build]
     services:
       postgres:
@@ -855,8 +599,6 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: force_test
         ports:
-          # Dynamic host port: Docker assigns a random available port so
-          # parallel jobs on the same self-hosted runner never collide on 5432.
           - 5432
         options: >-
           --health-cmd pg_isready
@@ -875,46 +617,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
-          # was intermittently stalling for minutes on our self-hosted runners
-          # and eating job timeouts (cancelled Lint/Security Audit). See the
-          # full explanation on the Lint job above (~line 93).
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -1072,11 +780,13 @@ jobs:
   #   - tests/integration/rls-pooler-isolation.test.ts: interleaved requests for two stores
   #     through a real pgbouncer in transaction mode leak 0 rows (needs the pgbouncer binary).
   # If a migration predicate is wrong or a table ships without a policy, THIS job fails.
+
   test-rls-ebda-app:
     name: RLS ebda_app Strict-Policy Proof
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 25
-    needs: [build]
+    # NIGHTLY lane (every cron) and manual dispatch; independent of `build`.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -1085,8 +795,6 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: force_test
         ports:
-          # Dynamic host port: Docker assigns a random available port so
-          # parallel jobs on the same self-hosted runner never collide on 5432.
           - 5432
         options: >-
           --health-cmd pg_isready
@@ -1095,46 +803,12 @@ jobs:
           --health-retries 10
           --health-start-period 30s
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
-          # was intermittently stalling for minutes on our self-hosted runners
-          # and eating job timeouts (cancelled Lint/Security Audit). See the
-          # full explanation on the Lint job above (~line 93).
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -1209,10 +883,11 @@ jobs:
   # (RLS bypassed) and as ebda_app (RLS enforced) —
   # calls the storefront endpoints for every store, and fails on any array
   # that shrank or field that vanished. scripts/rls-payload-parity.mjs.
+
   test-rls-payload-parity:
     name: RLS Payload Parity (owner vs ebda_app)
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [build]
     services:
       postgres:
@@ -1231,43 +906,12 @@ jobs:
           --health-retries 10
           --health-start-period 30s
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' — see the Lint job.
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -1311,8 +955,8 @@ jobs:
 
   test-e2e:
     name: E2E Tests
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 35
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [build]
     services:
       postgres:
@@ -1322,8 +966,6 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: force_test
         ports:
-          # Dynamic host port: Docker assigns a random available port so
-          # parallel jobs on the same self-hosted runner never collide on 5432.
           - 5432
         options: >-
           --health-cmd pg_isready
@@ -1342,46 +984,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
-          # was intermittently stalling for minutes on our self-hosted runners
-          # and eating job timeouts (cancelled Lint/Security Audit). See the
-          # full explanation on the Lint job above (~line 93).
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -1428,58 +1036,20 @@ jobs:
 
   security:
     name: Security Audit
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    # 18 (was 10, was 7, was 5). The budget is the SUM of the worst cases, not
-    # the audit alone: 3 bounded audit attempts (3 x 110s + 2 x 10s backoff =
-    # ~5.8 min, #1520) + a COLD `npm ci` (268s recorded on the umbra guest —
-    # see the Lint job's timeout note) + checkout/setup/jq/trufflehog (3-22s
-    # measured across 30 recent runs). 10 left 10.5 min of need against 10 min
-    # on a cold install, so the job would be CANCELLED (neither pass nor fail,
-    # blocks the merge with no finding) exactly when the registry is slow
-    # (scoped audit, PR 1978). tests/unit/audit-report-verdict.test.ts asserts
-    # this sum, not the attempt arithmetic alone.
+    # FULL lane: Sunday cron or manual dispatch.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')
+    runs-on: ubuntu-latest
+    # 18: the budget is the SUM of the worst cases, not the audit alone — 3
+    # bounded audit attempts (~5.8 min, #1520) + a COLD `npm ci` + checkout and
+    # trufflehog. tests/unit/audit-report-verdict.test.ts asserts this sum.
     timeout-minutes: 18
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
-          # was intermittently stalling for minutes on our self-hosted runners
-          # and eating job timeouts (cancelled Lint/Security Audit). See the
-          # full explanation on the Lint job above (~line 93).
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -1504,125 +1074,75 @@ jobs:
           # on anything not explicitly waived, and the list must only shrink.
           node .github/scripts/audit-gate.mjs
 
-      - name: Ensure jq (trufflehog needs it; self-hosted runner may lack it + can't sudo)
-        run: |
-          if command -v jq >/dev/null 2>&1; then
-            echo "jq present: $(jq --version)"
-          else
-            echo "jq missing — installing a static binary to a runner-owned PATH dir (no sudo)"
-            mkdir -p "$HOME/.local/bin"
-            JQ_SHA=5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5
-            curl -fsSL -o "$HOME/.local/bin/jq" https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
-            echo "$JQ_SHA  $HOME/.local/bin/jq" | sha256sum -c - || { echo "::error::jq checksum mismatch — refusing to execute"; rm -f "$HOME/.local/bin/jq"; exit 1; }
-            chmod +x "$HOME/.local/bin/jq"
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-            "$HOME/.local/bin/jq" --version
-          fi
-
       - name: Check for secrets
-        # Pinned to a release tag (not the floating '@main' branch ref) — fixed
-        # 2026-07-05. '@main' can't be cached by the runner's action-download
-        # cache (its resolved SHA changes on every trufflehog commit), so every
-        # job re-downloaded the action tarball from codeload.github.com; on our
-        # self-hosted runners that download was intermittently hitting the
-        # actions/runner's 100s HttpClient timeout, retrying twice with backoff,
-        # and burning this job's whole 5-minute timeout before npm audit or the
-        # scan ever ran (surfaced as a cancelled/red "Security Audit" check on
-        # ~40% of recent runs — not a real vulnerability or secret finding).
-        # A pinned tag resolves to a stable SHA the runner caches after the
-        # first successful download, and is also better supply-chain hygiene
-        # than trusting an unpinned third-party branch. Bump deliberately.
         uses: trufflesecurity/trufflehog@4dd8831c5f12599465d4d45c3c447b4018a34c85 # v3.97.9
         with:
           path: ./
           extra_args: --only-verified
 
-      # trufflehog's action scans inside a Docker container running AS ROOT and
-      # leaves `trufflehog-<pid>-<rand>/` (mode 700, root:root) in the workspace
-      # when the scan is interrupted — an OOM kill, a cancelled run, a guest
-      # restart. The runner user cannot remove it: deleting that tree means
-      # recursing INTO a directory it is not permitted to read, and this runner
-      # has no sudo (see the jq step above).
-      #
-      # The consequence is far worse than a stray directory. The NEXT job to
-      # land on that runner dies in `actions/checkout` — which clears the
-      # workspace before anything else — with
-      #   EACCES: permission denied, scandir '.../trufflehog-20-...'
-      # so it fails before a single real step runs, and it is STICKY: every
-      # later job on that runner fails identically until someone with root
-      # deletes it. On 2026-09-23 one leftover took out six runs at once and
-      # survived a full re-run of all of them; the failures looked like six
-      # unrelated red checks, not one directory.
-      #
-      # Clean it the way it was created — a root container bind-mounting the
-      # workspace — since sudo is unavailable. `if: always()` because the
-      # interrupted-scan case is exactly the one that strands the directory.
-      #
-      # `always()` covers step failure and job cancellation — it does NOT
-      # cover the runner process being OOM-killed or the guest restarting,
-      # because then no further step in the job runs at all, this one
-      # included (#1883). The fast path here is kept for the ordinary case
-      # (fails loud if a genuine cleanup failure would strand the NEXT job),
-      # but every job on the self-hosted runner now ALSO runs
-      # an inline pre-checkout cleanup step before checkout, which is
-      # the path that survives a hard kill — that pre-checkout guard is the
-      # actual safety net now, so a docker hiccup here degrades to a warning
-      # instead of failing a security scan that itself found nothing.
-      - name: Remove root-owned trufflehog scratch (survives an interrupted scan)
-        if: always()
-        shell: bash
+  # Mutation tests: weekly (Sunday) or manual only (far too slow for a push or
+  # a nightly).
+  #   - Stryker over the mutate list in stryker.conf.json (unit tier).
+  #   - The defence mutation record, unit tier: removes each mandatory security
+  #     defence in turn and proves its guarding test then FAILS. The
+  #     integration tier needs Postgres and is run by hand with --tier=all.
+  mutation:
+    name: Mutation tests
+    if: (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0') || (github.event_name == 'workflow_dispatch' && inputs.mutation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database + shared packages
         run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            echo "no trufflehog scratch left behind"
-            exit 0
-          fi
-          echo "removing root-owned scratch: ${leftovers[*]}"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' \
-            || echo "::warning::trufflehog scratch cleanup's docker run failed — the pre-checkout guard on the next job will retry it"
-          remaining=(trufflehog-*)
-          if [ ${#remaining[@]} -ne 0 ]; then
-            echo "::warning::trufflehog scratch survived cleanup (${remaining[*]}) — the pre-checkout guard on the next job on this runner will retry it before checkout"
-            exit 0
-          fi
-          echo "workspace is clean"
+          npm run build -w packages/database
+          npm run build -w packages/shared
+
+      - name: Stryker mutation run
+        run: npx stryker run
+
+      - name: Defence mutation record (unit tier)
+        run: node scripts/defence-mutation-record.mjs --tier=unit
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-report
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 7
 
   notify-failure:
-    # Umbra-only CI policy (2026-07-15): GitHub-hosted runners are billing-
-    # blocked permanently, so the old fail-open-on-cloud design can never fire.
-    # This job now rides the self-hosted runner; the runner-is-dead case is
-    # alerted by the local OS medic (:7717 runner-offline watch), not by CI.
-    name: Notify on failure (main only)
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    name: Notify on failure (main and nightly)
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     needs:
       [
-        lint,
-        typecheck,
-        security,
+        guards,
         build,
-        cf-build-check,
+        security,
         test-unit,
+        orphan-tests,
         test-integration,
         test-rls-ebda-app,
         test-rls-payload-parity,
         test-e2e,
+        mutation,
       ]
-    if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && failure() && github.event_name != 'pull_request'
     steps:
       - name: Compose + send Telegram alert
         env:
@@ -1631,19 +1151,20 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           REF: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
           RUN_ID: ${{ github.run_id }}
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-          LINT_RES: ${{ needs.lint.result }}
-          TYPECHECK_RES: ${{ needs.typecheck.result }}
-          SECURITY_RES: ${{ needs.security.result }}
+          GUARDS_RES: ${{ needs.guards.result }}
           BUILD_RES: ${{ needs.build.result }}
-          CF_BUILD_RES: ${{ needs.cf-build-check.result }}
+          SECURITY_RES: ${{ needs.security.result }}
           UNIT_RES: ${{ needs.test-unit.result }}
+          ORPHAN_RES: ${{ needs.orphan-tests.result }}
           INT_RES: ${{ needs.test-integration.result }}
           RLS_EBDA_APP_RES: ${{ needs.test-rls-ebda-app.result }}
           RLS_PARITY_RES: ${{ needs.test-rls-payload-parity.result }}
           E2E_RES: ${{ needs.test-e2e.result }}
+          MUTATION_RES: ${{ needs.mutation.result }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
             echo "telegram secrets not configured — skipping alert"
@@ -1653,7 +1174,7 @@ jobs:
           # Collect which jobs failed (vs which skipped vs passed) so Ahmad
           # can see what to look at without clicking through.
           FAILED_JOBS=""
-          for entry in "lint:$LINT_RES" "typecheck:$TYPECHECK_RES" "security:$SECURITY_RES" "build:$BUILD_RES" "cf-build:$CF_BUILD_RES" "unit:$UNIT_RES" "integration:$INT_RES" "rls-ebda-app:$RLS_EBDA_APP_RES" "rls-payload-parity:$RLS_PARITY_RES" "e2e:$E2E_RES"; do
+          for entry in "guards:$GUARDS_RES" "build:$BUILD_RES" "security:$SECURITY_RES" "unit:$UNIT_RES" "orphan-tests:$ORPHAN_RES" "integration:$INT_RES" "rls-ebda-app:$RLS_EBDA_APP_RES" "rls-payload-parity:$RLS_PARITY_RES" "e2e:$E2E_RES" "mutation:$MUTATION_RES"; do
             name="${entry%:*}"
             res="${entry#*:}"
             if [ "$res" = "failure" ]; then
@@ -1663,15 +1184,16 @@ jobs:
           FAILED_JOBS="${FAILED_JOBS%, }"
           [ -z "$FAILED_JOBS" ] && FAILED_JOBS="(none reported — check run)"
 
-          # First line of the commit message only (Telegram truncates long bodies)
-          TITLE=$(echo "$COMMIT_MSG" | head -n 1 | cut -c1-100)
+          # First line of the commit message only (Telegram truncates long bodies).
+          # Scheduled/manual runs carry no head_commit.
+          TITLE=$(echo "${COMMIT_MSG:-($EVENT run)}" | head -n 1 | cut -c1-100)
           SHORT_SHA="${SHA:0:8}"
 
           # Markdown V1 escaping is minimal — wrap code segments in backticks
           # to neutralize most special chars, but use a plain header so
           # Telegram preserves layout when an underscore sneaks in.
-          MSG=$(printf '🔴 *CI FAIL* — %s\n*branch:* `%s`\n*sha:* `%s`\n*commit:* %s\n*author:* %s\n*failed:* %s\n[view run](https://github.com/%s/actions/runs/%s)' \
-            "$REPO" "$REF" "$SHORT_SHA" "$TITLE" "$COMMIT_AUTHOR" "$FAILED_JOBS" "$REPO" "$RUN_ID")
+          MSG=$(printf '🔴 *CI FAIL* (%s) — %s\n*branch:* `%s`\n*sha:* `%s`\n*commit:* %s\n*author:* %s\n*failed:* %s\n[view run](https://github.com/%s/actions/runs/%s)' \
+            "$EVENT" "$REPO" "$REF" "$SHORT_SHA" "$TITLE" "${COMMIT_AUTHOR:-n/a}" "$FAILED_JOBS" "$REPO" "$RUN_ID")
 
           curl -sS -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \

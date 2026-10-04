@@ -161,14 +161,14 @@ describe('check-migration-order.mjs (end to end, real git repo)', () => {
 });
 
 describe('ci.yml runs the gate on every PR', () => {
-  it('the Lint job (required, no `needs`, always runs) fetches main and runs the script', () => {
+  it('the guards job (no `needs`, no `if`, always runs) fetches main and runs the script', () => {
     const ci = yaml.load(readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8')) as {
       jobs: Record<string, { needs?: unknown; if?: string; steps: Array<{ run?: string }> }>;
     };
-    const lint = ci.jobs.lint;
-    expect(lint.needs).toBeUndefined();
-    expect(lint.if).toBeUndefined();
-    const run = lint.steps.map(s => s.run ?? '').join('\n');
+    const guards = ci.jobs.guards;
+    expect(guards.needs).toBeUndefined();
+    expect(guards.if).toBeUndefined();
+    const run = guards.steps.map(s => s.run ?? '').join('\n');
     expect(run).toMatch(/node scripts\/check-migration-order\.mjs --fetch --base origin\/main/);
     // The fetch lives in the script (depth only inside Actions), never as a bare
     // `git fetch --depth` a person or agent can copy into the shared repo.
@@ -182,7 +182,7 @@ describe('ci.yml runs the gate on every PR', () => {
         { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> }
       >;
     };
-    const step = ci.jobs.lint.steps.find(s => s.name === 'Migration ordering gate')!;
+    const step = ci.jobs.guards.steps.find(s => s.name === 'Migration ordering gate')!;
     expect(step.env?.BEFORE_SHA).toBe('${{ github.event.before }}');
     expect(step.run).toMatch(
       /if \[ "\$EVENT_NAME" = "push" \]; then\s+node scripts\/check-migration-order\.mjs --fetch --base "\$BEFORE_SHA"/

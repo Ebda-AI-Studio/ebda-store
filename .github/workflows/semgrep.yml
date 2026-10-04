@@ -1,14 +1,21 @@
 name: Semgrep
 
+# Weekly + manual, NOT on pull requests or pushes (lean CI, SP4 task 9). The
+# scan installs semgrep from PyPI and walks the whole tree, ~3-4 billed
+# minutes; paid on every PR and every main push it would eat ~400 of the
+# 2,000 monthly minutes. The PR lane keeps gitleaks and the unit/lint/
+# typecheck gates; this SAST scan sweeps main every Sunday (right after ci.yml's
+# full lane) and on demand. See docs/ebda/ci.md.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: '47 1 * * 0'
+  workflow_dispatch:
 
 concurrency:
-  group: semgrep-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A group of its own per run (see ci.yml / gitleaks.yml: GitHub keeps only one
+  # pending run per group, and a shared group would cancel a queued scan).
+  group: semgrep-${{ github.run_id }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -16,85 +23,14 @@ permissions:
 jobs:
   semgrep:
     name: Semgrep SAST
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Semgrep scan (block on ERROR severity)
-        # Install semgrep into a venv off the runner's SYSTEM python3 — works on
-        # cloud (ubuntu-latest) AND the self-hosted Ubuntu 26.04 box, which
-        # actions/setup-python@v5 cannot provision (no prebuilt 3.12 for 26.04).
         run: |
           set -euo pipefail
-          # Prefer a shared venv on the self-hosted guest. 2026-08-23: with 18
-          # runner instances on a 6-CPU guest, the per-run `pip install semgrep`
-          # pushed this job past its cap and Semgrep failed on FWB and CRM at the
-          # same moment — killed mid-install ("Terminate orphan process: (pip)").
-          # Cloud runners have no /opt venv and fall through to the logic below.
-          if /opt/semgrep-venv/bin/semgrep --version >/dev/null 2>&1; then
-            # Refresh at most weekly: the shared venv is provisioned out-of-band,
-            # so without this the SAST gate would run an ever-staler analyzer.
-            # A failed refresh scans with the existing binary rather than
-            # skipping the gate — stale beats absent.
-            # Report staleness; never mutate. An in-place `pip install --upgrade`
-            # into the SHARED venv can corrupt a scan another runner is executing
-            # against it, and two concurrent refreshes can corrupt each other.
-            if [ -z "$(find /opt/semgrep-venv -maxdepth 0 -mtime -30 2>/dev/null)" ]; then
-              echo "::notice::shared semgrep venv is >30 days old — refresh it on the guest"
-            fi
-            /opt/semgrep-venv/bin/semgrep scan \
-              --config p/default \
-              --config p/owasp-top-ten \
-              --config p/javascript \
-              --config p/typescript \
-              --config p/secrets \
-              --error --severity ERROR
-            exit $?
-          fi
-          # A freshly-provisioned self-hosted VM (e.g. the Mac OrbStack Ubuntu
-          # 26.04 box) ships python3 WITHOUT the venv module — `python3 -m venv`
-          # then fails with "ensurepip is not available". Self-heal it so a VM
-          # rebuild can't silently break this SECURITY gate; on cloud runners
-          # venv is already present so the install is a no-op.
-          if ! python3 -m venv "$RUNNER_TEMP/semgrep-venv" 2>/dev/null; then
-            echo "::notice::python3 venv missing — installing python3-venv on this runner"
-            venv_pkg="$(python3 -c 'import sys; print(f"python3.{sys.version_info.minor}-venv")')"
-            sudo apt-get -o DPkg::Lock::Timeout=600 update -qq
-            sudo apt-get -o DPkg::Lock::Timeout=600 install -y python3-venv "$venv_pkg"
-            rm -rf "$RUNNER_TEMP/semgrep-venv"
-            python3 -m venv "$RUNNER_TEMP/semgrep-venv"
-          fi
+          python3 -m venv "$RUNNER_TEMP/semgrep-venv"
           "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet --upgrade semgrep
           "$RUNNER_TEMP/semgrep-venv/bin/semgrep" scan \
             --config p/default \
