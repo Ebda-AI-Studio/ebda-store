@@ -30,6 +30,7 @@
     "dev:marketing": "npm run dev -w apps/marketing",
     "dev:status": "npm run dev -w apps/status",
     "test:status": "npm run test -w apps/status",
+    "test:api-workers": "npm run cf:test -w apps/api",
     "build": "npm run build --workspaces --if-present",
     "build:web": "npm run build -w apps/web",
     "build:api": "npm run build -w apps/api",

@@ -1,0 +1,125 @@
+/**
+ * The Cloudflare Worker's configuration (R-EBDA-001, SP4 Stage 1): what wrangler.jsonc may and may
+ * not say, and that the scheduled schedules the code handles are the ones the config declares.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { CRON_SCHEDULE } from '@api/cf/cron';
+
+const ROOT = join(__dirname, '..', '..');
+const api = (p: string) => readFileSync(join(ROOT, 'apps/api', p), 'utf8');
+
+/** wrangler.jsonc is JSON with comments and trailing commas. */
+function parseJsonc(text: string): Record<string, any> {
+  const noComments = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'\\])\/\/.*$/gm, '$1');
+  return JSON.parse(noComments.replace(/,(\s*[}\]])/g, '$1'));
+}
+
+const config = parseJsonc(api('wrangler.jsonc'));
+
+describe('wrangler.jsonc', () => {
+  it('runs Express on workerd: nodejs_compat, the Worker entry, a pinned compatibility date', () => {
+    expect(config.main).toBe('src/worker.ts');
+    expect(config.compatibility_flags).toContain('nodejs_compat');
+    expect(config.compatibility_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('binds Hyperdrive with a LOCAL connection string for the non-bypass role, through the pooler', () => {
+    const hd = config.hyperdrive[0];
+    expect(hd.binding).toBe('HYPERDRIVE');
+    expect(hd.localConnectionString).toMatch(/^postgresql:\/\/ebda_app:/);
+    expect(hd.localConnectionString).not.toMatch(/postgres:|neondb_owner/);
+  });
+
+  it('holds no secret: every secret-shaped var is absent and the only password is the repo-wide fake one', () => {
+    const text = api('wrangler.jsonc');
+    const vars = Object.keys(config.vars ?? {});
+    for (const name of vars) {
+      expect(
+        name,
+        `${name} looks like a secret and belongs in wrangler secret / .dev.vars`
+      ).not.toMatch(/SECRET|PASSWORD|TOKEN|KEY|DSN/i);
+    }
+    const passwords = [...text.matchAll(/:\/\/[^:\s"]+:([^@\s"]+)@/g)].map(m => m[1]);
+    expect(passwords.every(p => p === 'ci-only-app-pw')).toBe(true);
+    expect(text).not.toMatch(/sk_(live|test)_|-----BEGIN|AKIA[0-9A-Z]{12}/);
+  });
+
+  it('declares every binding the code reads', () => {
+    const doNames = config.durable_objects.bindings.map((b: any) => b.name);
+    expect(doNames).toEqual(expect.arrayContaining(['AUTH_STATE', 'STORE_REALTIME']));
+    expect(config.kv_namespaces.map((k: any) => k.binding)).toContain('KV_CACHE');
+    expect(config.queues.producers.map((p: any) => p.binding)).toEqual(
+      expect.arrayContaining(['EMAIL_QUEUE', 'SMS_QUEUE'])
+    );
+    expect(config.ratelimits.map((r: any) => r.name)).toContain('RATE_LIMITER');
+    expect(config.version_metadata.binding).toBe('CF_VERSION_METADATA');
+  });
+
+  it('both Durable Objects are SQLite-backed and exported by the entry', () => {
+    const created = config.migrations.flatMap((m: any) => m.new_sqlite_classes ?? []);
+    expect(created).toEqual(expect.arrayContaining(['AuthState', 'StoreRealtime']));
+    const entry = api('src/worker.ts');
+    expect(entry).toMatch(/export \{ AuthState \}/);
+    expect(entry).toMatch(/export \{ StoreRealtime \}/);
+  });
+
+  it('every queue has a consumer with retries and a dead-letter queue, and the DLQs are consumed', () => {
+    const consumers = config.queues.consumers as Array<Record<string, any>>;
+    for (const q of ['ebda-email', 'ebda-sms']) {
+      const c = consumers.find(x => x.queue === q)!;
+      expect(c.max_retries).toBeGreaterThan(0);
+      expect(c.dead_letter_queue).toBe(`${q}-dlq`);
+      expect(consumers.some(x => x.queue === `${q}-dlq`)).toBe(true);
+    }
+  });
+
+  it('Node-only packages are aliased to Workers code, and every alias target exists', () => {
+    const alias = config.alias as Record<string, string>;
+    for (const pkg of [
+      'ioredis',
+      'socket.io',
+      'rate-limit-redis',
+      'sharp',
+      'imapflow',
+      'pino',
+      'multer',
+      '@sentry/node',
+    ]) {
+      expect(alias[pkg], pkg).toBeTruthy();
+    }
+    for (const target of Object.values(alias)) {
+      expect(() => readFileSync(join(ROOT, 'apps/api', target)), target).not.toThrow();
+    }
+  });
+});
+
+describe('Hyperdrive caching stays OFF', () => {
+  // A cached read is keyed on SQL text + parameters, not on the transaction-local tenant GUCs, so
+  // caching could serve one store's rows to another (design section 3). It is a property of the
+  // Hyperdrive config, created by this script; the config file cannot express it.
+  const script = api('scripts/cf-hyperdrive-create.sh');
+
+  it('the creation script passes --caching-disabled to the create command', () => {
+    expect(script).toMatch(/hyperdrive create .*--caching-disabled/);
+  });
+
+  it('and refuses an owner / superuser connection string', () => {
+    expect(script).toMatch(/neondb_owner/);
+    expect(script).toMatch(/refusing an owner\/superuser/);
+  });
+
+  it('nothing in the repo turns caching on', () => {
+    expect(api('wrangler.jsonc')).not.toMatch(/caching.*(enabled|true)/i);
+    expect(script).not.toMatch(/--caching-enabled|--max-age|--stale-while-revalidate/);
+  });
+});
+
+describe('Cron Triggers', () => {
+  it('every schedule the code handles is declared in wrangler.jsonc, and every declared one has jobs', () => {
+    const declared: string[] = [...config.triggers.crons].sort();
+    expect(Object.keys(CRON_SCHEDULE).sort()).toEqual(declared);
+    for (const jobs of Object.values(CRON_SCHEDULE)) expect(jobs.length).toBeGreaterThan(0);
+  });
+});

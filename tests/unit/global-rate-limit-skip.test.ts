@@ -306,8 +306,8 @@ describe('req.path at app-level really is the full mounted path', () => {
  * it after `express.json`) reddens this.
  */
 describe('the Inngest path has its own bucket, ahead of body parsing (issue 2063)', () => {
-  it('index.ts mounts inngestLimiter on /api/v1/inngest before express.json and inngestServe', () => {
-    const src = fs.readFileSync(path.resolve(process.cwd(), 'apps/api/src/index.ts'), 'utf8');
+  it('app.ts mounts inngestLimiter on /api/v1/inngest before express.json and inngestServe', () => {
+    const src = fs.readFileSync(path.resolve(process.cwd(), 'apps/api/src/app.ts'), 'utf8');
     const mount = src.indexOf("app.use('/api/v1/inngest', inngestLimiter)");
     const json = src.indexOf("app.use(express.json({ limit: '10mb' }))");
     const serveMount = src.indexOf("'/api/v1/inngest',\n  inngestServe(");

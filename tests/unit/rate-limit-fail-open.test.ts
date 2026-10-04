@@ -16,7 +16,7 @@
  *  1. behavioral — the exact posture we ship (Redis store + passOnStoreError)
  *     serves the request when the store errors, and the v8 default (control)
  *     500s, pinning the library semantics this fix relies on;
- *  2. source gate — every `rateLimit({` config in security.ts and index.ts
+ *  2. source gate — every `rateLimit({` config in security.ts and app.ts
  *     carries `passOnStoreError: true`, so a future limiter cannot silently
  *     regress to fail-closed.
  */
@@ -93,8 +93,8 @@ describe('rate-limiter failure posture — fail-open on store error', () => {
     expect(res.status).toBe(500);
   });
 
-  it('every rateLimit() config in security.ts and index.ts declares passOnStoreError: true', () => {
-    for (const rel of ['apps/api/src/middleware/security.ts', 'apps/api/src/index.ts']) {
+  it('every rateLimit() config in security.ts and app.ts declares passOnStoreError: true', () => {
+    for (const rel of ['apps/api/src/middleware/security.ts', 'apps/api/src/app.ts']) {
       const src = fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
       // Each `rateLimit({ ... })` block must contain the posture flag. Blocks
       // are delimited well enough by the next `});` at the call's nesting —

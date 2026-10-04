@@ -51,7 +51,9 @@ export function buildCommitSha(env: NodeJS.ProcessEnv = process.env): string | n
  * from the container.
  */
 export function deploymentId(env: NodeJS.ProcessEnv = process.env): string | null {
-  return nonEmpty(env.RAILWAY_DEPLOYMENT_ID) ?? null;
+  // CF_DEPLOYMENT_ID: the Cloudflare Worker's version id (worker.ts copies the
+  // `version_metadata` binding into it, or a deploy passes it with `--var`).
+  return nonEmpty(env.RAILWAY_DEPLOYMENT_ID) ?? nonEmpty(env.CF_DEPLOYMENT_ID) ?? null;
 }
 
 export interface BuildIdentity {

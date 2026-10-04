@@ -1,0 +1,116 @@
+// The Ebda API on Cloudflare Workers (R-EBDA-001, docs/ebda/design/cloudflare-backend.md).
+// Express runs through `httpServerHandler` (`cloudflare:node`, nodejs_compat); each request
+// gets its own Prisma client over Hyperdrive. NO SECRETS HERE: local secrets live in
+// `.dev.vars` (see `.dev.vars.example`), deployed ones in `wrangler secret put`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ebda-api",
+  "main": "src/worker.ts",
+  // Pinned to what the pinned wrangler's workerd supports (4.116.0 rejects 2026-09-01).
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+
+  // Hyperdrive in front of Neon. QUERY CACHING MUST STAY OFF: a cached read is keyed on SQL text
+  // and parameters, not on the tenant GUC, so caching could serve one store's rows to another
+  // (design section 3). It is a property of the Hyperdrive CONFIG, not of this file: create it with
+  // `scripts/cf-hyperdrive-create.sh` (`--caching-disabled`). `localConnectionString` is
+  // `wrangler dev` / tests only: the local API role (`ebda_app`, NOBYPASSRLS) through pgbouncer
+  // in transaction mode, which is what Hyperdrive's pooler looks like to the Worker. The password is
+  // the repo-wide fake dev one (`ci-only-app-pw`, the CI role step and tests/integration/rls-*.test.ts):
+  // roles are cluster-wide, so a different one here would be reset by the next test run.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Placeholder: replace with the id `wrangler hyperdrive create` prints, per environment.
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgresql://ebda_app:ci-only-app-pw@127.0.0.1:6433/ebda_s1",
+    },
+  ],
+
+  // Public caches (store / product payloads). Placeholder ids: `wrangler kv namespace create`.
+  "kv_namespaces": [{ "binding": "KV_CACHE", "id": "00000000000000000000000000000000" }],
+
+  "durable_objects": {
+    "bindings": [
+      // Token denylist, token versions, MFA / lockout counters, auth rate limits.
+      { "name": "AUTH_STATE", "class_name": "AuthState" },
+      // One per store: admin realtime over hibernating WebSockets.
+      { "name": "STORE_REALTIME", "class_name": "StoreRealtime" },
+    ],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] }],
+
+  "queues": {
+    "producers": [
+      { "binding": "EMAIL_QUEUE", "queue": "ebda-email" },
+      { "binding": "SMS_QUEUE", "queue": "ebda-sms" },
+    ],
+    "consumers": [
+      // At-least-once with retries, then the dead-letter queue. The DLQ consumers park the
+      // message where the super-admin replay pages read it.
+      {
+        "queue": "ebda-email",
+        "max_batch_size": 10,
+        "max_batch_timeout": 2,
+        "max_retries": 3,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-email-dlq",
+      },
+      {
+        "queue": "ebda-sms",
+        "max_batch_size": 10,
+        "max_batch_timeout": 2,
+        "max_retries": 3,
+        "retry_delay": 5,
+        "dead_letter_queue": "ebda-sms-dlq",
+      },
+      { "queue": "ebda-email-dlq", "max_batch_size": 10, "max_retries": 2 },
+      { "queue": "ebda-sms-dlq", "max_batch_size": 10, "max_retries": 2 },
+    ],
+  },
+
+  // Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding; approximate,
+  // per location). Auth limits (5 / 15 min per IP + email) are exact, on the AuthState DO.
+  "ratelimits": [
+    { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 1200, "period": 60 } },
+  ],
+
+  // Scheduled work that used to be setInterval loops (index.ts, Node only): see src/cf/cron.ts.
+  "triggers": {
+    "crons": ["*/15 * * * *", "*/30 * * * *", "0 */12 * * *", "0 3 * * *"],
+  },
+
+  // Node-only packages replaced by Workers-native code or stubbed (see src/cf/stubs/*).
+  "alias": {
+    "ioredis": "./src/cf/stubs/ioredis.ts",
+    "socket.io": "./src/cf/stubs/socket-io.ts",
+    "@socket.io/redis-adapter": "./src/cf/stubs/socket-io-redis-adapter.ts",
+    "rate-limit-redis": "./src/cf/stubs/rate-limit-redis.ts",
+    "imapflow": "./src/cf/stubs/imapflow.ts",
+    "@sentry/node": "./src/cf/stubs/sentry-node.ts",
+    "@sentry/profiling-node": "./src/cf/stubs/sentry-profiling-node.ts",
+    "sharp": "./src/cf/stubs/sharp.ts",
+    "swagger-jsdoc": "./src/cf/stubs/swagger.ts",
+    "swagger-ui-express": "./src/cf/stubs/swagger.ts",
+    "compression": "./src/cf/stubs/compression.ts",
+    "pino": "./src/cf/stubs/pino.ts",
+    "iconv-lite": "./src/cf/stubs/iconv-lite.ts",
+    "multer": "./src/cf/stubs/multer-formdata.ts",
+  },
+
+  // Non-secret configuration. BUILD_COMMIT_SHA is overridden per deploy
+  // (`wrangler deploy --var BUILD_COMMIT_SHA:$GITHUB_SHA`); /health reports it. Local
+  // development overrides these (NODE_ENV=development, localhost URLs) in `.dev.vars`.
+  "vars": {
+    "NODE_ENV": "production",
+    "APP_VERSION": "1.0.0",
+    "BUILD_COMMIT_SHA": "",
+    "WEB_URL": "https://app.ebda.app",
+    "ADMIN_URL": "https://app.ebda.app",
+    "API_URL": "https://api.ebda.app",
+    "TRUST_PROXY_HOPS": "1",
+    "INNGEST_SERVE_HOST": "https://api.ebda.app",
+  },
+}

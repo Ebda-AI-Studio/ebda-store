@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import logger from '../lib/logger';
+import { isWorkers } from '../lib/runtime';
 
 /**
  * Target dimensions per aspect ratio. Picked to match the storefront's
@@ -81,6 +82,11 @@ const MAX_LONGEST_SIDE = 2000;
  * failing the upload — a large image beats a broken one.
  */
 export async function enforceMaxDimensions(buffer: Buffer): Promise<Buffer> {
+  // Workers: sharp is a native addon and does not run there. Resizing moves to Cloudflare Images
+  // on delivery (the original stays in R2, `/cdn-cgi/image/...` or the IMAGES binding), so the
+  // upload path stores the original. TODO(SP4 stage 2): wire the delivery-side transform and the
+  // 2000px ceiling through it; until then Workers uploads are stored as sent.
+  if (isWorkers) return buffer;
   try {
     const metadata = await sharp(buffer).metadata();
     if (!metadata.width || !metadata.height) return buffer;
@@ -133,6 +139,8 @@ export async function enforceMaxDimensions(buffer: Buffer): Promise<Buffer> {
 
 export async function resizeToAspect(buffer: Buffer, aspect: string | undefined): Promise<Buffer> {
   if (!aspect) return buffer;
+  // Workers: see enforceMaxDimensions (sharp does not run there; Cloudflare Images on delivery).
+  if (isWorkers) return buffer;
   const target = ASPECT_TARGETS[aspect];
   if (!target) {
     logger.debug({ aspect }, 'image-resize: unknown aspect, skipping');

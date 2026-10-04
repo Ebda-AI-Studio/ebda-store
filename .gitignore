@@ -170,3 +170,9 @@ apps/docs/.generated/
 apps/status/.gate/
 apps/status/dist/
 .wrangler/
+
+# Local Worker secrets (apps/api/.dev.vars.example is the committed template)
+.dev.vars
+
+# wrangler dry-run output (apps/api cf:dry-run)
+dist-cf/

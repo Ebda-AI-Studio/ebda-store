@@ -76,6 +76,7 @@ import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
+import realtimeRoutes from './realtime.routes';
 import {
   tenantContext,
   aiRouteContext,
@@ -92,6 +93,10 @@ const router = Router();
 router.use('/public', publicStoreContext);
 router.use('/public', publicRoutes);
 router.use('/public', publicStoreLayoutRoutes);
+
+// Token + store-room authority for the Workers realtime Durable Object (no tenant scope:
+// it reads only the `stores` routing table).
+router.use('/realtime', realtimeRoutes);
 
 // Store-scoped MCP endpoint (agent checkout) — POST /api/v1/mcp/:storeSlug.
 // Resolves the store by slug + checks the `agent_checkout` feature gate

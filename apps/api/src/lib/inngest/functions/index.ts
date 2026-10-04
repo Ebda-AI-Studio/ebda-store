@@ -21,6 +21,7 @@ import {
 } from './data-retention';
 import { alertsFailureWatch } from './alerts-failure-watch';
 import { gmailAlertPoller } from './gmail-alert-poller';
+import { isWorkers } from '../../runtime';
 import { queueDepthWatch } from './queue-depth-watch';
 import { agentWriteDeniedWatch } from './agent-write-denied-watch';
 import { orderWhatsAppNotify } from './order-whatsapp-notify';
@@ -80,7 +81,7 @@ import { campaignSend } from './campaign-send';
  * `/api/v1/inngest`. Functions added here are picked up by the
  * Inngest platform on the next deploy / dev sync.
  */
-export const inngestFunctions: InngestFunction.Any[] = [
+const allInngestFunctions: InngestFunction.Any[] = [
   orderCreated,
   orderRefunded,
   bulkImportProducts,
@@ -208,3 +209,12 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // no cron, so registering it sends nothing on its own.
   campaignSend,
 ];
+
+/**
+ * Served functions. On Workers the Gmail alert poller is left out: it is FWB ops plumbing over IMAP
+ * (TCP + TLS to Gmail), dropped from the Ebda API (R-EBDA-001 section 5); Ebda alerts come from
+ * Sentry and the status page.
+ */
+export const inngestFunctions: InngestFunction.Any[] = isWorkers
+  ? allInngestFunctions.filter(f => f !== gmailAlertPoller)
+  : allInngestFunctions;

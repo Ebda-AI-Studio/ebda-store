@@ -11,6 +11,8 @@ import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-letter';
+import { isWorkers } from '../lib/runtime';
+import { cfBindings } from '../cf/bindings';
 
 export interface QueuedSms {
   id: string;
@@ -86,7 +88,12 @@ class SmsQueueService {
       createdAt: new Date().toISOString(),
     };
 
-    if (redis.isAvailable()) {
+    const queue = isWorkers ? cfBindings()?.SMS_QUEUE : undefined;
+    if (queue) {
+      // Cloudflare Queues: durable, retried by the platform, dead-lettered into
+      // `ebda-sms-dlq` (`deliver` / `parkDeadLetter`, wired in cf/queues.ts).
+      await queue.send(queuedSms, { contentType: 'json' });
+    } else if (!isWorkers && redis.isAvailable()) {
       await redis.getClient()?.lpush(QUEUE_KEY, JSON.stringify(queuedSms));
     } else {
       // Fallback: send immediately if Redis is not available
@@ -95,6 +102,41 @@ class SmsQueueService {
     }
 
     return id;
+  }
+
+  /**
+   * Cloudflare Queues consumer: ONE attempt. A provider failure THROWS so the platform retries
+   * the message and, once `max_retries` is spent, dead-letters it (`parkDeadLetter`). A send
+   * that the provider accepted never throws (sendSms logs and returns): retrying it would text
+   * the customer twice.
+   */
+  async deliver(sms: QueuedSms): Promise<void> {
+    await this.sendSms(sms, { rethrow: true });
+  }
+
+  /** Dead-letter queue consumer: the permanent-failure half of `sendSms`, for a Queues-exhausted message. */
+  async parkDeadLetter(sms: QueuedSms, why = 'max attempts reached'): Promise<void> {
+    logger.error({ smsId: sms.id, why }, '[SMS QUEUE] SMS failed permanently');
+    const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
+    await prisma.notificationLog
+      .upsert({
+        where: { idempotencyKey: sms.idempotencyKey },
+        create: {
+          storeId: sms.storeId,
+          channel: 'sms',
+          event: sms.event,
+          recipientPhoneHash,
+          status: 'failed',
+          idempotencyKey: sms.idempotencyKey,
+          error: sms.error ?? why,
+          metadata: { attempts: sms.attempts },
+        },
+        update: { status: 'failed', error: sms.error ?? why, metadata: { attempts: sms.attempts } },
+      })
+      .catch(err => logger.error({ err }, '[SMS QUEUE] Failed to write failure log'));
+    if (redis.isAvailable()) {
+      await redis.getClient()?.lpush(FAILED_KEY, JSON.stringify(sms));
+    }
   }
 
   /**
@@ -180,7 +222,7 @@ class SmsQueueService {
   /**
    * Send SMS with idempotency check, retry logic, and NotificationLog
    */
-  private async sendSms(sms: QueuedSms): Promise<void> {
+  private async sendSms(sms: QueuedSms, opts: { rethrow?: boolean } = {}): Promise<void> {
     sms.attempts++;
     sms.lastAttempt = new Date().toISOString();
 
@@ -258,6 +300,9 @@ class SmsQueueService {
         return;
       }
       sms.error = error instanceof Error ? error.message : 'Unknown error';
+
+      // A Queues consumer attempt: the platform owns retry + dead-lettering.
+      if (opts.rethrow) throw error;
 
       if (sms.attempts < sms.maxAttempts) {
         // Re-queue for retry with exponential backoff
@@ -397,8 +442,22 @@ class SmsQueueService {
     const client = redis.getClient();
     if (!client) return { retried: 0, skipped: 0, kept: 0 };
 
+    // Workers: "re-queue" means producing to Cloudflare Queues, not LPUSH-ing a list nobody consumes.
+    const queue = isWorkers ? cfBindings()?.SMS_QUEUE : undefined;
+    const replayClient = queue
+      ? {
+          lpush: (key: string, value: string) =>
+            key === QUEUE_KEY
+              ? queue.send(JSON.parse(value), { contentType: 'json' })
+              : client.lpush(key, value),
+          rpop: (key: string) => client.rpop(key),
+          llen: (key: string) => client.llen(key),
+          ltrim: (key: string, a: number, b: number) => client.ltrim(key, a, b),
+          expire: (key: string, s: number) => client.expire(key, s),
+        }
+      : client;
     const { retried, skipped, kept, lost } = await replayDeadLetters<QueuedSms>(
-      client,
+      replayClient,
       { failed: FAILED_KEY, corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
       isQueuedSms,
       logger

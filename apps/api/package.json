@@ -11,7 +11,11 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
-    "clean": "rm -rf dist node_modules"
+    "clean": "rm -rf dist node_modules",
+    "cf:dev": "wrangler dev",
+    "cf:dry-run": "wrangler deploy --dry-run --outdir dist-cf",
+    "cf:test": "npm run cf:dry-run && vitest run --config vitest.workers.config.mts",
+    "cf:exit-test": "node scripts/stage1-exit-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1039.0",
@@ -28,6 +32,7 @@
     "@opentelemetry/sdk-trace-base": "^2.8.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
     "@prisma/client": "^6.19.3",
+    "@sentry/cloudflare": "^10.53.1",
     "@sentry/node": "^10.51.0",
     "@sentry/profiling-node": "^10.51.0",
     "@socket.io/redis-adapter": "^8.3.0",
@@ -58,6 +63,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
@@ -74,6 +80,7 @@
     "tsx": "^4.6.2",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.59.1",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "wrangler": "4.116.0"
   }
 }

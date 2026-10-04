@@ -64,9 +64,11 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 
 const SALT_ROUNDS = 12;
 
-// Hash of random bytes, computed once: the unknown-address resend path and the
-// existing-address signup path both spend a bcrypt so timing is uniform.
-const DUMMY_HASH = bcrypt.hashSync(`dummy-${Math.random()}-${Date.now()}`, SALT_ROUNDS);
+// Cost-12 hash of random bytes (plaintext discarded), a constant: the unknown-address
+// resend path and the existing-address signup path both spend a bcrypt so timing is
+// uniform. Not computed at import: bcrypt needs random bytes, which workerd forbids in
+// global scope (R-EBDA-001).
+const DUMMY_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 
 export class MerchantSignupService {
   static async signup(input: MerchantSignupInput): Promise<typeof GENERIC_SIGNUP_RESULT> {
