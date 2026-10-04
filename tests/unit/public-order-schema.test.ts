@@ -92,7 +92,7 @@ describe('public checkout order schema (KW contract regression)', () => {
     it('accepts a full KW order (blank city + no email) with a payment method', () => {
       const r = createOrderSchema.safeParse({
         shippingAddress: kwAddress,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       });
       expect(r.success).toBe(true);
     });
@@ -101,14 +101,14 @@ describe('public checkout order schema (KW contract regression)', () => {
       expect(
         createOrderSchema.safeParse({
           shippingAddress: kwAddress,
-          paymentMethod: 'knet',
+          paymentMethod: 'card',
           locale: 'ar',
         }).success
       ).toBe(true);
       expect(
         createOrderSchema.safeParse({
           shippingAddress: kwAddress,
-          paymentMethod: 'knet',
+          paymentMethod: 'card',
           locale: 'fr',
         }).success
       ).toBe(false);

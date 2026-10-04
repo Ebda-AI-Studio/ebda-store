@@ -65,11 +65,11 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
   // The route calls the provider in two halves; a COMMIT failure hits the second.
   PaymentService: {
     requestProviderPayment: async (...a: unknown[]) => ({
-      providerName: 'myfatoorah',
+      providerName: 'paymob',
       response: await h.createPayment(...a),
     }),
     recordProviderPayment: vi.fn().mockResolvedValue(undefined),
-    getDefaultProvider: async () => 'myfatoorah',
+    getDefaultProvider: async () => 'paymob',
     getAvailableProviders: async () => [],
   },
 }));
@@ -123,7 +123,7 @@ beforeEach(() => {
   h.createPayment.mockResolvedValue({
     transactionId: 'txn-1',
     paymentUrl: 'https://gw.test/pay',
-    provider: 'myfatoorah',
+    provider: 'paymob',
   });
 });
 
@@ -136,7 +136,7 @@ const create = (provider: string) =>
 describe('POST /payments/create — rollback survives a failed COMMIT (issue 2306)', () => {
   it('online: provider accepted, COMMIT fails → the order is rolled back', async () => {
     h.commitFails = true;
-    const res = await create('myfatoorah');
+    const res = await create('paymob');
     expect(res.status).toBe(500);
     expect(h.rollbackCalls).toEqual([['store-1', ORDER_ID, 'sess-1']]);
   });
@@ -145,13 +145,13 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
   // still live with no Payment row behind it, so it must be named in a P1.
   it('online: provider accepted, COMMIT fails → the live invoice is alerted', async () => {
     h.commitFails = true;
-    await create('myfatoorah');
+    await create('paymob');
     expect(h.orphanAlert).toHaveBeenCalledTimes(1);
     expect(h.orphanAlert).toHaveBeenCalledWith(
       expect.objectContaining({
         storeId: 'store-1',
         orderId: ORDER_ID,
-        provider: 'myfatoorah',
+        provider: 'paymob',
         transactionId: 'txn-1',
         amount: 5000,
         source: 'checkout',
@@ -164,7 +164,7 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
   // this file mocks out: tests/unit/payment-create-orphaned-record.test.ts.
   it('online: provider REJECTED → no orphaned-invoice alert (nothing was minted)', async () => {
     h.createPayment.mockRejectedValueOnce(new Error('gateway 400'));
-    const res = await create('myfatoorah');
+    const res = await create('paymob');
     expect(res.status).toBe(500);
     expect(h.rollbackCalls).toEqual([['store-1', ORDER_ID, 'sess-1']]);
     expect(h.orphanAlert).not.toHaveBeenCalled();
@@ -184,7 +184,7 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
   });
 
   it('a committed payment is never rolled back (control)', async () => {
-    const res = await create('myfatoorah');
+    const res = await create('paymob');
     expect(res.status).toBe(200);
     expect(h.rollbackCalls).toEqual([]);
     expect(h.orphanAlert).not.toHaveBeenCalled();

@@ -114,7 +114,7 @@ async function paidOrder(status: 'delivered' | 'refunded' | 'cancelled') {
         ],
       },
       payments: {
-        create: [{ provider: 'myfatoorah', status: 'completed', amount: 2000, paidAt: new Date() }],
+        create: [{ provider: 'paymob', status: 'completed', amount: 2000, paidAt: new Date() }],
       },
     },
   });

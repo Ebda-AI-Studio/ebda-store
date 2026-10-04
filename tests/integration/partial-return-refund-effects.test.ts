@@ -356,7 +356,7 @@ describe.skipIf(!hasDb)('partial-return refund effects', () => {
       tx.payment.create({
         data: {
           orderId,
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           amount: 10500,
           currency: 'EGP',

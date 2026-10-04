@@ -22,7 +22,7 @@ import { maskCredentials, normalizeProviderSettings } from '@api/routes/payment-
 
 const SECRET = 'sk_live_9f3a7c-SUPER-SECRET';
 const row = (over: Record<string, unknown> = {}) => ({
-  provider: 'myfatoorah',
+  provider: 'paymob',
   apiKey: encryption.encrypt(SECRET),
   secretKey: encryption.encrypt('sec-key-value'),
   merchantId: encryption.encrypt('merchant-42'),
@@ -81,7 +81,7 @@ describe('provider credentials', () => {
       expect(logged).not.toContain(leak);
     }
     expect(JSON.parse(logged)).toMatchObject({
-      provider: 'myfatoorah',
+      provider: 'paymob',
       mode: 'live',
       hasApiKey: true,
     });
@@ -102,10 +102,17 @@ describe('normalizeProviderSettings', () => {
     });
   });
 
-  it('drops unknown keys (nothing arbitrary is persisted) and gives gateways no settings', () => {
+  it('drops unknown keys (nothing arbitrary is persisted), gateways included', () => {
     const out = normalizeProviderSettings('instapay', { handle: 'a1@instapay', evil: '<x>' }, true);
     expect(out).not.toHaveProperty('evil');
-    expect(normalizeProviderSettings('myfatoorah', { anything: 1 }, true)).toEqual({});
+    expect(normalizeProviderSettings('paymob', { anything: 1 }, false)).not.toHaveProperty(
+      'anything'
+    );
+    expect(normalizeProviderSettings('kashier', { anything: 1 }, true)).not.toHaveProperty(
+      'anything'
+    );
+    // Providers with no settings at all (COD fee aside) persist nothing.
+    expect(normalizeProviderSettings('unknown-gw', { anything: 1 }, true)).toEqual({});
   });
 
   it('COD: a percentage in basis points', () => {

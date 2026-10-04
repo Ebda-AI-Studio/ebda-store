@@ -87,7 +87,7 @@ describe('refund posts a reversal journal entry', () => {
         payments: {
           create: [
             {
-              provider: 'myfatoorah',
+              provider: 'paymob',
               status: 'completed',
               amount: 2000,
               paidAt: new Date(),

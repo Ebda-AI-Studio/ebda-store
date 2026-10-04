@@ -185,7 +185,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
         shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 400 });
 
@@ -221,7 +221,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
         shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 400 });
 
@@ -248,7 +248,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
         shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 409 });
 

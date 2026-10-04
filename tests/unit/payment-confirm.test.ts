@@ -62,7 +62,7 @@ import type { PaymentStatusResponse } from '@api/services/payment-providers/type
 const basePayment = {
   id: 'pay_1',
   status: 'pending',
-  provider: 'myfatoorah',
+  provider: 'paymob',
   metadata: {},
   amount: 5000,
 };
@@ -73,7 +73,7 @@ function statusResponse(
 ): PaymentStatusResponse {
   return {
     success: true,
-    provider: 'myfatoorah',
+    provider: 'paymob',
     transactionId: '215031900',
     invoiceId: '215031900',
     status,
@@ -110,7 +110,7 @@ describe('confirmPaymentFromProviderStatus', () => {
       data: {
         orderId: 'ord_1',
         storeId: 'store_1',
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
         locale: 'ar',
       },
     });
@@ -282,7 +282,7 @@ describe('confirmPaymentFromProviderStatus', () => {
       expect(sendAlertMock).not.toHaveBeenCalled();
     });
 
-    it('no paidAmount reported (Tap/Hesabe/UPayments never set it) → falls back to status-only, marks paid', async () => {
+    it('no paidAmount reported (a gateway that does not report it leaves it unset) → falls back to status-only, marks paid', async () => {
       const result = await confirmPaymentFromProviderStatus({
         payment: basePayment,
         order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },

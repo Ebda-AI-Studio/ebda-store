@@ -1096,7 +1096,7 @@ describe('order-refunded fanout — cancel before any refund moved (issue 1948)'
     h.orderFindUnique.mockResolvedValue({
       ...ORDER,
       status: 'cancelled',
-      payments: [{ refundedAmount: 0, provider: 'myfatoorah', metadata: {} }],
+      payments: [{ refundedAmount: 0, provider: 'paymob', metadata: {} }],
       couponCode: null,
       customerId: null,
     });
@@ -1120,19 +1120,19 @@ describe('order-refunded fanout — cancel before any refund moved (issue 1948)'
     [
       'a captured card payment → refund pending',
       'paid',
-      [{ provider: 'myfatoorah', status: 'completed', refundedAmount: 0, metadata: {} }],
+      [{ provider: 'paymob', status: 'completed', refundedAmount: 0, metadata: {} }],
       true,
     ],
     [
       'an unpaid order → not charged',
       'unpaid',
-      [{ provider: 'myfatoorah', status: 'pending', refundedAmount: 0, metadata: {} }],
+      [{ provider: 'paymob', status: 'pending', refundedAmount: 0, metadata: {} }],
       false,
     ],
     [
       'an auth-only / voided payment → not charged',
       'unpaid',
-      [{ provider: 'tap', status: 'cancelled', refundedAmount: 0, metadata: {} }],
+      [{ provider: 'kashier', status: 'cancelled', refundedAmount: 0, metadata: {} }],
       false,
     ],
     // PR 2335 audit P1: COD whose cash was COLLECTED (mark-paid → order paid,
@@ -1170,7 +1170,7 @@ describe('order-refunded fanout — cancel before any refund moved (issue 1948)'
     h.orderFindUnique.mockResolvedValue({
       ...ORDER,
       status: 'cancelled',
-      payments: [{ refundedAmount: 5000, provider: 'myfatoorah', metadata: {} }],
+      payments: [{ refundedAmount: 5000, provider: 'paymob', metadata: {} }],
       couponCode: null,
       customerId: null,
     });

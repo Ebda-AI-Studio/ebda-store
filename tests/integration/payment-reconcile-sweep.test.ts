@@ -69,7 +69,7 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
         await tx.payment.create({
           data: {
             orderId: cancelledOrderId,
-            provider: 'myfatoorah',
+            provider: 'paymob',
             status: 'completed',
             amount: 5000,
             currency: 'EGP',
@@ -95,7 +95,7 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
       await tx.payment.create({
         data: {
           orderId: healthy.id,
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           amount: 5000,
           currency: 'EGP',

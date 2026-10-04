@@ -50,12 +50,13 @@ export class FawryStub {
   }
 
   fetch = async (url: string, init?: RequestInit): Promise<Response> => {
-    const early = await this.faults.enter();
-    if (early) return early;
     const u = new URL(url);
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = method === 'GET' ? Object.fromEntries(u.searchParams) : await readJson(init);
+    // Recorded BEFORE the fault gate: a call the gateway "never answers" still reached it.
     this.requests.push({ method, path: u.pathname, body });
+    const early = await this.faults.enter();
+    if (early) return early;
     if (method === 'POST' && u.pathname === '/ECommerceWeb/Fawry/payments/charge')
       return this.charge(body);
     if (method === 'GET' && u.pathname === '/ECommerceWeb/Fawry/payments/status/v2')

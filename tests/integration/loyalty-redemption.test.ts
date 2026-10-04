@@ -151,7 +151,7 @@ describe('loyalty redemption — integration', () => {
       country: 'EG',
       phone: '96551234567',
     },
-    paymentMethod: 'myfatoorah', // non-COD → no inngest/socket fanout at create
+    paymentMethod: 'paymob', // non-COD → no inngest/socket fanout at create
   };
 
   it('golden path: decrements balance, applies discount to total, logs redeem_discount', async () => {

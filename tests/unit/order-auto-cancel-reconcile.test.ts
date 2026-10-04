@@ -5,7 +5,7 @@ import { decideAutoCancelAction } from '../../apps/api/src/lib/inngest/functions
 // threshold WITHOUT ever asking the provider whether the money had actually
 // been captured. `paymentStatus='unpaid'` only means "nothing ever told us it
 // was paid" — and all three things that normally tell us can miss the same
-// order at once: the webhook is lost (or, for MyFatoorah, is account-level and
+// order at once: the webhook is lost (or, for a gateway whose webhook is account-level and
 // never fires per-invoice) AND the customer never returns to the success page
 // (closed the tab / dead battery / lost signal), so verify-on-return never
 // runs either.

@@ -25,7 +25,10 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@force/database', () => ({
   prisma: {
-    payment: { create: (...a: unknown[]) => h.paymentCreate(...a) },
+    payment: {
+      create: (...a: unknown[]) => h.paymentCreate(...a),
+      count: async () => 0,
+    },
     paymentConfig: { findMany: (...a: unknown[]) => h.paymentConfigFindMany(...a) },
   },
   Prisma: {},
@@ -55,25 +58,17 @@ vi.mock('@api/lib/logger', () => ({
 vi.mock('@api/services/payment-providers/orphaned-invoice-alert', () => ({
   alertOrphanedProviderInvoice: (...a: unknown[]) => h.orphanAlert(...(a as [])),
 }));
-const { providerClass } = vi.hoisted(() => ({
-  providerClass: (name: string) =>
-    class {
-      name = name;
-      initialize = () => undefined;
-      createPayment = (...a: unknown[]) => h.providerCreatePayment(...a);
-    },
-}));
-vi.mock('@api/services/payment-providers/tap.provider', () => ({
-  TapPaymentProvider: providerClass('tap'),
-}));
-vi.mock('@api/services/payment-providers/myfatoorah.provider', () => ({
-  MyFatoorahPaymentProvider: providerClass('myfatoorah'),
-}));
-vi.mock('@api/services/payment-providers/hesabe.provider', () => ({
-  HesabePaymentProvider: providerClass('hesabe'),
-}));
-vi.mock('@api/services/payment-providers/upayments.provider', () => ({
-  UPaymentsProvider: providerClass('upayments'),
+// The Egyptian gateways are v2 adapters behind `V2ProviderBridge`; this test drives the v1 face the
+// factory uses, so the bridge is replaced by a stub provider named after the adapter it wraps.
+vi.mock('@api/services/payment-providers/v2-bridge', () => ({
+  V2ProviderBridge: class {
+    name: string;
+    constructor(adapter: { name: string }) {
+      this.name = adapter.name;
+    }
+    initialize = () => undefined;
+    createPayment = (...a: unknown[]) => h.providerCreatePayment(...a);
+  },
 }));
 
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
@@ -88,7 +83,7 @@ const request: CreatePaymentRequest = {
   customer: { id: 'c1', name: 'Customer', email: '' },
   items: [{ name: 'Item', quantity: 1, unitPrice: 5000 }],
   callbackUrl: 'https://store.test/checkout/success',
-  webhookUrl: 'https://api.test/api/v1/webhooks/payment/myfatoorah',
+  webhookUrl: 'https://api.test/api/v1/webhooks/payment/paymob',
 };
 
 beforeEach(() => {
@@ -96,7 +91,7 @@ beforeEach(() => {
   PaymentService.clearCache(STORE_ID);
   h.paymentConfigFindMany.mockResolvedValue([
     {
-      provider: 'myfatoorah',
+      provider: 'paymob',
       apiKey: 'k',
       secretKey: null,
       merchantId: null,
@@ -106,7 +101,7 @@ beforeEach(() => {
       isDefault: true,
       displayName: null,
       displayNameAr: null,
-      supportedMethods: ['knet'],
+      supportedMethods: ['card'],
       supportedCurrencies: ['EGP'],
       fixedFee: 0,
       percentageFee: 0,
@@ -114,7 +109,7 @@ beforeEach(() => {
   ]);
   h.providerCreatePayment.mockResolvedValue({
     success: true,
-    provider: 'myfatoorah',
+    provider: 'paymob',
     transactionId: 'txn-2370',
     invoiceId: 'inv-1',
     paymentUrl: 'https://pay.test/inv-1',
@@ -132,7 +127,7 @@ describe('PaymentService.createPayment — orphaned invoice on a failed record w
       new Error('canceling statement due to statement timeout')
     );
 
-    await expect(PaymentService.createPayment(request, 'myfatoorah', STORE_ID)).rejects.toThrow(
+    await expect(PaymentService.createPayment(request, 'paymob', STORE_ID)).rejects.toThrow(
       'statement timeout'
     );
 
@@ -141,7 +136,7 @@ describe('PaymentService.createPayment — orphaned invoice on a failed record w
       storeId: STORE_ID,
       orderId: 'order-1',
       orderNumber: 'ORD-2370',
-      provider: 'myfatoorah',
+      provider: 'paymob',
       transactionId: 'txn-2370',
       amount: 5000,
       currency: 'EGP',
@@ -152,7 +147,7 @@ describe('PaymentService.createPayment — orphaned invoice on a failed record w
   it('gateway rejected → no alert (nothing was minted)', async () => {
     h.providerCreatePayment.mockRejectedValueOnce(new Error('gateway 400'));
 
-    await expect(PaymentService.createPayment(request, 'myfatoorah', STORE_ID)).rejects.toThrow(
+    await expect(PaymentService.createPayment(request, 'paymob', STORE_ID)).rejects.toThrow(
       'gateway 400'
     );
 
@@ -161,7 +156,7 @@ describe('PaymentService.createPayment — orphaned invoice on a failed record w
   });
 
   it('gateway accepted, row written → no alert (control)', async () => {
-    const res = await PaymentService.createPayment(request, 'myfatoorah', STORE_ID);
+    const res = await PaymentService.createPayment(request, 'paymob', STORE_ID);
 
     expect(res.transactionId).toBe('txn-2370');
     expect(h.paymentCreate).toHaveBeenCalledTimes(1);

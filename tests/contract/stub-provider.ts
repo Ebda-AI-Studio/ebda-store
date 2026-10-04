@@ -132,7 +132,7 @@ function header(headers: WebhookHeaders, name: string): string | undefined {
 
 export function createStubProvider(gateway: StubGateway, timeoutMs = 50): PaymentProviderV2 {
   return {
-    name: 'tap', // any member of the PaymentProvider union: the stub is not registered anywhere
+    name: 'paymob', // any member of the PaymentProvider union: the stub is not registered anywhere
     capabilities: {
       methods: ['card', 'meeza', 'wallet'],
       instructions: ['redirect', 'iframe', 'reference-code'],

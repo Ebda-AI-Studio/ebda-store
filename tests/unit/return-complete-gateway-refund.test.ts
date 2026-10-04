@@ -539,7 +539,7 @@ describe('ReturnService.complete — the claim is retained once money may have m
    * so until it lands the retry recomputes the identical allocation (this
    * return is still excluded from prevQty by `id: { not: returnId }`) and the
    * payment still has room. A "retryable" return after a successful refund is
-   * a second real refund, and there is no undo API at Tap/MyFatoorah/KNET.
+   * a second real refund, and there is no undo API at the gateway.
    *
    * So the claim is held and the merchant gets a 409 until a human reconciles
    * — a stranded return is recoverable by hand; a duplicate refund is not.
@@ -1135,7 +1135,7 @@ describe('ReturnService.refundPreview — what the admin confirms is what comple
       refundedAmount: PAYMENT_TOTAL,
       status: 'refunded',
       transactionId: 'tx-1',
-      provider: 'tap',
+      provider: 'kashier',
     });
 
     const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);

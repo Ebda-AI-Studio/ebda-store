@@ -60,11 +60,11 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
   // The route calls the provider in two halves (no transaction open during the call).
   PaymentService: {
     requestProviderPayment: async (...a: unknown[]) => ({
-      providerName: 'tap',
+      providerName: 'kashier',
       response: await h.createPayment(...a),
     }),
     recordProviderPayment: vi.fn().mockResolvedValue(undefined),
-    getDefaultProvider: async () => 'tap',
+    getDefaultProvider: async () => 'kashier',
     getAvailableProviders: async () => [],
   },
 }));
@@ -98,7 +98,7 @@ const freshIp = () =>
 const ctx = (over: Partial<Parameters<typeof CardTestingGuard.assertAllowed>[0]> = {}) => ({
   storeId: freshStore(),
   orderId: uid(),
-  provider: 'tap',
+  provider: 'kashier',
   ip: freshIp(),
   sessionId: `sess-${uid()}`,
   ...over,
@@ -332,7 +332,7 @@ describe('POST /payments/create wiring', () => {
     h.createPayment.mockResolvedValue({
       transactionId: 'txn-1',
       paymentUrl: 'https://gw.test/pay',
-      provider: 'tap',
+      provider: 'kashier',
     });
   });
 
@@ -346,10 +346,10 @@ describe('POST /payments/create wiring', () => {
   it('refuses an online attempt over budget with 429, never calls the gateway, rolls the order back', async () => {
     process.env.PAYMENT_ATTEMPTS_PER_IP_10M = '2';
     const ip = freshIp();
-    expect((await create('tap', ip)).status).toBe(200);
-    expect((await create('tap', ip)).status).toBe(200);
+    expect((await create('kashier', ip)).status).toBe(200);
+    expect((await create('kashier', ip)).status).toBe(200);
     h.createPayment.mockClear();
-    const res = await create('tap', ip);
+    const res = await create('kashier', ip);
     expect(res.status).toBe(429);
     expect(res.body.error.code).toBe('PAYMENT_RATE_LIMITED');
     expect(h.createPayment).not.toHaveBeenCalled();
@@ -359,8 +359,8 @@ describe('POST /payments/create wiring', () => {
   it('COD through the same route is unaffected by an exhausted budget', async () => {
     process.env.PAYMENT_ATTEMPTS_PER_IP_10M = '1';
     const ip = freshIp();
-    expect((await create('tap', ip)).status).toBe(200);
-    expect((await create('tap', ip)).status).toBe(429);
+    expect((await create('kashier', ip)).status).toBe(200);
+    expect((await create('kashier', ip)).status).toBe(429);
     const cod = await create('cod', ip);
     expect(cod.status).toBe(200);
     expect(cod.body.data.cod).toBe(true);

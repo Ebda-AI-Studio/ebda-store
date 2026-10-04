@@ -62,7 +62,7 @@ function paymentRow(refundedAmount: number) {
     id: 'pay_1',
     orderId: 'order_1',
     status: refundedAmount > 0 ? 'partially_refunded' : 'completed',
-    provider: 'myfatoorah',
+    provider: 'paymob',
     amount: 5000,
     refundedAmount,
     order: { store: { id: 'store_1', ownerId: 'owner' } },

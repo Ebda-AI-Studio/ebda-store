@@ -483,7 +483,7 @@ describe('MCP endpoint — handshake + gating', () => {
       },
     });
     // This store has no PaymentConfig row for any online provider (tap/
-    // myfatoorah/hesabe/upayments) and the test harness sets no provider env
+    // paymob/kashier/fawry) and the test harness sets no provider env
     // vars, so PaymentFactory has nothing to fall back to either —
     // PaymentService.getDefaultProvider(store.id) resolves null.
     const { client, transport } = mcpClient(slug, agentKeyA);

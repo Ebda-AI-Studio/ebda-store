@@ -27,7 +27,7 @@ const invoice = {
   storeId: '11111111-1111-4111-8111-111111111111',
   orderId: 'order-1',
   orderNumber: 'ORD-1001',
-  provider: 'myfatoorah',
+  provider: 'paymob',
   transactionId: 'mf-123',
   amount: 12500,
   currency: 'EGP',

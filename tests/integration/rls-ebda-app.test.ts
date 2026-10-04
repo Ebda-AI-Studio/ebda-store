@@ -892,7 +892,7 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     const key = `${PREFIX}wh-${uid()}`;
     const id1 = await asApp(() =>
       webhookInbox.record({
-        provider: 'tap',
+        provider: 'kashier',
         idempotencyKey: key,
         storeId: null,
         payload: { n: 1 },
@@ -902,7 +902,7 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     );
     const id2 = await asApp(() =>
       webhookInbox.record({
-        provider: 'tap',
+        provider: 'kashier',
         idempotencyKey: key,
         storeId: ids.storeB,
         payload: { n: 2 },
@@ -927,7 +927,7 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     );
     const id3 = await asApp(() =>
       webhookInbox.record({
-        provider: 'tap',
+        provider: 'kashier',
         idempotencyKey: key,
         storeId: null,
         payload: { n: 3 },
@@ -950,7 +950,7 @@ describe('SECURITY DEFINER functions: they return only what they should', () => 
     const key2 = `${PREFIX}wh-${uid()}`;
     const id4 = await asApp(() =>
       webhookInbox.record({
-        provider: 'tap',
+        provider: 'kashier',
         idempotencyKey: key2,
         storeId: null,
         payload: {},
@@ -1302,7 +1302,7 @@ describe('definer guards: the mutating functions check WHO is calling', () => {
     const key = `${PREFIX}wh-guard-${uid()}`;
     const id = await asApp(() =>
       webhookInbox.record({
-        provider: 'tap',
+        provider: 'kashier',
         idempotencyKey: key,
         storeId: ids.storeB,
         payload: { secret: 'pan' },

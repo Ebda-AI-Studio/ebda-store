@@ -54,11 +54,12 @@ export class PaymobStub {
   }
 
   fetch = async (url: string, init?: RequestInit): Promise<Response> => {
-    const early = await this.faults.enter();
-    if (early) return early;
     const path = new URL(url).pathname;
     const body = await readJson(init);
+    // Recorded BEFORE the fault gate: a call the gateway "never answers" still reached it.
     this.requests.push({ path, body });
+    const early = await this.faults.enter();
+    if (early) return early;
     if (headerOf(init, 'authorization') !== `Token ${PAYMOB_STUB.secretKey}`) {
       return json(401, { detail: 'Authentication credentials were not provided.' });
     }

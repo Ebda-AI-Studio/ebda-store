@@ -39,12 +39,13 @@ export class KashierStub {
   }
 
   fetch = async (url: string, init?: RequestInit): Promise<Response> => {
-    const early = await this.faults.enter();
-    if (early) return early;
     const path = new URL(url).pathname;
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = await readJson(init);
+    // Recorded BEFORE the fault gate: a call the gateway "never answers" still reached it.
     this.requests.push({ method, path, body });
+    const early = await this.faults.enter();
+    if (early) return early;
     if (headerOf(init, 'authorization') !== KASHIER_STUB.secretKey) {
       return json(401, { message: 'unauthorized' });
     }

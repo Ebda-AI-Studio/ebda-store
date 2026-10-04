@@ -86,7 +86,7 @@ describe('order payment posts a balanced journal entry', () => {
         payments: {
           create: [
             {
-              provider: 'myfatoorah',
+              provider: 'paymob',
               status: 'completed',
               amount: 5000,
               paidAt: new Date(),
@@ -173,7 +173,7 @@ describe('order payment posts a balanced journal entry', () => {
         payments: {
           create: [
             {
-              provider: 'tap', // → Cash Card (1010)
+              provider: 'kashier', // → Cash Card (1010)
               status: 'completed',
               amount: 5750,
               paidAt: new Date(),
@@ -240,7 +240,7 @@ describe('order payment posts a balanced journal entry', () => {
           ],
         },
         payments: {
-          create: [{ provider: 'tap', status: 'completed', amount: 5500, paidAt: new Date() }],
+          create: [{ provider: 'kashier', status: 'completed', amount: 5500, paidAt: new Date() }],
         },
       },
     });
