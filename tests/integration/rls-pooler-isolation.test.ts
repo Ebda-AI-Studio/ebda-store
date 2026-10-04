@@ -29,10 +29,12 @@ import crypto from 'node:crypto';
 import pg from 'pg';
 import {
   createPrismaClient,
+  createIsolateDb,
   runWithRequestDb,
   runInTenantContext,
   prisma,
   type AppPrismaClient,
+  type IsolateDb,
 } from '@force/database';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
@@ -93,12 +95,19 @@ describe.skipIf(!haveBouncer)('tenant isolation behind a transaction-mode pooler
 
   const makeApp = () => createPrismaClient({ connectionString: poolerUrl, max: 1 });
 
-  /** One "request": its own client (max 1), its own tenant transaction. */
-  async function request(storeId: string | null) {
-    return runWithRequestDb(makeApp, async () => {
-      const read = () => prisma.storeFaq.findMany({ select: { storeId: true, question: true } });
-      return storeId ? runInTenantContext(storeId, read) : read();
-    });
+  // The Workers design (SP4 Stage 2): pooled, reused clients leased per request, a connection per request.
+  let shared: IsolateDb;
+  type Mode = 'client per request' | 'leased clients';
+  const read = (storeId: string | null) => () => {
+    const q = () => prisma.storeFaq.findMany({ select: { storeId: true, question: true } });
+    return storeId ? runInTenantContext(storeId, q) : q();
+  };
+
+  /** One "request": its own connection (max 1), its own tenant transaction. */
+  async function request(storeId: string | null, mode: Mode = 'client per request') {
+    return mode === 'leased clients'
+      ? shared.run(read(storeId))
+      : runWithRequestDb(makeApp, read(storeId));
   }
 
   beforeAll(async () => {
@@ -185,6 +194,7 @@ describe.skipIf(!haveBouncer)('tenant isolation behind a transaction-mode pooler
     await waitForPort(port);
     poolerUrl = `postgresql://ebda_app:${APP_PASSWORD}@127.0.0.1:${port}/pooled`;
     controlUrl = `postgresql://ebda_app:${APP_PASSWORD}@127.0.0.1:${port}/control`;
+    shared = createIsolateDb({ connectionString: poolerUrl, max: 6 });
   }, 60_000);
 
   afterAll(async () => {
@@ -223,41 +233,154 @@ describe.skipIf(!haveBouncer)('tenant isolation behind a transaction-mode pooler
     expect(leaks, 'the harness must be able to observe a session-level leak').toBeGreaterThan(0);
   }, 60_000);
 
-  it('interleaved requests for two stores (and contextless ones) never see another tenant', async () => {
-    const plan: Array<string | null> = [];
-    for (let i = 0; i < 300; i++) plan.push(i % 3 === 0 ? null : i % 3 === 1 ? storeA : storeB);
+  it.each<Mode>(['client per request', 'leased clients'])(
+    'interleaved requests for two stores (and contextless ones) never see another tenant (%s)',
+    async mode => {
+      const plan: Array<string | null> = [];
+      for (let i = 0; i < 300; i++) plan.push(i % 3 === 0 ? null : i % 3 === 1 ? storeA : storeB);
 
-    // 20 requests in flight at a time over a 2-connection server pool.
-    const results: Array<{ s: string | null; rows: Awaited<ReturnType<typeof request>> }> = [];
-    let next = 0;
-    await Promise.all(
-      Array.from({ length: 20 }, async () => {
-        while (next < plan.length) {
-          const s = plan[next++];
-          results.push({ s, rows: await request(s) });
+      // 20 requests in flight at a time over a 2-connection server pool.
+      const results: Array<{ s: string | null; rows: Awaited<ReturnType<typeof request>> }> = [];
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: 20 }, async () => {
+          while (next < plan.length) {
+            const s = plan[next++];
+            results.push({ s, rows: await request(s, mode) });
+          }
+        })
+      );
+
+      const violations: string[] = [];
+      for (const { s, rows } of results) {
+        if (s === null) {
+          if (rows.length !== 0) violations.push(`contextless request saw ${rows.length} rows`);
+          continue;
         }
+        const mine = s === storeA ? markerA : markerB;
+        if (rows.length !== 3) violations.push(`store request saw ${rows.length} rows (want 3)`);
+        for (const r of rows) {
+          if (r.storeId !== s || !r.question.startsWith(mine)) {
+            violations.push(
+              `store ${s === storeA ? 'A' : 'B'} saw ${r.question} (store ${r.storeId})`
+            );
+          }
+        }
+      }
+      expect(violations).toEqual([]);
+      expect(results.filter(r => r.s === null)).toHaveLength(100);
+    },
+    120_000
+  );
+
+  it('leased clients: overlapping requests hold different connections and clients, and release them', async () => {
+    const seen = await Promise.all(
+      Array.from({ length: 6 }, (_, i) =>
+        shared.run(async () => {
+          const lease = shared.currentLease()!;
+          const pids = await lease.client.$transaction(async tx => {
+            const a = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+            await tx.$queryRaw`SELECT pg_sleep(0.2)`; // overlap: all 6 hold a server connection now
+            const b = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+            return [a[0].pid, b[0].pid];
+          });
+          return { i, lease, pids };
+        })
+      )
+    );
+    // Inside one transaction the connection never changes ...
+    for (const r of seen) expect(r.pids[0]).toBe(r.pids[1]);
+    // ... overlapping transactions use different server connections (this pooler has 2) ...
+    expect(new Set(seen.map(r => r.pids[0])).size).toBe(2);
+    // ... on 6 different request scopes and 6 different clients (a client serves one request at a time).
+    expect(new Set(seen.map(r => r.lease.scope.id)).size).toBe(6);
+    expect(new Set(seen.map(r => r.lease.client)).size).toBe(6);
+    for (const r of seen) expect(r.lease.scope.opened).toBe(1);
+    // A request that never queries never opens a connection.
+    const idle = await shared.run(async () => shared.currentLease()!.scope);
+    expect(idle.opened).toBe(0);
+    // Everything is back: nothing leased, nothing waiting, no more clients than the pool allows.
+    const st = shared.stats();
+    expect(st.leased).toBe(0);
+    expect(st.waiting).toBe(0);
+    expect(st.created).toBeLessThanOrEqual(st.max);
+  }, 30_000);
+
+  it('leased clients: a client is REUSED by the next request on a fresh connection', async () => {
+    const one = await shared.run(async () => {
+      await prisma.$queryRaw`SELECT 1`;
+      return shared.currentLease()!;
+    });
+    const two = await shared.run(async () => {
+      await prisma.$queryRaw`SELECT 1`;
+      return shared.currentLease()!;
+    });
+    expect(two.client).toBe(one.client); // same engine: no per-request client construction
+    expect(two.scope.id).not.toBe(one.scope.id); // new per-request connection
+  });
+
+  it('leased clients: more concurrent requests than clients wait, none is lost, none is shared', async () => {
+    const small = createIsolateDb({ connectionString: poolerUrl, max: 2 });
+    const running = { now: 0, peak: 0 };
+    const out = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        small.run(async () => {
+          running.now++;
+          running.peak = Math.max(running.peak, running.now);
+          await small.currentLease()!.client.$queryRaw`SELECT pg_sleep(0.05)`;
+          running.now--;
+          return i;
+        })
+      )
+    );
+    expect(out).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(running.peak).toBeLessThanOrEqual(2);
+    expect(small.stats()).toMatchObject({ created: 2, leased: 0, waiting: 0 });
+  }, 30_000);
+
+  it('leased clients: a pool timeout sheds load instead of queueing forever', async () => {
+    const tiny = createIsolateDb({ connectionString: poolerUrl, max: 1, maxWaitMs: 100 });
+    const hold = tiny.run(() => new Promise<void>(r => setTimeout(r, 400)));
+    await new Promise(r => setTimeout(r, 20));
+    await expect(tiny.run(async () => 1)).rejects.toThrow(/no database client available/);
+    await hold;
+    expect(tiny.stats()).toMatchObject({ leased: 0, waiting: 0 });
+  });
+
+  it('leased clients: a nested transaction inside a tenant transaction does not deadlock', async () => {
+    // withMoneyTx inside runInTenantContext opens a SECOND transaction on a second connection.
+    const db = createIsolateDb({ connectionString: poolerUrl, max: 1, connectionsPerRequest: 2 });
+    const rows = await db.run(() =>
+      runInTenantContext(storeA, async () => {
+        const outer = await prisma.storeFaq.findMany({ select: { storeId: true } });
+        const inner = await prisma.$transaction(async tx => tx.storeFaq.findMany());
+        return { outer: outer.length, inner: inner.length };
       })
     );
+    expect(rows).toEqual({ outer: 3, inner: 3 });
+  }, 20_000);
 
-    const violations: string[] = [];
-    for (const { s, rows } of results) {
-      if (s === null) {
-        if (rows.length !== 0) violations.push(`contextless request saw ${rows.length} rows`);
-        continue;
-      }
-      const mine = s === storeA ? markerA : markerB;
-      if (rows.length !== 3) violations.push(`store request saw ${rows.length} rows (want 3)`);
-      for (const r of rows) {
-        if (r.storeId !== s || !r.question.startsWith(mine)) {
-          violations.push(
-            `store ${s === storeA ? 'A' : 'B'} saw ${r.question} (store ${r.storeId})`
-          );
-        }
-      }
-    }
-    expect(violations).toEqual([]);
-    expect(results.filter(r => r.s === null)).toHaveLength(100);
-  }, 120_000);
+  it("leased clients: with ONE connection per request the same nesting waits for pg's connect timeout", async () => {
+    // The negative control for the test above (and the reason connectionsPerRequest is not 1).
+    const db = createIsolateDb({
+      connectionString: `${poolerUrl}?connect_timeout=2`,
+      max: 1,
+      connectionsPerRequest: 1,
+    });
+    await expect(
+      db.run(() =>
+        runInTenantContext(storeA, async () =>
+          prisma.$transaction(async tx => tx.storeFaq.findMany())
+        )
+      )
+    ).rejects.toThrow(/timeout/i);
+  }, 20_000);
+
+  it('leased clients: a query with no lease is refused, not run on a stray socket', async () => {
+    const lease = await shared.run(async () => shared.currentLease()!);
+    // the lease is over: its client's adapter is unbound
+    await expect(lease.client.$queryRaw`SELECT 1`).rejects.toThrow(/outside a request lease/);
+  });
 
   it('a tenant transaction leaves no store on the server connection for the next client', async () => {
     for (let i = 0; i < 10; i++) await request(i % 2 ? storeA : storeB);

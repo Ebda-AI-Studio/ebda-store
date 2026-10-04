@@ -40,6 +40,12 @@ const OUT = arg('out', '');
 // Pause between rounds so each is a fresh burst, not a continuation of the previous one's teardown.
 const PAUSE_MS = Number(arg('pause-ms', '3000'));
 const NO_WEBHOOK = process.argv.includes('--no-webhook');
+// Soak mode (SP4 Stage 2): `--conc C` runs each round's N requests through a pool of C in flight
+// instead of all at once (`--n 1000 --rounds 1 --conc 25` is the 1,000-request soak).
+const CONC = Number(arg('conc', '0'));
+// `--stats` reads the Worker's dev-only /__dev/stats (needs DEV_STATS=1) after every round: clients
+// built vs the pool maximum, and leases still held (must be 0 when idle: a leak otherwise).
+const STATS = process.argv.includes('--stats');
 const STAGGER_MS = Number(arg('stagger-ms', '4'));
 const DB = arg('db', 'ebda_s1');
 const WEBHOOK_SECRET = process.env.TAP_WEBHOOK_SECRET || 'dev-only-tap-webhook-secret';
@@ -314,12 +320,26 @@ for (let round = 0; round < ROUNDS; round++) {
   if (round > 0) await new Promise(r => setTimeout(r, PAUSE_MS));
   const { jobs, idempotencyKey } = buildRound(round);
   const t0 = performance.now();
-  const results = await Promise.all(
-    jobs.map(async (j, i) => {
-      if (STAGGER_MS > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS));
-      return j();
-    })
-  );
+  let results;
+  if (CONC > 0) {
+    results = new Array(jobs.length);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: CONC }, async () => {
+        while (next < jobs.length) {
+          const i = next++;
+          results[i] = await jobs[i]();
+        }
+      })
+    );
+  } else {
+    results = await Promise.all(
+      jobs.map(async (j, i) => {
+        if (STAGGER_MS > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS));
+        return j();
+      })
+    );
+  }
   const wall = performance.now() - t0;
 
   const byKind = {};
@@ -366,6 +386,27 @@ for (let round = 0; round < ROUNDS; round++) {
     sampleProblems: problems.slice(0, 5),
     sampleLeaks: leaks.slice(0, 5),
   };
+  if (STATS) {
+    // Let the post-response `waitUntil` releases finish, then read the isolate's counters.
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const st = await send(`${BASE}/__dev/stats`, {
+        method: 'GET',
+        headers: {},
+        timeoutMs: 10_000,
+      });
+      row.isolate = JSON.parse(st.text);
+      const pool = row.isolate.pool;
+      // Clients built never exceed the pool maximum ...
+      if (!pool || pool.created > pool.max) row.errors++;
+      // ... and, with every response in, no client is still leased: a lease held while idle is a
+      // leaked connection (/__dev/stats itself is not a lease).
+      if (pool && (pool.leased !== 0 || pool.waiting !== 0)) row.leaks++;
+    } catch (e) {
+      row.isolate = { error: String(e) };
+      row.errors++;
+    }
+  }
   report.rounds.push(row);
   console.log(JSON.stringify(row));
   if (row.errors > 0 || row.leaks > 0) failed = true;

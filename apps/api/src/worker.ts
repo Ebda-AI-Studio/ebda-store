@@ -5,10 +5,12 @@
  * `handleAsNodeRequest` (`cloudflare:node`, `nodejs_compat`). Everything that is
  * Worker-specific lives in this file and src/cf/:
  *
- *   - one Prisma client PER REQUEST (`max: 1`) over Hyperdrive, bound through
- *     AsyncLocalStorage. workerd forbids reusing an I/O object (a pooled socket) from
- *     another request, so a module-global client hangs under concurrency (experiment
- *     B6/B9). The client is closed through `ctx.waitUntil`, after the post-commit
+ *   - a POOL of Prisma clients per isolate, each leased to one request at a time and reused (the
+ *     engine, ~3.3 MB, is built once per client, not per request), over a leased driver adapter.
+ *     The pg connection (pool of one, over Hyperdrive) is per request and opened lazily: workerd
+ *     forbids reusing an I/O object (a socket) from another request (experiment B6/B9). One client
+ *     shared by concurrent requests hangs, see packages/database/src/client-pool.ts. The
+ *     connection is closed, and the client returned, through `ctx.waitUntil`, after the post-commit
  *     deferred work (`deferAfterTenantCommit`) has drained on it.
  *   - the client's real IP: Cloudflare's `cf-connecting-ip` overwrites X-Forwarded-For,
  *     so `trust proxy` = 1 yields the connecting address and a spoofed header is dropped.
@@ -18,13 +20,13 @@
 import { handleAsNodeRequest } from 'cloudflare:node';
 import { createServer } from 'node:http';
 import app from './app';
-import { createPrismaClient, prisma, runWithRequestDb } from '@force/database';
+import { ClientPoolTimeout, createIsolateDb, prisma, type IsolateDb } from '@force/database';
 import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
-import { ConcurrencyGate, GateTimeout } from './cf/concurrency-gate';
+import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { runScheduled } from './cf/cron';
 import { isPlatformOrigin } from './lib/cors-cache';
@@ -66,14 +68,7 @@ createServer(app).listen(PORT);
 /** Upper bound for the post-response drain (Workers grants 30 s after the response). */
 const DRAIN_BUDGET_MS = 25_000;
 
-/**
- * Request-bound clients live at once in this isolate (see cf/concurrency-gate.ts: ~3.3 MB each
- * against a 128 MB isolate whose idle JS heap is already ~60 MB; the Stage 1 exit test measured
- * the heap at 115 MB with 16). Override with the DB_CLIENT_CONCURRENCY / DB_CLIENT_WAIT_MS vars.
- */
-const DEFAULT_CLIENT_CONCURRENCY = 8;
-const DEFAULT_GATE_MAX_WAIT_MS = 20_000;
-let gate: ConcurrencyGate | undefined;
+let isolateDb: IsolateDb | undefined;
 
 let roleChecked = false;
 let redisReady: Promise<void> | undefined;
@@ -124,60 +119,73 @@ function prepare(env: CfBindings): void {
 
 /**
  * Run `fn` with everything a Worker invocation needs: the bindings recorded, `waitUntil` on
- * AsyncLocalStorage, and a request-bound Prisma client (closed after the deferred work drains).
- * Used by fetch, queue and scheduled alike: a queue consumer or a cron touches the database
- * exactly as a request does.
+ * AsyncLocalStorage, and a leased Prisma client with this request's own database connection
+ * (returned, and the connection closed, after the deferred work drains). Used by fetch, queue and
+ * scheduled alike: a queue consumer or a cron touches the database exactly as a request does.
  */
 async function withWorkerContext<T>(env: CfBindings, ctx: Ctx, fn: () => Promise<T>): Promise<T> {
   prepare(env);
-  gate ??= new ConcurrencyGate(
-    Number(env.DB_CLIENT_CONCURRENCY) > 0
-      ? Number(env.DB_CLIENT_CONCURRENCY)
-      : DEFAULT_CLIENT_CONCURRENCY,
-    Number(env.DB_CLIENT_WAIT_MS) > 0 ? Number(env.DB_CLIENT_WAIT_MS) : DEFAULT_GATE_MAX_WAIT_MS
-  );
-  const release = await gate.acquire();
-  let released = false;
-  const free = (): void => {
-    if (!released) {
-      released = true;
-      release();
+  isolateDb ??= createIsolateDb({
+    connectionString: env.HYPERDRIVE.connectionString,
+    // Engines (~3.3 MB each) per isolate; a request waits for one when all are leased. Override
+    // with the DB_CLIENT_CONCURRENCY / DB_CLIENT_WAIT_MS vars.
+    max: Number(env.DB_CLIENT_CONCURRENCY) > 0 ? Number(env.DB_CLIENT_CONCURRENCY) : undefined,
+    maxWaitMs: Number(env.DB_CLIENT_WAIT_MS) > 0 ? Number(env.DB_CLIENT_WAIT_MS) : undefined,
+    // The API opens a second transaction while the request's tenant transaction is open.
+    connectionsPerRequest:
+      Number(env.DB_REQUEST_CONNECTIONS) > 0 ? Number(env.DB_REQUEST_CONNECTIONS) : undefined,
+    log: ['error', 'warn'],
+    // The request's connection is ended after every request; workerd reports that as a
+    // cancelled stream on the idle client. Not an error.
+    onPoolError: err => logger.debug({ err: err.message }, '[database] idle pool client error'),
+  });
+  const db = isolateDb;
+  let lease: ReturnType<IsolateDb['currentLease']>;
+  let roleCheck: Promise<void> | undefined;
+  // Work the request handed to `cfWaitUntil` (a verification email, a webhook fan-out, ...) runs on
+  // THIS request's database lease. The lease is returned to the pool only after it has settled:
+  // a Prisma call after that would land on the next request's connection.
+  const floating = new Set<Promise<unknown>>();
+  const waitUntil = (p: Promise<unknown>): void => {
+    floating.add(p);
+    void p.finally(() => floating.delete(p));
+    ctx.waitUntil(p);
+  };
+  const drainFloating = async (): Promise<void> => {
+    const deadline = Date.now() + DRAIN_BUDGET_MS;
+    while (floating.size > 0 && Date.now() < deadline) {
+      await Promise.race([
+        Promise.allSettled([...floating]),
+        new Promise(r => setTimeout(r, Math.max(0, deadline - Date.now()))),
+      ]);
     }
   };
-  try {
-    return await runWithWaitUntil(
-      p => ctx.waitUntil(p),
-      () =>
-        runWithRequestDb(
-          () =>
-            createPrismaClient({
-              connectionString: env.HYPERDRIVE.connectionString,
-              max: 1,
-              log: ['error', 'warn'],
-              // The one connection is ended after every request; workerd reports that as a
-              // cancelled stream on the idle client. Not an error.
-              onPoolError: err =>
-                logger.debug({ err: err.message }, '[database] idle pool client error'),
+  return runWithWaitUntil(waitUntil, () =>
+    db.run(
+      async () => {
+        lease = db.currentLease();
+        noteLease(lease);
+        if (!roleChecked) {
+          // Runs on THIS request's connection, so the release below must wait for it.
+          roleChecked = true;
+          roleCheck = checkRole();
+          ctx.waitUntil(roleCheck);
+        }
+        return fn();
+      },
+      {
+        waitUntil: p => ctx.waitUntil(p),
+        // Post-commit work runs on this request's connection and must finish before it closes.
+        beforeDisconnect: () =>
+          Promise.all([awaitDeferredWork(DRAIN_BUDGET_MS), roleCheck])
+            .then(drainFloating)
+            .finally(() => {
+              // The lease is released right after this; its `opened` count is final.
+              noteLeaseClosing(lease);
             }),
-          async () => {
-            if (!roleChecked) {
-              roleChecked = true;
-              ctx.waitUntil(checkRole());
-            }
-            return fn();
-          },
-          {
-            waitUntil: p => ctx.waitUntil(p),
-            // The slot frees once the post-commit work has drained, just before the client closes.
-            beforeDisconnect: () => awaitDeferredWork(DRAIN_BUDGET_MS).finally(free),
-          }
-        )
-    );
-  } catch (err) {
-    // runWithRequestDb always reaches beforeDisconnect, but if it threw before that, do not leak the slot.
-    free();
-    throw err;
-  }
+      }
+    )
+  );
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -260,6 +268,15 @@ async function floodGuard(
 
 async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
   const path = new URL(request.url).pathname;
+  if (path === '/__dev/stats') {
+    const res = devStats(env, isolateDb);
+    if (res) return res;
+  }
+  if (path === '/__dev/probe' && env.DEV_STATS === '1') {
+    const url = new URL(request.url);
+    const res = await withWorkerContext(env, ctx, () => devProbe(env, isolateDb!, url));
+    if (res) return res;
+  }
   const flooded = await floodGuard(request, env, path);
   if (flooded) return flooded;
   if (path === '/socket.io/' || path === '/socket.io') {
@@ -271,7 +288,7 @@ async function handle(request: Request, env: CfBindings, ctx: Ctx): Promise<Resp
   try {
     return await withWorkerContext(env, ctx, () => handleAsNodeRequest(PORT, forwarded, env, ctx));
   } catch (err) {
-    if (err instanceof GateTimeout) {
+    if (err instanceof ClientPoolTimeout) {
       // Shed load instead of letting the isolate hit its memory limit.
       return Response.json(
         { success: false, error: { code: 'OVERLOADED', message: 'Server busy, please retry.' } },

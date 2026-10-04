@@ -14,9 +14,11 @@
 // on the request-bound client.
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createPrismaClient, type AppPrismaClient } from './client';
+import { ClientPool, type ClientLease, type ClientPoolOptions } from './client-pool';
 
 interface RequestDb {
-  client: AppPrismaClient;
+  /** A pooled client's getter refuses once its lease is released (see `createIsolateDb`). */
+  readonly client: AppPrismaClient;
 }
 
 const requestDb = new AsyncLocalStorage<RequestDb>();
@@ -102,4 +104,61 @@ export async function runWithRequestDb<T>(
     if (opts.waitUntil) opts.waitUntil(release);
     else await release;
   }
+}
+
+export interface IsolateDbOptions extends ClientPoolOptions {}
+
+export interface IsolateDb {
+  /** Like `runWithRequestDb`, but on a pooled, reused client with a per-request connection. */
+  run<T>(fn: () => Promise<T>, opts?: RunWithRequestDbOptions): Promise<T>;
+  /** The lease of the current async context (tests, diagnostics). */
+  currentLease(): ClientLease | undefined;
+  stats(): ReturnType<ClientPool['stats']>;
+}
+
+/**
+ * Cloudflare Workers: build ONCE per isolate. A request leases one of at most `max` Prisma clients
+ * (engines are built lazily and reused, not rebuilt per request), runs on it with its own lazily
+ * opened pg connection, and returns it after its deferred work has drained. Transactions begin on,
+ * and stay pinned to, that connection. See `client-pool.ts` for why clients are not shared by
+ * concurrent requests.
+ */
+export function createIsolateDb(opts: IsolateDbOptions): IsolateDb {
+  const pool = new ClientPool(opts);
+  const leases = new AsyncLocalStorage<ClientLease>();
+  return {
+    stats: () => pool.stats(),
+    currentLease: () => leases.getStore(),
+    run: async (fn, runOpts = {}) => {
+      const lease = await pool.acquire();
+      try {
+        // The exported `prisma` resolves its client through this store on EVERY call. Once the lease
+        // is released the client belongs to the next request, so a floating promise of this one that
+        // reaches for `prisma` late must fail here, not run on someone else's connection.
+        const bound: RequestDb = {
+          get client() {
+            if (!lease.live) {
+              throw new Error(
+                'database used after its request ended: a promise outlived the response ' +
+                  '(await it, or register it with ctx.waitUntil / deferAfterTenantCommit)'
+              );
+            }
+            return lease.client;
+          },
+        };
+        return await leases.run(lease, () => requestDb.run(bound, fn));
+      } finally {
+        const release = (async () => {
+          try {
+            await runOpts.beforeDisconnect?.();
+          } catch {
+            // A failing drain must not leak the connection or the client.
+          }
+          await lease.release();
+        })();
+        if (runOpts.waitUntil) runOpts.waitUntil(release);
+        else await release;
+      }
+    },
+  };
 }

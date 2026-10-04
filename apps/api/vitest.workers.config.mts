@@ -48,6 +48,8 @@ const apiVars = {
   ADMIN_URL: 'http://localhost:3001',
   API_URL: 'http://localhost:8787',
   TRUST_PROXY_HOPS: '1',
+  // The dev-only /__dev/stats and /__dev/probe routes (src/cf/dev-stats.ts); never set in wrangler.jsonc.
+  DEV_STATS: '1',
 };
 
 // Two workers in one Miniflare: the BUILT API Worker (`npm run cf:dry-run`: wrangler's esbuild bundle with
