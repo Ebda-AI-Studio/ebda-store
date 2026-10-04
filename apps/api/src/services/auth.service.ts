@@ -20,6 +20,7 @@ import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
+import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
@@ -433,14 +434,18 @@ export class AuthService {
     // Verification email goes out fire-and-forget so a slow / unreachable
     // SMTP host can't stall the registration response. If delivery fails
     // the customer can request a resend via /auth/resend-verification.
-    void this.sendVerificationEmail(
-      user.id,
-      user.email,
-      `${user.firstName} ${user.lastName}`.trim() || user.email,
-      storeId,
-      data.language
-    ).catch(err =>
-      logger.error({ err, userId: user.id }, 'Failed to send verification email after register')
+    // `cfWaitUntil`: on a Worker a bare floating promise is cancelled with the response (and its
+    // database lease is gone), so the email would silently never go out. On Node it is `void`.
+    cfWaitUntil(
+      this.sendVerificationEmail(
+        user.id,
+        user.email,
+        `${user.firstName} ${user.lastName}`.trim() || user.email,
+        storeId,
+        data.language
+      ).catch(err =>
+        logger.error({ err, userId: user.id }, 'Failed to send verification email after register')
+      )
     );
 
     return { emailVerificationSent: true } as const;
