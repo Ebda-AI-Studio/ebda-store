@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lib/lazy-modules';
 import { neutralizeRowObject } from '../lib/exports/xlsx';
 import multer from 'multer';
 import { authenticate, authorize } from '../middleware/auth';
@@ -115,7 +116,7 @@ router.get(
         orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
       });
 
-      const workbook = new ExcelJS.Workbook();
+      const workbook = new (await loadExcelJS()).Workbook();
       workbook.creator = BRAND.name;
       workbook.created = new Date();
       const sheet = workbook.addWorksheet('Area Rates');
@@ -433,7 +434,7 @@ function parseCsvBufferToRows(buf: Buffer): Record<string, string>[] {
 
 /** Parse an xlsx buffer into raw import row objects using ExcelJS. */
 async function parseXlsxBufferToRows(buf: Buffer): Promise<Record<string, string>[]> {
-  const wb = new ExcelJS.Workbook();
+  const wb = new (await loadExcelJS()).Workbook();
   // ExcelJS expects an ArrayBuffer / Buffer — cast via ArrayBuffer to satisfy
   // strict type constraints across different Node Buffer type declarations.
   await wb.xlsx.load(

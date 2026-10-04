@@ -10,7 +10,8 @@
  *   '#,##0.00'   → EGP two-decimal amounts (use `excelMoneyFormat` from @force/shared)
  *   '@'          → force text cell (prevents Excel from mangling phone numbers)
  */
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lazy-modules';
 import type { Response } from 'express';
 import { neutralizeFormula, describeListFilters, type ReportRange, BRAND } from '@force/shared';
 
@@ -108,7 +109,7 @@ export function addFiltersSheet(wb: ExcelJS.Workbook, filters: ExportFilterSumma
  * Caller MUST NOT write headers or call res.end() before this.
  */
 export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): Promise<void> {
-  const wb = new ExcelJS.Workbook();
+  const wb = new (await loadExcelJS()).Workbook();
   wb.creator = BRAND.name;
   wb.created = new Date();
 

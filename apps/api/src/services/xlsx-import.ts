@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lib/lazy-modules';
 import { AppError } from '../middleware/error-handler';
 
 import { tryToMinor } from '@force/shared';
@@ -33,7 +33,7 @@ export async function xlsxBufferToImportCsv(
     trackInventory = false,
   } = options;
 
-  const workbook = new ExcelJS.Workbook();
+  const workbook = new (await loadExcelJS()).Workbook();
   try {
     // exceljs' load signature expects ArrayBuffer-backed data; copy the
     // buffer's view to be explicit so TS is happy across node/undici Buffer types.

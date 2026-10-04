@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lib/lazy-modules';
 import {
   neutralizeRowObject,
   neutralizeRowArray,
@@ -133,7 +134,7 @@ router.get(
           ? aggregated.orders
           : aggregated.orders.filter(o => exportedIds.has(customerKeyOf(o) ?? `guest:${o.id}`));
 
-      const workbook = new ExcelJS.Workbook();
+      const workbook = new (await loadExcelJS()).Workbook();
       workbook.creator = BRAND.name;
       workbook.created = new Date();
       const sheet = workbook.addWorksheet('Customers');

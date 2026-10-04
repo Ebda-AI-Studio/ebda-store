@@ -49,7 +49,8 @@ import { trialBalance, profitAndLoss, balanceSheet } from '../services/accountin
 import { generateTaxReport } from '../services/accounting/tax-report.service';
 import { streamXlsxResponse, summarizeExportFilters } from '../lib/exports/xlsx';
 import multer from 'multer';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lib/lazy-modules';
 import {
   importBankStatement,
   runAutoMatch,
@@ -1269,7 +1270,7 @@ router.post(
       } else if (ext === 'xlsx') {
         // Convert XLSX → CSV so the existing parseStatementCsv logic handles it.
         // Read first sheet, emit header + data rows as comma-separated text.
-        const wb = new ExcelJS.Workbook();
+        const wb = new (await loadExcelJS()).Workbook();
         const ab = fileBuffer.buffer.slice(
           fileBuffer.byteOffset,
           fileBuffer.byteOffset + fileBuffer.byteLength

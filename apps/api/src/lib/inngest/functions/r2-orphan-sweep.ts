@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
-import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import type { S3Client } from '@aws-sdk/client-s3';
+import { loadS3 } from '../../lazy-modules';
 import { prisma, isOwnerRole, withOwnerTx } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -68,6 +69,7 @@ function formatBytes(n: number): string {
  * StorageService (endpoint + access key + secret key from config).
  */
 async function listAllObjects(client: S3Client, bucket: string): Promise<R2Obj[]> {
+  const { ListObjectsV2Command } = await loadS3();
   const objects: R2Obj[] = [];
   let continuationToken: string | undefined;
   do {
@@ -141,6 +143,7 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
     // in report-only mode. Default OFF for safety.
     const applyDeletes = process.env.R2_ORPHAN_SWEEP_APPLY === 'true';
 
+    const { S3Client, DeleteObjectsCommand } = await loadS3();
     const client = new S3Client({
       endpoint: config.storageEndpoint,
       region: 'auto',

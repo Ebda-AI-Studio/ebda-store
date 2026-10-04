@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { loadS3 } from '../../lazy-modules';
 import { auditRetention } from '../../definer';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -52,6 +52,7 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
         return { skipped: true, written: 0, key: null };
       }
 
+      const { S3Client, PutObjectCommand } = await loadS3();
       const s3 = new S3Client({
         endpoint,
         region: 'auto',
