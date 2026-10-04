@@ -76,6 +76,17 @@ export interface CreatePrismaClientOptions {
    * one transaction). Default for a Node process: `DB_CONNECTION_LIMIT` or 15.
    */
   max?: number;
+  /**
+   * Called when an IDLE pooled client errors (a socket the pooler or Neon dropped). Default:
+   * `console.error`. A Worker passes a quieter sink: its per-request client ends its single
+   * connection at the end of every request, and workerd reports that as a cancelled stream.
+   */
+  onPoolError?: (err: Error) => void;
+  /**
+   * Prisma log levels. Default: query + error + warn in development, error otherwise. A Worker
+   * passes ['error', 'warn']: a console line per query is CPU, log volume and heap there.
+   */
+  log?: Array<'query' | 'info' | 'warn' | 'error'>;
 }
 
 /**
@@ -166,6 +177,17 @@ function retypeUnsupportedFields(r: pg.QueryResult | undefined): void {
 }
 
 class TextFallbackClient extends pg.Client {
+  constructor(config?: string | pg.ClientConfig) {
+    super(config);
+    // A late socket error (the read loop of a closing socket: workerd's "Network connection
+    // lost") reaches the Client AFTER pg-pool has detached its own 'error' listener. An EventEmitter
+    // 'error' with no listener THROWS, inside pg-cloudflare's promise chain, which workerd reports
+    // as an uncaught rejection (and `wrangler dev` treats as fatal). Errors on a LIVE query still
+    // reject that query; this only absorbs the orphaned ones. The pool's idle listener still logs
+    // idle-client errors through `onPoolError`.
+    this.on('error', () => undefined);
+  }
+
   // pg-pool calls `client.query(text, values, callback)` for `pool.query`, while a
   // pooled client's `query` (interactive transactions) returns a promise: both
   // shapes are covered.
@@ -205,9 +227,15 @@ export function createPrismaClient(opts: CreatePrismaClientOptions): AppPrismaCl
     disposeExternalPool: true,
     // The adapter attaches an 'error' listener to idle pool clients; without a
     // sink here a dropped idle socket would be swallowed with no trace.
-    onPoolError: err => {
-      console.error(`[database] idle pool client error: ${err.message}`);
-    },
+    onPoolError:
+      opts.onPoolError ??
+      (err => {
+        console.error(`[database] idle pool client error: ${err.message}`);
+      }),
   });
-  return new PrismaClient({ ...prismaOptions, adapter }) as unknown as AppPrismaClient;
+  return new PrismaClient({
+    ...prismaOptions,
+    ...(opts.log ? { log: opts.log } : {}),
+    adapter,
+  }) as unknown as AppPrismaClient;
 }
