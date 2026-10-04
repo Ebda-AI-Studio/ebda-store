@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, PaymentProvider, ProviderHealthStatus } from '@force/database';
+import { prisma, Prisma, PaymentProvider, ProviderHealthStatus } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -10,7 +10,14 @@ import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
 import { tenantContext } from '../middleware/tenant-context';
 
-import { REGION } from '@force/shared';
+import {
+  REGION,
+  codSettingsSchema,
+  instapaySettingsBaseSchema,
+  instapaySettingsSchema,
+} from '@force/shared';
+import { AppError } from '../middleware/error-handler';
+import { providerHealth } from '../services/payment-providers/provider-health';
 const router = Router();
 
 // Mounted bare at '/payment-settings' in routes/index.ts — the global
@@ -29,7 +36,7 @@ router.param('storeId', tenantContext);
 // ==========================================
 
 const paymentConfigSchema = z.object({
-  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']),
+  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod', 'instapay']),
   isEnabled: z.boolean().default(false),
   isDefault: z.boolean().default(false),
   displayName: z.string().optional(),
@@ -43,6 +50,8 @@ const paymentConfigSchema = z.object({
   supportedCurrencies: z.array(z.string()).default([REGION.currency]),
   fixedFee: z.number().int().min(0).default(0),
   percentageFee: z.number().min(0).max(100).default(0),
+  /** Non-secret per-provider settings (InstaPay handle/phone/expiry, COD percentage). */
+  settings: z.record(z.string(), z.unknown()).optional(),
 });
 
 const updateConfigSchema = paymentConfigSchema.partial();
@@ -86,6 +95,38 @@ export function maskCredentials(config: {
     apiKeyFingerprintMissing: Boolean(config.apiKey) && !config.apiKeyLast4,
     merchantIdFingerprintMissing: Boolean(config.merchantId) && !config.merchantIdLast4,
   };
+}
+
+/**
+ * Validate and normalise the NON-secret `settings` JSON of one provider config.
+ * InstaPay needs a handle or a phone once it is enabled (a disabled draft may be
+ * partial); COD takes an optional percentage. Anything else carries no settings.
+ */
+export function normalizeProviderSettings(
+  provider: string,
+  settings: Record<string, unknown> | undefined,
+  isEnabled: boolean
+): Record<string, unknown> {
+  const raw = settings ?? {};
+  if (provider === 'instapay') {
+    const parsed = (isEnabled ? instapaySettingsSchema : instapaySettingsBaseSchema).safeParse(raw);
+    if (!parsed.success) {
+      throw new AppError(
+        422,
+        'INVALID_PAYMENT_SETTINGS',
+        parsed.error.issues.map(i => `${i.path.join('.') || 'settings'}: ${i.message}`).join('; ')
+      );
+    }
+    return parsed.data;
+  }
+  if (provider === 'cod') {
+    const parsed = codSettingsSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new AppError(422, 'INVALID_PAYMENT_SETTINGS', 'percentBps must be 0-5000');
+    }
+    return parsed.data;
+  }
+  return {};
 }
 
 function encryptCredentials(data: {
@@ -780,10 +821,13 @@ router.get(
         orderBy: { provider: 'asc' },
       });
 
-      // Mask sensitive credentials
+      // Mask sensitive credentials. `circuit` is the LIVE outage state of this
+      // method on this node (open circuit = the checkout is hiding it right now);
+      // `healthStatus` is the last persisted value.
       const safeStoreConfigs = storeConfigs.map(config => ({
         ...config,
         ...maskCredentials(config),
+        circuit: providerHealth(storeId, config.provider),
       }));
 
       const safeGlobalConfigs = globalConfigs.map(config => ({
@@ -889,6 +933,11 @@ router.post(
           supportedCurrencies: data.supportedCurrencies,
           fixedFee: data.fixedFee,
           percentageFee: data.percentageFee,
+          settings: normalizeProviderSettings(
+            data.provider,
+            data.settings,
+            data.isEnabled
+          ) as Prisma.InputJsonValue,
           createdBy: userId,
           updatedBy: userId,
         },
@@ -1014,6 +1063,17 @@ router.put(
         updateData.webhookSecret = encryption.encrypt(data.webhookSecret);
       } else {
         delete updateData.webhookSecret;
+      }
+
+      if (data.settings !== undefined || data.isEnabled !== undefined) {
+        updateData.settings = normalizeProviderSettings(
+          provider,
+          {
+            ...((existing.settings as Record<string, unknown> | null) ?? {}),
+            ...(data.settings ?? {}),
+          },
+          data.isEnabled ?? existing.isEnabled
+        );
       }
 
       const config = await prisma.paymentConfig.update({

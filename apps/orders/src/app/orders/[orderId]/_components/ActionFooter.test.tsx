@@ -82,3 +82,32 @@ describe('orders PWA ActionFooter — status action (#1936)', () => {
     expect(onStatusChange).toHaveBeenCalledWith('delivered');
   });
 });
+
+// SP6a — InstaPay awaiting confirmation: the one-thumb "payment received" control.
+vi.mock('@/components/ConfirmInstapayButton', () => ({
+  ConfirmInstapayButton: ({ amountMinor }: { amountMinor: number }) => (
+    <button data-testid="confirm-instapay" data-amount={amountMinor}>
+      confirm
+    </button>
+  ),
+}));
+
+describe('orders PWA ActionFooter - InstaPay', () => {
+  const awaiting = () =>
+    ({
+      ...order('awaiting_payment_confirmation', 'unpaid'),
+      payments: [{ provider: 'instapay', status: 'pending', transactionId: 'instapay_k1' }],
+    }) as unknown as OrderDetail;
+
+  it('shows the confirm control with the exact amount, and never offers to ship', () => {
+    renderFooter(awaiting());
+    expect(screen.getByTestId('confirm-instapay').getAttribute('data-amount')).toBe('5000');
+    expect(screen.queryByText('processing')).toBeNull();
+    expect(screen.queryByText('shipped')).toBeNull();
+  });
+
+  it('shows no confirm control on an ordinary confirmed order', () => {
+    renderFooter(order('confirmed', 'paid'));
+    expect(screen.queryByTestId('confirm-instapay')).toBeNull();
+  });
+});

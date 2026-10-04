@@ -493,7 +493,35 @@ export class OrderService {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
 
-    return order;
+    // InstaPay (SP6a): what the merchant needs to match the transfer against their
+    // InstaPay app: the reference the customer entered and the hold deadline. A
+    // derived summary, never the raw payment metadata. Only present on an InstaPay
+    // order, so every other order keeps exactly the shape it always had.
+    const result: typeof order & {
+      instapay?: {
+        customerReference: string | null;
+        customerReferenceAt: string | null;
+        handle: string | null;
+        expiresAt: string | null;
+      };
+    } = order;
+    if (order.payments?.some(p => p.provider === 'instapay')) {
+      const ip = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay' },
+        orderBy: { createdAt: 'desc' },
+        select: { metadata: true },
+      });
+      const m = (ip?.metadata ?? {}) as Record<string, unknown>;
+      const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
+      result.instapay = {
+        customerReference: str(m.customerReference),
+        customerReferenceAt: str(m.customerReferenceAt),
+        handle: str(m.handle),
+        expiresAt: order.paymentConfirmationExpiresAt?.toISOString() ?? null,
+      };
+    }
+
+    return result;
   }
 
   static async getByOrderNumber(storeId: string, orderNumber: string) {
@@ -1916,6 +1944,17 @@ export class OrderService {
     // direct writers via `assertValidTransition` (see its doc comment for
     // the allowed-list rationale).
     assertValidTransition(order.status, status);
+    // An InstaPay order leaves `awaiting_payment_confirmation` for `confirmed`
+    // ONLY through the merchant's confirm (instapay-confirmation: it also records
+    // the payment, the audit trail and the post-payment fan-out). A bare status
+    // write would mark the order confirmed with no money recorded behind it.
+    if (order.status === 'awaiting_payment_confirmation' && status === 'confirmed') {
+      throw new AppError(
+        409,
+        'INSTAPAY_CONFIRM_REQUIRED',
+        'Confirm the InstaPay payment to confirm this order'
+      );
+    }
     // pending/cancelled → refunded exists for orders that captured a payment
     // (PR #770). A manual status change must not mark an order that never took
     // money as refunded.

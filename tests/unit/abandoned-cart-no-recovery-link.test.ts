@@ -105,7 +105,9 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
     });
     const sql = (h.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
     expect(sql).toMatch(/JOIN public\.orders o ON o\.id = ac\.recovered_order_id/);
-    expect(sql).toMatch(/o\.status NOT IN \('cancelled', 'refunded'\)/);
+    expect(sql).toMatch(
+      /o\.status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/
+    );
     expect(sql).toMatch(/o\.payment_status <> 'failed'/);
     expect(h.queryRaw.mock.calls[0].slice(1)).toEqual(['store-1', 'store-1']);
   });

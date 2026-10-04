@@ -47,6 +47,9 @@ export const COMPLETE_ERROR_CODES = new Set([
   'REFUND_EXCEEDS_REMAINING',
   'INVALID_REFUND_AMOUNT',
   'AMBIGUOUS_PAYMENT',
+  // InstaPay has no provider to refund through (SP6a): the merchant sends the money
+  // back from their own app and completes the return with a record-only refund.
+  'MANUAL_PROVIDER_REFUND',
 ]);
 
 /**

@@ -35,6 +35,13 @@ import { AppError } from '../middleware/error-handler';
  * tests/unit/order-status-transitions-parity.test.ts fails when they differ.
  */
 export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  // InstaPay manual transfer (SP6a, Review Focus 3). The order holds stock but
+  // is NOT shippable: the only ways out are `confirmed` (the merchant's one
+  // "payment received" action, which also records the payment — see
+  // instapay-confirmation.service.ts) and `cancelled` (merchant or expiry).
+  // processing/shipped/delivered are deliberately absent, so no generic writer
+  // can ship an unconfirmed order. `refunded` is absent too: nothing was captured.
+  awaiting_payment_confirmation: ['confirmed', 'cancelled'],
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   processing: ['shipped', 'delivered', 'cancelled', 'refunded'],

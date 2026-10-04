@@ -10,13 +10,15 @@
  */
 export interface PaymentCreateResult {
   success: boolean;
-  data?: { paymentUrl?: string; cod?: boolean };
+  data?: { paymentUrl?: string; cod?: boolean; instapay?: unknown };
   error?: { code?: string; message?: string };
 }
 
 export interface PaymentResultActions {
   clearSavedCheckout: () => void;
   goToCodSuccess: () => void;
+  /** InstaPay: the order is on hold; the success page shows the transfer details. */
+  goToInstapay: () => void;
   goToGateway: (paymentUrl: string) => void;
 }
 
@@ -33,6 +35,12 @@ export function handlePaymentCreateResult(
     // Cash on delivery — go straight to success.
     actions.clearSavedCheckout();
     actions.goToCodSuccess();
+    return;
+  }
+  if (result.success && result.data?.instapay) {
+    // InstaPay manual transfer — the success page shows who to pay, how much, and the reference.
+    actions.clearSavedCheckout();
+    actions.goToInstapay();
     return;
   }
   if (result.success && result.data?.paymentUrl) {

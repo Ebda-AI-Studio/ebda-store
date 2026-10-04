@@ -85,6 +85,8 @@ export const statusOptionsFor = orderStatusOptions;
 export const STATUS_FILTERS = [
   'all',
   'pending',
+  // InstaPay orders waiting for the merchant's "payment received" (SP6a).
+  'awaiting_payment_confirmation',
   'confirmed',
   'processing',
   'shipped',

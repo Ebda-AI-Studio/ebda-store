@@ -42,7 +42,10 @@ vi.mock('@force/database', () => ({
     }
     return out;
   },
+  // Reads before the payment wrap (the order, the existing payment) never fail.
+  withStore: async (_s: string, fn: () => unknown) => fn(),
 }));
+vi.mock('@api/lib/definer', () => ({ getOrderStoreId: async () => 'store-1' }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: any, _res: any, next: any) => next(),
   optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
@@ -54,9 +57,21 @@ vi.mock('@api/middleware/security', () => ({
   paymentLimiter: (_req: any, _res: any, next: any) => next(),
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
+vi.mock('@api/utils/store-helpers', () => ({
+  getAuthUser: (req: any) => req.user,
+  resolvePublicStoreId: async () => undefined,
+}));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
-  PaymentService: { createPayment: (...a: unknown[]) => h.createPayment(...a) },
+  // The route calls the provider in two halves; a COMMIT failure hits the second.
+  PaymentService: {
+    requestProviderPayment: async (...a: unknown[]) => ({
+      providerName: 'myfatoorah',
+      response: await h.createPayment(...a),
+    }),
+    recordProviderPayment: vi.fn().mockResolvedValue(undefined),
+    getDefaultProvider: async () => 'myfatoorah',
+    getAvailableProviders: async () => [],
+  },
 }));
 vi.mock('@api/services/payment-providers/orphaned-invoice-alert', () => ({
   alertOrphanedProviderInvoice: (...a: unknown[]) => h.orphanAlert(...a),

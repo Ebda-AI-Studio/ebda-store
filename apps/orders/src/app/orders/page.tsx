@@ -686,7 +686,12 @@ export default function OrdersListPage() {
                         </span>
                       </button>
                     )}
-                    <OrderCard order={order} storeId={selectedStoreId!} />
+                    <OrderCard
+                      order={order}
+                      storeId={selectedStoreId!}
+                      canManage={canManage}
+                      onChanged={() => void fetchOrders({ silent: true })}
+                    />
                   </div>
                 );
               })}

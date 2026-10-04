@@ -15,6 +15,8 @@ export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
   hesabe: '1010',
   upayments: '1010',
   cod: '1020',
+  // InstaPay: a bank transfer the merchant confirmed (SP6a), booked with the instant methods.
+  instapay: '1000',
 };
 
 /**

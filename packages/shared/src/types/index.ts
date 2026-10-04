@@ -343,6 +343,7 @@ export interface Order {
 
 export type OrderStatus =
   | 'pending'
+  | 'awaiting_payment_confirmation'
   | 'confirmed'
   | 'processing'
   | 'shipped'

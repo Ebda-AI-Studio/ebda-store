@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { PaymentEventsTimeline } from '../../../../../../components/payment-events/PaymentEventsTimeline';
 import { formatMoney } from './format';
@@ -14,11 +15,17 @@ interface PaymentCardProps {
 
 export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   const t = useT('orders.detail');
+  const tInstapay = useT('orders.detail.instapay');
+  const locale = useLocale();
   const isPaid = order.paymentStatus === 'paid';
   // What is still to be collected: the order value less any part paid from
   // the customer wallet at checkout (D1). === order.total without a wallet.
   const remain = isPaid ? 0 : Math.max(0, order.total - (order.walletAmount ?? 0));
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
+  const expiresAt = order.paymentConfirmationExpiresAt
+    ? new Date(order.paymentConfirmationExpiresAt)
+    : null;
+  const expired = expiresAt ? expiresAt.getTime() <= Date.now() : false;
 
   // Pick the most-recent successful payment for the details row, falling
   // back to the most recent attempt of any status. Shows the merchant
@@ -110,6 +117,57 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               latest payment attempt. Hidden when no payment record yet so
               orders that are still waiting on checkout don't show an
               empty section. */}
+          {order.status === 'awaiting_payment_confirmation' && (
+            <div
+              className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900"
+              data-testid="instapay-panel"
+            >
+              <p className="font-semibold">{tInstapay('title')}</p>
+              <p className="mt-1">
+                {tInstapay('waiting', { amount: formatMoney(remain, order.currency) })}
+              </p>
+              {expiresAt && (
+                <p
+                  className={`mt-1 text-xs ${expired ? 'font-semibold text-destructive-ink' : ''}`}
+                >
+                  {expired
+                    ? tInstapay('expired')
+                    : tInstapay('expires', {
+                        when: expiresAt.toLocaleString(locale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                          numberingSystem: 'latn',
+                        }),
+                      })}
+                </p>
+              )}
+              <dl className="mt-3 space-y-1.5">
+                {order.instapay?.handle && (
+                  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                    <dt className="text-violet-700">{tInstapay('payTo')}</dt>
+                    <dd className="font-medium" dir="ltr">
+                      {order.instapay.handle}
+                    </dd>
+                  </div>
+                )}
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <dt className="text-violet-700">{tInstapay('orderRef')}</dt>
+                  <dd className="font-mono text-xs" dir="ltr">
+                    {order.orderNumber}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <dt className="text-violet-700">{tInstapay('customerReference')}</dt>
+                  <dd className="font-medium" dir="ltr">
+                    {order.instapay?.customerReference ?? (
+                      <span className="text-xs font-normal">{tInstapay('noReference')}</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
+
           {providerLabel && (
             <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">

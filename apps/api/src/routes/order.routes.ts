@@ -35,6 +35,7 @@ import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
+import { InstapayService } from '../services/payment-providers/instapay.service';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
@@ -888,6 +889,50 @@ router.post(
         success: true,
         data: { message: 'Order marked as paid', orderNumber: order.orderNumber },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// InstaPay: the merchant confirms the transfer arrived (SP6a)
+// ==========================================
+
+/**
+ * POST /stores/:storeId/orders/:orderId/confirm-instapay
+ *
+ * The one manual step of the InstaPay flow: the merchant saw the money in their
+ * InstaPay account. Confirms the order ONCE (awaiting_payment_confirmation ->
+ * confirmed, payment recorded, post-payment fan-out). A repeat is an idempotent
+ * 200 with `changed:false`; confirming an order whose window expired (and was
+ * cancelled) is a 409. Same permission as marking a COD order paid.
+ */
+router.post(
+  '/:orderId/confirm-instapay',
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+      const outcome = await InstapayService.confirm({
+        storeId,
+        orderId,
+        actorUserId: user.userId,
+      });
+      await auditLog({
+        action: outcome.changed ? 'order.instapay_confirmed' : 'order.instapay_confirm_repeated',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: { status: outcome.status },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: outcome });
     } catch (error) {
       next(error);
     }

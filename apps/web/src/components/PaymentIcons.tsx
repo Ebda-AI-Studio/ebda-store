@@ -163,6 +163,7 @@ export function getPaymentIcon(providerId: string): React.ReactNode {
     cash_on_delivery: <CashOnDeliveryIcon />,
     bank_transfer: <BankTransferIcon />,
     bank: <BankTransferIcon />,
+    instapay: <BankTransferIcon />,
   };
 
   return iconMap[providerId.toLowerCase()] || <DefaultPaymentIcon />;

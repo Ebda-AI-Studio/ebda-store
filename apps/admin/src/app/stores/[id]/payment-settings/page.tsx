@@ -26,6 +26,38 @@ const PROVIDERS: ProviderDef[] = [
     color: '#64748B',
     kind: 'cod',
   },
+  {
+    id: 'instapay',
+    name: 'InstaPay',
+    nameAr: 'إنستاباي',
+    color: '#6B3FA0',
+    kind: 'instapay',
+  },
+  // Egypt gateways land in SP6b; shown so merchants can see what is coming.
+  {
+    id: 'paymob',
+    name: 'Paymob',
+    nameAr: 'باي موب',
+    color: '#0B5FFF',
+    kind: 'gateway',
+    comingSoon: true,
+  },
+  {
+    id: 'kashier',
+    name: 'Kashier',
+    nameAr: 'كاشير',
+    color: '#00A19A',
+    kind: 'gateway',
+    comingSoon: true,
+  },
+  {
+    id: 'fawry',
+    name: 'Fawry',
+    nameAr: 'فوري',
+    color: '#F2B705',
+    kind: 'gateway',
+    comingSoon: true,
+  },
 ];
 
 const emptyConfig = (provider: string): StorePaymentConfig => ({
@@ -35,10 +67,12 @@ const emptyConfig = (provider: string): StorePaymentConfig => ({
   secretKey: '',
   webhookSecret: '',
   merchantId: '',
-  testMode: provider === 'cod' ? false : true,
-  displayName: provider === 'cod' ? 'Cash on Delivery' : '',
-  displayNameAr: provider === 'cod' ? 'الدفع عند الاستلام' : '',
+  testMode: provider === 'cod' || provider === 'instapay' ? false : true,
+  displayName: provider === 'cod' ? 'Cash on Delivery' : provider === 'instapay' ? 'InstaPay' : '',
+  displayNameAr:
+    provider === 'cod' ? 'الدفع عند الاستلام' : provider === 'instapay' ? 'إنستاباي' : '',
   fixedFee: 0,
+  settings: {},
 });
 
 export default function StorePaymentSettingsPage() {
@@ -100,7 +134,7 @@ export default function StorePaymentSettingsPage() {
   function updateForm(
     provider: string,
     field: keyof StorePaymentConfig,
-    value: string | number | boolean | null
+    value: string | number | boolean | null | Record<string, unknown>
   ) {
     setForms(prev => ({
       ...prev,
@@ -136,6 +170,7 @@ export default function StorePaymentSettingsPage() {
     const isNew = !existingConfig?.id;
 
     const isCod = provider === 'cod';
+    const isInstapay = provider === 'instapay';
 
     try {
       const body: Record<string, unknown> = isCod
@@ -146,16 +181,30 @@ export default function StorePaymentSettingsPage() {
             displayNameAr: formData.displayNameAr || 'الدفع عند الاستلام',
             fixedFee: Math.max(0, Math.floor(Number(formData.fixedFee) || 0)),
             testMode: false,
+            settings: { percentBps: Number(formData.settings?.percentBps) || 0 },
           }
-        : {
-            provider: formData.provider,
-            isEnabled: formData.isEnabled,
-            testMode: formData.testMode,
-            ...(formData.apiKey ? { apiKey: formData.apiKey } : {}),
-            ...(formData.secretKey ? { secretKey: formData.secretKey } : {}),
-            ...(formData.webhookSecret ? { webhookSecret: formData.webhookSecret } : {}),
-            ...(formData.merchantId ? { merchantId: formData.merchantId } : {}),
-          };
+        : isInstapay
+          ? {
+              provider,
+              isEnabled: formData.isEnabled,
+              displayName: formData.displayName || 'InstaPay',
+              displayNameAr: formData.displayNameAr || 'إنستاباي',
+              testMode: false,
+              settings: Object.fromEntries(
+                Object.entries(formData.settings ?? {}).filter(
+                  ([, v]) => v !== '' && v !== null && v !== undefined
+                )
+              ),
+            }
+          : {
+              provider: formData.provider,
+              isEnabled: formData.isEnabled,
+              testMode: formData.testMode,
+              ...(formData.apiKey ? { apiKey: formData.apiKey } : {}),
+              ...(formData.secretKey ? { secretKey: formData.secretKey } : {}),
+              ...(formData.webhookSecret ? { webhookSecret: formData.webhookSecret } : {}),
+              ...(formData.merchantId ? { merchantId: formData.merchantId } : {}),
+            };
 
       const endpoint = isNew
         ? `/api/v1/payment-settings/store/${storeId}`

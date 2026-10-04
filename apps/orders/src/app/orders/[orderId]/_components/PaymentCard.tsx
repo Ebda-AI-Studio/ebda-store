@@ -86,6 +86,14 @@ export function PaymentCard({ order }: PaymentCardProps) {
 
           {providerLabel && (
             <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
+              {order.status === 'awaiting_payment_confirmation' && (
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <dt className="text-muted-foreground">{t.instapay.reference}</dt>
+                  <dd className="font-medium text-foreground" dir="ltr">
+                    {order.instapay?.customerReference ?? t.instapay.waiting}
+                  </dd>
+                </div>
+              )}
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <dt className="text-muted-foreground">{t.detail.paymentMethod}</dt>
                 <dd className="font-medium text-foreground">{providerLabel}</dd>

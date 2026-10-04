@@ -1,0 +1,636 @@
+/**
+ * InstaPay manual-confirmation lifecycle (SP6a, Review Focus 3).
+ *
+ *   pending --initiate--> awaiting_payment_confirmation --confirm--> confirmed (paid)
+ *                                    |
+ *                                    +--expiry cron / merchant cancel--> cancelled
+ *
+ * Where each rule is enforced:
+ *
+ *  - DOES NOT SHIP: `awaiting_payment_confirmation` allows only `confirmed` and
+ *    `cancelled` in the one state machine (`order-status-machine.ts`, mirrored in
+ *    @force/shared), and `assertOrderFulfillable` blocks carrier booking.
+ *  - DOES NOT COUNT AS REVENUE: the order stays `paymentStatus='unpaid'` with a
+ *    `pending` Payment until `confirm`; every revenue aggregate excludes the status
+ *    (`NON_REVENUE_ORDER_STATUSES`), and the GL only posts `paymentStatus='paid'`.
+ *  - EXPIRES: `expireDue` (Inngest cron, one tenant transaction per store) cancels
+ *    awaiting orders past `payment_confirmation_expires_at`, releasing stock through
+ *    the normal cancel path, and notifies the merchant (the customer gets the
+ *    cancelled notification from the status fan-out).
+ *  - CONFIRMED ONCE: confirm and expiry both take `SELECT ... FOR UPDATE` on the
+ *    order row, so a concurrent double confirm (or confirm racing expiry) is
+ *    serialised: the loser sees the new status. A repeat confirm is an idempotent
+ *    no-op (`changed:false`), and a confirm of an expired or cancelled order is
+ *    refused (409).
+ *
+ * No external call happens here: the only I/O is Postgres. Notifications and the
+ * `order/created` fan-out are deferred until after the tenant transaction commits.
+ */
+import {
+  currentTenantGucs,
+  hasTenantContext,
+  prisma,
+  withStore,
+  type Prisma,
+} from '@force/database';
+import {
+  AWAITING_PAYMENT_CONFIRMATION,
+  INSTAPAY_DEFAULT_EXPIRY_HOURS,
+  instapayReferenceSchema,
+  type InstapayInstructions,
+} from '@force/shared';
+import { AppError } from '../../middleware/error-handler';
+import logger from '../../lib/logger';
+import { inngest } from '../../lib/inngest/client';
+import { deferAfterTenantCommit } from '../../lib/after-tenant-commit';
+import { invalidateCustomersCache } from '../../lib/public-cache';
+import { OrderService } from '../order.service';
+import { OneSignalService } from '../onesignal.service';
+import { socketService } from '../socket.service';
+import { recordPaymentEvent } from '../payment-event.service';
+import { toProviderCredentials } from './credentials';
+import { instapayProvider, parseInstapaySettings } from './instapay.provider';
+
+const HOUR_MS = 3_600_000;
+
+export type ConfirmOutcome =
+  | { changed: true; orderId: string; status: 'confirmed' }
+  | { changed: false; orderId: string; status: string };
+
+interface LockedOrder {
+  id: string;
+  status: string;
+  payment_status: string;
+  payment_confirmation_expires_at: Date | null;
+}
+
+/** Take the row lock that serialises confirm / expiry / cancel for ONE order. */
+async function lockOrder(
+  tx: Prisma.TransactionClient,
+  storeId: string,
+  orderId: string
+): Promise<LockedOrder | null> {
+  const rows = await tx.$queryRaw<LockedOrder[]>`
+    SELECT id, status::text AS status, payment_status::text AS payment_status,
+           payment_confirmation_expires_at
+      FROM orders
+     WHERE id = ${orderId} AND store_id = ${storeId} AND deleted_at IS NULL
+       FOR UPDATE`;
+  return rows[0] ?? null;
+}
+
+/** Work that must only run once the transaction that decided it has COMMITTED. */
+export type PostCommit = (name: string, task: () => Promise<unknown>) => void;
+
+/**
+ * `withStore` plus a post-commit queue that is correct wherever the caller sits:
+ *  - inside a request's tenant transaction (the admin route under `tenantContext`):
+ *    tasks go to `deferAfterTenantCommit`, which drains them after the request COMMITs;
+ *  - anywhere else (the expiry cron, a script): `withStore` opens its own short
+ *    transaction, and the tasks run right after IT commits. Running them inside it
+ *    would touch a transaction that is already closing (P2028).
+ */
+async function withStoreAfterCommit<T>(
+  storeId: string,
+  fn: (after: PostCommit) => Promise<T>
+): Promise<T> {
+  const inRequestTx = hasTenantContext() && currentTenantGucs()?.storeId === storeId;
+  const tasks: Array<{ name: string; task: () => Promise<unknown> }> = [];
+  const after: PostCommit = (name, task) => {
+    if (inRequestTx) void deferAfterTenantCommit(name, task);
+    else tasks.push({ name, task: () => withStore(storeId, task) });
+  };
+  const result = await withStore(storeId, () => fn(after));
+  await runPostCommit(tasks);
+  return result;
+}
+
+/** Run collected post-commit tasks; a failing notification never fails the money path. */
+export async function runPostCommit(
+  tasks: Array<{ name: string; task: () => Promise<unknown> }>
+): Promise<void> {
+  for (const { name, task } of tasks) {
+    try {
+      await task();
+    } catch (err) {
+      logger.error({ err, task: name }, '[INSTAPAY] post-commit task failed');
+    }
+  }
+}
+
+function metaOf(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
+export class InstapayService {
+  /** The store's enabled InstaPay config, or null. (No global fallback: the handle is per merchant.) */
+  static async getConfig(storeId: string) {
+    return prisma.paymentConfig.findFirst({
+      where: { storeId, provider: 'instapay', isEnabled: true },
+    });
+  }
+
+  /**
+   * Put a freshly created (`pending`, unpaid) order on hold for an InstaPay
+   * transfer. Runs INSIDE the caller's tenant transaction (no network). Returns
+   * what the checkout shows. A replay while the order is already awaiting returns
+   * the SAME instructions and creates nothing.
+   */
+  static async initiate(args: {
+    storeId: string;
+    order: {
+      id: string;
+      orderNumber: string;
+      total: number;
+      walletAmount: number;
+      currency: string;
+      status: string;
+    };
+    customer: { name: string; email: string; phone?: string };
+    userId?: string | null;
+    now?: Date;
+    /** Collects work to run AFTER the caller's transaction commits (the merchant notification). */
+    postCommit?: PostCommit;
+  }): Promise<{ payment: { id: string }; instructions: InstapayInstructions; created: boolean }> {
+    const { storeId, order } = args;
+    const now = args.now ?? new Date();
+    const cfg = await this.getConfig(storeId);
+    if (!cfg) {
+      throw new AppError(400, 'INSTAPAY_NOT_AVAILABLE', 'InstaPay is not available for this store');
+    }
+    const settings = parseInstapaySettings(
+      toProviderCredentials({ ...cfg, fixedFee: cfg.fixedFee }).settings
+    );
+    const hours = settings.expiryHours ?? INSTAPAY_DEFAULT_EXPIRY_HOURS;
+
+    // Same lock as confirm/expiry, so initiate cannot interleave with them.
+    const locked = await lockOrder(
+      prisma as unknown as Prisma.TransactionClient,
+      storeId,
+      order.id
+    );
+    if (!locked) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+
+    const amountMinor = order.total - order.walletAmount;
+
+    if (locked.status === AWAITING_PAYMENT_CONFIRMATION) {
+      const existing = await prisma.payment.findFirst({
+        where: { orderId: order.id, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existing) {
+        return {
+          payment: { id: existing.id },
+          instructions: this.instructionsFor({
+            order,
+            amountMinor: existing.amount,
+            payment: existing,
+            expiresAt:
+              locked.payment_confirmation_expires_at ?? new Date(now.getTime() + hours * HOUR_MS),
+          }),
+          created: false,
+        };
+      }
+    }
+    if (locked.status !== 'pending' || locked.payment_status !== 'unpaid') {
+      throw new AppError(409, 'ORDER_NOT_PAYABLE', 'This order can no longer be paid by InstaPay');
+    }
+    if (amountMinor <= 0) {
+      throw new AppError(409, 'ORDER_ALREADY_PAID', 'Nothing is due on this order');
+    }
+
+    const expiresAt = new Date(now.getTime() + hours * HOUR_MS);
+    const result = await instapayProvider.createPayment(
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        amountMinor,
+        currency: 'EGP',
+        customer: args.customer,
+        returnUrls: { success: '', failure: '' },
+        idempotencyKey: `${order.id}:instapay`,
+        expiresAt,
+      },
+      toProviderCredentials(cfg)
+    );
+
+    const claimed = await prisma.order.updateMany({
+      where: { id: order.id, storeId, status: 'pending', paymentStatus: 'unpaid' },
+      data: { status: AWAITING_PAYMENT_CONFIRMATION, paymentConfirmationExpiresAt: expiresAt },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError(409, 'ORDER_NOT_PAYABLE', 'This order can no longer be paid by InstaPay');
+    }
+
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: 'instapay',
+        method: 'instapay',
+        status: 'pending',
+        amount: amountMinor,
+        currency: order.currency,
+        transactionId: result.providerRef,
+        metadata: {
+          reference: order.orderNumber,
+          handle: settings.handle ?? null,
+          phone: settings.phone ?? null,
+          accountName: settings.accountName ?? null,
+          noteEn: settings.noteEn ?? null,
+          noteAr: settings.noteAr ?? null,
+          expiresAt: expiresAt.toISOString(),
+          customerReference: null,
+        },
+      },
+    });
+    await prisma.orderEvent.create({
+      data: {
+        storeId,
+        orderId: order.id,
+        fromStatus: 'pending',
+        toStatus: AWAITING_PAYMENT_CONFIRMATION,
+        actorId: args.userId ?? null,
+        metadata: { via: 'instapay_initiate', expiresAt: expiresAt.toISOString() },
+      },
+    });
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      storeId,
+      orderId: order.id,
+      eventType: 'created',
+      toStatus: 'pending',
+      provider: 'instapay',
+      triggeredByUserId: args.userId ?? null,
+      details: { amount: amountMinor, expiresAt: expiresAt.toISOString() },
+    });
+
+    // The merchant has to act: tell them (after COMMIT, never inside the transaction).
+    // Its own short store scope: it runs after the caller's transaction is gone.
+    args.postCommit?.('instapay.awaiting.notify', () =>
+      withStore(storeId, () => InstapayService.notifyMerchantAwaiting(storeId, order.id))
+    );
+
+    return {
+      payment: { id: payment.id },
+      instructions: this.instructionsFor({ order, amountMinor, payment, expiresAt }),
+      created: true,
+    };
+  }
+
+  /** What the customer sees. Built from the stored payment, so a replay shows exactly what was first shown. */
+  static instructionsFor(args: {
+    order: { orderNumber: string; currency: string };
+    amountMinor: number;
+    payment: { metadata: unknown };
+    expiresAt: Date;
+  }): InstapayInstructions {
+    const m = metaOf(args.payment.metadata);
+    const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
+    return {
+      kind: 'manual-instructions',
+      method: 'instapay',
+      handle: str(m.handle),
+      phone: str(m.phone),
+      accountName: str(m.accountName),
+      amountMinor: args.amountMinor,
+      currency: args.order.currency,
+      reference: args.order.orderNumber,
+      expiresAt: args.expiresAt.toISOString(),
+      noteEn: str(m.noteEn),
+      noteAr: str(m.noteAr),
+      customerReference: str(m.customerReference) ?? null,
+    };
+  }
+
+  /** The customer's view of an InstaPay order (public by order id, like payments/create). */
+  static async getInstructions(storeId: string, orderId: string) {
+    return withStore(storeId, async () => {
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, storeId, deletedAt: null },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          currency: true,
+          paymentConfirmationExpiresAt: true,
+          payments: {
+            where: { provider: 'instapay' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+      const payment = order?.payments[0];
+      if (!order || !payment)
+        throw new AppError(404, 'NOT_FOUND', 'No InstaPay payment for this order');
+      return {
+        orderStatus: order.status,
+        paymentStatus: order.paymentStatus,
+        instructions: this.instructionsFor({
+          order,
+          amountMinor: payment.amount,
+          payment,
+          expiresAt: order.paymentConfirmationExpiresAt ?? new Date(0),
+        }),
+      };
+    });
+  }
+
+  /** The customer enters / uploads the transfer reference. Only while the order is still awaiting. */
+  static async submitReference(storeId: string, orderId: string, rawReference: string) {
+    const reference = instapayReferenceSchema.parse(rawReference);
+    return withStore(storeId, async tx => {
+      const locked = await lockOrder(tx as unknown as Prisma.TransactionClient, storeId, orderId);
+      if (!locked) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      if (locked.status !== AWAITING_PAYMENT_CONFIRMATION) {
+        throw new AppError(
+          409,
+          'INSTAPAY_NOT_AWAITING',
+          'This order is not waiting for a transfer'
+        );
+      }
+      const payment = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!payment) throw new AppError(404, 'NOT_FOUND', 'No InstaPay payment for this order');
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          metadata: {
+            ...metaOf(payment.metadata),
+            customerReference: reference,
+            customerReferenceAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        storeId,
+        orderId,
+        eventType: 'status_change',
+        fromStatus: 'pending',
+        toStatus: 'pending',
+        provider: 'instapay',
+        details: { reason: 'customer_reference_submitted', reference },
+      });
+      return { reference };
+    });
+  }
+
+  /**
+   * The merchant confirms the money arrived. ONE transition, whatever the
+   * concurrency: see the file header. Idempotent for an already confirmed order.
+   */
+  static async confirm(args: {
+    storeId: string;
+    orderId: string;
+    actorUserId: string | null;
+    now?: Date;
+  }): Promise<ConfirmOutcome> {
+    const { storeId, orderId } = args;
+    const now = args.now ?? new Date();
+    return withStoreAfterCommit(storeId, async after => {
+      const locked = await lockOrder(
+        prisma as unknown as Prisma.TransactionClient,
+        storeId,
+        orderId
+      );
+      if (!locked) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+
+      if (locked.status !== AWAITING_PAYMENT_CONFIRMATION) {
+        // Idempotent: it was confirmed already (by this merchant's second tap, a second
+        // staff member, or a retry) and has moved on or not. Nothing changes, nothing re-fires.
+        const confirmedBefore = await prisma.payment.findFirst({
+          where: { orderId, provider: 'instapay', status: 'completed' },
+          select: { id: true },
+        });
+        if (confirmedBefore && locked.status !== 'cancelled' && locked.status !== 'refunded') {
+          return { changed: false, orderId, status: locked.status };
+        }
+        if (locked.status === 'cancelled') {
+          throw new AppError(
+            409,
+            'INSTAPAY_ORDER_CANCELLED',
+            'This order was cancelled (the confirmation window may have expired)'
+          );
+        }
+        throw new AppError(
+          409,
+          'INSTAPAY_NOT_AWAITING',
+          'This order is not waiting for an InstaPay confirmation'
+        );
+      }
+
+      const expiresAt = locked.payment_confirmation_expires_at;
+      if (expiresAt && expiresAt.getTime() <= now.getTime()) {
+        throw new AppError(
+          409,
+          'INSTAPAY_CONFIRMATION_EXPIRED',
+          'The confirmation window for this order has expired'
+        );
+      }
+
+      const payment = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!payment) throw new AppError(409, 'INSTAPAY_NOT_AWAITING', 'No pending InstaPay payment');
+
+      const claimed = await prisma.order.updateMany({
+        where: { id: orderId, storeId, status: AWAITING_PAYMENT_CONFIRMATION },
+        data: { status: 'confirmed', paymentStatus: 'paid' },
+      });
+      if (claimed.count !== 1) {
+        // Cannot happen under the row lock; refuse rather than half-apply.
+        throw new AppError(409, 'INSTAPAY_NOT_AWAITING', 'The order changed while confirming');
+      }
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'completed',
+          paidAt: now,
+          metadata: {
+            ...metaOf(payment.metadata),
+            confirmedVia: 'merchant_instapay_confirm',
+            confirmedBy: args.actorUserId,
+            confirmedAt: now.toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await prisma.orderEvent.create({
+        data: {
+          storeId,
+          orderId,
+          fromStatus: AWAITING_PAYMENT_CONFIRMATION,
+          toStatus: 'confirmed',
+          actorId: args.actorUserId,
+          metadata: { via: 'instapay_confirm', amountMinor: payment.amount },
+        },
+      });
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        storeId,
+        orderId,
+        eventType: 'admin_action',
+        fromStatus: 'pending',
+        toStatus: 'completed',
+        provider: 'instapay',
+        triggeredByUserId: args.actorUserId,
+        details: { reason: 'merchant_confirmed_instapay_transfer', amountMinor: payment.amount },
+      });
+
+      // After COMMIT, exactly once (we are inside the one winning transition): the same
+      // post-payment fan-out a gateway webhook triggers (customer confirmation, admin push,
+      // accounting journal, loyalty) and the customers-cache bust.
+      after('instapay.confirmed.fanout', async () => {
+        await invalidateCustomersCache(storeId);
+        await inngest
+          .send({
+            name: 'order/created',
+            data: { orderId, storeId, paymentMethod: 'instapay' },
+          })
+          .catch((err: unknown) =>
+            logger.error({ err, orderId }, '[INSTAPAY] failed to enqueue order/created')
+          );
+        const order = await prisma.order.findFirst({
+          where: { id: orderId },
+          select: { orderNumber: true, total: true },
+        });
+        if (order) {
+          try {
+            socketService.newOrderNotification(storeId, {
+              orderId,
+              orderNumber: order.orderNumber,
+              total: order.total,
+              customerName: 'InstaPay',
+            });
+          } catch (err) {
+            logger.warn({ err, orderId }, '[INSTAPAY] socket emit failed');
+          }
+        }
+      });
+      return { changed: true, orderId, status: 'confirmed' };
+    });
+  }
+
+  /**
+   * Cancel ONE awaiting order whose hold has run out. Inventory is released by the
+   * normal cancel path (`OrderService.updateStatus`), which also enqueues the
+   * customer's cancellation notification. Safe to call repeatedly and concurrently
+   * with `confirm` (row lock): an order confirmed first is skipped.
+   */
+  static async expireOne(
+    storeId: string,
+    orderId: string,
+    now: Date = new Date()
+  ): Promise<'expired' | 'skipped'> {
+    return withStoreAfterCommit(storeId, async after => {
+      const locked = await lockOrder(
+        prisma as unknown as Prisma.TransactionClient,
+        storeId,
+        orderId
+      );
+      if (
+        !locked ||
+        locked.status !== AWAITING_PAYMENT_CONFIRMATION ||
+        !locked.payment_confirmation_expires_at ||
+        locked.payment_confirmation_expires_at.getTime() > now.getTime()
+      ) {
+        return 'skipped';
+      }
+      const before = await prisma.order.findFirst({
+        where: { id: orderId, storeId },
+        select: { notes: true },
+      });
+      await OrderService.updateStatus(storeId, orderId, 'cancelled');
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          notes:
+            (before?.notes ? before.notes + '\n' : '') +
+            '[auto-cancelled: InstaPay confirmation window expired]',
+        },
+      });
+      const payment = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (payment) {
+        await prisma.payment.update({ where: { id: payment.id }, data: { status: 'expired' } });
+        await recordPaymentEvent({
+          paymentId: payment.id,
+          storeId,
+          orderId,
+          eventType: 'status_change',
+          fromStatus: 'pending',
+          toStatus: 'expired',
+          provider: 'instapay',
+          details: { reason: 'instapay_confirmation_window_expired' },
+        });
+      }
+      after('instapay.expired.notify', () =>
+        InstapayService.notifyMerchantExpired(storeId, orderId)
+      );
+      return 'expired';
+    });
+  }
+
+  /** The expiry sweep for ONE store (called per store by the cron, `acrossStores`). */
+  static async expireDue(storeId: string, now: Date = new Date(), limit = 200) {
+    const due = await withStore(storeId, () =>
+      prisma.order.findMany({
+        where: {
+          status: AWAITING_PAYMENT_CONFIRMATION,
+          deletedAt: null,
+          paymentConfirmationExpiresAt: { lte: now },
+        },
+        select: { id: true },
+        orderBy: { paymentConfirmationExpiresAt: 'asc' },
+        take: limit,
+      })
+    );
+    let expired = 0;
+    let failed = 0;
+    for (const { id } of due) {
+      try {
+        if ((await this.expireOne(storeId, id, now)) === 'expired') expired += 1;
+      } catch (err) {
+        failed += 1;
+        logger.error({ err, storeId, orderId: id }, '[INSTAPAY] expiry failed for order');
+      }
+    }
+    return { storeId, scanned: due.length, expired, failed };
+  }
+
+  static async notifyMerchantAwaiting(storeId: string, orderId: string): Promise<void> {
+    await this.notifyMerchant(storeId, orderId, 'awaiting');
+  }
+
+  static async notifyMerchantExpired(storeId: string, orderId: string): Promise<void> {
+    await this.notifyMerchant(storeId, orderId, 'expired');
+  }
+
+  private static async notifyMerchant(
+    storeId: string,
+    orderId: string,
+    kind: 'awaiting' | 'expired'
+  ): Promise<void> {
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, storeId },
+      select: { orderNumber: true, total: true, currency: true },
+    });
+    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { name: true } });
+    if (!order) return;
+    await OneSignalService.notifyAdminsOfInstapay({
+      orderId,
+      orderNumber: order.orderNumber,
+      storeId,
+      storeName: store?.name ?? storeId,
+      total: order.total,
+      currency: order.currency,
+      kind,
+    });
+  }
+}

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { prisma, Prisma, runInTenantContext } from '@force/database';
+import { prisma, Prisma, runInTenantContext, withStore } from '@force/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
@@ -27,6 +27,8 @@ import {
   AvailablePaymentMethod,
   Currency,
 } from './types';
+import { callThroughBreaker } from './provider-health';
+import { withProviderDeadline } from './provider-call';
 import { TapPaymentProvider } from './tap.provider';
 import { MyFatoorahPaymentProvider } from './myfatoorah.provider';
 import { HesabePaymentProvider } from './hesabe.provider';
@@ -137,24 +139,37 @@ class PaymentFactory {
     let defaultProvider: PaymentProvider | null = null;
 
     try {
-      // First try to get store-specific config, then fall back to global
-      let dbConfigs = await prisma.paymentConfig.findMany({
-        where: {
-          storeId: storeId,
-          isEnabled: true,
-        },
-        orderBy: { provider: 'asc' },
-      });
-
-      // If no store-specific config, try global config
-      if (dbConfigs.length === 0 && storeId !== null) {
-        dbConfigs = await prisma.paymentConfig.findMany({
+      // First try to get store-specific config, then fall back to global.
+      //
+      // Under strict RLS a read with no store scope sees NO tenant rows, so a
+      // store's configs are read inside that store's scope (`withStore`: it reuses
+      // the request's transaction when one is open for the same store, otherwise
+      // it opens a short one). Without this the first caller outside a transaction
+      // (the storefront's GET /payments/config) cached "no providers" for five
+      // minutes and every online checkout failed (SP6a).
+      const read = <T>(fn: () => Promise<T>): Promise<T> =>
+        storeId !== null ? withStore(storeId, fn) : fn();
+      let dbConfigs = await read(() =>
+        prisma.paymentConfig.findMany({
           where: {
-            storeId: null,
+            storeId: storeId,
             isEnabled: true,
           },
           orderBy: { provider: 'asc' },
-        });
+        })
+      );
+
+      // If no store-specific config, try global config
+      if (dbConfigs.length === 0 && storeId !== null) {
+        dbConfigs = await read(() =>
+          prisma.paymentConfig.findMany({
+            where: {
+              storeId: null,
+              isEnabled: true,
+            },
+            orderBy: { provider: 'asc' },
+          })
+        );
       }
 
       // Fall back to environment variables ONLY for platform-level lookups
@@ -730,35 +745,70 @@ export class PaymentService {
   }
 
   /**
-   * Create a payment
+   * Create a payment: the provider call, then the record. Kept for callers that
+   * own a transaction boundary themselves (payment links, the agent's place_order).
+   * The checkout calls the two halves separately so NO transaction is open during
+   * the provider call (see `requestProviderPayment`).
    */
   static async createPayment(
     request: CreatePaymentRequest,
     provider?: PaymentProvider,
     storeId?: string
   ): Promise<PaymentResponse> {
-    const p = await factory.getProvider(provider, storeId);
-    const response = await p.createPayment(request);
+    const { providerName, response } = await PaymentService.requestProviderPayment(
+      request,
+      provider,
+      storeId
+    );
+    await PaymentService.recordProviderPayment(providerName, request, response, storeId);
+    return response;
+  }
 
-    // The gateway ACCEPTED: from here the invoice is live at the provider
-    // whatever happens to the writes below. If recording it throws (statement
-    // timeout, connection blip, the tenant transaction's own timeout expiring
-    // during the gateway call, a constraint error), this method rejects — so
-    // no caller ever learns an invoice was minted, and without this catch the
-    // orphan was silent (issue 2370). Raised here, for EVERY caller; the
-    // callers' own catch covers only the later COMMIT failure, and cannot
-    // double-alert this case because they arm it only after we resolve.
-    // The helper logs synchronously and dispatches the Telegram page without
-    // awaiting it, so this aborted transaction's connection is not held for
-    // the POST (issue 2379).
+  /**
+   * HALF 1: ask the provider to open a payment. Writes NOTHING (the provider's
+   * config is read in its own short store scope) and must be called with no
+   * request transaction open. Bounded by a deadline and run behind the
+   * per-(store, provider) circuit breaker, so a slow or dead gateway fails one
+   * method fast instead of holding a connection or stalling checkout.
+   */
+  static async requestProviderPayment(
+    request: CreatePaymentRequest,
+    provider?: PaymentProvider,
+    storeId?: string
+  ): Promise<{ providerName: PaymentProvider; response: PaymentResponse }> {
+    const p = await factory.getProvider(provider, storeId);
+    const call = () =>
+      withProviderDeadline(`${p.name}.createPayment`, () => p.createPayment(request));
+    const response = storeId ? await callThroughBreaker(storeId, p.name, call) : await call();
+    return { providerName: p.name, response };
+  }
+
+  /**
+   * HALF 2: record the accepted invoice (the Payment row + its `created` audit
+   * event). The gateway ACCEPTED: from here the invoice is live at the provider
+   * whatever happens to the writes below. If recording it throws (statement
+   * timeout, connection blip, a constraint error), this method rejects — so no
+   * caller ever learns an invoice was minted, and without this catch the orphan
+   * was silent (issue 2370). Raised here, for EVERY caller; the callers' own catch
+   * covers only the later COMMIT failure, and cannot double-alert this case
+   * because they arm it only after we resolve. The helper logs synchronously and
+   * dispatches the Telegram page without awaiting it, so this aborted
+   * transaction's connection is not held for the POST (issue 2379).
+   */
+  static async recordProviderPayment(
+    providerName: string,
+    request: CreatePaymentRequest,
+    response: PaymentResponse,
+    storeId?: string
+  ): Promise<void> {
     try {
-      await PaymentService.recordCreatedPayment(p.name, request, response);
+      await PaymentService.recordCreatedPayment(providerName, request, response);
     } catch (err) {
       await alertOrphanedProviderInvoice({
         storeId: storeId ?? 'unknown',
         orderId: request.orderId,
         orderNumber: request.orderNumber,
-        provider: p.name,
+        provider: providerName,
         transactionId: response.transactionId,
         amount: request.amount,
         currency: request.currency,
@@ -766,8 +816,6 @@ export class PaymentService {
       });
       throw err;
     }
-
-    return response;
   }
 
   /** The Payment row + its `created` audit event for an accepted invoice. */
@@ -933,6 +981,16 @@ export class PaymentService {
 
     if (!payment) {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+    }
+
+    // InstaPay has no provider to refund through: the merchant sends the money back
+    // from their own InstaPay app and records it with a manual refund.
+    if (payment.provider === 'instapay') {
+      throw new AppError(
+        409,
+        'MANUAL_PROVIDER_REFUND',
+        'InstaPay payments are refunded by the merchant outside the system. Use a manual refund.'
+      );
     }
 
     // `amount: 0` is a CALLER BUG, never "refund the whole payment".

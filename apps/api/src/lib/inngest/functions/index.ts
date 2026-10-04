@@ -44,6 +44,7 @@ import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
 import { orderCapiConversion } from './order-capi-conversion';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
+import { instapayExpiry } from './instapay-expiry';
 import { storeUsageSnapshot } from './store-usage-snapshot';
 import { billingRenewalDaily } from './billing-renewal';
 import { domainClaimSweep } from './domain-claim-sweep';
@@ -139,6 +140,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   orderCapiConversion,
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
+  instapayExpiry,
   storeUsageSnapshot,
   billingRenewalDaily,
   domainClaimSweep,

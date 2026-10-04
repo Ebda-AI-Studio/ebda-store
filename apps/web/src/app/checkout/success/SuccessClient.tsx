@@ -8,6 +8,7 @@ import { Button } from '@force/ui';
 import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { WaMeCodConfirmButton } from '../../../templates/shared/WaMeButtons';
+import { InstapayCard } from './InstapayCard';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
@@ -23,13 +24,15 @@ import { groupOrderLinesForDisplay, fromMinor, REGION } from '@force/shared';
 //   pending   → provider hasn't reported a final status yet (KNET delay)
 //   failed    → provider reported failed/expired/cancelled
 //   cod       → cash on delivery (no gateway to verify)
+//   awaiting  → InstaPay: the customer transfers, the merchant confirms (no gateway)
 //   unknown   → verify couldn't run (no orderId / network) — neutral copy
-type PaymentState = 'verifying' | 'paid' | 'pending' | 'failed' | 'cod' | 'unknown';
+type PaymentState = 'verifying' | 'paid' | 'pending' | 'failed' | 'cod' | 'awaiting' | 'unknown';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId');
   const isCod = searchParams?.get('cod') === '1';
+  const isInstapay = searchParams?.get('instapay') === '1';
   // MyFatoorah appends its PaymentId to the success URL on return; the
   // casing varies (`paymentId` vs `Id`). Forward it to the API for the
   // audit trail — authorization rides on the order UUID, not this value.
@@ -43,7 +46,9 @@ function SuccessContent() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);
-  const [paymentState, setPaymentState] = useState<PaymentState>(isCod ? 'cod' : 'verifying');
+  const [paymentState, setPaymentState] = useState<PaymentState>(
+    isCod ? 'cod' : isInstapay ? 'awaiting' : 'verifying'
+  );
 
   useEffect(() => {
     // Clear cart on successful checkout
@@ -65,7 +70,7 @@ function SuccessContent() {
       // "confirmed". This is the reliable confirmation path — it also
       // triggers the same server-side fanout (email/push/accounting) the
       // missed webhook would have. Idempotent + safe to call on reload.
-      if (!isCod) {
+      if (!isCod && !isInstapay) {
         try {
           const verify = await api.verifyOrderPayment(orderId!, returnPaymentId);
           if (!cancelled && verify.success && verify.data) {
@@ -92,6 +97,7 @@ function SuccessContent() {
           // (committed) or online orders the provider reported paid. Don't
           // attribute revenue for a pending/failed gateway return.
           const confirmed = isCod || fetchedOrder.paymentStatus === 'paid';
+          // (An InstaPay order is not a sale until the merchant confirms the transfer: paymentStatus stays unpaid.)
           // Once per ORDER, not per mount: a refresh or a re-opened success
           // link must not report the sale again (#1346). The order is marked
           // only when a pixel library actually received it — before marketing
@@ -125,32 +131,39 @@ function SuccessContent() {
 
   // Truthful headline + sub-copy per verified state.
   const heading =
-    paymentState === 'failed'
-      ? t('Payment not completed', 'لم يكتمل الدفع')
-      : paymentState === 'pending'
-        ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
-        : t('Thank you for your order!', 'شكراً لطلبك!');
+    paymentState === 'awaiting'
+      ? t('Waiting for your transfer', 'بانتظار التحويل')
+      : paymentState === 'failed'
+        ? t('Payment not completed', 'لم يكتمل الدفع')
+        : paymentState === 'pending'
+          ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
+          : t('Thank you for your order!', 'شكراً لطلبك!');
 
   const subCopy =
-    paymentState === 'failed'
+    paymentState === 'awaiting'
       ? t(
-          'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
-          'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
+          'Your order is held for you. Transfer the amount below and the store will confirm it.',
+          'طلبك محجوز لك. حوّل المبلغ الموضّح أدناه وسيؤكده المتجر.'
         )
-      : paymentState === 'pending'
+      : paymentState === 'failed'
         ? t(
-            'Your payment is being confirmed. This page will update, or check your order status shortly.',
-            'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
+            'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
+            'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
           )
-        : isCod
+        : paymentState === 'pending'
           ? t(
-              'Your order has been placed. Please have the payment ready when your order is delivered.',
-              'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+              'Your payment is being confirmed. This page will update, or check your order status shortly.',
+              'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
             )
-          : t(
-              'Your payment is confirmed and your order will be shipped soon.',
-              'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
-            );
+          : isCod
+            ? t(
+                'Your order has been placed. Please have the payment ready when your order is delivered.',
+                'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+              )
+            : t(
+                'Your payment is confirmed and your order will be shipped soon.',
+                'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
+              );
 
   return (
     <MinimalChrome>
@@ -158,7 +171,9 @@ function SuccessContent() {
         <div className="text-center">
           {/* Status icon \u2014 reflects the VERIFIED payment state, not an
               unconditional checkmark. */}
-          {paymentState === 'verifying' || paymentState === 'pending' ? (
+          {paymentState === 'verifying' ||
+          paymentState === 'pending' ||
+          paymentState === 'awaiting' ? (
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15">
               <div className="h-9 w-9 animate-spin rounded-full border-4 border-warning border-t-transparent" />
             </div>
@@ -208,6 +223,15 @@ function SuccessContent() {
                 )}
               </p>
             </div>
+          )}
+
+          {isInstapay && orderId && (
+            <InstapayCard
+              orderId={orderId}
+              onStatus={s =>
+                setPaymentState(s === 'awaiting' ? 'awaiting' : s === 'paid' ? 'paid' : 'failed')
+              }
+            />
           )}
 
           {isCod && order && (

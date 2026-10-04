@@ -11,7 +11,16 @@
 import crypto from 'node:crypto';
 
 const LOAD_TEST_TOKEN = 'bfp-parity-load-test-token';
-export const HARNESS_ENV = { LOAD_TEST_BYPASS_TOKEN: LOAD_TEST_TOKEN };
+// The card-testing guard (SP5) budgets online payment attempts per client IP and per store
+// in fixed 10-minute windows (10 / 10 min by default); the harness makes a dozen online
+// attempts from one IP per side, so without a higher budget the tail of a run is a 429 or
+// not depending on where the 10-minute boundary falls. The budgets are a defence, not the
+// thing under test here, so the process under test is given room.
+export const HARNESS_ENV = {
+  LOAD_TEST_BYPASS_TOKEN: LOAD_TEST_TOKEN,
+  PAYMENT_ATTEMPTS_PER_IP_10M: '10000',
+  PAYMENT_ATTEMPTS_PER_STORE_10M: '10000',
+};
 export const LOAD_TEST_HEADER = { 'x-load-test-token': LOAD_TEST_TOKEN };
 
 class BaseClient {

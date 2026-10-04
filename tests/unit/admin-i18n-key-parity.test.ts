@@ -41,6 +41,9 @@ const arFlat = flatten(ar as Messages);
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   // Self-serve onboarding: LTR example values (email address, Egyptian mobile
   // in local format, a price in EGP) shown inside dir="ltr" inputs.
+  // InstaPay settings (SP6a): an example address and a local-format mobile, LTR in both locales.
+  'paymentSettings.instapay.handlePlaceholder',
+  'paymentSettings.instapay.phonePlaceholder',
   'onboarding.signup.emailPlaceholder',
   'onboarding.signup.phonePlaceholder',
   'onboarding.flow.product.pricePlaceholder',

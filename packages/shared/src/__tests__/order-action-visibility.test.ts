@@ -131,3 +131,47 @@ describe('refundViaProviderRemaining (#2069)', () => {
     expect(refundViaProviderRemaining({ status: 'x', paymentStatus: 'paid' })).toBeNull();
   });
 });
+
+// SP6a — InstaPay is a manual provider: no payment link, no provider refresh, no
+// manual mark-paid while it awaits the merchant's confirmation, and no refund
+// "via provider" afterwards (the merchant refunds outside the system).
+describe('orderActionVisibility - InstaPay', () => {
+  const instapay = (status: string) => ({
+    provider: 'instapay',
+    status,
+    transactionId: 'instapay_k1',
+  });
+
+  it('awaiting: only the dedicated confirm is offered', () => {
+    const v = orderActionVisibility({
+      status: 'awaiting_payment_confirmation',
+      paymentStatus: 'unpaid',
+      payments: [instapay('pending')],
+    });
+    expect(v.showConfirmInstapay).toBe(true);
+    expect(v.showMarkPaid).toBe(false); // no payment link / provider refresh
+    expect(v.showManualMarkPaid).toBe(false);
+    expect(v.hasProviderPayment).toBe(false);
+    expect(v.showRefundViaProvider).toBe(false);
+  });
+
+  it('once confirmed: no confirm button, and refund is NOT via a provider', () => {
+    const v = orderActionVisibility({
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      payments: [instapay('completed')],
+    });
+    expect(v.showConfirmInstapay).toBe(false);
+    expect(v.showRefundViaProvider).toBe(false);
+    expect(v.showManualMarkPaid).toBe(false);
+  });
+
+  it('a cancelled/expired hold offers nothing', () => {
+    const v = orderActionVisibility({
+      status: 'cancelled',
+      paymentStatus: 'unpaid',
+      payments: [instapay('expired')],
+    });
+    expect(v.showConfirmInstapay).toBe(false);
+  });
+});

@@ -3,6 +3,7 @@ import { getCached, customersCacheKey } from '../lib/public-cache';
 import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
 import { AppError } from '../middleware/error-handler';
+import { NON_REVENUE_ORDER_STATUSES } from '@force/shared';
 
 /**
  * Customer aggregation — the Customers page's definition of "a customer"
@@ -92,7 +93,7 @@ export function formatShippingAddress(addr: ShippingAddressShape | null): string
  * `getPeriodStats`: `status notIn ['cancelled','refunded']`), so the
  * Customers page and Analytics never disagree about what "spent" means.
  */
-const KPI_EXCLUDED_STATUSES = new Set(['cancelled', 'refunded']);
+const KPI_EXCLUDED_STATUSES = new Set<string>(NON_REVENUE_ORDER_STATUSES);
 
 /**
  * An order counts toward spend unless it is cancelled/refunded OR its payment

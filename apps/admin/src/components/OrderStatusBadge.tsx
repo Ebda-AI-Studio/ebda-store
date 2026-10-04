@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 
 type OrderStatus =
   | 'pending'
+  | 'awaiting_payment_confirmation'
   | 'confirmed'
   | 'processing'
   | 'shipped'
@@ -26,6 +27,12 @@ export type StatusStyle = { bg: string; text: string; dot: string } | { classNam
 
 const DEFAULT_STATUS_STYLES: Record<string, StatusStyle> = {
   pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  // InstaPay: the money has not been confirmed to have arrived (SP6a).
+  awaiting_payment_confirmation: {
+    bg: 'bg-violet-50',
+    text: 'text-violet-700',
+    dot: 'bg-violet-500',
+  },
   confirmed: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
   processing: { bg: 'bg-info/5', text: 'text-info-ink', dot: 'bg-info' },
   shipped: { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500' },
