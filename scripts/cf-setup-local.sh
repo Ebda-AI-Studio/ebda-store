@@ -4,7 +4,7 @@
 #
 # apps/<app>/open-next.config.ts and wrangler.jsonc ARE committed (.gitignore
 # records why), but THIS script overwrites both on every deploy
-# (.github/workflows/cf-deploy.yml) and in ci.yml's cf-build-check — the
+# (.github/workflows/cf-deploy.yml) and in ci.yml's worker-dry-run — the
 # committed copies are a local-dev fallback, and editing them changes nothing
 # that ships. Edit this script instead. The generated result is asserted by
 # scripts/assert-cf-cache-bindings.sh in both places.
